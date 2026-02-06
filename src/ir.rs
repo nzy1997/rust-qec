@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum StimTarget {
     Qubit(u32),
+    QubitInv(u32),
     Rec(i32),
 }
 
