@@ -1,8 +1,8 @@
 use rand::Rng;
-use yao_rs::{Gate, Circuit, State, apply, measure::measure_and_collapse, put, control};
 
 use crate::ir::{StimInstr, StimTarget};
 use crate::recorder::Recorder;
+use crate::sim::tableau::StabilizerState;
 
 pub struct Executor {
     instrs: Vec<StimInstr>,
@@ -21,62 +21,117 @@ impl Executor {
 
     pub fn run(&mut self, rng: &mut impl Rng) -> Result<ExecOutput, String> {
         let n = max_qubit(&self.instrs)?;
-        let mut state = State::zero_state(&vec![2; n]);
+        let mut state = StabilizerState::new(n);
         let mut recorder = Recorder::default();
         let mut detectors = Vec::new();
         let mut observables = Vec::new();
 
         for instr in &self.instrs {
-            match instr.name.as_str() {
-                "H" | "X" | "Y" | "Z" | "S" => {
-                    let gate = match instr.name.as_str() {
-                        "H" => Gate::H,
-                        "X" => Gate::X,
-                        "Y" => Gate::Y,
-                        "Z" => Gate::Z,
-                        _ => Gate::S,
-                    };
-                    for t in &instr.targets {
-                        let q = expect_qubit(t)?;
-                        let c = Circuit::new(vec![2; n], vec![put(vec![q], gate.clone())])
-                            .map_err(|e| format!("circuit: {e:?}"))?;
-                        state = apply(&c, &state);
+            match instr {
+                StimInstr::Op { name, args, targets, .. } => {
+                    match name.as_str() {
+                        "H" => for_each_qubit(targets, |q| state.h(q))?,
+                        "S" => for_each_qubit(targets, |q| state.s(q))?,
+                        "X" => for_each_qubit(targets, |q| state.x_gate(q))?,
+                        "Y" => for_each_qubit(targets, |q| state.y_gate(q))?,
+                        "Z" => for_each_qubit(targets, |q| state.z_gate(q))?,
+                        "CX" | "CNOT" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (c, t) in pairs {
+                                state.cx(c, t);
+                            }
+                        }
+                        "CZ" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (c, t) in pairs {
+                                state.cz(c, t);
+                            }
+                        }
+                        "M" => {
+                            for q in qubits(targets)? {
+                                let (bit, _) = state.measure_z(q, rng);
+                                recorder.push(bit == 1);
+                            }
+                        }
+                        "MX" => {
+                            for q in qubits(targets)? {
+                                state.h(q);
+                                let (bit, _) = state.measure_z(q, rng);
+                                state.h(q);
+                                recorder.push(bit == 1);
+                            }
+                        }
+                        "MY" => {
+                            for q in qubits(targets)? {
+                                state.s_dag(q);
+                                state.h(q);
+                                let (bit, _) = state.measure_z(q, rng);
+                                state.h(q);
+                                state.s(q);
+                                recorder.push(bit == 1);
+                            }
+                        }
+                        "X_ERROR" => {
+                            let p = args.get(0).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if rng.r#gen::<f64>() < p {
+                                    state.x_gate(q);
+                                }
+                            }
+                        }
+                        "Z_ERROR" => {
+                            let p = args.get(0).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if rng.r#gen::<f64>() < p {
+                                    state.z_gate(q);
+                                }
+                            }
+                        }
+                        "DEPOLARIZE1" => {
+                            let p = args.get(0).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if rng.r#gen::<f64>() < p {
+                                    match rng.gen_range(0..3) {
+                                        0 => state.x_gate(q),
+                                        1 => state.y_gate(q),
+                                        _ => state.z_gate(q),
+                                    }
+                                }
+                            }
+                        }
+                        "DEPOLARIZE2" => {
+                            let p = args.get(0).copied().unwrap_or(0.0);
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs {
+                                if rng.r#gen::<f64>() < p {
+                                    let r = rng.gen_range(0..15);
+                                    let (pa, pb) = two_qubit_pauli(r);
+                                    apply_pauli(&mut state, a, pa);
+                                    apply_pauli(&mut state, b, pb);
+                                }
+                            }
+                        }
+                        "DETECTOR" => {
+                            let bit = xor_recs(&recorder, targets)?;
+                            detectors.push(bit);
+                        }
+                        "OBSERVABLE_INCLUDE" => {
+                            let index = args.get(0).copied().unwrap_or(0.0) as u32;
+                            let bit = xor_recs(&recorder, targets)?;
+                            observables.push((index, bit));
+                        }
+                        _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
-                "CX" | "CNOT" => {
-                    let pairs = qubit_pairs(&instr.targets)?;
-                    for (c, t) in pairs {
-                        let ckt = Circuit::new(vec![2; n], vec![control(vec![c], vec![t], Gate::X)])
-                            .map_err(|e| format!("circuit: {e:?}"))?;
-                        state = apply(&ckt, &state);
+                StimInstr::Repeat { count, body } => {
+                    for _ in 0..*count {
+                        let mut inner = Executor::from_instrs(body.clone())?;
+                        let out = inner.run(rng)?;
+                        recorder.extend(out.measurements);
+                        detectors.extend(out.detectors);
+                        observables.extend(out.observables);
                     }
                 }
-                "CZ" => {
-                    let pairs = qubit_pairs(&instr.targets)?;
-                    for (c, t) in pairs {
-                        let ckt = Circuit::new(vec![2; n], vec![control(vec![c], vec![t], Gate::Z)])
-                            .map_err(|e| format!("circuit: {e:?}"))?;
-                        state = apply(&ckt, &state);
-                    }
-                }
-                "M" => {
-                    for t in &instr.targets {
-                        let q = expect_qubit(t)?;
-                        let result = measure_and_collapse(&mut state, Some(&[q]), rng);
-                        let bit = result[0] == 1;
-                        recorder.push(bit);
-                    }
-                }
-                "DETECTOR" => {
-                    let bit = xor_recs(&recorder, &instr.targets)?;
-                    detectors.push(bit);
-                }
-                "OBSERVABLE_INCLUDE" => {
-                    let index = instr.args.get(0).copied().unwrap_or(0.0) as u32;
-                    let bit = xor_recs(&recorder, &instr.targets)?;
-                    observables.push((index, bit));
-                }
-                _ => return Err(format!("unsupported instruction {}", instr.name)),
             }
         }
 
@@ -100,13 +155,36 @@ fn recorder_bits(r: Recorder) -> Vec<bool> {
 fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
     let mut max_q: Option<u32> = None;
     for i in instrs {
-        for t in &i.targets {
-            if let StimTarget::Qubit(q) = t {
-                max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+        match i {
+            StimInstr::Op { targets, .. } => {
+                for t in targets {
+                    if let StimTarget::Qubit(q) = t {
+                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                    }
+                }
+            }
+            StimInstr::Repeat { body, .. } => {
+                let inner = max_qubit(body)? as u32;
+                max_q = Some(max_q.map_or(inner, |m| m.max(inner)));
             }
         }
     }
     Ok(max_q.map(|m| (m as usize) + 1).unwrap_or(0))
+}
+
+fn qubits(targets: &[StimTarget]) -> Result<Vec<usize>, String> {
+    let mut out = Vec::new();
+    for t in targets {
+        out.push(expect_qubit(t)?);
+    }
+    Ok(out)
+}
+
+fn for_each_qubit<F: FnMut(usize)>(targets: &[StimTarget], mut f: F) -> Result<(), String> {
+    for t in targets {
+        f(expect_qubit(t)?);
+    }
+    Ok(())
 }
 
 fn expect_qubit(t: &StimTarget) -> Result<usize, String> {
@@ -140,4 +218,31 @@ fn xor_recs(r: &Recorder, targets: &[StimTarget]) -> Result<bool, String> {
         }
     }
     Ok(acc)
+}
+
+fn apply_pauli(state: &mut StabilizerState, q: usize, p: u8) {
+    match p {
+        0 => {}
+        1 => state.x_gate(q),
+        2 => state.y_gate(q),
+        3 => state.z_gate(q),
+        _ => {}
+    }
+}
+
+fn two_qubit_pauli(r: usize) -> (u8, u8) {
+    // Map 0..14 to 15 non-identity pairs from {I,X,Y,Z}^2 \ {II}
+    let mut idx = 0usize;
+    for a in 0..4 {
+        for b in 0..4 {
+            if a == 0 && b == 0 {
+                continue;
+            }
+            if idx == r {
+                return (a as u8, b as u8);
+            }
+            idx += 1;
+        }
+    }
+    (0, 0)
 }

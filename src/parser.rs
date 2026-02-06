@@ -1,26 +1,76 @@
 use crate::ir::{StimInstr, StimTarget};
 
 pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
-    let mut out = Vec::new();
+    let mut stack: Vec<Vec<StimInstr>> = vec![Vec::new()];
+    let mut repeat_counts: Vec<u64> = Vec::new();
+
     for (line_no, raw) in input.lines().enumerate() {
         let line = raw.split('#').next().unwrap().trim();
         if line.is_empty() {
             continue;
         }
+        if line == "}" {
+            let body = stack.pop().ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
+            let count = repeat_counts.pop().ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
+            if count == 0 {
+                return Err(format!("line {}: REPEAT 0 not allowed", line_no + 1));
+            }
+            let repeat = StimInstr::Repeat { count, body };
+            stack
+                .last_mut()
+                .ok_or_else(|| format!("line {}: repeat outside program", line_no + 1))?
+                .push(repeat);
+            continue;
+        }
+
+        let mut is_block_start = false;
+        let mut line = line.to_string();
+        if line.ends_with('{') {
+            is_block_start = true;
+            line = line[..line.len() - 1].trim().to_string();
+        }
+
         let mut parts = line.split_whitespace();
         let name_token = parts
             .next()
             .ok_or_else(|| format!("line {}: empty", line_no + 1))?;
         let (name, args) = split_name_and_args(name_token)?;
-        let mut instr = StimInstr::new(name, args, vec![]);
-        for token in parts {
-            if let Some(t) = parse_target(token)? {
-                instr.targets.push(t);
+        let name = name.to_ascii_uppercase();
+
+        if is_block_start {
+            if name != "REPEAT" {
+                return Err(format!("line {}: only REPEAT opens a block", line_no + 1));
+            }
+            let count_token = parts
+                .next()
+                .ok_or_else(|| format!("line {}: missing repeat count", line_no + 1))?;
+            let count: u64 = count_token
+                .parse()
+                .map_err(|_| format!("line {}: bad repeat count", line_no + 1))?;
+            repeat_counts.push(count);
+            stack.push(Vec::new());
+            continue;
+        }
+
+        let mut instr = StimInstr::new(&name, args, vec![]);
+        if let StimInstr::Op { targets, .. } = &mut instr {
+            for token in parts {
+                if let Some(t) = parse_target(token)? {
+                    targets.push(t);
+                }
             }
         }
-        out.push(instr);
+        stack
+            .last_mut()
+            .ok_or_else(|| format!("line {}: instruction outside program", line_no + 1))?
+            .push(instr);
     }
-    Ok(out)
+
+    if stack.len() != 1 {
+        return Err("unterminated REPEAT block".to_string());
+    }
+
+    Ok(stack.pop().unwrap())
 }
 
 fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
@@ -29,6 +79,9 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
         let val: i32 = inner
             .parse()
             .map_err(|_| format!("bad rec target {token}"))?;
+        if val >= 0 {
+            return Err("rec must be negative".to_string());
+        }
         return Ok(Some(StimTarget::Rec(val)));
     }
     if let Ok(q) = token.parse::<u32>() {

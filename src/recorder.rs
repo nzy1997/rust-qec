@@ -22,4 +22,8 @@ impl Recorder {
         }
         self.bits.get(idx as usize).copied()
     }
+
+    pub fn extend(&mut self, bits: Vec<bool>) {
+        self.bits.extend(bits);
+    }
 }

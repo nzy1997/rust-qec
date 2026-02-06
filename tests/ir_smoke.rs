@@ -3,7 +3,7 @@ use rstim::ir::{StimInstr, StimTarget, Annotation};
 #[test]
 fn build_simple_instr() {
     let instr = StimInstr::new("H", vec![], vec![StimTarget::Qubit(0)]);
-    assert_eq!(instr.name, "H");
+    assert_eq!(instr.name().unwrap(), "H");
 }
 
 #[test]
