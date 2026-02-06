@@ -7,3 +7,4 @@ pub mod recorder;
 pub mod parser;
 pub mod executor;
 pub mod sim;
+pub mod coords;

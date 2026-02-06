@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::coords::CoordState;
 use crate::ir::{StimInstr, StimTarget};
 use crate::recorder::Recorder;
 use crate::sim::tableau::StabilizerState;
@@ -11,7 +12,9 @@ pub struct Executor {
 pub struct ExecOutput {
     pub measurements: Vec<bool>,
     pub detectors: Vec<bool>,
+    pub detector_coords: Vec<Vec<f64>>,
     pub observables: Vec<(u32, bool)>,
+    pub qubit_coords: std::collections::HashMap<u32, Vec<f64>>,
 }
 
 impl Executor {
@@ -24,7 +27,9 @@ impl Executor {
         let mut state = StabilizerState::new(n);
         let mut recorder = Recorder::default();
         let mut detectors = Vec::new();
+        let mut detector_coords = Vec::new();
         let mut observables = Vec::new();
+        let mut coords = CoordState::default();
 
         for instr in &self.instrs {
             match instr {
@@ -111,9 +116,27 @@ impl Executor {
                                 }
                             }
                         }
+                        "QUBIT_COORDS" => {
+                            let coords_vec = coords.apply_offset(args);
+                            for t in targets {
+                                if let StimTarget::Qubit(q) = t {
+                                    coords.qubit_coords.insert(*q, coords_vec.clone());
+                                } else {
+                                    return Err("QUBIT_COORDS expects qubit targets".to_string());
+                                }
+                            }
+                        }
+                        "SHIFT_COORDS" => {
+                            coords.shift(args);
+                        }
+                        "TICK" => {
+                            coords.tick += 1;
+                        }
                         "DETECTOR" => {
                             let bit = xor_recs(&recorder, targets)?;
                             detectors.push(bit);
+                            let det_coords = coords.apply_offset(args);
+                            detector_coords.push(det_coords);
                         }
                         "OBSERVABLE_INCLUDE" => {
                             let index = args.get(0).copied().unwrap_or(0.0) as u32;
@@ -129,7 +152,9 @@ impl Executor {
                         let out = inner.run(rng)?;
                         recorder.extend(out.measurements);
                         detectors.extend(out.detectors);
+                        detector_coords.extend(out.detector_coords);
                         observables.extend(out.observables);
+                        coords.qubit_coords.extend(out.qubit_coords);
                     }
                 }
             }
@@ -138,7 +163,9 @@ impl Executor {
         Ok(ExecOutput {
             measurements: recorder_bits(recorder),
             detectors,
+            detector_coords,
             observables,
+            qubit_coords: coords.qubit_coords,
         })
     }
 }
