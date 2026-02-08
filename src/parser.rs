@@ -84,7 +84,15 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
         }
         return Ok(Some(StimTarget::Rec(val)));
     }
-    if let Ok(q) = token.parse::<u32>() {
+    let (negated, raw) = if let Some(rest) = token.strip_prefix('!') {
+        (true, rest)
+    } else {
+        (false, token)
+    };
+    if let Ok(q) = raw.parse::<u32>() {
+        if negated {
+            return Ok(Some(StimTarget::QubitInv(q)));
+        }
         return Ok(Some(StimTarget::Qubit(q)));
     }
     Err(format!("unsupported target {token}"))

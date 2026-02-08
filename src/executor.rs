@@ -53,27 +53,30 @@ impl Executor {
                             }
                         }
                         "M" => {
-                            for q in qubits(targets)? {
+                            for (q, inv) in qubits_with_inversion(targets)? {
                                 let (bit, _) = state.measure_z(q, rng);
-                                recorder.push(bit == 1);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
                             }
                         }
                         "MX" => {
-                            for q in qubits(targets)? {
+                            for (q, inv) in qubits_with_inversion(targets)? {
                                 state.h(q);
                                 let (bit, _) = state.measure_z(q, rng);
                                 state.h(q);
-                                recorder.push(bit == 1);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
                             }
                         }
                         "MY" => {
-                            for q in qubits(targets)? {
+                            for (q, inv) in qubits_with_inversion(targets)? {
                                 state.s_dag(q);
                                 state.h(q);
                                 let (bit, _) = state.measure_z(q, rng);
                                 state.h(q);
                                 state.s(q);
-                                recorder.push(bit == 1);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
                             }
                         }
                         "X_ERROR" => {
@@ -187,6 +190,8 @@ fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
                 for t in targets {
                     if let StimTarget::Qubit(q) = t {
                         max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                    } else if let StimTarget::QubitInv(q) = t {
+                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
                     }
                 }
             }
@@ -207,6 +212,18 @@ fn qubits(targets: &[StimTarget]) -> Result<Vec<usize>, String> {
     Ok(out)
 }
 
+fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, String> {
+    let mut out = Vec::new();
+    for t in targets {
+        match t {
+            StimTarget::Qubit(q) => out.push((*q as usize, false)),
+            StimTarget::QubitInv(q) => out.push((*q as usize, true)),
+            _ => return Err("expected qubit target".to_string()),
+        }
+    }
+    Ok(out)
+}
+
 fn for_each_qubit<F: FnMut(usize)>(targets: &[StimTarget], mut f: F) -> Result<(), String> {
     for t in targets {
         f(expect_qubit(t)?);
@@ -217,6 +234,7 @@ fn for_each_qubit<F: FnMut(usize)>(targets: &[StimTarget], mut f: F) -> Result<(
 fn expect_qubit(t: &StimTarget) -> Result<usize, String> {
     match t {
         StimTarget::Qubit(q) => Ok(*q as usize),
+        StimTarget::QubitInv(_) => Err("inverted qubit target only valid for measurement".to_string()),
         _ => Err("expected qubit target".to_string()),
     }
 }
