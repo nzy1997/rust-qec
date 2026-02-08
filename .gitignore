@@ -2,6 +2,7 @@
 /yao-rs/
 /.worktrees/
 
+Cargo.lock
 
 # Added by cargo
 
