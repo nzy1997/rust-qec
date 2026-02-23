@@ -288,6 +288,18 @@ impl Executor {
                                 recorder.push(bit);
                             }
                         }
+                        "SPP" => {
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                apply_spp(&mut state, &product.terms, product.inverted, false);
+                            }
+                        }
+                        "SPP_DAG" => {
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                apply_spp(&mut state, &product.terms, product.inverted, true);
+                            }
+                        }
                         _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
@@ -530,6 +542,49 @@ fn measure_pauli_product(
     }
 
     result
+}
+
+fn apply_spp(
+    state: &mut StabilizerState,
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+    dag: bool,
+) {
+    if terms.is_empty() {
+        return;
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    let anchor = terms.last().unwrap().0;
+    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    for &q in &non_anchor {
+        state.cx(q, anchor);
+    }
+
+    if dag ^ inverted {
+        state.s_dag(anchor);
+    } else {
+        state.s(anchor);
+    }
+
+    for &q in non_anchor.iter().rev() {
+        state.cx(q, anchor);
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
 }
 
 fn pair_measure(
