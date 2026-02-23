@@ -37,24 +37,78 @@ impl Executor {
                     match name.as_str() {
                         "I" => {}
                         "H" => for_each_qubit(targets, |q| state.h(q))?,
-                        "S" => for_each_qubit(targets, |q| state.s(q))?,
-                        "S_DAG" => for_each_qubit(targets, |q| state.s_dag(q))?,
+                        "H_XY" => for_each_qubit(targets, |q| state.h_xy(q))?,
+                        "H_YZ" => for_each_qubit(targets, |q| state.h_yz(q))?,
+                        "S" | "SQRT_Z" => for_each_qubit(targets, |q| state.s(q))?,
+                        "S_DAG" | "SQRT_Z_DAG" => for_each_qubit(targets, |q| state.s_dag(q))?,
+                        "SQRT_X" => for_each_qubit(targets, |q| state.sqrt_x(q))?,
+                        "SQRT_X_DAG" => for_each_qubit(targets, |q| state.sqrt_x_dag(q))?,
+                        "SQRT_Y" => for_each_qubit(targets, |q| state.sqrt_y(q))?,
+                        "SQRT_Y_DAG" => for_each_qubit(targets, |q| state.sqrt_y_dag(q))?,
                         "X" => for_each_qubit(targets, |q| state.x_gate(q))?,
                         "Y" => for_each_qubit(targets, |q| state.y_gate(q))?,
                         "Z" => for_each_qubit(targets, |q| state.z_gate(q))?,
-                        "CX" | "CNOT" => {
+                        "CX" | "CNOT" | "ZCX" => {
                             let pairs = qubit_pairs(targets)?;
-                            for (c, t) in pairs {
-                                state.cx(c, t);
-                            }
+                            for (c, t) in pairs { state.cx(c, t); }
                         }
-                        "CZ" => {
+                        "CY" | "ZCY" => {
                             let pairs = qubit_pairs(targets)?;
-                            for (c, t) in pairs {
-                                state.cz(c, t);
-                            }
+                            for (c, t) in pairs { state.cy(c, t); }
                         }
-                        "M" => {
+                        "CZ" | "ZCZ" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (c, t) in pairs { state.cz(c, t); }
+                        }
+                        "XCX" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.xcx(a, b); }
+                        }
+                        "XCY" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.xcy(a, b); }
+                        }
+                        "XCZ" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.xcz(a, b); }
+                        }
+                        "YCX" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.ycx(a, b); }
+                        }
+                        "YCY" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.ycy(a, b); }
+                        }
+                        "YCZ" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.ycz(a, b); }
+                        }
+                        "SWAP" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.swap(a, b); }
+                        }
+                        "ISWAP" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.iswap(a, b); }
+                        }
+                        "ISWAP_DAG" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.iswap_dag(a, b); }
+                        }
+                        "CXSWAP" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.cxswap(a, b); }
+                        }
+                        "SWAPCX" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.swapcx(a, b); }
+                        }
+                        "CZSWAP" => {
+                            let pairs = qubit_pairs(targets)?;
+                            for (a, b) in pairs { state.czswap(a, b); }
+                        }
+                        "M" | "MZ" => {
                             for (q, inv) in qubits_with_inversion(targets)? {
                                 let (bit, _) = state.measure_z(q, rng);
                                 let b = (bit == 1) ^ inv;
@@ -81,11 +135,58 @@ impl Executor {
                                 recorder.push(b);
                             }
                         }
+                        "MR" | "MRZ" => {
+                            for (q, inv) in qubits_with_inversion(targets)? {
+                                let (bit, _) = state.measure_z(q, rng);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
+                                if bit == 1 { state.x_gate(q); }
+                            }
+                        }
+                        "MRX" => {
+                            for (q, inv) in qubits_with_inversion(targets)? {
+                                state.h(q);
+                                let (bit, _) = state.measure_z(q, rng);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
+                                if bit == 1 { state.x_gate(q); }
+                                state.h(q);
+                            }
+                        }
+                        "MRY" => {
+                            for (q, inv) in qubits_with_inversion(targets)? {
+                                state.s_dag(q);
+                                state.h(q);
+                                let (bit, _) = state.measure_z(q, rng);
+                                let b = (bit == 1) ^ inv;
+                                recorder.push(b);
+                                if bit == 1 { state.x_gate(q); }
+                                state.h(q);
+                                state.s(q);
+                            }
+                        }
+                        "R" | "RZ" => {
+                            for q in qubits(targets)? { state.reset_z(q, rng); }
+                        }
+                        "RX" => {
+                            for q in qubits(targets)? { state.reset_x(q, rng); }
+                        }
+                        "RY" => {
+                            for q in qubits(targets)? { state.reset_y(q, rng); }
+                        }
                         "X_ERROR" => {
                             let p = args.get(0).copied().unwrap_or(0.0);
                             for q in qubits(targets)? {
                                 if rng.r#gen::<f64>() < p {
                                     state.x_gate(q);
+                                }
+                            }
+                        }
+                        "Y_ERROR" => {
+                            let p = args.get(0).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if rng.r#gen::<f64>() < p {
+                                    state.y_gate(q);
                                 }
                             }
                         }

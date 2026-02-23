@@ -85,6 +85,159 @@ impl StabilizerState {
         self.h(b);
     }
 
+    pub fn sqrt_x(&mut self, q: usize) {
+        self.h(q);
+        self.s(q);
+        self.h(q);
+    }
+
+    pub fn sqrt_x_dag(&mut self, q: usize) {
+        self.h(q);
+        self.s_dag(q);
+        self.h(q);
+    }
+
+    pub fn sqrt_y(&mut self, q: usize) {
+        for i in 0..2 * self.n {
+            if self.x[i][q] && !self.z[i][q] {
+                self.phase[i] = (self.phase[i] + 2) % 4;
+            }
+            let tmp = self.x[i][q];
+            self.x[i][q] = self.z[i][q];
+            self.z[i][q] = tmp;
+        }
+    }
+
+    pub fn sqrt_y_dag(&mut self, q: usize) {
+        for i in 0..2 * self.n {
+            if self.z[i][q] && !self.x[i][q] {
+                self.phase[i] = (self.phase[i] + 2) % 4;
+            }
+            let tmp = self.x[i][q];
+            self.x[i][q] = self.z[i][q];
+            self.z[i][q] = tmp;
+        }
+    }
+
+    /// H_XY: X → Y, Y → X, Z → −Z
+    pub fn h_xy(&mut self, q: usize) {
+        for i in 0..2 * self.n {
+            let xi = self.x[i][q];
+            let zi = self.z[i][q];
+            let delta = (if xi { 1u8 } else { 0 }) + (if zi { 2u8 } else { 0 });
+            self.phase[i] = (self.phase[i] + delta) % 4;
+            self.z[i][q] = xi ^ zi;
+        }
+    }
+
+    /// H_YZ: X → −X, Y → Z, Z → Y
+    pub fn h_yz(&mut self, q: usize) {
+        for i in 0..2 * self.n {
+            let xi = self.x[i][q];
+            let zi = self.z[i][q];
+            let delta = (if xi { 2u8 } else { 0 }) + (if zi { 1u8 } else { 0 });
+            self.phase[i] = (self.phase[i] + delta) % 4;
+            self.x[i][q] = xi ^ zi;
+        }
+    }
+
+    pub fn cy(&mut self, c: usize, t: usize) {
+        self.s_dag(t);
+        self.cx(c, t);
+        self.s(t);
+    }
+
+    pub fn swap(&mut self, a: usize, b: usize) {
+        for i in 0..2 * self.n {
+            self.x[i].swap(a, b);
+            self.z[i].swap(a, b);
+        }
+    }
+
+    pub fn iswap(&mut self, a: usize, b: usize) {
+        self.s(a);
+        self.s(b);
+        self.cz(a, b);
+        self.swap(a, b);
+    }
+
+    pub fn iswap_dag(&mut self, a: usize, b: usize) {
+        self.s_dag(a);
+        self.s_dag(b);
+        self.cz(a, b);
+        self.swap(a, b);
+    }
+
+    pub fn xcx(&mut self, a: usize, b: usize) {
+        self.h(a);
+        self.cx(a, b);
+        self.h(a);
+    }
+
+    pub fn xcz(&mut self, a: usize, b: usize) {
+        self.cx(b, a);
+    }
+
+    pub fn xcy(&mut self, a: usize, b: usize) {
+        self.h_yz(b);
+        self.cx(b, a);
+        self.h_yz(b);
+    }
+
+    pub fn ycx(&mut self, a: usize, b: usize) {
+        self.h_yz(a);
+        self.cx(a, b);
+        self.h_yz(a);
+    }
+
+    pub fn ycz(&mut self, a: usize, b: usize) {
+        self.cy(b, a);
+    }
+
+    pub fn ycy(&mut self, a: usize, b: usize) {
+        self.h_yz(a);
+        self.h_yz(b);
+        self.cz(a, b);
+        self.h_yz(b);
+        self.h_yz(a);
+    }
+
+    pub fn cxswap(&mut self, a: usize, b: usize) {
+        self.cx(b, a);
+        self.cx(a, b);
+    }
+
+    pub fn swapcx(&mut self, a: usize, b: usize) {
+        self.cx(a, b);
+        self.cx(b, a);
+    }
+
+    pub fn czswap(&mut self, a: usize, b: usize) {
+        self.cz(a, b);
+        self.swap(a, b);
+    }
+
+    pub fn reset_z(&mut self, q: usize, rng: &mut impl Rng) {
+        let (outcome, _) = self.measure_z(q, rng);
+        if outcome == 1 {
+            self.x_gate(q);
+        }
+    }
+
+    pub fn reset_x(&mut self, q: usize, rng: &mut impl Rng) {
+        self.h(q);
+        self.reset_z(q, rng);
+        self.h(q);
+    }
+
+    pub fn reset_y(&mut self, q: usize, rng: &mut impl Rng) {
+        self.s_dag(q);
+        self.h(q);
+        self.reset_z(q, rng);
+        self.h(q);
+        self.s(q);
+    }
+
     pub fn measure_z(&mut self, q: usize, rng: &mut impl Rng) -> (u8, bool) {
         // Find a stabilizer row with X on q
         let mut p = None;
