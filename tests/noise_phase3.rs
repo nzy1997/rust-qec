@@ -146,3 +146,79 @@ fn pauli_channel_2_no_error() {
     let m = run("PAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n");
     assert_eq!(m, vec![false, false]);
 }
+
+#[test]
+fn heralded_erase_no_noise() {
+    let instrs = parse_lines("HERALDED_ERASE(0) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    // measurements: [herald=false, M=false]
+    assert_eq!(out.measurements, vec![false, false]);
+}
+
+#[test]
+fn heralded_erase_always() {
+    let instrs = parse_lines("HERALDED_ERASE(1) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements[0], true); // herald bit
+    assert_eq!(out.measurements.len(), 2);
+}
+
+#[test]
+fn heralded_erase_detector_sees_herald() {
+    let instrs = parse_lines("HERALDED_ERASE(1) 0\nM 0\nDETECTOR rec[-2]\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.detectors[0], true);
+}
+
+#[test]
+fn heralded_erase_multi_qubit() {
+    let instrs = parse_lines("HERALDED_ERASE(1) 0 1\nM 0 1\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements.len(), 4); // herald0, herald1, M0, M1
+    assert_eq!(out.measurements[0], true);
+    assert_eq!(out.measurements[1], true);
+}
+
+#[test]
+fn heralded_pauli_channel_1_no_noise() {
+    let instrs = parse_lines("HERALDED_PAULI_CHANNEL_1(0,0,0,0) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![false, false]);
+}
+
+#[test]
+fn heralded_pauli_channel_1_deterministic_x() {
+    let instrs = parse_lines("HERALDED_PAULI_CHANNEL_1(0,1,0,0) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![true, true]); // herald=true, X|0⟩→|1⟩
+}
+
+#[test]
+fn heralded_pauli_channel_1_false_positive() {
+    let instrs = parse_lines("HERALDED_PAULI_CHANNEL_1(1,0,0,0) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![true, false]); // herald=true, I|0⟩=|0⟩
+}
+
+#[test]
+fn heralded_pauli_channel_1_deterministic_z() {
+    let instrs = parse_lines("HERALDED_PAULI_CHANNEL_1(0,0,0,1) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![true, false]); // herald=true, Z|0⟩=|0⟩
+}

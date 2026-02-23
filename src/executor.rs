@@ -302,7 +302,7 @@ impl Executor {
                             }
                         }
                         "PAULI_CHANNEL_1" => {
-                            let px = args.get(0).copied().unwrap_or(0.0);
+                            let px = args.first().copied().unwrap_or(0.0);
                             let py = args.get(1).copied().unwrap_or(0.0);
                             let pz = args.get(2).copied().unwrap_or(0.0);
                             for q in qubits(targets)? {
@@ -339,6 +339,47 @@ impl Executor {
                                 if let Some((pa, pb)) = chosen {
                                     apply_pauli(&mut state, a, pa);
                                     apply_pauli(&mut state, b, pb);
+                                }
+                            }
+                        }
+                        "HERALDED_ERASE" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    recorder.push(true);
+                                    match rng.gen_range(0u8..4) {
+                                        1 => state.x_gate(q),
+                                        2 => state.y_gate(q),
+                                        3 => state.z_gate(q),
+                                        _ => {} // I
+                                    }
+                                } else {
+                                    recorder.push(false);
+                                }
+                            }
+                        }
+                        "HERALDED_PAULI_CHANNEL_1" => {
+                            let pi = args.first().copied().unwrap_or(0.0);
+                            let px = args.get(1).copied().unwrap_or(0.0);
+                            let py = args.get(2).copied().unwrap_or(0.0);
+                            let pz = args.get(3).copied().unwrap_or(0.0);
+                            let total = pi + px + py + pz;
+                            for q in qubits(targets)? {
+                                let r: f64 = rng.r#gen();
+                                if r < total {
+                                    recorder.push(true);
+                                    let inner = r;
+                                    if inner < pi {
+                                        // I — false positive
+                                    } else if inner < pi + px {
+                                        state.x_gate(q);
+                                    } else if inner < pi + px + py {
+                                        state.y_gate(q);
+                                    } else {
+                                        state.z_gate(q);
+                                    }
+                                } else {
+                                    recorder.push(false);
                                 }
                             }
                         }
