@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-yao-rs = { git = "https://github.com/GiggleLiu/yao-rs", rev = "a7d0786d9c7e78195b076e850486a2f405c947b8" }
 rand = "0.8"
