@@ -222,3 +222,59 @@ fn heralded_pauli_channel_1_deterministic_z() {
     let out = ex.run(&mut rng).unwrap();
     assert_eq!(out.measurements, vec![true, false]); // herald=true, Z|0⟩=|0⟩
 }
+
+// --- Coverage gap tests ---
+
+#[test]
+fn parser_tag_error_unclosed_bracket() {
+    assert!(parse_lines("H[ 0\n").is_err());
+}
+
+#[test]
+fn parser_tag_error_bad_syntax() {
+    // ] before [ in a single token
+    assert!(parse_lines("]H[\n").is_err());
+}
+
+#[test]
+fn parser_tag_error_unexpected_chars_after_tag() {
+    assert!(parse_lines("H[tag]x 0\n").is_err());
+}
+
+#[test]
+fn pauli_channel_1_deterministic_y() {
+    // Y|0⟩ = i|1⟩, measure gives 1
+    let m = run("PAULI_CHANNEL_1(0,1,0) 0\nM 0\n");
+    assert_eq!(m, vec![true]);
+}
+
+#[test]
+fn heralded_pauli_channel_1_deterministic_y() {
+    let instrs = parse_lines("HERALDED_PAULI_CHANNEL_1(0,0,1,0) 0\nM 0\n").unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = ex.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![true, true]); // herald=true, Y|0⟩→|1⟩
+}
+
+#[test]
+fn heralded_erase_covers_all_pauli_branches() {
+    // Run HERALDED_ERASE(1) on many qubits with different seeds to hit all match arms.
+    // With enough qubits, gen_range(0..4) will produce 0,1,2,3.
+    for seed in 0u64..20 {
+        let instrs = parse_lines("HERALDED_ERASE(1) 0 1 2 3 4 5 6 7\nM 0 1 2 3 4 5 6 7\n").unwrap();
+        let mut ex = Executor::from_instrs(instrs).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed);
+        let out = ex.run(&mut rng).unwrap();
+        assert_eq!(out.measurements.len(), 16); // 8 heralds + 8 measurements
+        for i in 0..8 {
+            assert_eq!(out.measurements[i], true); // all heralds true since p=1
+        }
+    }
+}
+
+#[test]
+fn correlated_error_e_alias() {
+    let m = run("E(1) X0\nM 0\n");
+    assert_eq!(m, vec![true]);
+}
