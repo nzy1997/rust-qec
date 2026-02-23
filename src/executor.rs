@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::coords::CoordState;
-use crate::ir::{StimInstr, StimTarget};
+use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use crate::recorder::Recorder;
 use crate::sim::tableau::StabilizerState;
 
@@ -165,6 +165,17 @@ impl Executor {
                                 state.s(q);
                             }
                         }
+                        "MPAD" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            for t in targets {
+                                let q = expect_qubit(t)?;
+                                let mut bit = q != 0;
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    bit = !bit;
+                                }
+                                recorder.push(bit);
+                            }
+                        }
                         "R" | "RZ" => {
                             for q in qubits(targets)? { state.reset_z(q, rng); }
                         }
@@ -249,6 +260,46 @@ impl Executor {
                             let bit = xor_recs(&recorder, targets)?;
                             observables.push((index, bit));
                         }
+                        "MXX" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::X, p, rng, &mut recorder)?;
+                        }
+                        "MYY" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::Y, p, rng, &mut recorder)?;
+                        }
+                        "MZZ" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::Z, p, rng, &mut recorder)?;
+                        }
+                        "MPP" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                let mut bit = measure_pauli_product(
+                                    &mut state,
+                                    &product.terms,
+                                    product.inverted,
+                                    rng,
+                                );
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    bit = !bit;
+                                }
+                                recorder.push(bit);
+                            }
+                        }
+                        "SPP" => {
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                apply_spp(&mut state, &product.terms, product.inverted, false);
+                            }
+                        }
+                        "SPP_DAG" => {
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                apply_spp(&mut state, &product.terms, product.inverted, true);
+                            }
+                        }
                         _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
@@ -291,10 +342,14 @@ fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
         match i {
             StimInstr::Op { targets, .. } => {
                 for t in targets {
-                    if let StimTarget::Qubit(q) = t {
-                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
-                    } else if let StimTarget::QubitInv(q) = t {
-                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                    match t {
+                        StimTarget::Qubit(q) | StimTarget::QubitInv(q) => {
+                            max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                        }
+                        StimTarget::Pauli { qubit: q, .. } => {
+                            max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                        }
+                        StimTarget::Combiner | StimTarget::Rec(_) => {}
                     }
                 }
             }
@@ -325,6 +380,14 @@ fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, S
         }
     }
     Ok(out)
+}
+
+fn qubits_with_inversion_pairs(targets: &[StimTarget]) -> Result<Vec<((usize, bool), (usize, bool))>, String> {
+    let flat = qubits_with_inversion(targets)?;
+    if flat.len() % 2 != 0 {
+        return Err("odd number of targets for pair measurement".to_string());
+    }
+    Ok(flat.chunks(2).map(|c| (c[0], c[1])).collect())
 }
 
 fn for_each_qubit<F: FnMut(usize)>(targets: &[StimTarget], mut f: F) -> Result<(), String> {
@@ -393,4 +456,153 @@ fn two_qubit_pauli(r: usize) -> (u8, u8) {
         }
     }
     (0, 0)
+}
+
+struct PauliProduct {
+    terms: Vec<(usize, PauliBasis)>,
+    inverted: bool,
+}
+
+fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, String> {
+    let mut products = Vec::new();
+    let mut current_terms: Vec<(usize, PauliBasis)> = Vec::new();
+    let mut inverted = false;
+    let mut after_combiner = false;
+
+    for target in targets {
+        match target {
+            StimTarget::Pauli { qubit, basis, inverted: inv } => {
+                if !after_combiner && !current_terms.is_empty() {
+                    products.push(PauliProduct {
+                        terms: std::mem::take(&mut current_terms),
+                        inverted,
+                    });
+                    inverted = false;
+                }
+                if current_terms.is_empty() && *inv {
+                    inverted = true;
+                }
+                current_terms.push((*qubit as usize, *basis));
+                after_combiner = false;
+            }
+            StimTarget::Combiner => {
+                after_combiner = true;
+            }
+            _ => return Err("MPP targets must be Pauli targets".to_string()),
+        }
+    }
+    if !current_terms.is_empty() {
+        products.push(PauliProduct { terms: current_terms, inverted });
+    }
+    Ok(products)
+}
+
+fn measure_pauli_product(
+    state: &mut StabilizerState,
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+    rng: &mut impl Rng,
+) -> bool {
+    if terms.is_empty() {
+        return inverted;
+    }
+
+    // Basis change: X→Z via H, Y→Z via H_YZ
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    // CX fold: chain all qubits' Z parity onto anchor (last qubit)
+    let anchor = terms.last().unwrap().0;
+    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    for &q in &non_anchor {
+        state.cx(q, anchor);
+    }
+
+    // Measure anchor in Z basis
+    let (bit, _) = state.measure_z(anchor, rng);
+    let result = (bit == 1) ^ inverted;
+
+    // Uncompute CX (reverse order, CX is self-inverse)
+    for &q in non_anchor.iter().rev() {
+        state.cx(q, anchor);
+    }
+
+    // Undo basis change (H and H_YZ are self-inverse)
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    result
+}
+
+fn apply_spp(
+    state: &mut StabilizerState,
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+    dag: bool,
+) {
+    if terms.is_empty() {
+        return;
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    let anchor = terms.last().unwrap().0;
+    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    for &q in &non_anchor {
+        state.cx(q, anchor);
+    }
+
+    if dag ^ inverted {
+        state.s_dag(anchor);
+    } else {
+        state.s(anchor);
+    }
+
+    for &q in non_anchor.iter().rev() {
+        state.cx(q, anchor);
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+}
+
+fn pair_measure(
+    state: &mut StabilizerState,
+    targets: &[StimTarget],
+    basis: PauliBasis,
+    noise_p: f64,
+    rng: &mut impl Rng,
+    recorder: &mut Recorder,
+) -> Result<(), String> {
+    let pairs = qubits_with_inversion_pairs(targets)?;
+    for ((a, inv_a), (b, _inv_b)) in pairs {
+        let terms = vec![(a, basis), (b, basis)];
+        let mut bit = measure_pauli_product(state, &terms, inv_a, rng);
+        if noise_p > 0.0 && rng.r#gen::<f64>() < noise_p {
+            bit = !bit;
+        }
+        recorder.push(bit);
+    }
+    Ok(())
 }

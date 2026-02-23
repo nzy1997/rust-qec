@@ -1,4 +1,4 @@
-use crate::ir::{StimInstr, StimTarget};
+use crate::ir::{PauliBasis, StimInstr, StimTarget};
 
 pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
     let mut stack: Vec<Vec<StimInstr>> = vec![Vec::new()];
@@ -55,7 +55,20 @@ pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
         let mut instr = StimInstr::new(&name, args, vec![]);
         if let StimInstr::Op { targets, .. } = &mut instr {
             for token in parts {
-                if let Some(t) = parse_target(token)? {
+                let subs: Vec<&str> = token.split('*').collect();
+                if subs.len() > 1 {
+                    for (j, sub) in subs.iter().enumerate() {
+                        if sub.is_empty() {
+                            return Err(format!("line {}: empty target around *", line_no + 1));
+                        }
+                        if j > 0 {
+                            targets.push(StimTarget::Combiner);
+                        }
+                        if let Some(t) = parse_target(sub)? {
+                            targets.push(t);
+                        }
+                    }
+                } else if let Some(t) = parse_target(token)? {
                     targets.push(t);
                 }
             }
@@ -89,6 +102,19 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
     } else {
         (false, token)
     };
+    if raw.len() > 1 {
+        let first = raw.as_bytes()[0];
+        if matches!(first, b'X' | b'Y' | b'Z') {
+            if let Ok(q) = raw[1..].parse::<u32>() {
+                let basis = match first {
+                    b'X' => PauliBasis::X,
+                    b'Y' => PauliBasis::Y,
+                    _ => PauliBasis::Z,
+                };
+                return Ok(Some(StimTarget::pauli(q, basis, negated)));
+            }
+        }
+    }
     if let Ok(q) = raw.parse::<u32>() {
         if negated {
             return Ok(Some(StimTarget::QubitInv(q)));
