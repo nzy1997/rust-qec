@@ -260,6 +260,18 @@ impl Executor {
                             let bit = xor_recs(&recorder, targets)?;
                             observables.push((index, bit));
                         }
+                        "MXX" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::X, p, rng, &mut recorder)?;
+                        }
+                        "MYY" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::Y, p, rng, &mut recorder)?;
+                        }
+                        "MZZ" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            pair_measure(&mut state, targets, PauliBasis::Z, p, rng, &mut recorder)?;
+                        }
                         "MPP" => {
                             let p = args.first().copied().unwrap_or(0.0);
                             let products = split_pauli_products(targets)?;
@@ -356,6 +368,14 @@ fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, S
         }
     }
     Ok(out)
+}
+
+fn qubits_with_inversion_pairs(targets: &[StimTarget]) -> Result<Vec<((usize, bool), (usize, bool))>, String> {
+    let flat = qubits_with_inversion(targets)?;
+    if flat.len() % 2 != 0 {
+        return Err("odd number of targets for pair measurement".to_string());
+    }
+    Ok(flat.chunks(2).map(|c| (c[0], c[1])).collect())
 }
 
 fn for_each_qubit<F: FnMut(usize)>(targets: &[StimTarget], mut f: F) -> Result<(), String> {
@@ -510,4 +530,24 @@ fn measure_pauli_product(
     }
 
     result
+}
+
+fn pair_measure(
+    state: &mut StabilizerState,
+    targets: &[StimTarget],
+    basis: PauliBasis,
+    noise_p: f64,
+    rng: &mut impl Rng,
+    recorder: &mut Recorder,
+) -> Result<(), String> {
+    let pairs = qubits_with_inversion_pairs(targets)?;
+    for ((a, inv_a), (b, _inv_b)) in pairs {
+        let terms = vec![(a, basis), (b, basis)];
+        let mut bit = measure_pauli_product(state, &terms, inv_a, rng);
+        if noise_p > 0.0 && rng.r#gen::<f64>() < noise_p {
+            bit = !bit;
+        }
+        recorder.push(bit);
+    }
+    Ok(())
 }
