@@ -165,6 +165,17 @@ impl Executor {
                                 state.s(q);
                             }
                         }
+                        "MPAD" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            for t in targets {
+                                let q = expect_qubit(t)?;
+                                let mut bit = q != 0;
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    bit = !bit;
+                                }
+                                recorder.push(bit);
+                            }
+                        }
                         "R" | "RZ" => {
                             for q in qubits(targets)? { state.reset_z(q, rng); }
                         }
