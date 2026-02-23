@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::coords::CoordState;
-use crate::ir::{StimInstr, StimTarget};
+use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use crate::recorder::Recorder;
 use crate::sim::tableau::StabilizerState;
 
@@ -260,6 +260,22 @@ impl Executor {
                             let bit = xor_recs(&recorder, targets)?;
                             observables.push((index, bit));
                         }
+                        "MPP" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            let products = split_pauli_products(targets)?;
+                            for product in &products {
+                                let mut bit = measure_pauli_product(
+                                    &mut state,
+                                    &product.terms,
+                                    product.inverted,
+                                    rng,
+                                );
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    bit = !bit;
+                                }
+                                recorder.push(bit);
+                            }
+                        }
                         _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
@@ -408,4 +424,90 @@ fn two_qubit_pauli(r: usize) -> (u8, u8) {
         }
     }
     (0, 0)
+}
+
+struct PauliProduct {
+    terms: Vec<(usize, PauliBasis)>,
+    inverted: bool,
+}
+
+fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, String> {
+    let mut products = Vec::new();
+    let mut current_terms: Vec<(usize, PauliBasis)> = Vec::new();
+    let mut inverted = false;
+    let mut after_combiner = false;
+
+    for target in targets {
+        match target {
+            StimTarget::Pauli { qubit, basis, inverted: inv } => {
+                if !after_combiner && !current_terms.is_empty() {
+                    products.push(PauliProduct {
+                        terms: std::mem::take(&mut current_terms),
+                        inverted,
+                    });
+                    inverted = false;
+                }
+                if current_terms.is_empty() && *inv {
+                    inverted = true;
+                }
+                current_terms.push((*qubit as usize, *basis));
+                after_combiner = false;
+            }
+            StimTarget::Combiner => {
+                after_combiner = true;
+            }
+            _ => return Err("MPP targets must be Pauli targets".to_string()),
+        }
+    }
+    if !current_terms.is_empty() {
+        products.push(PauliProduct { terms: current_terms, inverted });
+    }
+    Ok(products)
+}
+
+fn measure_pauli_product(
+    state: &mut StabilizerState,
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+    rng: &mut impl Rng,
+) -> bool {
+    if terms.is_empty() {
+        return inverted;
+    }
+
+    // Basis change: X→Z via H, Y→Z via H_YZ
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    // CX fold: chain all qubits' Z parity onto anchor (last qubit)
+    let anchor = terms.last().unwrap().0;
+    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    for &q in &non_anchor {
+        state.cx(q, anchor);
+    }
+
+    // Measure anchor in Z basis
+    let (bit, _) = state.measure_z(anchor, rng);
+    let result = (bit == 1) ^ inverted;
+
+    // Uncompute CX (reverse order, CX is self-inverse)
+    for &q in non_anchor.iter().rev() {
+        state.cx(q, anchor);
+    }
+
+    // Undo basis change (H and H_YZ are self-inverse)
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    result
 }

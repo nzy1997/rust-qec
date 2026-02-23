@@ -124,8 +124,9 @@ impl StabilizerState {
         for i in 0..2 * self.n {
             let xi = self.x[i][q];
             let zi = self.z[i][q];
-            let delta = (if xi { 1u8 } else { 0 }) + (if zi { 2u8 } else { 0 });
-            self.phase[i] = (self.phase[i] + delta) % 4;
+            if zi && !xi {
+                self.phase[i] = (self.phase[i] + 2) % 4;
+            }
             self.z[i][q] = xi ^ zi;
         }
     }
@@ -135,8 +136,9 @@ impl StabilizerState {
         for i in 0..2 * self.n {
             let xi = self.x[i][q];
             let zi = self.z[i][q];
-            let delta = (if xi { 2u8 } else { 0 }) + (if zi { 1u8 } else { 0 });
-            self.phase[i] = (self.phase[i] + delta) % 4;
+            if xi && !zi {
+                self.phase[i] = (self.phase[i] + 2) % 4;
+            }
             self.x[i][q] = xi ^ zi;
         }
     }
