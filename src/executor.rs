@@ -35,7 +35,7 @@ impl Executor {
             match instr {
                 StimInstr::Op { name, args, targets, .. } => {
                     match name.as_str() {
-                        "I" => {}
+                        "I" | "I_ERROR" | "II_ERROR" => {}
                         "H" => for_each_qubit(targets, |q| state.h(q))?,
                         "H_XY" => for_each_qubit(targets, |q| state.h_xy(q))?,
                         "H_YZ" => for_each_qubit(targets, |q| state.h_yz(q))?,

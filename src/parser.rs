@@ -34,7 +34,7 @@ pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
         let name_token = parts
             .next()
             .ok_or_else(|| format!("line {}: empty", line_no + 1))?;
-        let (name, args) = split_name_and_args(name_token)?;
+        let (name, tag, args) = split_name_and_args(name_token)?;
         let name = name.to_ascii_uppercase();
 
         if is_block_start {
@@ -52,7 +52,12 @@ pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
             continue;
         }
 
-        let mut instr = StimInstr::new(&name, args, vec![]);
+        let mut instr = StimInstr::Op {
+            name: name.clone(),
+            tag,
+            args,
+            targets: vec![],
+        };
         if let StimInstr::Op { targets, .. } = &mut instr {
             for token in parts {
                 let subs: Vec<&str> = token.split('*').collect();
@@ -124,13 +129,37 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
     Err(format!("unsupported target {token}"))
 }
 
-fn split_name_and_args(token: &str) -> Result<(&str, Vec<f64>), String> {
-    if let Some(idx) = token.find('(') {
-        if !token.ends_with(')') {
+fn split_name_and_args(token: &str) -> Result<(&str, Option<String>, Vec<f64>), String> {
+    let (name, tag, rest) = if let Some(bi) = token.find('[') {
+        let bj = token.find(']').ok_or_else(|| format!("unclosed tag bracket in {token}"))?;
+        if bj < bi {
+            return Err(format!("bad tag syntax in {token}"));
+        }
+        let name = &token[..bi];
+        let tag = Some(token[bi + 1..bj].to_string());
+        (name, tag, &token[bj + 1..])
+    } else {
+        (token, None, "")
+    };
+
+    let args = if let Some(rest) = rest.strip_prefix('(') {
+        let rest = rest.strip_suffix(')').ok_or_else(|| format!("bad args {token}"))?;
+        let rest = rest.trim();
+        if rest.is_empty() {
+            vec![]
+        } else {
+            rest.split(',')
+                .map(|s| s.trim().parse::<f64>().map_err(|_| format!("bad arg {s}")))
+                .collect::<Result<Vec<_>, _>>()?
+        }
+    } else if !rest.is_empty() {
+        return Err(format!("unexpected characters after tag in {token}"));
+    } else if let Some(idx) = name.find('(') {
+        if !name.ends_with(')') {
             return Err(format!("bad args {token}"));
         }
-        let name = &token[..idx];
-        let args_str = token[idx + 1..token.len() - 1].trim();
+        let args_str = name[idx + 1..name.len() - 1].trim();
+        let actual_name = &name[..idx];
         let args = if args_str.is_empty() {
             vec![]
         } else {
@@ -139,8 +168,10 @@ fn split_name_and_args(token: &str) -> Result<(&str, Vec<f64>), String> {
                 .map(|s| s.trim().parse::<f64>().map_err(|_| format!("bad arg {s}")))
                 .collect::<Result<Vec<_>, _>>()?
         };
-        Ok((name, args))
+        return Ok((actual_name, tag, args));
     } else {
-        Ok((token, vec![]))
-    }
+        vec![]
+    };
+
+    Ok((name, tag, args))
 }
