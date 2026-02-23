@@ -30,12 +30,13 @@ impl Executor {
         let mut detector_coords = Vec::new();
         let mut observables = Vec::new();
         let mut coords = CoordState::default();
+        let mut last_correlated_error_occurred = false;
 
         for instr in &self.instrs {
             match instr {
                 StimInstr::Op { name, args, targets, .. } => {
                     match name.as_str() {
-                        "I" => {}
+                        "I" | "I_ERROR" | "II_ERROR" => {}
                         "H" => for_each_qubit(targets, |q| state.h(q))?,
                         "H_XY" => for_each_qubit(targets, |q| state.h_xy(q))?,
                         "H_YZ" => for_each_qubit(targets, |q| state.h_yz(q))?,
@@ -300,6 +301,106 @@ impl Executor {
                                 apply_spp(&mut state, &product.terms, product.inverted, true);
                             }
                         }
+                        "PAULI_CHANNEL_1" => {
+                            let px = args.first().copied().unwrap_or(0.0);
+                            let py = args.get(1).copied().unwrap_or(0.0);
+                            let pz = args.get(2).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                let r: f64 = rng.r#gen();
+                                if r < px {
+                                    state.x_gate(q);
+                                } else if r < px + py {
+                                    state.y_gate(q);
+                                } else if r < px + py + pz {
+                                    state.z_gate(q);
+                                }
+                            }
+                        }
+                        "PAULI_CHANNEL_2" => {
+                            let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                            let pairs = qubit_pairs(targets)?;
+                            let paulis: [(u8, u8); 15] = [
+                                (0, 1), (0, 2), (0, 3),
+                                (1, 0), (1, 1), (1, 2), (1, 3),
+                                (2, 0), (2, 1), (2, 2), (2, 3),
+                                (3, 0), (3, 1), (3, 2), (3, 3),
+                            ];
+                            for (a, b) in pairs {
+                                let r: f64 = rng.r#gen();
+                                let mut cumulative = 0.0;
+                                let mut chosen = None;
+                                for (i, &(pa, pb)) in paulis.iter().enumerate() {
+                                    cumulative += probs[i];
+                                    if r < cumulative {
+                                        chosen = Some((pa, pb));
+                                        break;
+                                    }
+                                }
+                                if let Some((pa, pb)) = chosen {
+                                    apply_pauli(&mut state, a, pa);
+                                    apply_pauli(&mut state, b, pb);
+                                }
+                            }
+                        }
+                        "HERALDED_ERASE" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    recorder.push(true);
+                                    match rng.gen_range(0u8..4) {
+                                        1 => state.x_gate(q),
+                                        2 => state.y_gate(q),
+                                        3 => state.z_gate(q),
+                                        _ => {} // I
+                                    }
+                                } else {
+                                    recorder.push(false);
+                                }
+                            }
+                        }
+                        "HERALDED_PAULI_CHANNEL_1" => {
+                            let pi = args.first().copied().unwrap_or(0.0);
+                            let px = args.get(1).copied().unwrap_or(0.0);
+                            let py = args.get(2).copied().unwrap_or(0.0);
+                            let pz = args.get(3).copied().unwrap_or(0.0);
+                            let total = pi + px + py + pz;
+                            for q in qubits(targets)? {
+                                let r: f64 = rng.r#gen();
+                                if r < total {
+                                    recorder.push(true);
+                                    let inner = r;
+                                    if inner < pi {
+                                        // I — false positive
+                                    } else if inner < pi + px {
+                                        state.x_gate(q);
+                                    } else if inner < pi + px + py {
+                                        state.y_gate(q);
+                                    } else {
+                                        state.z_gate(q);
+                                    }
+                                } else {
+                                    recorder.push(false);
+                                }
+                            }
+                        }
+                        "CORRELATED_ERROR" | "E" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            if p > 0.0 && rng.r#gen::<f64>() < p {
+                                apply_pauli_targets(&mut state, targets)?;
+                                last_correlated_error_occurred = true;
+                            } else {
+                                last_correlated_error_occurred = false;
+                            }
+                        }
+                        "ELSE_CORRELATED_ERROR" => {
+                            if !last_correlated_error_occurred {
+                                let p = args.first().copied().unwrap_or(0.0);
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    apply_pauli_targets(&mut state, targets)?;
+                                    last_correlated_error_occurred = true;
+                                }
+                            }
+                        }
                         _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
@@ -429,6 +530,23 @@ fn xor_recs(r: &Recorder, targets: &[StimTarget]) -> Result<bool, String> {
         }
     }
     Ok(acc)
+}
+
+fn apply_pauli_targets(state: &mut StabilizerState, targets: &[StimTarget]) -> Result<(), String> {
+    for t in targets {
+        match t {
+            StimTarget::Pauli { qubit, basis, .. } => {
+                let q = *qubit as usize;
+                match basis {
+                    PauliBasis::X => state.x_gate(q),
+                    PauliBasis::Y => state.y_gate(q),
+                    PauliBasis::Z => state.z_gate(q),
+                }
+            }
+            _ => return Err("CORRELATED_ERROR targets must be Pauli".to_string()),
+        }
+    }
+    Ok(())
 }
 
 fn apply_pauli(state: &mut StabilizerState, q: usize, p: u8) {
