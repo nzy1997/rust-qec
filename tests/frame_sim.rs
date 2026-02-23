@@ -150,3 +150,93 @@ fn frame_sim_measure_reset_measure() {
         assert_eq!(m.get(1, shot), false, "shot {shot}");
     }
 }
+
+#[test]
+fn frame_sim_x_error_all_flip() {
+    let instrs = parse_lines("X_ERROR(1) 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![false]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 { assert_eq!(m.get(0, shot), true); }
+}
+
+#[test]
+fn frame_sim_z_error_no_flip_z_measurement() {
+    let instrs = parse_lines("Z_ERROR(1) 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 { assert_eq!(m.get(0, shot), false); }
+}
+
+#[test]
+fn frame_sim_correlated_error() {
+    let instrs = parse_lines("CORRELATED_ERROR(1) X0 X1\nM 0 1\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(2, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 {
+        assert_eq!(m.get(0, shot), true);
+        assert_eq!(m.get(1, shot), true);
+    }
+}
+
+#[test]
+fn frame_sim_else_correlated_error() {
+    let instrs = parse_lines("CORRELATED_ERROR(1) X0\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(2, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 {
+        assert_eq!(m.get(0, shot), true);
+        assert_eq!(m.get(1, shot), false);
+    }
+}
+
+#[test]
+fn frame_sim_depolarize1_statistical() {
+    let instrs = parse_lines("DEPOLARIZE1(0.75) 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let n = 10000;
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, n);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    let count: usize = (0..n).filter(|&s| m.get(0, s)).count();
+    // X or Y flip Z measurement: 2/3 of 75% = 50%
+    assert!((count as f64 / n as f64 - 0.5).abs() < 0.05, "count={count}");
+}
+
+#[test]
+fn frame_sim_mpp_zz_bell() {
+    let instrs = parse_lines("H 0\nCNOT 0 1\nMPP Z0*Z1\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(2, 128);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..128 {
+        assert_eq!(m.get(0, shot), ref_sample[0]);
+    }
+}
+
+#[test]
+fn frame_sim_heralded_erase() {
+    let instrs = parse_lines("HERALDED_ERASE(1) 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![false, false]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 { assert_eq!(m.get(0, shot), true); }
+}
