@@ -5,6 +5,7 @@ use rstim::sim::bit_table::BitTable;
 use rstim::sim::frame::FrameSimulator;
 use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
+use rstim::sampler::sample_batch;
 
 #[test]
 fn measure_record_batch_push_and_lookback() {
@@ -239,4 +240,66 @@ fn frame_sim_heralded_erase() {
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     let m = frame.measurements(&ref_sample);
     for shot in 0..64 { assert_eq!(m.get(0, shot), true); }
+}
+
+#[test]
+fn sample_batch_deterministic() {
+    let instrs = parse_lines("X 0\nM 0\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 100, &mut rng).unwrap();
+    for shot in 0..100 {
+        assert_eq!(out.measurements.get(0, shot), true);
+    }
+}
+
+#[test]
+fn sample_batch_detector_noiseless() {
+    let instrs = parse_lines("M 0\nR 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 64, &mut rng).unwrap();
+    for shot in 0..64 {
+        assert_eq!(out.detections.get(0, shot), false);
+    }
+}
+
+#[test]
+fn sample_batch_detector_with_noise() {
+    let instrs = parse_lines("M 0\nR 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 64, &mut rng).unwrap();
+    for shot in 0..64 {
+        assert_eq!(out.detections.get(0, shot), true);
+    }
+}
+
+#[test]
+fn sample_batch_observable() {
+    let instrs = parse_lines("X 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 64, &mut rng).unwrap();
+    for shot in 0..64 {
+        assert_eq!(out.observable_flips.get(0, shot), true);
+    }
+}
+
+#[test]
+fn sample_batch_bell_correlated() {
+    let instrs = parse_lines("H 0\nCNOT 0 1\nM 0 1\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 1000, &mut rng).unwrap();
+    for shot in 0..1000 {
+        assert_eq!(out.measurements.get(0, shot), out.measurements.get(1, shot));
+    }
+}
+
+#[test]
+fn sample_batch_repeat() {
+    let instrs = parse_lines("REPEAT 3 {\nX 0\nM 0\nR 0\n}\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 64, &mut rng).unwrap();
+    for shot in 0..64 {
+        for m_idx in 0..3 {
+            assert_eq!(out.measurements.get(m_idx, shot), true);
+        }
+    }
 }

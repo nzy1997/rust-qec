@@ -724,7 +724,7 @@ fn recorder_bits(r: Recorder) -> Vec<bool> {
     out
 }
 
-fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
+pub(crate) fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
     let mut max_q: Option<u32> = None;
     for i in instrs {
         match i {

@@ -11,6 +11,8 @@ pub struct FrameSimulator {
     pub z_table: BitTable,
     pub m_record: MeasureRecordBatch,
     last_correlated_error_occurred: Vec<u64>,
+    det_records: Vec<Vec<u64>>,
+    obs_records: Vec<Vec<u64>>,
 }
 
 impl FrameSimulator {
@@ -23,6 +25,8 @@ impl FrameSimulator {
             z_table: BitTable::new(num_qubits, batch_size),
             m_record: MeasureRecordBatch::new(batch_size),
             last_correlated_error_occurred: vec![0u64; words_per_row],
+            det_records: Vec::new(),
+            obs_records: Vec::new(),
         }
     }
 
@@ -35,7 +39,7 @@ impl FrameSimulator {
         for instr in instrs {
             match instr {
                 StimInstr::Op { name, args, targets, .. } => {
-                    self.exec_op(name.as_str(), args, targets, rng)?;
+                    self.exec_op(name.as_str(), args, targets, ref_sample, rng)?;
                 }
                 StimInstr::Repeat { count, body } => {
                     for _ in 0..*count {
@@ -52,6 +56,7 @@ impl FrameSimulator {
         name: &str,
         args: &[f64],
         targets: &[StimTarget],
+        ref_sample: &[bool],
         rng: &mut impl Rng,
     ) -> Result<(), String> {
         let wpr = self.x_table.words_per_row();
@@ -535,9 +540,48 @@ impl FrameSimulator {
                 }
             }
 
-            // Metadata: no-op
-            "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS"
-            | "DETECTOR" | "OBSERVABLE_INCLUDE" => {}
+            "DETECTOR" => {
+                let wpr = self.m_record.words_per_row();
+                let mut result = vec![0u64; wpr];
+                let mut ref_parity = false;
+                for t in targets {
+                    if let StimTarget::Rec(offset) = t {
+                        let k = (-*offset) as usize;
+                        self.m_record.xor_lookback_into(k, &mut result);
+                        let m_idx = self.m_record.len() - k;
+                        if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                            ref_parity = !ref_parity;
+                        }
+                    }
+                }
+                if ref_parity {
+                    for w in &mut result { *w ^= !0u64; }
+                }
+                self.det_records.push(result);
+            }
+            "OBSERVABLE_INCLUDE" => {
+                let idx = args.first().copied().unwrap_or(0.0) as usize;
+                let wpr = self.m_record.words_per_row();
+                while self.obs_records.len() <= idx {
+                    self.obs_records.push(vec![0u64; wpr]);
+                }
+                let mut ref_parity = false;
+                for t in targets {
+                    if let StimTarget::Rec(offset) = t {
+                        let k = (-*offset) as usize;
+                        self.m_record.xor_lookback_into(k, &mut self.obs_records[idx]);
+                        let m_idx = self.m_record.len() - k;
+                        if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                            ref_parity = !ref_parity;
+                        }
+                    }
+                }
+                if ref_parity {
+                    for w in &mut self.obs_records[idx] { *w ^= !0u64; }
+                }
+            }
+
+            "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => {}
 
             "MPAD" => {
                 for _t in targets {
@@ -651,6 +695,24 @@ impl FrameSimulator {
                     *w = !*w;
                 }
             }
+        }
+        result
+    }
+
+    pub fn detections(&self) -> BitTable {
+        let n = self.det_records.len();
+        let mut result = BitTable::new(n, self.batch_size);
+        for (i, row) in self.det_records.iter().enumerate() {
+            result.row_words_mut(i).copy_from_slice(row);
+        }
+        result
+    }
+
+    pub fn observable_flips(&self) -> BitTable {
+        let n = self.obs_records.len();
+        let mut result = BitTable::new(n, self.batch_size);
+        for (i, row) in self.obs_records.iter().enumerate() {
+            result.row_words_mut(i).copy_from_slice(row);
         }
         result
     }
