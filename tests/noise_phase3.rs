@@ -100,3 +100,49 @@ fn correlated_error_multi_qubit_pauli() {
     let m = run("CORRELATED_ERROR(1) Y0 Z1\nM 0 1\n");
     assert_eq!(m, vec![true, false]);
 }
+
+#[test]
+fn pauli_channel_1_deterministic_x() {
+    let m = run("PAULI_CHANNEL_1(1,0,0) 0\nM 0\n");
+    assert_eq!(m, vec![true]);
+}
+
+#[test]
+fn pauli_channel_1_deterministic_z() {
+    // Z|0⟩ = |0⟩
+    let m = run("PAULI_CHANNEL_1(0,0,1) 0\nM 0\n");
+    assert_eq!(m, vec![false]);
+}
+
+#[test]
+fn pauli_channel_1_no_error() {
+    let m = run("PAULI_CHANNEL_1(0,0,0) 0\nM 0\n");
+    assert_eq!(m, vec![false]);
+}
+
+#[test]
+fn pauli_channel_1_multi_qubit() {
+    let m = run("PAULI_CHANNEL_1(1,0,0) 0 1\nM 0 1\n");
+    assert_eq!(m, vec![true, true]);
+}
+
+#[test]
+fn pauli_channel_2_deterministic_xx() {
+    // p_xx=1 (index 4), all others 0
+    // Order: IX IY IZ XI XX XY XZ YI YX YY YZ ZI ZX ZY ZZ
+    let m = run("PAULI_CHANNEL_2(0,0,0,0,1,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n");
+    assert_eq!(m, vec![true, true]);
+}
+
+#[test]
+fn pauli_channel_2_deterministic_zi() {
+    // p_zi=1 (index 11): Z on first qubit, I on second
+    let m = run("PAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,1,0,0,0) 0 1\nM 0 1\n");
+    assert_eq!(m, vec![false, false]); // Z|0⟩=|0⟩
+}
+
+#[test]
+fn pauli_channel_2_no_error() {
+    let m = run("PAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n");
+    assert_eq!(m, vec![false, false]);
+}

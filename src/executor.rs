@@ -301,6 +301,47 @@ impl Executor {
                                 apply_spp(&mut state, &product.terms, product.inverted, true);
                             }
                         }
+                        "PAULI_CHANNEL_1" => {
+                            let px = args.get(0).copied().unwrap_or(0.0);
+                            let py = args.get(1).copied().unwrap_or(0.0);
+                            let pz = args.get(2).copied().unwrap_or(0.0);
+                            for q in qubits(targets)? {
+                                let r: f64 = rng.r#gen();
+                                if r < px {
+                                    state.x_gate(q);
+                                } else if r < px + py {
+                                    state.y_gate(q);
+                                } else if r < px + py + pz {
+                                    state.z_gate(q);
+                                }
+                            }
+                        }
+                        "PAULI_CHANNEL_2" => {
+                            let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                            let pairs = qubit_pairs(targets)?;
+                            let paulis: [(u8, u8); 15] = [
+                                (0, 1), (0, 2), (0, 3),
+                                (1, 0), (1, 1), (1, 2), (1, 3),
+                                (2, 0), (2, 1), (2, 2), (2, 3),
+                                (3, 0), (3, 1), (3, 2), (3, 3),
+                            ];
+                            for (a, b) in pairs {
+                                let r: f64 = rng.r#gen();
+                                let mut cumulative = 0.0;
+                                let mut chosen = None;
+                                for (i, &(pa, pb)) in paulis.iter().enumerate() {
+                                    cumulative += probs[i];
+                                    if r < cumulative {
+                                        chosen = Some((pa, pb));
+                                        break;
+                                    }
+                                }
+                                if let Some((pa, pb)) = chosen {
+                                    apply_pauli(&mut state, a, pa);
+                                    apply_pauli(&mut state, b, pb);
+                                }
+                            }
+                        }
                         "CORRELATED_ERROR" | "E" => {
                             let p = args.first().copied().unwrap_or(0.0);
                             if p > 0.0 && rng.r#gen::<f64>() < p {
