@@ -46,3 +46,57 @@ fn parser_tag_no_args() {
         _ => panic!("expected Op"),
     }
 }
+
+#[test]
+fn correlated_error_deterministic() {
+    let m = run("CORRELATED_ERROR(1) X0\nM 0\n");
+    assert_eq!(m, vec![true]);
+}
+
+#[test]
+fn correlated_error_zero_prob() {
+    let m = run("CORRELATED_ERROR(0) X0\nM 0\n");
+    assert_eq!(m, vec![false]);
+}
+
+#[test]
+fn correlated_error_multi_pauli() {
+    let m = run("CORRELATED_ERROR(1) X0\nM 0 1 2\n");
+    assert_eq!(m, vec![true, false, false]);
+}
+
+#[test]
+fn else_correlated_error_skipped_when_first_fires() {
+    let m = run("CORRELATED_ERROR(1) X0\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\n");
+    assert_eq!(m, vec![true, false]);
+}
+
+#[test]
+fn else_correlated_error_fires_when_first_doesnt() {
+    let m = run("CORRELATED_ERROR(0) X0\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\n");
+    assert_eq!(m, vec![false, true]);
+}
+
+#[test]
+fn correlated_error_chain_three() {
+    let m = run("CORRELATED_ERROR(0) X0\nELSE_CORRELATED_ERROR(1) X1\nELSE_CORRELATED_ERROR(1) X2\nM 0 1 2\n");
+    assert_eq!(m, vec![false, true, false]);
+}
+
+#[test]
+fn correlated_error_resets_flag() {
+    let m = run(
+        "CORRELATED_ERROR(1) X0\n\
+         ELSE_CORRELATED_ERROR(1) X1\n\
+         CORRELATED_ERROR(1) X2\n\
+         ELSE_CORRELATED_ERROR(1) X3\n\
+         M 0 1 2 3\n"
+    );
+    assert_eq!(m, vec![true, false, true, false]);
+}
+
+#[test]
+fn correlated_error_multi_qubit_pauli() {
+    let m = run("CORRELATED_ERROR(1) Y0 Z1\nM 0 1\n");
+    assert_eq!(m, vec![true, false]);
+}

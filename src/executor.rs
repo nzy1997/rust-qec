@@ -30,6 +30,7 @@ impl Executor {
         let mut detector_coords = Vec::new();
         let mut observables = Vec::new();
         let mut coords = CoordState::default();
+        let mut last_correlated_error_occurred = false;
 
         for instr in &self.instrs {
             match instr {
@@ -300,6 +301,24 @@ impl Executor {
                                 apply_spp(&mut state, &product.terms, product.inverted, true);
                             }
                         }
+                        "CORRELATED_ERROR" | "E" => {
+                            let p = args.first().copied().unwrap_or(0.0);
+                            if p > 0.0 && rng.r#gen::<f64>() < p {
+                                apply_pauli_targets(&mut state, targets)?;
+                                last_correlated_error_occurred = true;
+                            } else {
+                                last_correlated_error_occurred = false;
+                            }
+                        }
+                        "ELSE_CORRELATED_ERROR" => {
+                            if !last_correlated_error_occurred {
+                                let p = args.first().copied().unwrap_or(0.0);
+                                if p > 0.0 && rng.r#gen::<f64>() < p {
+                                    apply_pauli_targets(&mut state, targets)?;
+                                    last_correlated_error_occurred = true;
+                                }
+                            }
+                        }
                         _ => return Err(format!("unsupported instruction {}", name)),
                     }
                 }
@@ -429,6 +448,23 @@ fn xor_recs(r: &Recorder, targets: &[StimTarget]) -> Result<bool, String> {
         }
     }
     Ok(acc)
+}
+
+fn apply_pauli_targets(state: &mut StabilizerState, targets: &[StimTarget]) -> Result<(), String> {
+    for t in targets {
+        match t {
+            StimTarget::Pauli { qubit, basis, .. } => {
+                let q = *qubit as usize;
+                match basis {
+                    PauliBasis::X => state.x_gate(q),
+                    PauliBasis::Y => state.y_gate(q),
+                    PauliBasis::Z => state.z_gate(q),
+                }
+            }
+            _ => return Err("CORRELATED_ERROR targets must be Pauli".to_string()),
+        }
+    }
+    Ok(())
 }
 
 fn apply_pauli(state: &mut StabilizerState, q: usize, p: u8) {
