@@ -1,5 +1,8 @@
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::sim::measure_record_batch::MeasureRecordBatch;
 use rstim::sim::bit_table::BitTable;
+use rstim::sim::frame::FrameSimulator;
 use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 
@@ -77,4 +80,73 @@ fn reference_sample_reset() {
     let instrs = parse_lines("X 0\nR 0\nM 0\n").unwrap();
     let ref_sample = reference_sample(&instrs).unwrap();
     assert_eq!(ref_sample, vec![false]);
+}
+
+#[test]
+fn frame_sim_no_noise_x_m() {
+    let instrs = parse_lines("X 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![true]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 {
+        assert_eq!(m.get(0, shot), true, "shot {shot}");
+    }
+}
+
+#[test]
+fn frame_sim_h_cnot_bell() {
+    let instrs = parse_lines("H 0\nCNOT 0 1\nM 0 1\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(2, 256);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..256 {
+        assert_eq!(m.get(0, shot), m.get(1, shot), "shot {shot}");
+    }
+}
+
+#[test]
+fn frame_sim_identity() {
+    let instrs = parse_lines("M 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 128);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..128 {
+        assert_eq!(m.get(0, shot), false, "shot {shot}");
+    }
+}
+
+#[test]
+fn frame_sim_reset_then_measure() {
+    let instrs = parse_lines("X 0\nR 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![false]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 {
+        assert_eq!(m.get(0, shot), false, "shot {shot}");
+    }
+}
+
+#[test]
+fn frame_sim_measure_reset_measure() {
+    let instrs = parse_lines("MR 0\nM 0\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![false, false]);
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut frame = FrameSimulator::new(1, 64);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    let m = frame.measurements(&ref_sample);
+    for shot in 0..64 {
+        assert_eq!(m.get(0, shot), false, "shot {shot}");
+        assert_eq!(m.get(1, shot), false, "shot {shot}");
+    }
 }
