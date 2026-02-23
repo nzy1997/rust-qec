@@ -428,6 +428,293 @@ impl Executor {
     }
 }
 
+// --- reference_sample: noiseless biased simulation ---
+
+pub fn reference_sample(instrs: &[StimInstr]) -> Result<Vec<bool>, String> {
+    let n = max_qubit(instrs)?;
+    let mut state = StabilizerState::new(n);
+    let mut measurements = Vec::new();
+    ref_sample_instrs(&mut state, &mut measurements, instrs)?;
+    Ok(measurements)
+}
+
+fn ref_sample_instrs(
+    state: &mut StabilizerState,
+    measurements: &mut Vec<bool>,
+    instrs: &[StimInstr],
+) -> Result<(), String> {
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, args, targets, .. } => {
+                ref_sample_op(state, measurements, name.as_str(), args, targets)?;
+            }
+            StimInstr::Repeat { count, body } => {
+                for _ in 0..*count {
+                    ref_sample_instrs(state, measurements, body)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn ref_sample_op(
+    state: &mut StabilizerState,
+    measurements: &mut Vec<bool>,
+    name: &str,
+    _args: &[f64],
+    targets: &[StimTarget],
+) -> Result<(), String> {
+    match name {
+        // Identity
+        "I" => {}
+
+        // Single-qubit Cliffords
+        "H" => for_each_qubit(targets, |q| state.h(q))?,
+        "H_XY" => for_each_qubit(targets, |q| state.h_xy(q))?,
+        "H_YZ" => for_each_qubit(targets, |q| state.h_yz(q))?,
+        "S" | "SQRT_Z" => for_each_qubit(targets, |q| state.s(q))?,
+        "S_DAG" | "SQRT_Z_DAG" => for_each_qubit(targets, |q| state.s_dag(q))?,
+        "SQRT_X" => for_each_qubit(targets, |q| state.sqrt_x(q))?,
+        "SQRT_X_DAG" => for_each_qubit(targets, |q| state.sqrt_x_dag(q))?,
+        "SQRT_Y" => for_each_qubit(targets, |q| state.sqrt_y(q))?,
+        "SQRT_Y_DAG" => for_each_qubit(targets, |q| state.sqrt_y_dag(q))?,
+        "X" => for_each_qubit(targets, |q| state.x_gate(q))?,
+        "Y" => for_each_qubit(targets, |q| state.y_gate(q))?,
+        "Z" => for_each_qubit(targets, |q| state.z_gate(q))?,
+
+        // Two-qubit Cliffords
+        "CX" | "CNOT" | "ZCX" => {
+            for (c, t) in qubit_pairs(targets)? { state.cx(c, t); }
+        }
+        "CY" | "ZCY" => {
+            for (c, t) in qubit_pairs(targets)? { state.cy(c, t); }
+        }
+        "CZ" | "ZCZ" => {
+            for (a, b) in qubit_pairs(targets)? { state.cz(a, b); }
+        }
+        "XCX" => {
+            for (a, b) in qubit_pairs(targets)? { state.xcx(a, b); }
+        }
+        "XCY" => {
+            for (a, b) in qubit_pairs(targets)? { state.xcy(a, b); }
+        }
+        "XCZ" => {
+            for (a, b) in qubit_pairs(targets)? { state.xcz(a, b); }
+        }
+        "YCX" => {
+            for (a, b) in qubit_pairs(targets)? { state.ycx(a, b); }
+        }
+        "YCY" => {
+            for (a, b) in qubit_pairs(targets)? { state.ycy(a, b); }
+        }
+        "YCZ" => {
+            for (a, b) in qubit_pairs(targets)? { state.ycz(a, b); }
+        }
+        "SWAP" => {
+            for (a, b) in qubit_pairs(targets)? { state.swap(a, b); }
+        }
+        "ISWAP" => {
+            for (a, b) in qubit_pairs(targets)? { state.iswap(a, b); }
+        }
+        "ISWAP_DAG" => {
+            for (a, b) in qubit_pairs(targets)? { state.iswap_dag(a, b); }
+        }
+        "CXSWAP" => {
+            for (a, b) in qubit_pairs(targets)? { state.cxswap(a, b); }
+        }
+        "SWAPCX" => {
+            for (a, b) in qubit_pairs(targets)? { state.swapcx(a, b); }
+        }
+        "CZSWAP" => {
+            for (a, b) in qubit_pairs(targets)? { state.czswap(a, b); }
+        }
+
+        // Measurements (biased)
+        "M" | "MZ" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                let bit = state.measure_z_biased(q);
+                measurements.push((bit == 1) ^ inv);
+            }
+        }
+        "MX" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                state.h(q);
+                let bit = state.measure_z_biased(q);
+                state.h(q);
+                measurements.push((bit == 1) ^ inv);
+            }
+        }
+        "MY" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                state.s_dag(q);
+                state.h(q);
+                let bit = state.measure_z_biased(q);
+                state.h(q);
+                state.s(q);
+                measurements.push((bit == 1) ^ inv);
+            }
+        }
+        "MR" | "MRZ" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                let bit = state.measure_z_biased(q);
+                measurements.push((bit == 1) ^ inv);
+                if bit == 1 { state.x_gate(q); }
+            }
+        }
+        "MRX" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                state.h(q);
+                let bit = state.measure_z_biased(q);
+                measurements.push((bit == 1) ^ inv);
+                if bit == 1 { state.x_gate(q); }
+                state.h(q);
+            }
+        }
+        "MRY" => {
+            for (q, inv) in qubits_with_inversion(targets)? {
+                state.s_dag(q);
+                state.h(q);
+                let bit = state.measure_z_biased(q);
+                measurements.push((bit == 1) ^ inv);
+                if bit == 1 { state.x_gate(q); }
+                state.h(q);
+                state.s(q);
+            }
+        }
+        "MPAD" => {
+            for t in targets {
+                let q = expect_qubit(t)?;
+                measurements.push(q != 0);
+            }
+        }
+
+        // Resets (biased)
+        "R" | "RZ" => {
+            for q in qubits(targets)? { state.reset_z_biased(q); }
+        }
+        "RX" => {
+            for q in qubits(targets)? { state.reset_x_biased(q); }
+        }
+        "RY" => {
+            for q in qubits(targets)? { state.reset_y_biased(q); }
+        }
+
+        // Multi-qubit Pauli measurements (biased)
+        "MPP" => {
+            let products = split_pauli_products(targets)?;
+            for product in &products {
+                let bit = measure_pauli_product_biased(
+                    state,
+                    &product.terms,
+                    product.inverted,
+                );
+                measurements.push(bit);
+            }
+        }
+        "MXX" => {
+            let pairs = qubits_with_inversion_pairs(targets)?;
+            for ((a, inv_a), (b, _)) in pairs {
+                let terms = vec![(a, PauliBasis::X), (b, PauliBasis::X)];
+                let bit = measure_pauli_product_biased(state, &terms, inv_a);
+                measurements.push(bit);
+            }
+        }
+        "MYY" => {
+            let pairs = qubits_with_inversion_pairs(targets)?;
+            for ((a, inv_a), (b, _)) in pairs {
+                let terms = vec![(a, PauliBasis::Y), (b, PauliBasis::Y)];
+                let bit = measure_pauli_product_biased(state, &terms, inv_a);
+                measurements.push(bit);
+            }
+        }
+        "MZZ" => {
+            let pairs = qubits_with_inversion_pairs(targets)?;
+            for ((a, inv_a), (b, _)) in pairs {
+                let terms = vec![(a, PauliBasis::Z), (b, PauliBasis::Z)];
+                let bit = measure_pauli_product_biased(state, &terms, inv_a);
+                measurements.push(bit);
+            }
+        }
+
+        // SPP gates (no measurements, same logic as executor)
+        "SPP" => {
+            let products = split_pauli_products(targets)?;
+            for product in &products {
+                apply_spp(state, &product.terms, product.inverted, false);
+            }
+        }
+        "SPP_DAG" => {
+            let products = split_pauli_products(targets)?;
+            for product in &products {
+                apply_spp(state, &product.terms, product.inverted, true);
+            }
+        }
+
+        // Heralded channels: push false per target (no herald in noiseless)
+        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+            for _q in qubits(targets)? {
+                measurements.push(false);
+            }
+        }
+
+        // Noise instructions: skip
+        "X_ERROR" | "Z_ERROR" | "Y_ERROR"
+        | "DEPOLARIZE1" | "DEPOLARIZE2"
+        | "CORRELATED_ERROR" | "E" | "ELSE_CORRELATED_ERROR"
+        | "PAULI_CHANNEL_1" | "PAULI_CHANNEL_2"
+        | "I_ERROR" | "II_ERROR" => {}
+
+        // Metadata: skip
+        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS"
+        | "DETECTOR" | "OBSERVABLE_INCLUDE" => {}
+
+        _ => return Err(format!("reference_sample: unsupported instruction {}", name)),
+    }
+    Ok(())
+}
+
+fn measure_pauli_product_biased(
+    state: &mut StabilizerState,
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+) -> bool {
+    if terms.is_empty() {
+        return inverted;
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    let anchor = terms.last().unwrap().0;
+    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    for &q in &non_anchor {
+        state.cx(q, anchor);
+    }
+
+    let bit = state.measure_z_biased(anchor);
+    let result = (bit == 1) ^ inverted;
+
+    for &q in non_anchor.iter().rev() {
+        state.cx(q, anchor);
+    }
+
+    for &(q, basis) in terms {
+        match basis {
+            PauliBasis::X => state.h(q),
+            PauliBasis::Y => state.h_yz(q),
+            PauliBasis::Z => {}
+        }
+    }
+
+    result
+}
+
 fn recorder_bits(r: Recorder) -> Vec<bool> {
     let mut out = Vec::new();
     for i in 1..=r.len() {
