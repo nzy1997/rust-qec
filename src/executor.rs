@@ -291,10 +291,14 @@ fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
         match i {
             StimInstr::Op { targets, .. } => {
                 for t in targets {
-                    if let StimTarget::Qubit(q) = t {
-                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
-                    } else if let StimTarget::QubitInv(q) = t {
-                        max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                    match t {
+                        StimTarget::Qubit(q) | StimTarget::QubitInv(q) => {
+                            max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                        }
+                        StimTarget::Pauli { qubit: q, .. } => {
+                            max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
+                        }
+                        StimTarget::Combiner | StimTarget::Rec(_) => {}
                     }
                 }
             }

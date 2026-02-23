@@ -1,8 +1,23 @@
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PauliBasis {
+    X,
+    Y,
+    Z,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StimTarget {
     Qubit(u32),
     QubitInv(u32),
     Rec(i32),
+    Pauli { qubit: u32, basis: PauliBasis, inverted: bool },
+    Combiner,
+}
+
+impl StimTarget {
+    pub fn pauli(qubit: u32, basis: PauliBasis, inverted: bool) -> Self {
+        StimTarget::Pauli { qubit, basis, inverted }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
