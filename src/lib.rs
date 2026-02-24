@@ -14,3 +14,4 @@ pub mod error_analyzer;
 pub mod output;
 pub mod cli;
 pub mod stats;
+pub mod transforms;
