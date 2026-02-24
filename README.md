@@ -1,7 +1,7 @@
 # rstim
 
 [![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rstim/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
+[![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
 
 A Rust implementation of Stim-like stabilizer circuit simulation.
 
