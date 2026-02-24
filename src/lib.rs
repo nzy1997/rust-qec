@@ -10,3 +10,4 @@ pub mod sim;
 pub mod coords;
 pub mod sampler;
 pub mod dem;
+pub mod error_analyzer;
