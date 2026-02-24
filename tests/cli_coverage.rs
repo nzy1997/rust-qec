@@ -95,7 +95,7 @@ fn merge_both() {
     assert_eq!(merged.num_major(), 3);
     assert!(merged.get(0, 0));
     assert!(!merged.get(1, 0));
-    assert!(merged.get(2, 0)); // obs[0] at position n_dets+0
+    assert!(merged.get(2, 0));
     assert!(!merged.get(0, 1));
     assert!(merged.get(1, 1));
     assert!(!merged.get(2, 1));
@@ -116,6 +116,145 @@ fn make_rng_with_seed_deterministic() {
 #[test]
 fn make_rng_without_seed() {
     let _rng = cli::make_rng(None);
+}
+
+// ---------- read_input ----------
+
+#[test]
+fn read_input_from_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.stim");
+    std::fs::write(&path, "R 0\nM 0").unwrap();
+    let text = cli::read_input(Some(path.to_str().unwrap())).unwrap();
+    assert_eq!(text, "R 0\nM 0");
+}
+
+#[test]
+fn read_input_file_not_found() {
+    let err = cli::read_input(Some("/nonexistent/path/file.stim"));
+    assert!(err.is_err());
+    assert!(err.unwrap_err().contains("failed to read"));
+}
+
+// ---------- open_output ----------
+
+#[test]
+fn open_output_to_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("out.txt");
+    {
+        use std::io::Write;
+        let mut w = cli::open_output(Some(path.to_str().unwrap())).unwrap();
+        w.write_all(b"hello").unwrap();
+    }
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
+}
+
+#[test]
+fn open_output_to_stdout() {
+    let w = cli::open_output(None);
+    assert!(w.is_ok());
+}
+
+#[test]
+fn open_output_bad_path() {
+    let result = cli::open_output(Some("/nonexistent/dir/file.txt"));
+    assert!(result.is_err());
+}
+
+// ---------- run() dispatch ----------
+
+#[test]
+fn run_no_command_prints_version() {
+    use clap::Parser;
+    let cli = cli::Cli::parse_from(["rstim"]);
+    let result = cli::run(cli);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn run_sample_via_dispatch() {
+    use clap::Parser;
+    let dir = tempfile::tempdir().unwrap();
+    let circuit_path = dir.path().join("test.stim");
+    std::fs::write(&circuit_path, "R 0\nX 0\nM 0").unwrap();
+    let out_path = dir.path().join("out.txt");
+    let cli = cli::Cli::parse_from([
+        "rstim", "sample", "--shots", "1",
+        "--in", circuit_path.to_str().unwrap(),
+        "--out", out_path.to_str().unwrap(),
+    ]);
+    cli::run(cli).unwrap();
+    assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
+}
+
+#[test]
+fn run_detect_via_dispatch() {
+    use clap::Parser;
+    let dir = tempfile::tempdir().unwrap();
+    let circuit_path = dir.path().join("test.stim");
+    std::fs::write(&circuit_path, "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]").unwrap();
+    let out_path = dir.path().join("out.txt");
+    let cli = cli::Cli::parse_from([
+        "rstim", "detect", "--shots", "1",
+        "--in", circuit_path.to_str().unwrap(),
+        "--out", out_path.to_str().unwrap(),
+    ]);
+    cli::run(cli).unwrap();
+    assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
+}
+
+#[test]
+fn run_analyze_errors_via_dispatch() {
+    use clap::Parser;
+    let dir = tempfile::tempdir().unwrap();
+    let circuit_path = dir.path().join("test.stim");
+    std::fs::write(&circuit_path, "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]").unwrap();
+    let out_path = dir.path().join("out.dem");
+    let cli = cli::Cli::parse_from([
+        "rstim", "analyze_errors",
+        "--in", circuit_path.to_str().unwrap(),
+        "--out", out_path.to_str().unwrap(),
+    ]);
+    cli::run(cli).unwrap();
+    let dem = std::fs::read_to_string(&out_path).unwrap();
+    assert!(dem.contains("error(0.1)"));
+    assert!(dem.contains("D0"));
+}
+
+#[test]
+fn run_sample_dem_via_dispatch() {
+    use clap::Parser;
+    let dir = tempfile::tempdir().unwrap();
+    let dem_path = dir.path().join("test.dem");
+    std::fs::write(&dem_path, "error(1) D0 L0").unwrap();
+    let out_path = dir.path().join("out.txt");
+    let cli = cli::Cli::parse_from([
+        "rstim", "sample_dem", "--shots", "1",
+        "--in", dem_path.to_str().unwrap(),
+        "--out", out_path.to_str().unwrap(),
+    ]);
+    cli::run(cli).unwrap();
+    assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
+}
+
+#[test]
+fn run_sample_dem_with_obs_via_dispatch() {
+    use clap::Parser;
+    let dir = tempfile::tempdir().unwrap();
+    let dem_path = dir.path().join("test.dem");
+    std::fs::write(&dem_path, "error(1) D0 L0").unwrap();
+    let out_path = dir.path().join("out.txt");
+    let obs_path = dir.path().join("obs.txt");
+    let cli = cli::Cli::parse_from([
+        "rstim", "sample_dem", "--shots", "1",
+        "--in", dem_path.to_str().unwrap(),
+        "--out", out_path.to_str().unwrap(),
+        "--obs_out", obs_path.to_str().unwrap(),
+    ]);
+    cli::run(cli).unwrap();
+    assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
+    assert_eq!(std::fs::read_to_string(&obs_path).unwrap().trim(), "1");
 }
 
 // ---------- run_sample ----------
@@ -414,7 +553,7 @@ fn run_sample_dem_with_obs_b8() {
     assert_eq!(obs_buf, vec![0x01]);
 }
 
-// ---------- run_sample_dem pipeline ----------
+// ---------- pipeline ----------
 
 #[test]
 fn pipeline_analyze_then_sample_dem() {

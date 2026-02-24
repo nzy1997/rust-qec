@@ -70,6 +70,64 @@ fn format_r8_long_run() {
 }
 
 #[test]
+fn format_r8_long_terminator_run() {
+    // Bit 0 set, then 259 trailing zeros before end. Terminator run = 259 >= 255.
+    let mut table = BitTable::new(260, 1);
+    table.set(0, 0, true);
+    let mut buf = Vec::new();
+    write_shots_r8(&table, &mut buf).unwrap();
+    // [0 (run before bit 0), 255 (255 zeros no True), 4 (4 zeros then terminator)]
+    assert_eq!(buf, vec![0, 255, 4]);
+}
+
+#[test]
+fn format_r8_multiple_shots() {
+    let mut table = BitTable::new(3, 2);
+    table.set(0, 0, true);
+    table.set(2, 1, true);
+    let mut buf = Vec::new();
+    write_shots_r8(&table, &mut buf).unwrap();
+    // shot 0: bit 0 set -> [0, 2]  (0 before hit, 2 zeros then terminator)
+    // shot 1: bit 2 set -> [2, 0]  (2 zeros before hit, 0 zeros then terminator)
+    assert_eq!(buf, vec![0, 2, 2, 0]);
+}
+
+#[test]
+fn format_b8_zero_bits() {
+    let table = BitTable::new(0, 2);
+    let mut buf = Vec::new();
+    write_shots_b8(&table, &mut buf).unwrap();
+    assert!(buf.is_empty());
+}
+
+#[test]
+fn format_b8_multi_shot() {
+    let mut table = BitTable::new(8, 2);
+    table.set(0, 0, true);
+    table.set(7, 1, true);
+    let mut buf = Vec::new();
+    write_shots_b8(&table, &mut buf).unwrap();
+    assert_eq!(buf, vec![0x01, 0x80]);
+}
+
+#[test]
+fn format_hits_no_hits() {
+    let table = BitTable::new(5, 1);
+    let mut buf = Vec::new();
+    write_shots_hits(&table, &mut buf).unwrap();
+    assert_eq!(String::from_utf8(buf).unwrap(), "\n");
+}
+
+#[test]
+fn format_dets_no_detections() {
+    let dets = BitTable::new(3, 1);
+    let obs = BitTable::new(2, 1);
+    let mut buf = Vec::new();
+    write_shots_dets(&dets, &obs, &mut buf).unwrap();
+    assert_eq!(String::from_utf8(buf).unwrap(), "shot\n");
+}
+
+#[test]
 fn format_hits_simple() {
     let mut table = BitTable::new(5, 2);
     table.set(1, 0, true);
