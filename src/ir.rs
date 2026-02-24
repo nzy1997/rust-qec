@@ -18,6 +18,14 @@ impl StimTarget {
     pub fn pauli(qubit: u32, basis: PauliBasis, inverted: bool) -> Self {
         StimTarget::Pauli { qubit, basis, inverted }
     }
+
+    pub fn qubit_index(&self) -> Option<u32> {
+        match self {
+            StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Some(*q),
+            StimTarget::Pauli { qubit, .. } => Some(*qubit),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
