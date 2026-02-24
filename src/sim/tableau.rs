@@ -219,6 +219,66 @@ impl StabilizerState {
         self.swap(a, b);
     }
 
+    /// Like measure_z but always returns 0 for random outcomes (bias toward +Z).
+    /// Used by reference_sample for noiseless baseline.
+    pub fn measure_z_biased(&mut self, q: usize) -> u8 {
+        let mut p = None;
+        for i in self.n..2 * self.n {
+            if self.x[i][q] {
+                p = Some(i);
+                break;
+            }
+        }
+
+        if let Some(p) = p {
+            let r: u8 = 0;
+            for i in 0..2 * self.n {
+                if i != p && self.x[i][q] {
+                    self.row_mult(i, p);
+                }
+            }
+            let d = p - self.n;
+            self.copy_row(p, d);
+            self.x[p].fill(false);
+            self.z[p].fill(false);
+            self.z[p][q] = true;
+            self.phase[p] = 0;
+            return r;
+        }
+
+        let mut temp_x = vec![false; self.n];
+        let mut temp_z = vec![false; self.n];
+        temp_z[q] = true;
+        let mut temp_phase: u8 = 0;
+        for i in 0..self.n {
+            if self.x[i][q] {
+                self.row_mult_temp(&mut temp_x, &mut temp_z, &mut temp_phase, i + self.n);
+            }
+        }
+        if temp_phase % 4 == 2 { 1 } else { 0 }
+    }
+
+    pub fn reset_z_biased(&mut self, q: usize) {
+        let outcome = self.measure_z_biased(q);
+        if outcome == 1 {
+            self.x_gate(q);
+        }
+    }
+
+    pub fn reset_x_biased(&mut self, q: usize) {
+        self.h(q);
+        self.reset_z_biased(q);
+        self.h(q);
+    }
+
+    pub fn reset_y_biased(&mut self, q: usize) {
+        self.s_dag(q);
+        self.h(q);
+        self.reset_z_biased(q);
+        self.h(q);
+        self.s(q);
+    }
+
     pub fn reset_z(&mut self, q: usize, rng: &mut impl Rng) {
         let (outcome, _) = self.measure_z(q, rng);
         if outcome == 1 {
