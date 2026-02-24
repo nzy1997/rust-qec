@@ -93,6 +93,31 @@ impl FrameSimulator {
                     do_sqrt_x(&mut self.x_table, &mut self.z_table, q);
                 }
             }
+            "C_XYZ" | "C_NXYZ" | "C_XNYZ" | "C_XYNZ" => {
+                for q in qubits(targets)? {
+                    do_c_xyz(&mut self.x_table, &mut self.z_table, q);
+                }
+            }
+            "C_ZYX" | "C_NZYX" | "C_ZNYX" | "C_ZYNX" => {
+                for q in qubits(targets)? {
+                    do_c_zyx(&mut self.x_table, &mut self.z_table, q);
+                }
+            }
+            "H_NXY" => {
+                for q in qubits(targets)? {
+                    do_s(&self.x_table, &mut self.z_table, q);
+                }
+            }
+            "H_NXZ" => {
+                for q in qubits(targets)? {
+                    do_h(&mut self.x_table, &mut self.z_table, q);
+                }
+            }
+            "H_NYZ" => {
+                for q in qubits(targets)? {
+                    do_sqrt_x(&mut self.x_table, &mut self.z_table, q);
+                }
+            }
 
             "CX" | "CNOT" | "ZCX" => {
                 for (c, t) in qubit_pairs(targets)? {
@@ -719,6 +744,26 @@ impl FrameSimulator {
 }
 
 // --- Frame gate primitives ---
+
+fn do_c_xyz(x_table: &mut BitTable, z_table: &mut BitTable, q: usize) {
+    let wpr = x_table.words_per_row();
+    for w in 0..wpr {
+        let xi = x_table.row_words(q)[w];
+        let zi = z_table.row_words(q)[w];
+        x_table.row_words_mut(q)[w] = xi ^ zi;
+        z_table.row_words_mut(q)[w] = xi;
+    }
+}
+
+fn do_c_zyx(x_table: &mut BitTable, z_table: &mut BitTable, q: usize) {
+    let wpr = x_table.words_per_row();
+    for w in 0..wpr {
+        let xi = x_table.row_words(q)[w];
+        let zi = z_table.row_words(q)[w];
+        x_table.row_words_mut(q)[w] = zi;
+        z_table.row_words_mut(q)[w] = xi ^ zi;
+    }
+}
 
 fn do_h(x_table: &mut BitTable, z_table: &mut BitTable, q: usize) {
     let wpr = x_table.words_per_row();
