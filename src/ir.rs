@@ -110,7 +110,7 @@ fn write_instrs(s: &mut String, instrs: &[StimInstr], indent: usize) {
                 if !args.is_empty() {
                     s.push('(');
                     for (i, a) in args.iter().enumerate() {
-                        if i > 0 { s.push_str(", "); }
+                        if i > 0 { s.push(','); }
                         if *a == (*a as i64) as f64 {
                             write!(s, "{}", *a as i64).unwrap();
                         } else {
