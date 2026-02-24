@@ -55,6 +55,11 @@ impl DetectorErrorModel {
         self.num_observables
     }
 
+    pub fn set_min_counts(&mut self, detectors: usize, observables: usize) {
+        self.num_detectors = self.num_detectors.max(detectors);
+        self.num_observables = self.num_observables.max(observables);
+    }
+
     pub fn add_error(&mut self, probability: f64, targets: Vec<DemTarget>) {
         self.push(DemInstruction::Error {
             probability,
@@ -120,7 +125,7 @@ impl DetectorErrorModel {
     }
 
     pub fn effective_num_detectors(&self) -> usize {
-        effective_det_count(&self.instrs, 0)
+        self.num_detectors.max(effective_det_count(&self.instrs, 0))
     }
 
     pub fn sample(&self, rng: &mut impl Rng) -> (Vec<bool>, Vec<bool>) {

@@ -57,12 +57,12 @@ impl ErrorAnalyzer {
         analyzer.undo_circuit(instrs)?;
 
         let mut dem = DetectorErrorModel::new();
+        dem.set_min_counts(num_detectors, num_observables);
         for (prob, targets) in analyzer.errors.into_iter().rev() {
             if prob > 0.0 && !targets.is_empty() {
                 dem.add_error(prob, targets);
             }
         }
-        let _ = num_observables;
         Ok(dem)
     }
 
