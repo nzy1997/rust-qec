@@ -24,7 +24,7 @@ impl OutputFormat {
 }
 
 /// Dense text: one line per shot, '0'/'1' per bit.
-pub fn write_shots_01(table: &BitTable, w: &mut impl Write) -> std::io::Result<()> {
+pub fn write_shots_01(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
     let n_bits = table.num_major();
     let n_shots = table.num_minor();
     for shot in 0..n_shots {
@@ -38,7 +38,7 @@ pub fn write_shots_01(table: &BitTable, w: &mut impl Write) -> std::io::Result<(
 }
 
 /// Dense binary: ceil(n_bits/8) bytes per shot, LSB-first bit packing.
-pub fn write_shots_b8(table: &BitTable, w: &mut impl Write) -> std::io::Result<()> {
+pub fn write_shots_b8(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
     let n_bits = table.num_major();
     let n_shots = table.num_minor();
     let bytes_per_shot = (n_bits + 7) / 8;
@@ -60,7 +60,7 @@ pub fn write_shots_b8(table: &BitTable, w: &mut impl Write) -> std::io::Result<(
 /// Sparse binary run-length encoding.
 /// Each byte = length of run of 0s before next 1. 255 = 255 zeros without a 1.
 /// Each shot terminated by an implicit True bit past the end.
-pub fn write_shots_r8(table: &BitTable, w: &mut impl Write) -> std::io::Result<()> {
+pub fn write_shots_r8(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
     let n_bits = table.num_major();
     let n_shots = table.num_minor();
     for shot in 0..n_shots {
@@ -88,7 +88,7 @@ pub fn write_shots_r8(table: &BitTable, w: &mut impl Write) -> std::io::Result<(
 }
 
 /// Sparse text: comma-separated indices of set bits, one line per shot.
-pub fn write_shots_hits(table: &BitTable, w: &mut impl Write) -> std::io::Result<()> {
+pub fn write_shots_hits(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
     let n_bits = table.num_major();
     let n_shots = table.num_minor();
     for shot in 0..n_shots {
@@ -112,7 +112,7 @@ pub fn write_shots_hits(table: &BitTable, w: &mut impl Write) -> std::io::Result
 pub fn write_shots_dets(
     detections: &BitTable,
     observable_flips: &BitTable,
-    w: &mut impl Write,
+    w: &mut (impl Write + ?Sized),
 ) -> std::io::Result<()> {
     let n_shots = detections.num_minor();
     let n_dets = detections.num_major();
