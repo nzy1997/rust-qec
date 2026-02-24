@@ -87,3 +87,75 @@ fn without_tags_preserves_repeat() {
         }
     }
 }
+
+#[test]
+fn inverse_single_qubit_gates() {
+    let instrs = parse_lines("S 0\nH 1").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv.len(), 2);
+    assert_eq!(inv[0].name().unwrap(), "H");
+    assert_eq!(inv[1].name().unwrap(), "S_DAG");
+}
+
+#[test]
+fn inverse_two_qubit_gates() {
+    let instrs = parse_lines("CX 0 1\nCZ 2 3").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv.len(), 2);
+    assert_eq!(inv[0].name().unwrap(), "CZ");
+    assert_eq!(inv[1].name().unwrap(), "CX");
+}
+
+#[test]
+fn inverse_self_inverse_gates() {
+    let instrs = parse_lines("H 0\nX 0\nY 0\nZ 0\nCX 0 1\nCZ 0 1\nSWAP 0 1").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv.len(), 7);
+    assert_eq!(inv[0].name().unwrap(), "SWAP");
+    assert_eq!(inv[6].name().unwrap(), "H");
+}
+
+#[test]
+fn inverse_s_and_sqrt_gates() {
+    let instrs = parse_lines("S 0\nSQRT_X 0\nSQRT_Y 0").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv[0].name().unwrap(), "SQRT_Y_DAG");
+    assert_eq!(inv[1].name().unwrap(), "SQRT_X_DAG");
+    assert_eq!(inv[2].name().unwrap(), "S_DAG");
+}
+
+#[test]
+fn inverse_dag_gates() {
+    let instrs = parse_lines("S_DAG 0\nSQRT_X_DAG 0\nSQRT_Y_DAG 0\nISWAP_DAG 0 1").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv[0].name().unwrap(), "ISWAP");
+    assert_eq!(inv[1].name().unwrap(), "SQRT_Y");
+    assert_eq!(inv[2].name().unwrap(), "SQRT_X");
+    assert_eq!(inv[3].name().unwrap(), "S");
+}
+
+#[test]
+fn inverse_fails_on_measurement() {
+    let instrs = parse_lines("M 0").unwrap();
+    assert!(transforms::inverse(&instrs).is_err());
+}
+
+#[test]
+fn inverse_fails_on_noise() {
+    let instrs = parse_lines("X_ERROR(0.1) 0").unwrap();
+    assert!(transforms::inverse(&instrs).is_err());
+}
+
+#[test]
+fn inverse_repeat_block() {
+    let instrs = parse_lines("REPEAT 3 {\n  S 0\n  H 0\n}").unwrap();
+    let inv = transforms::inverse(&instrs).unwrap();
+    assert_eq!(inv.len(), 1);
+    if let rstim::ir::StimInstr::Repeat { count, body } = &inv[0] {
+        assert_eq!(*count, 3);
+        assert_eq!(body[0].name().unwrap(), "H");
+        assert_eq!(body[1].name().unwrap(), "S_DAG");
+    } else {
+        panic!("expected Repeat");
+    }
+}
