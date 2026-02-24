@@ -49,6 +49,17 @@ impl Executor {
                         "X" => for_each_qubit(targets, |q| state.x_gate(q))?,
                         "Y" => for_each_qubit(targets, |q| state.y_gate(q))?,
                         "Z" => for_each_qubit(targets, |q| state.z_gate(q))?,
+                        "C_XYZ" => for_each_qubit(targets, |q| state.c_xyz(q))?,
+                        "C_ZYX" => for_each_qubit(targets, |q| state.c_zyx(q))?,
+                        "C_NXYZ" => for_each_qubit(targets, |q| state.c_nxyz(q))?,
+                        "C_NZYX" => for_each_qubit(targets, |q| state.c_nzyx(q))?,
+                        "C_XNYZ" => for_each_qubit(targets, |q| state.c_xnyz(q))?,
+                        "C_XYNZ" => for_each_qubit(targets, |q| state.c_xynz(q))?,
+                        "C_ZNYX" => for_each_qubit(targets, |q| state.c_znyx(q))?,
+                        "C_ZYNX" => for_each_qubit(targets, |q| state.c_zynx(q))?,
+                        "H_NXY" => for_each_qubit(targets, |q| state.h_nxy(q))?,
+                        "H_NXZ" => for_each_qubit(targets, |q| state.h_nxz(q))?,
+                        "H_NYZ" => for_each_qubit(targets, |q| state.h_nyz(q))?,
                         "CX" | "CNOT" | "ZCX" => {
                             let pairs = qubit_pairs(targets)?;
                             for (c, t) in pairs { state.cx(c, t); }
@@ -482,6 +493,17 @@ fn ref_sample_op(
         "X" => for_each_qubit(targets, |q| state.x_gate(q))?,
         "Y" => for_each_qubit(targets, |q| state.y_gate(q))?,
         "Z" => for_each_qubit(targets, |q| state.z_gate(q))?,
+        "C_XYZ" => for_each_qubit(targets, |q| state.c_xyz(q))?,
+        "C_ZYX" => for_each_qubit(targets, |q| state.c_zyx(q))?,
+        "C_NXYZ" => for_each_qubit(targets, |q| state.c_nxyz(q))?,
+        "C_NZYX" => for_each_qubit(targets, |q| state.c_nzyx(q))?,
+        "C_XNYZ" => for_each_qubit(targets, |q| state.c_xnyz(q))?,
+        "C_XYNZ" => for_each_qubit(targets, |q| state.c_xynz(q))?,
+        "C_ZNYX" => for_each_qubit(targets, |q| state.c_znyx(q))?,
+        "C_ZYNX" => for_each_qubit(targets, |q| state.c_zynx(q))?,
+        "H_NXY" => for_each_qubit(targets, |q| state.h_nxy(q))?,
+        "H_NXZ" => for_each_qubit(targets, |q| state.h_nxz(q))?,
+        "H_NYZ" => for_each_qubit(targets, |q| state.h_nyz(q))?,
 
         // Two-qubit Cliffords
         "CX" | "CNOT" | "ZCX" => {

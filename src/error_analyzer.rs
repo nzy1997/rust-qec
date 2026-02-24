@@ -127,6 +127,41 @@ impl ErrorAnalyzer {
                     self.z_sens[q].xor_other(&x);
                 }
             }
+            "C_XYZ" | "C_NXYZ" | "C_XNYZ" | "C_XYNZ" => {
+                for q in qubits(targets) {
+                    let old_x = self.x_sens[q].clone();
+                    let old_z = self.z_sens[q].clone();
+                    self.x_sens[q] = old_x.clone();
+                    self.x_sens[q].xor_other(&old_z);
+                    self.z_sens[q] = old_x;
+                }
+            }
+            "C_ZYX" | "C_NZYX" | "C_ZNYX" | "C_ZYNX" => {
+                for q in qubits(targets) {
+                    let old_x = self.x_sens[q].clone();
+                    let old_z = self.z_sens[q].clone();
+                    self.x_sens[q] = old_z.clone();
+                    self.z_sens[q] = old_x;
+                    self.z_sens[q].xor_other(&old_z);
+                }
+            }
+            "H_NXY" => {
+                for q in qubits(targets) {
+                    let z = self.z_sens[q].clone();
+                    self.x_sens[q].xor_other(&z);
+                }
+            }
+            "H_NXZ" => {
+                for q in qubits(targets) {
+                    std::mem::swap(&mut self.x_sens[q], &mut self.z_sens[q]);
+                }
+            }
+            "H_NYZ" => {
+                for q in qubits(targets) {
+                    let x = self.x_sens[q].clone();
+                    self.z_sens[q].xor_other(&x);
+                }
+            }
 
             "CX" | "CNOT" | "ZCX" => {
                 for (c, t) in qubit_pairs(targets) {

@@ -58,6 +58,22 @@ pub enum Commands {
         #[arg(long)]
         out: Option<String>,
     },
+    /// Generate a common QEC circuit
+    #[command(name = "gen")]
+    Gen {
+        #[arg(long)]
+        code: String,
+        #[arg(long)]
+        task: String,
+        #[arg(long)]
+        distance: usize,
+        #[arg(long)]
+        rounds: usize,
+        #[arg(long = "after_clifford_depolarization", default_value = "0")]
+        noise: f64,
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Sample detection events from a detector error model
     #[command(name = "sample_dem")]
     SampleDem {
@@ -94,6 +110,10 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
             run_analyze_errors(&text, &mut w)
+        }
+        Some(Commands::Gen { code, task, distance, rounds, noise, out }) => {
+            let mut w = open_output(out.as_deref())?;
+            run_gen(&code, &task, distance, rounds, noise, &mut w)
         }
         Some(Commands::SampleDem { shots, out_format, r#in, out, seed, obs_out, obs_out_format }) => {
             let text = read_input(r#in.as_deref())?;
@@ -169,6 +189,22 @@ pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable
         }
     }
     merged
+}
+
+pub fn run_gen(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let instrs = match (code, task) {
+        ("repetition_code", "memory") => crate::circuit_gen::repetition_code_memory(distance, rounds, noise),
+        _ => return Err(format!("unknown code/task: {code}/{task}")),
+    };
+    let circuit_text = crate::ir::circuit_to_string(&instrs);
+    out.write_all(circuit_text.as_bytes()).map_err(|e| format!("write error: {e}"))
 }
 
 pub fn run_sample(

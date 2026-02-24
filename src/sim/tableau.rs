@@ -143,6 +143,18 @@ impl StabilizerState {
         }
     }
 
+    pub fn c_xyz(&mut self, q: usize) { self.s_dag(q); self.h(q); }
+    pub fn c_zyx(&mut self, q: usize) { self.h(q); self.s(q); }
+    pub fn c_nxyz(&mut self, q: usize) { self.c_xyz(q); self.z_gate(q); }
+    pub fn c_nzyx(&mut self, q: usize) { self.c_zyx(q); self.z_gate(q); }
+    pub fn c_xnyz(&mut self, q: usize) { self.c_xyz(q); self.x_gate(q); }
+    pub fn c_xynz(&mut self, q: usize) { self.c_xyz(q); self.y_gate(q); }
+    pub fn c_znyx(&mut self, q: usize) { self.c_zyx(q); self.x_gate(q); }
+    pub fn c_zynx(&mut self, q: usize) { self.c_zyx(q); self.y_gate(q); }
+    pub fn h_nxy(&mut self, q: usize) { self.h_xy(q); self.z_gate(q); }
+    pub fn h_nxz(&mut self, q: usize) { self.h(q); self.y_gate(q); }
+    pub fn h_nyz(&mut self, q: usize) { self.h_yz(q); self.x_gate(q); }
+
     pub fn cy(&mut self, c: usize, t: usize) {
         self.s_dag(t);
         self.cx(c, t);
