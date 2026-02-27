@@ -24,7 +24,6 @@ impl StimTarget {
         match self {
             StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Some(*q),
             StimTarget::Pauli { qubit, .. } => Some(*qubit),
-            StimTarget::Sweep(_) => None,
             _ => None,
         }
     }

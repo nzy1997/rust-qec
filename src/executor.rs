@@ -786,6 +786,9 @@ fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, S
         match t {
             StimTarget::Qubit(q) => out.push((*q as usize, false)),
             StimTarget::QubitInv(q) => out.push((*q as usize, true)),
+            StimTarget::Sweep(_) => return Err(
+                "sweep[] targets are not supported in circuit execution (no sweep table)".to_string()
+            ),
             _ => return Err("expected qubit target".to_string()),
         }
     }
@@ -811,6 +814,9 @@ fn expect_qubit(t: &StimTarget) -> Result<usize, String> {
     match t {
         StimTarget::Qubit(q) => Ok(*q as usize),
         StimTarget::QubitInv(_) => Err("inverted qubit target only valid for measurement".to_string()),
+        StimTarget::Sweep(_) => Err(
+            "sweep[] targets are not supported in circuit execution (no sweep table)".to_string()
+        ),
         _ => Err("expected qubit target".to_string()),
     }
 }

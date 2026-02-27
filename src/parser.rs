@@ -126,6 +126,9 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
         }
         return Ok(Some(StimTarget::Qubit(q)));
     }
+    // Use `token` (not `raw`) here so that `!sweep[0]` is rejected:
+    // negated sweep targets are invalid in Stim, and stripping the `!`
+    // prefix before this check would silently accept them.
     if token.starts_with("sweep[") && token.ends_with(']') {
         let inner = &token[6..token.len() - 1];
         let k: u32 = inner.parse().map_err(|_| format!("bad sweep target {token}"))?;
