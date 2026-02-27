@@ -1,4 +1,4 @@
-use rstim::codegen::surface_code::{rotated_memory_x, rotated_memory_z};
+use rstim::codegen::surface_code::{rotated_memory_x, rotated_memory_z, unrotated_memory_x, unrotated_memory_z};
 use rstim::stats;
 
 #[test]
@@ -47,4 +47,29 @@ fn rotated_memory_x_with_noise() {
         matches!(i, StimInstr::Op { name, .. } if name == "DEPOLARIZE1" || name == "DEPOLARIZE2")
     });
     assert!(has_noise);
+}
+
+#[test]
+fn unrotated_memory_x_d3_r1() {
+    let instrs = unrotated_memory_x(3, 1, 0.0);
+    assert!(stats::num_qubits(&instrs) > 0);
+    assert!(stats::num_measurements(&instrs) > 0);
+    assert!(stats::num_observables(&instrs) >= 1);
+}
+
+#[test]
+fn unrotated_memory_z_d3_r1() {
+    let instrs = unrotated_memory_z(3, 1, 0.0);
+    assert!(stats::num_qubits(&instrs) > 0);
+    assert!(stats::num_observables(&instrs) >= 1);
+}
+
+#[test]
+fn unrotated_memory_x_roundtrip() {
+    use rstim::ir::circuit_to_string;
+    use rstim::parser::parse_lines;
+    let instrs = unrotated_memory_x(3, 2, 0.0);
+    let s = circuit_to_string(&instrs);
+    let reparsed = parse_lines(&s).unwrap();
+    assert_eq!(instrs, reparsed);
 }
