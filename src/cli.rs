@@ -74,6 +74,24 @@ pub enum Commands {
         #[arg(long)]
         out: Option<String>,
     },
+    /// Convert shot data between output formats
+    #[command(name = "convert")]
+    Convert {
+        #[arg(long = "in_format", default_value = "01")]
+        in_format: String,
+        #[arg(long = "out_format", default_value = "01")]
+        out_format: String,
+        #[arg(long)]
+        bits: Option<usize>,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long)]
+        shots: Option<usize>,
+    },
     /// Sample detection events from a detector error model
     #[command(name = "sample_dem")]
     SampleDem {
@@ -114,6 +132,11 @@ pub fn run(cli: Cli) -> Result<(), String> {
         Some(Commands::Gen { code, task, distance, rounds, noise, out }) => {
             let mut w = open_output(out.as_deref())?;
             run_gen(&code, &task, distance, rounds, noise, &mut w)
+        }
+        Some(Commands::Convert { in_format, out_format, bits, circuit, r#in, out, shots }) => {
+            let data = read_input_bytes(r#in.as_deref())?;
+            let mut w = open_output(out.as_deref())?;
+            run_convert(&data, &in_format, &out_format, bits, circuit.as_deref(), shots, &mut w)
         }
         Some(Commands::SampleDem { shots, out_format, r#in, out, seed, obs_out, obs_out_format }) => {
             let text = read_input(r#in.as_deref())?;
@@ -312,4 +335,57 @@ pub fn run_sample_dem_with_obs(
         }
     }
     write_format(obs_fmt, &result.observable_flips, obs_out)
+}
+
+pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    match path {
+        Some(p) => std::fs::read(p).map_err(|e| e.to_string()),
+        None => {
+            let mut buf = Vec::new();
+            std::io::stdin().read_to_end(&mut buf).map_err(|e| e.to_string())?;
+            Ok(buf)
+        }
+    }
+}
+
+pub fn run_convert(
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    bits: Option<usize>,
+    circuit: Option<&str>,
+    shots: Option<usize>,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    use crate::output::*;
+    let n_bits = if let Some(b) = bits {
+        b
+    } else if let Some(circ_text) = circuit {
+        let instrs = crate::parser::parse_lines(circ_text)?;
+        crate::stats::num_measurements(&instrs)
+    } else {
+        return Err("--bits or --circuit required for convert".to_string());
+    };
+
+    let table = match in_format {
+        "01" => read_shots_01(data, n_bits)?,
+        "b8" => read_shots_b8(data, n_bits)?,
+        "r8" => read_shots_r8(data, n_bits)?,
+        "hits" => read_shots_hits(data, n_bits)?,
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, n_bits, n)?
+        }
+        _ => return Err(format!("unknown in_format: {in_format}")),
+    };
+
+    match out_format {
+        "01" => write_shots_01(&table, out),
+        "b8" => write_shots_b8(&table, out),
+        "r8" => write_shots_r8(&table, out),
+        "hits" => write_shots_hits(&table, out),
+        "ptb64" => write_shots_ptb64(&table, out),
+        _ => return Err(format!("unknown out_format: {out_format}")),
+    }.map_err(|e| e.to_string())
 }
