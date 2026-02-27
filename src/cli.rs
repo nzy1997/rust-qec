@@ -201,7 +201,7 @@ pub fn run_gen(
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = match (code, task) {
-        ("repetition_code", "memory") => crate::circuit_gen::repetition_code_memory(distance, rounds, noise),
+        ("repetition_code", "memory") => crate::r#gen::repetition_code_memory(distance, rounds, noise),
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
     let circuit_text = crate::ir::circuit_to_string(&instrs);
