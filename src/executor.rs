@@ -759,7 +759,7 @@ pub(crate) fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
                         StimTarget::Pauli { qubit: q, .. } => {
                             max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
                         }
-                        StimTarget::Combiner | StimTarget::Rec(_) => {}
+                        StimTarget::Combiner | StimTarget::Rec(_) | StimTarget::Sweep(_) => {}
                     }
                 }
             }

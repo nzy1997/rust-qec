@@ -126,6 +126,11 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
         }
         return Ok(Some(StimTarget::Qubit(q)));
     }
+    if token.starts_with("sweep[") && token.ends_with(']') {
+        let inner = &token[6..token.len() - 1];
+        let k: u32 = inner.parse().map_err(|_| format!("bad sweep target {token}"))?;
+        return Ok(Some(StimTarget::Sweep(k)));
+    }
     Err(format!("unsupported target {token}"))
 }
 
