@@ -1,4 +1,4 @@
-use rstim::output::{OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets};
+use rstim::output::{OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64};
 use rstim::sim::bit_table::BitTable;
 
 #[test]
@@ -158,4 +158,52 @@ fn output_format_from_str() {
     assert_eq!(OutputFormat::from_str("hits").unwrap(), OutputFormat::Hits);
     assert_eq!(OutputFormat::from_str("dets").unwrap(), OutputFormat::Dets);
     assert!(OutputFormat::from_str("unknown").is_err());
+}
+
+#[test]
+fn ptb64_format_parses() {
+    assert!(OutputFormat::from_str("ptb64").is_ok());
+}
+
+#[test]
+fn ptb64_single_shot_single_bit() {
+    let mut table = BitTable::new(1, 1);
+    table.set(0, 0, true);
+    let mut out = Vec::new();
+    write_shots_ptb64(&table, &mut out).unwrap();
+    assert_eq!(out.len(), 8);
+    assert_eq!(u64::from_le_bytes(out[..8].try_into().unwrap()), 1u64);
+}
+
+#[test]
+fn ptb64_two_bits_two_shots() {
+    // shot0: bit0=1, bit1=0 / shot1: bit0=0, bit1=1
+    // bit0 word: shot0=1, shot1=0 → 0b01 = 1
+    // bit1 word: shot0=0, shot1=1 → 0b10 = 2
+    let mut table = BitTable::new(2, 2);
+    table.set(0, 0, true);
+    table.set(1, 1, true);
+    let mut out = Vec::new();
+    write_shots_ptb64(&table, &mut out).unwrap();
+    assert_eq!(out.len(), 16);
+    let w0 = u64::from_le_bytes(out[0..8].try_into().unwrap());
+    let w1 = u64::from_le_bytes(out[8..16].try_into().unwrap());
+    assert_eq!(w0, 1u64);
+    assert_eq!(w1, 2u64);
+}
+
+#[test]
+fn ptb64_more_than_64_shots() {
+    // 1 bit, 65 shots, all set
+    // chunk0: 64 shots all set → u64::MAX
+    // chunk1: 1 shot set → 1
+    let mut table = BitTable::new(1, 65);
+    for s in 0..65 { table.set(0, s, true); }
+    let mut out = Vec::new();
+    write_shots_ptb64(&table, &mut out).unwrap();
+    assert_eq!(out.len(), 16);
+    let w0 = u64::from_le_bytes(out[0..8].try_into().unwrap());
+    let w1 = u64::from_le_bytes(out[8..16].try_into().unwrap());
+    assert_eq!(w0, u64::MAX);
+    assert_eq!(w1, 1u64);
 }

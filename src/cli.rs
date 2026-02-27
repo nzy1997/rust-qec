@@ -7,7 +7,7 @@ use rand::rngs::StdRng;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets,
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
 use crate::parser::parse_lines;
 use crate::sampler::sample_batch;
@@ -170,6 +170,7 @@ pub fn write_format(fmt: OutputFormat, table: &BitTable, out: &mut dyn Write) ->
         OutputFormat::R8 => write_shots_r8(table, out),
         OutputFormat::Hits => write_shots_hits(table, out),
         OutputFormat::Dets => return Err("use write_shots_dets for dets format".to_string()),
+        OutputFormat::Ptb64 => write_shots_ptb64(table, out),
     }.map_err(|e| format!("write error: {e}"))
 }
 

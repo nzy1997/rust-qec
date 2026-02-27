@@ -8,6 +8,7 @@ pub enum OutputFormat {
     R8,
     Hits,
     Dets,
+    Ptb64,
 }
 
 impl OutputFormat {
@@ -18,6 +19,7 @@ impl OutputFormat {
             "r8" => Ok(Self::R8),
             "hits" => Ok(Self::Hits),
             "dets" => Ok(Self::Dets),
+            "ptb64" => Ok(Self::Ptb64),
             _ => Err(format!("unknown output format: {:?}", s)),
         }
     }
@@ -130,6 +132,30 @@ pub fn write_shots_dets(
             }
         }
         w.write_all(b"\n")?;
+    }
+    Ok(())
+}
+
+/// Partially-transposed bit-packed binary (ptb64).
+/// Shots are grouped in chunks of 64. For each chunk, one little-endian u64
+/// word is written per bit/detector: bit k of the word = value of that bit
+/// in shot (chunk_start + k).
+pub fn write_shots_ptb64(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
+    let n_bits = table.num_major();
+    let n_shots = table.num_minor();
+    let mut chunk_start = 0;
+    while chunk_start < n_shots {
+        let chunk_end = (chunk_start + 64).min(n_shots);
+        for bit in 0..n_bits {
+            let mut word: u64 = 0;
+            for (k, shot) in (chunk_start..chunk_end).enumerate() {
+                if table.get(bit, shot) {
+                    word |= 1u64 << k;
+                }
+            }
+            w.write_all(&word.to_le_bytes())?;
+        }
+        chunk_start += 64;
     }
     Ok(())
 }
