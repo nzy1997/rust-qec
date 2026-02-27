@@ -16,4 +16,4 @@ pub mod cli;
 pub mod stats;
 pub mod transforms;
 pub mod circuit_gen;
-pub mod r#gen;
+pub mod codegen;
