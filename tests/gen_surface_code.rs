@@ -73,3 +73,11 @@ fn unrotated_memory_x_roundtrip() {
     let reparsed = parse_lines(&s).unwrap();
     assert_eq!(instrs, reparsed);
 }
+
+#[test]
+fn cli_gen_surface_code_rotated_memory_x() {
+    use rstim::codegen::surface_code::rotated_memory_x;
+    // Verify the function is callable with the same signature as CLI would use
+    let instrs = rotated_memory_x(3, 1, 0.0);
+    assert!(!instrs.is_empty());
+}

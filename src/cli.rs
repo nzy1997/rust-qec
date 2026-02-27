@@ -202,6 +202,11 @@ pub fn run_gen(
 ) -> Result<(), String> {
     let instrs = match (code, task) {
         ("repetition_code", "memory") => crate::codegen::repetition_code_memory(distance, rounds, noise),
+        ("surface_code", "rotated_memory_x") => crate::codegen::surface_code::rotated_memory_x(distance, rounds, noise),
+        ("surface_code", "rotated_memory_z") => crate::codegen::surface_code::rotated_memory_z(distance, rounds, noise),
+        ("surface_code", "unrotated_memory_x") => crate::codegen::surface_code::unrotated_memory_x(distance, rounds, noise),
+        ("surface_code", "unrotated_memory_z") => crate::codegen::surface_code::unrotated_memory_z(distance, rounds, noise),
+        ("color_code", "memory_xyz") => crate::codegen::color_code::memory_xyz(distance, rounds, noise),
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
     let circuit_text = crate::ir::circuit_to_string(&instrs);
