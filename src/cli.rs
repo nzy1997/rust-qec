@@ -111,6 +111,20 @@ pub enum Commands {
         #[arg(long)]
         shots: Option<usize>,
     },
+    /// Explain which errors could have caused observed detection events
+    #[command(name = "explain_errors")]
+    ExplainErrors {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long = "in_format", default_value = "dets")]
+        in_format: String,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long)]
+        dem: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Sample detection events from a detector error model
     #[command(name = "sample_dem")]
     SampleDem {
@@ -162,6 +176,23 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let data = read_input_bytes(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
             run_m2d(&circ_text, &data, &in_format, &out_format, shots, append_observables, &mut w)
+        }
+        Some(Commands::ExplainErrors { r#in, in_format, circuit, dem, out }) => {
+            let det_data = read_input_bytes(r#in.as_deref())?;
+            let circuit_text = circuit.as_deref()
+                .map(|p| std::fs::read_to_string(p).map_err(|e| e.to_string()))
+                .transpose()?;
+            let dem_text = dem.as_deref()
+                .map(|p| std::fs::read_to_string(p).map_err(|e| e.to_string()))
+                .transpose()?;
+            let mut w = open_output(out.as_deref())?;
+            run_explain_errors(
+                circuit_text.as_deref().unwrap_or(""),
+                dem_text.as_deref(),
+                &det_data,
+                &in_format,
+                &mut w,
+            )
         }
         Some(Commands::SampleDem { shots, out_format, r#in, out, seed, obs_out, obs_out_format }) => {
             let text = read_input(r#in.as_deref())?;
@@ -456,5 +487,77 @@ pub fn run_m2d(
                 write_format(fmt, &result.detections, out)
             }
         }
+    }
+}
+
+pub fn run_explain_errors(
+    circuit_text: &str,
+    dem_text: Option<&str>,
+    det_data: &[u8],
+    in_format: &str,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let dem = if let Some(dt) = dem_text {
+        crate::dem::DetectorErrorModel::parse(dt)?
+    } else {
+        let instrs = crate::parser::parse_lines(circuit_text)?;
+        crate::error_analyzer::ErrorAnalyzer::circuit_to_dem(&instrs)?
+    };
+
+    let fired_per_shot = parse_fired_detectors(det_data, in_format, dem.num_detectors())?;
+
+    for (shot_idx, fired) in fired_per_shot.iter().enumerate() {
+        let explanations = crate::explain_errors::explain(&dem, fired);
+        if explanations.is_empty() {
+            writeln!(out, "shot {shot_idx}: no errors needed").map_err(|e| e.to_string())?;
+        } else {
+            writeln!(out, "shot {shot_idx}:").map_err(|e| e.to_string())?;
+            for e in &explanations {
+                let det_str: Vec<String> = e.detectors.iter().map(|d| format!("D{d}")).collect();
+                let obs_str: Vec<String> = e.observables.iter().map(|o| format!("L{o}")).collect();
+                let targets: Vec<String> = det_str.into_iter().chain(obs_str).collect();
+                writeln!(out, "  error({:.4}) {}", e.probability, targets.join(" "))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn parse_fired_detectors(
+    data: &[u8],
+    format: &str,
+    n_dets: usize,
+) -> Result<Vec<Vec<usize>>, String> {
+    match format {
+        "dets" => {
+            let text = std::str::from_utf8(data).map_err(|e| e.to_string())?;
+            let mut shots = Vec::new();
+            for line in text.lines() {
+                let line = line.trim();
+                if !line.starts_with("shot") { continue; }
+                let mut fired = Vec::new();
+                for token in line.split_whitespace().skip(1) {
+                    if let Some(rest) = token.strip_prefix('D') {
+                        let d: usize = rest.parse().map_err(|_| format!("bad detector {token}"))?;
+                        fired.push(d);
+                    }
+                }
+                shots.push(fired);
+            }
+            Ok(shots)
+        }
+        "01" => {
+            use crate::output::read_shots_01;
+            let table = read_shots_01(data, n_dets)?;
+            let n_shots = table.num_minor();
+            let mut shots = Vec::new();
+            for shot in 0..n_shots {
+                let fired: Vec<usize> = (0..n_dets).filter(|&d| table.get(d, shot)).collect();
+                shots.push(fired);
+            }
+            Ok(shots)
+        }
+        _ => Err(format!("unsupported in_format for explain_errors: {format}")),
     }
 }

@@ -1,6 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::explain_errors::explain;
+use rstim::cli::run_explain_errors;
 
 #[test]
 fn explain_no_detectors_fired() {
@@ -33,4 +34,25 @@ fn explain_probability_in_range() {
     for e in &explanations {
         assert!(e.probability > 0.0 && e.probability <= 1.0);
     }
+}
+
+#[test]
+fn explain_errors_cli_dets_format() {
+    let circuit = "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]";
+    let dets_input = b"shot D0\n";
+    let mut out = Vec::new();
+    run_explain_errors(circuit, None, dets_input, "dets", &mut out).unwrap();
+    let text = String::from_utf8(out).unwrap();
+    assert!(text.contains("error("));
+    assert!(text.contains("D0"));
+}
+
+#[test]
+fn explain_errors_cli_no_detectors() {
+    let circuit = "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]";
+    let dets_input = b"shot\n"; // no detectors fired
+    let mut out = Vec::new();
+    run_explain_errors(circuit, None, dets_input, "dets", &mut out).unwrap();
+    let text = String::from_utf8(out).unwrap();
+    assert!(text.contains("no errors needed"));
 }
