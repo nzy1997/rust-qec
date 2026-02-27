@@ -6,6 +6,7 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
+use crate::m2d::measurements_to_detections;
 use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
@@ -92,6 +93,24 @@ pub enum Commands {
         #[arg(long)]
         shots: Option<usize>,
     },
+    /// Convert measurement results to detection events
+    #[command(name = "m2d")]
+    M2d {
+        #[arg(long = "in_format", default_value = "01")]
+        in_format: String,
+        #[arg(long = "out_format", default_value = "dets")]
+        out_format: String,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long = "append_observables")]
+        append_observables: bool,
+        #[arg(long)]
+        shots: Option<usize>,
+    },
     /// Sample detection events from a detector error model
     #[command(name = "sample_dem")]
     SampleDem {
@@ -137,6 +156,12 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let data = read_input_bytes(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
             run_convert(&data, &in_format, &out_format, bits, circuit.as_deref(), shots, &mut w)
+        }
+        Some(Commands::M2d { in_format, out_format, circuit, r#in, out, append_observables, shots }) => {
+            let circ_text = read_input(circuit.as_deref())?;
+            let data = read_input_bytes(r#in.as_deref())?;
+            let mut w = open_output(out.as_deref())?;
+            run_m2d(&circ_text, &data, &in_format, &out_format, shots, append_observables, &mut w)
         }
         Some(Commands::SampleDem { shots, out_format, r#in, out, seed, obs_out, obs_out_format }) => {
             let text = read_input(r#in.as_deref())?;
@@ -388,4 +413,48 @@ pub fn run_convert(
         "ptb64" => write_shots_ptb64(&table, out),
         _ => return Err(format!("unknown out_format: {out_format}")),
     }.map_err(|e| e.to_string())
+}
+
+pub fn run_m2d(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    use crate::output::*;
+    let instrs = parse_lines(circuit_text)?;
+    let n_meas = crate::stats::num_measurements(&instrs);
+
+    let meas_table = match in_format {
+        "01" => read_shots_01(data, n_meas)?,
+        "b8" => read_shots_b8(data, n_meas)?,
+        "r8" => read_shots_r8(data, n_meas)?,
+        "hits" => read_shots_hits(data, n_meas)?,
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, n_meas, n)?
+        }
+        _ => return Err(format!("unknown in_format: {in_format}")),
+    };
+
+    let result = measurements_to_detections(&instrs, &meas_table)?;
+    let fmt = OutputFormat::from_str(out_format)?;
+
+    match fmt {
+        OutputFormat::Dets => {
+            write_shots_dets(&result.detections, &result.observable_flips, out)
+                .map_err(|e| format!("write error: {e}"))
+        }
+        _ => {
+            if append_observables {
+                let merged = merge_detections_observables(&result.detections, &result.observable_flips);
+                write_format(fmt, &merged, out)
+            } else {
+                write_format(fmt, &result.detections, out)
+            }
+        }
+    }
 }

@@ -17,3 +17,4 @@ pub mod stats;
 pub mod transforms;
 pub mod circuit_gen;
 pub mod codegen;
+pub mod m2d;
