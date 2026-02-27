@@ -812,17 +812,27 @@ fn do_swap(x_table: &mut BitTable, z_table: &mut BitTable, a: usize, b: usize) {
 // --- Target helpers ---
 
 fn qubits(targets: &[StimTarget]) -> Result<Vec<usize>, String> {
-    targets.iter().map(|t| match t {
-        StimTarget::Qubit(q) => Ok(*q as usize),
-        _ => Err("expected qubit target".to_string()),
-    }).collect()
+    let mut out = Vec::new();
+    for t in targets {
+        match t {
+            StimTarget::Qubit(q) => out.push(*q as usize),
+            StimTarget::Sweep(_) => {} // skip: treated as always-0 (no-op)
+            _ => return Err("expected qubit target".to_string()),
+        }
+    }
+    Ok(out)
 }
 
 fn qubits_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<usize>, String> {
-    targets.iter().map(|t| match t {
-        StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Ok(*q as usize),
-        _ => Err("expected qubit target".to_string()),
-    }).collect()
+    let mut out = Vec::new();
+    for t in targets {
+        match t {
+            StimTarget::Qubit(q) | StimTarget::QubitInv(q) => out.push(*q as usize),
+            StimTarget::Sweep(_) => {} // skip: treated as always-0 (no-op)
+            _ => return Err("expected qubit target".to_string()),
+        }
+    }
+    Ok(out)
 }
 
 fn qubit_pairs(targets: &[StimTarget]) -> Result<Vec<(usize, usize)>, String> {
@@ -832,6 +842,10 @@ fn qubit_pairs(targets: &[StimTarget]) -> Result<Vec<(usize, usize)>, String> {
     let mut out = Vec::new();
     let mut it = targets.iter();
     while let (Some(a), Some(b)) = (it.next(), it.next()) {
+        // Skip any pair that contains a sweep target (sweep=0 means gate is no-op)
+        if matches!(a, StimTarget::Sweep(_)) || matches!(b, StimTarget::Sweep(_)) {
+            continue;
+        }
         let qa = match a {
             StimTarget::Qubit(q) => *q as usize,
             _ => return Err("expected qubit target in pair".to_string()),
@@ -852,6 +866,10 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
     let mut out = Vec::new();
     let mut it = targets.iter();
     while let (Some(a), Some(b)) = (it.next(), it.next()) {
+        // Skip any pair that contains a sweep target (sweep=0 means gate is no-op)
+        if matches!(a, StimTarget::Sweep(_)) || matches!(b, StimTarget::Sweep(_)) {
+            continue;
+        }
         let qa = match a {
             StimTarget::Qubit(q) | StimTarget::QubitInv(q) => *q as usize,
             _ => return Err("expected qubit target in pair".to_string()),

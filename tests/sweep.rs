@@ -1,5 +1,8 @@
 use rstim::parser::parse_lines;
 use rstim::ir::StimTarget;
+use rstim::executor::Executor;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 #[test]
 fn parse_sweep_target() {
@@ -44,4 +47,26 @@ fn sweep_empty_index_rejected() {
 #[test]
 fn sweep_nonnumeric_rejected() {
     assert!(parse_lines("CX sweep[abc] 0").is_err());
+}
+
+#[test]
+fn sweep_target_executes_without_error() {
+    // sweep[k] treated as 0 — CX with sweep[0]=0 is identity on qubit 1
+    let instrs = parse_lines("CX sweep[0] 1\nM 1").unwrap();
+    let mut exec = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(0);
+    let out = exec.run(&mut rng).unwrap();
+    assert_eq!(out.measurements, vec![false]);
+}
+
+#[test]
+fn sweep_in_frame_sim() {
+    use rstim::sampler::sample_batch;
+    let instrs = parse_lines("CX sweep[0] 1\nM 1").unwrap();
+    let mut rng = StdRng::seed_from_u64(0);
+    let result = sample_batch(&instrs, 4, &mut rng).unwrap();
+    // all shots: qubit 1 not flipped = 0
+    for shot in 0..4 {
+        assert!(!result.measurements.get(0, shot));
+    }
 }
