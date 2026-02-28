@@ -193,6 +193,69 @@ fn ptb64_two_bits_two_shots() {
 }
 
 #[test]
+fn read_01_bad_byte_errors() {
+    use rstim::output::read_shots_01;
+    let data = b"1X\n";
+    assert!(read_shots_01(data, 2).is_err());
+}
+
+#[test]
+fn read_01_bad_length_errors() {
+    use rstim::output::read_shots_01;
+    let data = b"10"; // no newline, length mismatch
+    assert!(read_shots_01(data, 2).is_err());
+}
+
+#[test]
+fn read_b8_bad_length_errors() {
+    use rstim::output::read_shots_b8;
+    let data = vec![1u8, 2, 3]; // 3 bytes not divisible by ceil(10/8)=2
+    assert!(read_shots_b8(&data, 10).is_err());
+}
+
+#[test]
+fn read_b8_zero_bits() {
+    use rstim::output::read_shots_b8;
+    let t = read_shots_b8(&[], 0).unwrap();
+    assert_eq!(t.num_major(), 0);
+}
+
+#[test]
+fn read_r8_truncated_errors() {
+    use rstim::output::read_shots_r8;
+    // 255 means "255 zeros, continue" but then data ends — mid-shot error
+    let data = vec![255u8];
+    assert!(read_shots_r8(&data, 300).is_err());
+}
+
+#[test]
+fn read_r8_long_run() {
+    use rstim::output::{read_shots_r8, write_shots_r8};
+    use rstim::sim::bit_table::BitTable;
+    // bit 300 set in a 301-bit shot — exercises the 255-run path
+    let mut t = BitTable::new(301, 1);
+    t.set(300, 0, true);
+    let mut buf = Vec::new();
+    write_shots_r8(&t, &mut buf).unwrap();
+    let recovered = read_shots_r8(&buf, 301).unwrap();
+    assert!(recovered.get(300, 0));
+}
+
+#[test]
+fn read_hits_out_of_range_errors() {
+    use rstim::output::read_shots_hits;
+    let data = b"5\n"; // index 5 out of range for 3 bits
+    assert!(read_shots_hits(data, 3).is_err());
+}
+
+#[test]
+fn read_ptb64_bad_length_errors() {
+    use rstim::output::read_shots_ptb64;
+    let data = vec![0u8; 7]; // not 8 bytes
+    assert!(read_shots_ptb64(&data, 1, 1).is_err());
+}
+
+#[test]
 fn ptb64_more_than_64_shots() {
     // 1 bit, 65 shots, all set
     // chunk0: 64 shots all set → u64::MAX
