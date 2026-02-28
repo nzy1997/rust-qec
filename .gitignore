@@ -8,3 +8,9 @@ Cargo.lock
 
 /target
 .cursor/
+
+# Coverage reports
+cobertura.xml
+
+# Build artifacts
+*.rlib
