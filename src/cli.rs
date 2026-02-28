@@ -6,8 +6,9 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
+use crate::m2d::measurements_to_detections;
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets,
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
 use crate::parser::parse_lines;
 use crate::sampler::sample_batch;
@@ -74,6 +75,56 @@ pub enum Commands {
         #[arg(long)]
         out: Option<String>,
     },
+    /// Convert shot data between output formats
+    #[command(name = "convert")]
+    Convert {
+        #[arg(long = "in_format", default_value = "01")]
+        in_format: String,
+        #[arg(long = "out_format", default_value = "01")]
+        out_format: String,
+        #[arg(long)]
+        bits: Option<usize>,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long)]
+        shots: Option<usize>,
+    },
+    /// Convert measurement results to detection events
+    #[command(name = "m2d")]
+    M2d {
+        #[arg(long = "in_format", default_value = "01")]
+        in_format: String,
+        #[arg(long = "out_format", default_value = "dets")]
+        out_format: String,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long = "append_observables")]
+        append_observables: bool,
+        #[arg(long)]
+        shots: Option<usize>,
+    },
+    /// Explain which errors could have caused observed detection events
+    #[command(name = "explain_errors")]
+    ExplainErrors {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long = "in_format", default_value = "dets")]
+        in_format: String,
+        #[arg(long)]
+        circuit: Option<String>,
+        #[arg(long)]
+        dem: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Sample detection events from a detector error model
     #[command(name = "sample_dem")]
     SampleDem {
@@ -114,6 +165,34 @@ pub fn run(cli: Cli) -> Result<(), String> {
         Some(Commands::Gen { code, task, distance, rounds, noise, out }) => {
             let mut w = open_output(out.as_deref())?;
             run_gen(&code, &task, distance, rounds, noise, &mut w)
+        }
+        Some(Commands::Convert { in_format, out_format, bits, circuit, r#in, out, shots }) => {
+            let data = read_input_bytes(r#in.as_deref())?;
+            let mut w = open_output(out.as_deref())?;
+            run_convert(&data, &in_format, &out_format, bits, circuit.as_deref(), shots, &mut w)
+        }
+        Some(Commands::M2d { in_format, out_format, circuit, r#in, out, append_observables, shots }) => {
+            let circ_text = read_input(circuit.as_deref())?;
+            let data = read_input_bytes(r#in.as_deref())?;
+            let mut w = open_output(out.as_deref())?;
+            run_m2d(&circ_text, &data, &in_format, &out_format, shots, append_observables, &mut w)
+        }
+        Some(Commands::ExplainErrors { r#in, in_format, circuit, dem, out }) => {
+            let det_data = read_input_bytes(r#in.as_deref())?;
+            let circuit_text = circuit.as_deref()
+                .map(|p| std::fs::read_to_string(p).map_err(|e| e.to_string()))
+                .transpose()?;
+            let dem_text = dem.as_deref()
+                .map(|p| std::fs::read_to_string(p).map_err(|e| e.to_string()))
+                .transpose()?;
+            let mut w = open_output(out.as_deref())?;
+            run_explain_errors(
+                circuit_text.as_deref().unwrap_or(""),
+                dem_text.as_deref(),
+                &det_data,
+                &in_format,
+                &mut w,
+            )
         }
         Some(Commands::SampleDem { shots, out_format, r#in, out, seed, obs_out, obs_out_format }) => {
             let text = read_input(r#in.as_deref())?;
@@ -170,6 +249,7 @@ pub fn write_format(fmt: OutputFormat, table: &BitTable, out: &mut dyn Write) ->
         OutputFormat::R8 => write_shots_r8(table, out),
         OutputFormat::Hits => write_shots_hits(table, out),
         OutputFormat::Dets => return Err("use write_shots_dets for dets format".to_string()),
+        OutputFormat::Ptb64 => write_shots_ptb64(table, out),
     }.map_err(|e| format!("write error: {e}"))
 }
 
@@ -200,7 +280,12 @@ pub fn run_gen(
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = match (code, task) {
-        ("repetition_code", "memory") => crate::circuit_gen::repetition_code_memory(distance, rounds, noise),
+        ("repetition_code", "memory") => crate::codegen::repetition_code_memory(distance, rounds, noise),
+        ("surface_code", "rotated_memory_x") => crate::codegen::surface_code::rotated_memory_x(distance, rounds, noise),
+        ("surface_code", "rotated_memory_z") => crate::codegen::surface_code::rotated_memory_z(distance, rounds, noise),
+        ("surface_code", "unrotated_memory_x") => crate::codegen::surface_code::unrotated_memory_x(distance, rounds, noise),
+        ("surface_code", "unrotated_memory_z") => crate::codegen::surface_code::unrotated_memory_z(distance, rounds, noise),
+        ("color_code", "memory_xyz") => crate::codegen::color_code::memory_xyz(distance, rounds, noise),
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
     let circuit_text = crate::ir::circuit_to_string(&instrs);
@@ -306,4 +391,173 @@ pub fn run_sample_dem_with_obs(
         }
     }
     write_format(obs_fmt, &result.observable_flips, obs_out)
+}
+
+pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    match path {
+        Some(p) => std::fs::read(p).map_err(|e| e.to_string()),
+        None => {
+            let mut buf = Vec::new();
+            std::io::stdin().read_to_end(&mut buf).map_err(|e| e.to_string())?;
+            Ok(buf)
+        }
+    }
+}
+
+pub fn run_convert(
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    bits: Option<usize>,
+    circuit: Option<&str>,
+    shots: Option<usize>,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    use crate::output::*;
+    let n_bits = if let Some(b) = bits {
+        b
+    } else if let Some(circ_text) = circuit {
+        let instrs = crate::parser::parse_lines(circ_text)?;
+        crate::stats::num_measurements(&instrs)
+    } else {
+        return Err("--bits or --circuit required for convert".to_string());
+    };
+
+    let table = match in_format {
+        "01" => read_shots_01(data, n_bits)?,
+        "b8" => read_shots_b8(data, n_bits)?,
+        "r8" => read_shots_r8(data, n_bits)?,
+        "hits" => read_shots_hits(data, n_bits)?,
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, n_bits, n)?
+        }
+        _ => return Err(format!("unknown in_format: {in_format}")),
+    };
+
+    match out_format {
+        "01" => write_shots_01(&table, out),
+        "b8" => write_shots_b8(&table, out),
+        "r8" => write_shots_r8(&table, out),
+        "hits" => write_shots_hits(&table, out),
+        "ptb64" => write_shots_ptb64(&table, out),
+        _ => return Err(format!("unknown out_format: {out_format}")),
+    }.map_err(|e| e.to_string())
+}
+
+pub fn run_m2d(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    use crate::output::*;
+    let instrs = parse_lines(circuit_text)?;
+    let n_meas = crate::stats::num_measurements(&instrs);
+
+    let meas_table = match in_format {
+        "01" => read_shots_01(data, n_meas)?,
+        "b8" => read_shots_b8(data, n_meas)?,
+        "r8" => read_shots_r8(data, n_meas)?,
+        "hits" => read_shots_hits(data, n_meas)?,
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, n_meas, n)?
+        }
+        _ => return Err(format!("unknown in_format: {in_format}")),
+    };
+
+    let result = measurements_to_detections(&instrs, &meas_table)?;
+    let fmt = OutputFormat::from_str(out_format)?;
+
+    match fmt {
+        OutputFormat::Dets => {
+            write_shots_dets(&result.detections, &result.observable_flips, out)
+                .map_err(|e| format!("write error: {e}"))
+        }
+        _ => {
+            if append_observables {
+                let merged = merge_detections_observables(&result.detections, &result.observable_flips);
+                write_format(fmt, &merged, out)
+            } else {
+                write_format(fmt, &result.detections, out)
+            }
+        }
+    }
+}
+
+pub fn run_explain_errors(
+    circuit_text: &str,
+    dem_text: Option<&str>,
+    det_data: &[u8],
+    in_format: &str,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let dem = if let Some(dt) = dem_text {
+        crate::dem::DetectorErrorModel::parse(dt)?
+    } else {
+        let instrs = crate::parser::parse_lines(circuit_text)?;
+        crate::error_analyzer::ErrorAnalyzer::circuit_to_dem(&instrs)?
+    };
+
+    let fired_per_shot = parse_fired_detectors(det_data, in_format, dem.num_detectors())?;
+
+    for (shot_idx, fired) in fired_per_shot.iter().enumerate() {
+        let explanations = crate::explain_errors::explain(&dem, fired);
+        if explanations.is_empty() {
+            writeln!(out, "shot {shot_idx}: no errors needed").map_err(|e| e.to_string())?;
+        } else {
+            writeln!(out, "shot {shot_idx}:").map_err(|e| e.to_string())?;
+            for e in &explanations {
+                let det_str: Vec<String> = e.detectors.iter().map(|d| format!("D{d}")).collect();
+                let obs_str: Vec<String> = e.observables.iter().map(|o| format!("L{o}")).collect();
+                let targets: Vec<String> = det_str.into_iter().chain(obs_str).collect();
+                writeln!(out, "  error({:.4}) {}", e.probability, targets.join(" "))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn parse_fired_detectors(
+    data: &[u8],
+    format: &str,
+    n_dets: usize,
+) -> Result<Vec<Vec<usize>>, String> {
+    match format {
+        "dets" => {
+            let text = std::str::from_utf8(data).map_err(|e| e.to_string())?;
+            let mut shots = Vec::new();
+            for line in text.lines() {
+                let line = line.trim();
+                if !line.starts_with("shot") { continue; }
+                let mut fired = Vec::new();
+                for token in line.split_whitespace().skip(1) {
+                    if let Some(rest) = token.strip_prefix('D') {
+                        let d: usize = rest.parse().map_err(|_| format!("bad detector {token}"))?;
+                        fired.push(d);
+                    }
+                }
+                shots.push(fired);
+            }
+            Ok(shots)
+        }
+        "01" => {
+            use crate::output::read_shots_01;
+            let table = read_shots_01(data, n_dets)?;
+            let n_shots = table.num_minor();
+            let mut shots = Vec::new();
+            for shot in 0..n_shots {
+                let fired: Vec<usize> = (0..n_dets).filter(|&d| table.get(d, shot)).collect();
+                shots.push(fired);
+            }
+            Ok(shots)
+        }
+        _ => Err(format!("unsupported in_format for explain_errors: {format}")),
+    }
 }

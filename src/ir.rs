@@ -12,6 +12,7 @@ pub enum StimTarget {
     Rec(i32),
     Pauli { qubit: u32, basis: PauliBasis, inverted: bool },
     Combiner,
+    Sweep(u32),
 }
 
 impl StimTarget {
@@ -135,6 +136,7 @@ fn write_instrs(s: &mut String, instrs: &[StimInstr], indent: usize) {
                             write!(s, "{qubit}").unwrap();
                         }
                         StimTarget::Combiner => s.push('*'),
+                        StimTarget::Sweep(k) => write!(s, "sweep[{k}]").unwrap(),
                     }
                 }
                 s.push('\n');

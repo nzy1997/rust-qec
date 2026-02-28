@@ -759,7 +759,7 @@ pub(crate) fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
                         StimTarget::Pauli { qubit: q, .. } => {
                             max_q = Some(max_q.map_or(*q, |m| m.max(*q)));
                         }
-                        StimTarget::Combiner | StimTarget::Rec(_) => {}
+                        StimTarget::Combiner | StimTarget::Rec(_) | StimTarget::Sweep(_) => {}
                     }
                 }
             }
@@ -775,7 +775,11 @@ pub(crate) fn max_qubit(instrs: &[StimInstr]) -> Result<usize, String> {
 fn qubits(targets: &[StimTarget]) -> Result<Vec<usize>, String> {
     let mut out = Vec::new();
     for t in targets {
-        out.push(expect_qubit(t)?);
+        match t {
+            StimTarget::Qubit(q) => out.push(*q as usize),
+            StimTarget::Sweep(_) => {} // skip: treated as always-0 (no-op)
+            _ => out.push(expect_qubit(t)?),
+        }
     }
     Ok(out)
 }
@@ -786,6 +790,7 @@ fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, S
         match t {
             StimTarget::Qubit(q) => out.push((*q as usize, false)),
             StimTarget::QubitInv(q) => out.push((*q as usize, true)),
+            StimTarget::Sweep(_) => {} // skip: treated as always-0 (no-op)
             _ => return Err("expected qubit target".to_string()),
         }
     }
@@ -811,6 +816,7 @@ fn expect_qubit(t: &StimTarget) -> Result<usize, String> {
     match t {
         StimTarget::Qubit(q) => Ok(*q as usize),
         StimTarget::QubitInv(_) => Err("inverted qubit target only valid for measurement".to_string()),
+        StimTarget::Sweep(_) => Err("sweep[] target unexpected here".to_string()),
         _ => Err("expected qubit target".to_string()),
     }
 }
@@ -822,6 +828,10 @@ fn qubit_pairs(targets: &[StimTarget]) -> Result<Vec<(usize, usize)>, String> {
     let mut out = Vec::new();
     let mut it = targets.iter();
     while let (Some(a), Some(b)) = (it.next(), it.next()) {
+        // Skip any pair that contains a sweep target (sweep=0 means gate is no-op)
+        if matches!(a, StimTarget::Sweep(_)) || matches!(b, StimTarget::Sweep(_)) {
+            continue;
+        }
         out.push((expect_qubit(a)?, expect_qubit(b)?));
     }
     Ok(out)
