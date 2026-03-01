@@ -1,30 +1,34 @@
 use crate::ir::{StimInstr, StimTarget};
+use super::NoiseParams;
 
 /// Generate a rotated surface code memory-X experiment circuit.
-///
-/// d=3: 9 data qubits + 8 ancilla = 17 total.
-/// Logical observable: X on the left column of data qubits.
 pub fn rotated_memory_x(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
-    rotated_surface_code(distance, rounds, noise, true)
+    rotated_memory_x_with_params(distance, rounds, NoiseParams::uniform(noise))
 }
 
 /// Generate a rotated surface code memory-Z experiment circuit.
-///
-/// d=3: 9 data qubits + 8 ancilla = 17 total.
-/// Logical observable: Z on the bottom row of data qubits.
 pub fn rotated_memory_z(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
-    rotated_surface_code(distance, rounds, noise, false)
+    rotated_memory_z_with_params(distance, rounds, NoiseParams::uniform(noise))
 }
 
-fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) -> Vec<StimInstr> {
+/// Generate a rotated surface code memory-X experiment circuit with per-channel noise.
+pub fn rotated_memory_x_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
+    rotated_surface_code(distance, rounds, params, true)
+}
+
+/// Generate a rotated surface code memory-Z experiment circuit with per-channel noise.
+pub fn rotated_memory_z_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
+    rotated_surface_code(distance, rounds, params, false)
+}
+
+fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_x: bool) -> Vec<StimInstr> {
     assert!(d >= 2, "distance must be >= 2");
     assert!(rounds >= 1, "rounds must be >= 1");
 
     // --- Build coordinate sets ---
-    // Data qubits: x in {1,3,...,2d-1}, y in {1,3,...,2d-1}
     let mut data_coords: Vec<(i32, i32)> = Vec::new();
-    let mut x_observable: Vec<(i32, i32)> = Vec::new(); // left column (x==1)
-    let mut z_observable: Vec<(i32, i32)> = Vec::new(); // bottom row (y==1)
+    let mut x_observable: Vec<(i32, i32)> = Vec::new();
+    let mut z_observable: Vec<(i32, i32)> = Vec::new();
     for xi in 0..d {
         for yi in 0..d {
             let cx = (xi as i32) * 2 + 1;
@@ -40,7 +44,6 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     }
     data_coords.sort();
 
-    // Measurement qubits: x in {0,2,...,2d}, y in {0,2,...,2d} with filtering
     let mut x_measure_coords: Vec<(i32, i32)> = Vec::new();
     let mut z_measure_coords: Vec<(i32, i32)> = Vec::new();
     for xi in 0..=(d as i32) {
@@ -66,13 +69,11 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     x_measure_coords.sort();
     z_measure_coords.sort();
 
-    // All measurement qubits in sorted order (x first, then z)
     let mut measure_coords: Vec<(i32, i32)> = Vec::new();
     measure_coords.extend_from_slice(&x_measure_coords);
     measure_coords.extend_from_slice(&z_measure_coords);
     measure_coords.sort();
 
-    // --- Assign qubit indices in sorted (x,y) order ---
     let mut all_coords: Vec<(i32, i32)> = Vec::new();
     all_coords.extend_from_slice(&data_coords);
     all_coords.extend_from_slice(&measure_coords);
@@ -88,19 +89,12 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     let _z_measure_qubits: Vec<u32> = z_measure_coords.iter().map(|&c| coord_to_idx(c)).collect();
     let measure_qubits: Vec<u32> = measure_coords.iter().map(|&c| coord_to_idx(c)).collect();
 
-    // Chosen basis
     let chosen_measure_coords: &Vec<(i32, i32)> = if is_memory_x { &x_measure_coords } else { &z_measure_coords };
     let chosen_observable: &Vec<(i32, i32)> = if is_memory_x { &x_observable } else { &z_observable };
 
-    // Interaction orders (from Stim source)
-    // Z-ancilla: [(1,1),(1,-1),(-1,1),(-1,-1)]
-    // X-ancilla: [(1,1),(-1,1),(1,-1),(-1,-1)]
     let z_order: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
     let x_order: [(i32, i32); 4] = [(1, 1), (-1, 1), (1, -1), (-1, -1)];
 
-    // Build CNOT target lists for each of 4 layers
-    // X: ancilla -> data (measure is control, data is target)
-    // Z: data -> ancilla (data is control, measure is target)
     let mut cnot_layers: [Vec<u32>; 4] = [vec![], vec![], vec![], vec![]];
     for k in 0..4 {
         for &mc in &x_measure_coords {
@@ -132,9 +126,9 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     for &q in &data_qubits {
         instrs.push(op(data_reset_op, &[], &[StimTarget::Qubit(q)]));
     }
-    if noise > 0.0 {
+    if params.after_reset_flip_probability > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(q)]));
+            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
         }
     }
 
@@ -142,8 +136,12 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     for &q in &measure_qubits {
         instrs.push(op("R", &[], &[StimTarget::Qubit(q)]));
     }
+    if params.after_reset_flip_probability > 0.0 {
+        for &q in &measure_qubits {
+            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+        }
+    }
 
-    // measure_coord_to_order: position in measure_qubits list
     let measure_coord_to_order = |c: (i32, i32)| -> usize {
         measure_coords.iter().position(|&x| x == c).unwrap()
     };
@@ -154,34 +152,62 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     let n_measure = measure_qubits.len();
     let n_data = data_qubits.len();
 
-    // First round (head cycle)
-    instrs.push(op("TICK", &[], &[]));
-    // H on X ancilla
-    for &q in &x_measure_qubits {
-        instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-    }
-    // 4 CNOT layers
-    for k in 0..4 {
+    // Helper: emit one stabilizer round (H, 4 CX layers, H, MR)
+    let emit_round = |instrs: &mut Vec<StimInstr>| {
         instrs.push(op("TICK", &[], &[]));
-        let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-        if !targets.is_empty() {
-            instrs.push(op("CX", &[], &targets));
+
+        // before_round_data_depolarization at start of round
+        if params.before_round_data_depolarization > 0.0 {
+            for &q in &data_qubits {
+                instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+            }
         }
-        if noise > 0.0 && !cnot_layers[k].is_empty() {
-            let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-            instrs.push(op("DEPOLARIZE2", &[noise], &pairs));
+
+        // H on X ancilla
+        for &q in &x_measure_qubits {
+            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
-    }
-    instrs.push(op("TICK", &[], &[]));
-    // H on X ancilla
-    for &q in &x_measure_qubits {
-        instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-    }
-    instrs.push(op("TICK", &[], &[]));
-    // MR all ancilla
-    for &q in &measure_qubits {
-        instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
-    }
+        // 4 CNOT layers
+        for k in 0..4 {
+            instrs.push(op("TICK", &[], &[]));
+            let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
+            if !targets.is_empty() {
+                instrs.push(op("CX", &[], &targets));
+            }
+            if params.after_clifford_depolarization > 0.0 && !cnot_layers[k].is_empty() {
+                let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
+                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &pairs));
+            }
+        }
+        instrs.push(op("TICK", &[], &[]));
+        // H on X ancilla
+        for &q in &x_measure_qubits {
+            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
+        }
+        instrs.push(op("TICK", &[], &[]));
+
+        // before_measure_flip_probability: X_ERROR before MR
+        if params.before_measure_flip_probability > 0.0 {
+            for &q in &measure_qubits {
+                instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
+            }
+        }
+
+        // MR all ancilla
+        for &q in &measure_qubits {
+            instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
+        }
+
+        // after_reset_flip_probability: X_ERROR after MR (which includes reset)
+        if params.after_reset_flip_probability > 0.0 {
+            for &q in &measure_qubits {
+                instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            }
+        }
+    };
+
+    // First round (head cycle)
+    emit_round(&mut instrs);
     // Detectors for first round: only chosen-basis ancilla
     for &mc in chosen_measure_coords.iter() {
         let order = measure_coord_to_order(mc);
@@ -196,29 +222,7 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
     // Subsequent rounds (body cycle, rounds-1 times)
     for _round in 1..rounds {
         instrs.push(op("SHIFT_COORDS", &[0.0, 0.0, 1.0], &[]));
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &x_measure_qubits {
-            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-        }
-        for k in 0..4 {
-            instrs.push(op("TICK", &[], &[]));
-            let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-            if !targets.is_empty() {
-                instrs.push(op("CX", &[], &targets));
-            }
-            if noise > 0.0 && !cnot_layers[k].is_empty() {
-                let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-                instrs.push(op("DEPOLARIZE2", &[noise], &pairs));
-            }
-        }
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &x_measure_qubits {
-            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-        }
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &measure_qubits {
-            instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
-        }
+        emit_round(&mut instrs);
         // Detectors: all ancilla, compare current to previous
         for &mc in &measure_coords {
             let order = measure_coord_to_order(mc);
@@ -233,9 +237,14 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
 
     // Tail: measure data qubits in chosen basis
     instrs.push(op("TICK", &[], &[]));
-    if noise > 0.0 {
+    if params.before_round_data_depolarization > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(q)]));
+            instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+        }
+    }
+    if params.before_measure_flip_probability > 0.0 {
+        for &q in &data_qubits {
+            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
         }
     }
     let data_meas_op = if is_memory_x { "MX" } else { "M" };
@@ -243,10 +252,9 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
         instrs.push(op(data_meas_op, &[], &[StimTarget::Qubit(q)]));
     }
 
-    // Tail detectors: for each chosen-basis ancilla, compare last ancilla meas + neighboring data
+    // Tail detectors
     for &mc in chosen_measure_coords.iter() {
         let mut det_targets: Vec<StimTarget> = Vec::new();
-        // Neighboring data qubits (using z_order offsets per Stim)
         for &delta in &z_order {
             let dc = (mc.0 + delta.0, mc.1 + delta.1);
             if let Some(dorder) = data_coords.iter().position(|&x| x == dc) {
@@ -254,7 +262,6 @@ fn rotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) 
                 det_targets.push(StimTarget::Rec(offset));
             }
         }
-        // Last ancilla measurement
         let morder = measure_coord_to_order(mc);
         let anc_offset = -((n_data + n_measure - morder) as i32);
         det_targets.push(StimTarget::Rec(anc_offset));
@@ -291,21 +298,30 @@ fn op(name: &str, args: &[f64], targets: &[StimTarget]) -> StimInstr {
 
 /// Generate an unrotated surface code memory-X experiment circuit.
 pub fn unrotated_memory_x(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
-    unrotated_surface_code(distance, rounds, noise, true)
+    unrotated_memory_x_with_params(distance, rounds, NoiseParams::uniform(noise))
 }
 
 /// Generate an unrotated surface code memory-Z experiment circuit.
 pub fn unrotated_memory_z(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
-    unrotated_surface_code(distance, rounds, noise, false)
+    unrotated_memory_z_with_params(distance, rounds, NoiseParams::uniform(noise))
 }
 
-fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool) -> Vec<StimInstr> {
+/// Generate an unrotated surface code memory-X experiment circuit with per-channel noise.
+pub fn unrotated_memory_x_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
+    unrotated_surface_code(distance, rounds, params, true)
+}
+
+/// Generate an unrotated surface code memory-Z experiment circuit with per-channel noise.
+pub fn unrotated_memory_z_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
+    unrotated_surface_code(distance, rounds, params, false)
+}
+
+fn unrotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_x: bool) -> Vec<StimInstr> {
     assert!(d >= 2, "distance must be >= 2");
     assert!(rounds >= 1, "rounds must be >= 1");
 
     let width = 2 * d - 1;
 
-    // Classify each grid position
     let mut data_coords: Vec<(i32, i32)> = Vec::new();
     let mut x_measure_coords: Vec<(i32, i32)> = Vec::new();
     let mut z_measure_coords: Vec<(i32, i32)> = Vec::new();
@@ -335,7 +351,6 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
         }
     }
 
-    // Qubit index: x + y * width (row-major)
     let coord_to_idx = |c: (i32, i32)| -> u32 { (c.0 + c.1 * width as i32) as u32 };
 
     let data_qubits: Vec<u32> = data_coords.iter().map(|&c| coord_to_idx(c)).collect();
@@ -349,7 +364,6 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
 
     let measure_qubits: Vec<u32> = measure_coords.iter().map(|&c| coord_to_idx(c)).collect();
 
-    // All coords for QUBIT_COORDS
     let mut all_coords: Vec<(i32, i32)> = Vec::new();
     all_coords.extend_from_slice(&data_coords);
     all_coords.extend_from_slice(&x_measure_coords);
@@ -360,12 +374,8 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
     let chosen_measure_coords: &Vec<(i32, i32)> = if is_memory_x { &x_measure_coords } else { &z_measure_coords };
     let chosen_observable: &Vec<(i32, i32)> = if is_memory_x { &x_observable } else { &z_observable };
 
-    // Interaction order (same for X and Z ancilla in unrotated code)
     let interact_order: [(i32, i32); 4] = [(1, 0), (0, 1), (0, -1), (-1, 0)];
 
-    // Build CNOT layers
-    // X-ancilla: ancilla -> data (ancilla is control, data is target)
-    // Z-ancilla: data -> ancilla (data is control, ancilla is target)
     let mut cnot_layers: [Vec<u32>; 4] = [vec![], vec![], vec![], vec![]];
     for k in 0..4 {
         for &mc in &x_measure_coords {
@@ -407,9 +417,9 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
     for &q in &data_qubits {
         instrs.push(op(data_reset_op, &[], &[StimTarget::Qubit(q)]));
     }
-    if noise > 0.0 {
+    if params.after_reset_flip_probability > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(q)]));
+            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
         }
     }
 
@@ -417,32 +427,61 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
     for &q in &measure_qubits {
         instrs.push(op("R", &[], &[StimTarget::Qubit(q)]));
     }
+    if params.after_reset_flip_probability > 0.0 {
+        for &q in &measure_qubits {
+            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+        }
+    }
+
+    // Helper: emit one stabilizer round
+    let emit_round = |instrs: &mut Vec<StimInstr>| {
+        instrs.push(op("TICK", &[], &[]));
+
+        if params.before_round_data_depolarization > 0.0 {
+            for &q in &data_qubits {
+                instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+            }
+        }
+
+        for &q in &x_measure_qubits {
+            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
+        }
+        for k in 0..4 {
+            instrs.push(op("TICK", &[], &[]));
+            let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
+            if !targets.is_empty() {
+                instrs.push(op("CX", &[], &targets));
+            }
+            if params.after_clifford_depolarization > 0.0 && !cnot_layers[k].is_empty() {
+                let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
+                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &pairs));
+            }
+        }
+        instrs.push(op("TICK", &[], &[]));
+        for &q in &x_measure_qubits {
+            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
+        }
+        instrs.push(op("TICK", &[], &[]));
+
+        if params.before_measure_flip_probability > 0.0 {
+            for &q in &measure_qubits {
+                instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
+            }
+        }
+
+        for &q in &measure_qubits {
+            instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
+        }
+
+        if params.after_reset_flip_probability > 0.0 {
+            for &q in &measure_qubits {
+                instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            }
+        }
+    };
 
     // First round
-    instrs.push(op("TICK", &[], &[]));
-    for &q in &x_measure_qubits {
-        instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-    }
-    for k in 0..4 {
-        instrs.push(op("TICK", &[], &[]));
-        let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-        if !targets.is_empty() {
-            instrs.push(op("CX", &[], &targets));
-        }
-        if noise > 0.0 && !cnot_layers[k].is_empty() {
-            let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-            instrs.push(op("DEPOLARIZE2", &[noise], &pairs));
-        }
-    }
-    instrs.push(op("TICK", &[], &[]));
-    for &q in &x_measure_qubits {
-        instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-    }
-    instrs.push(op("TICK", &[], &[]));
-    for &q in &measure_qubits {
-        instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
-    }
-    // First-round detectors: only chosen-basis ancilla
+    emit_round(&mut instrs);
     for &mc in chosen_measure_coords.iter() {
         let order = measure_coord_to_order(mc);
         let rec_offset = -((n_measure - order) as i32);
@@ -456,29 +495,7 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
     // Subsequent rounds
     for _round in 1..rounds {
         instrs.push(op("SHIFT_COORDS", &[0.0, 0.0, 1.0], &[]));
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &x_measure_qubits {
-            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-        }
-        for k in 0..4 {
-            instrs.push(op("TICK", &[], &[]));
-            let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-            if !targets.is_empty() {
-                instrs.push(op("CX", &[], &targets));
-            }
-            if noise > 0.0 && !cnot_layers[k].is_empty() {
-                let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
-                instrs.push(op("DEPOLARIZE2", &[noise], &pairs));
-            }
-        }
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &x_measure_qubits {
-            instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
-        }
-        instrs.push(op("TICK", &[], &[]));
-        for &q in &measure_qubits {
-            instrs.push(op("MR", &[], &[StimTarget::Qubit(q)]));
-        }
+        emit_round(&mut instrs);
         for &mc in &measure_coords {
             let order = measure_coord_to_order(mc);
             let k = (n_measure - order - 1) as i32;
@@ -492,9 +509,14 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
 
     // Tail: measure data in chosen basis
     instrs.push(op("TICK", &[], &[]));
-    if noise > 0.0 {
+    if params.before_round_data_depolarization > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(q)]));
+            instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+        }
+    }
+    if params.before_measure_flip_probability > 0.0 {
+        for &q in &data_qubits {
+            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
         }
     }
     let data_meas_op = if is_memory_x { "MX" } else { "M" };
@@ -536,4 +558,3 @@ fn unrotated_surface_code(d: usize, rounds: usize, noise: f64, is_memory_x: bool
 
     instrs
 }
-

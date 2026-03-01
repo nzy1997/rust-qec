@@ -1,12 +1,18 @@
 use crate::ir::{StimInstr, StimTarget};
+use super::NoiseParams;
 
-/// Generate a repetition code memory experiment circuit.
+/// Generate a repetition code memory experiment circuit (uniform noise convenience wrapper).
+pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
+    repetition_code_memory_with_params(distance, rounds, NoiseParams::uniform(noise))
+}
+
+/// Generate a repetition code memory experiment circuit with per-channel noise.
 ///
 /// Layout: d data qubits (0..d-1) interleaved with d-1 ancilla qubits (d..2d-2).
 /// Each round: reset ancillas, CNOT from data[i] and data[i+1] to ancilla[i],
 /// measure ancillas, compare with previous round via DETECTOR.
 /// Final round: measure all data qubits, create detectors and observable.
-pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
+pub fn repetition_code_memory_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
     assert!(distance >= 2, "distance must be >= 2");
     assert!(rounds >= 1, "rounds must be >= 1");
 
@@ -34,17 +40,44 @@ pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec
         for &a in &ancilla {
             instrs.push(op("R", &[], &[StimTarget::Qubit(a)]));
         }
+        // after_reset_flip_probability: X_ERROR after ancilla reset
+        if params.after_reset_flip_probability > 0.0 {
+            for &a in &ancilla {
+                instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(a)]));
+            }
+        }
+
+        // before_round_data_depolarization: DEPOLARIZE1 on data qubits at start of round
+        if params.before_round_data_depolarization > 0.0 {
+            for &d in &data {
+                instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(d)]));
+            }
+        }
 
         for (i, &a) in ancilla.iter().enumerate() {
             instrs.push(op("CX", &[], &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)]));
         }
+        // after_clifford_depolarization: DEPOLARIZE2 after first CX layer
+        if params.after_clifford_depolarization > 0.0 {
+            for (i, &a) in ancilla.iter().enumerate() {
+                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)]));
+            }
+        }
+
         for (i, &a) in ancilla.iter().enumerate() {
             instrs.push(op("CX", &[], &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)]));
         }
+        // after_clifford_depolarization: DEPOLARIZE2 after second CX layer
+        if params.after_clifford_depolarization > 0.0 {
+            for (i, &a) in ancilla.iter().enumerate() {
+                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)]));
+            }
+        }
 
-        if noise > 0.0 {
-            for &d in &data {
-                instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(d)]));
+        // before_measure_flip_probability: X_ERROR before measurement
+        if params.before_measure_flip_probability > 0.0 {
+            for &a in &ancilla {
+                instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(a)]));
             }
         }
 
@@ -72,10 +105,15 @@ pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec
     }
 
     instrs.push(op("TICK", &[], &[]));
-    for &d in &data {
-        if noise > 0.0 {
-            instrs.push(op("DEPOLARIZE1", &[noise], &[StimTarget::Qubit(d)]));
+
+    // before_measure_flip_probability: X_ERROR before final data measurement
+    if params.before_measure_flip_probability > 0.0 {
+        for &d in &data {
+            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(d)]));
         }
+    }
+
+    for &d in &data {
         instrs.push(op("M", &[], &[StimTarget::Qubit(d)]));
     }
 
