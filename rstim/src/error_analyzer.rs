@@ -1,4 +1,7 @@
-use crate::dem::{DemTarget, DetectorErrorModel};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+
+use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 
 #[derive(Debug, Clone, Default)]
@@ -63,6 +66,12 @@ impl ErrorAnalyzer {
                 dem.add_error(prob, targets);
             }
         }
+        Ok(dem)
+    }
+
+    pub fn circuit_to_dem_decomposed(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
+        let mut dem = Self::circuit_to_dem(instrs)?;
+        decompose_errors(&mut dem)?;
         Ok(dem)
     }
 
@@ -843,4 +852,208 @@ fn count_annotations(instrs: &[StimInstr], kind: &str) -> usize {
         }
     }
     count
+}
+
+/// Extract the detector/observable target set from a list of DemTargets,
+/// ignoring separators. Returns a BTreeSet for XOR-style operations.
+fn target_set(targets: &[DemTarget]) -> BTreeSet<DemTarget> {
+    targets
+        .iter()
+        .filter(|t| !matches!(t, DemTarget::Separator))
+        .cloned()
+        .collect()
+}
+
+/// Symmetric difference of two BTreeSets.
+fn symmetric_difference(
+    a: &BTreeSet<DemTarget>,
+    b: &BTreeSet<DemTarget>,
+) -> BTreeSet<DemTarget> {
+    a.symmetric_difference(b).cloned().collect()
+}
+
+/// Count detector targets in a target set.
+fn detector_count(targets: &BTreeSet<DemTarget>) -> usize {
+    targets
+        .iter()
+        .filter(|t| matches!(t, DemTarget::Detector(_)))
+        .count()
+}
+
+/// Check if a single component (no separators) is graphlike (at most 2 detectors).
+fn component_is_graphlike(targets: &[DemTarget]) -> bool {
+    // Split by separators and check each component
+    let mut det_count = 0usize;
+    for t in targets {
+        match t {
+            DemTarget::Separator => {
+                if det_count > 2 {
+                    return false;
+                }
+                det_count = 0;
+            }
+            DemTarget::Detector(_) => {
+                det_count += 1;
+            }
+            _ => {}
+        }
+    }
+    det_count <= 2
+}
+
+/// Convert a BTreeSet of targets into a sorted Vec.
+fn set_to_targets(set: &BTreeSet<DemTarget>) -> Vec<DemTarget> {
+    set.iter().cloned().collect()
+}
+
+/// Decompose non-graphlike errors in a DEM into graphlike components.
+///
+/// A graphlike error has at most 2 detector targets per ^-separated component.
+/// Non-graphlike errors (3+ detectors) are decomposed by finding combinations
+/// of existing graphlike errors whose detector sets XOR to produce the
+/// non-graphlike error's detector set.
+pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
+    let instrs = dem.instructions().to_vec();
+
+    // Build a lookup of known graphlike errors: target_set -> index
+    let mut graphlike_map: BTreeMap<BTreeSet<DemTarget>, usize> = BTreeMap::new();
+    let mut graphlike_sets: Vec<(usize, BTreeSet<DemTarget>)> = Vec::new();
+
+    // Classify errors
+    let mut non_graphlike_indices: Vec<usize> = Vec::new();
+
+    for (i, instr) in instrs.iter().enumerate() {
+        if let DemInstruction::Error { targets, .. } = instr {
+            if component_is_graphlike(targets) {
+                let tset = target_set(targets);
+                if !tset.is_empty() {
+                    graphlike_map.insert(tset.clone(), i);
+                    graphlike_sets.push((i, tset));
+                }
+            } else {
+                non_graphlike_indices.push(i);
+            }
+        }
+    }
+
+    if non_graphlike_indices.is_empty() {
+        return Ok(());
+    }
+
+    // Try to decompose each non-graphlike error
+    let mut new_instrs = instrs;
+
+    for &idx in &non_graphlike_indices {
+        let (prob, targets) = match &new_instrs[idx] {
+            DemInstruction::Error { probability, targets } => (*probability, targets.clone()),
+            _ => unreachable!(),
+        };
+
+        let error_set = target_set(&targets);
+        let mut decomposed = false;
+
+        // Strategy 1: find K1 such that K1 is graphlike, and S ^ K1 is also a known graphlike error
+        for (_, k1_set) in &graphlike_sets {
+            // K1 must be a subset of or overlap with error_set for the decomposition to reduce complexity
+            let remainder = symmetric_difference(&error_set, k1_set);
+            if detector_count(&remainder) <= 2 {
+                if let Some(_) = graphlike_map.get(&remainder) {
+                    // Decompose: error_set = k1_set ^ remainder
+                    let mut new_targets = set_to_targets(k1_set);
+                    new_targets.push(DemTarget::Separator);
+                    new_targets.extend(set_to_targets(&remainder));
+                    new_instrs[idx] = DemInstruction::Error {
+                        probability: prob,
+                        targets: new_targets,
+                    };
+                    decomposed = true;
+                    break;
+                }
+                // Even if remainder is not a known error, it's graphlike (<=2 detectors),
+                // so we can use it directly as a new component
+                let mut new_targets = set_to_targets(k1_set);
+                new_targets.push(DemTarget::Separator);
+                new_targets.extend(set_to_targets(&remainder));
+                new_instrs[idx] = DemInstruction::Error {
+                    probability: prob,
+                    targets: new_targets,
+                };
+                decomposed = true;
+                break;
+            }
+        }
+
+        if decomposed {
+            continue;
+        }
+
+        // Strategy 2: find pairs (K1, K2) of known graphlike errors where K1 ^ K2 = S
+        let mut found_pair = false;
+        'outer: for (i, (_, k1_set)) in graphlike_sets.iter().enumerate() {
+            for (_, k2_set) in graphlike_sets.iter().skip(i) {
+                let combined = symmetric_difference(k1_set, k2_set);
+                if combined == error_set {
+                    let mut new_targets = set_to_targets(k1_set);
+                    new_targets.push(DemTarget::Separator);
+                    new_targets.extend(set_to_targets(k2_set));
+                    new_instrs[idx] = DemInstruction::Error {
+                        probability: prob,
+                        targets: new_targets,
+                    };
+                    found_pair = true;
+                    break 'outer;
+                }
+            }
+        }
+
+        if !found_pair {
+            // Strategy 3: brute-force decompose into components of <=2 detectors each
+            // Extract just detectors and observables separately
+            let dets: Vec<DemTarget> = error_set
+                .iter()
+                .filter(|t| matches!(t, DemTarget::Detector(_)))
+                .cloned()
+                .collect();
+            let obs: Vec<DemTarget> = error_set
+                .iter()
+                .filter(|t| matches!(t, DemTarget::Observable(_)))
+                .cloned()
+                .collect();
+
+            if dets.len() >= 3 {
+                // Split into pairs of detectors, distributing observables into the first component
+                let mut new_targets: Vec<DemTarget> = Vec::new();
+                let mut first = true;
+                for chunk in dets.chunks(2) {
+                    if !first {
+                        new_targets.push(DemTarget::Separator);
+                    }
+                    new_targets.extend_from_slice(chunk);
+                    if first {
+                        // Put observables in the first component
+                        new_targets.extend(obs.iter().cloned());
+                        first = false;
+                    }
+                }
+                new_instrs[idx] = DemInstruction::Error {
+                    probability: prob,
+                    targets: new_targets,
+                };
+            } else {
+                return Err(format!(
+                    "failed to decompose non-graphlike error: {:?}",
+                    targets
+                ));
+            }
+        }
+    }
+
+    // Rebuild the DEM
+    let mut new_dem = DetectorErrorModel::new();
+    new_dem.set_min_counts(dem.num_detectors(), dem.num_observables());
+    for instr in new_instrs {
+        new_dem.push(instr);
+    }
+    *dem = new_dem;
+    Ok(())
 }
