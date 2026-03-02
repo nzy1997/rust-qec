@@ -187,6 +187,13 @@ for shot in 0..1000 {
 println!("Logical error rate: {}/{}", errors, 1000);
 ```
 
+Without a decoder, you can still inspect the raw sampling output:
+
+```
+Shots with detection events: 837/1000
+Actual observable flips: 103/1000
+```
+
 ## Estimate threshold
 
 A threshold experiment sweeps over code distances and noise rates. Below
@@ -194,15 +201,35 @@ threshold, larger codes perform better; above threshold, they perform worse.
 
 ```rust
 for d in [3, 5, 7] {
-    for noise in [0.01, 0.02, 0.05, 0.1] {
+    for noise in [0.01, 0.05, 0.1] {
         let circuit = repetition_code_memory(d, d * 3, noise);
-        let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
-        // ... build decoder, sample, decode, count errors ...
-        let error_rate = errors as f64 / shots as f64;
-        println!("d={} p={:.3} error_rate={:.4}", d, noise, error_rate);
+        let output = sample_batch(&circuit, 10000, &mut rng).unwrap();
+        let errors: usize = (0..10000)
+            .filter(|&s| output.observable_flips.get(0, s))
+            .count();
+        let error_rate = errors as f64 / 10000.0;
+        println!("d={} p={:.2} error_rate={:.4}", d, noise, error_rate);
     }
 }
 ```
+
+Output (without decoding — raw observable flip rate):
+
+```
+d=3 p=0.01 error_rate=0.1074
+d=3 p=0.05 error_rate=0.3518
+d=3 p=0.10 error_rate=0.4589
+d=5 p=0.01 error_rate=0.1567
+d=5 p=0.05 error_rate=0.4259
+d=5 p=0.10 error_rate=0.4983
+d=7 p=0.01 error_rate=0.1990
+d=7 p=0.05 error_rate=0.4642
+d=7 p=0.10 error_rate=0.4974
+```
+
+Note: these are raw flip rates without decoding. With a MWPM decoder,
+the error rates would be much lower — the decoder corrects most errors,
+and increasing distance would improve performance below threshold.
 
 When you plot `error_rate` vs `noise` for each distance, the curves cross at
 the threshold noise rate.
@@ -217,35 +244,57 @@ save/resume.
 ```rust
 use rsinter::task::{Task, CollectionOptions};
 use rsinter::collect::{collect, CollectOptions};
+use rsinter::decode::VacuousDecoder;
 use rsinter::stats::shot_error_rate_to_piece_error_rate;
+use std::collections::HashMap;
 
-let task = Task {
-    circuit,
-    decoder: "rmatching".into(),
-    dem,
-    metadata: serde_json::json!({"d": 5, "p": 0.01}),
-    collection_options: CollectionOptions {
-        max_shots: Some(100_000),
-        max_errors: Some(500),
-    },
-};
+let tasks: Vec<Task> = [3, 5, 7].iter().map(|&d| {
+    let circuit = repetition_code_memory(d, d * 3, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+    Task {
+        circuit,
+        decoder: "vacuous".into(),
+        dem,
+        metadata: serde_json::json!({"d": d, "p": 0.01}),
+        collection_options: CollectionOptions {
+            max_shots: Some(100_000),
+            max_errors: None,
+        },
+    }
+}).collect();
+
+let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
+decoders.insert("vacuous".into(), Box::new(VacuousDecoder));
 
 let options = CollectOptions {
-    num_workers: 8,
+    num_workers: 4,
     max_shots: None,
     max_errors: None,
     max_batch_size: Some(1024),
     start_batch_size: 256,
     save_resume_filepath: None,
-    print_progress: true,
+    print_progress: false,
 };
 
-let results = collect(vec![task], decoders, &options).unwrap();
-
-// Convert shot error rate to per-round error rate
-let per_round_rate = shot_error_rate_to_piece_error_rate(
-    results[0].errors as f64 / results[0].shots as f64,
-    rounds as f64,
-);
-println!("Per-round logical error rate: {:.6}", per_round_rate);
+let results = collect(tasks, decoders, &options).unwrap();
+for stat in &results {
+    let d = stat.metadata["d"].as_u64().unwrap();
+    let rate = stat.errors as f64 / stat.shots as f64;
+    let per_round = shot_error_rate_to_piece_error_rate(rate, (d * 3) as f64);
+    println!("d={} shots={} errors={} shot_error_rate={:.4} per_round_rate={:.6}",
+             d, stat.shots, stat.errors, rate, per_round);
+}
 ```
+
+Output (using VacuousDecoder — always predicts no flip):
+
+```
+d=3 shots=100000 errors=10554 shot_error_rate=0.1055 per_round_rate=0.013000
+d=5 shots=100000 errors=15790 shot_error_rate=0.1579 per_round_rate=0.012491
+d=7 shots=100000 errors=20410 shot_error_rate=0.2041 per_round_rate=0.012335
+```
+
+With a real decoder (e.g., rmatching), error rates would be much lower.
+The `shot_error_rate_to_piece_error_rate` function converts per-experiment
+error rates to per-round rates, making them comparable across different
+round counts.
