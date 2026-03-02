@@ -42,6 +42,22 @@ fn main() {
 }
 ```
 
+Output:
+
+```
+2 measurements, 10 shots
+  shot 0: 0 0
+  shot 1: 0 0
+  shot 2: 0 0
+  shot 3: 0 0
+  shot 4: 0 0
+  shot 5: 0 0
+  shot 6: 0 0
+  shot 7: 0 0
+  shot 8: 0 0
+  shot 9: 0 0
+```
+
 The two measurement outcomes in each shot will always agree (`00` or `11`),
 because H + CNOT creates the Bell state (|00> + |11>) / sqrt(2).
 
@@ -68,6 +84,12 @@ let fires: usize = (0..1000)
     .filter(|&s| output.detections.get(0, s))
     .count();
 println!("Detector fired {}/1000 times (~10% expected)", fires);
+```
+
+Output:
+
+```
+Detector fired 99/1000 times (~10% expected)
 ```
 
 ## Generate QEC circuits
@@ -109,6 +131,14 @@ use rstim::error_analyzer::ErrorAnalyzer;
 
 let dem = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
 println!("{}", dem);
+```
+
+Example output (for a simple 3-qubit circuit with `X_ERROR(0.01)`):
+
+```
+error(0.01) D1 L0
+error(0.01) D0 D1
+error(0.01) D0
 ```
 
 For minimum-weight perfect matching (MWPM) decoders, use the decomposed
