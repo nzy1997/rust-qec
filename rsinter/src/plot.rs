@@ -28,7 +28,11 @@ pub fn plot_error_rate(
         groups.entry(group_func(stat)).or_default().push((x, low, best, high));
     }
     for pts in groups.values_mut() {
-        pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    }
+
+    if groups.is_empty() {
+        return Ok(());
     }
 
     // Compute axis ranges
@@ -84,22 +88,23 @@ where
 
     for (i, (label, points)) in groups.iter().enumerate() {
         let color = Palette99::pick(i).mix(0.9);
+        let legend_color = color.clone();
 
         // Line through best values
         chart.draw_series(LineSeries::new(
-            points.iter().map(|(x, _, best, _)| (*x, *best)),
+            points.iter().map(|(x, _, best, _)| (*x, best.max(1e-10))),
             ShapeStyle::from(&color).stroke_width(2),
         ))?.label(label).legend(move |(x, y)| {
-            PathElement::new(vec![(x, y), (x + 20, y)], ShapeStyle::from(&Palette99::pick(i).mix(0.9)).stroke_width(2))
+            PathElement::new(vec![(x, y), (x + 20, y)], ShapeStyle::from(&legend_color).stroke_width(2))
         });
 
         // Error bars: vertical line from low to high
         chart.draw_series(points.iter().flat_map(|(x, low, _best, high)| {
             let low = low.max(1e-10);
             vec![
-                PathElement::new(vec![(*x, low), (*x, *high)], ShapeStyle::from(&Palette99::pick(i).mix(0.9)).stroke_width(1)),
-                PathElement::new(vec![(*x - cap, low), (*x + cap, low)], ShapeStyle::from(&Palette99::pick(i).mix(0.9)).stroke_width(1)),
-                PathElement::new(vec![(*x - cap, *high), (*x + cap, *high)], ShapeStyle::from(&Palette99::pick(i).mix(0.9)).stroke_width(1)),
+                PathElement::new(vec![(*x, low), (*x, *high)], ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(*x - cap, low), (*x + cap, low)], ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(*x - cap, *high), (*x + cap, *high)], ShapeStyle::from(&color).stroke_width(1)),
             ]
         }))?;
     }
