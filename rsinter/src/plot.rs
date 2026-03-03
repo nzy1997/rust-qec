@@ -44,8 +44,8 @@ pub fn plot_error_rate(
     let y_min_pos = all_y.iter().cloned().filter(|v| *v > 0.0).fold(f64::INFINITY, f64::min);
     let y_max = all_y.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-    let x_pad = (x_max - x_min) * 0.1;
-    let x_range = (x_min - x_pad)..(x_max + x_pad);
+    // Multiplicative padding so the range stays positive on a log-scale x-axis.
+    let x_range = (x_min / 1.1)..(x_max * 1.1);
     let y_low  = (y_min_pos * 0.5).max(1e-10);
     let y_high = (y_max * 2.0).min(1.0);
 
@@ -75,7 +75,10 @@ where
         .margin(40)
         .x_label_area_size(50)
         .y_label_area_size(70)
-        .build_cartesian_2d(x_range.clone(), (y_range.start..y_range.end).log_scale())?;
+        .build_cartesian_2d(
+            (x_range.start..x_range.end).log_scale(),
+            (y_range.start..y_range.end).log_scale(),
+        )?;
 
     chart
         .configure_mesh()
@@ -83,8 +86,9 @@ where
         .y_desc("Logical Error Rate")
         .draw()?;
 
-    let x_span = x_range.end - x_range.start;
-    let cap = x_span * 0.005;
+    // Multiplicative cap: each error bar whisker extends 1.5% of x on each side.
+    // This stays visually consistent on a log-scale x-axis.
+    const CAP_FACTOR: f64 = 1.015;
 
     for (i, (label, points)) in groups.iter().enumerate() {
         let color = Palette99::pick(i).mix(0.9);
@@ -98,13 +102,15 @@ where
             PathElement::new(vec![(x, y), (x + 20, y)], ShapeStyle::from(&legend_color).stroke_width(2))
         });
 
-        // Error bars: vertical line from low to high
+        // Error bars: vertical line from low to high, with horizontal caps
         chart.draw_series(points.iter().flat_map(|(x, low, _best, high)| {
             let low = low.max(1e-10);
+            let x_lo = x / CAP_FACTOR;
+            let x_hi = x * CAP_FACTOR;
             vec![
                 PathElement::new(vec![(*x, low), (*x, *high)], ShapeStyle::from(&color).stroke_width(1)),
-                PathElement::new(vec![(*x - cap, low), (*x + cap, low)], ShapeStyle::from(&color).stroke_width(1)),
-                PathElement::new(vec![(*x - cap, *high), (*x + cap, *high)], ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(x_lo, low),  (x_hi, low)],   ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(x_lo, *high), (x_hi, *high)], ShapeStyle::from(&color).stroke_width(1)),
             ]
         }))?;
     }
