@@ -343,3 +343,35 @@ With a real decoder (e.g., rmatching), error rates would be much lower.
 The `shot_error_rate_to_piece_error_rate` function converts per-experiment
 error rates to per-round rates, making them comparable across different
 round counts.
+
+## Plot logical error rate vs physical error rate
+
+After collecting stats with `rsinter`, visualize the threshold with
+`rsinter::plot::plot_error_rate`. The x-axis is the physical error rate
+(from task metadata), the y-axis is the logical error rate with confidence
+intervals, and each curve is one code distance.
+
+```rust
+use rsinter::plot::plot_error_rate;
+use std::path::Path;
+
+// `results` is Vec<TaskStats> from rsinter::collect::collect(...)
+// metadata contains {"d": 3, "p": 0.01, "r": 9} (d=distance, p=noise, r=rounds)
+
+plot_error_rate(
+    &results,
+    |s| s.metadata["p"].as_f64().unwrap(),           // x: physical error rate
+    |s| format!("d={}", s.metadata["d"].as_u64().unwrap()), // one curve per distance
+    Path::new("threshold.svg"),                       // .svg (default) or .png
+).unwrap();
+```
+
+The `errors / shots` ratio is used as the logical error rate. To express
+it per round instead of per shot, convert with `shot_error_rate_to_piece_error_rate`
+and store the result as the task's error count scaled accordingly, or plot
+the raw per-shot rate and label the axis accordingly.
+
+Example output for a rotated surface code under circuit-level noise near
+threshold (d = 3, 5, 7; p ∈ {0.008 … 0.012}):
+
+![Surface code threshold plot](surface_code_threshold.svg)
