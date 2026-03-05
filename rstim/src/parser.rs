@@ -30,7 +30,8 @@ pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
             line = line[..line.len() - 1].trim().to_string();
         }
 
-        let mut parts = line.split_whitespace();
+        let tokens = split_respecting_parens(&line);
+        let mut parts = tokens.iter().map(|s| s.as_str());
         let name_token = parts
             .next()
             .ok_or_else(|| format!("line {}: empty", line_no + 1))?;
@@ -182,4 +183,35 @@ fn split_name_and_args(token: &str) -> Result<(&str, Option<String>, Vec<f64>), 
     };
 
     Ok((name, tag, args))
+}
+
+/// Split a line into whitespace-separated tokens, but treat content inside
+/// parentheses as part of the current token.  This allows argument lists
+/// like `DETECTOR(2, 4, 0) rec[-1]` to survive tokenization intact.
+fn split_respecting_parens(line: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut depth: usize = 0;
+    for ch in line.chars() {
+        match ch {
+            '(' => {
+                depth += 1;
+                current.push(ch);
+            }
+            ')' => {
+                depth = depth.saturating_sub(1);
+                current.push(ch);
+            }
+            c if c.is_whitespace() && depth == 0 => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
 }
