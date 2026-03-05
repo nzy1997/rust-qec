@@ -59,10 +59,26 @@ impl ErrorAnalyzer {
 
         analyzer.undo_circuit(instrs)?;
 
-        let mut dem = DetectorErrorModel::new();
-        dem.set_min_counts(num_detectors, num_observables);
+        // Merge errors that affect the same target set.
+        // When multiple independent noise channels each flip the same set of
+        // detectors/observables with probabilities p1, p2, …, the net probability
+        // that an ODD number of them fire is:
+        //   p_combined = p1 + p2 - 2*p1*p2
+        let mut merged: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
         for (prob, targets) in analyzer.errors.into_iter().rev() {
             if prob > 0.0 && !targets.is_empty() {
+                merged.entry(targets)
+                    .and_modify(|existing| {
+                        *existing = *existing + prob - 2.0 * *existing * prob;
+                    })
+                    .or_insert(prob);
+            }
+        }
+
+        let mut dem = DetectorErrorModel::new();
+        dem.set_min_counts(num_detectors, num_observables);
+        for (targets, prob) in merged {
+            if prob > 0.0 {
                 dem.add_error(prob, targets);
             }
         }
@@ -380,17 +396,19 @@ impl ErrorAnalyzer {
                 if p > 0.0 {
                     let p3 = p / 3.0;
                     for q in qubits(targets) {
+                        let mut components = Vec::new();
                         if !self.x_sens[q].is_empty() {
-                            self.errors.push((p3, self.x_sens[q].targets.clone()));
+                            components.push((p3, self.x_sens[q].targets.clone()));
                         }
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((p3, y_sens.targets));
+                            components.push((p3, y_sens.targets));
                         }
                         if !self.z_sens[q].is_empty() {
-                            self.errors.push((p3, self.z_sens[q].targets.clone()));
+                            components.push((p3, self.z_sens[q].targets.clone()));
                         }
+                        self.emit_noise_channel(components);
                     }
                 }
             }
@@ -416,6 +434,7 @@ impl ErrorAnalyzer {
                             (false, true, true, true),   // ZY
                             (false, true, false, true),  // ZZ
                         ];
+                        let mut components = Vec::new();
                         for (xa, za, xb, zb) in &paulis {
                             let mut sens = SparseXorVec::default();
                             if *xa { sens.xor_other(&self.x_sens[qa]); }
@@ -423,9 +442,10 @@ impl ErrorAnalyzer {
                             if *xb { sens.xor_other(&self.x_sens[qb]); }
                             if *zb { sens.xor_other(&self.z_sens[qb]); }
                             if !sens.is_empty() {
-                                self.errors.push((p15, sens.targets));
+                                components.push((p15, sens.targets));
                             }
                         }
+                        self.emit_noise_channel(components);
                     }
                 }
             }
@@ -454,19 +474,21 @@ impl ErrorAnalyzer {
                 let py = args.get(1).copied().unwrap_or(0.0);
                 let pz = args.get(2).copied().unwrap_or(0.0);
                 for q in qubits(targets) {
+                    let mut components = Vec::new();
                     if px > 0.0 && !self.x_sens[q].is_empty() {
-                        self.errors.push((px, self.x_sens[q].targets.clone()));
+                        components.push((px, self.x_sens[q].targets.clone()));
                     }
                     if py > 0.0 {
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((py, y_sens.targets));
+                            components.push((py, y_sens.targets));
                         }
                     }
                     if pz > 0.0 && !self.z_sens[q].is_empty() {
-                        self.errors.push((pz, self.z_sens[q].targets.clone()));
+                        components.push((pz, self.z_sens[q].targets.clone()));
                     }
+                    self.emit_noise_channel(components);
                 }
             }
             "PAULI_CHANNEL_2" => {
@@ -489,6 +511,7 @@ impl ErrorAnalyzer {
                     (false, true, false, true),
                 ];
                 for (qa, qb) in qubit_pairs(targets) {
+                    let mut components = Vec::new();
                     for (i, (xa, za, xb, zb)) in paulis.iter().enumerate() {
                         if probs[i] > 0.0 {
                             let mut sens = SparseXorVec::default();
@@ -497,10 +520,11 @@ impl ErrorAnalyzer {
                             if *xb { sens.xor_other(&self.x_sens[qb]); }
                             if *zb { sens.xor_other(&self.z_sens[qb]); }
                             if !sens.is_empty() {
-                                self.errors.push((probs[i], sens.targets));
+                                components.push((probs[i], sens.targets));
                             }
                         }
                     }
+                    self.emit_noise_channel(components);
                 }
             }
             "HERALDED_ERASE" => {
@@ -509,17 +533,19 @@ impl ErrorAnalyzer {
                     self.num_measurements -= 1;
                     if p > 0.0 {
                         let p4 = p / 4.0;
+                        let mut components = Vec::new();
                         if !self.x_sens[q].is_empty() {
-                            self.errors.push((p4, self.x_sens[q].targets.clone()));
+                            components.push((p4, self.x_sens[q].targets.clone()));
                         }
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((p4, y_sens.targets));
+                            components.push((p4, y_sens.targets));
                         }
                         if !self.z_sens[q].is_empty() {
-                            self.errors.push((p4, self.z_sens[q].targets.clone()));
+                            components.push((p4, self.z_sens[q].targets.clone()));
                         }
+                        self.emit_noise_channel(components);
                     }
                 }
             }
@@ -529,19 +555,21 @@ impl ErrorAnalyzer {
                 let pz = args.get(3).copied().unwrap_or(0.0);
                 for q in qubits(targets).into_iter().rev() {
                     self.num_measurements -= 1;
+                    let mut components = Vec::new();
                     if px > 0.0 && !self.x_sens[q].is_empty() {
-                        self.errors.push((px, self.x_sens[q].targets.clone()));
+                        components.push((px, self.x_sens[q].targets.clone()));
                     }
                     if py > 0.0 {
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((py, y_sens.targets));
+                            components.push((py, y_sens.targets));
                         }
                     }
                     if pz > 0.0 && !self.z_sens[q].is_empty() {
-                        self.errors.push((pz, self.z_sens[q].targets.clone()));
+                        components.push((pz, self.z_sens[q].targets.clone()));
                     }
+                    self.emit_noise_channel(components);
                 }
             }
             "I_ERROR" | "II_ERROR" => {}
@@ -611,6 +639,21 @@ impl ErrorAnalyzer {
 
     fn undo_h(&mut self, q: usize) {
         std::mem::swap(&mut self.x_sens[q], &mut self.z_sens[q]);
+    }
+
+    /// Emit errors from a single noise channel (e.g. one DEPOLARIZE1 on one qubit).
+    /// Within a channel the Pauli components are mutually exclusive, so errors
+    /// with the same target set are combined by addition (not XOR).
+    fn emit_noise_channel(&mut self, components: Vec<(f64, Vec<DemTarget>)>) {
+        let mut grouped: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+        for (prob, targets) in components {
+            if prob > 0.0 && !targets.is_empty() {
+                *grouped.entry(targets).or_default() += prob;
+            }
+        }
+        for (targets, prob) in grouped {
+            self.errors.push((prob, targets));
+        }
     }
 
     fn undo_s(&mut self, q: usize) {

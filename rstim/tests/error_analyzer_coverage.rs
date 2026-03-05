@@ -313,8 +313,10 @@ fn z_error_detected_by_mx() {
 
 #[test]
 fn depolarize1_with_z_sensitivity() {
+    // Y and Z errors both flip MX measurement → merged into one entry with p = 2*0.01 = 0.02
     let dem = circuit_to_dem("RX 0\nDEPOLARIZE1(0.03) 0\nMX 0\nDETECTOR rec[-1]");
-    assert!(error_count(&dem) >= 2);
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.02, &[DemTarget::Detector(0)]);
 }
 
 // --- PAULI_CHANNEL_1 with Y and Z ---

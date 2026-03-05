@@ -125,11 +125,14 @@ fn detector_and_observable_combined() {
 
 #[test]
 fn depolarize1_produces_x_and_y_errors() {
+    // X and Y errors both flip the Z-basis measurement → same detector target.
+    // Within DEPOLARIZE1 they are mutually exclusive, so probabilities add:
+    // p/3 + p/3 = 2p/3 = 0.02
     let dem = circuit_to_dem(
         "R 0\nDEPOLARIZE1(0.03) 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 2);
-    assert_has_error(&dem, 0.01, &[DemTarget::Detector(0)]);
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.02, &[DemTarget::Detector(0)]);
 }
 
 #[test]

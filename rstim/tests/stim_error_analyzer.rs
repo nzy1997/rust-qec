@@ -103,13 +103,11 @@ fn stim_z_error_no_detection_in_z_basis() {
 #[test]
 fn stim_depolarize1_approx_prob() {
     // DEPOLARIZE1(0.25) on qubit measured in Z basis:
-    // X and Y flip the measurement → combined probability ≈ 2/3 * 0.25 ≈ 0.1667
+    // X and Y flip the measurement → combined probability = 2/3 * 0.25 ≈ 0.1667
     let dem = circuit_to_dem("DEPOLARIZE1(0.25) 3\nM 3\nDETECTOR rec[-1]");
-    // Should have two independent error terms (X contribution p/3 and Y contribution p/3)
-    // which the error analyzer produces as separate errors, each with prob 0.25/3 ≈ 0.0833
-    assert!(error_count(&dem) >= 1);
-    // Check that there's an error near p/3 = 0.08333
-    assert_has_error_approx(&dem, 0.25 / 3.0, 1e-6, &[DemTarget::Detector(0)]);
+    assert_eq!(error_count(&dem), 1);
+    // X and Y are mutually exclusive within the channel, so probabilities add: 2*p/3
+    assert_has_error_approx(&dem, 2.0 * 0.25 / 3.0, 1e-6, &[DemTarget::Detector(0)]);
 }
 
 #[test]
@@ -463,16 +461,11 @@ fn stim_triple_records_same_as_single() {
 #[test]
 fn stim_pauli_channel_1_exact() {
     // PAULI_CHANNEL_1(0.1, 0.2, 0.15) on a qubit measured in Z basis.
-    // X and Y flip the Z measurement. The error analyzer treats them as independent
-    // channels with probabilities px=0.1, py=0.2 (both flip), pz=0.15 (doesn't flip).
-    // rstim produces separate error entries for X and Y contributions.
+    // X and Y flip the Z measurement. They are mutually exclusive within the
+    // channel, so probabilities add: 0.1 + 0.2 = 0.3.
     let dem = circuit_to_dem("R 0\nPAULI_CHANNEL_1(0.1,0.2,0.15) 0\nM 0\nDETECTOR rec[-1]");
-    // Should have errors for px (X) and py (Y), both with target D0
-    assert!(error_count(&dem) >= 1);
-    // Check the X contribution
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
-    // Check the Y contribution
-    assert_has_error(&dem, 0.2, &[DemTarget::Detector(0)]);
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.3, &[DemTarget::Detector(0)]);
 }
 
 // ── measure_pauli_product_4body ──────────────────────────────────────────────
@@ -659,11 +652,11 @@ fn stim_i_error_and_ii_error_noop() {
 
 #[test]
 fn stim_depolarize1_x_basis() {
-    // RX qubit, DEPOLARIZE1, MX → Y and Z components flip
+    // RX qubit, DEPOLARIZE1, MX → Y and Z components flip X measurement
     let dem = circuit_to_dem("RX 0\nDEPOLARIZE1(0.03) 0\nMX 0\nDETECTOR rec[-1]");
-    // Z and Y flip the X measurement. Each has prob 0.01.
-    assert!(error_count(&dem) >= 2);
-    assert_has_error(&dem, 0.01, &[DemTarget::Detector(0)]);
+    // Y and Z flip the X measurement. Each has prob p/3 = 0.01. Mutually exclusive → add: 0.02
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.02, &[DemTarget::Detector(0)]);
 }
 
 // ── PAULI_CHANNEL_1 Y only ──────────────────────────────────────────────────

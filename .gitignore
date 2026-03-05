@@ -15,3 +15,5 @@ cobertura.xml
 
 # Build artifacts
 *.rlib
+
+drafts/
