@@ -82,6 +82,13 @@ impl ErrorAnalyzer {
                 dem.add_error(prob, targets);
             }
         }
+
+        // Add detector coordinate annotations
+        let annotations = collect_detector_annotations(instrs);
+        for ann in annotations {
+            dem.push(ann);
+        }
+
         Ok(dem)
     }
 
@@ -394,58 +401,42 @@ impl ErrorAnalyzer {
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 if p > 0.0 {
-                    let p3 = p / 3.0;
-                    for q in qubits(targets) {
-                        let mut components = Vec::new();
-                        if !self.x_sens[q].is_empty() {
-                            components.push((p3, self.x_sens[q].targets.clone()));
+                    let q = depolarize1_to_independent(p);
+                    for q_idx in qubits(targets) {
+                        // X error (basis index 0)
+                        if !self.x_sens[q_idx].is_empty() {
+                            self.errors.push((q, self.x_sens[q_idx].targets.clone()));
                         }
-                        let mut y_sens = self.x_sens[q].clone();
-                        y_sens.xor_other(&self.z_sens[q]);
+                        // Z error (basis index 1)
+                        if !self.z_sens[q_idx].is_empty() {
+                            self.errors.push((q, self.z_sens[q_idx].targets.clone()));
+                        }
+                        // Y = X⊕Z error (basis index 0⊕1)
+                        let mut y_sens = self.x_sens[q_idx].clone();
+                        y_sens.xor_other(&self.z_sens[q_idx]);
                         if !y_sens.is_empty() {
-                            components.push((p3, y_sens.targets));
+                            self.errors.push((q, y_sens.targets));
                         }
-                        if !self.z_sens[q].is_empty() {
-                            components.push((p3, self.z_sens[q].targets.clone()));
-                        }
-                        self.emit_noise_channel(components);
                     }
                 }
             }
             "DEPOLARIZE2" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 if p > 0.0 {
-                    let p15 = p / 15.0;
+                    let q = depolarize2_to_independent(p);
                     for (qa, qb) in qubit_pairs(targets) {
-                        let paulis: [(bool, bool, bool, bool); 15] = [
-                            (false, false, true, false), // IX
-                            (false, false, true, true),  // IY
-                            (false, false, false, true), // IZ
-                            (true, false, false, false), // XI
-                            (true, false, true, false),  // XX
-                            (true, false, true, true),   // XY
-                            (true, false, false, true),  // XZ
-                            (true, true, false, false),  // YI
-                            (true, true, true, false),   // YX
-                            (true, true, true, true),    // YY
-                            (true, true, false, true),   // YZ
-                            (false, true, false, false), // ZI
-                            (false, true, true, false),  // ZX
-                            (false, true, true, true),   // ZY
-                            (false, true, false, true),  // ZZ
-                        ];
-                        let mut components = Vec::new();
-                        for (xa, za, xb, zb) in &paulis {
+                        // 4 basis axes: x_a (bit 0), z_a (bit 1), x_b (bit 2), z_b (bit 3)
+                        // Iterate over all 15 non-identity combinations (k = 1..15)
+                        for k in 1u8..16 {
                             let mut sens = SparseXorVec::default();
-                            if *xa { sens.xor_other(&self.x_sens[qa]); }
-                            if *za { sens.xor_other(&self.z_sens[qa]); }
-                            if *xb { sens.xor_other(&self.x_sens[qb]); }
-                            if *zb { sens.xor_other(&self.z_sens[qb]); }
+                            if k & 1 != 0 { sens.xor_other(&self.x_sens[qa]); }
+                            if k & 2 != 0 { sens.xor_other(&self.z_sens[qa]); }
+                            if k & 4 != 0 { sens.xor_other(&self.x_sens[qb]); }
+                            if k & 8 != 0 { sens.xor_other(&self.z_sens[qb]); }
                             if !sens.is_empty() {
-                                components.push((p15, sens.targets));
+                                self.errors.push((q, sens.targets));
                             }
                         }
-                        self.emit_noise_channel(components);
                     }
                 }
             }
@@ -473,22 +464,50 @@ impl ErrorAnalyzer {
                 let px = args.first().copied().unwrap_or(0.0);
                 let py = args.get(1).copied().unwrap_or(0.0);
                 let pz = args.get(2).copied().unwrap_or(0.0);
+                // Try converting disjoint probabilities to independent ones
+                let (ix, iy, iz, is_independent) =
+                    if let Some((a, b, c)) = try_disjoint_to_independent_xyz(px, py, pz) {
+                        (a, b, c, true)
+                    } else {
+                        (px, py, pz, false)
+                    };
                 for q in qubits(targets) {
-                    let mut components = Vec::new();
-                    if px > 0.0 && !self.x_sens[q].is_empty() {
-                        components.push((px, self.x_sens[q].targets.clone()));
-                    }
-                    if py > 0.0 {
-                        let mut y_sens = self.x_sens[q].clone();
-                        y_sens.xor_other(&self.z_sens[q]);
-                        if !y_sens.is_empty() {
-                            components.push((py, y_sens.targets));
+                    if is_independent {
+                        // Emit each basis combination independently
+                        // combo 01 = X-sens: prob ix
+                        if ix > 0.0 && !self.x_sens[q].is_empty() {
+                            self.errors.push((ix, self.x_sens[q].targets.clone()));
                         }
+                        // combo 10 = Z-sens: prob iz
+                        if iz > 0.0 && !self.z_sens[q].is_empty() {
+                            self.errors.push((iz, self.z_sens[q].targets.clone()));
+                        }
+                        // combo 11 = Y-sens = X⊕Z: prob iy
+                        if iy > 0.0 {
+                            let mut y_sens = self.x_sens[q].clone();
+                            y_sens.xor_other(&self.z_sens[q]);
+                            if !y_sens.is_empty() {
+                                self.errors.push((iy, y_sens.targets));
+                            }
+                        }
+                    } else {
+                        // Fall back to disjoint approximation
+                        let mut components = Vec::new();
+                        if ix > 0.0 && !self.x_sens[q].is_empty() {
+                            components.push((ix, self.x_sens[q].targets.clone()));
+                        }
+                        if iy > 0.0 {
+                            let mut y_sens = self.x_sens[q].clone();
+                            y_sens.xor_other(&self.z_sens[q]);
+                            if !y_sens.is_empty() {
+                                components.push((iy, y_sens.targets));
+                            }
+                        }
+                        if iz > 0.0 && !self.z_sens[q].is_empty() {
+                            components.push((iz, self.z_sens[q].targets.clone()));
+                        }
+                        self.emit_noise_channel(components);
                     }
-                    if pz > 0.0 && !self.z_sens[q].is_empty() {
-                        components.push((pz, self.z_sens[q].targets.clone()));
-                    }
-                    self.emit_noise_channel(components);
                 }
             }
             "PAULI_CHANNEL_2" => {
@@ -895,6 +914,106 @@ fn count_annotations(instrs: &[StimInstr], kind: &str) -> usize {
         }
     }
     count
+}
+
+/// Convert DEPOLARIZE1(p) probability to independent per-channel probability.
+///
+/// DEPOLARIZE1(p) applies X, Y, or Z each with disjoint probability p/3.
+/// This converts to independent X-flip and Z-flip probabilities such that
+/// the composition of independent X and Z channels reproduces the same
+/// disjoint distribution over {I, X, Y, Z}.
+fn depolarize1_to_independent(p: f64) -> f64 {
+    0.5 - 0.5 * (1.0 - (4.0 * p) / 3.0).sqrt()
+}
+
+/// Convert DEPOLARIZE2(p) probability to independent per-channel probability.
+///
+/// DEPOLARIZE2(p) applies each of 15 non-identity two-qubit Paulis with
+/// disjoint probability p/15. This converts to the independent probability
+/// for each of the 4 basis axes (Xa, Za, Xb, Zb) such that the composition
+/// of 4 independent channels reproduces the same disjoint distribution.
+fn depolarize2_to_independent(p: f64) -> f64 {
+    0.5 - 0.5 * (1.0 - (16.0 * p) / 15.0).powf(0.125)
+}
+
+/// Convert disjoint (mutually exclusive) X/Y/Z probabilities to independent
+/// per-channel probabilities. Returns None if no exact solution exists.
+fn try_disjoint_to_independent_xyz(
+    x: f64,
+    y: f64,
+    z: f64,
+) -> Option<(f64, f64, f64)> {
+    let i = (1.0 - x - y - z).max(0.0);
+    // Re-arrange so identity is most likely
+    if i < x {
+        let result = try_disjoint_to_independent_xyz(i, z, y);
+        return result.map(|(a, b, c)| (1.0 - a, b, c));
+    }
+    if i < y {
+        let result = try_disjoint_to_independent_xyz(z, i, x);
+        return result.map(|(a, b, c)| (a, 1.0 - b, c));
+    }
+    if i < z {
+        let result = try_disjoint_to_independent_xyz(y, x, i);
+        return result.map(|(a, b, c)| (a, b, 1.0 - c));
+    }
+    if x + z >= 0.5 || x + y >= 0.5 || y + z >= 0.5 {
+        return None;
+    }
+    let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
+    let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
+    let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
+    let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
+    let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
+    let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
+    if a >= 0.0 && b >= 0.0 && c >= 0.0 {
+        Some((a, b, c))
+    } else {
+        None
+    }
+}
+
+/// Collect detector coordinate annotations from a circuit.
+/// Walks the circuit forward to build detector and shift_detectors instructions.
+fn collect_detector_annotations(instrs: &[StimInstr]) -> Vec<DemInstruction> {
+    let mut result = Vec::new();
+    let mut det_index: usize = 0;
+    collect_detector_annotations_inner(instrs, &mut result, &mut det_index);
+    result
+}
+
+fn collect_detector_annotations_inner(
+    instrs: &[StimInstr],
+    result: &mut Vec<DemInstruction>,
+    det_index: &mut usize,
+) {
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, args, .. } => match name.as_str() {
+                "DETECTOR" => {
+                    if !args.is_empty() {
+                        result.push(DemInstruction::Detector {
+                            index: *det_index,
+                            coords: args.clone(),
+                        });
+                    }
+                    *det_index += 1;
+                }
+                "SHIFT_COORDS" => {
+                    result.push(DemInstruction::ShiftDetectors {
+                        detector_offset: 0,
+                        coord_offsets: args.clone(),
+                    });
+                }
+                _ => {}
+            },
+            StimInstr::Repeat { count, body } => {
+                for _ in 0..*count {
+                    collect_detector_annotations_inner(body, result, det_index);
+                }
+            }
+        }
+    }
 }
 
 /// Extract the detector/observable target set from a list of DemTargets,

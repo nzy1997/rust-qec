@@ -579,12 +579,13 @@ fn stim_depolarize2_after_h_cnot() {
     );
     // Should produce all 15 non-identity 2-qubit Pauli error terms
     assert_eq!(error_count(&dem), 15);
-    // Each should have probability ~0.25/15 ≈ 0.01667
+    // Each should have the independent per-channel probability
+    let expected = 0.5 - 0.5 * (1.0 - 16.0 * 0.25 / 15.0_f64).powf(0.125);
     for instr in dem.instructions() {
         if let DemInstruction::Error { probability, .. } = instr {
             assert!(
-                (*probability - 0.25 / 15.0).abs() < 1e-6,
-                "expected prob ~0.01667 but got {probability}"
+                (*probability - expected).abs() < 1e-10,
+                "expected prob ~{expected} but got {probability}"
             );
         }
     }
