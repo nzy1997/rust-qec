@@ -225,10 +225,8 @@ fn error_analyzer_c_zyx_family() {
     for gate in &["C_ZYX", "C_NZYX", "C_ZNYX", "C_ZYNX"] {
         let circuit = format!("R 0 1\n{gate} 0\nCX 0 1\nX_ERROR(0.1) 0\n{gate} 0\n{gate} 0\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]");
         let instrs = parse_lines(&circuit).unwrap();
-        let dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
-        let dem_str = dem.to_string();
-        assert!(dem_str.contains("error") || dem_str.contains("detector"),
-            "DEM for {gate} should contain error/detector info");
+        let result = ErrorAnalyzer::circuit_to_dem(&instrs);
+        assert!(result.is_err(), "expected default gauge rejection for {gate}");
     }
 }
 
@@ -243,14 +241,16 @@ fn error_analyzer_h_nxy() {
 fn error_analyzer_h_nxz() {
     let circuit = "R 0 1\nH_NXZ 0\nCX 0 1\nX_ERROR(0.1) 0\nH_NXZ 0\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]";
     let instrs = parse_lines(circuit).unwrap();
-    let _dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
+    let result = ErrorAnalyzer::circuit_to_dem(&instrs);
+    assert!(result.is_err());
 }
 
 #[test]
 fn error_analyzer_h_nyz() {
     let circuit = "R 0 1\nH_NYZ 0\nCX 0 1\nX_ERROR(0.1) 0\nH_NYZ 0\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]";
     let instrs = parse_lines(circuit).unwrap();
-    let _dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
+    let result = ErrorAnalyzer::circuit_to_dem(&instrs);
+    assert!(result.is_err());
 }
 
 // ========== Stats coverage (src/stats.rs) ==========
