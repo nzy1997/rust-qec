@@ -30,6 +30,10 @@ impl SparseXorVec {
     fn clear(&mut self) {
         self.targets.clear();
     }
+
+    fn has_observable(&self) -> bool {
+        self.targets.iter().any(|target| matches!(target, DemTarget::Observable(_)))
+    }
 }
 
 pub struct ErrorAnalyzer {
@@ -58,6 +62,7 @@ impl ErrorAnalyzer {
         };
 
         analyzer.undo_circuit(instrs)?;
+        analyzer.ensure_no_pending_gauge()?;
 
         // Merge errors that affect the same target set.
         // When multiple independent noise channels each flip the same set of
@@ -291,21 +296,25 @@ impl ErrorAnalyzer {
 
             "M" | "MZ" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.undo_mz(q);
                 }
             }
             "MX" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.undo_mx(q);
                 }
             }
             "MY" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.undo_my(q);
                 }
             }
             "MR" | "MRZ" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mz(q);
@@ -313,6 +322,7 @@ impl ErrorAnalyzer {
             }
             "MRX" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mx(q);
@@ -320,6 +330,7 @@ impl ErrorAnalyzer {
             }
             "MRY" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_my(q);
@@ -328,18 +339,21 @@ impl ErrorAnalyzer {
 
             "R" | "RZ" => {
                 for q in qubits(targets) {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
             }
             "RX" => {
                 for q in qubits(targets) {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
             }
             "RY" => {
                 for q in qubits(targets) {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
@@ -776,6 +790,64 @@ impl ErrorAnalyzer {
             }
         }
         Ok(())
+    }
+
+    fn ensure_x_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if !self.x_sens[q].is_empty() {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_y_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if self.x_sens[q].targets != self.z_sens[q].targets {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_z_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if !self.z_sens[q].is_empty() {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_no_pending_gauge(&self) -> Result<(), String> {
+        for q in 0..self.x_sens.len() {
+            if !self.x_sens[q].is_empty() || !self.z_sens[q].is_empty() {
+                return Err(format!(
+                    "non-deterministic {} encountered",
+                    self.sensitivity_kind_for_qubit(q),
+                ));
+            }
+        }
+        if self.measurement_sens.iter().any(|sens| !sens.is_empty()) {
+            let kind = if self.measurement_sens.iter().any(SparseXorVec::has_observable) {
+                "observable"
+            } else {
+                "detector"
+            };
+            return Err(format!("non-deterministic {kind} encountered"));
+        }
+        Ok(())
+    }
+
+    fn sensitivity_kind_for_qubit(&self, q: usize) -> &'static str {
+        if self.x_sens[q].has_observable() || self.z_sens[q].has_observable() {
+            "observable"
+        } else {
+            "detector"
+        }
     }
 }
 

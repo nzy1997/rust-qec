@@ -75,3 +75,11 @@ fn analyze_errors_invalid_rec_fails_cleanly() {
     assert!(stderr.contains("rec"));
     assert!(!stderr.contains("panicked"));
 }
+
+#[test]
+fn analyze_errors_rejects_gauge_detector() {
+    let output = run_with_stdin(&["analyze_errors"], "R 0\nH 0\nM 0\nDETECTOR rec[-1]");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("non-deterministic"));
+}

@@ -317,70 +317,60 @@ fn stim_c_zyx_then_c_xyz() {
 // marked #[ignore]. They document the expected Stim behavior for future work.
 
 #[test]
-#[ignore = "rstim does not yet detect gauge observables"]
 fn stim_detect_gauge_observable() {
     let result = circuit_to_dem_err("R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]");
     assert!(result.is_err(), "expected error for gauge observable");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_r_h_m() {
     let result = circuit_to_dem_err("R 0\nH 0\nM 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_m_h_m() {
     let result = circuit_to_dem_err("M 0\nH 0\nM 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mz_mx() {
     let result = circuit_to_dem_err("MZ 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_my_mx() {
     let result = circuit_to_dem_err("MY 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mx_mz() {
     let result = circuit_to_dem_err("MX 0\nMZ 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_rx_mz() {
     let result = circuit_to_dem_err("RX 0\nMZ 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_ry_mx() {
     let result = circuit_to_dem_err("RY 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_rz_mx() {
     let result = circuit_to_dem_err("RZ 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mx_no_reset() {
     let result = circuit_to_dem_err("MX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
