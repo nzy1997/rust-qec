@@ -66,3 +66,12 @@ fn analyze_errors_to_file() {
     let dem = std::fs::read_to_string(&out_path).unwrap();
     assert!(dem.contains("error"));
 }
+
+#[test]
+fn analyze_errors_invalid_rec_fails_cleanly() {
+    let output = run_with_stdin(&["analyze_errors"], "DETECTOR rec[-1]");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("rec"));
+    assert!(!stderr.contains("panicked"));
+}

@@ -356,7 +356,7 @@ impl ErrorAnalyzer {
                 let det_target = DemTarget::Detector(self.det_index);
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
-                        let abs_idx = (self.num_measurements as i32 + offset) as usize;
+                        let abs_idx = checked_rec_index(self.num_measurements, *offset)?;
                         self.measurement_sens[abs_idx].xor_item(det_target.clone());
                     }
                 }
@@ -366,7 +366,7 @@ impl ErrorAnalyzer {
                 let obs_target = DemTarget::Observable(obs_idx);
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
-                        let abs_idx = (self.num_measurements as i32 + offset) as usize;
+                        let abs_idx = checked_rec_index(self.num_measurements, *offset)?;
                         self.measurement_sens[abs_idx].xor_item(obs_target.clone());
                     }
                 }
@@ -835,6 +835,16 @@ fn qubit_pairs_inv(targets: &[StimTarget]) -> Vec<(usize, usize)> {
     qs.chunks(2).filter_map(|c| {
         if c.len() == 2 { Some((c[0], c[1])) } else { None }
     }).collect()
+}
+
+fn checked_rec_index(num_measurements: usize, offset: i32) -> Result<usize, String> {
+    let idx = num_measurements as i32 + offset;
+    if idx < 0 || idx >= num_measurements as i32 {
+        return Err(format!(
+            "invalid rec[{offset}] reference with {num_measurements} measurements available"
+        ));
+    }
+    Ok(idx as usize)
 }
 
 fn count_qubits(instrs: &[StimInstr]) -> usize {

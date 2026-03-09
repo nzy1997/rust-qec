@@ -606,16 +606,17 @@ fn stim_depolarize2_cnot_basis_change_same_errors() {
 // ── Measurement before beginning should error ────────────────────────────────
 
 #[test]
-#[should_panic]
 fn stim_measurement_before_beginning_detector() {
-    // DETECTOR rec[-1] without any prior measurement should panic/error
-    let _ = circuit_to_dem("DETECTOR rec[-1]");
+    let result = circuit_to_dem_err("DETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("rec"));
 }
 
 #[test]
-#[should_panic]
 fn stim_measurement_before_beginning_observable() {
-    let _ = circuit_to_dem("OBSERVABLE_INCLUDE(0) rec[-1]");
+    let result = circuit_to_dem_err("OBSERVABLE_INCLUDE(0) rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("rec"));
 }
 
 // ── MPAD basic ───────────────────────────────────────────────────────────────
