@@ -414,6 +414,7 @@ impl ErrorAnalyzer {
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
+                ensure_valid_depolarize1_probability(p)?;
                 if p > 0.0 {
                     let q = depolarize1_to_independent(p);
                     for q_idx in qubits(targets) {
@@ -436,6 +437,7 @@ impl ErrorAnalyzer {
             }
             "DEPOLARIZE2" => {
                 let p = args.first().copied().unwrap_or(0.0);
+                ensure_valid_depolarize2_probability(p)?;
                 if p > 0.0 {
                     let q = depolarize2_to_independent(p);
                     for (qa, qb) in qubit_pairs(targets) {
@@ -1008,6 +1010,13 @@ fn depolarize1_to_independent(p: f64) -> f64 {
     0.5 - 0.5 * (1.0 - (4.0 * p) / 3.0).sqrt()
 }
 
+fn ensure_valid_depolarize1_probability(p: f64) -> Result<(), String> {
+    if p > 0.75 {
+        return Err(format!("DEPOLARIZE1({p}) exceeds exact-analysis limit of 3/4"));
+    }
+    Ok(())
+}
+
 /// Convert DEPOLARIZE2(p) probability to independent per-channel probability.
 ///
 /// DEPOLARIZE2(p) applies each of 15 non-identity two-qubit Paulis with
@@ -1016,6 +1025,13 @@ fn depolarize1_to_independent(p: f64) -> f64 {
 /// of 4 independent channels reproduces the same disjoint distribution.
 fn depolarize2_to_independent(p: f64) -> f64 {
     0.5 - 0.5 * (1.0 - (16.0 * p) / 15.0).powf(0.125)
+}
+
+fn ensure_valid_depolarize2_probability(p: f64) -> Result<(), String> {
+    if p > 15.0 / 16.0 {
+        return Err(format!("DEPOLARIZE2({p}) exceeds exact-analysis limit of 15/16"));
+    }
+    Ok(())
 }
 
 /// Convert disjoint (mutually exclusive) X/Y/Z probabilities to independent

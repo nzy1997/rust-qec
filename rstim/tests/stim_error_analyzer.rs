@@ -593,6 +593,20 @@ fn stim_depolarize2_cnot_basis_change_same_errors() {
     assert_eq!(error_count(&dem1), error_count(&dem2));
 }
 
+#[test]
+fn stim_depolarize1_overmix_rejected() {
+    let result = circuit_to_dem_err("DEPOLARIZE1(0.76) 0\nM 0\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("DEPOLARIZE1"));
+}
+
+#[test]
+fn stim_depolarize2_overmix_rejected() {
+    let result = circuit_to_dem_err("DEPOLARIZE2(0.94) 0 1\nM 0 1\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("DEPOLARIZE2"));
+}
+
 // ── Measurement before beginning should error ────────────────────────────────
 
 #[test]

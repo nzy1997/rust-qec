@@ -83,3 +83,13 @@ fn analyze_errors_rejects_gauge_detector() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("non-deterministic"));
 }
+
+#[test]
+fn analyze_errors_rejects_overmixed_depolarize() {
+    let output = run_with_stdin(
+        &["analyze_errors"],
+        "DEPOLARIZE1(0.76) 0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(!output.status.success());
+    assert!(String::from_utf8(output.stderr).unwrap().contains("DEPOLARIZE1"));
+}
