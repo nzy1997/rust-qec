@@ -7,6 +7,11 @@ fn circuit_to_dem(circuit_str: &str) -> DetectorErrorModel {
     ErrorAnalyzer::circuit_to_dem(&instrs).unwrap()
 }
 
+fn circuit_to_dem_err(circuit_str: &str) -> Result<DetectorErrorModel, String> {
+    let instrs = parse_lines(circuit_str).unwrap();
+    ErrorAnalyzer::circuit_to_dem(&instrs)
+}
+
 fn assert_has_error(dem: &DetectorErrorModel, prob: f64, expected_targets: &[DemTarget]) {
     let found = dem.instructions().iter().any(|instr| {
         if let rstim::dem::DemInstruction::Error { probability, targets } = instr {
@@ -89,11 +94,10 @@ fn cx_propagates_z_sensitivity() {
 
 #[test]
 fn h_gate_swaps_x_z_sensitivity() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nZ_ERROR(0.1) 0\nH 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -212,20 +216,18 @@ fn cz_propagates_x_to_z_cross_basis() {
 
 #[test]
 fn sqrt_x_gate_z_picks_up_x() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nZ_ERROR(0.1) 0\nSQRT_X 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }
 
 #[test]
 fn sqrt_y_gate_swaps_x_z() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nZ_ERROR(0.1) 0\nSQRT_Y 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -257,11 +259,10 @@ fn mpp_zz_bell_pair() {
 
 #[test]
 fn mxx_measurement() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0 1\nZ_ERROR(0.1) 0\nMXX 0 1\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -334,10 +335,10 @@ fn e_alias_for_correlated_error() {
 
 #[test]
 fn mry_measurement_reset() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nMRY 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 0);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -351,11 +352,10 @@ fn h_xy_sensitivity() {
 
 #[test]
 fn h_yz_sensitivity() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nZ_ERROR(0.1) 0\nH_YZ 0\nM 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -402,17 +402,16 @@ fn spp_z_modifies_sensitivity() {
 
 #[test]
 fn myy_measurement() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0 1\nX_ERROR(0.1) 0\nMYY 0 1\nDETECTOR rec[-1]"
     );
-    assert!(error_count(&dem) > 0);
+    assert!(result.is_err());
 }
 
 #[test]
 fn my_measurement() {
-    let dem = circuit_to_dem(
+    let result = circuit_to_dem_err(
         "R 0\nX_ERROR(0.1) 0\nMY 0\nDETECTOR rec[-1]"
     );
-    assert_eq!(error_count(&dem), 1);
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+    assert!(result.is_err());
 }

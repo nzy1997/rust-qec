@@ -398,6 +398,10 @@ impl ErrorAnalyzer {
 
             "MPAD" => {
                 for _t in targets.iter().rev() {
+                    if self.num_measurements == 0 {
+                        return Err("MPAD underflow in error_analyzer".to_string());
+                    }
+                    self.measurement_sens[self.num_measurements - 1].clear();
                     self.num_measurements -= 1;
                 }
             }
