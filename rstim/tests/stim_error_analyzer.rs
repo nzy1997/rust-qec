@@ -682,3 +682,37 @@ fn stim_pauli_channel_1_z_in_x_basis() {
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
 }
+
+#[test]
+fn stim_pauli_channel_2_rejected_by_default() {
+    let result = circuit_to_dem_err(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("PAULI_CHANNEL_2"));
+}
+
+#[test]
+fn stim_else_correlated_error_without_leader_is_rejected() {
+    let result = circuit_to_dem_err("ELSE_CORRELATED_ERROR(0.25) X0\nM 0\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("ELSE_CORRELATED_ERROR"));
+}
+
+#[test]
+fn stim_correlated_error_two_branch_block_is_mutually_exclusive() {
+    let dem = circuit_to_dem(
+        "E(0.25) X0\nELSE_CORRELATED_ERROR(0.5) X0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.625, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_correlated_error_three_branch_block_rejected_by_default() {
+    let result = circuit_to_dem_err(
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("approximation"));
+}

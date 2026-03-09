@@ -93,3 +93,23 @@ fn analyze_errors_rejects_overmixed_depolarize() {
     assert!(!output.status.success());
     assert!(String::from_utf8(output.stderr).unwrap().contains("DEPOLARIZE1"));
 }
+
+#[test]
+fn analyze_errors_rejects_pauli_channel_2() {
+    let output = run_with_stdin(
+        &["analyze_errors"],
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    );
+    assert!(!output.status.success());
+    assert!(String::from_utf8(output.stderr).unwrap().contains("PAULI_CHANNEL_2"));
+}
+
+#[test]
+fn analyze_errors_rejects_unsupported_correlated_block() {
+    let output = run_with_stdin(
+        &["analyze_errors"],
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(!output.status.success());
+    assert!(String::from_utf8(output.stderr).unwrap().contains("approximation"));
+}

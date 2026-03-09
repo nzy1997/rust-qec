@@ -104,8 +104,45 @@ impl ErrorAnalyzer {
     }
 
     fn undo_circuit(&mut self, instrs: &[StimInstr]) -> Result<(), String> {
-        for instr in instrs.iter().rev() {
-            match instr {
+        let mut i = instrs.len();
+        while i > 0 {
+            i -= 1;
+            match &instrs[i] {
+                StimInstr::Op { name, .. } if name == "ELSE_CORRELATED_ERROR" => {
+                    let end = i;
+                    let mut start = i;
+                    while start > 0 {
+                        match &instrs[start - 1] {
+                            StimInstr::Op { name, .. } if name == "ELSE_CORRELATED_ERROR" => {
+                                start -= 1;
+                            }
+                            StimInstr::Op { name, .. }
+                                if name == "CORRELATED_ERROR" || name == "E" =>
+                            {
+                                start -= 1;
+                                self.undo_correlated_block(&instrs[start..=end])?;
+                                i = start;
+                                break;
+                            }
+                            _ => {
+                                return Err(
+                                    "ELSE_CORRELATED_ERROR without preceding E block".to_string()
+                                );
+                            }
+                        }
+                    }
+                    if start == 0 {
+                        match &instrs[0] {
+                            StimInstr::Op { name, .. }
+                                if name == "CORRELATED_ERROR" || name == "E" => {}
+                            _ => {
+                                return Err(
+                                    "ELSE_CORRELATED_ERROR without preceding E block".to_string()
+                                );
+                            }
+                        }
+                    }
+                }
                 StimInstr::Op { name, args, targets, .. } => {
                     self.undo_op(name.as_str(), args, targets)?;
                 }
@@ -456,25 +493,11 @@ impl ErrorAnalyzer {
                     }
                 }
             }
-            "CORRELATED_ERROR" | "E" | "ELSE_CORRELATED_ERROR" => {
-                let p = args.first().copied().unwrap_or(0.0);
-                let mut sens = SparseXorVec::default();
-                for t in targets {
-                    if let StimTarget::Pauli { qubit, basis, .. } = t {
-                        let q = *qubit as usize;
-                        match basis {
-                            PauliBasis::X => sens.xor_other(&self.x_sens[q]),
-                            PauliBasis::Y => {
-                                sens.xor_other(&self.x_sens[q]);
-                                sens.xor_other(&self.z_sens[q]);
-                            }
-                            PauliBasis::Z => sens.xor_other(&self.z_sens[q]),
-                        }
-                    }
-                }
-                if !sens.is_empty() {
-                    self.errors.push((p, sens.targets));
-                }
+            "CORRELATED_ERROR" | "E" => {
+                self.undo_correlated_op(args, targets);
+            }
+            "ELSE_CORRELATED_ERROR" => {
+                return Err("ELSE_CORRELATED_ERROR without preceding E block".to_string());
             }
             "PAULI_CHANNEL_1" => {
                 let px = args.first().copied().unwrap_or(0.0);
@@ -527,39 +550,11 @@ impl ErrorAnalyzer {
                 }
             }
             "PAULI_CHANNEL_2" => {
-                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
-                let paulis: [(bool, bool, bool, bool); 15] = [
-                    (false, false, true, false),
-                    (false, false, true, true),
-                    (false, false, false, true),
-                    (true, false, false, false),
-                    (true, false, true, false),
-                    (true, false, true, true),
-                    (true, false, false, true),
-                    (true, true, false, false),
-                    (true, true, true, false),
-                    (true, true, true, true),
-                    (true, true, false, true),
-                    (false, true, false, false),
-                    (false, true, true, false),
-                    (false, true, true, true),
-                    (false, true, false, true),
-                ];
-                for (qa, qb) in qubit_pairs(targets) {
-                    let mut components = Vec::new();
-                    for (i, (xa, za, xb, zb)) in paulis.iter().enumerate() {
-                        if probs[i] > 0.0 {
-                            let mut sens = SparseXorVec::default();
-                            if *xa { sens.xor_other(&self.x_sens[qa]); }
-                            if *za { sens.xor_other(&self.z_sens[qa]); }
-                            if *xb { sens.xor_other(&self.x_sens[qb]); }
-                            if *zb { sens.xor_other(&self.z_sens[qb]); }
-                            if !sens.is_empty() {
-                                components.push((probs[i], sens.targets));
-                            }
-                        }
-                    }
-                    self.emit_noise_channel(components);
+                if args.iter().any(|p| *p > 0.0) {
+                    return Err(
+                        "PAULI_CHANNEL_2 requires an approximation mode that rstim does not yet expose"
+                            .to_string(),
+                    );
                 }
             }
             "HERALDED_ERASE" => {
@@ -688,6 +683,74 @@ impl ErrorAnalyzer {
         }
         for (targets, prob) in grouped {
             self.errors.push((prob, targets));
+        }
+    }
+
+    fn correlated_targets(&self, targets: &[StimTarget]) -> Vec<DemTarget> {
+        let mut sens = SparseXorVec::default();
+        for t in targets {
+            if let StimTarget::Pauli { qubit, basis, .. } = t {
+                let q = *qubit as usize;
+                match basis {
+                    PauliBasis::X => sens.xor_other(&self.x_sens[q]),
+                    PauliBasis::Y => {
+                        sens.xor_other(&self.x_sens[q]);
+                        sens.xor_other(&self.z_sens[q]);
+                    }
+                    PauliBasis::Z => sens.xor_other(&self.z_sens[q]),
+                }
+            }
+        }
+        sens.targets
+    }
+
+    fn undo_correlated_op(&mut self, args: &[f64], targets: &[StimTarget]) {
+        let p = args.first().copied().unwrap_or(0.0);
+        let targets = self.correlated_targets(targets);
+        if p > 0.0 && !targets.is_empty() {
+            self.errors.push((p, targets));
+        }
+    }
+
+    fn undo_correlated_block(&mut self, block: &[StimInstr]) -> Result<(), String> {
+        if block.len() > 2 {
+            return Err(
+                "correlated error block requires approximation mode for >2 branches".to_string(),
+            );
+        }
+
+        let mut grouped: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+        let mut remaining = 1.0;
+        for instr in block {
+            let (probability, targets) = self.correlated_branch_from_instr(instr)?;
+            let effective_probability = probability * remaining;
+            remaining *= 1.0 - probability;
+            if effective_probability > 0.0 && !targets.is_empty() {
+                *grouped.entry(targets).or_default() += effective_probability;
+            }
+        }
+        for (targets, probability) in grouped {
+            self.errors.push((probability, targets));
+        }
+        Ok(())
+    }
+
+    fn correlated_branch_from_instr(
+        &self,
+        instr: &StimInstr,
+    ) -> Result<(f64, Vec<DemTarget>), String> {
+        match instr {
+            StimInstr::Op { name, args, targets, .. }
+                if name == "CORRELATED_ERROR"
+                    || name == "E"
+                    || name == "ELSE_CORRELATED_ERROR" =>
+            {
+                Ok((
+                    args.first().copied().unwrap_or(0.0),
+                    self.correlated_targets(targets),
+                ))
+            }
+            _ => Err("invalid correlated error block".to_string()),
         }
     }
 
@@ -826,7 +889,7 @@ impl ErrorAnalyzer {
 
     fn ensure_no_pending_gauge(&self) -> Result<(), String> {
         for q in 0..self.x_sens.len() {
-            if !self.x_sens[q].is_empty() || !self.z_sens[q].is_empty() {
+            if !self.z_sens[q].is_empty() {
                 return Err(format!(
                     "non-deterministic {} encountered",
                     self.sensitivity_kind_for_qubit(q),
