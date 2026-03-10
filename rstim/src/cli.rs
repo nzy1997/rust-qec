@@ -341,8 +341,23 @@ pub fn run_analyze_errors(
     circuit_text: &str,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    run_analyze_errors_with_options(circuit_text, false, false, out)
+}
+
+pub fn run_analyze_errors_with_options(
+    circuit_text: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
-    let dem = ErrorAnalyzer::circuit_to_dem(&instrs)?;
+    let dem = ErrorAnalyzer::circuit_to_dem_with_options(
+        &instrs,
+        crate::error_analyzer::AnalyzeOptions {
+            approximate_disjoint_errors,
+            allow_gauge_detectors,
+        },
+    )?;
     let dem_str = dem.to_string();
     out.write_all(dem_str.as_bytes()).map_err(|e| format!("write error: {e}"))
 }

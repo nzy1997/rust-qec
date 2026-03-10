@@ -4,6 +4,12 @@ use std::collections::BTreeSet;
 use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AnalyzeOptions {
+    pub approximate_disjoint_errors: bool,
+    pub allow_gauge_detectors: bool,
+}
+
 #[derive(Debug, Clone, Default)]
 struct SparseXorVec {
     targets: Vec<DemTarget>,
@@ -43,10 +49,20 @@ pub struct ErrorAnalyzer {
     num_measurements: usize,
     det_index: usize,
     errors: Vec<(f64, Vec<DemTarget>)>,
+    // Phase 2 options are threaded first and consumed by later tasks.
+    #[allow(dead_code)]
+    options: AnalyzeOptions,
 }
 
 impl ErrorAnalyzer {
     pub fn circuit_to_dem(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
+        Self::circuit_to_dem_with_options(instrs, AnalyzeOptions::default())
+    }
+
+    pub fn circuit_to_dem_with_options(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+    ) -> Result<DetectorErrorModel, String> {
         let num_qubits = count_qubits(instrs);
         let num_measurements = count_measurements(instrs);
         let num_detectors = count_annotations(instrs, "DETECTOR");
@@ -59,6 +75,7 @@ impl ErrorAnalyzer {
             num_measurements,
             det_index: num_detectors,
             errors: Vec::new(),
+            options,
         };
 
         analyzer.undo_circuit(instrs)?;

@@ -456,6 +456,19 @@ fn run_analyze_errors_empty_circuit() {
     assert!(s.is_empty() || !s.contains("error"));
 }
 
+#[test]
+fn run_analyze_errors_with_default_options_still_rejects_gauge() {
+    let mut buf = Vec::new();
+    let err = cli::run_analyze_errors_with_options(
+        "R 0\nH 0\nM 0\nDETECTOR rec[-1]",
+        false,
+        false,
+        &mut buf,
+    )
+    .unwrap_err();
+    assert!(err.contains("non-deterministic"));
+}
+
 // ---------- run_sample_dem ----------
 
 #[test]
