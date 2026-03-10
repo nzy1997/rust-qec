@@ -113,3 +113,30 @@ fn analyze_errors_rejects_unsupported_correlated_block() {
     assert!(!output.status.success());
     assert!(String::from_utf8(output.stderr).unwrap().contains("approximation"));
 }
+
+#[test]
+fn analyze_errors_allow_gauge_detectors_flag_accepts_gauge_circuit() {
+    let output = run_with_stdin(
+        &["analyze_errors", "--allow_gauge_detectors"],
+        "R 0\nH 0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
+fn analyze_errors_approximate_disjoint_errors_flag_accepts_pauli_channel_2() {
+    let output = run_with_stdin(
+        &["analyze_errors", "--approximate_disjoint_errors"],
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
+fn analyze_errors_approximate_disjoint_errors_flag_accepts_correlated_block() {
+    let output = run_with_stdin(
+        &["analyze_errors", "--approximate_disjoint_errors"],
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+}

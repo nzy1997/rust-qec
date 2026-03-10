@@ -5,7 +5,7 @@
 /// composite DEPOLARIZE2 analysis, reversed operation order, MPP ordering,
 /// duplicate records, exact pauli_channel_1, and gauge detection.
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
-use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::error_analyzer::{AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -18,6 +18,21 @@ fn circuit_to_dem(circuit_str: &str) -> DetectorErrorModel {
 fn circuit_to_dem_err(circuit_str: &str) -> Result<DetectorErrorModel, String> {
     let instrs = parse_lines(circuit_str).unwrap();
     ErrorAnalyzer::circuit_to_dem(&instrs)
+}
+
+fn circuit_to_dem_with_options(
+    circuit_str: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+) -> Result<DetectorErrorModel, String> {
+    let instrs = parse_lines(circuit_str).unwrap();
+    ErrorAnalyzer::circuit_to_dem_with_options(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors,
+            allow_gauge_detectors,
+        },
+    )
 }
 
 fn error_count(dem: &DetectorErrorModel) -> usize {
@@ -376,6 +391,28 @@ fn stim_detect_gauge_detector_mx_no_reset() {
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
+#[test]
+fn stim_detect_gauge_detector_allowed_with_option() {
+    let dem = circuit_to_dem_with_options(
+        "R 0\nH 0\nM 0\nDETECTOR rec[-1]",
+        false,
+        true,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
+}
+
+#[test]
+fn stim_detect_gauge_observable_allowed_with_option() {
+    let dem = circuit_to_dem_with_options(
+        "R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+        false,
+        true,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
+}
+
 // ── composite_error_analysis ─────────────────────────────────────────────────
 
 #[test]
@@ -693,6 +730,18 @@ fn stim_pauli_channel_2_rejected_by_default() {
 }
 
 #[test]
+fn stim_pauli_channel_2_allowed_with_approximation_option() {
+    let dem = circuit_to_dem_with_options(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.01, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
 fn stim_else_correlated_error_without_leader_is_rejected() {
     let result = circuit_to_dem_err("ELSE_CORRELATED_ERROR(0.25) X0\nM 0\nDETECTOR rec[-1]");
     assert!(result.is_err());
@@ -715,4 +764,16 @@ fn stim_correlated_error_three_branch_block_rejected_by_default() {
     );
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("approximation"));
+}
+
+#[test]
+fn stim_correlated_error_three_branch_block_allowed_with_approximation_option() {
+    let dem = circuit_to_dem_with_options(
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.316, 1e-12, &[DemTarget::Detector(0)]);
 }

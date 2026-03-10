@@ -58,6 +58,10 @@ pub enum Commands {
         r#in: Option<String>,
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "approximate_disjoint_errors")]
+        approximate_disjoint_errors: bool,
+        #[arg(long = "allow_gauge_detectors")]
+        allow_gauge_detectors: bool,
     },
     /// Generate a common QEC circuit
     #[command(name = "gen")]
@@ -157,10 +161,20 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let mut w = open_output(out.as_deref())?;
             run_detect(&text, shots.unwrap_or(1) as usize, &out_format, seed, append_observables, &mut w)
         }
-        Some(Commands::AnalyzeErrors { r#in, out }) => {
+        Some(Commands::AnalyzeErrors {
+            r#in,
+            out,
+            approximate_disjoint_errors,
+            allow_gauge_detectors,
+        }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_analyze_errors(&text, &mut w)
+            run_analyze_errors_with_options(
+                &text,
+                approximate_disjoint_errors,
+                allow_gauge_detectors,
+                &mut w,
+            )
         }
         Some(Commands::Gen { code, task, distance, rounds, noise, out }) => {
             let mut w = open_output(out.as_deref())?;

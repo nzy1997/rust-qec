@@ -571,11 +571,45 @@ impl ErrorAnalyzer {
                 }
             }
             "PAULI_CHANNEL_2" => {
-                if args.iter().any(|p| *p > 0.0) {
+                if args.iter().any(|p| *p > 0.0) && !self.options.approximate_disjoint_errors {
                     return Err(
                         "PAULI_CHANNEL_2 requires an approximation mode that rstim does not yet expose"
                             .to_string(),
                     );
+                }
+                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                let paulis: [(bool, bool, bool, bool); 15] = [
+                    (false, false, true, false),
+                    (false, false, true, true),
+                    (false, false, false, true),
+                    (true, false, false, false),
+                    (true, false, true, false),
+                    (true, false, true, true),
+                    (true, false, false, true),
+                    (true, true, false, false),
+                    (true, true, true, false),
+                    (true, true, true, true),
+                    (true, true, false, true),
+                    (false, true, false, false),
+                    (false, true, true, false),
+                    (false, true, true, true),
+                    (false, true, false, true),
+                ];
+                for (qa, qb) in qubit_pairs(targets) {
+                    let mut components = Vec::new();
+                    for (i, (xa, za, xb, zb)) in paulis.iter().enumerate() {
+                        if probs[i] > 0.0 {
+                            let mut sens = SparseXorVec::default();
+                            if *xa { sens.xor_other(&self.x_sens[qa]); }
+                            if *za { sens.xor_other(&self.z_sens[qa]); }
+                            if *xb { sens.xor_other(&self.x_sens[qb]); }
+                            if *zb { sens.xor_other(&self.z_sens[qb]); }
+                            if !sens.is_empty() {
+                                components.push((probs[i], sens.targets));
+                            }
+                        }
+                    }
+                    self.emit_noise_channel(components);
                 }
             }
             "HERALDED_ERASE" => {
@@ -734,7 +768,7 @@ impl ErrorAnalyzer {
     }
 
     fn undo_correlated_block(&mut self, block: &[StimInstr]) -> Result<(), String> {
-        if block.len() > 2 {
+        if block.len() > 2 && !self.options.approximate_disjoint_errors {
             return Err(
                 "correlated error block requires approximation mode for >2 branches".to_string(),
             );
@@ -879,6 +913,9 @@ impl ErrorAnalyzer {
     }
 
     fn ensure_x_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if self.options.allow_gauge_detectors {
+            return Ok(());
+        }
         if !self.x_sens[q].is_empty() {
             return Err(format!(
                 "non-deterministic {} encountered",
@@ -889,6 +926,9 @@ impl ErrorAnalyzer {
     }
 
     fn ensure_y_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if self.options.allow_gauge_detectors {
+            return Ok(());
+        }
         if self.x_sens[q].targets != self.z_sens[q].targets {
             return Err(format!(
                 "non-deterministic {} encountered",
@@ -899,6 +939,9 @@ impl ErrorAnalyzer {
     }
 
     fn ensure_z_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if self.options.allow_gauge_detectors {
+            return Ok(());
+        }
         if !self.z_sens[q].is_empty() {
             return Err(format!(
                 "non-deterministic {} encountered",
@@ -909,6 +952,9 @@ impl ErrorAnalyzer {
     }
 
     fn ensure_no_pending_gauge(&self) -> Result<(), String> {
+        if self.options.allow_gauge_detectors {
+            return Ok(());
+        }
         for q in 0..self.x_sens.len() {
             if !self.z_sens[q].is_empty() {
                 return Err(format!(
