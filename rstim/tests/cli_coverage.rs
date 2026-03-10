@@ -469,6 +469,27 @@ fn run_analyze_errors_with_default_options_still_rejects_gauge() {
     assert!(err.contains("non-deterministic"));
 }
 
+#[test]
+fn run_analyze_errors_options_only_change_behavior_when_enabled() {
+    let mut strict_buf = Vec::new();
+    let strict = cli::run_analyze_errors_with_options(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+        false,
+        false,
+        &mut strict_buf,
+    );
+    assert!(strict.is_err());
+
+    let mut relaxed_buf = Vec::new();
+    let relaxed = cli::run_analyze_errors_with_options(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+        true,
+        false,
+        &mut relaxed_buf,
+    );
+    assert!(relaxed.is_ok());
+}
+
 // ---------- run_sample_dem ----------
 
 #[test]
