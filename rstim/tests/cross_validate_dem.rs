@@ -1,12 +1,32 @@
+#![allow(unexpected_cfgs)]
+
 use rstim::codegen::repetition_code_memory;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::circuit_to_string;
 use rstim::parser::parse_lines;
 use std::collections::BTreeMap;
+use std::fs;
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+
+fn stim_env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+    match payload.downcast::<String>() {
+        Ok(message) => *message,
+        Err(payload) => match payload.downcast::<&'static str>() {
+            Ok(message) => (*message).to_string(),
+            Err(_) => "non-string panic payload".to_string(),
+        },
+    }
+}
 
 fn stim_analyze_errors(circuit_text: &str) -> String {
-    let mut child = Command::new("stim")
+    let stim_cmd = std::env::var("RSTIM_TEST_STIM").unwrap_or_else(|_| "stim".to_string());
+    let mut child = Command::new(stim_cmd)
         .args(["analyze_errors"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -38,6 +58,80 @@ fn parse_dem_errors(dem_text: &str) -> BTreeMap<String, f64> {
 }
 
 #[test]
+fn parse_dem_errors_extracts_only_error_lines() {
+    let dem_text = "\
+error(0.125) D0 D1
+detector(1, 2, 3) D0
+shift_detectors(2) 0, 1
+error(0.5) D2 L0
+";
+    let errors = parse_dem_errors(dem_text);
+    assert_eq!(errors.len(), 2);
+    assert_eq!(errors["D0 D1"], 0.125);
+    assert_eq!(errors["D2 L0"], 0.5);
+}
+
+#[test]
+fn stim_analyze_errors_respects_override_command() {
+    let _guard = stim_env_lock().lock().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let stim_path = dir.path().join("stim");
+    fs::write(
+        &stim_path,
+        "#!/bin/sh\ncat >/dev/null\nprintf 'error(0.25) D0\\n'",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&stim_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&stim_path, perms).unwrap();
+    }
+
+    unsafe {
+        std::env::set_var("RSTIM_TEST_STIM", &stim_path);
+    }
+    let output = stim_analyze_errors("M 0\nDETECTOR rec[-1]");
+    unsafe {
+        std::env::remove_var("RSTIM_TEST_STIM");
+    }
+
+    assert_eq!(output, "error(0.25) D0\n");
+}
+
+#[test]
+fn stim_analyze_errors_propagates_failure_output() {
+    let _guard = stim_env_lock().lock().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let stim_path = dir.path().join("stim");
+    fs::write(
+        &stim_path,
+        "#!/bin/sh\ncat >/dev/null\necho 'stim exploded' >&2\nexit 1\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&stim_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&stim_path, perms).unwrap();
+    }
+
+    unsafe {
+        std::env::set_var("RSTIM_TEST_STIM", &stim_path);
+    }
+    let result = std::panic::catch_unwind(|| stim_analyze_errors("M 0\nDETECTOR rec[-1]"));
+    unsafe {
+        std::env::remove_var("RSTIM_TEST_STIM");
+    }
+
+    let panic_text = panic_message(result.unwrap_err());
+    assert!(panic_text.contains("stim failed: stim exploded"));
+}
+
+#[test]
+#[cfg(not(tarpaulin))]
 #[ignore] // requires stim CLI: pip install stim
 fn cross_validate_decomposed_dem_rep_code() {
     let circuit = repetition_code_memory(5, 3, 0.01);
@@ -60,6 +154,7 @@ fn cross_validate_decomposed_dem_rep_code() {
 }
 
 #[test]
+#[cfg(not(tarpaulin))]
 #[ignore] // requires stim CLI: pip install stim
 fn cross_validate_surface_code_dem() {
     let circuit_text = std::fs::read_to_string("../drafts/surface_code_rotated_memory_x_5_0.01.stim")
@@ -108,6 +203,7 @@ fn cross_validate_surface_code_dem() {
 }
 
 #[test]
+#[cfg(not(tarpaulin))]
 #[ignore] // requires stim CLI: pip install stim
 fn cross_validate_rep_code_dem_probabilities() {
     let circuit = repetition_code_memory(5, 3, 0.01);
