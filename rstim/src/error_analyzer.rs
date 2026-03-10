@@ -30,6 +30,10 @@ impl SparseXorVec {
     fn clear(&mut self) {
         self.targets.clear();
     }
+
+    fn has_observable(&self) -> bool {
+        self.targets.iter().any(|target| matches!(target, DemTarget::Observable(_)))
+    }
 }
 
 pub struct ErrorAnalyzer {
@@ -58,14 +62,38 @@ impl ErrorAnalyzer {
         };
 
         analyzer.undo_circuit(instrs)?;
+        analyzer.ensure_no_pending_gauge()?;
+
+        // Merge errors that affect the same target set.
+        // When multiple independent noise channels each flip the same set of
+        // detectors/observables with probabilities p1, p2, …, the net probability
+        // that an ODD number of them fire is:
+        //   p_combined = p1 + p2 - 2*p1*p2
+        let mut merged: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+        for (prob, targets) in analyzer.errors.into_iter().rev() {
+            if prob > 0.0 && !targets.is_empty() {
+                merged.entry(targets)
+                    .and_modify(|existing| {
+                        *existing = *existing + prob - 2.0 * *existing * prob;
+                    })
+                    .or_insert(prob);
+            }
+        }
 
         let mut dem = DetectorErrorModel::new();
         dem.set_min_counts(num_detectors, num_observables);
-        for (prob, targets) in analyzer.errors.into_iter().rev() {
-            if prob > 0.0 && !targets.is_empty() {
+        for (targets, prob) in merged {
+            if prob > 0.0 {
                 dem.add_error(prob, targets);
             }
         }
+
+        // Add detector coordinate annotations
+        let annotations = collect_detector_annotations(instrs);
+        for ann in annotations {
+            dem.push(ann);
+        }
+
         Ok(dem)
     }
 
@@ -76,8 +104,45 @@ impl ErrorAnalyzer {
     }
 
     fn undo_circuit(&mut self, instrs: &[StimInstr]) -> Result<(), String> {
-        for instr in instrs.iter().rev() {
-            match instr {
+        let mut i = instrs.len();
+        while i > 0 {
+            i -= 1;
+            match &instrs[i] {
+                StimInstr::Op { name, .. } if name == "ELSE_CORRELATED_ERROR" => {
+                    let end = i;
+                    let mut start = i;
+                    while start > 0 {
+                        match &instrs[start - 1] {
+                            StimInstr::Op { name, .. } if name == "ELSE_CORRELATED_ERROR" => {
+                                start -= 1;
+                            }
+                            StimInstr::Op { name, .. }
+                                if name == "CORRELATED_ERROR" || name == "E" =>
+                            {
+                                start -= 1;
+                                self.undo_correlated_block(&instrs[start..=end])?;
+                                i = start;
+                                break;
+                            }
+                            _ => {
+                                return Err(
+                                    "ELSE_CORRELATED_ERROR without preceding E block".to_string()
+                                );
+                            }
+                        }
+                    }
+                    if start == 0 {
+                        match &instrs[0] {
+                            StimInstr::Op { name, .. }
+                                if name == "CORRELATED_ERROR" || name == "E" => {}
+                            _ => {
+                                return Err(
+                                    "ELSE_CORRELATED_ERROR without preceding E block".to_string()
+                                );
+                            }
+                        }
+                    }
+                }
                 StimInstr::Op { name, args, targets, .. } => {
                     self.undo_op(name.as_str(), args, targets)?;
                 }
@@ -268,21 +333,25 @@ impl ErrorAnalyzer {
 
             "M" | "MZ" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.undo_mz(q);
                 }
             }
             "MX" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.undo_mx(q);
                 }
             }
             "MY" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.undo_my(q);
                 }
             }
             "MR" | "MRZ" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mz(q);
@@ -290,6 +359,7 @@ impl ErrorAnalyzer {
             }
             "MRX" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mx(q);
@@ -297,6 +367,7 @@ impl ErrorAnalyzer {
             }
             "MRY" => {
                 for q in qubits_inv(targets).into_iter().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_my(q);
@@ -305,18 +376,21 @@ impl ErrorAnalyzer {
 
             "R" | "RZ" => {
                 for q in qubits(targets) {
+                    self.ensure_z_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
             }
             "RX" => {
                 for q in qubits(targets) {
+                    self.ensure_x_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
             }
             "RY" => {
                 for q in qubits(targets) {
+                    self.ensure_y_collapse_is_deterministic(q)?;
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                 }
@@ -324,6 +398,10 @@ impl ErrorAnalyzer {
 
             "MPAD" => {
                 for _t in targets.iter().rev() {
+                    if self.num_measurements == 0 {
+                        return Err("MPAD underflow in error_analyzer".to_string());
+                    }
+                    self.measurement_sens[self.num_measurements - 1].clear();
                     self.num_measurements -= 1;
                 }
             }
@@ -333,7 +411,7 @@ impl ErrorAnalyzer {
                 let det_target = DemTarget::Detector(self.det_index);
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
-                        let abs_idx = (self.num_measurements as i32 + offset) as usize;
+                        let abs_idx = checked_rec_index(self.num_measurements, *offset)?;
                         self.measurement_sens[abs_idx].xor_item(det_target.clone());
                     }
                 }
@@ -343,7 +421,7 @@ impl ErrorAnalyzer {
                 let obs_target = DemTarget::Observable(obs_idx);
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
-                        let abs_idx = (self.num_measurements as i32 + offset) as usize;
+                        let abs_idx = checked_rec_index(self.num_measurements, *offset)?;
                         self.measurement_sens[abs_idx].xor_item(obs_target.clone());
                     }
                 }
@@ -377,130 +455,110 @@ impl ErrorAnalyzer {
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
+                ensure_valid_depolarize1_probability(p)?;
                 if p > 0.0 {
-                    let p3 = p / 3.0;
-                    for q in qubits(targets) {
-                        if !self.x_sens[q].is_empty() {
-                            self.errors.push((p3, self.x_sens[q].targets.clone()));
+                    let q = depolarize1_to_independent(p);
+                    for q_idx in qubits(targets) {
+                        // X error (basis index 0)
+                        if !self.x_sens[q_idx].is_empty() {
+                            self.errors.push((q, self.x_sens[q_idx].targets.clone()));
                         }
-                        let mut y_sens = self.x_sens[q].clone();
-                        y_sens.xor_other(&self.z_sens[q]);
+                        // Z error (basis index 1)
+                        if !self.z_sens[q_idx].is_empty() {
+                            self.errors.push((q, self.z_sens[q_idx].targets.clone()));
+                        }
+                        // Y = X⊕Z error (basis index 0⊕1)
+                        let mut y_sens = self.x_sens[q_idx].clone();
+                        y_sens.xor_other(&self.z_sens[q_idx]);
                         if !y_sens.is_empty() {
-                            self.errors.push((p3, y_sens.targets));
-                        }
-                        if !self.z_sens[q].is_empty() {
-                            self.errors.push((p3, self.z_sens[q].targets.clone()));
+                            self.errors.push((q, y_sens.targets));
                         }
                     }
                 }
             }
             "DEPOLARIZE2" => {
                 let p = args.first().copied().unwrap_or(0.0);
+                ensure_valid_depolarize2_probability(p)?;
                 if p > 0.0 {
-                    let p15 = p / 15.0;
+                    let q = depolarize2_to_independent(p);
                     for (qa, qb) in qubit_pairs(targets) {
-                        let paulis: [(bool, bool, bool, bool); 15] = [
-                            (false, false, true, false), // IX
-                            (false, false, true, true),  // IY
-                            (false, false, false, true), // IZ
-                            (true, false, false, false), // XI
-                            (true, false, true, false),  // XX
-                            (true, false, true, true),   // XY
-                            (true, false, false, true),  // XZ
-                            (true, true, false, false),  // YI
-                            (true, true, true, false),   // YX
-                            (true, true, true, true),    // YY
-                            (true, true, false, true),   // YZ
-                            (false, true, false, false), // ZI
-                            (false, true, true, false),  // ZX
-                            (false, true, true, true),   // ZY
-                            (false, true, false, true),  // ZZ
-                        ];
-                        for (xa, za, xb, zb) in &paulis {
+                        // 4 basis axes: x_a (bit 0), z_a (bit 1), x_b (bit 2), z_b (bit 3)
+                        // Iterate over all 15 non-identity combinations (k = 1..15)
+                        for k in 1u8..16 {
                             let mut sens = SparseXorVec::default();
-                            if *xa { sens.xor_other(&self.x_sens[qa]); }
-                            if *za { sens.xor_other(&self.z_sens[qa]); }
-                            if *xb { sens.xor_other(&self.x_sens[qb]); }
-                            if *zb { sens.xor_other(&self.z_sens[qb]); }
+                            if k & 1 != 0 { sens.xor_other(&self.x_sens[qa]); }
+                            if k & 2 != 0 { sens.xor_other(&self.z_sens[qa]); }
+                            if k & 4 != 0 { sens.xor_other(&self.x_sens[qb]); }
+                            if k & 8 != 0 { sens.xor_other(&self.z_sens[qb]); }
                             if !sens.is_empty() {
-                                self.errors.push((p15, sens.targets));
+                                self.errors.push((q, sens.targets));
                             }
                         }
                     }
                 }
             }
-            "CORRELATED_ERROR" | "E" | "ELSE_CORRELATED_ERROR" => {
-                let p = args.first().copied().unwrap_or(0.0);
-                let mut sens = SparseXorVec::default();
-                for t in targets {
-                    if let StimTarget::Pauli { qubit, basis, .. } = t {
-                        let q = *qubit as usize;
-                        match basis {
-                            PauliBasis::X => sens.xor_other(&self.x_sens[q]),
-                            PauliBasis::Y => {
-                                sens.xor_other(&self.x_sens[q]);
-                                sens.xor_other(&self.z_sens[q]);
-                            }
-                            PauliBasis::Z => sens.xor_other(&self.z_sens[q]),
-                        }
-                    }
-                }
-                if !sens.is_empty() {
-                    self.errors.push((p, sens.targets));
-                }
+            "CORRELATED_ERROR" | "E" => {
+                self.undo_correlated_op(args, targets);
+            }
+            "ELSE_CORRELATED_ERROR" => {
+                return Err("ELSE_CORRELATED_ERROR without preceding E block".to_string());
             }
             "PAULI_CHANNEL_1" => {
                 let px = args.first().copied().unwrap_or(0.0);
                 let py = args.get(1).copied().unwrap_or(0.0);
                 let pz = args.get(2).copied().unwrap_or(0.0);
+                // Try converting disjoint probabilities to independent ones
+                let (ix, iy, iz, is_independent) =
+                    if let Some((a, b, c)) = try_disjoint_to_independent_xyz(px, py, pz) {
+                        (a, b, c, true)
+                    } else {
+                        (px, py, pz, false)
+                    };
                 for q in qubits(targets) {
-                    if px > 0.0 && !self.x_sens[q].is_empty() {
-                        self.errors.push((px, self.x_sens[q].targets.clone()));
-                    }
-                    if py > 0.0 {
-                        let mut y_sens = self.x_sens[q].clone();
-                        y_sens.xor_other(&self.z_sens[q]);
-                        if !y_sens.is_empty() {
-                            self.errors.push((py, y_sens.targets));
+                    if is_independent {
+                        // Emit each basis combination independently
+                        // combo 01 = X-sens: prob ix
+                        if ix > 0.0 && !self.x_sens[q].is_empty() {
+                            self.errors.push((ix, self.x_sens[q].targets.clone()));
                         }
-                    }
-                    if pz > 0.0 && !self.z_sens[q].is_empty() {
-                        self.errors.push((pz, self.z_sens[q].targets.clone()));
+                        // combo 10 = Z-sens: prob iz
+                        if iz > 0.0 && !self.z_sens[q].is_empty() {
+                            self.errors.push((iz, self.z_sens[q].targets.clone()));
+                        }
+                        // combo 11 = Y-sens = X⊕Z: prob iy
+                        if iy > 0.0 {
+                            let mut y_sens = self.x_sens[q].clone();
+                            y_sens.xor_other(&self.z_sens[q]);
+                            if !y_sens.is_empty() {
+                                self.errors.push((iy, y_sens.targets));
+                            }
+                        }
+                    } else {
+                        // Fall back to disjoint approximation
+                        let mut components = Vec::new();
+                        if ix > 0.0 && !self.x_sens[q].is_empty() {
+                            components.push((ix, self.x_sens[q].targets.clone()));
+                        }
+                        if iy > 0.0 {
+                            let mut y_sens = self.x_sens[q].clone();
+                            y_sens.xor_other(&self.z_sens[q]);
+                            if !y_sens.is_empty() {
+                                components.push((iy, y_sens.targets));
+                            }
+                        }
+                        if iz > 0.0 && !self.z_sens[q].is_empty() {
+                            components.push((iz, self.z_sens[q].targets.clone()));
+                        }
+                        self.emit_noise_channel(components);
                     }
                 }
             }
             "PAULI_CHANNEL_2" => {
-                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
-                let paulis: [(bool, bool, bool, bool); 15] = [
-                    (false, false, true, false),
-                    (false, false, true, true),
-                    (false, false, false, true),
-                    (true, false, false, false),
-                    (true, false, true, false),
-                    (true, false, true, true),
-                    (true, false, false, true),
-                    (true, true, false, false),
-                    (true, true, true, false),
-                    (true, true, true, true),
-                    (true, true, false, true),
-                    (false, true, false, false),
-                    (false, true, true, false),
-                    (false, true, true, true),
-                    (false, true, false, true),
-                ];
-                for (qa, qb) in qubit_pairs(targets) {
-                    for (i, (xa, za, xb, zb)) in paulis.iter().enumerate() {
-                        if probs[i] > 0.0 {
-                            let mut sens = SparseXorVec::default();
-                            if *xa { sens.xor_other(&self.x_sens[qa]); }
-                            if *za { sens.xor_other(&self.z_sens[qa]); }
-                            if *xb { sens.xor_other(&self.x_sens[qb]); }
-                            if *zb { sens.xor_other(&self.z_sens[qb]); }
-                            if !sens.is_empty() {
-                                self.errors.push((probs[i], sens.targets));
-                            }
-                        }
-                    }
+                if args.iter().any(|p| *p > 0.0) {
+                    return Err(
+                        "PAULI_CHANNEL_2 requires an approximation mode that rstim does not yet expose"
+                            .to_string(),
+                    );
                 }
             }
             "HERALDED_ERASE" => {
@@ -509,17 +567,19 @@ impl ErrorAnalyzer {
                     self.num_measurements -= 1;
                     if p > 0.0 {
                         let p4 = p / 4.0;
+                        let mut components = Vec::new();
                         if !self.x_sens[q].is_empty() {
-                            self.errors.push((p4, self.x_sens[q].targets.clone()));
+                            components.push((p4, self.x_sens[q].targets.clone()));
                         }
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((p4, y_sens.targets));
+                            components.push((p4, y_sens.targets));
                         }
                         if !self.z_sens[q].is_empty() {
-                            self.errors.push((p4, self.z_sens[q].targets.clone()));
+                            components.push((p4, self.z_sens[q].targets.clone()));
                         }
+                        self.emit_noise_channel(components);
                     }
                 }
             }
@@ -529,19 +589,21 @@ impl ErrorAnalyzer {
                 let pz = args.get(3).copied().unwrap_or(0.0);
                 for q in qubits(targets).into_iter().rev() {
                     self.num_measurements -= 1;
+                    let mut components = Vec::new();
                     if px > 0.0 && !self.x_sens[q].is_empty() {
-                        self.errors.push((px, self.x_sens[q].targets.clone()));
+                        components.push((px, self.x_sens[q].targets.clone()));
                     }
                     if py > 0.0 {
                         let mut y_sens = self.x_sens[q].clone();
                         y_sens.xor_other(&self.z_sens[q]);
                         if !y_sens.is_empty() {
-                            self.errors.push((py, y_sens.targets));
+                            components.push((py, y_sens.targets));
                         }
                     }
                     if pz > 0.0 && !self.z_sens[q].is_empty() {
-                        self.errors.push((pz, self.z_sens[q].targets.clone()));
+                        components.push((pz, self.z_sens[q].targets.clone()));
                     }
+                    self.emit_noise_channel(components);
                 }
             }
             "I_ERROR" | "II_ERROR" => {}
@@ -611,6 +673,89 @@ impl ErrorAnalyzer {
 
     fn undo_h(&mut self, q: usize) {
         std::mem::swap(&mut self.x_sens[q], &mut self.z_sens[q]);
+    }
+
+    /// Emit errors from a single noise channel (e.g. one DEPOLARIZE1 on one qubit).
+    /// Within a channel the Pauli components are mutually exclusive, so errors
+    /// with the same target set are combined by addition (not XOR).
+    fn emit_noise_channel(&mut self, components: Vec<(f64, Vec<DemTarget>)>) {
+        let mut grouped: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+        for (prob, targets) in components {
+            if prob > 0.0 && !targets.is_empty() {
+                *grouped.entry(targets).or_default() += prob;
+            }
+        }
+        for (targets, prob) in grouped {
+            self.errors.push((prob, targets));
+        }
+    }
+
+    fn correlated_targets(&self, targets: &[StimTarget]) -> Vec<DemTarget> {
+        let mut sens = SparseXorVec::default();
+        for t in targets {
+            if let StimTarget::Pauli { qubit, basis, .. } = t {
+                let q = *qubit as usize;
+                match basis {
+                    PauliBasis::X => sens.xor_other(&self.x_sens[q]),
+                    PauliBasis::Y => {
+                        sens.xor_other(&self.x_sens[q]);
+                        sens.xor_other(&self.z_sens[q]);
+                    }
+                    PauliBasis::Z => sens.xor_other(&self.z_sens[q]),
+                }
+            }
+        }
+        sens.targets
+    }
+
+    fn undo_correlated_op(&mut self, args: &[f64], targets: &[StimTarget]) {
+        let p = args.first().copied().unwrap_or(0.0);
+        let targets = self.correlated_targets(targets);
+        if p > 0.0 && !targets.is_empty() {
+            self.errors.push((p, targets));
+        }
+    }
+
+    fn undo_correlated_block(&mut self, block: &[StimInstr]) -> Result<(), String> {
+        if block.len() > 2 {
+            return Err(
+                "correlated error block requires approximation mode for >2 branches".to_string(),
+            );
+        }
+
+        let mut grouped: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+        let mut remaining = 1.0;
+        for instr in block {
+            let (probability, targets) = self.correlated_branch_from_instr(instr)?;
+            let effective_probability = probability * remaining;
+            remaining *= 1.0 - probability;
+            if effective_probability > 0.0 && !targets.is_empty() {
+                *grouped.entry(targets).or_default() += effective_probability;
+            }
+        }
+        for (targets, probability) in grouped {
+            self.errors.push((probability, targets));
+        }
+        Ok(())
+    }
+
+    fn correlated_branch_from_instr(
+        &self,
+        instr: &StimInstr,
+    ) -> Result<(f64, Vec<DemTarget>), String> {
+        match instr {
+            StimInstr::Op { name, args, targets, .. }
+                if name == "CORRELATED_ERROR"
+                    || name == "E"
+                    || name == "ELSE_CORRELATED_ERROR" =>
+            {
+                Ok((
+                    args.first().copied().unwrap_or(0.0),
+                    self.correlated_targets(targets),
+                ))
+            }
+            _ => Err("invalid correlated error block".to_string()),
+        }
     }
 
     fn undo_s(&mut self, q: usize) {
@@ -715,6 +860,64 @@ impl ErrorAnalyzer {
         }
         Ok(())
     }
+
+    fn ensure_x_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if !self.x_sens[q].is_empty() {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_y_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if self.x_sens[q].targets != self.z_sens[q].targets {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_z_collapse_is_deterministic(&self, q: usize) -> Result<(), String> {
+        if !self.z_sens[q].is_empty() {
+            return Err(format!(
+                "non-deterministic {} encountered",
+                self.sensitivity_kind_for_qubit(q),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_no_pending_gauge(&self) -> Result<(), String> {
+        for q in 0..self.x_sens.len() {
+            if !self.z_sens[q].is_empty() {
+                return Err(format!(
+                    "non-deterministic {} encountered",
+                    self.sensitivity_kind_for_qubit(q),
+                ));
+            }
+        }
+        if self.measurement_sens.iter().any(|sens| !sens.is_empty()) {
+            let kind = if self.measurement_sens.iter().any(SparseXorVec::has_observable) {
+                "observable"
+            } else {
+                "detector"
+            };
+            return Err(format!("non-deterministic {kind} encountered"));
+        }
+        Ok(())
+    }
+
+    fn sensitivity_kind_for_qubit(&self, q: usize) -> &'static str {
+        if self.x_sens[q].has_observable() || self.z_sens[q].has_observable() {
+            "observable"
+        } else {
+            "detector"
+        }
+    }
 }
 
 struct PauliProduct {
@@ -773,6 +976,16 @@ fn qubit_pairs_inv(targets: &[StimTarget]) -> Vec<(usize, usize)> {
     qs.chunks(2).filter_map(|c| {
         if c.len() == 2 { Some((c[0], c[1])) } else { None }
     }).collect()
+}
+
+fn checked_rec_index(num_measurements: usize, offset: i32) -> Result<usize, String> {
+    let idx = num_measurements as i32 + offset;
+    if idx < 0 || idx >= num_measurements as i32 {
+        return Err(format!(
+            "invalid rec[{offset}] reference with {num_measurements} measurements available"
+        ));
+    }
+    Ok(idx as usize)
 }
 
 fn count_qubits(instrs: &[StimInstr]) -> usize {
@@ -852,6 +1065,120 @@ fn count_annotations(instrs: &[StimInstr], kind: &str) -> usize {
         }
     }
     count
+}
+
+/// Convert DEPOLARIZE1(p) probability to independent per-channel probability.
+///
+/// DEPOLARIZE1(p) applies X, Y, or Z each with disjoint probability p/3.
+/// This converts to independent X-flip and Z-flip probabilities such that
+/// the composition of independent X and Z channels reproduces the same
+/// disjoint distribution over {I, X, Y, Z}.
+fn depolarize1_to_independent(p: f64) -> f64 {
+    0.5 - 0.5 * (1.0 - (4.0 * p) / 3.0).sqrt()
+}
+
+fn ensure_valid_depolarize1_probability(p: f64) -> Result<(), String> {
+    if p > 0.75 {
+        return Err(format!("DEPOLARIZE1({p}) exceeds exact-analysis limit of 3/4"));
+    }
+    Ok(())
+}
+
+/// Convert DEPOLARIZE2(p) probability to independent per-channel probability.
+///
+/// DEPOLARIZE2(p) applies each of 15 non-identity two-qubit Paulis with
+/// disjoint probability p/15. This converts to the independent probability
+/// for each of the 4 basis axes (Xa, Za, Xb, Zb) such that the composition
+/// of 4 independent channels reproduces the same disjoint distribution.
+fn depolarize2_to_independent(p: f64) -> f64 {
+    0.5 - 0.5 * (1.0 - (16.0 * p) / 15.0).powf(0.125)
+}
+
+fn ensure_valid_depolarize2_probability(p: f64) -> Result<(), String> {
+    if p > 15.0 / 16.0 {
+        return Err(format!("DEPOLARIZE2({p}) exceeds exact-analysis limit of 15/16"));
+    }
+    Ok(())
+}
+
+/// Convert disjoint (mutually exclusive) X/Y/Z probabilities to independent
+/// per-channel probabilities. Returns None if no exact solution exists.
+fn try_disjoint_to_independent_xyz(
+    x: f64,
+    y: f64,
+    z: f64,
+) -> Option<(f64, f64, f64)> {
+    let i = (1.0 - x - y - z).max(0.0);
+    // Re-arrange so identity is most likely
+    if i < x {
+        let result = try_disjoint_to_independent_xyz(i, z, y);
+        return result.map(|(a, b, c)| (1.0 - a, b, c));
+    }
+    if i < y {
+        let result = try_disjoint_to_independent_xyz(z, i, x);
+        return result.map(|(a, b, c)| (a, 1.0 - b, c));
+    }
+    if i < z {
+        let result = try_disjoint_to_independent_xyz(y, x, i);
+        return result.map(|(a, b, c)| (a, b, 1.0 - c));
+    }
+    if x + z >= 0.5 || x + y >= 0.5 || y + z >= 0.5 {
+        return None;
+    }
+    let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
+    let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
+    let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
+    let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
+    let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
+    let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
+    if a >= 0.0 && b >= 0.0 && c >= 0.0 {
+        Some((a, b, c))
+    } else {
+        None
+    }
+}
+
+/// Collect detector coordinate annotations from a circuit.
+/// Walks the circuit forward to build detector and shift_detectors instructions.
+fn collect_detector_annotations(instrs: &[StimInstr]) -> Vec<DemInstruction> {
+    let mut result = Vec::new();
+    let mut det_index: usize = 0;
+    collect_detector_annotations_inner(instrs, &mut result, &mut det_index);
+    result
+}
+
+fn collect_detector_annotations_inner(
+    instrs: &[StimInstr],
+    result: &mut Vec<DemInstruction>,
+    det_index: &mut usize,
+) {
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, args, .. } => match name.as_str() {
+                "DETECTOR" => {
+                    if !args.is_empty() {
+                        result.push(DemInstruction::Detector {
+                            index: *det_index,
+                            coords: args.clone(),
+                        });
+                    }
+                    *det_index += 1;
+                }
+                "SHIFT_COORDS" => {
+                    result.push(DemInstruction::ShiftDetectors {
+                        detector_offset: 0,
+                        coord_offsets: args.clone(),
+                    });
+                }
+                _ => {}
+            },
+            StimInstr::Repeat { count, body } => {
+                for _ in 0..*count {
+                    collect_detector_annotations_inner(body, result, det_index);
+                }
+            }
+        }
+    }
 }
 
 /// Extract the detector/observable target set from a list of DemTargets,
