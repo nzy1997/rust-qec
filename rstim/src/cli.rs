@@ -52,6 +52,10 @@ pub enum Commands {
         seed: Option<u64>,
         #[arg(long = "append_observables")]
         append_observables: bool,
+        #[arg(long = "obs_out")]
+        obs_out: Option<String>,
+        #[arg(long = "obs_out_format", default_value = "01")]
+        obs_out_format: String,
     },
     /// Convert a circuit into a detector error model
     #[command(name = "analyze_errors")]
@@ -167,10 +171,33 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 &mut w,
             )
         }
-        Some(Commands::Detect { shots, out_format, r#in, out, seed, append_observables }) => {
+        Some(Commands::Detect {
+            shots,
+            out_format,
+            r#in,
+            out,
+            seed,
+            append_observables,
+            obs_out,
+            obs_out_format,
+        }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_detect(&text, shots.unwrap_or(1) as usize, &out_format, seed, append_observables, &mut w)
+            if let Some(obs_path) = obs_out.as_deref() {
+                let mut obs_w = open_output(Some(obs_path))?;
+                run_detect_with_obs(
+                    &text,
+                    shots.unwrap_or(1) as usize,
+                    &out_format,
+                    seed,
+                    append_observables,
+                    &mut w,
+                    &mut obs_w,
+                    &obs_out_format,
+                )
+            } else {
+                run_detect(&text, shots.unwrap_or(1) as usize, &out_format, seed, append_observables, &mut w)
+            }
         }
         Some(Commands::AnalyzeErrors {
             r#in,
@@ -298,6 +325,33 @@ pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable
     merged
 }
 
+fn write_detection_outputs(
+    detections: &BitTable,
+    observable_flips: &BitTable,
+    fmt: OutputFormat,
+    append_observables: bool,
+    out: &mut dyn Write,
+    obs_out: Option<(&mut dyn Write, OutputFormat)>,
+) -> Result<(), String> {
+    match fmt {
+        OutputFormat::Dets => {
+            write_shots_dets(detections, observable_flips, out).map_err(|e| format!("write error: {e}"))?;
+        }
+        _ => {
+            if append_observables {
+                let merged = merge_detections_observables(detections, observable_flips);
+                write_format(fmt, &merged, out)?;
+            } else {
+                write_format(fmt, detections, out)?;
+            }
+        }
+    }
+    if let Some((obs_writer, obs_fmt)) = obs_out {
+        write_format(obs_fmt, observable_flips, obs_writer)?;
+    }
+    Ok(())
+}
+
 pub fn run_gen(
     code: &str,
     task: &str,
@@ -356,20 +410,39 @@ pub fn run_detect(
     let instrs = parse_lines(circuit_text)?;
     let mut rng = make_rng(seed);
     let result = sample_batch(&instrs, shots, &mut rng)?;
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))
-        }
-        _ => {
-            if append_observables {
-                let merged = merge_detections_observables(&result.detections, &result.observable_flips);
-                write_format(fmt, &merged, out)
-            } else {
-                write_format(fmt, &result.detections, out)
-            }
-        }
-    }
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        None,
+    )
+}
+
+pub fn run_detect_with_obs(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    append_observables: bool,
+    out: &mut dyn Write,
+    obs_out: &mut dyn Write,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    let fmt = OutputFormat::from_str(out_format)?;
+    let obs_fmt = OutputFormat::from_str(obs_out_format)?;
+    let instrs = parse_lines(circuit_text)?;
+    let mut rng = make_rng(seed);
+    let result = sample_batch(&instrs, shots, &mut rng)?;
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        Some((obs_out, obs_fmt)),
+    )
 }
 
 pub fn run_analyze_errors(
@@ -426,13 +499,14 @@ pub fn run_sample_dem(
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
     let result = dem.sample_batch(shots, &mut rng);
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))
-        }
-        _ => write_format(fmt, &result.detections, out),
-    }
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        false,
+        out,
+        None,
+    )
 }
 
 pub fn run_sample_dem_with_obs(
@@ -449,16 +523,14 @@ pub fn run_sample_dem_with_obs(
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
     let result = dem.sample_batch(shots, &mut rng);
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))?;
-        }
-        _ => {
-            write_format(fmt, &result.detections, out)?;
-        }
-    }
-    write_format(obs_fmt, &result.observable_flips, obs_out)
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        false,
+        out,
+        Some((obs_out, obs_fmt)),
+    )
 }
 
 pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {

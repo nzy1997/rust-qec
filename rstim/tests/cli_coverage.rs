@@ -229,6 +229,30 @@ fn run_detect_via_dispatch() {
 }
 
 #[test]
+fn run_detect_via_dispatch_accepts_obs_out() {
+    use clap::Parser;
+    let cli = cli::Cli::try_parse_from([
+        "rstim",
+        "detect",
+        "--shots",
+        "1",
+        "--obs_out",
+        "obs.txt",
+        "--obs_out_format",
+        "hits",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Some(cli::Commands::Detect {
+            obs_out: Some(_),
+            obs_out_format,
+            ..
+        }) if obs_out_format == "hits"
+    ));
+}
+
+#[test]
 fn run_analyze_errors_via_dispatch() {
     use clap::Parser;
     let dir = tempfile::tempdir().unwrap();
