@@ -777,3 +777,20 @@ fn stim_correlated_error_three_branch_block_allowed_with_approximation_option() 
     assert_eq!(error_count(&dem), 1);
     assert_has_error_approx(&dem, 0.316, 1e-12, &[DemTarget::Detector(0)]);
 }
+
+#[test]
+fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
+    let instrs = parse_lines(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    )
+    .unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors: true,
+            allow_gauge_detectors: false,
+        },
+    )
+    .unwrap();
+    assert!(dem.to_string().contains("error("));
+}

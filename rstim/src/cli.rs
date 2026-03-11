@@ -62,6 +62,8 @@ pub enum Commands {
         approximate_disjoint_errors: bool,
         #[arg(long = "allow_gauge_detectors")]
         allow_gauge_detectors: bool,
+        #[arg(long = "decompose_errors")]
+        decompose_errors: bool,
     },
     /// Generate a common QEC circuit
     #[command(name = "gen")]
@@ -166,13 +168,15 @@ pub fn run(cli: Cli) -> Result<(), String> {
             out,
             approximate_disjoint_errors,
             allow_gauge_detectors,
+            decompose_errors,
         }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_analyze_errors_with_options(
+            run_analyze_errors_with_flags(
                 &text,
                 approximate_disjoint_errors,
                 allow_gauge_detectors,
+                decompose_errors,
                 &mut w,
             )
         }
@@ -355,7 +359,7 @@ pub fn run_analyze_errors(
     circuit_text: &str,
     out: &mut dyn Write,
 ) -> Result<(), String> {
-    run_analyze_errors_with_options(circuit_text, false, false, out)
+    run_analyze_errors_with_flags(circuit_text, false, false, false, out)
 }
 
 pub fn run_analyze_errors_with_options(
@@ -364,14 +368,32 @@ pub fn run_analyze_errors_with_options(
     allow_gauge_detectors: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    run_analyze_errors_with_flags(
+        circuit_text,
+        approximate_disjoint_errors,
+        allow_gauge_detectors,
+        false,
+        out,
+    )
+}
+
+pub fn run_analyze_errors_with_flags(
+    circuit_text: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+    decompose_errors: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
-    let dem = ErrorAnalyzer::circuit_to_dem_with_options(
-        &instrs,
-        crate::error_analyzer::AnalyzeOptions {
-            approximate_disjoint_errors,
-            allow_gauge_detectors,
-        },
-    )?;
+    let options = crate::error_analyzer::AnalyzeOptions {
+        approximate_disjoint_errors,
+        allow_gauge_detectors,
+    };
+    let dem = if decompose_errors {
+        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(&instrs, options)?
+    } else {
+        ErrorAnalyzer::circuit_to_dem_with_options(&instrs, options)?
+    };
     let dem_str = dem.to_string();
     out.write_all(dem_str.as_bytes()).map_err(|e| format!("write error: {e}"))
 }

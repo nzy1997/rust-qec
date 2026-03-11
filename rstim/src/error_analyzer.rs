@@ -120,6 +120,15 @@ impl ErrorAnalyzer {
         Ok(dem)
     }
 
+    pub fn circuit_to_dem_with_options_decomposed(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+    ) -> Result<DetectorErrorModel, String> {
+        let mut dem = Self::circuit_to_dem_with_options(instrs, options)?;
+        decompose_errors(&mut dem)?;
+        Ok(dem)
+    }
+
     fn undo_circuit(&mut self, instrs: &[StimInstr]) -> Result<(), String> {
         let mut i = instrs.len();
         while i > 0 {

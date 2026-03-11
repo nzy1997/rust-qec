@@ -490,6 +490,31 @@ fn run_analyze_errors_options_only_change_behavior_when_enabled() {
     assert!(relaxed.is_ok());
 }
 
+#[test]
+fn run_analyze_errors_with_decompose_errors_uses_decomposed_path() {
+    let mut buf = Vec::new();
+    cli::run_analyze_errors_with_flags(
+        "R 0 1 2\nX_ERROR(0.1) 0 1\nM 0 1 2\nDETECTOR rec[-3] rec[-2]\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
+        false,
+        false,
+        true,
+        &mut buf,
+    )
+    .unwrap();
+    let dem = String::from_utf8(buf).unwrap();
+    assert!(dem.contains("error("));
+}
+
+#[test]
+fn run_analyze_errors_with_decompose_errors_preserves_default_for_graphlike_input() {
+    let circuit = "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]";
+    let mut plain = Vec::new();
+    let mut decomp = Vec::new();
+    cli::run_analyze_errors_with_flags(circuit, false, false, false, &mut plain).unwrap();
+    cli::run_analyze_errors_with_flags(circuit, false, false, true, &mut decomp).unwrap();
+    assert_eq!(plain, decomp);
+}
+
 // ---------- run_sample_dem ----------
 
 #[test]
