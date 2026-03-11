@@ -103,3 +103,27 @@ pub fn num_ticks(instrs: &[StimInstr]) -> usize {
     }
     count
 }
+
+/// One more than the largest sweep bit index used in the circuit.
+pub fn num_sweep_bits(instrs: &[StimInstr]) -> usize {
+    let mut max_k: Option<u32> = None;
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { targets, .. } => {
+                for t in targets {
+                    if let crate::ir::StimTarget::Sweep(k) = t {
+                        max_k = Some(max_k.map_or(*k, |m| m.max(*k)));
+                    }
+                }
+            }
+            StimInstr::Repeat { body, .. } => {
+                let inner = num_sweep_bits(body);
+                if inner > 0 {
+                    let k = (inner - 1) as u32;
+                    max_k = Some(max_k.map_or(k, |m| m.max(k)));
+                }
+            }
+        }
+    }
+    max_k.map_or(0, |m| (m + 1) as usize)
+}

@@ -35,16 +35,20 @@ pub fn measurements_to_detections(
 pub fn measurements_to_detections_with_options(
     instrs: &[StimInstr],
     meas_table: &BitTable,
-    _sweep_table: Option<&BitTable>,
+    sweep_table: Option<&BitTable>,
     options: M2dOptions,
 ) -> Result<M2dOutput, String> {
-    let reference = match options.reference_sample_mode {
-        ReferenceSampleMode::SimulateNoiseless => {
-            build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?
+    let shared_reference = match options.reference_sample_mode {
+        ReferenceSampleMode::SimulateNoiseless if sweep_table.is_none() => {
+            Some(build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?)
         }
-        ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
+        ReferenceSampleMode::AssumeAllZero => Some(vec![false; crate::stats::num_measurements(instrs)]),
+        ReferenceSampleMode::SimulateNoiseless => None,
     };
-    let n_meas = reference.len();
+    let n_meas = shared_reference
+        .as_ref()
+        .map(|reference| reference.len())
+        .unwrap_or_else(|| crate::stats::num_measurements(instrs));
     let n_shots = meas_table.num_minor();
 
     if meas_table.num_major() != n_meas {
@@ -52,6 +56,15 @@ pub fn measurements_to_detections_with_options(
             "meas_table has {} bits but circuit has {} measurements",
             meas_table.num_major(), n_meas
         ));
+    }
+    if let Some(sweep_table) = sweep_table {
+        if sweep_table.num_minor() != n_shots {
+            return Err(format!(
+                "sweep shots {} do not match measurement shots {}",
+                sweep_table.num_minor(),
+                n_shots
+            ));
+        }
     }
 
     let det_obs = collect_det_obs(instrs)?;
@@ -62,6 +75,18 @@ pub fn measurements_to_detections_with_options(
     let mut obs = BitTable::new(n_obs, n_shots);
 
     for shot in 0..n_shots {
+        let per_shot_reference;
+        let reference = if let Some(reference) = shared_reference.as_ref() {
+            reference.as_slice()
+        } else {
+            let sweep_table = sweep_table.expect("validated above");
+            let sweep_row: Vec<bool> = (0..sweep_table.num_major())
+                .map(|i| sweep_table.get(i, shot))
+                .collect();
+            per_shot_reference =
+                crate::executor::reference_sample_with_sweep_bits(instrs, Some(&sweep_row))?;
+            per_shot_reference.as_slice()
+        };
         let flips: Vec<bool> = (0..n_meas)
             .map(|i| meas_table.get(i, shot) ^ reference[i])
             .collect();

@@ -122,6 +122,10 @@ pub enum Commands {
         append_observables: bool,
         #[arg(long = "skip_reference_sample")]
         skip_reference_sample: bool,
+        #[arg(long = "sweep")]
+        sweep: Option<String>,
+        #[arg(long = "sweep_format", default_value = "01")]
+        sweep_format: String,
         #[arg(long)]
         shots: Option<usize>,
     },
@@ -235,10 +239,16 @@ pub fn run(cli: Cli) -> Result<(), String> {
             out,
             append_observables,
             skip_reference_sample,
+            sweep,
+            sweep_format,
             shots,
         }) => {
             let circ_text = read_input(circuit.as_deref())?;
             let data = read_input_bytes(r#in.as_deref())?;
+            let sweep_data = sweep
+                .as_deref()
+                .map(|path| read_input_bytes(Some(path)))
+                .transpose()?;
             let mut w = open_output(out.as_deref())?;
             let options = M2dOptions {
                 reference_sample_mode: if skip_reference_sample {
@@ -248,12 +258,13 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 },
                 ran_without_feedback: false,
             };
-            run_m2d_with_options(
+            run_m2d_impl(
                 &circ_text,
                 &data,
                 &in_format,
                 &out_format,
                 shots,
+                sweep_data.as_deref().map(|data| (data, sweep_format.as_str())),
                 options,
                 append_observables,
                 &mut w,
@@ -634,12 +645,13 @@ pub fn run_m2d(
     append_observables: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
-    run_m2d_with_options(
+    run_m2d_impl(
         circuit_text,
         data,
         in_format,
         out_format,
         shots,
+        None,
         M2dOptions::default(),
         append_observables,
         out,
@@ -656,10 +668,40 @@ pub fn run_m2d_with_options(
     append_observables: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    run_m2d_impl(
+        circuit_text,
+        data,
+        in_format,
+        out_format,
+        shots,
+        None,
+        options,
+        append_observables,
+        out,
+    )
+}
+
+fn run_m2d_impl(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    sweep_data: Option<(&[u8], &str)>,
+    options: M2dOptions,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
     let n_meas = crate::stats::num_measurements(&instrs);
     let meas_table = read_table_from_format(data, in_format, n_meas, shots)?;
-    let result = measurements_to_detections_with_options(&instrs, &meas_table, None, options)?;
+    let sweep_table = if let Some((sweep_bytes, sweep_format)) = sweep_data {
+        let n_sweep_bits = crate::stats::num_sweep_bits(&instrs);
+        Some(read_table_from_format(sweep_bytes, sweep_format, n_sweep_bits, shots)?)
+    } else {
+        None
+    };
+    let result = measurements_to_detections_with_options(&instrs, &meas_table, sweep_table.as_ref(), options)?;
     let fmt = OutputFormat::from_str(out_format)?;
 
     match fmt {

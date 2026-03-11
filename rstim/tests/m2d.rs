@@ -101,6 +101,32 @@ fn m2d_skip_reference_sample_matches_default_on_zero_reference() {
 }
 
 #[test]
+fn m2d_sweep_controlled_reference_is_evaluated_per_shot() {
+    let instrs = parse_lines("R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let mut meas = BitTable::new(1, 2);
+    meas.set(0, 1, true);
+
+    let mut sweep = BitTable::new(1, 2);
+    sweep.set(0, 1, true);
+
+    let out = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default()).unwrap();
+    assert!(!out.detections.get(0, 0));
+    assert!(!out.detections.get(0, 1));
+}
+
+#[test]
+fn m2d_sweep_shot_count_mismatch_errors() {
+    let instrs = parse_lines("R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(1, &[false]);
+    let sweep = BitTable::new(1, 2);
+    let err = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default())
+        .err()
+        .unwrap();
+    assert!(err.contains("sweep shots"));
+}
+
+#[test]
 fn run_m2d_01_to_01() {
     let circuit = "R 0\nM 0\nDETECTOR rec[-1]";
     let data = b"1\n"; // 1 meas, 1 shot, bit=1 (flipped)

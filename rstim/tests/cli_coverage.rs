@@ -275,6 +275,32 @@ fn run_m2d_dispatch_accepts_skip_reference_sample() {
 }
 
 #[test]
+fn run_m2d_dispatch_accepts_sweep_input() {
+    use clap::Parser;
+    let cli = cli::Cli::try_parse_from([
+        "rstim",
+        "m2d",
+        "--circuit",
+        "test.stim",
+        "--in",
+        "shots.01",
+        "--sweep",
+        "sweep.01",
+        "--sweep_format",
+        "hits",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Some(cli::Commands::M2d {
+            sweep: Some(_),
+            sweep_format,
+            ..
+        }) if sweep_format == "hits"
+    ));
+}
+
+#[test]
 fn run_analyze_errors_via_dispatch() {
     use clap::Parser;
     let dir = tempfile::tempdir().unwrap();
