@@ -38,17 +38,32 @@ pub fn measurements_to_detections_with_options(
     sweep_table: Option<&BitTable>,
     options: M2dOptions,
 ) -> Result<M2dOutput, String> {
+    let normalization = if options.ran_without_feedback {
+        Some(crate::transforms::normalize_feedbackless_m2d(instrs)?)
+    } else {
+        None
+    };
+    let work_instrs = normalization
+        .as_ref()
+        .map(|normalized| normalized.circuit.as_slice())
+        .unwrap_or(instrs);
+    let empty_corrections: &[Vec<usize>] = &[];
+    let measurement_corrections = normalization
+        .as_ref()
+        .map(|normalized| normalized.measurement_corrections.as_slice())
+        .unwrap_or(empty_corrections);
+
     let shared_reference = match options.reference_sample_mode {
         ReferenceSampleMode::SimulateNoiseless if sweep_table.is_none() => {
-            Some(build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?)
+            Some(build_reference_sample(work_instrs, ReferenceSampleMode::SimulateNoiseless)?)
         }
-        ReferenceSampleMode::AssumeAllZero => Some(vec![false; crate::stats::num_measurements(instrs)]),
+        ReferenceSampleMode::AssumeAllZero => Some(vec![false; crate::stats::num_measurements(work_instrs)]),
         ReferenceSampleMode::SimulateNoiseless => None,
     };
     let n_meas = shared_reference
         .as_ref()
         .map(|reference| reference.len())
-        .unwrap_or_else(|| crate::stats::num_measurements(instrs));
+        .unwrap_or_else(|| crate::stats::num_measurements(work_instrs));
     let n_shots = meas_table.num_minor();
 
     if meas_table.num_major() != n_meas {
@@ -67,7 +82,7 @@ pub fn measurements_to_detections_with_options(
         }
     }
 
-    let det_obs = collect_det_obs(instrs)?;
+    let det_obs = collect_det_obs(work_instrs)?;
     let n_dets = det_obs.detectors.len();
     let n_obs = det_obs.observables.len();
 
@@ -84,12 +99,19 @@ pub fn measurements_to_detections_with_options(
                 .map(|i| sweep_table.get(i, shot))
                 .collect();
             per_shot_reference =
-                crate::executor::reference_sample_with_sweep_bits(instrs, Some(&sweep_row))?;
+                crate::executor::reference_sample_with_sweep_bits(work_instrs, Some(&sweep_row))?;
             per_shot_reference.as_slice()
         };
-        let flips: Vec<bool> = (0..n_meas)
-            .map(|i| meas_table.get(i, shot) ^ reference[i])
-            .collect();
+        let mut flips = Vec::with_capacity(n_meas);
+        for i in 0..n_meas {
+            let mut flip = meas_table.get(i, shot) ^ reference[i];
+            if let Some(extra_terms) = measurement_corrections.get(i) {
+                for &j in extra_terms {
+                    flip ^= flips[j];
+                }
+            }
+            flips.push(flip);
+        }
 
         for (d, rec_offsets) in det_obs.detectors.iter().enumerate() {
             let val = rec_offsets.iter().fold(false, |acc, &r| acc ^ flips[r]);

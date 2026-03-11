@@ -127,6 +127,26 @@ fn m2d_sweep_shot_count_mismatch_errors() {
 }
 
 #[test]
+fn m2d_ran_without_feedback_compensates_simple_classical_x_feedback() {
+    let instrs = parse_lines(
+        "R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
+    let meas = single_shot_table(2, &[true, false]);
+    let out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        None,
+        M2dOptions {
+            ran_without_feedback: true,
+            ..M2dOptions::default()
+        },
+    )
+    .unwrap();
+    assert!(!out.detections.get(0, 0));
+}
+
+#[test]
 fn run_m2d_01_to_01() {
     let circuit = "R 0\nM 0\nDETECTOR rec[-1]";
     let data = b"1\n"; // 1 meas, 1 shot, bit=1 (flipped)

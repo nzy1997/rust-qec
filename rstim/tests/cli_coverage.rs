@@ -301,6 +301,28 @@ fn run_m2d_dispatch_accepts_sweep_input() {
 }
 
 #[test]
+fn run_m2d_dispatch_accepts_ran_without_feedback() {
+    use clap::Parser;
+    let cli = cli::Cli::try_parse_from([
+        "rstim",
+        "m2d",
+        "--circuit",
+        "test.stim",
+        "--in",
+        "shots.01",
+        "--ran_without_feedback",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Some(cli::Commands::M2d {
+            ran_without_feedback: true,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn run_analyze_errors_via_dispatch() {
     use clap::Parser;
     let dir = tempfile::tempdir().unwrap();

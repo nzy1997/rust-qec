@@ -126,6 +126,8 @@ pub enum Commands {
         sweep: Option<String>,
         #[arg(long = "sweep_format", default_value = "01")]
         sweep_format: String,
+        #[arg(long = "ran_without_feedback")]
+        ran_without_feedback: bool,
         #[arg(long)]
         shots: Option<usize>,
     },
@@ -241,6 +243,7 @@ pub fn run(cli: Cli) -> Result<(), String> {
             skip_reference_sample,
             sweep,
             sweep_format,
+            ran_without_feedback,
             shots,
         }) => {
             let circ_text = read_input(circuit.as_deref())?;
@@ -256,7 +259,7 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 } else {
                     crate::data_path::ReferenceSampleMode::SimulateNoiseless
                 },
-                ran_without_feedback: false,
+                ran_without_feedback,
             };
             run_m2d_impl(
                 &circ_text,

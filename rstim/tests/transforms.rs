@@ -159,3 +159,25 @@ fn inverse_repeat_block() {
         panic!("expected Repeat");
     }
 }
+
+#[test]
+fn normalize_feedbackless_m2d_strips_simple_controlled_x_and_records_correction() {
+    let instrs = parse_lines(
+        "R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
+
+    let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
+    assert_eq!(
+        rstim::ir::circuit_to_string(&normalized.circuit),
+        "R 0 1\nX 0\nM 0\nM 1\nDETECTOR rec[-1] rec[-2]\n",
+    );
+    assert_eq!(normalized.measurement_corrections, vec![vec![], vec![0]]);
+}
+
+#[test]
+fn normalize_feedbackless_m2d_rejects_intervening_quantum_op() {
+    let instrs = parse_lines("M 0\nCX rec[-1] 1\nH 1\nM 1\n").unwrap();
+    let err = transforms::normalize_feedbackless_m2d(&instrs).unwrap_err();
+    assert!(err.contains("unsupported feedback"));
+}
