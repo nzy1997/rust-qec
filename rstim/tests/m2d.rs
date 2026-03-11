@@ -1,5 +1,6 @@
+use rstim::data_path::ReferenceSampleMode;
 use rstim::parser::parse_lines;
-use rstim::m2d::measurements_to_detections;
+use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
 use rstim::sim::bit_table::BitTable;
 use rstim::cli::run_m2d;
 
@@ -79,6 +80,24 @@ fn m2d_multiple_shots() {
     assert!(!out.detections.get(0, 0));
     assert!(out.detections.get(0, 1));
     assert!(!out.detections.get(0, 2));
+}
+
+#[test]
+fn m2d_skip_reference_sample_matches_default_on_zero_reference() {
+    let instrs = parse_lines("R 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(1, &[true]);
+    let default_out = measurements_to_detections(&instrs, &meas).unwrap();
+    let skipped_out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        None,
+        M2dOptions {
+            reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
+            ran_without_feedback: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(default_out.detections.get(0, 0), skipped_out.detections.get(0, 0));
 }
 
 #[test]

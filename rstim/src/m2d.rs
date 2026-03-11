@@ -1,10 +1,25 @@
+use crate::data_path::{build_reference_sample, ReferenceSampleMode};
 use crate::ir::{StimInstr, StimTarget};
-use crate::executor::reference_sample;
 use crate::sim::bit_table::BitTable;
 
 pub struct M2dOutput {
     pub detections: BitTable,
     pub observable_flips: BitTable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct M2dOptions {
+    pub reference_sample_mode: ReferenceSampleMode,
+    pub ran_without_feedback: bool,
+}
+
+impl Default for M2dOptions {
+    fn default() -> Self {
+        Self {
+            reference_sample_mode: ReferenceSampleMode::SimulateNoiseless,
+            ran_without_feedback: false,
+        }
+    }
 }
 
 /// Convert raw measurement bits to detection events.
@@ -14,7 +29,21 @@ pub fn measurements_to_detections(
     instrs: &[StimInstr],
     meas_table: &BitTable,
 ) -> Result<M2dOutput, String> {
-    let reference = reference_sample(instrs)?;
+    measurements_to_detections_with_options(instrs, meas_table, None, M2dOptions::default())
+}
+
+pub fn measurements_to_detections_with_options(
+    instrs: &[StimInstr],
+    meas_table: &BitTable,
+    _sweep_table: Option<&BitTable>,
+    options: M2dOptions,
+) -> Result<M2dOutput, String> {
+    let reference = match options.reference_sample_mode {
+        ReferenceSampleMode::SimulateNoiseless => {
+            build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?
+        }
+        ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
+    };
     let n_meas = reference.len();
     let n_shots = meas_table.num_minor();
 

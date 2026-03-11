@@ -6,7 +6,7 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
-use crate::m2d::measurements_to_detections;
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
@@ -120,6 +120,8 @@ pub enum Commands {
         out: Option<String>,
         #[arg(long = "append_observables")]
         append_observables: bool,
+        #[arg(long = "skip_reference_sample")]
+        skip_reference_sample: bool,
         #[arg(long)]
         shots: Option<usize>,
     },
@@ -225,11 +227,37 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let mut w = open_output(out.as_deref())?;
             run_convert(&data, &in_format, &out_format, bits, circuit.as_deref(), shots, &mut w)
         }
-        Some(Commands::M2d { in_format, out_format, circuit, r#in, out, append_observables, shots }) => {
+        Some(Commands::M2d {
+            in_format,
+            out_format,
+            circuit,
+            r#in,
+            out,
+            append_observables,
+            skip_reference_sample,
+            shots,
+        }) => {
             let circ_text = read_input(circuit.as_deref())?;
             let data = read_input_bytes(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_m2d(&circ_text, &data, &in_format, &out_format, shots, append_observables, &mut w)
+            let options = M2dOptions {
+                reference_sample_mode: if skip_reference_sample {
+                    crate::data_path::ReferenceSampleMode::AssumeAllZero
+                } else {
+                    crate::data_path::ReferenceSampleMode::SimulateNoiseless
+                },
+                ran_without_feedback: false,
+            };
+            run_m2d_with_options(
+                &circ_text,
+                &data,
+                &in_format,
+                &out_format,
+                shots,
+                options,
+                append_observables,
+                &mut w,
+            )
         }
         Some(Commands::ExplainErrors { r#in, in_format, circuit, dem, out }) => {
             let det_data = read_input_bytes(r#in.as_deref())?;
@@ -545,6 +573,27 @@ pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {
     }
 }
 
+fn read_table_from_format(
+    data: &[u8],
+    format: &str,
+    bits: usize,
+    shots: Option<usize>,
+) -> Result<BitTable, String> {
+    use crate::output::*;
+
+    match format {
+        "01" => read_shots_01(data, bits),
+        "b8" => read_shots_b8(data, bits),
+        "r8" => read_shots_r8(data, bits),
+        "hits" => read_shots_hits(data, bits),
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, bits, n)
+        }
+        _ => Err(format!("unknown in_format: {format}")),
+    }
+}
+
 pub fn run_convert(
     data: &[u8],
     in_format: &str,
@@ -564,17 +613,7 @@ pub fn run_convert(
         return Err("--bits or --circuit required for convert".to_string());
     };
 
-    let table = match in_format {
-        "01" => read_shots_01(data, n_bits)?,
-        "b8" => read_shots_b8(data, n_bits)?,
-        "r8" => read_shots_r8(data, n_bits)?,
-        "hits" => read_shots_hits(data, n_bits)?,
-        "ptb64" => {
-            let n = shots.ok_or("--shots required for ptb64 input")?;
-            read_shots_ptb64(data, n_bits, n)?
-        }
-        _ => return Err(format!("unknown in_format: {in_format}")),
-    };
+    let table = read_table_from_format(data, in_format, n_bits, shots)?;
 
     match out_format {
         "01" => write_shots_01(&table, out),
@@ -595,23 +634,32 @@ pub fn run_m2d(
     append_observables: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
-    use crate::output::*;
+    run_m2d_with_options(
+        circuit_text,
+        data,
+        in_format,
+        out_format,
+        shots,
+        M2dOptions::default(),
+        append_observables,
+        out,
+    )
+}
+
+pub fn run_m2d_with_options(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    options: M2dOptions,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
     let n_meas = crate::stats::num_measurements(&instrs);
-
-    let meas_table = match in_format {
-        "01" => read_shots_01(data, n_meas)?,
-        "b8" => read_shots_b8(data, n_meas)?,
-        "r8" => read_shots_r8(data, n_meas)?,
-        "hits" => read_shots_hits(data, n_meas)?,
-        "ptb64" => {
-            let n = shots.ok_or("--shots required for ptb64 input")?;
-            read_shots_ptb64(data, n_meas, n)?
-        }
-        _ => return Err(format!("unknown in_format: {in_format}")),
-    };
-
-    let result = measurements_to_detections(&instrs, &meas_table)?;
+    let meas_table = read_table_from_format(data, in_format, n_meas, shots)?;
+    let result = measurements_to_detections_with_options(&instrs, &meas_table, None, options)?;
     let fmt = OutputFormat::from_str(out_format)?;
 
     match fmt {

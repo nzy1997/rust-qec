@@ -253,6 +253,28 @@ fn run_detect_via_dispatch_accepts_obs_out() {
 }
 
 #[test]
+fn run_m2d_dispatch_accepts_skip_reference_sample() {
+    use clap::Parser;
+    let cli = cli::Cli::try_parse_from([
+        "rstim",
+        "m2d",
+        "--circuit",
+        "test.stim",
+        "--in",
+        "shots.01",
+        "--skip_reference_sample",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Some(cli::Commands::M2d {
+            skip_reference_sample: true,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn run_analyze_errors_via_dispatch() {
     use clap::Parser;
     let dir = tempfile::tempdir().unwrap();
