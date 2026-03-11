@@ -189,6 +189,30 @@ fn run_sample_via_dispatch() {
 }
 
 #[test]
+fn run_sample_via_dispatch_accepts_skip_reference_sample() {
+    use clap::Parser;
+    let cli = cli::Cli::try_parse_from([
+        "rstim",
+        "sample",
+        "--shots",
+        "1",
+        "--skip_reference_sample",
+        "--in",
+        "test.stim",
+        "--out",
+        "out.txt",
+    ])
+    .unwrap();
+    assert!(matches!(
+        cli.command,
+        Some(cli::Commands::Sample {
+            skip_reference_sample: true,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn run_detect_via_dispatch() {
     use clap::Parser;
     let dir = tempfile::tempdir().unwrap();
@@ -262,7 +286,7 @@ fn run_sample_dem_with_obs_via_dispatch() {
 #[test]
 fn run_sample_01() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nX 0\nM 0", 2, "01", Some(42), &mut buf).unwrap();
+    cli::run_sample("R 0\nX 0\nM 0", 2, "01", Some(42), false, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s, "1\n1\n");
 }
@@ -270,28 +294,28 @@ fn run_sample_01() {
 #[test]
 fn run_sample_b8() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nX 0\nM 0", 1, "b8", Some(42), &mut buf).unwrap();
+    cli::run_sample("R 0\nX 0\nM 0", 1, "b8", Some(42), false, &mut buf).unwrap();
     assert_eq!(buf, vec![0x01]);
 }
 
 #[test]
 fn run_sample_r8() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nX 0\nM 0", 1, "r8", Some(42), &mut buf).unwrap();
+    cli::run_sample("R 0\nX 0\nM 0", 1, "r8", Some(42), false, &mut buf).unwrap();
     assert_eq!(buf, vec![0, 0]);
 }
 
 #[test]
 fn run_sample_hits() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nX 0\nM 0", 1, "hits", Some(42), &mut buf).unwrap();
+    cli::run_sample("R 0\nX 0\nM 0", 1, "hits", Some(42), false, &mut buf).unwrap();
     assert_eq!(String::from_utf8(buf).unwrap(), "0\n");
 }
 
 #[test]
 fn run_sample_dets_rejected() {
     let mut buf = Vec::new();
-    let err = cli::run_sample("R 0\nM 0", 1, "dets", Some(42), &mut buf);
+    let err = cli::run_sample("R 0\nM 0", 1, "dets", Some(42), false, &mut buf);
     assert!(err.is_err());
     assert!(err.unwrap_err().contains("dets"));
 }
@@ -299,14 +323,14 @@ fn run_sample_dets_rejected() {
 #[test]
 fn run_sample_invalid_format() {
     let mut buf = Vec::new();
-    let err = cli::run_sample("R 0\nM 0", 1, "bad", Some(42), &mut buf);
+    let err = cli::run_sample("R 0\nM 0", 1, "bad", Some(42), false, &mut buf);
     assert!(err.is_err());
 }
 
 #[test]
 fn run_sample_noiseless() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nM 0", 3, "01", Some(42), &mut buf).unwrap();
+    cli::run_sample("R 0\nM 0", 3, "01", Some(42), false, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s, "0\n0\n0\n");
 }
@@ -315,15 +339,15 @@ fn run_sample_noiseless() {
 fn run_sample_seed_deterministic() {
     let mut buf1 = Vec::new();
     let mut buf2 = Vec::new();
-    cli::run_sample("H 0\nM 0", 10, "01", Some(99), &mut buf1).unwrap();
-    cli::run_sample("H 0\nM 0", 10, "01", Some(99), &mut buf2).unwrap();
+    cli::run_sample("H 0\nM 0", 10, "01", Some(99), false, &mut buf1).unwrap();
+    cli::run_sample("H 0\nM 0", 10, "01", Some(99), false, &mut buf2).unwrap();
     assert_eq!(buf1, buf2);
 }
 
 #[test]
 fn run_sample_no_seed() {
     let mut buf = Vec::new();
-    cli::run_sample("R 0\nM 0", 1, "01", None, &mut buf).unwrap();
+    cli::run_sample("R 0\nM 0", 1, "01", None, false, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.trim() == "0" || s.trim() == "1");
 }

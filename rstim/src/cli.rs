@@ -11,7 +11,7 @@ use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
 use crate::parser::parse_lines;
-use crate::sampler::sample_batch;
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -35,6 +35,8 @@ pub enum Commands {
         out: Option<String>,
         #[arg(long)]
         seed: Option<u64>,
+        #[arg(long = "skip_reference_sample")]
+        skip_reference_sample: bool,
     },
     /// Sample detection events and observable flips from a circuit
     Detect {
@@ -153,10 +155,17 @@ pub enum Commands {
 
 pub fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
-        Some(Commands::Sample { shots, out_format, r#in, out, seed }) => {
+        Some(Commands::Sample { shots, out_format, r#in, out, seed, skip_reference_sample }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_sample(&text, shots.unwrap_or(1) as usize, &out_format, seed, &mut w)
+            run_sample(
+                &text,
+                shots.unwrap_or(1) as usize,
+                &out_format,
+                seed,
+                skip_reference_sample,
+                &mut w,
+            )
         }
         Some(Commands::Detect { shots, out_format, r#in, out, seed, append_observables }) => {
             let text = read_input(r#in.as_deref())?;
@@ -315,12 +324,20 @@ pub fn run_sample(
     shots: usize,
     out_format: &str,
     seed: Option<u64>,
+    skip_reference_sample: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let fmt = OutputFormat::from_str(out_format)?;
     let instrs = parse_lines(circuit_text)?;
     let mut rng = make_rng(seed);
-    let result = sample_batch(&instrs, shots, &mut rng)?;
+    let options = SampleOptions {
+        reference_sample_mode: if skip_reference_sample {
+            crate::data_path::ReferenceSampleMode::AssumeAllZero
+        } else {
+            crate::data_path::ReferenceSampleMode::SimulateNoiseless
+        },
+    };
+    let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
     match fmt {
         OutputFormat::Dets => Err("dets format not applicable to sample command; use detect".to_string()),
         _ => write_format(fmt, &result.measurements, out),
