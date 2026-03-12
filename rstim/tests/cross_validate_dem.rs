@@ -132,8 +132,8 @@ fn stim_analyze_errors_propagates_failure_output() {
 
 #[test]
 #[cfg(not(tarpaulin))]
-#[ignore] // requires stim CLI: pip install stim
 fn cross_validate_decomposed_dem_rep_code() {
+    let _guard = stim_env_lock().lock().unwrap();
     let circuit = repetition_code_memory(5, 3, 0.01);
     let circuit_text = circuit_to_string(&circuit);
 
@@ -155,8 +155,8 @@ fn cross_validate_decomposed_dem_rep_code() {
 
 #[test]
 #[cfg(not(tarpaulin))]
-#[ignore] // requires stim CLI: pip install stim
 fn cross_validate_surface_code_dem() {
+    let _guard = stim_env_lock().lock().unwrap();
     let circuit_text = std::fs::read_to_string("../drafts/surface_code_rotated_memory_x_5_0.01.stim")
         .expect("missing ../drafts/surface_code_rotated_memory_x_5_0.01.stim");
     let instrs = parse_lines(&circuit_text).unwrap();
@@ -204,8 +204,8 @@ fn cross_validate_surface_code_dem() {
 
 #[test]
 #[cfg(not(tarpaulin))]
-#[ignore] // requires stim CLI: pip install stim
 fn cross_validate_rep_code_dem_probabilities() {
+    let _guard = stim_env_lock().lock().unwrap();
     let circuit = repetition_code_memory(5, 3, 0.01);
     let circuit_text = circuit_to_string(&circuit);
 
