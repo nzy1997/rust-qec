@@ -442,10 +442,17 @@ impl Executor {
 // --- reference_sample: noiseless biased simulation ---
 
 pub fn reference_sample(instrs: &[StimInstr]) -> Result<Vec<bool>, String> {
+    reference_sample_with_sweep_bits(instrs, None)
+}
+
+pub fn reference_sample_with_sweep_bits(
+    instrs: &[StimInstr],
+    sweep_bits: Option<&[bool]>,
+) -> Result<Vec<bool>, String> {
     let n = max_qubit(instrs)?;
     let mut state = StabilizerState::new(n);
     let mut measurements = Vec::new();
-    ref_sample_instrs(&mut state, &mut measurements, instrs)?;
+    ref_sample_instrs(&mut state, &mut measurements, instrs, sweep_bits)?;
     Ok(measurements)
 }
 
@@ -453,15 +460,16 @@ fn ref_sample_instrs(
     state: &mut StabilizerState,
     measurements: &mut Vec<bool>,
     instrs: &[StimInstr],
+    sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     for instr in instrs {
         match instr {
             StimInstr::Op { name, args, targets, .. } => {
-                ref_sample_op(state, measurements, name.as_str(), args, targets)?;
+                ref_sample_op(state, measurements, name.as_str(), args, targets, sweep_bits)?;
             }
             StimInstr::Repeat { count, body } => {
                 for _ in 0..*count {
-                    ref_sample_instrs(state, measurements, body)?;
+                    ref_sample_instrs(state, measurements, body, sweep_bits)?;
                 }
             }
         }
@@ -475,6 +483,7 @@ fn ref_sample_op(
     name: &str,
     _args: &[f64],
     targets: &[StimTarget],
+    sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     match name {
         // Identity
@@ -507,13 +516,13 @@ fn ref_sample_op(
 
         // Two-qubit Cliffords
         "CX" | "CNOT" | "ZCX" => {
-            for (c, t) in qubit_pairs(targets)? { state.cx(c, t); }
+            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
         }
         "CY" | "ZCY" => {
-            for (c, t) in qubit_pairs(targets)? { state.cy(c, t); }
+            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
         }
         "CZ" | "ZCZ" => {
-            for (a, b) in qubit_pairs(targets)? { state.cz(a, b); }
+            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
         }
         "XCX" => {
             for (a, b) in qubit_pairs(targets)? { state.xcx(a, b); }
@@ -692,6 +701,47 @@ fn ref_sample_op(
         | "DETECTOR" | "OBSERVABLE_INCLUDE" => {}
 
         _ => return Err(format!("reference_sample: unsupported instruction {}", name)),
+    }
+    Ok(())
+}
+
+fn apply_reference_controlled_pairs(
+    state: &mut StabilizerState,
+    name: &str,
+    targets: &[StimTarget],
+    sweep_bits: Option<&[bool]>,
+) -> Result<(), String> {
+    if targets.len() % 2 != 0 {
+        return Err("odd number of targets".to_string());
+    }
+    let mut it = targets.iter();
+    while let (Some(a), Some(b)) = (it.next(), it.next()) {
+        match (a, b) {
+            (StimTarget::Qubit(c), StimTarget::Qubit(t)) => match name {
+                "CX" | "CNOT" | "ZCX" => state.cx(*c as usize, *t as usize),
+                "CY" | "ZCY" => state.cy(*c as usize, *t as usize),
+                "CZ" | "ZCZ" => state.cz(*c as usize, *t as usize),
+                _ => return Err(format!("unsupported reference pair op {name}")),
+            },
+            (StimTarget::Sweep(k), StimTarget::Qubit(q)) => {
+                let active = sweep_bits
+                    .and_then(|bits| bits.get(*k as usize))
+                    .copied()
+                    .unwrap_or(false);
+                if active {
+                    match name {
+                        "CX" | "CNOT" | "ZCX" => state.x_gate(*q as usize),
+                        "CY" | "ZCY" => state.y_gate(*q as usize),
+                        "CZ" | "ZCZ" => state.z_gate(*q as usize),
+                        _ => return Err(format!("unsupported reference pair op {name}")),
+                    }
+                }
+            }
+            (StimTarget::Sweep(_), _) | (_, StimTarget::Sweep(_)) => {
+                return Err("unsupported sweep target placement".to_string());
+            }
+            _ => return Err("expected qubit target in pair".to_string()),
+        }
     }
     Ok(())
 }

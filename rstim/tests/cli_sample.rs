@@ -71,3 +71,16 @@ fn sample_seed_deterministic() {
     let out2 = run_with_stdin(&["sample", "--shots", "10", "--seed", "42"], "H 0\nM 0");
     assert_eq!(out1.stdout, out2.stdout);
 }
+
+#[test]
+fn sample_skip_reference_sample_matches_default_on_zero_reference() {
+    let circuit = "R 0\nM 0\n";
+    let default_out = run_with_stdin(&["sample", "--shots", "5", "--seed", "42"], circuit);
+    let skipped_out = run_with_stdin(
+        &["sample", "--shots", "5", "--seed", "42", "--skip_reference_sample"],
+        circuit,
+    );
+    assert!(default_out.status.success());
+    assert!(skipped_out.status.success(), "stderr: {}", String::from_utf8_lossy(&skipped_out.stderr));
+    assert_eq!(default_out.stdout, skipped_out.stdout);
+}

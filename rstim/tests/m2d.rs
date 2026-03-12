@@ -1,7 +1,8 @@
+use rstim::data_path::ReferenceSampleMode;
 use rstim::parser::parse_lines;
-use rstim::m2d::measurements_to_detections;
+use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
 use rstim::sim::bit_table::BitTable;
-use rstim::cli::run_m2d;
+use rstim::cli::{run_m2d, run_m2d_with_options};
 
 fn single_shot_table(bits: usize, vals: &[bool]) -> BitTable {
     let mut t = BitTable::new(bits, 1);
@@ -79,6 +80,91 @@ fn m2d_multiple_shots() {
     assert!(!out.detections.get(0, 0));
     assert!(out.detections.get(0, 1));
     assert!(!out.detections.get(0, 2));
+}
+
+#[test]
+fn m2d_skip_reference_sample_matches_default_on_zero_reference() {
+    let instrs = parse_lines("R 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(1, &[true]);
+    let default_out = measurements_to_detections(&instrs, &meas).unwrap();
+    let skipped_out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        None,
+        M2dOptions {
+            reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
+            ran_without_feedback: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(default_out.detections.get(0, 0), skipped_out.detections.get(0, 0));
+}
+
+#[test]
+fn m2d_sweep_controlled_reference_is_evaluated_per_shot() {
+    let instrs = parse_lines("R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let mut meas = BitTable::new(1, 2);
+    meas.set(0, 1, true);
+
+    let mut sweep = BitTable::new(1, 2);
+    sweep.set(0, 1, true);
+
+    let out = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default()).unwrap();
+    assert!(!out.detections.get(0, 0));
+    assert!(!out.detections.get(0, 1));
+}
+
+#[test]
+fn m2d_sweep_shot_count_mismatch_errors() {
+    let instrs = parse_lines("R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(1, &[false]);
+    let sweep = BitTable::new(1, 2);
+    let err = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default())
+        .err()
+        .unwrap();
+    assert!(err.contains("sweep shots"));
+}
+
+#[test]
+fn m2d_ran_without_feedback_compensates_simple_classical_x_feedback() {
+    let instrs = parse_lines(
+        "R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
+    let meas = single_shot_table(2, &[true, false]);
+    let out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        None,
+        M2dOptions {
+            ran_without_feedback: true,
+            ..M2dOptions::default()
+        },
+    )
+    .unwrap();
+    assert!(!out.detections.get(0, 0));
+}
+
+#[test]
+fn run_m2d_with_options_matches_default_wrapper() {
+    let circuit = "R 0\nM 0\nDETECTOR rec[-1]";
+    let data = b"1\n";
+    let mut wrapped = Vec::new();
+    let mut explicit = Vec::new();
+    run_m2d(circuit, data, "01", "01", None, false, &mut wrapped).unwrap();
+    run_m2d_with_options(
+        circuit,
+        data,
+        "01",
+        "01",
+        None,
+        M2dOptions::default(),
+        false,
+        &mut explicit,
+    )
+    .unwrap();
+    assert_eq!(wrapped, explicit);
 }
 
 #[test]

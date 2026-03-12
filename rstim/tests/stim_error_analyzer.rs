@@ -5,7 +5,7 @@
 /// composite DEPOLARIZE2 analysis, reversed operation order, MPP ordering,
 /// duplicate records, exact pauli_channel_1, and gauge detection.
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
-use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::error_analyzer::{AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -18,6 +18,21 @@ fn circuit_to_dem(circuit_str: &str) -> DetectorErrorModel {
 fn circuit_to_dem_err(circuit_str: &str) -> Result<DetectorErrorModel, String> {
     let instrs = parse_lines(circuit_str).unwrap();
     ErrorAnalyzer::circuit_to_dem(&instrs)
+}
+
+fn circuit_to_dem_with_options(
+    circuit_str: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+) -> Result<DetectorErrorModel, String> {
+    let instrs = parse_lines(circuit_str).unwrap();
+    ErrorAnalyzer::circuit_to_dem_with_options(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors,
+            allow_gauge_detectors,
+        },
+    )
 }
 
 fn error_count(dem: &DetectorErrorModel) -> usize {
@@ -103,13 +118,11 @@ fn stim_z_error_no_detection_in_z_basis() {
 #[test]
 fn stim_depolarize1_approx_prob() {
     // DEPOLARIZE1(0.25) on qubit measured in Z basis:
-    // X and Y flip the measurement → combined probability ≈ 2/3 * 0.25 ≈ 0.1667
+    // X and Y flip the measurement → combined probability = 2/3 * 0.25 ≈ 0.1667
     let dem = circuit_to_dem("DEPOLARIZE1(0.25) 3\nM 3\nDETECTOR rec[-1]");
-    // Should have two independent error terms (X contribution p/3 and Y contribution p/3)
-    // which the error analyzer produces as separate errors, each with prob 0.25/3 ≈ 0.0833
-    assert!(error_count(&dem) >= 1);
-    // Check that there's an error near p/3 = 0.08333
-    assert_has_error_approx(&dem, 0.25 / 3.0, 1e-6, &[DemTarget::Detector(0)]);
+    assert_eq!(error_count(&dem), 1);
+    // X and Y are mutually exclusive within the channel, so probabilities add: 2*p/3
+    assert_has_error_approx(&dem, 2.0 * 0.25 / 3.0, 1e-6, &[DemTarget::Detector(0)]);
 }
 
 #[test]
@@ -319,73 +332,85 @@ fn stim_c_zyx_then_c_xyz() {
 // marked #[ignore]. They document the expected Stim behavior for future work.
 
 #[test]
-#[ignore = "rstim does not yet detect gauge observables"]
 fn stim_detect_gauge_observable() {
     let result = circuit_to_dem_err("R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]");
     assert!(result.is_err(), "expected error for gauge observable");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_r_h_m() {
     let result = circuit_to_dem_err("R 0\nH 0\nM 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_m_h_m() {
     let result = circuit_to_dem_err("M 0\nH 0\nM 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mz_mx() {
     let result = circuit_to_dem_err("MZ 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_my_mx() {
     let result = circuit_to_dem_err("MY 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mx_mz() {
     let result = circuit_to_dem_err("MX 0\nMZ 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_rx_mz() {
     let result = circuit_to_dem_err("RX 0\nMZ 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_ry_mx() {
     let result = circuit_to_dem_err("RY 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_rz_mx() {
     let result = circuit_to_dem_err("RZ 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
 }
 
 #[test]
-#[ignore = "rstim does not yet detect gauge detectors"]
 fn stim_detect_gauge_detector_mx_no_reset() {
     let result = circuit_to_dem_err("MX 0\nDETECTOR rec[-1]");
     assert!(result.is_err(), "expected error for gauge detector");
+}
+
+#[test]
+fn stim_detect_gauge_detector_allowed_with_option() {
+    let dem = circuit_to_dem_with_options(
+        "R 0\nH 0\nM 0\nDETECTOR rec[-1]",
+        false,
+        true,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
+}
+
+#[test]
+fn stim_detect_gauge_observable_allowed_with_option() {
+    let dem = circuit_to_dem_with_options(
+        "R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+        false,
+        true,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
 }
 
 // ── composite_error_analysis ─────────────────────────────────────────────────
@@ -463,16 +488,11 @@ fn stim_triple_records_same_as_single() {
 #[test]
 fn stim_pauli_channel_1_exact() {
     // PAULI_CHANNEL_1(0.1, 0.2, 0.15) on a qubit measured in Z basis.
-    // X and Y flip the Z measurement. The error analyzer treats them as independent
-    // channels with probabilities px=0.1, py=0.2 (both flip), pz=0.15 (doesn't flip).
-    // rstim produces separate error entries for X and Y contributions.
+    // X and Y flip the Z measurement. They are mutually exclusive within the
+    // channel, so probabilities add: 0.1 + 0.2 = 0.3.
     let dem = circuit_to_dem("R 0\nPAULI_CHANNEL_1(0.1,0.2,0.15) 0\nM 0\nDETECTOR rec[-1]");
-    // Should have errors for px (X) and py (Y), both with target D0
-    assert!(error_count(&dem) >= 1);
-    // Check the X contribution
-    assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
-    // Check the Y contribution
-    assert_has_error(&dem, 0.2, &[DemTarget::Detector(0)]);
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.3, &[DemTarget::Detector(0)]);
 }
 
 // ── measure_pauli_product_4body ──────────────────────────────────────────────
@@ -586,12 +606,13 @@ fn stim_depolarize2_after_h_cnot() {
     );
     // Should produce all 15 non-identity 2-qubit Pauli error terms
     assert_eq!(error_count(&dem), 15);
-    // Each should have probability ~0.25/15 ≈ 0.01667
+    // Each should have the independent per-channel probability
+    let expected = 0.5 - 0.5 * (1.0 - 16.0 * 0.25 / 15.0_f64).powf(0.125);
     for instr in dem.instructions() {
         if let DemInstruction::Error { probability, .. } = instr {
             assert!(
-                (*probability - 0.25 / 15.0).abs() < 1e-6,
-                "expected prob ~0.01667 but got {probability}"
+                (*probability - expected).abs() < 1e-10,
+                "expected prob ~{expected} but got {probability}"
             );
         }
     }
@@ -609,19 +630,34 @@ fn stim_depolarize2_cnot_basis_change_same_errors() {
     assert_eq!(error_count(&dem1), error_count(&dem2));
 }
 
-// ── Measurement before beginning should error ────────────────────────────────
-
 #[test]
-#[should_panic]
-fn stim_measurement_before_beginning_detector() {
-    // DETECTOR rec[-1] without any prior measurement should panic/error
-    let _ = circuit_to_dem("DETECTOR rec[-1]");
+fn stim_depolarize1_overmix_rejected() {
+    let result = circuit_to_dem_err("DEPOLARIZE1(0.76) 0\nM 0\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("DEPOLARIZE1"));
 }
 
 #[test]
-#[should_panic]
+fn stim_depolarize2_overmix_rejected() {
+    let result = circuit_to_dem_err("DEPOLARIZE2(0.94) 0 1\nM 0 1\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("DEPOLARIZE2"));
+}
+
+// ── Measurement before beginning should error ────────────────────────────────
+
+#[test]
+fn stim_measurement_before_beginning_detector() {
+    let result = circuit_to_dem_err("DETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("rec"));
+}
+
+#[test]
 fn stim_measurement_before_beginning_observable() {
-    let _ = circuit_to_dem("OBSERVABLE_INCLUDE(0) rec[-1]");
+    let result = circuit_to_dem_err("OBSERVABLE_INCLUDE(0) rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("rec"));
 }
 
 // ── MPAD basic ───────────────────────────────────────────────────────────────
@@ -659,11 +695,11 @@ fn stim_i_error_and_ii_error_noop() {
 
 #[test]
 fn stim_depolarize1_x_basis() {
-    // RX qubit, DEPOLARIZE1, MX → Y and Z components flip
+    // RX qubit, DEPOLARIZE1, MX → Y and Z components flip X measurement
     let dem = circuit_to_dem("RX 0\nDEPOLARIZE1(0.03) 0\nMX 0\nDETECTOR rec[-1]");
-    // Z and Y flip the X measurement. Each has prob 0.01.
-    assert!(error_count(&dem) >= 2);
-    assert_has_error(&dem, 0.01, &[DemTarget::Detector(0)]);
+    // Y and Z flip the X measurement. Each has prob p/3 = 0.01. Mutually exclusive → add: 0.02
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.02, &[DemTarget::Detector(0)]);
 }
 
 // ── PAULI_CHANNEL_1 Y only ──────────────────────────────────────────────────
@@ -682,4 +718,79 @@ fn stim_pauli_channel_1_z_in_x_basis() {
     let dem = circuit_to_dem("RX 0\nPAULI_CHANNEL_1(0,0,0.1) 0\nMX 0\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_pauli_channel_2_rejected_by_default() {
+    let result = circuit_to_dem_err(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("PAULI_CHANNEL_2"));
+}
+
+#[test]
+fn stim_pauli_channel_2_allowed_with_approximation_option() {
+    let dem = circuit_to_dem_with_options(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.01, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_else_correlated_error_without_leader_is_rejected() {
+    let result = circuit_to_dem_err("ELSE_CORRELATED_ERROR(0.25) X0\nM 0\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("ELSE_CORRELATED_ERROR"));
+}
+
+#[test]
+fn stim_correlated_error_two_branch_block_is_mutually_exclusive() {
+    let dem = circuit_to_dem(
+        "E(0.25) X0\nELSE_CORRELATED_ERROR(0.5) X0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error(&dem, 0.625, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_correlated_error_three_branch_block_rejected_by_default() {
+    let result = circuit_to_dem_err(
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("approximation"));
+}
+
+#[test]
+fn stim_correlated_error_three_branch_block_allowed_with_approximation_option() {
+    let dem = circuit_to_dem_with_options(
+        "E(0.1) X0\nELSE_CORRELATED_ERROR(0.2) Z0\nELSE_CORRELATED_ERROR(0.3) Y0\nM 0\nDETECTOR rec[-1]",
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.316, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
+    let instrs = parse_lines(
+        "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
+    )
+    .unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors: true,
+            allow_gauge_detectors: false,
+        },
+    )
+    .unwrap();
+    assert!(dem.to_string().contains("error("));
 }

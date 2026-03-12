@@ -6,12 +6,12 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
-use crate::m2d::measurements_to_detections;
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64,
 };
 use crate::parser::parse_lines;
-use crate::sampler::sample_batch;
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -35,6 +35,8 @@ pub enum Commands {
         out: Option<String>,
         #[arg(long)]
         seed: Option<u64>,
+        #[arg(long = "skip_reference_sample")]
+        skip_reference_sample: bool,
     },
     /// Sample detection events and observable flips from a circuit
     Detect {
@@ -50,6 +52,10 @@ pub enum Commands {
         seed: Option<u64>,
         #[arg(long = "append_observables")]
         append_observables: bool,
+        #[arg(long = "obs_out")]
+        obs_out: Option<String>,
+        #[arg(long = "obs_out_format", default_value = "01")]
+        obs_out_format: String,
     },
     /// Convert a circuit into a detector error model
     #[command(name = "analyze_errors")]
@@ -58,6 +64,12 @@ pub enum Commands {
         r#in: Option<String>,
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "approximate_disjoint_errors")]
+        approximate_disjoint_errors: bool,
+        #[arg(long = "allow_gauge_detectors")]
+        allow_gauge_detectors: bool,
+        #[arg(long = "decompose_errors")]
+        decompose_errors: bool,
     },
     /// Generate a common QEC circuit
     #[command(name = "gen")]
@@ -108,6 +120,14 @@ pub enum Commands {
         out: Option<String>,
         #[arg(long = "append_observables")]
         append_observables: bool,
+        #[arg(long = "skip_reference_sample")]
+        skip_reference_sample: bool,
+        #[arg(long = "sweep")]
+        sweep: Option<String>,
+        #[arg(long = "sweep_format", default_value = "01")]
+        sweep_format: String,
+        #[arg(long = "ran_without_feedback")]
+        ran_without_feedback: bool,
         #[arg(long)]
         shots: Option<usize>,
     },
@@ -147,20 +167,62 @@ pub enum Commands {
 
 pub fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
-        Some(Commands::Sample { shots, out_format, r#in, out, seed }) => {
+        Some(Commands::Sample { shots, out_format, r#in, out, seed, skip_reference_sample }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_sample(&text, shots.unwrap_or(1) as usize, &out_format, seed, &mut w)
+            run_sample(
+                &text,
+                shots.unwrap_or(1) as usize,
+                &out_format,
+                seed,
+                skip_reference_sample,
+                &mut w,
+            )
         }
-        Some(Commands::Detect { shots, out_format, r#in, out, seed, append_observables }) => {
+        Some(Commands::Detect {
+            shots,
+            out_format,
+            r#in,
+            out,
+            seed,
+            append_observables,
+            obs_out,
+            obs_out_format,
+        }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_detect(&text, shots.unwrap_or(1) as usize, &out_format, seed, append_observables, &mut w)
+            if let Some(obs_path) = obs_out.as_deref() {
+                let mut obs_w = open_output(Some(obs_path))?;
+                run_detect_with_obs(
+                    &text,
+                    shots.unwrap_or(1) as usize,
+                    &out_format,
+                    seed,
+                    append_observables,
+                    &mut w,
+                    &mut obs_w,
+                    &obs_out_format,
+                )
+            } else {
+                run_detect(&text, shots.unwrap_or(1) as usize, &out_format, seed, append_observables, &mut w)
+            }
         }
-        Some(Commands::AnalyzeErrors { r#in, out }) => {
+        Some(Commands::AnalyzeErrors {
+            r#in,
+            out,
+            approximate_disjoint_errors,
+            allow_gauge_detectors,
+            decompose_errors,
+        }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
-            run_analyze_errors(&text, &mut w)
+            run_analyze_errors_with_flags(
+                &text,
+                approximate_disjoint_errors,
+                allow_gauge_detectors,
+                decompose_errors,
+                &mut w,
+            )
         }
         Some(Commands::Gen { code, task, distance, rounds, noise, out }) => {
             let mut w = open_output(out.as_deref())?;
@@ -171,11 +233,45 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let mut w = open_output(out.as_deref())?;
             run_convert(&data, &in_format, &out_format, bits, circuit.as_deref(), shots, &mut w)
         }
-        Some(Commands::M2d { in_format, out_format, circuit, r#in, out, append_observables, shots }) => {
+        Some(Commands::M2d {
+            in_format,
+            out_format,
+            circuit,
+            r#in,
+            out,
+            append_observables,
+            skip_reference_sample,
+            sweep,
+            sweep_format,
+            ran_without_feedback,
+            shots,
+        }) => {
             let circ_text = read_input(circuit.as_deref())?;
             let data = read_input_bytes(r#in.as_deref())?;
+            let sweep_data = sweep
+                .as_deref()
+                .map(|path| read_input_bytes(Some(path)))
+                .transpose()?;
             let mut w = open_output(out.as_deref())?;
-            run_m2d(&circ_text, &data, &in_format, &out_format, shots, append_observables, &mut w)
+            let options = M2dOptions {
+                reference_sample_mode: if skip_reference_sample {
+                    crate::data_path::ReferenceSampleMode::AssumeAllZero
+                } else {
+                    crate::data_path::ReferenceSampleMode::SimulateNoiseless
+                },
+                ran_without_feedback,
+            };
+            run_m2d_impl(
+                &circ_text,
+                &data,
+                &in_format,
+                &out_format,
+                shots,
+                sweep_data.as_deref().map(|data| (data, sweep_format.as_str())),
+                options,
+                append_observables,
+                &mut w,
+            )
         }
         Some(Commands::ExplainErrors { r#in, in_format, circuit, dem, out }) => {
             let det_data = read_input_bytes(r#in.as_deref())?;
@@ -271,6 +367,33 @@ pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable
     merged
 }
 
+fn write_detection_outputs(
+    detections: &BitTable,
+    observable_flips: &BitTable,
+    fmt: OutputFormat,
+    append_observables: bool,
+    out: &mut dyn Write,
+    obs_out: Option<(&mut dyn Write, OutputFormat)>,
+) -> Result<(), String> {
+    match fmt {
+        OutputFormat::Dets => {
+            write_shots_dets(detections, observable_flips, out).map_err(|e| format!("write error: {e}"))?;
+        }
+        _ => {
+            if append_observables {
+                let merged = merge_detections_observables(detections, observable_flips);
+                write_format(fmt, &merged, out)?;
+            } else {
+                write_format(fmt, detections, out)?;
+            }
+        }
+    }
+    if let Some((obs_writer, obs_fmt)) = obs_out {
+        write_format(obs_fmt, observable_flips, obs_writer)?;
+    }
+    Ok(())
+}
+
 pub fn run_gen(
     code: &str,
     task: &str,
@@ -297,12 +420,20 @@ pub fn run_sample(
     shots: usize,
     out_format: &str,
     seed: Option<u64>,
+    skip_reference_sample: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let fmt = OutputFormat::from_str(out_format)?;
     let instrs = parse_lines(circuit_text)?;
     let mut rng = make_rng(seed);
-    let result = sample_batch(&instrs, shots, &mut rng)?;
+    let options = SampleOptions {
+        reference_sample_mode: if skip_reference_sample {
+            crate::data_path::ReferenceSampleMode::AssumeAllZero
+        } else {
+            crate::data_path::ReferenceSampleMode::SimulateNoiseless
+        },
+    };
+    let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
     match fmt {
         OutputFormat::Dets => Err("dets format not applicable to sample command; use detect".to_string()),
         _ => write_format(fmt, &result.measurements, out),
@@ -321,28 +452,80 @@ pub fn run_detect(
     let instrs = parse_lines(circuit_text)?;
     let mut rng = make_rng(seed);
     let result = sample_batch(&instrs, shots, &mut rng)?;
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))
-        }
-        _ => {
-            if append_observables {
-                let merged = merge_detections_observables(&result.detections, &result.observable_flips);
-                write_format(fmt, &merged, out)
-            } else {
-                write_format(fmt, &result.detections, out)
-            }
-        }
-    }
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        None,
+    )
+}
+
+pub fn run_detect_with_obs(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    append_observables: bool,
+    out: &mut dyn Write,
+    obs_out: &mut dyn Write,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    let fmt = OutputFormat::from_str(out_format)?;
+    let obs_fmt = OutputFormat::from_str(obs_out_format)?;
+    let instrs = parse_lines(circuit_text)?;
+    let mut rng = make_rng(seed);
+    let result = sample_batch(&instrs, shots, &mut rng)?;
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        Some((obs_out, obs_fmt)),
+    )
 }
 
 pub fn run_analyze_errors(
     circuit_text: &str,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    run_analyze_errors_with_flags(circuit_text, false, false, false, out)
+}
+
+pub fn run_analyze_errors_with_options(
+    circuit_text: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    run_analyze_errors_with_flags(
+        circuit_text,
+        approximate_disjoint_errors,
+        allow_gauge_detectors,
+        false,
+        out,
+    )
+}
+
+pub fn run_analyze_errors_with_flags(
+    circuit_text: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+    decompose_errors: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
-    let dem = ErrorAnalyzer::circuit_to_dem(&instrs)?;
+    let options = crate::error_analyzer::AnalyzeOptions {
+        approximate_disjoint_errors,
+        allow_gauge_detectors,
+    };
+    let dem = if decompose_errors {
+        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(&instrs, options)?
+    } else {
+        ErrorAnalyzer::circuit_to_dem_with_options(&instrs, options)?
+    };
     let dem_str = dem.to_string();
     out.write_all(dem_str.as_bytes()).map_err(|e| format!("write error: {e}"))
 }
@@ -358,13 +541,14 @@ pub fn run_sample_dem(
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
     let result = dem.sample_batch(shots, &mut rng);
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))
-        }
-        _ => write_format(fmt, &result.detections, out),
-    }
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        false,
+        out,
+        None,
+    )
 }
 
 pub fn run_sample_dem_with_obs(
@@ -381,16 +565,14 @@ pub fn run_sample_dem_with_obs(
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
     let result = dem.sample_batch(shots, &mut rng);
-    match fmt {
-        OutputFormat::Dets => {
-            write_shots_dets(&result.detections, &result.observable_flips, out)
-                .map_err(|e| format!("write error: {e}"))?;
-        }
-        _ => {
-            write_format(fmt, &result.detections, out)?;
-        }
-    }
-    write_format(obs_fmt, &result.observable_flips, obs_out)
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        false,
+        out,
+        Some((obs_out, obs_fmt)),
+    )
 }
 
 pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {
@@ -402,6 +584,27 @@ pub fn read_input_bytes(path: Option<&str>) -> Result<Vec<u8>, String> {
             std::io::stdin().read_to_end(&mut buf).map_err(|e| e.to_string())?;
             Ok(buf)
         }
+    }
+}
+
+fn read_table_from_format(
+    data: &[u8],
+    format: &str,
+    bits: usize,
+    shots: Option<usize>,
+) -> Result<BitTable, String> {
+    use crate::output::*;
+
+    match format {
+        "01" => read_shots_01(data, bits),
+        "b8" => read_shots_b8(data, bits),
+        "r8" => read_shots_r8(data, bits),
+        "hits" => read_shots_hits(data, bits),
+        "ptb64" => {
+            let n = shots.ok_or("--shots required for ptb64 input")?;
+            read_shots_ptb64(data, bits, n)
+        }
+        _ => Err(format!("unknown in_format: {format}")),
     }
 }
 
@@ -424,17 +627,7 @@ pub fn run_convert(
         return Err("--bits or --circuit required for convert".to_string());
     };
 
-    let table = match in_format {
-        "01" => read_shots_01(data, n_bits)?,
-        "b8" => read_shots_b8(data, n_bits)?,
-        "r8" => read_shots_r8(data, n_bits)?,
-        "hits" => read_shots_hits(data, n_bits)?,
-        "ptb64" => {
-            let n = shots.ok_or("--shots required for ptb64 input")?;
-            read_shots_ptb64(data, n_bits, n)?
-        }
-        _ => return Err(format!("unknown in_format: {in_format}")),
-    };
+    let table = read_table_from_format(data, in_format, n_bits, shots)?;
 
     match out_format {
         "01" => write_shots_01(&table, out),
@@ -455,23 +648,63 @@ pub fn run_m2d(
     append_observables: bool,
     out: &mut dyn Write,
 ) -> Result<(), String> {
-    use crate::output::*;
+    run_m2d_impl(
+        circuit_text,
+        data,
+        in_format,
+        out_format,
+        shots,
+        None,
+        M2dOptions::default(),
+        append_observables,
+        out,
+    )
+}
+
+pub fn run_m2d_with_options(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    options: M2dOptions,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    run_m2d_impl(
+        circuit_text,
+        data,
+        in_format,
+        out_format,
+        shots,
+        None,
+        options,
+        append_observables,
+        out,
+    )
+}
+
+fn run_m2d_impl(
+    circuit_text: &str,
+    data: &[u8],
+    in_format: &str,
+    out_format: &str,
+    shots: Option<usize>,
+    sweep_data: Option<(&[u8], &str)>,
+    options: M2dOptions,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
     let n_meas = crate::stats::num_measurements(&instrs);
-
-    let meas_table = match in_format {
-        "01" => read_shots_01(data, n_meas)?,
-        "b8" => read_shots_b8(data, n_meas)?,
-        "r8" => read_shots_r8(data, n_meas)?,
-        "hits" => read_shots_hits(data, n_meas)?,
-        "ptb64" => {
-            let n = shots.ok_or("--shots required for ptb64 input")?;
-            read_shots_ptb64(data, n_meas, n)?
-        }
-        _ => return Err(format!("unknown in_format: {in_format}")),
+    let meas_table = read_table_from_format(data, in_format, n_meas, shots)?;
+    let sweep_table = if let Some((sweep_bytes, sweep_format)) = sweep_data {
+        let n_sweep_bits = crate::stats::num_sweep_bits(&instrs);
+        Some(read_table_from_format(sweep_bytes, sweep_format, n_sweep_bits, shots)?)
+    } else {
+        None
     };
-
-    let result = measurements_to_detections(&instrs, &meas_table)?;
+    let result = measurements_to_detections_with_options(&instrs, &meas_table, sweep_table.as_ref(), options)?;
     let fmt = OutputFormat::from_str(out_format)?;
 
     match fmt {

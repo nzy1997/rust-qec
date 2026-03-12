@@ -6,6 +6,7 @@ pub mod ir;
 pub mod recorder;
 pub mod parser;
 pub mod executor;
+pub mod data_path;
 pub mod sim;
 pub mod coords;
 pub mod sampler;

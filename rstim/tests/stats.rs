@@ -60,3 +60,15 @@ fn num_ticks_with_repeat() {
     let instrs = parse_lines("REPEAT 3 {\n  H 0\n  TICK\n}").unwrap();
     assert_eq!(stats::num_ticks(&instrs), 3);
 }
+
+#[test]
+fn num_sweep_bits_tracks_highest_index() {
+    let instrs = parse_lines("CX sweep[3] 0\nCX sweep[1] 2\n").unwrap();
+    assert_eq!(stats::num_sweep_bits(&instrs), 4);
+}
+
+#[test]
+fn num_sweep_bits_includes_repeat_bodies() {
+    let instrs = parse_lines("REPEAT 2 {\n  CX sweep[4] 0\n}\nCX sweep[1] 2\n").unwrap();
+    assert_eq!(stats::num_sweep_bits(&instrs), 5);
+}
