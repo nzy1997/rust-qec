@@ -17,3 +17,4 @@ cobertura.xml
 *.rlib
 
 drafts/
+.DS_Store
