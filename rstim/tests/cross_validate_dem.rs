@@ -1,17 +1,22 @@
 #![allow(unexpected_cfgs)]
 
-use rstim::codegen::repetition_code_memory;
+use rstim::codegen::{repetition_code_memory, surface_code::rotated_memory_x};
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::circuit_to_string;
-use rstim::parser::parse_lines;
 use std::collections::BTreeMap;
 use std::fs;
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 fn stim_env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn lock_stim_env() -> MutexGuard<'static, ()> {
+    stim_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
@@ -73,7 +78,7 @@ error(0.5) D2 L0
 
 #[test]
 fn stim_analyze_errors_respects_override_command() {
-    let _guard = stim_env_lock().lock().unwrap();
+    let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();
     let stim_path = dir.path().join("stim");
     fs::write(
@@ -102,7 +107,7 @@ fn stim_analyze_errors_respects_override_command() {
 
 #[test]
 fn stim_analyze_errors_propagates_failure_output() {
-    let _guard = stim_env_lock().lock().unwrap();
+    let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();
     let stim_path = dir.path().join("stim");
     fs::write(
@@ -133,7 +138,7 @@ fn stim_analyze_errors_propagates_failure_output() {
 #[test]
 #[cfg(not(tarpaulin))]
 fn cross_validate_decomposed_dem_rep_code() {
-    let _guard = stim_env_lock().lock().unwrap();
+    let _guard = lock_stim_env();
     let circuit = repetition_code_memory(5, 3, 0.01);
     let circuit_text = circuit_to_string(&circuit);
 
@@ -156,10 +161,9 @@ fn cross_validate_decomposed_dem_rep_code() {
 #[test]
 #[cfg(not(tarpaulin))]
 fn cross_validate_surface_code_dem() {
-    let _guard = stim_env_lock().lock().unwrap();
-    let circuit_text = std::fs::read_to_string("../drafts/surface_code_rotated_memory_x_5_0.01.stim")
-        .expect("missing ../drafts/surface_code_rotated_memory_x_5_0.01.stim");
-    let instrs = parse_lines(&circuit_text).unwrap();
+    let _guard = lock_stim_env();
+    let instrs = rotated_memory_x(5, 3, 0.01);
+    let circuit_text = circuit_to_string(&instrs);
 
     let stim_dem_text = stim_analyze_errors(&circuit_text);
     let rstim_dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
@@ -205,7 +209,7 @@ fn cross_validate_surface_code_dem() {
 #[test]
 #[cfg(not(tarpaulin))]
 fn cross_validate_rep_code_dem_probabilities() {
-    let _guard = stim_env_lock().lock().unwrap();
+    let _guard = lock_stim_env();
     let circuit = repetition_code_memory(5, 3, 0.01);
     let circuit_text = circuit_to_string(&circuit);
 
