@@ -2,7 +2,7 @@ use rstim::data_path::ReferenceSampleMode;
 use rstim::parser::parse_lines;
 use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
 use rstim::sim::bit_table::BitTable;
-use rstim::cli::run_m2d;
+use rstim::cli::{run_m2d, run_m2d_with_options};
 
 fn single_shot_table(bits: usize, vals: &[bool]) -> BitTable {
     let mut t = BitTable::new(bits, 1);
@@ -144,6 +144,27 @@ fn m2d_ran_without_feedback_compensates_simple_classical_x_feedback() {
     )
     .unwrap();
     assert!(!out.detections.get(0, 0));
+}
+
+#[test]
+fn run_m2d_with_options_matches_default_wrapper() {
+    let circuit = "R 0\nM 0\nDETECTOR rec[-1]";
+    let data = b"1\n";
+    let mut wrapped = Vec::new();
+    let mut explicit = Vec::new();
+    run_m2d(circuit, data, "01", "01", None, false, &mut wrapped).unwrap();
+    run_m2d_with_options(
+        circuit,
+        data,
+        "01",
+        "01",
+        None,
+        M2dOptions::default(),
+        false,
+        &mut explicit,
+    )
+    .unwrap();
+    assert_eq!(wrapped, explicit);
 }
 
 #[test]

@@ -3,7 +3,7 @@ use rand::rngs::StdRng;
 use rstim::sim::measure_record_batch::MeasureRecordBatch;
 use rstim::sim::bit_table::BitTable;
 use rstim::sim::frame::FrameSimulator;
-use rstim::executor::reference_sample;
+use rstim::executor::{reference_sample, reference_sample_with_sweep_bits};
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
 
@@ -81,6 +81,31 @@ fn reference_sample_reset() {
     let instrs = parse_lines("X 0\nR 0\nM 0\n").unwrap();
     let ref_sample = reference_sample(&instrs).unwrap();
     assert_eq!(ref_sample, vec![false]);
+}
+
+#[test]
+fn reference_sample_with_sweep_bits_applies_cy_control() {
+    let instrs = parse_lines("R 0\nCY sweep[0] 0\nM 0\n").unwrap();
+    let inactive = reference_sample_with_sweep_bits(&instrs, Some(&[false])).unwrap();
+    let active = reference_sample_with_sweep_bits(&instrs, Some(&[true])).unwrap();
+    assert_eq!(inactive, vec![false]);
+    assert_eq!(active, vec![true]);
+}
+
+#[test]
+fn reference_sample_with_sweep_bits_applies_cz_control() {
+    let instrs = parse_lines("R 0\nH 0\nCZ sweep[0] 0\nMX 0\n").unwrap();
+    let inactive = reference_sample_with_sweep_bits(&instrs, Some(&[false])).unwrap();
+    let active = reference_sample_with_sweep_bits(&instrs, Some(&[true])).unwrap();
+    assert_eq!(inactive, vec![false]);
+    assert_eq!(active, vec![true]);
+}
+
+#[test]
+fn reference_sample_with_sweep_bits_rejects_unsupported_target_placement() {
+    let instrs = parse_lines("CX 0 sweep[0]\n").unwrap();
+    let err = reference_sample_with_sweep_bits(&instrs, Some(&[true])).unwrap_err();
+    assert!(err.contains("unsupported sweep target placement"));
 }
 
 #[test]

@@ -181,3 +181,46 @@ fn normalize_feedbackless_m2d_rejects_intervening_quantum_op() {
     let err = transforms::normalize_feedbackless_m2d(&instrs).unwrap_err();
     assert!(err.contains("unsupported feedback"));
 }
+
+#[test]
+fn normalize_feedbackless_m2d_preserves_annotations_while_feedback_pending() {
+    let instrs = parse_lines(
+        "M 0\nCX rec[-1] 1\nSHIFT_COORDS(1)\nTICK\nM 1\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
+    assert_eq!(
+        rstim::ir::circuit_to_string(&normalized.circuit),
+        "M 0\nSHIFT_COORDS(1)\nTICK\nM 1\nDETECTOR rec[-1]\n",
+    );
+    assert_eq!(normalized.measurement_corrections, vec![vec![], vec![0]]);
+}
+
+#[test]
+fn normalize_feedbackless_m2d_applies_cz_feedback_to_x_basis_measurement() {
+    let instrs = parse_lines("M 0\nCZ rec[-1] 1\nMX 1\n").unwrap();
+    let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
+    assert_eq!(normalized.measurement_corrections, vec![vec![], vec![0]]);
+}
+
+#[test]
+fn normalize_feedbackless_m2d_applies_cy_feedback_to_y_basis_measurement() {
+    let instrs = parse_lines("M 0\nCY rec[-1] 1\nMY 1\n").unwrap();
+    let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
+    assert_eq!(normalized.measurement_corrections, vec![vec![], vec![0, 0]]);
+}
+
+#[test]
+fn normalize_feedbackless_m2d_rejects_out_of_range_feedback_reference() {
+    let instrs = parse_lines("M 0\nCX rec[-2] 1\nM 1\n").unwrap();
+    let err = transforms::normalize_feedbackless_m2d(&instrs).unwrap_err();
+    assert!(err.contains("unsupported feedback rec[-2]"));
+}
+
+#[test]
+fn normalize_feedbackless_m2d_rejects_pending_feedback_at_end() {
+    let instrs = parse_lines("M 0\nCX rec[-1] 1\n").unwrap();
+    let err = transforms::normalize_feedbackless_m2d(&instrs).unwrap_err();
+    assert!(err.contains("left pending on qubit 1"));
+}
