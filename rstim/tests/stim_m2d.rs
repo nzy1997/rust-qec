@@ -2,7 +2,8 @@
 // Tests: measurements_to_detection_events conversion.
 // Avoids overlap with existing m2d.rs tests.
 
-use rstim::m2d::measurements_to_detections;
+use rstim::data_path::ReferenceSampleMode;
+use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
 use rstim::parser::parse_lines;
 use rstim::sim::bit_table::BitTable;
 
@@ -203,4 +204,22 @@ fn m2d_repeated_ref() {
             assert!(out.detections.get(d, 0), "det {d} should fire");
         }
     }
+}
+
+#[test]
+fn m2d_skip_reference_sample_preserves_zero_reference_behavior() {
+    let instrs = parse_lines("R 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(1, &[true]);
+    let default_out = measurements_to_detections(&instrs, &meas).unwrap();
+    let skipped_out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        None,
+        M2dOptions {
+            reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
+            ran_without_feedback: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(default_out.detections.get(0, 0), skipped_out.detections.get(0, 0));
 }

@@ -131,3 +131,158 @@ pub fn without_tags(instrs: &[StimInstr]) -> Vec<StimInstr> {
         },
     }).collect()
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FeedbacklessM2dNormalization {
+    pub circuit: Vec<StimInstr>,
+    pub measurement_corrections: Vec<Vec<usize>>,
+}
+
+pub fn normalize_feedbackless_m2d(
+    instrs: &[StimInstr],
+) -> Result<FeedbacklessM2dNormalization, String> {
+    let flat = flattened(instrs);
+    let num_qubits = crate::stats::num_qubits(&flat);
+    let mut pending_x: Vec<Vec<usize>> = vec![Vec::new(); num_qubits];
+    let mut pending_z: Vec<Vec<usize>> = vec![Vec::new(); num_qubits];
+    let mut circuit = Vec::with_capacity(flat.len());
+    let mut measurement_corrections = Vec::new();
+    let mut measurement_count = 0usize;
+
+    for instr in flat {
+        match &instr {
+            StimInstr::Op { name, targets, .. } if is_feedback_operation(name, targets) => {
+                accumulate_feedback(
+                    name,
+                    targets,
+                    measurement_count,
+                    &mut pending_x,
+                    &mut pending_z,
+                )?;
+            }
+            StimInstr::Op { name, .. } if is_annotation(name) => {
+                circuit.push(instr);
+            }
+            StimInstr::Op { name, targets, .. } if is_single_qubit_measurement(name) => {
+                for target in targets {
+                    measurement_corrections.push(take_measurement_correction(
+                        name,
+                        target,
+                        &mut pending_x,
+                        &mut pending_z,
+                    ));
+                    measurement_count += 1;
+                }
+                circuit.push(instr);
+            }
+            StimInstr::Op { name, targets, .. } => {
+                if touches_pending_qubits(targets, &pending_x, &pending_z) {
+                    return Err(format!("unsupported feedback before {name}"));
+                }
+                measurement_count += crate::stats::num_measurements(std::slice::from_ref(&instr));
+                if measurement_count > measurement_corrections.len() {
+                    measurement_corrections.resize(measurement_count, Vec::new());
+                }
+                circuit.push(instr);
+            }
+            StimInstr::Repeat { .. } => unreachable!("flattened removed repeats"),
+        }
+    }
+
+    for q in 0..num_qubits {
+        if !pending_x[q].is_empty() || !pending_z[q].is_empty() {
+            return Err(format!("unsupported feedback left pending on qubit {q}"));
+        }
+    }
+
+    Ok(FeedbacklessM2dNormalization {
+        circuit,
+        measurement_corrections,
+    })
+}
+
+fn is_feedback_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool {
+    matches!(name, "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ")
+        && matches!(
+            targets,
+            [crate::ir::StimTarget::Rec(_), crate::ir::StimTarget::Qubit(_)]
+        )
+}
+
+fn is_annotation(name: &str) -> bool {
+    matches!(name, "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS")
+}
+
+fn is_single_qubit_measurement(name: &str) -> bool {
+    matches!(name, "M" | "MZ" | "MR" | "MRZ" | "MX" | "MRX" | "MY" | "MRY")
+}
+
+fn accumulate_feedback(
+    name: &str,
+    targets: &[crate::ir::StimTarget],
+    measurement_count: usize,
+    pending_x: &mut [Vec<usize>],
+    pending_z: &mut [Vec<usize>],
+) -> Result<(), String> {
+    if targets.len() != 2 {
+        return Err(format!("unsupported feedback form for {name}"));
+    }
+    let (offset, qubit) = match (&targets[0], &targets[1]) {
+        (crate::ir::StimTarget::Rec(offset), crate::ir::StimTarget::Qubit(qubit)) => (*offset, *qubit as usize),
+        _ => return Err(format!("unsupported feedback form for {name}")),
+    };
+    let measurement = resolve_rec_measurement_index(measurement_count, offset)?;
+    match name {
+        "CX" | "CNOT" | "ZCX" => pending_x[qubit].push(measurement),
+        "CZ" | "ZCZ" => pending_z[qubit].push(measurement),
+        "CY" | "ZCY" => {
+            pending_x[qubit].push(measurement);
+            pending_z[qubit].push(measurement);
+        }
+        _ => return Err(format!("unsupported feedback form for {name}")),
+    }
+    Ok(())
+}
+
+fn resolve_rec_measurement_index(measurement_count: usize, offset: i32) -> Result<usize, String> {
+    let abs = measurement_count as i64 + offset as i64;
+    if abs < 0 || abs >= measurement_count as i64 {
+        return Err(format!("unsupported feedback rec[{offset}]"));
+    }
+    Ok(abs as usize)
+}
+
+fn take_measurement_correction(
+    name: &str,
+    target: &crate::ir::StimTarget,
+    pending_x: &mut [Vec<usize>],
+    pending_z: &mut [Vec<usize>],
+) -> Vec<usize> {
+    let qubit = match target {
+        crate::ir::StimTarget::Qubit(qubit) | crate::ir::StimTarget::QubitInv(qubit) => *qubit as usize,
+        _ => return Vec::new(),
+    };
+    let x = std::mem::take(&mut pending_x[qubit]);
+    let z = std::mem::take(&mut pending_z[qubit]);
+    match name {
+        "M" | "MZ" | "MR" | "MRZ" => x,
+        "MX" | "MRX" => z,
+        "MY" | "MRY" => {
+            let mut corrections = x;
+            corrections.extend(z);
+            corrections
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn touches_pending_qubits(
+    targets: &[crate::ir::StimTarget],
+    pending_x: &[Vec<usize>],
+    pending_z: &[Vec<usize>],
+) -> bool {
+    targets.iter().filter_map(|target| target.qubit_index()).any(|q| {
+        let q = q as usize;
+        !pending_x[q].is_empty() || !pending_z[q].is_empty()
+    })
+}
