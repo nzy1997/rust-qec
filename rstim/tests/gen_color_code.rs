@@ -1,4 +1,5 @@
 use rstim::codegen::color_code::memory_xyz;
+use rstim::ir::{StimInstr, StimTarget};
 use rstim::stats;
 
 #[test]
@@ -29,10 +30,30 @@ fn color_code_roundtrip() {
 
 #[test]
 fn color_code_with_noise() {
-    use rstim::ir::StimInstr;
     let instrs = memory_xyz(3, 2, 0.001);
     let has_noise = instrs.iter().any(|i| {
         matches!(i, StimInstr::Op { name, .. } if name == "DEPOLARIZE1" || name == "DEPOLARIZE2")
     });
     assert!(has_noise);
+}
+
+#[test]
+fn color_code_has_no_self_targeting_two_qubit_pairs() {
+    let instrs = memory_xyz(3, 2, 0.001);
+
+    for instr in &instrs {
+        let StimInstr::Op { name, targets, .. } = instr else {
+            continue;
+        };
+        if name != "CX" && name != "DEPOLARIZE2" {
+            continue;
+        }
+        assert_eq!(targets.len() % 2, 0, "{instr:?}");
+        for pair in targets.chunks_exact(2) {
+            let [StimTarget::Qubit(a), StimTarget::Qubit(b)] = pair else {
+                panic!("unexpected non-qubit pair in {instr:?}");
+            };
+            assert_ne!(a, b, "self-targeting {name} pair in {instr:?}");
+        }
+    }
 }

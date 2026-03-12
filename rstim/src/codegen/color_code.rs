@@ -60,6 +60,14 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         }
         m
     };
+    let data_coord_to_qubit: std::collections::HashMap<(i64, i64), u32> = {
+        let mut m = std::collections::HashMap::new();
+        for &q in &data_qubits {
+            let c = q2p[q as usize];
+            m.insert(coord_key(c), q);
+        }
+        m
+    };
     let measure_coord_to_order: std::collections::HashMap<(i64, i64), usize> = {
         let mut m = std::collections::HashMap::new();
         for (i, &q) in measurement_qubits.iter().enumerate() {
@@ -84,7 +92,7 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
             let mc = q2p[mq as usize];
             let mk = coord_key(mc);
             let dk = (mk.0 + ddx2, mk.1 + ddy);
-            if let Some(&dq) = p2q.get(&dk) {
+            if let Some(&dq) = data_coord_to_qubit.get(&dk) {
                 cnot_targets[k].push(dq);
                 cnot_targets[k].push(mq);
             }
