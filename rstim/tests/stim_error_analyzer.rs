@@ -90,6 +90,13 @@ fn stim_x_error_basic() {
 }
 
 #[test]
+fn stim_noisy_measurement_merges_with_data_error() {
+    let dem = circuit_to_dem("R 0\nX_ERROR(0.1) 0\nM(0.2) 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.26, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
 fn stim_x_error_with_observable() {
     let dem = circuit_to_dem(
         "X_ERROR(0.25) 3\nM 3\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",

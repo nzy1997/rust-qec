@@ -358,42 +358,54 @@ impl ErrorAnalyzer {
             }
 
             "M" | "MZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_mz(q);
                 }
             }
             "MX" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_mx(q);
                 }
             }
             "MY" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_my(q);
                 }
             }
             "MR" | "MRZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mz(q);
                 }
             }
             "MRX" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mx(q);
                 }
             }
             "MRY" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_my(q);
@@ -729,6 +741,16 @@ impl ErrorAnalyzer {
         let m_sens = std::mem::take(&mut self.measurement_sens[m_idx]);
         self.x_sens[q].xor_other(&m_sens);
         self.z_sens[q].xor_other(&m_sens);
+    }
+
+    fn emit_measurement_noise(&mut self, probability: f64) {
+        if probability <= 0.0 || self.num_measurements == 0 {
+            return;
+        }
+        let targets = self.measurement_sens[self.num_measurements - 1].targets.clone();
+        if !targets.is_empty() {
+            self.errors.push((probability, targets));
+        }
     }
 
     fn undo_h(&mut self, q: usize) {
