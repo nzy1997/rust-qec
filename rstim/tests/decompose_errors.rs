@@ -102,6 +102,39 @@ fn decompose_errors_merges_duplicate_decomposed_targets_for_small_surface_code()
     assert_eq!(errors.get("D3 ^ D9"), Some(&vec![0.005333333333333312]));
 }
 
+#[test]
+fn decompose_errors_merges_duplicate_decomposed_targets_for_larger_surface_code() {
+    let circuit = rotated_memory_x(5, 3, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D1 L0 ^ D12"), Some(&vec![0.007318633932043431]));
+    assert_eq!(errors.get("D10 ^ D30"), Some(&vec![0.004669790293214321]));
+    assert_eq!(errors.get("D11 ^ D32"), Some(&vec![0.005333333333333312]));
+    assert_eq!(errors.get("D12 ^ D16 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D13 ^ D18 L0"), Some(&vec![0.006000449842759885]));
+    assert_eq!(errors.get("D13 ^ D2 L0"), Some(&vec![0.007318633932043431]));
+    assert_eq!(errors.get("D32 ^ D33"), Some(&vec![0.006000449842759885]));
+    assert_eq!(errors.get("D33 ^ D56"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D56 ^ D57"), Some(&vec![0.00798307302879027]));
+}
+
+#[test]
+fn decompose_errors_matches_stim_semantics_for_standard_rep_code_fixture() {
+    let circuit = repetition_code_memory(5, 3, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 D1"), Some(&vec![0.00930483174566696]));
+    assert_eq!(errors.get("D0 D4"), Some(&vec![0.022367932846491825]));
+    assert_eq!(errors.get("D1 D5"), Some(&vec![0.024922133333333315]));
+    assert_eq!(errors.get("D4 L0"), Some(&vec![0.011928888888888814]));
+    assert_eq!(errors.get("D0 L0 ^ D4 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D11 ^ D7"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D12 L0 ^ D8 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D11 ^ D15"), Some(&vec![0.0026738159584462984]));
+}
+
 fn assert_all_graphlike(text: &str) {
     for line in text.lines() {
         let line = line.trim();
