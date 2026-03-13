@@ -748,6 +748,20 @@ fn stim_pauli_channel_1_z_in_x_basis() {
 }
 
 #[test]
+fn stim_pauli_channel_1_falls_back_to_disjoint_approximation_in_z_basis() {
+    let dem = circuit_to_dem("R 0\nPAULI_CHANNEL_1(0.3,0.3,0) 0\nM 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.6, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_pauli_channel_1_falls_back_to_disjoint_approximation_in_x_basis() {
+    let dem = circuit_to_dem("RX 0\nPAULI_CHANNEL_1(0,0.3,0.3) 0\nMX 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.6, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
 fn stim_pauli_channel_2_rejected_by_default() {
     let result = circuit_to_dem_err(
         "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
@@ -803,6 +817,27 @@ fn stim_correlated_error_three_branch_block_allowed_with_approximation_option() 
     .unwrap();
     assert_eq!(error_count(&dem), 1);
     assert_has_error_approx(&dem, 0.316, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_heralded_erase_x_basis_merges_y_and_z_components() {
+    let dem = circuit_to_dem("RX 0\nHERALDED_ERASE(0.75) 0\nMX 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.375, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn circuit_to_dem_with_options_allows_non_deterministic_mx_when_enabled() {
+    let dem = circuit_to_dem_with_options("MX 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
+        .unwrap();
+    assert_eq!(dem.num_detectors(), 1);
+}
+
+#[test]
+fn circuit_to_dem_with_options_allows_non_deterministic_my_when_enabled() {
+    let dem = circuit_to_dem_with_options("MY 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
+        .unwrap();
+    assert_eq!(dem.num_detectors(), 1);
 }
 
 #[test]
