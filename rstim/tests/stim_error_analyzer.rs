@@ -5,6 +5,7 @@
 /// composite DEPOLARIZE2 analysis, reversed operation order, MPP ordering,
 /// duplicate records, exact pauli_channel_1, and gauge detection.
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
+use rstim::codegen::color_code::memory_xyz;
 use rstim::error_analyzer::{AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 
@@ -169,6 +170,25 @@ fn stim_depolarize2_three_error_classes() {
     assert!(has_d0, "expected D0 error");
     assert!(has_d1, "expected D1 error");
     assert!(has_d0d1, "expected D0 D1 error");
+}
+
+#[test]
+fn stim_depolarize2_decomposed_merges_into_three_graphlike_classes() {
+    let instrs = parse_lines(
+        "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]",
+    )
+    .unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&instrs).unwrap();
+
+    assert_eq!(error_count(&dem), 3);
+    assert_has_error_approx(&dem, 0.07182558071116237, 1e-12, &[DemTarget::Detector(0)]);
+    assert_has_error_approx(
+        &dem,
+        0.07182558071116237,
+        1e-12,
+        &[DemTarget::Detector(0), DemTarget::Separator, DemTarget::Detector(1)],
+    );
+    assert_has_error_approx(&dem, 0.07182558071116237, 1e-12, &[DemTarget::Detector(1)]);
 }
 
 // ── reversed_operation_order ─────────────────────────────────────────────────
@@ -800,4 +820,26 @@ fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
     )
     .unwrap();
     assert!(dem.to_string().contains("error("));
+}
+
+#[test]
+fn circuit_to_dem_with_options_decomposed_allows_gauge_detectors() {
+    let instrs = parse_lines("R 0\nH 0\nM 0\nDETECTOR rec[-1]").unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors: false,
+            allow_gauge_detectors: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
+    assert_eq!(dem.num_detectors(), 1);
+}
+
+#[test]
+fn color_code_decomposed_reports_non_deterministic_detector_failure() {
+    let circuit = memory_xyz(3, 2, 0.001);
+    let err = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap_err();
+    assert!(err.contains("non-deterministic detector"), "{err}");
 }

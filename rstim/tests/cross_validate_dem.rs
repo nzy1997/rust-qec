@@ -275,7 +275,6 @@ fn stim_analyze_errors_propagates_failure_output() {
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_decomposed_handwritten_non_graphlike_failure_mode() {
     let _guard = lock_stim_env();
     let circuit_text = "\
@@ -323,7 +322,6 @@ DETECTOR rec[-1]
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_decomposed_rep_code_dem() {
     let _guard = lock_stim_env();
     let circuit = repetition_code_memory(5, 3, 0.01);
@@ -339,7 +337,6 @@ fn cross_validate_decomposed_rep_code_dem() {
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_decomposed_surface_code_dem() {
     let _guard = lock_stim_env();
     let circuit = rotated_memory_x(5, 3, 0.01);
@@ -355,7 +352,6 @@ fn cross_validate_decomposed_surface_code_dem() {
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_decomposed_color_code_failure_mode() {
     let _guard = lock_stim_env();
     let circuit = memory_xyz(3, 2, 0.001);
@@ -399,7 +395,6 @@ fn cross_validate_decomposed_color_code_failure_mode() {
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_surface_code_dem() {
     let _guard = lock_stim_env();
     let instrs = rotated_memory_x(5, 3, 0.01);
@@ -447,7 +442,6 @@ fn cross_validate_surface_code_dem() {
 }
 
 #[test]
-#[cfg(not(tarpaulin))]
 fn cross_validate_rep_code_dem_probabilities() {
     let _guard = lock_stim_env();
     let circuit = repetition_code_memory(5, 3, 0.01);
