@@ -1717,3 +1717,187 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
     *dem = new_dem;
     Ok(())
 }
+
+#[cfg(test)]
+mod internal_branch_tests {
+    use super::*;
+    use crate::ir::{PauliBasis, StimInstr, StimTarget};
+
+    fn make_analyzer(num_qubits: usize, num_measurements: usize) -> ErrorAnalyzer {
+        ErrorAnalyzer {
+            x_sens: vec![SparseXorVec::default(); num_qubits],
+            z_sens: vec![SparseXorVec::default(); num_qubits],
+            measurement_sens: vec![SparseXorVec::default(); num_measurements],
+            num_measurements,
+            det_index: 0,
+            errors: Vec::new(),
+            decompose_channel_errors: false,
+            options: AnalyzeOptions::default(),
+        }
+    }
+
+    #[test]
+    fn undo_op_reports_internal_mpad_underflow() {
+        let mut analyzer = make_analyzer(0, 0);
+        let err = analyzer
+            .undo_op("MPAD", &[], &[StimTarget::Qubit(0)])
+            .unwrap_err();
+        assert!(err.contains("underflow"));
+    }
+
+    #[test]
+    fn undo_op_reports_internal_else_correlated_error_without_leader() {
+        let mut analyzer = make_analyzer(0, 0);
+        let err = analyzer
+            .undo_op("ELSE_CORRELATED_ERROR", &[0.25], &[StimTarget::pauli(0, PauliBasis::X, false)])
+            .unwrap_err();
+        assert!(err.contains("ELSE_CORRELATED_ERROR"));
+    }
+
+    #[test]
+    fn emit_error_combinations_folds_disjoint_empty_combinations() {
+        let mut analyzer = make_analyzer(0, 0);
+        analyzer.emit_error_combinations(
+            &[0.0, 0.1, 0.2, 0.3],
+            &[
+                vec![DemTarget::Detector(0)],
+                vec![DemTarget::Detector(0)],
+            ],
+            true,
+        );
+
+        assert_eq!(analyzer.errors.len(), 1);
+        assert_eq!(analyzer.errors[0].1, vec![DemTarget::Detector(0)]);
+        assert!((analyzer.errors[0].0 - 0.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn join_components_skips_empty_components() {
+        let joined = ErrorAnalyzer::join_components_with_separators(vec![
+            vec![DemTarget::Detector(0)],
+            Vec::new(),
+            vec![DemTarget::Detector(1)],
+        ]);
+        assert_eq!(
+            joined,
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Separator,
+                DemTarget::Detector(1),
+            ]
+        );
+    }
+
+    #[test]
+    fn decompose_combination_targets_keeps_unsolved_goal_as_single_component() {
+        let mut stored_ids = vec![Vec::new(); 8];
+        stored_ids[7] = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+        ];
+        let detector_masks = vec![0, 0, 0, 0, 0, 0, 0, 0b111];
+
+        ErrorAnalyzer::decompose_combination_targets(&mut stored_ids, &detector_masks);
+
+        assert_eq!(
+            stored_ids[7],
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ]
+        );
+    }
+
+    #[test]
+    fn correlated_branch_from_instr_rejects_invalid_instruction() {
+        let analyzer = make_analyzer(1, 0);
+        let err = analyzer
+            .correlated_branch_from_instr(&StimInstr::new(
+                "X_ERROR",
+                vec![0.1],
+                vec![StimTarget::Qubit(0)],
+            ))
+            .unwrap_err();
+        assert!(err.contains("invalid correlated error block"));
+    }
+
+    #[test]
+    fn allow_gauge_short_circuits_x_and_y_determinism_checks() {
+        let mut x_analyzer = make_analyzer(1, 0);
+        x_analyzer.options.allow_gauge_detectors = true;
+        x_analyzer.x_sens[0].targets = vec![DemTarget::Detector(0)];
+        assert!(x_analyzer.ensure_x_collapse_is_deterministic(0).is_ok());
+
+        let mut y_analyzer = make_analyzer(1, 0);
+        y_analyzer.options.allow_gauge_detectors = true;
+        y_analyzer.x_sens[0].targets = vec![DemTarget::Detector(0)];
+        assert!(y_analyzer.ensure_y_collapse_is_deterministic(0).is_ok());
+    }
+
+    #[test]
+    fn ensure_no_pending_gauge_distinguishes_observable_from_detector() {
+        let mut observable_analyzer = make_analyzer(0, 1);
+        observable_analyzer.measurement_sens[0].targets = vec![DemTarget::Observable(0)];
+        let observable_err = observable_analyzer.ensure_no_pending_gauge().unwrap_err();
+        assert!(observable_err.contains("observable"));
+
+        let mut detector_analyzer = make_analyzer(0, 1);
+        detector_analyzer.measurement_sens[0].targets = vec![DemTarget::Detector(0)];
+        let detector_err = detector_analyzer.ensure_no_pending_gauge().unwrap_err();
+        assert!(detector_err.contains("detector"));
+    }
+
+    #[test]
+    fn target_helpers_ignore_non_matching_targets() {
+        assert_eq!(
+            split_pauli_products(&[
+                StimTarget::pauli(0, PauliBasis::X, false),
+                StimTarget::Combiner,
+                StimTarget::Sweep(1),
+                StimTarget::pauli(1, PauliBasis::Z, false),
+            ])
+            .len(),
+            1
+        );
+        assert_eq!(qubits(&[StimTarget::Qubit(2), StimTarget::Rec(-1)]), vec![2]);
+        assert_eq!(
+            qubits_inv(&[StimTarget::QubitInv(3), StimTarget::Sweep(1)]),
+            vec![3]
+        );
+    }
+
+    #[test]
+    fn try_disjoint_to_independent_xyz_covers_recursions_and_none_cases() {
+        assert!(try_disjoint_to_independent_xyz(0.1, 0.9, 0.0).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.2, 0.8).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.0, 0.9).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.3, 0.3, 0.0).is_none());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.01, 0.01).is_none());
+    }
+
+    #[test]
+    fn decompose_helpers_cover_set_operations_and_separator_overflow() {
+        let mut a = BTreeSet::new();
+        a.insert(DemTarget::Detector(0));
+        a.insert(DemTarget::Detector(1));
+        let mut b = BTreeSet::new();
+        b.insert(DemTarget::Detector(1));
+        b.insert(DemTarget::Detector(2));
+
+        let diff = symmetric_difference(&a, &b);
+        assert_eq!(detector_count(&diff), 2);
+        assert_eq!(
+            set_to_targets(&diff),
+            vec![DemTarget::Detector(0), DemTarget::Detector(2)]
+        );
+        assert!(!component_is_graphlike(&[
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+            DemTarget::Separator,
+            DemTarget::Detector(3),
+        ]));
+    }
+}

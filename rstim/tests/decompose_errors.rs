@@ -1,4 +1,5 @@
-use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::dem::{DemInstruction, DetectorErrorModel};
+use rstim::error_analyzer::{decompose_errors, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 use rstim::codegen::repetition_code_memory;
 use rstim::codegen::surface_code::rotated_memory_x;
@@ -133,6 +134,38 @@ fn decompose_errors_matches_stim_semantics_for_standard_rep_code_fixture() {
     assert_eq!(errors.get("D11 ^ D7"), Some(&vec![0.0026738159584462984]));
     assert_eq!(errors.get("D12 L0 ^ D8 L0"), Some(&vec![0.0026738159584462984]));
     assert_eq!(errors.get("D11 ^ D15"), Some(&vec![0.0026738159584462984]));
+}
+
+#[test]
+fn decompose_errors_uses_known_graphlike_remainder_and_preserves_annotations() {
+    let mut dem = DetectorErrorModel::parse(
+        "error(0.1) D0\nerror(0.1) D1 D2\nerror(0.2) D0 D1 D2\ndetector(1, 2) D0\n",
+    )
+    .unwrap();
+
+    decompose_errors(&mut dem).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 ^ D1 D2"), Some(&vec![0.2]));
+    assert!(dem.instructions().iter().any(|instr| {
+        matches!(
+            instr,
+            DemInstruction::Detector {
+                index: 0,
+                coords
+            } if coords == &vec![1.0, 2.0]
+        )
+    }));
+}
+
+#[test]
+fn decompose_errors_uses_graphlike_remainder_even_without_existing_basis_error() {
+    let mut dem = DetectorErrorModel::parse("error(0.1) D0\nerror(0.2) D0 D1 D2\n").unwrap();
+
+    decompose_errors(&mut dem).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 ^ D1 D2"), Some(&vec![0.2]));
 }
 
 fn assert_all_graphlike(text: &str) {
