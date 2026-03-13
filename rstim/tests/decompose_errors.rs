@@ -1,6 +1,9 @@
-use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::dem::{DemInstruction, DetectorErrorModel};
+use rstim::error_analyzer::{decompose_errors, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 use rstim::codegen::repetition_code_memory;
+use rstim::codegen::surface_code::rotated_memory_x;
+use std::collections::BTreeMap;
 
 #[test]
 fn decompose_already_graphlike_unchanged() {
@@ -33,6 +36,138 @@ fn decompose_no_errors_is_fine() {
     assert_eq!(dem.to_string().matches("error").count(), 0);
 }
 
+#[test]
+fn decompose_errors_rejects_non_graphlike_error_without_graphlike_basis() {
+    let circuit = parse_lines(
+        "\
+R 0 1 2
+X_ERROR(0.1) 0
+CX 0 1
+CX 1 2
+M 0 1 2
+DETECTOR rec[-3]
+DETECTOR rec[-2]
+DETECTOR rec[-1]
+",
+    )
+    .unwrap();
+
+    let err = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap_err();
+    assert!(err.contains("decompose") || err.contains("graphlike"), "{err}");
+}
+
+#[test]
+fn decompose_errors_matches_stim_semantics_for_minimal_rep_code_boundary_case() {
+    let circuit = repetition_code_memory(3, 1, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let expected = "\
+error(0.009304831745666962) D0 D1
+error(0.02236793284649183) D0 D2
+error(0.005333333333333312) D0 D3
+error(0.009304831745666962) D0 L0
+error(0.009304831745666962) D1
+error(0.02236793284649183) D1 D3
+error(0.01262033963927737) D2 D3
+error(0.01262033963927737) D2 L0
+error(0.002673815958446298) D2 L0 ^ D0 L0
+error(0.01262033963927737) D3
+error(0.002673815958446298) D3 ^ D1
+detector(1, 0, 0) D0
+detector(3, 0, 0) D1
+detector(1, 0, 1) D2
+detector(3, 0, 1) D3
+";
+    let expected_map = parse_error_multiset(expected);
+    let actual_map = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(
+        actual_map.keys().collect::<Vec<_>>(),
+        expected_map.keys().collect::<Vec<_>>(),
+        "{}",
+        dem,
+    );
+    assert_prob_multimaps_close(
+        &expected_map,
+        &actual_map,
+        &dem.to_string(),
+    );
+}
+
+#[test]
+fn decompose_errors_merges_duplicate_decomposed_targets_for_small_surface_code() {
+    let circuit = rotated_memory_x(3, 2, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D11 ^ D14"), Some(&vec![0.007318633932043431]));
+    assert_eq!(errors.get("D3 ^ D9"), Some(&vec![0.005333333333333312]));
+}
+
+#[test]
+fn decompose_errors_merges_duplicate_decomposed_targets_for_larger_surface_code() {
+    let circuit = rotated_memory_x(5, 3, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D1 L0 ^ D12"), Some(&vec![0.007318633932043431]));
+    assert_eq!(errors.get("D10 ^ D30"), Some(&vec![0.004669790293214321]));
+    assert_eq!(errors.get("D11 ^ D32"), Some(&vec![0.005333333333333312]));
+    assert_eq!(errors.get("D12 ^ D16 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D13 ^ D18 L0"), Some(&vec![0.006000449842759885]));
+    assert_eq!(errors.get("D13 ^ D2 L0"), Some(&vec![0.007318633932043431]));
+    assert_eq!(errors.get("D32 ^ D33"), Some(&vec![0.006000449842759885]));
+    assert_eq!(errors.get("D33 ^ D56"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D56 ^ D57"), Some(&vec![0.00798307302879027]));
+}
+
+#[test]
+fn decompose_errors_matches_stim_semantics_for_standard_rep_code_fixture() {
+    let circuit = repetition_code_memory(5, 3, 0.01);
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 D1"), Some(&vec![0.00930483174566696]));
+    assert_eq!(errors.get("D0 D4"), Some(&vec![0.022367932846491825]));
+    assert_eq!(errors.get("D1 D5"), Some(&vec![0.024922133333333315]));
+    assert_eq!(errors.get("D4 L0"), Some(&vec![0.011928888888888814]));
+    assert_eq!(errors.get("D0 L0 ^ D4 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D11 ^ D7"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D12 L0 ^ D8 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(errors.get("D11 ^ D15"), Some(&vec![0.0026738159584462984]));
+}
+
+#[test]
+fn decompose_errors_uses_known_graphlike_remainder_and_preserves_annotations() {
+    let mut dem = DetectorErrorModel::parse(
+        "error(0.1) D0\nerror(0.1) D1 D2\nerror(0.2) D0 D1 D2\ndetector(1, 2) D0\n",
+    )
+    .unwrap();
+
+    decompose_errors(&mut dem).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 ^ D1 D2"), Some(&vec![0.2]));
+    assert!(dem.instructions().iter().any(|instr| {
+        matches!(
+            instr,
+            DemInstruction::Detector {
+                index: 0,
+                coords
+            } if coords == &vec![1.0, 2.0]
+        )
+    }));
+}
+
+#[test]
+fn decompose_errors_uses_graphlike_remainder_even_without_existing_basis_error() {
+    let mut dem = DetectorErrorModel::parse("error(0.1) D0\nerror(0.2) D0 D1 D2\n").unwrap();
+
+    decompose_errors(&mut dem).unwrap();
+    let errors = parse_error_multiset(&dem.to_string());
+
+    assert_eq!(errors.get("D0 ^ D1 D2"), Some(&vec![0.2]));
+}
+
 fn assert_all_graphlike(text: &str) {
     for line in text.lines() {
         let line = line.trim();
@@ -47,4 +182,53 @@ fn assert_all_graphlike(text: &str) {
             }
         }
     }
+}
+
+fn parse_error_multiset(text: &str) -> BTreeMap<String, Vec<f64>> {
+    let mut out = BTreeMap::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("error(") {
+            if let Some(end) = rest.find(')') {
+                let prob: f64 = rest[..end].parse().unwrap();
+                let targets = canonicalize_error_targets(rest[end + 1..].trim());
+                out.entry(targets).or_insert_with(Vec::new).push(prob);
+            }
+        }
+    }
+    for probs in out.values_mut() {
+        probs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    }
+    out
+}
+
+fn assert_prob_multimaps_close(
+    expected: &BTreeMap<String, Vec<f64>>,
+    actual: &BTreeMap<String, Vec<f64>>,
+    context: &str,
+) {
+    assert_eq!(expected.len(), actual.len(), "{context}");
+    for (key, expected_probs) in expected {
+        let actual_probs = actual.get(key).unwrap_or_else(|| panic!("{context}"));
+        assert_eq!(expected_probs.len(), actual_probs.len(), "{context}");
+        for (expected_prob, actual_prob) in expected_probs.iter().zip(actual_probs.iter()) {
+            let scale = expected_prob.abs().max(actual_prob.abs()).max(1.0);
+            let diff = (expected_prob - actual_prob).abs();
+            assert!(diff <= 1e-12 * scale, "{context}");
+        }
+    }
+}
+
+fn canonicalize_error_targets(targets: &str) -> String {
+    let mut components: Vec<String> = targets
+        .split('^')
+        .map(|component| {
+            let mut terms: Vec<&str> = component.split_whitespace().collect();
+            terms.sort();
+            terms.join(" ")
+        })
+        .filter(|component| !component.is_empty())
+        .collect();
+    components.sort();
+    components.join(" ^ ")
 }

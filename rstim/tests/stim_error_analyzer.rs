@@ -5,6 +5,7 @@
 /// composite DEPOLARIZE2 analysis, reversed operation order, MPP ordering,
 /// duplicate records, exact pauli_channel_1, and gauge detection.
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
+use rstim::codegen::color_code::memory_xyz;
 use rstim::error_analyzer::{AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 
@@ -90,6 +91,13 @@ fn stim_x_error_basic() {
 }
 
 #[test]
+fn stim_noisy_measurement_merges_with_data_error() {
+    let dem = circuit_to_dem("R 0\nX_ERROR(0.1) 0\nM(0.2) 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.26, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
 fn stim_x_error_with_observable() {
     let dem = circuit_to_dem(
         "X_ERROR(0.25) 3\nM 3\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
@@ -162,6 +170,25 @@ fn stim_depolarize2_three_error_classes() {
     assert!(has_d0, "expected D0 error");
     assert!(has_d1, "expected D1 error");
     assert!(has_d0d1, "expected D0 D1 error");
+}
+
+#[test]
+fn stim_depolarize2_decomposed_merges_into_three_graphlike_classes() {
+    let instrs = parse_lines(
+        "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]",
+    )
+    .unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&instrs).unwrap();
+
+    assert_eq!(error_count(&dem), 3);
+    assert_has_error_approx(&dem, 0.07182558071116237, 1e-12, &[DemTarget::Detector(0)]);
+    assert_has_error_approx(
+        &dem,
+        0.07182558071116237,
+        1e-12,
+        &[DemTarget::Detector(0), DemTarget::Separator, DemTarget::Detector(1)],
+    );
+    assert_has_error_approx(&dem, 0.07182558071116237, 1e-12, &[DemTarget::Detector(1)]);
 }
 
 // ── reversed_operation_order ─────────────────────────────────────────────────
@@ -721,6 +748,20 @@ fn stim_pauli_channel_1_z_in_x_basis() {
 }
 
 #[test]
+fn stim_pauli_channel_1_falls_back_to_disjoint_approximation_in_z_basis() {
+    let dem = circuit_to_dem("R 0\nPAULI_CHANNEL_1(0.3,0.3,0) 0\nM 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.6, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn stim_pauli_channel_1_falls_back_to_disjoint_approximation_in_x_basis() {
+    let dem = circuit_to_dem("RX 0\nPAULI_CHANNEL_1(0,0.3,0.3) 0\nMX 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.6, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
 fn stim_pauli_channel_2_rejected_by_default() {
     let result = circuit_to_dem_err(
         "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
@@ -779,6 +820,27 @@ fn stim_correlated_error_three_branch_block_allowed_with_approximation_option() 
 }
 
 #[test]
+fn stim_heralded_erase_x_basis_merges_y_and_z_components() {
+    let dem = circuit_to_dem("RX 0\nHERALDED_ERASE(0.75) 0\nMX 0\nDETECTOR rec[-1]");
+    assert_eq!(error_count(&dem), 1);
+    assert_has_error_approx(&dem, 0.375, 1e-12, &[DemTarget::Detector(0)]);
+}
+
+#[test]
+fn circuit_to_dem_with_options_allows_non_deterministic_mx_when_enabled() {
+    let dem = circuit_to_dem_with_options("MX 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
+        .unwrap();
+    assert_eq!(dem.num_detectors(), 1);
+}
+
+#[test]
+fn circuit_to_dem_with_options_allows_non_deterministic_my_when_enabled() {
+    let dem = circuit_to_dem_with_options("MY 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
+        .unwrap();
+    assert_eq!(dem.num_detectors(), 1);
+}
+
+#[test]
 fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
     let instrs = parse_lines(
         "PAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-1]",
@@ -793,4 +855,26 @@ fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
     )
     .unwrap();
     assert!(dem.to_string().contains("error("));
+}
+
+#[test]
+fn circuit_to_dem_with_options_decomposed_allows_gauge_detectors() {
+    let instrs = parse_lines("R 0\nH 0\nM 0\nDETECTOR rec[-1]").unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
+        &instrs,
+        AnalyzeOptions {
+            approximate_disjoint_errors: false,
+            allow_gauge_detectors: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(error_count(&dem), 0);
+    assert_eq!(dem.num_detectors(), 1);
+}
+
+#[test]
+fn color_code_decomposed_reports_non_deterministic_detector_failure() {
+    let circuit = memory_xyz(3, 2, 0.001);
+    let err = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap_err();
+    assert!(err.contains("non-deterministic detector"), "{err}");
 }
