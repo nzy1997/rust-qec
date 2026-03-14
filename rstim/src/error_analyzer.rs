@@ -42,6 +42,36 @@ impl SparseXorVec {
     }
 }
 
+fn canonicalize_error_targets(targets: &[DemTarget]) -> Vec<DemTarget> {
+    let mut components: Vec<Vec<DemTarget>> = Vec::new();
+    let mut current = Vec::new();
+    for target in targets {
+        if matches!(target, DemTarget::Separator) {
+            if !current.is_empty() {
+                current.sort();
+                components.push(current);
+                current = Vec::new();
+            }
+        } else {
+            current.push(target.clone());
+        }
+    }
+    if !current.is_empty() {
+        current.sort();
+        components.push(current);
+    }
+    components.sort();
+
+    let mut out = Vec::new();
+    for (k, component) in components.into_iter().enumerate() {
+        if k > 0 {
+            out.push(DemTarget::Separator);
+        }
+        out.extend(component);
+    }
+    out
+}
+
 pub struct ErrorAnalyzer {
     x_sens: Vec<SparseXorVec>,
     z_sens: Vec<SparseXorVec>,
@@ -49,6 +79,7 @@ pub struct ErrorAnalyzer {
     num_measurements: usize,
     det_index: usize,
     errors: Vec<(f64, Vec<DemTarget>)>,
+    decompose_channel_errors: bool,
     // Phase 2 options are threaded first and consumed by later tasks.
     #[allow(dead_code)]
     options: AnalyzeOptions,
@@ -56,12 +87,20 @@ pub struct ErrorAnalyzer {
 
 impl ErrorAnalyzer {
     pub fn circuit_to_dem(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
-        Self::circuit_to_dem_with_options(instrs, AnalyzeOptions::default())
+        Self::circuit_to_dem_inner(instrs, AnalyzeOptions::default(), false)
     }
 
     pub fn circuit_to_dem_with_options(
         instrs: &[StimInstr],
         options: AnalyzeOptions,
+    ) -> Result<DetectorErrorModel, String> {
+        Self::circuit_to_dem_inner(instrs, options, false)
+    }
+
+    fn circuit_to_dem_inner(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+        decompose_channel_errors: bool,
     ) -> Result<DetectorErrorModel, String> {
         let num_qubits = count_qubits(instrs);
         let num_measurements = count_measurements(instrs);
@@ -75,6 +114,7 @@ impl ErrorAnalyzer {
             num_measurements,
             det_index: num_detectors,
             errors: Vec::new(),
+            decompose_channel_errors,
             options,
         };
 
@@ -89,6 +129,7 @@ impl ErrorAnalyzer {
         let mut merged: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
         for (prob, targets) in analyzer.errors.into_iter().rev() {
             if prob > 0.0 && !targets.is_empty() {
+                let targets = canonicalize_error_targets(&targets);
                 merged.entry(targets)
                     .and_modify(|existing| {
                         *existing = *existing + prob - 2.0 * *existing * prob;
@@ -115,7 +156,7 @@ impl ErrorAnalyzer {
     }
 
     pub fn circuit_to_dem_decomposed(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
-        let mut dem = Self::circuit_to_dem(instrs)?;
+        let mut dem = Self::circuit_to_dem_inner(instrs, AnalyzeOptions::default(), true)?;
         decompose_errors(&mut dem)?;
         Ok(dem)
     }
@@ -124,7 +165,7 @@ impl ErrorAnalyzer {
         instrs: &[StimInstr],
         options: AnalyzeOptions,
     ) -> Result<DetectorErrorModel, String> {
-        let mut dem = Self::circuit_to_dem_with_options(instrs, options)?;
+        let mut dem = Self::circuit_to_dem_inner(instrs, options, true)?;
         decompose_errors(&mut dem)?;
         Ok(dem)
     }
@@ -358,42 +399,54 @@ impl ErrorAnalyzer {
             }
 
             "M" | "MZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_mz(q);
                 }
             }
             "MX" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_mx(q);
                 }
             }
             "MY" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.undo_my(q);
                 }
             }
             "MR" | "MRZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mz(q);
                 }
             }
             "MRX" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_mx(q);
                 }
             }
             "MRY" => {
+                let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits_inv(targets).into_iter().rev() {
                     self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise(p);
                     self.x_sens[q].clear();
                     self.z_sens[q].clear();
                     self.undo_my(q);
@@ -485,20 +538,14 @@ impl ErrorAnalyzer {
                 if p > 0.0 {
                     let q = depolarize1_to_independent(p);
                     for q_idx in qubits(targets) {
-                        // X error (basis index 0)
-                        if !self.x_sens[q_idx].is_empty() {
-                            self.errors.push((q, self.x_sens[q_idx].targets.clone()));
-                        }
-                        // Z error (basis index 1)
-                        if !self.z_sens[q_idx].is_empty() {
-                            self.errors.push((q, self.z_sens[q_idx].targets.clone()));
-                        }
-                        // Y = X⊕Z error (basis index 0⊕1)
-                        let mut y_sens = self.x_sens[q_idx].clone();
-                        y_sens.xor_other(&self.z_sens[q_idx]);
-                        if !y_sens.is_empty() {
-                            self.errors.push((q, y_sens.targets));
-                        }
+                        self.emit_error_combinations(
+                            &[0.0, q, q, q],
+                            &[
+                                self.x_sens[q_idx].targets.clone(),
+                                self.z_sens[q_idx].targets.clone(),
+                            ],
+                            false,
+                        );
                     }
                 }
             }
@@ -508,18 +555,16 @@ impl ErrorAnalyzer {
                 if p > 0.0 {
                     let q = depolarize2_to_independent(p);
                     for (qa, qb) in qubit_pairs(targets) {
-                        // 4 basis axes: x_a (bit 0), z_a (bit 1), x_b (bit 2), z_b (bit 3)
-                        // Iterate over all 15 non-identity combinations (k = 1..15)
-                        for k in 1u8..16 {
-                            let mut sens = SparseXorVec::default();
-                            if k & 1 != 0 { sens.xor_other(&self.x_sens[qa]); }
-                            if k & 2 != 0 { sens.xor_other(&self.z_sens[qa]); }
-                            if k & 4 != 0 { sens.xor_other(&self.x_sens[qb]); }
-                            if k & 8 != 0 { sens.xor_other(&self.z_sens[qb]); }
-                            if !sens.is_empty() {
-                                self.errors.push((q, sens.targets));
-                            }
-                        }
+                        self.emit_error_combinations(
+                            &[0.0, q, q, q, q, q, q, q, q, q, q, q, q, q, q, q],
+                            &[
+                                self.x_sens[qa].targets.clone(),
+                                self.z_sens[qa].targets.clone(),
+                                self.x_sens[qb].targets.clone(),
+                                self.z_sens[qb].targets.clone(),
+                            ],
+                            false,
+                        );
                     }
                 }
             }
@@ -729,6 +774,226 @@ impl ErrorAnalyzer {
         let m_sens = std::mem::take(&mut self.measurement_sens[m_idx]);
         self.x_sens[q].xor_other(&m_sens);
         self.z_sens[q].xor_other(&m_sens);
+    }
+
+    fn xor_sorted_targets(a: &[DemTarget], b: &[DemTarget]) -> Vec<DemTarget> {
+        let mut i = 0;
+        let mut j = 0;
+        let mut out = Vec::with_capacity(a.len() + b.len());
+        while i < a.len() || j < b.len() {
+            if i == a.len() {
+                out.push(b[j].clone());
+                j += 1;
+            } else if j == b.len() {
+                out.push(a[i].clone());
+                i += 1;
+            } else {
+                match a[i].cmp(&b[j]) {
+                    std::cmp::Ordering::Less => {
+                        out.push(a[i].clone());
+                        i += 1;
+                    }
+                    std::cmp::Ordering::Greater => {
+                        out.push(b[j].clone());
+                        j += 1;
+                    }
+                    std::cmp::Ordering::Equal => {
+                        i += 1;
+                        j += 1;
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn join_components_with_separators(components: Vec<Vec<DemTarget>>) -> Vec<DemTarget> {
+        let mut out = Vec::new();
+        for (k, component) in components.into_iter().enumerate() {
+            if component.is_empty() {
+                continue;
+            }
+            if !out.is_empty() && k > 0 {
+                out.push(DemTarget::Separator);
+            }
+            out.extend(component);
+        }
+        out
+    }
+
+    fn decompose_combination_targets(stored_ids: &mut [Vec<DemTarget>], detector_masks: &[u64]) {
+        let mut detector_counts = vec![0u8; detector_masks.len()];
+        for k in 1..detector_masks.len() {
+            detector_counts[k] = detector_masks[k].count_ones() as u8;
+        }
+
+        let mut solved = 0u64;
+        let mut single_detectors_union = 0u64;
+        for k in 1..detector_masks.len() {
+            if detector_counts[k] == 1 {
+                single_detectors_union |= detector_masks[k];
+                solved |= 1 << k;
+            }
+        }
+
+        let mut irreducible_pairs = Vec::new();
+        for k in 1..detector_masks.len() {
+            if detector_counts[k] == 2 && (detector_masks[k] & !single_detectors_union) != 0 {
+                irreducible_pairs.push(k);
+                solved |= 1 << k;
+            }
+        }
+
+        for goal_k in 1..detector_masks.len() {
+            if detector_counts[goal_k] == 0 || ((solved >> goal_k) & 1) != 0 {
+                continue;
+            }
+
+            let goal = detector_masks[goal_k];
+            let mut components = Vec::new();
+            let mut remnants = if (goal & !single_detectors_union) == 0 {
+                goal
+            } else {
+                let mut solved_with_pairs = None;
+
+                for &pair_k in &irreducible_pairs {
+                    let mask = detector_masks[pair_k];
+                    if (goal & mask) == mask && (goal & !(single_detectors_union | mask)) == 0 {
+                        components.push(stored_ids[pair_k].clone());
+                        solved_with_pairs = Some(goal & !mask);
+                        break;
+                    }
+                }
+
+                if solved_with_pairs.is_none() {
+                    'search_two_pairs: for i in 0..irreducible_pairs.len() {
+                        let k1 = irreducible_pairs[i];
+                        let m1 = detector_masks[k1];
+                        for &candidate_k2 in irreducible_pairs.iter().skip(i + 1) {
+                            let k2 = candidate_k2;
+                            let m2 = detector_masks[k2];
+                            if (m1 & m2) == 0 && (goal & !(single_detectors_union | m1 | m2)) == 0 {
+                                let mut first = k1;
+                                let mut second = k2;
+                                if stored_ids[second] < stored_ids[first] {
+                                    std::mem::swap(&mut first, &mut second);
+                                }
+                                components.push(stored_ids[first].clone());
+                                components.push(stored_ids[second].clone());
+                                solved_with_pairs = Some(goal & !(m1 | m2));
+                                break 'search_two_pairs;
+                            }
+                        }
+                    }
+                }
+
+                match solved_with_pairs {
+                    Some(remnants) => remnants,
+                    None => {
+                        components.push(stored_ids[goal_k].clone());
+                        0
+                    }
+                }
+            };
+
+            for k2 in 0..detector_masks.len() {
+                if remnants == 0 {
+                    break;
+                }
+                if detector_counts[k2] == 1 && (detector_masks[k2] & !remnants) == 0 {
+                    remnants &= !detector_masks[k2];
+                    components.push(stored_ids[k2].clone());
+                }
+            }
+
+            stored_ids[goal_k] = Self::join_components_with_separators(components);
+        }
+    }
+
+    fn emit_error_combinations(
+        &mut self,
+        probabilities: &[f64],
+        basis_errors: &[Vec<DemTarget>],
+        probabilities_are_disjoint: bool,
+    ) {
+        let s = basis_errors.len();
+        let num_cases = 1usize << s;
+        debug_assert_eq!(probabilities.len(), num_cases);
+
+        let mut stored_ids = vec![Vec::<DemTarget>::new(); num_cases];
+        let mut detector_masks = vec![0u64; num_cases];
+
+        for k in 0..s {
+            let slot = 1usize << k;
+            stored_ids[slot] = basis_errors[k].clone();
+        }
+
+        let mut involved_detectors = Vec::<usize>::new();
+        if self.decompose_channel_errors {
+            for k in 0..s {
+                let slot = 1usize << k;
+                for target in &basis_errors[k] {
+                    if let DemTarget::Detector(det) = target {
+                        let bit = if let Some(existing) = involved_detectors.iter().position(|value| value == det) {
+                            existing
+                        } else {
+                            involved_detectors.push(*det);
+                            involved_detectors.len() - 1
+                        };
+                        if bit < 64 {
+                            detector_masks[slot] ^= 1u64 << bit;
+                        }
+                    }
+                }
+            }
+        }
+
+        for k in 3..num_cases {
+            let c1 = k & (k - 1);
+            let c2 = k ^ c1;
+            if c1 != 0 {
+                stored_ids[k] = Self::xor_sorted_targets(&stored_ids[c1], &stored_ids[c2]);
+                if self.decompose_channel_errors {
+                    detector_masks[k] = detector_masks[c1] ^ detector_masks[c2];
+                }
+            }
+        }
+
+        if self.decompose_channel_errors && involved_detectors.len() < 64 {
+            Self::decompose_combination_targets(&mut stored_ids, &detector_masks);
+        }
+
+        let mut probs = probabilities.to_vec();
+        if probabilities_are_disjoint {
+            for k in 1..num_cases {
+                if stored_ids[k].is_empty() {
+                    for dst in 0..num_cases {
+                        let src = dst ^ k;
+                        if src > dst {
+                            probs[dst] += probs[src];
+                            probs[src] = 0.0;
+                        }
+                    }
+                }
+            }
+        }
+
+        for k in 1..num_cases {
+            let prob = probs[k];
+            if prob > 0.0 && !stored_ids[k].is_empty() {
+                self.errors.push((prob, stored_ids[k].clone()));
+            }
+        }
+    }
+
+    fn emit_measurement_noise(&mut self, probability: f64) {
+        if probability <= 0.0 || self.num_measurements == 0 {
+            return;
+        }
+        let targets = self.measurement_sens[self.num_measurements - 1].targets.clone();
+        if !targets.is_empty() {
+            self.errors.push((probability, targets));
+        }
     }
 
     fn undo_h(&mut self, q: usize) {
@@ -1406,53 +1671,233 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
         }
 
         if !found_pair {
-            // Strategy 3: brute-force decompose into components of <=2 detectors each
-            // Extract just detectors and observables separately
-            let dets: Vec<DemTarget> = error_set
-                .iter()
-                .filter(|t| matches!(t, DemTarget::Detector(_)))
-                .cloned()
-                .collect();
-            let obs: Vec<DemTarget> = error_set
-                .iter()
-                .filter(|t| matches!(t, DemTarget::Observable(_)))
-                .cloned()
-                .collect();
-
-            if dets.len() >= 3 {
-                // Split into pairs of detectors, distributing observables into the first component
-                let mut new_targets: Vec<DemTarget> = Vec::new();
-                let mut first = true;
-                for chunk in dets.chunks(2) {
-                    if !first {
-                        new_targets.push(DemTarget::Separator);
-                    }
-                    new_targets.extend_from_slice(chunk);
-                    if first {
-                        // Put observables in the first component
-                        new_targets.extend(obs.iter().cloned());
-                        first = false;
-                    }
-                }
-                new_instrs[idx] = DemInstruction::Error {
-                    probability: prob,
-                    targets: new_targets,
-                };
-            } else {
-                return Err(format!(
-                    "failed to decompose non-graphlike error: {:?}",
-                    targets
-                ));
-            }
+            return Err(format!(
+                "failed to decompose non-graphlike error into graphlike components: {:?}",
+                targets
+            ));
         }
     }
 
     // Rebuild the DEM
+    let mut merged_errors: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
+    let mut annotations = Vec::new();
+    for instr in new_instrs {
+        match instr {
+            DemInstruction::Error {
+                probability,
+                targets,
+            } => {
+                if probability > 0.0 && !targets.is_empty() {
+                    let targets = canonicalize_error_targets(&targets);
+                    merged_errors
+                        .entry(targets)
+                        .and_modify(|existing| {
+                            *existing = *existing + probability - 2.0 * *existing * probability;
+                        })
+                        .or_insert(probability);
+                }
+            }
+            other => annotations.push(other),
+        }
+    }
+
     let mut new_dem = DetectorErrorModel::new();
     new_dem.set_min_counts(dem.num_detectors(), dem.num_observables());
-    for instr in new_instrs {
+    for (targets, probability) in merged_errors {
+        if probability > 0.0 {
+            new_dem.push(DemInstruction::Error {
+                probability,
+                targets,
+            });
+        }
+    }
+    for instr in annotations {
         new_dem.push(instr);
     }
     *dem = new_dem;
     Ok(())
+}
+
+#[cfg(test)]
+mod internal_branch_tests {
+    use super::*;
+    use crate::ir::{PauliBasis, StimInstr, StimTarget};
+
+    fn make_analyzer(num_qubits: usize, num_measurements: usize) -> ErrorAnalyzer {
+        ErrorAnalyzer {
+            x_sens: vec![SparseXorVec::default(); num_qubits],
+            z_sens: vec![SparseXorVec::default(); num_qubits],
+            measurement_sens: vec![SparseXorVec::default(); num_measurements],
+            num_measurements,
+            det_index: 0,
+            errors: Vec::new(),
+            decompose_channel_errors: false,
+            options: AnalyzeOptions::default(),
+        }
+    }
+
+    #[test]
+    fn undo_op_reports_internal_mpad_underflow() {
+        let mut analyzer = make_analyzer(0, 0);
+        let err = analyzer
+            .undo_op("MPAD", &[], &[StimTarget::Qubit(0)])
+            .unwrap_err();
+        assert!(err.contains("underflow"));
+    }
+
+    #[test]
+    fn undo_op_reports_internal_else_correlated_error_without_leader() {
+        let mut analyzer = make_analyzer(0, 0);
+        let err = analyzer
+            .undo_op("ELSE_CORRELATED_ERROR", &[0.25], &[StimTarget::pauli(0, PauliBasis::X, false)])
+            .unwrap_err();
+        assert!(err.contains("ELSE_CORRELATED_ERROR"));
+    }
+
+    #[test]
+    fn emit_error_combinations_folds_disjoint_empty_combinations() {
+        let mut analyzer = make_analyzer(0, 0);
+        analyzer.emit_error_combinations(
+            &[0.0, 0.1, 0.2, 0.3],
+            &[
+                vec![DemTarget::Detector(0)],
+                vec![DemTarget::Detector(0)],
+            ],
+            true,
+        );
+
+        assert_eq!(analyzer.errors.len(), 1);
+        assert_eq!(analyzer.errors[0].1, vec![DemTarget::Detector(0)]);
+        assert!((analyzer.errors[0].0 - 0.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn join_components_skips_empty_components() {
+        let joined = ErrorAnalyzer::join_components_with_separators(vec![
+            vec![DemTarget::Detector(0)],
+            Vec::new(),
+            vec![DemTarget::Detector(1)],
+        ]);
+        assert_eq!(
+            joined,
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Separator,
+                DemTarget::Detector(1),
+            ]
+        );
+    }
+
+    #[test]
+    fn decompose_combination_targets_keeps_unsolved_goal_as_single_component() {
+        let mut stored_ids = vec![Vec::new(); 8];
+        stored_ids[7] = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+        ];
+        let detector_masks = vec![0, 0, 0, 0, 0, 0, 0, 0b111];
+
+        ErrorAnalyzer::decompose_combination_targets(&mut stored_ids, &detector_masks);
+
+        assert_eq!(
+            stored_ids[7],
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ]
+        );
+    }
+
+    #[test]
+    fn correlated_branch_from_instr_rejects_invalid_instruction() {
+        let analyzer = make_analyzer(1, 0);
+        let err = analyzer
+            .correlated_branch_from_instr(&StimInstr::new(
+                "X_ERROR",
+                vec![0.1],
+                vec![StimTarget::Qubit(0)],
+            ))
+            .unwrap_err();
+        assert!(err.contains("invalid correlated error block"));
+    }
+
+    #[test]
+    fn allow_gauge_short_circuits_x_and_y_determinism_checks() {
+        let mut x_analyzer = make_analyzer(1, 0);
+        x_analyzer.options.allow_gauge_detectors = true;
+        x_analyzer.x_sens[0].targets = vec![DemTarget::Detector(0)];
+        assert!(x_analyzer.ensure_x_collapse_is_deterministic(0).is_ok());
+
+        let mut y_analyzer = make_analyzer(1, 0);
+        y_analyzer.options.allow_gauge_detectors = true;
+        y_analyzer.x_sens[0].targets = vec![DemTarget::Detector(0)];
+        assert!(y_analyzer.ensure_y_collapse_is_deterministic(0).is_ok());
+    }
+
+    #[test]
+    fn ensure_no_pending_gauge_distinguishes_observable_from_detector() {
+        let mut observable_analyzer = make_analyzer(0, 1);
+        observable_analyzer.measurement_sens[0].targets = vec![DemTarget::Observable(0)];
+        let observable_err = observable_analyzer.ensure_no_pending_gauge().unwrap_err();
+        assert!(observable_err.contains("observable"));
+
+        let mut detector_analyzer = make_analyzer(0, 1);
+        detector_analyzer.measurement_sens[0].targets = vec![DemTarget::Detector(0)];
+        let detector_err = detector_analyzer.ensure_no_pending_gauge().unwrap_err();
+        assert!(detector_err.contains("detector"));
+    }
+
+    #[test]
+    fn target_helpers_ignore_non_matching_targets() {
+        assert_eq!(
+            split_pauli_products(&[
+                StimTarget::pauli(0, PauliBasis::X, false),
+                StimTarget::Combiner,
+                StimTarget::Sweep(1),
+                StimTarget::pauli(1, PauliBasis::Z, false),
+            ])
+            .len(),
+            1
+        );
+        assert_eq!(qubits(&[StimTarget::Qubit(2), StimTarget::Rec(-1)]), vec![2]);
+        assert_eq!(
+            qubits_inv(&[StimTarget::QubitInv(3), StimTarget::Sweep(1)]),
+            vec![3]
+        );
+    }
+
+    #[test]
+    fn try_disjoint_to_independent_xyz_covers_recursions_and_none_cases() {
+        assert!(try_disjoint_to_independent_xyz(0.1, 0.9, 0.0).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.2, 0.8).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.0, 0.9).is_some());
+        assert!(try_disjoint_to_independent_xyz(0.3, 0.3, 0.0).is_none());
+        assert!(try_disjoint_to_independent_xyz(0.0, 0.01, 0.01).is_none());
+    }
+
+    #[test]
+    fn decompose_helpers_cover_set_operations_and_separator_overflow() {
+        let mut a = BTreeSet::new();
+        a.insert(DemTarget::Detector(0));
+        a.insert(DemTarget::Detector(1));
+        let mut b = BTreeSet::new();
+        b.insert(DemTarget::Detector(1));
+        b.insert(DemTarget::Detector(2));
+
+        let diff = symmetric_difference(&a, &b);
+        assert_eq!(detector_count(&diff), 2);
+        assert_eq!(
+            set_to_targets(&diff),
+            vec![DemTarget::Detector(0), DemTarget::Detector(2)]
+        );
+        assert!(!component_is_graphlike(&[
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+            DemTarget::Separator,
+            DemTarget::Detector(3),
+        ]));
+    }
 }
