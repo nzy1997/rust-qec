@@ -1,4 +1,3 @@
-use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -135,18 +134,13 @@ fn run_with_stdin_forwards_input_to_child_process() {
 
 #[test]
 fn run_capture_includes_stderr_on_failure() {
-    let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("fail");
-    fs::write(&script, "#!/bin/sh\necho 'boom' >&2\nexit 1\n").unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script, perms).unwrap();
-    }
-
-    let panic = std::panic::catch_unwind(|| run_capture(script.to_str().unwrap(), &[])).unwrap_err();
+    let panic = std::panic::catch_unwind(|| {
+        run_capture(
+            "/bin/sh",
+            &["-c".to_string(), "echo boom >&2; exit 1".to_string()],
+        )
+    })
+    .unwrap_err();
     let text = panic_text(panic);
     assert!(text.contains("command failed"));
     assert!(text.contains("boom"));
