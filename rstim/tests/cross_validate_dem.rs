@@ -251,6 +251,29 @@ fn assert_prob_maps_close_reports_missing_keys() {
 }
 
 #[test]
+fn assert_all_graphlike_dem_text_rejects_non_graphlike_component() {
+    let panic = std::panic::catch_unwind(|| {
+        assert_all_graphlike_dem_text("error(0.1) D0 D1 D2\n");
+    })
+    .unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("non-graphlike component"));
+}
+
+#[test]
+fn assert_semantic_dem_parity_reports_annotation_mismatch() {
+    let panic = std::panic::catch_unwind(|| {
+        assert_semantic_dem_parity(
+            "error(0.1) D0 D1\ndetector(0, 0) D0\n",
+            "error(0.1) D0 D1\ndetector(1, 0) D0\n",
+        );
+    })
+    .unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("detector annotations differ"));
+}
+
+#[test]
 fn stim_analyze_errors_respects_override_command() {
     let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();

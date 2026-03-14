@@ -177,3 +177,27 @@ fn run_capture_includes_stderr_on_failure() {
     assert!(text.contains("command failed"));
     assert!(text.contains("boom"));
 }
+
+#[test]
+fn panic_text_handles_static_str_and_non_string_payloads() {
+    let literal = std::panic::catch_unwind(|| panic!("literal panic")).unwrap_err();
+    assert_eq!(panic_text(literal), "literal panic");
+
+    let non_string = std::panic::catch_unwind(|| std::panic::panic_any(7usize)).unwrap_err();
+    assert_eq!(panic_text(non_string), "non-string panic payload");
+}
+
+#[test]
+fn run_with_stdin_includes_stderr_on_failure() {
+    let panic = std::panic::catch_unwind(|| {
+        run_with_stdin(
+            "/bin/sh",
+            &["-c".to_string(), "echo nope >&2; exit 1".to_string()],
+            "ignored\n",
+        )
+    })
+    .unwrap_err();
+    let text = panic_text(panic);
+    assert!(text.contains("command failed"));
+    assert!(text.contains("nope"));
+}
