@@ -74,29 +74,70 @@ pub fn strip_comment_preamble(text: &str) -> &str {
     &text[offset..]
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CircuitSummary {
+    pub qubits: usize,
     pub opcode_counts: BTreeMap<String, usize>,
     pub measurements: usize,
     pub detectors: usize,
     pub observables: usize,
+    pub detector_target_arities: BTreeMap<usize, usize>,
+    pub observable_target_arities: BTreeMap<usize, usize>,
     pub qubit_coords: BTreeSet<String>,
     pub detector_annotations: BTreeSet<String>,
     pub observable_includes: BTreeSet<String>,
 }
 
+impl PartialEq for CircuitSummary {
+    fn eq(&self, other: &Self) -> bool {
+        self.qubits == other.qubits
+            && self.opcode_counts == other.opcode_counts
+            && self.measurements == other.measurements
+            && self.detectors == other.detectors
+            && self.observables == other.observables
+            && self.detector_target_arities == other.detector_target_arities
+            && self.observable_target_arities == other.observable_target_arities
+    }
+}
+
+impl Eq for CircuitSummary {}
+
 pub fn structural_circuit_summary(instrs: &[StimInstr]) -> CircuitSummary {
     let mut summary = CircuitSummary {
+        qubits: used_qubit_count(instrs),
         opcode_counts: BTreeMap::new(),
         measurements: stats::num_measurements(instrs),
         detectors: stats::num_detectors(instrs),
         observables: stats::num_observables(instrs),
+        detector_target_arities: BTreeMap::new(),
+        observable_target_arities: BTreeMap::new(),
         qubit_coords: BTreeSet::new(),
         detector_annotations: BTreeSet::new(),
         observable_includes: BTreeSet::new(),
     };
     accumulate_instrs(instrs, &mut summary);
     summary
+}
+
+fn used_qubit_count(instrs: &[StimInstr]) -> usize {
+    let mut qubits = BTreeSet::new();
+    collect_qubits(instrs, &mut qubits);
+    qubits.len()
+}
+
+fn collect_qubits(instrs: &[StimInstr], qubits: &mut BTreeSet<u32>) {
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { targets, .. } => {
+                for target in targets {
+                    if let Some(qubit) = target.qubit_index() {
+                        qubits.insert(qubit);
+                    }
+                }
+            }
+            StimInstr::Repeat { body, .. } => collect_qubits(body, qubits),
+        }
+    }
 }
 
 fn accumulate_instrs(instrs: &[StimInstr], summary: &mut CircuitSummary) {
@@ -107,43 +148,91 @@ fn accumulate_instrs(instrs: &[StimInstr], summary: &mut CircuitSummary) {
                 args,
                 targets,
                 ..
-            } => {
-                *summary.opcode_counts.entry(name.clone()).or_default() += 1;
-                match name.as_str() {
-                    "QUBIT_COORDS" => {
-                        if let Some(q) = targets.first().and_then(StimTarget::qubit_index) {
-                            summary.qubit_coords.insert(format!(
-                                "QUBIT_COORDS({}) {}",
-                                format_args(args),
-                                q
-                            ));
-                        }
-                    }
-                    "DETECTOR" => {
-                        summary.detector_annotations.insert(format!(
-                            "DETECTOR({}) {}",
+            } => match name.as_str() {
+                "QUBIT_COORDS" => {
+                    if let Some(q) = targets.first().and_then(StimTarget::qubit_index) {
+                        summary.qubit_coords.insert(format!(
+                            "QUBIT_COORDS({}) {}",
                             format_args(args),
-                            format_targets(targets)
+                            q
                         ));
                     }
-                    "OBSERVABLE_INCLUDE" => {
-                        summary.observable_includes.insert(format!(
-                            "OBSERVABLE_INCLUDE({}) {}",
-                            format_args(args),
-                            format_targets(targets)
-                        ));
-                    }
-                    _ => {}
                 }
-            }
+                "DETECTOR" => {
+                    let arity = targets
+                        .iter()
+                        .filter(|target| matches!(target, StimTarget::Rec(_)))
+                        .count();
+                    *summary.detector_target_arities.entry(arity).or_default() += 1;
+                    summary.detector_annotations.insert(format!(
+                        "DETECTOR({}) {}",
+                        format_args(args),
+                        format_targets(targets)
+                    ));
+                }
+                "OBSERVABLE_INCLUDE" => {
+                    let arity = targets
+                        .iter()
+                        .filter(|target| matches!(target, StimTarget::Rec(_)))
+                        .count();
+                    *summary.observable_target_arities.entry(arity).or_default() += 1;
+                    summary.observable_includes.insert(format!(
+                        "OBSERVABLE_INCLUDE({}) {}",
+                        format_args(args),
+                        format_targets(targets)
+                    ));
+                }
+                "MR" => {
+                    add_opcode_units(&mut summary.opcode_counts, "M", targets.len());
+                    add_opcode_units(&mut summary.opcode_counts, "R", targets.len());
+                }
+                "MRX" => {
+                    add_opcode_units(&mut summary.opcode_counts, "MX", targets.len());
+                    add_opcode_units(&mut summary.opcode_counts, "RX", targets.len());
+                }
+                "MRY" => {
+                    add_opcode_units(&mut summary.opcode_counts, "MY", targets.len());
+                    add_opcode_units(&mut summary.opcode_counts, "RY", targets.len());
+                }
+                "MRZ" => {
+                    add_opcode_units(&mut summary.opcode_counts, "MZ", targets.len());
+                    add_opcode_units(&mut summary.opcode_counts, "R", targets.len());
+                }
+                "TICK" | "SHIFT_COORDS" => {}
+                _ => {
+                    let units = normalized_opcode_units(name, targets);
+                    add_opcode_units(&mut summary.opcode_counts, name, units);
+                }
+            },
             StimInstr::Repeat { count, body } => {
-                *summary
-                    .opcode_counts
-                    .entry("REPEAT".to_string())
-                    .or_default() += 1;
                 for _ in 0..*count {
                     accumulate_instrs(body, summary);
                 }
+            }
+        }
+    }
+}
+
+fn add_opcode_units(opcode_counts: &mut BTreeMap<String, usize>, name: &str, units: usize) {
+    if units > 0 {
+        *opcode_counts.entry(name.to_string()).or_default() += units;
+    }
+}
+
+fn normalized_opcode_units(name: &str, targets: &[StimTarget]) -> usize {
+    match name {
+        "QUBIT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => 0,
+        "CX" | "CY" | "CZ" | "SWAP" | "ISWAP" | "ISWAP_DAG" | "XCX" | "XCY" | "XCZ" | "YCX"
+        | "YCY" | "YCZ" | "MXX" | "MYY" | "MZZ" => targets.len() / 2,
+        "MPP" => targets
+            .split(|target| matches!(target, StimTarget::Combiner))
+            .filter(|group| !group.is_empty())
+            .count(),
+        _ => {
+            if targets.is_empty() {
+                1
+            } else {
+                targets.len()
             }
         }
     }
