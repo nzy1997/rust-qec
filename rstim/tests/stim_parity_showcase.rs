@@ -192,7 +192,10 @@ fn run_with_stdin_includes_stderr_on_failure() {
     let panic = std::panic::catch_unwind(|| {
         run_with_stdin(
             "/bin/sh",
-            &["-c".to_string(), "echo nope >&2; exit 1".to_string()],
+            &[
+                "-c".to_string(),
+                "cat >/dev/null; echo nope >&2; exit 1".to_string(),
+            ],
             "ignored\n",
         )
     })
