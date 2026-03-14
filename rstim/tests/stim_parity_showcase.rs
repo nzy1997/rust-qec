@@ -151,18 +151,11 @@ fn stim_cmd_respects_override_command() {
 
 #[test]
 fn run_with_stdin_forwards_input_to_child_process() {
-    let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("echo-stdin");
-    fs::write(&script, "#!/bin/sh\ncat\n").unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&script).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&script, perms).unwrap();
-    }
-
-    let output = run_with_stdin(script.to_str().unwrap(), &[], "alpha\nbeta\n");
+    let output = run_with_stdin(
+        "/bin/sh",
+        &["-c".to_string(), "cat".to_string()],
+        "alpha\nbeta\n",
+    );
     assert_eq!(output, "alpha\nbeta\n");
 }
 
