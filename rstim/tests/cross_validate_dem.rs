@@ -367,12 +367,7 @@ fn cross_validate_decomposed_color_code_failure_mode() {
         .expect("stim CLI not found");
     {
         use std::io::Write;
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(circuit_text.as_bytes())
-            .unwrap();
+        child.stdin.take().unwrap().write_all(circuit_text.as_bytes()).unwrap();
     }
     let output = child.wait_with_output().unwrap();
     let rstim_result = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit);
