@@ -1,8 +1,10 @@
 use rstim::dem::DetectorErrorModel;
 use rstim::parser::parse_lines;
 use rstim::showcase::{
-    dem_semantic_summary, showcase_cases, strip_comment_preamble, structural_circuit_summary,
+    dem_semantic_summary, median_duration_ns, render_markdown_table, showcase_cases,
+    strip_comment_preamble, structural_circuit_summary,
 };
+use std::time::Duration;
 
 #[test]
 fn showcase_cases_cover_expected_matrix() {
@@ -52,4 +54,32 @@ fn dem_semantic_summary_flattens_repeat_blocks_and_shifted_detectors() {
         .annotation_lines
         .iter()
         .any(|line| line.starts_with("detector(5,0) D2")));
+}
+
+#[test]
+fn median_duration_ns_picks_middle_value() {
+    let values = vec![
+        Duration::from_millis(30),
+        Duration::from_millis(10),
+        Duration::from_millis(20),
+    ];
+    assert_eq!(median_duration_ns(&values), 20_000_000);
+}
+
+#[test]
+fn render_markdown_table_includes_expected_headers() {
+    let table = render_markdown_table(&[vec![
+        "repetition_code/memory d=5 r=5".to_string(),
+        "exact".to_string(),
+        "match".to_string(),
+        "0".to_string(),
+        "1.0".to_string(),
+        "1.1".to_string(),
+        "2.0".to_string(),
+        "2.4".to_string(),
+        "1.10x".to_string(),
+        "1.20x".to_string(),
+    ]]);
+    assert!(table.contains("| Case | Gen | DEM |"));
+    assert!(table.contains("repetition_code/memory d=5 r=5"));
 }

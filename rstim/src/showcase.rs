@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Duration;
 
 use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
@@ -352,4 +353,24 @@ fn format_args(args: &[f64]) -> String {
         }
     }
     parts.join(",")
+}
+
+pub fn median_duration_ns(values: &[Duration]) -> u128 {
+    let mut nanos: Vec<u128> = values.iter().map(Duration::as_nanos).collect();
+    nanos.sort_unstable();
+    nanos[nanos.len() / 2]
+}
+
+pub fn render_markdown_table(rows: &[Vec<String>]) -> String {
+    let mut out = String::from(
+        "| Case | Gen | DEM | Max Rel Error | Stim Gen ms | rstim Gen ms | Stim DEM ms | rstim DEM ms | Gen Ratio | DEM Ratio |\n",
+    );
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    for row in rows {
+        out.push('|');
+        out.push(' ');
+        out.push_str(&row.join(" | "));
+        out.push_str(" |\n");
+    }
+    out
 }
