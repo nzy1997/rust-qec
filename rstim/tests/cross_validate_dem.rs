@@ -220,6 +220,37 @@ error(0.26) D0 ^ D1
 }
 
 #[test]
+fn panic_message_handles_static_str_and_non_string_payloads() {
+    let literal = std::panic::catch_unwind(|| panic!("literal panic")).unwrap_err();
+    assert_eq!(panic_message(literal), "literal panic");
+
+    let non_string = std::panic::catch_unwind(|| std::panic::panic_any(5usize)).unwrap_err();
+    assert_eq!(panic_message(non_string), "non-string panic payload");
+}
+
+#[test]
+fn canonicalize_error_targets_sorts_terms_and_components() {
+    assert_eq!(
+        canonicalize_error_targets(" D1   D0 ^  ^ L0 D2 "),
+        "D0 D1 ^ D2 L0"
+    );
+}
+
+#[test]
+fn assert_prob_maps_close_reports_missing_keys() {
+    let mut expected = BTreeMap::new();
+    expected.insert("D0 D1".to_string(), 0.125);
+    let actual = BTreeMap::new();
+
+    let panic = std::panic::catch_unwind(|| {
+        assert_prob_maps_close(&expected, &actual, "missing probability");
+    })
+    .unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("missing probability"));
+}
+
+#[test]
 fn stim_analyze_errors_respects_override_command() {
     let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();

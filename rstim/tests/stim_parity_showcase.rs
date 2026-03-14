@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -42,6 +43,16 @@ fn run_with_stdin(cmd: &str, args: &[String], stdin_data: &str) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).unwrap()
+}
+
+fn panic_text(payload: Box<dyn std::any::Any + Send>) -> String {
+    match payload.downcast::<String>() {
+        Ok(message) => *message,
+        Err(payload) => match payload.downcast::<&'static str>() {
+            Ok(message) => (*message).to_string(),
+            Err(_) => "non-string panic payload".to_string(),
+        },
+    }
 }
 
 #[test]
@@ -123,4 +134,53 @@ fn showcase_dem_parity_matches_semantically() {
             );
         }
     }
+}
+
+#[test]
+fn stim_cmd_respects_override_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim");
+    unsafe {
+        std::env::set_var("RSTIM_TEST_STIM", &fake_stim);
+    }
+    assert_eq!(stim_cmd(), fake_stim.to_string_lossy());
+    unsafe {
+        std::env::remove_var("RSTIM_TEST_STIM");
+    }
+}
+
+#[test]
+fn run_with_stdin_forwards_input_to_child_process() {
+    let dir = tempfile::tempdir().unwrap();
+    let script = dir.path().join("echo-stdin");
+    fs::write(&script, "#!/bin/sh\ncat\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script, perms).unwrap();
+    }
+
+    let output = run_with_stdin(script.to_str().unwrap(), &[], "alpha\nbeta\n");
+    assert_eq!(output, "alpha\nbeta\n");
+}
+
+#[test]
+fn run_capture_includes_stderr_on_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let script = dir.path().join("fail");
+    fs::write(&script, "#!/bin/sh\necho 'boom' >&2\nexit 1\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&script).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&script, perms).unwrap();
+    }
+
+    let panic = std::panic::catch_unwind(|| run_capture(script.to_str().unwrap(), &[])).unwrap_err();
+    let text = panic_text(panic);
+    assert!(text.contains("command failed"));
+    assert!(text.contains("boom"));
 }
