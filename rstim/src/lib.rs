@@ -12,6 +12,7 @@ pub mod coords;
 pub mod sampler;
 pub mod dem;
 pub mod error_analyzer;
+pub mod showcase;
 pub mod output;
 pub mod cli;
 pub mod stats;

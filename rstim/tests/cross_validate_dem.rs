@@ -48,7 +48,11 @@ fn stim_analyze_errors_flags(circuit_text: &str, flags: &[&str]) -> String {
         child.stdin.take().unwrap().write_all(circuit_text.as_bytes()).unwrap();
     }
     let output = child.wait_with_output().unwrap();
-    assert!(output.status.success(), "stim failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stim failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     String::from_utf8(output.stdout).unwrap()
 }
 
@@ -216,15 +220,62 @@ error(0.26) D0 ^ D1
 }
 
 #[test]
+fn panic_message_handles_static_str_and_non_string_payloads() {
+    let literal = std::panic::catch_unwind(|| panic!("literal panic")).unwrap_err();
+    assert_eq!(panic_message(literal), "literal panic");
+
+    let non_string = std::panic::catch_unwind(|| std::panic::panic_any(5usize)).unwrap_err();
+    assert_eq!(panic_message(non_string), "non-string panic payload");
+}
+
+#[test]
+fn canonicalize_error_targets_sorts_terms_and_components() {
+    assert_eq!(
+        canonicalize_error_targets(" D1   D0 ^  ^ L0 D2 "),
+        "D0 D1 ^ D2 L0"
+    );
+}
+
+#[test]
+fn assert_prob_maps_close_reports_missing_keys() {
+    let mut expected = BTreeMap::new();
+    expected.insert("D0 D1".to_string(), 0.125);
+    let actual = BTreeMap::new();
+
+    let panic = std::panic::catch_unwind(|| {
+        assert_prob_maps_close(&expected, &actual, "missing probability");
+    }).unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("missing probability"));
+}
+
+#[test]
+fn assert_all_graphlike_dem_text_rejects_non_graphlike_component() {
+    let panic = std::panic::catch_unwind(|| {
+        assert_all_graphlike_dem_text("error(0.1) D0 D1 D2\n");
+    }).unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("non-graphlike component"));
+}
+
+#[test]
+fn assert_semantic_dem_parity_reports_annotation_mismatch() {
+    let panic = std::panic::catch_unwind(|| {
+        assert_semantic_dem_parity(
+            "error(0.1) D0 D1\ndetector(0, 0) D0\n",
+            "error(0.1) D0 D1\ndetector(1, 0) D0\n",
+        );
+    }).unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("detector annotations differ"));
+}
+
+#[test]
 fn stim_analyze_errors_respects_override_command() {
     let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();
     let stim_path = dir.path().join("stim");
-    fs::write(
-        &stim_path,
-        "#!/bin/sh\ncat >/dev/null\nprintf 'error(0.25) D0\\n'",
-    )
-    .unwrap();
+    fs::write(&stim_path, "#!/bin/sh\ncat >/dev/null\nprintf 'error(0.25) D0\\n'").unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -407,17 +458,12 @@ fn cross_validate_surface_code_dem() {
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
 
-    // Same number of error lines
-    assert_eq!(stim_errors.len(), rstim_errors.len(),
-        "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
 
-    // Same target sets
     for key in stim_errors.keys() {
-        assert!(rstim_errors.contains_key(key),
-            "stim has error target '{}' not in rstim", key);
+        assert!(rstim_errors.contains_key(key), "stim has error target '{}' not in rstim", key);
     }
 
-    // Probabilities match within floating-point tolerance
     let mut max_rel = 0.0f64;
     for (key, stim_p) in &stim_errors {
         let rstim_p = rstim_errors[key];
@@ -425,20 +471,18 @@ fn cross_validate_surface_code_dem() {
         if rel > max_rel {
             max_rel = rel;
         }
-        assert!(rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={} rel={}",
-            key, stim_p, rstim_p, rel);
+        assert!(rel < 1e-12, "probability mismatch for '{}': stim={} rstim={} rel={}", key, stim_p, rstim_p, rel);
     }
 
-    // Same detector annotations
-    let stim_det_lines: Vec<&str> = stim_dem_text.lines()
+    let stim_det_lines: Vec<&str> = stim_dem_text
+        .lines()
         .filter(|l| l.starts_with("detector") || l.starts_with("shift_detectors"))
         .collect();
-    let rstim_det_lines: Vec<&str> = rstim_dem_text.lines()
+    let rstim_det_lines: Vec<&str> = rstim_dem_text
+        .lines()
         .filter(|l| l.starts_with("detector") || l.starts_with("shift_detectors"))
         .collect();
-    assert_eq!(stim_det_lines, rstim_det_lines,
-        "detector annotations differ");
+    assert_eq!(stim_det_lines, rstim_det_lines, "detector annotations differ");
 }
 
 #[test]
@@ -454,13 +498,11 @@ fn cross_validate_rep_code_dem_probabilities() {
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
 
-    assert_eq!(stim_errors.len(), rstim_errors.len(),
-        "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
 
     for (key, stim_p) in &stim_errors {
         let rstim_p = rstim_errors.get(key).unwrap_or(&0.0);
         let rel = (stim_p - rstim_p).abs() / stim_p.max(1e-20);
-        assert!(rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={}", key, stim_p, rstim_p);
+        assert!(rel < 1e-12, "probability mismatch for '{}': stim={} rstim={}", key, stim_p, rstim_p);
     }
 }
