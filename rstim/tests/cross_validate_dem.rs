@@ -45,12 +45,7 @@ fn stim_analyze_errors_flags(circuit_text: &str, flags: &[&str]) -> String {
         .expect("stim CLI not found");
     {
         use std::io::Write;
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(circuit_text.as_bytes())
-            .unwrap();
+        child.stdin.take().unwrap().write_all(circuit_text.as_bytes()).unwrap();
     }
     let output = child.wait_with_output().unwrap();
     assert!(
@@ -303,12 +298,7 @@ DETECTOR rec[-1]
         .expect("stim CLI not found");
     {
         use std::io::Write;
-        child
-            .stdin
-            .take()
-            .unwrap()
-            .write_all(circuit_text.as_bytes())
-            .unwrap();
+        child.stdin.take().unwrap().write_all(circuit_text.as_bytes()).unwrap();
     }
     let output = child.wait_with_output().unwrap();
     let instrs = rstim::parser::parse_lines(circuit_text).unwrap();
