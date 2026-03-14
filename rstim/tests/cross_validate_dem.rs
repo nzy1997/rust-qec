@@ -244,8 +244,7 @@ fn assert_prob_maps_close_reports_missing_keys() {
 
     let panic = std::panic::catch_unwind(|| {
         assert_prob_maps_close(&expected, &actual, "missing probability");
-    })
-    .unwrap_err();
+    }).unwrap_err();
     let text = panic_message(panic);
     assert!(text.contains("missing probability"));
 }
@@ -254,8 +253,7 @@ fn assert_prob_maps_close_reports_missing_keys() {
 fn assert_all_graphlike_dem_text_rejects_non_graphlike_component() {
     let panic = std::panic::catch_unwind(|| {
         assert_all_graphlike_dem_text("error(0.1) D0 D1 D2\n");
-    })
-    .unwrap_err();
+    }).unwrap_err();
     let text = panic_message(panic);
     assert!(text.contains("non-graphlike component"));
 }
@@ -267,8 +265,7 @@ fn assert_semantic_dem_parity_reports_annotation_mismatch() {
             "error(0.1) D0 D1\ndetector(0, 0) D0\n",
             "error(0.1) D0 D1\ndetector(1, 0) D0\n",
         );
-    })
-    .unwrap_err();
+    }).unwrap_err();
     let text = panic_message(panic);
     assert!(text.contains("detector annotations differ"));
 }
@@ -461,20 +458,10 @@ fn cross_validate_surface_code_dem() {
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
 
-    assert_eq!(
-        stim_errors.len(),
-        rstim_errors.len(),
-        "error count mismatch: stim={} rstim={}",
-        stim_errors.len(),
-        rstim_errors.len()
-    );
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
 
     for key in stim_errors.keys() {
-        assert!(
-            rstim_errors.contains_key(key),
-            "stim has error target '{}' not in rstim",
-            key
-        );
+        assert!(rstim_errors.contains_key(key), "stim has error target '{}' not in rstim", key);
     }
 
     let mut max_rel = 0.0f64;
@@ -484,14 +471,7 @@ fn cross_validate_surface_code_dem() {
         if rel > max_rel {
             max_rel = rel;
         }
-        assert!(
-            rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={} rel={}",
-            key,
-            stim_p,
-            rstim_p,
-            rel
-        );
+        assert!(rel < 1e-12, "probability mismatch for '{}': stim={} rstim={} rel={}", key, stim_p, rstim_p, rel);
     }
 
     let stim_det_lines: Vec<&str> = stim_dem_text
@@ -518,23 +498,11 @@ fn cross_validate_rep_code_dem_probabilities() {
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
 
-    assert_eq!(
-        stim_errors.len(),
-        rstim_errors.len(),
-        "error count mismatch: stim={} rstim={}",
-        stim_errors.len(),
-        rstim_errors.len()
-    );
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "error count mismatch: stim={} rstim={}", stim_errors.len(), rstim_errors.len());
 
     for (key, stim_p) in &stim_errors {
         let rstim_p = rstim_errors.get(key).unwrap_or(&0.0);
         let rel = (stim_p - rstim_p).abs() / stim_p.max(1e-20);
-        assert!(
-            rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={}",
-            key,
-            stim_p,
-            rstim_p
-        );
+        assert!(rel < 1e-12, "probability mismatch for '{}': stim={} rstim={}", key, stim_p, rstim_p);
     }
 }

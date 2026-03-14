@@ -79,8 +79,7 @@ fn render_markdown_table_includes_expected_headers() {
         "2.0".to_string(),
         "2.4".to_string(),
         "1.10x".to_string(),
-        "1.20x".to_string(),
-    ]]);
+        "1.20x".to_string()]]);
     assert!(table.contains("| Case | Gen | DEM |"));
     assert!(table.contains("repetition_code/memory d=5 r=5"));
 }
@@ -118,6 +117,7 @@ fn structural_circuit_summary_formats_special_targets_and_normalizes_units() {
             "OBSERVABLE_INCLUDE",
             vec![2.0],
             vec![
+                StimTarget::Qubit(8),
                 StimTarget::QubitInv(9),
                 StimTarget::Rec(-2),
                 StimTarget::pauli(4, PauliBasis::Y, true),
@@ -145,7 +145,7 @@ fn structural_circuit_summary_formats_special_targets_and_normalizes_units() {
     assert_eq!(summary.observable_target_arities[&1], 1);
     assert!(summary
         .observable_includes
-        .contains("OBSERVABLE_INCLUDE(2) !9 rec[-2] !Y4 X5 Z6 * sweep[7]"));
+        .contains("OBSERVABLE_INCLUDE(2) 8 !9 rec[-2] !Y4 X5 Z6 * sweep[7]"));
 }
 
 #[test]
