@@ -6,7 +6,9 @@ pub struct Qstd101Document {
     pub version: String,
     pub num_qubits: usize,
     pub operations: Vec<Qstd101Operation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<serde_json::Value>,
 }
 
@@ -17,11 +19,17 @@ pub enum Qstd101Operation {
     Gate {
         gate: String,
         targets: Vec<u32>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         controls: Vec<u32>,
-        control_configs: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        control_configs: Option<Vec<bool>>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         params: Vec<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         raw_targets: Option<Vec<Qstd101TargetRef>>,
-        display: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display: Option<Qstd101Display>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         tags: Vec<String>,
     },
     #[serde(rename = "tick")]
@@ -69,6 +77,7 @@ pub enum Qstd101TargetRef {
     #[serde(rename = "qubit")]
     Qubit {
         index: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         inverted: Option<bool>,
     },
     #[serde(rename = "rec")]
@@ -77,8 +86,9 @@ pub enum Qstd101TargetRef {
     },
     #[serde(rename = "pauli")]
     Pauli {
-        basis: String,
+        basis: Qstd101PauliBasis,
         qubit: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         inverted: Option<bool>,
     },
     #[serde(rename = "combiner")]
@@ -87,4 +97,17 @@ pub enum Qstd101TargetRef {
     Sweep {
         index: u32,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Qstd101Display {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Qstd101PauliBasis {
+    X,
+    Y,
+    Z,
 }
