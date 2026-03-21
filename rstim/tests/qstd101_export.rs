@@ -1,5 +1,6 @@
+use rstim::parser::parse_lines;
 use rstim::qstd101::{
-    Qstd101Document, Qstd101Operation, Qstd101PauliBasis, Qstd101TargetRef,
+    export_qstd101, Qstd101Document, Qstd101Operation, Qstd101PauliBasis, Qstd101TargetRef,
 };
 use serde_json::json;
 
@@ -100,4 +101,38 @@ fn serializes_target_refs_rec_and_pauli() {
             "qubit": 7
         })
     );
+}
+
+#[test]
+fn export_preserves_repeat_and_tick() {
+    let instrs = parse_lines("H 0\nTICK\nREPEAT 2 {\n  M 0\n}\n").unwrap();
+    let doc = export_qstd101(&instrs).unwrap();
+    assert!(matches!(doc.operations[1], Qstd101Operation::Tick));
+    assert!(matches!(
+        doc.operations[2],
+        Qstd101Operation::Repeat { count: 2, .. }
+    ));
+}
+
+#[test]
+fn export_preserves_detector_and_coords() {
+    let instrs = parse_lines("QUBIT_COORDS(1,2) 0\nM 0\nDETECTOR(5,6) rec[-1]\n").unwrap();
+    let doc = export_qstd101(&instrs).unwrap();
+    assert!(matches!(doc.operations[0], Qstd101Operation::QubitCoords { .. }));
+    assert!(matches!(doc.operations[2], Qstd101Operation::Detector { .. }));
+}
+
+#[test]
+fn export_uses_raw_targets_for_feedback() {
+    let instrs = parse_lines("M 0\nCX rec[-1] 1\n").unwrap();
+    let doc = export_qstd101(&instrs).unwrap();
+    match &doc.operations[1] {
+        Qstd101Operation::Gate {
+            raw_targets: Some(raw_targets),
+            ..
+        } => {
+            assert_eq!(raw_targets.len(), 2);
+        }
+        other => panic!("unexpected op: {other:?}"),
+    }
 }
