@@ -35,6 +35,7 @@ It does not yet implement a geometry-based layout renderer. The schema and rende
 ## Repository Layout
 
 - `examples/` keeps a small set of human-facing rendered demos.
+- examples that are meant to render after copying the package are self-contained and read JSON from files bundled inside `examples/`.
 - `checks/` holds metadata/query fixtures used to verify renderer behavior.
 
 ## Notes

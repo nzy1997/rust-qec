@@ -5,7 +5,7 @@
 = rotated surface code memory X, d=3, r=3
 
 #qstd101-timeline-file(
-  "../../../rstim/tests/fixtures/qstd101/surface_code_rotated_memory_x_d3_r3.json",
+  "examples/surface_code_rotated_memory_x_d3_r3.qstd101.json",
   theme: timeline-theme(
     step_width: 4.2em,
     font_size: 6.6pt,
