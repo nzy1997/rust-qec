@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
+use rstim::codegen::{repetition_code_memory, surface_code};
+use rstim::qstd101::{export_qstd101, Qstd101Document};
 
 fn fixture_path(file_name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -11,25 +12,25 @@ fn fixture_path(file_name: &str) -> PathBuf {
         .join(file_name)
 }
 
-fn load_fixture(file_name: &str) -> Value {
+fn load_fixture(file_name: &str) -> Qstd101Document {
     let path = fixture_path(file_name);
     assert!(path.exists(), "fixture file does not exist: {}", path.display());
 
     let text = fs::read_to_string(&path)
         .unwrap_or_else(|err| panic!("failed to read fixture {}: {err}", path.display()));
     serde_json::from_str(&text)
-        .unwrap_or_else(|err| panic!("failed to parse fixture {} as JSON: {err}", path.display()))
+        .unwrap_or_else(|err| panic!("failed to parse fixture {} as Qstd101Document: {err}", path.display()))
 }
 
-fn assert_common_markers(doc: &Value) {
-    assert_eq!(doc["standard"], "QSTD101-ZY");
-    assert_eq!(doc["version"], "1.0");
+fn assert_common_markers(doc: &Qstd101Document) {
+    assert_eq!(doc.standard, "QSTD101-ZY");
+    assert_eq!(doc.version, "1.0");
+    assert!(!doc.operations.is_empty(), "operations should be non-empty");
 
-    let ops = doc["operations"]
+    let serialized = serde_json::to_value(doc).expect("Qstd101Document should serialize");
+    let ops = serialized["operations"]
         .as_array()
-        .expect("operations should be a JSON array");
-    assert!(!ops.is_empty(), "operations should be non-empty");
-
+        .expect("operations should serialize to a JSON array");
     let has_qubit_coords = ops.iter().any(|op| op["type"] == "qubit_coords");
     let has_tick = ops.iter().any(|op| op["type"] == "tick");
     let has_detector = ops.iter().any(|op| op["type"] == "detector");
@@ -46,12 +47,21 @@ fn assert_common_markers(doc: &Value) {
 
 #[test]
 fn repetition_code_fixture_has_expected_qstd101_markers() {
-    let doc = load_fixture("repetition_code_memory_d3_r3.json");
-    assert_common_markers(&doc);
+    // Regenerate with: rstim gen ... && rstim export_json ... (Task 5 fixture flow).
+    let generated = export_qstd101(&repetition_code_memory(3, 3, 0.0))
+        .expect("export of repetition code should succeed");
+    let fixture = load_fixture("repetition_code_memory_d3_r3.json");
+
+    assert_eq!(generated, fixture);
+    assert_common_markers(&generated);
 }
 
 #[test]
 fn surface_code_fixture_has_expected_qstd101_markers() {
-    let doc = load_fixture("surface_code_rotated_memory_x_d3_r3.json");
-    assert_common_markers(&doc);
+    let generated = export_qstd101(&surface_code::rotated_memory_x(3, 3, 0.0))
+        .expect("export of rotated surface code should succeed");
+    let fixture = load_fixture("surface_code_rotated_memory_x_d3_r3.json");
+
+    assert_eq!(generated, fixture);
+    assert_common_markers(&generated);
 }
