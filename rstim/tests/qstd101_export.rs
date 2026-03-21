@@ -250,3 +250,24 @@ fn export_includes_framework_metadata() {
     let value = serde_json::to_value(doc).unwrap();
     assert_eq!(value["metadata"], json!({ "framework": "rstim" }));
 }
+
+#[test]
+fn export_rejects_tick_with_targets() {
+    let instrs = parse_lines("TICK 0\n").unwrap();
+    let err = export_qstd101(&instrs).unwrap_err();
+    assert!(err.contains("TICK"));
+}
+
+#[test]
+fn export_rejects_tick_with_args() {
+    let instrs = parse_lines("TICK(1)\n").unwrap();
+    let err = export_qstd101(&instrs).unwrap_err();
+    assert!(err.contains("TICK"));
+}
+
+#[test]
+fn export_rejects_shift_coords_with_targets() {
+    let instrs = parse_lines("SHIFT_COORDS(1) 0\n").unwrap();
+    let err = export_qstd101(&instrs).unwrap_err();
+    assert!(err.contains("SHIFT_COORDS"));
+}

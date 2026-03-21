@@ -141,14 +141,20 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                 ..
             } => {
                 let op = match name.as_str() {
-                    "TICK" => Qstd101Operation::Tick,
+                    "TICK" => {
+                        validate_no_args_or_targets(name, args, targets)?;
+                        Qstd101Operation::Tick
+                    }
                     "QUBIT_COORDS" => Qstd101Operation::QubitCoords {
                         coords: args.clone(),
                         targets: export_plain_qubit_targets(name, targets)?,
                     },
-                    "SHIFT_COORDS" => Qstd101Operation::ShiftCoords {
-                        delta: args.clone(),
-                    },
+                    "SHIFT_COORDS" => {
+                        validate_no_targets(name, targets)?;
+                        Qstd101Operation::ShiftCoords {
+                            delta: args.clone(),
+                        }
+                    }
                     "DETECTOR" => Qstd101Operation::Detector {
                         coords: args.clone(),
                         sources: export_rec_sources(name, targets)?,
@@ -199,6 +205,20 @@ fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<
             other => Err(format!("{name} expects qubit targets, got {other:?}")),
         })
         .collect()
+}
+
+fn validate_no_args_or_targets(name: &str, args: &[f64], targets: &[StimTarget]) -> Result<(), String> {
+    if !args.is_empty() {
+        return Err(format!("{name} expects no args, got {}", args.len()));
+    }
+    validate_no_targets(name, targets)
+}
+
+fn validate_no_targets(name: &str, targets: &[StimTarget]) -> Result<(), String> {
+    if !targets.is_empty() {
+        return Err(format!("{name} expects no targets, got {}", targets.len()));
+    }
+    Ok(())
 }
 
 fn parse_observable_index(args: &[f64]) -> Result<u32, String> {
