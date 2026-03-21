@@ -1,3 +1,4 @@
+use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::parser::parse_lines;
 use rstim::qstd101::{
     export_qstd101, Qstd101Document, Qstd101Operation, Qstd101PauliBasis, Qstd101TargetRef,
@@ -172,4 +173,80 @@ fn export_uses_raw_targets_for_feedback() {
         }
         other => panic!("unexpected op: {other:?}"),
     }
+}
+
+#[test]
+fn export_gate_keeps_pauli_qubit_lanes_and_raw_targets() {
+    let instrs = parse_lines("MPP X0*Z1\n").unwrap();
+    let doc = export_qstd101(&instrs).unwrap();
+    match &doc.operations[0] {
+        Qstd101Operation::Gate {
+            gate,
+            targets,
+            raw_targets,
+            ..
+        } => {
+            assert_eq!(gate, "MPP");
+            assert_eq!(targets, &vec![0, 1]);
+            assert_eq!(
+                raw_targets,
+                &Some(vec![
+                    Qstd101TargetRef::Pauli {
+                        basis: Qstd101PauliBasis::X,
+                        qubit: 0,
+                        inverted: None,
+                    },
+                    Qstd101TargetRef::Combiner,
+                    Qstd101TargetRef::Pauli {
+                        basis: Qstd101PauliBasis::Z,
+                        qubit: 1,
+                        inverted: None,
+                    },
+                ])
+            );
+        }
+        other => panic!("unexpected op: {other:?}"),
+    }
+}
+
+#[test]
+fn export_rejects_qubit_coords_with_inverted_target() {
+    let instrs = parse_lines("QUBIT_COORDS(1,2) !0\n").unwrap();
+    let err = export_qstd101(&instrs).unwrap_err();
+    assert!(err.contains("QUBIT_COORDS"));
+}
+
+#[test]
+fn export_rejects_detector_with_non_rec_source() {
+    let parsed = parse_lines("DETECTOR 0\n").unwrap();
+    assert!(export_qstd101(&parsed).is_err());
+
+    let manual = vec![StimInstr::Op {
+        name: "DETECTOR".to_string(),
+        tag: None,
+        args: vec![1.0, 2.0],
+        targets: vec![StimTarget::Pauli {
+            qubit: 3,
+            basis: PauliBasis::X,
+            inverted: false,
+        }],
+    }];
+    assert!(export_qstd101(&manual).is_err());
+}
+
+#[test]
+fn export_rejects_invalid_observable_include_shape() {
+    let extra_args = parse_lines("OBSERVABLE_INCLUDE(0,1) rec[-1]\n").unwrap();
+    assert!(export_qstd101(&extra_args).is_err());
+
+    let non_rec_sources = parse_lines("OBSERVABLE_INCLUDE(0) 0\n").unwrap();
+    assert!(export_qstd101(&non_rec_sources).is_err());
+}
+
+#[test]
+fn export_includes_framework_metadata() {
+    let instrs = parse_lines("H 0\n").unwrap();
+    let doc = export_qstd101(&instrs).unwrap();
+    let value = serde_json::to_value(doc).unwrap();
+    assert_eq!(value["metadata"], json!({ "framework": "rstim" }));
 }

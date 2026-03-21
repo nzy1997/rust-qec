@@ -135,6 +135,7 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
             }),
             StimInstr::Op {
                 name,
+                tag,
                 args,
                 targets,
                 ..
@@ -143,18 +144,18 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                     "TICK" => Qstd101Operation::Tick,
                     "QUBIT_COORDS" => Qstd101Operation::QubitCoords {
                         coords: args.clone(),
-                        targets: export_qubit_targets(name, targets)?,
+                        targets: export_plain_qubit_targets(name, targets)?,
                     },
                     "SHIFT_COORDS" => Qstd101Operation::ShiftCoords {
                         delta: args.clone(),
                     },
                     "DETECTOR" => Qstd101Operation::Detector {
                         coords: args.clone(),
-                        sources: export_targets(targets),
+                        sources: export_rec_sources(name, targets)?,
                     },
                     "OBSERVABLE_INCLUDE" => Qstd101Operation::ObservableInclude {
                         index: parse_observable_index(args)?,
-                        sources: export_targets(targets),
+                        sources: export_rec_sources(name, targets)?,
                     },
                     n if is_noise_op(n) => Qstd101Operation::Noise {
                         gate: n.to_string(),
@@ -162,13 +163,8 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                         raw_targets: export_targets(targets),
                     },
                     _ => {
-                        let targets_out: Vec<u32> = targets
-                            .iter()
-                            .filter_map(|target| match target {
-                                StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Some(*q),
-                                _ => None,
-                            })
-                            .collect();
+                        let targets_out: Vec<u32> =
+                            targets.iter().filter_map(StimTarget::qubit_index).collect();
                         let has_non_plain_targets = targets
                             .iter()
                             .any(|target| !matches!(target, StimTarget::Qubit(_)));
@@ -184,7 +180,7 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                                 None
                             },
                             display: None,
-                            tags: Vec::new(),
+                            tags: tag.iter().cloned().collect(),
                         }
                     }
                 };
@@ -195,17 +191,23 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
     Ok(ops)
 }
 
-fn export_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, String> {
+fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, String> {
     targets
         .iter()
         .map(|target| match target {
-            StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Ok(*q),
+            StimTarget::Qubit(q) => Ok(*q),
             other => Err(format!("{name} expects qubit targets, got {other:?}")),
         })
         .collect()
 }
 
 fn parse_observable_index(args: &[f64]) -> Result<u32, String> {
+    if args.len() != 1 {
+        return Err(format!(
+            "OBSERVABLE_INCLUDE requires exactly one argument, got {}",
+            args.len()
+        ));
+    }
     let Some(raw) = args.first().copied() else {
         return Err("OBSERVABLE_INCLUDE requires an observable index".to_string());
     };
@@ -220,6 +222,16 @@ fn parse_observable_index(args: &[f64]) -> Result<u32, String> {
         ));
     }
     Ok(raw as u32)
+}
+
+fn export_rec_sources(name: &str, targets: &[StimTarget]) -> Result<Vec<Qstd101TargetRef>, String> {
+    targets
+        .iter()
+        .map(|target| match target {
+            StimTarget::Rec(offset) => Ok(Qstd101TargetRef::Rec { offset: *offset }),
+            other => Err(format!("{name} expects rec sources, got {other:?}")),
+        })
+        .collect()
 }
 
 fn export_targets(targets: &[StimTarget]) -> Vec<Qstd101TargetRef> {
