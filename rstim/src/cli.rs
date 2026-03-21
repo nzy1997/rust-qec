@@ -163,6 +163,30 @@ pub enum Commands {
         #[arg(long = "obs_out_format", default_value = "01")]
         obs_out_format: String,
     },
+    /// Export a circuit as QSTD101 JSON
+    #[command(name = "export_json")]
+    ExportJson {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long, default_value = "pretty")]
+        format: String,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum JsonOutputFormat {
+    Pretty,
+    Compact,
+}
+
+fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
+    match format {
+        "pretty" => Ok(JsonOutputFormat::Pretty),
+        "compact" => Ok(JsonOutputFormat::Compact),
+        other => Err(format!("unknown json format: {other}")),
+    }
 }
 
 pub fn run(cli: Cli) -> Result<(), String> {
@@ -302,6 +326,12 @@ pub fn run(cli: Cli) -> Result<(), String> {
             } else {
                 run_sample_dem(&text, shots.unwrap_or(1) as usize, &out_format, seed, &mut w)
             }
+        }
+        Some(Commands::ExportJson { r#in, out, format }) => {
+            let text = read_input(r#in.as_deref())?;
+            let format = parse_json_output_format(&format)?;
+            let mut w = open_output(out.as_deref())?;
+            run_export_json(&text, format, &mut w)
         }
         None => {
             println!("rstim {}", crate::version());
@@ -528,6 +558,21 @@ pub fn run_analyze_errors_with_flags(
     };
     let dem_str = dem.to_string();
     out.write_all(dem_str.as_bytes()).map_err(|e| format!("write error: {e}"))
+}
+
+fn run_export_json(text: &str, format: JsonOutputFormat, w: &mut dyn Write) -> Result<(), String> {
+    let instrs = parse_lines(text)?;
+    let doc = crate::qstd101::export_qstd101(&instrs)?;
+    match format {
+        JsonOutputFormat::Pretty => {
+            serde_json::to_writer_pretty(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?
+        }
+        JsonOutputFormat::Compact => {
+            serde_json::to_writer(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?
+        }
+    }
+    w.write_all(b"\n").map_err(|e| format!("write error: {e}"))?;
+    Ok(())
 }
 
 pub fn run_sample_dem(
