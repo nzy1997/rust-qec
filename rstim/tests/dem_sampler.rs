@@ -20,7 +20,7 @@ fn dem_sample_no_error() {
     let mut rng = StdRng::seed_from_u64(42);
     let (dets, obs) = dem.sample(&mut rng);
     assert_eq!(dets, vec![false]);
-    assert_eq!(obs, vec![]);
+    assert!(obs.is_empty());
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn dem_sample_observable_only() {
     dem.add_error(1.0, vec![DemTarget::Observable(0)]);
     let mut rng = StdRng::seed_from_u64(42);
     let (dets, obs) = dem.sample(&mut rng);
-    assert_eq!(dets, vec![]);
+    assert!(dets.is_empty());
     assert_eq!(obs, vec![true]);
 }
 
