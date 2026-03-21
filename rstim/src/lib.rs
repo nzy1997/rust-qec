@@ -21,3 +21,4 @@ pub mod circuit_gen;
 pub mod codegen;
 pub mod m2d;
 pub mod explain_errors;
+pub mod qstd101;
