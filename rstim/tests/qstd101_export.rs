@@ -108,18 +108,46 @@ fn export_preserves_repeat_and_tick() {
     let instrs = parse_lines("H 0\nTICK\nREPEAT 2 {\n  M 0\n}\n").unwrap();
     let doc = export_qstd101(&instrs).unwrap();
     assert!(matches!(doc.operations[1], Qstd101Operation::Tick));
-    assert!(matches!(
-        doc.operations[2],
-        Qstd101Operation::Repeat { count: 2, .. }
-    ));
+    match &doc.operations[2] {
+        Qstd101Operation::Repeat { count, body } => {
+            assert_eq!(*count, 2);
+            assert_eq!(body.len(), 1);
+            match &body[0] {
+                Qstd101Operation::Gate {
+                    gate,
+                    targets,
+                    raw_targets,
+                    ..
+                } => {
+                    assert_eq!(gate, "M");
+                    assert_eq!(targets, &vec![0]);
+                    assert_eq!(raw_targets, &None);
+                }
+                other => panic!("unexpected repeat body op: {other:?}"),
+            }
+        }
+        other => panic!("unexpected op: {other:?}"),
+    }
 }
 
 #[test]
 fn export_preserves_detector_and_coords() {
     let instrs = parse_lines("QUBIT_COORDS(1,2) 0\nM 0\nDETECTOR(5,6) rec[-1]\n").unwrap();
     let doc = export_qstd101(&instrs).unwrap();
-    assert!(matches!(doc.operations[0], Qstd101Operation::QubitCoords { .. }));
-    assert!(matches!(doc.operations[2], Qstd101Operation::Detector { .. }));
+    match &doc.operations[0] {
+        Qstd101Operation::QubitCoords { coords, targets } => {
+            assert_eq!(coords, &vec![1.0, 2.0]);
+            assert_eq!(targets, &vec![0]);
+        }
+        other => panic!("unexpected coords op: {other:?}"),
+    }
+    match &doc.operations[2] {
+        Qstd101Operation::Detector { coords, sources } => {
+            assert_eq!(coords, &vec![5.0, 6.0]);
+            assert_eq!(sources, &vec![Qstd101TargetRef::Rec { offset: -1 }]);
+        }
+        other => panic!("unexpected detector op: {other:?}"),
+    }
 }
 
 #[test]
@@ -131,7 +159,16 @@ fn export_uses_raw_targets_for_feedback() {
             raw_targets: Some(raw_targets),
             ..
         } => {
-            assert_eq!(raw_targets.len(), 2);
+            assert_eq!(
+                raw_targets,
+                &vec![
+                    Qstd101TargetRef::Rec { offset: -1 },
+                    Qstd101TargetRef::Qubit {
+                        index: 1,
+                        inverted: None,
+                    },
+                ]
+            );
         }
         other => panic!("unexpected op: {other:?}"),
     }
