@@ -45,7 +45,8 @@ fn num_detectors_with_repeat() {
 
 #[test]
 fn num_observables() {
-    let instrs = parse_lines("M 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-2]").unwrap();
+    let instrs =
+        parse_lines("M 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-2]").unwrap();
     assert_eq!(stats::num_observables(&instrs), 3);
 }
 
@@ -71,4 +72,41 @@ fn num_sweep_bits_tracks_highest_index() {
 fn num_sweep_bits_includes_repeat_bodies() {
     let instrs = parse_lines("REPEAT 2 {\n  CX sweep[4] 0\n}\nCX sweep[1] 2\n").unwrap();
     assert_eq!(stats::num_sweep_bits(&instrs), 5);
+}
+
+#[test]
+fn summarize_empty_circuit() {
+    let instrs = parse_lines("").unwrap();
+    let summary = stats::summarize(&instrs);
+    assert_eq!(summary.instruction_count, 0);
+    assert_eq!(summary.repeat_blocks, 0);
+    assert_eq!(summary.max_repeat_depth, 0);
+    assert_eq!(summary.num_qubits, 0);
+    assert_eq!(summary.num_measurements, 0);
+    assert_eq!(summary.num_detectors, 0);
+    assert_eq!(summary.num_observables, 0);
+    assert_eq!(summary.num_ticks, 0);
+    assert_eq!(summary.num_sweep_bits, 0);
+}
+
+#[test]
+fn summarize_repeat_distinguishes_structure_from_expanded_counts() {
+    let instrs = parse_lines("H 0\nREPEAT 3 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n").unwrap();
+    let summary = stats::summarize(&instrs);
+    assert_eq!(summary.instruction_count, 5);
+    assert_eq!(summary.repeat_blocks, 1);
+    assert_eq!(summary.max_repeat_depth, 1);
+    assert_eq!(summary.num_measurements, 3);
+    assert_eq!(summary.num_detectors, 3);
+    assert_eq!(summary.num_ticks, 3);
+}
+
+#[test]
+fn summarize_nested_repeat_tracks_max_depth() {
+    let instrs = parse_lines("REPEAT 2 {\n  REPEAT 5 {\n    M 0\n  }\n}\n").unwrap();
+    let summary = stats::summarize(&instrs);
+    assert_eq!(summary.repeat_blocks, 2);
+    assert_eq!(summary.max_repeat_depth, 2);
+    assert_eq!(summary.instruction_count, 3);
+    assert_eq!(summary.num_measurements, 10);
 }
