@@ -90,3 +90,66 @@ fn stats_invalid_input_fails_cleanly() {
     assert!(stderr.contains("REPEAT") || stderr.contains("repeat"));
     assert!(!stderr.contains("panicked"));
 }
+
+#[test]
+fn stats_text_output_has_stable_order_and_all_fields() {
+    let output = run_with_stdin(&["stats"], "");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(
+        text,
+        concat!(
+            "instruction_count: 0\n",
+            "repeat_blocks: 0\n",
+            "max_repeat_depth: 0\n",
+            "num_qubits: 0\n",
+            "num_measurements: 0\n",
+            "num_detectors: 0\n",
+            "num_observables: 0\n",
+            "num_ticks: 0\n",
+            "num_sweep_bits: 0\n",
+        )
+    );
+}
+
+#[test]
+fn stats_json_can_write_to_file_without_stdout_noise() {
+    let dir = tempfile::tempdir().unwrap();
+    let in_path = dir.path().join("input.stim");
+    let out_path = dir.path().join("stats.json");
+    std::fs::write(
+        &in_path,
+        "REPEAT 2 {\n  REPEAT 3 {\n    M 7\n    OBSERVABLE_INCLUDE(2) rec[-1]\n    CX sweep[4] 7\n  }\n}\n",
+    )
+    .unwrap();
+    let output = rstim_cmd()
+        .args([
+            "stats",
+            "--in",
+            in_path.to_str().unwrap(),
+            "--out",
+            out_path.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stdout.is_empty());
+
+    let value: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(out_path).unwrap()).unwrap();
+    assert_eq!(value["instruction_count"], 5);
+    assert_eq!(value["repeat_blocks"], 2);
+    assert_eq!(value["max_repeat_depth"], 2);
+    assert_eq!(value["num_qubits"], 8);
+    assert_eq!(value["num_measurements"], 6);
+    assert_eq!(value["num_observables"], 3);
+    assert_eq!(value["num_sweep_bits"], 5);
+}

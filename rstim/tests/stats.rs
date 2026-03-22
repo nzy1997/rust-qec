@@ -110,3 +110,32 @@ fn summarize_nested_repeat_tracks_max_depth() {
     assert_eq!(summary.instruction_count, 3);
     assert_eq!(summary.num_measurements, 10);
 }
+
+#[test]
+fn summarize_counts_sibling_repeat_blocks_without_inflating_depth() {
+    let instrs = parse_lines("REPEAT 2 {\n  M 0\n}\nREPEAT 3 {\n  M 1\n}\n").unwrap();
+    let summary = stats::summarize(&instrs);
+    assert_eq!(summary.instruction_count, 4);
+    assert_eq!(summary.repeat_blocks, 2);
+    assert_eq!(summary.max_repeat_depth, 1);
+    assert_eq!(summary.num_qubits, 2);
+    assert_eq!(summary.num_measurements, 5);
+}
+
+#[test]
+fn summarize_combines_structural_and_expanded_counts_from_nested_feedback() {
+    let instrs = parse_lines(
+        "REPEAT 2 {\n  REPEAT 3 {\n    M 7\n    OBSERVABLE_INCLUDE(2) rec[-1]\n    CX sweep[4] 7\n  }\n}\n",
+    )
+    .unwrap();
+    let summary = stats::summarize(&instrs);
+    assert_eq!(summary.instruction_count, 5);
+    assert_eq!(summary.repeat_blocks, 2);
+    assert_eq!(summary.max_repeat_depth, 2);
+    assert_eq!(summary.num_qubits, 8);
+    assert_eq!(summary.num_measurements, 6);
+    assert_eq!(summary.num_detectors, 0);
+    assert_eq!(summary.num_observables, 3);
+    assert_eq!(summary.num_ticks, 0);
+    assert_eq!(summary.num_sweep_bits, 5);
+}
