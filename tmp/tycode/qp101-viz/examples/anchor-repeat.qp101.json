@@ -1,5 +1,5 @@
 {
-  "standard": "QSTD101-ZY",
+  "standard": "QP101-ZY",
   "version": "1.0",
   "num_qubits": 1,
   "operations": [

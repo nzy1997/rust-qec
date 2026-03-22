@@ -213,9 +213,9 @@ Current generator controls:
 This command is a convenient front door to the circuit generation APIs in
 `rstim::codegen`.
 
-## Export QSTD101 JSON with `export_json`
+## Export QP101 JSON with `export_json`
 
-`export_json` converts a circuit into the repository's QSTD101 JSON document:
+`export_json` converts a circuit into the repository's QP101 JSON document:
 
 ```sh
 rstim export_json --in circuit.stim --out circuit.json

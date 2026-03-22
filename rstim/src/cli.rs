@@ -173,7 +173,7 @@ pub enum Commands {
         #[arg(long = "obs_out_format", default_value = "01")]
         obs_out_format: String,
     },
-    /// Export a circuit as QSTD101 JSON
+    /// Export a circuit as QP101 JSON
     #[command(name = "export_json")]
     ExportJson {
         #[arg(long = "in")]
@@ -691,7 +691,7 @@ pub fn run_analyze_errors_with_flags(
 
 fn run_export_json(text: &str, format: JsonOutputFormat, w: &mut dyn Write) -> Result<(), String> {
     let instrs = parse_lines(text)?;
-    let doc = crate::qstd101::export_qstd101(&instrs)?;
+    let doc = crate::qp101::export_qp101(&instrs)?;
     match format {
         JsonOutputFormat::Pretty => {
             serde_json::to_writer_pretty(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?
