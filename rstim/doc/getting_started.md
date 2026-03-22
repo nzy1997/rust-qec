@@ -15,6 +15,51 @@ tool for quantum error correction circuit simulation. It provides:
 If you are familiar with Stim's Python API, rstim exposes the same concepts
 through Rust modules: `parser`, `sampler`, `codegen`, `error_analyzer`, and more.
 
+## Inspect a circuit from the CLI
+
+Before sampling or analyzing a circuit, it is often useful to inspect its size
+and structure from the command line:
+
+```sh
+printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | rstim stats
+```
+
+Output:
+
+```text
+instruction_count: 5
+repeat_blocks: 1
+max_repeat_depth: 1
+num_qubits: 1
+num_measurements: 2
+num_detectors: 2
+num_observables: 0
+num_ticks: 2
+num_sweep_bits: 0
+```
+
+This summary mixes:
+
+- structural counts such as `instruction_count`, `repeat_blocks`, and `max_repeat_depth`
+- expanded execution-facing counts such as `num_measurements`, `num_detectors`, and `num_ticks`
+
+That distinction matters for repeated circuits. A compact source circuit can
+still imply a much larger expanded workload.
+
+For scripting or shell pipelines, request JSON output instead:
+
+```sh
+printf 'M 0\nDETECTOR rec[-1]\n' | rstim stats --json
+```
+
+Once you understand the circuit shape, a typical CLI workflow is:
+
+1. `rstim stats` to inspect size and repeat structure
+2. `rstim sample` or `rstim detect` to generate shot data
+3. `rstim analyze_errors` to derive a detector error model when needed
+
+The full command reference is in [`cli.md`](cli.md).
+
 ## Create a circuit and sample
 
 Parse a simple Bell pair circuit and sample measurement outcomes:

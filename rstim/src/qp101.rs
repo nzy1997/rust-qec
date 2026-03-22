@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Qstd101Document {
+pub struct Qp101Document {
     pub standard: String,
     pub version: String,
     pub num_qubits: usize,
-    pub operations: Vec<Qstd101Operation>,
+    pub operations: Vec<Qp101Operation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -16,7 +16,7 @@ pub struct Qstd101Document {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
-pub enum Qstd101Operation {
+pub enum Qp101Operation {
     #[serde(rename = "gate")]
     Gate {
         gate: String,
@@ -28,9 +28,9 @@ pub enum Qstd101Operation {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         params: Vec<f64>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        raw_targets: Option<Vec<Qstd101TargetRef>>,
+        raw_targets: Option<Vec<Qp101TargetRef>>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        display: Option<Qstd101Display>,
+        display: Option<Qp101Display>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         tags: Vec<String>,
     },
@@ -39,7 +39,7 @@ pub enum Qstd101Operation {
     #[serde(rename = "repeat")]
     Repeat {
         count: u64,
-        body: Vec<Qstd101Operation>,
+        body: Vec<Qp101Operation>,
     },
     #[serde(rename = "qubit_coords")]
     QubitCoords {
@@ -53,18 +53,18 @@ pub enum Qstd101Operation {
     #[serde(rename = "detector")]
     Detector {
         coords: Vec<f64>,
-        sources: Vec<Qstd101TargetRef>,
+        sources: Vec<Qp101TargetRef>,
     },
     #[serde(rename = "observable_include")]
     ObservableInclude {
         index: u32,
-        sources: Vec<Qstd101TargetRef>,
+        sources: Vec<Qp101TargetRef>,
     },
     #[serde(rename = "noise")]
     Noise {
         gate: String,
         params: Vec<f64>,
-        raw_targets: Vec<Qstd101TargetRef>,
+        raw_targets: Vec<Qp101TargetRef>,
     },
     #[serde(rename = "annotation")]
     Annotation {
@@ -75,7 +75,7 @@ pub enum Qstd101Operation {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind")]
-pub enum Qstd101TargetRef {
+pub enum Qp101TargetRef {
     #[serde(rename = "qubit")]
     Qubit {
         index: u32,
@@ -88,7 +88,7 @@ pub enum Qstd101TargetRef {
     },
     #[serde(rename = "pauli")]
     Pauli {
-        basis: Qstd101PauliBasis,
+        basis: Qp101PauliBasis,
         qubit: u32,
         #[serde(skip_serializing_if = "Option::is_none")]
         inverted: Option<bool>,
@@ -102,21 +102,21 @@ pub enum Qstd101TargetRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Qstd101Display {
+pub struct Qp101Display {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Qstd101PauliBasis {
+pub enum Qp101PauliBasis {
     X,
     Y,
     Z,
 }
 
-pub fn export_qstd101(instrs: &[StimInstr]) -> Result<Qstd101Document, String> {
-    Ok(Qstd101Document {
-        standard: "QSTD101-ZY".to_string(),
+pub fn export_qp101(instrs: &[StimInstr]) -> Result<Qp101Document, String> {
+    Ok(Qp101Document {
+        standard: "QP101-ZY".to_string(),
         version: "1.0".to_string(),
         num_qubits: crate::stats::num_qubits(instrs),
         operations: export_operations(instrs)?,
@@ -125,11 +125,11 @@ pub fn export_qstd101(instrs: &[StimInstr]) -> Result<Qstd101Document, String> {
     })
 }
 
-fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, String> {
+fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String> {
     let mut ops = Vec::with_capacity(instrs.len());
     for instr in instrs {
         match instr {
-            StimInstr::Repeat { count, body } => ops.push(Qstd101Operation::Repeat {
+            StimInstr::Repeat { count, body } => ops.push(Qp101Operation::Repeat {
                 count: *count,
                 body: export_operations(body)?,
             }),
@@ -143,27 +143,27 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                 let op = match name.as_str() {
                     "TICK" => {
                         validate_no_args_or_targets(name, args, targets)?;
-                        Qstd101Operation::Tick
+                        Qp101Operation::Tick
                     }
-                    "QUBIT_COORDS" => Qstd101Operation::QubitCoords {
+                    "QUBIT_COORDS" => Qp101Operation::QubitCoords {
                         coords: args.clone(),
                         targets: export_plain_qubit_targets(name, targets)?,
                     },
                     "SHIFT_COORDS" => {
                         validate_no_targets(name, targets)?;
-                        Qstd101Operation::ShiftCoords {
+                        Qp101Operation::ShiftCoords {
                             delta: args.clone(),
                         }
                     }
-                    "DETECTOR" => Qstd101Operation::Detector {
+                    "DETECTOR" => Qp101Operation::Detector {
                         coords: args.clone(),
                         sources: export_rec_sources(name, targets)?,
                     },
-                    "OBSERVABLE_INCLUDE" => Qstd101Operation::ObservableInclude {
+                    "OBSERVABLE_INCLUDE" => Qp101Operation::ObservableInclude {
                         index: parse_observable_index(args)?,
                         sources: export_rec_sources(name, targets)?,
                     },
-                    n if is_noise_op(n) => Qstd101Operation::Noise {
+                    n if is_noise_op(n) => Qp101Operation::Noise {
                         gate: n.to_string(),
                         params: args.clone(),
                         raw_targets: export_targets(targets),
@@ -174,7 +174,7 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qstd101Operation>, Stri
                         let has_non_plain_targets = targets
                             .iter()
                             .any(|target| !matches!(target, StimTarget::Qubit(_)));
-                        Qstd101Operation::Gate {
+                        Qp101Operation::Gate {
                             gate: name.clone(),
                             targets: targets_out,
                             controls: Vec::new(),
@@ -244,50 +244,50 @@ fn parse_observable_index(args: &[f64]) -> Result<u32, String> {
     Ok(raw as u32)
 }
 
-fn export_rec_sources(name: &str, targets: &[StimTarget]) -> Result<Vec<Qstd101TargetRef>, String> {
+fn export_rec_sources(name: &str, targets: &[StimTarget]) -> Result<Vec<Qp101TargetRef>, String> {
     targets
         .iter()
         .map(|target| match target {
-            StimTarget::Rec(offset) => Ok(Qstd101TargetRef::Rec { offset: *offset }),
+            StimTarget::Rec(offset) => Ok(Qp101TargetRef::Rec { offset: *offset }),
             other => Err(format!("{name} expects rec sources, got {other:?}")),
         })
         .collect()
 }
 
-fn export_targets(targets: &[StimTarget]) -> Vec<Qstd101TargetRef> {
+fn export_targets(targets: &[StimTarget]) -> Vec<Qp101TargetRef> {
     targets.iter().map(export_target).collect()
 }
 
-fn export_target(target: &StimTarget) -> Qstd101TargetRef {
+fn export_target(target: &StimTarget) -> Qp101TargetRef {
     match target {
-        StimTarget::Qubit(index) => Qstd101TargetRef::Qubit {
+        StimTarget::Qubit(index) => Qp101TargetRef::Qubit {
             index: *index,
             inverted: None,
         },
-        StimTarget::QubitInv(index) => Qstd101TargetRef::Qubit {
+        StimTarget::QubitInv(index) => Qp101TargetRef::Qubit {
             index: *index,
             inverted: Some(true),
         },
-        StimTarget::Rec(offset) => Qstd101TargetRef::Rec { offset: *offset },
+        StimTarget::Rec(offset) => Qp101TargetRef::Rec { offset: *offset },
         StimTarget::Pauli {
             qubit,
             basis,
             inverted,
-        } => Qstd101TargetRef::Pauli {
+        } => Qp101TargetRef::Pauli {
             basis: export_pauli_basis(*basis),
             qubit: *qubit,
             inverted: if *inverted { Some(true) } else { None },
         },
-        StimTarget::Combiner => Qstd101TargetRef::Combiner,
-        StimTarget::Sweep(index) => Qstd101TargetRef::Sweep { index: *index },
+        StimTarget::Combiner => Qp101TargetRef::Combiner,
+        StimTarget::Sweep(index) => Qp101TargetRef::Sweep { index: *index },
     }
 }
 
-fn export_pauli_basis(basis: PauliBasis) -> Qstd101PauliBasis {
+fn export_pauli_basis(basis: PauliBasis) -> Qp101PauliBasis {
     match basis {
-        PauliBasis::X => Qstd101PauliBasis::X,
-        PauliBasis::Y => Qstd101PauliBasis::Y,
-        PauliBasis::Z => Qstd101PauliBasis::Z,
+        PauliBasis::X => Qp101PauliBasis::X,
+        PauliBasis::Y => Qp101PauliBasis::Y,
+        PauliBasis::Z => Qp101PauliBasis::Z,
     }
 }
 

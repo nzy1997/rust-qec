@@ -12,6 +12,42 @@ A Rust implementation of Stim-like stabilizer circuit simulation.
 - Coordinate annotations: `QUBIT_COORDS`, `SHIFT_COORDS`, `TICK`
 - Pauli noise channels: `X_ERROR`, `Z_ERROR`, `DEPOLARIZE1/2`
 
+## CLI Workflow
+
+`rstim` already includes a CLI for inspecting, sampling, analyzing, generating,
+and exporting circuits.
+
+Use `rstim stats` to inspect a circuit before running heavier workflows:
+
+```sh
+printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | rstim stats
+```
+
+Example output:
+
+```text
+instruction_count: 5
+repeat_blocks: 1
+max_repeat_depth: 1
+num_qubits: 1
+num_measurements: 2
+num_detectors: 2
+num_observables: 0
+num_ticks: 2
+num_sweep_bits: 0
+```
+
+For machine-readable output:
+
+```sh
+printf 'M 0\nDETECTOR rec[-1]\n' | rstim stats --json
+```
+
+For the full CLI reference, including `sample`, `detect`, `analyze_errors`,
+`convert`, `m2d`, `gen`, `sample_dem`, `explain_errors`, and `export_json`, see
+[`rstim/doc/cli.md`](rstim/doc/cli.md) and
+[`rstim/doc/getting_started.md`](rstim/doc/getting_started.md).
+
 ## Stim Parity Showcase
 
 On six representative `repetition_code` and rotated `surface_code` cases (`d=5`
