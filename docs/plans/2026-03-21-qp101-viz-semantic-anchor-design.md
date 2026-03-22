@@ -1,16 +1,16 @@
-# QSTD101 Viz Semantic Anchor Design
+# QP101 Viz Semantic Anchor Design
 
 **Date:** 2026-03-21
 
 ## Goal
 
-Improve the local `qstd101-viz` prototype so detector and observable annotations are visually tied to the measurements they depend on. The chosen direction is to keep the main circuit drawing close to the `yao-rs/visualization` quill-based style while adding a renderer-only semantic anchor layer.
+Improve the local `qp101-viz` prototype so detector and observable annotations are visually tied to the measurements they depend on. The chosen direction is to keep the main circuit drawing close to the `yao-rs/visualization` quill-based style while adding a renderer-only semantic anchor layer.
 
 The optimization target is not general prettification. It is semantic readability: when a user sees a detector or observable annotation, they should be able to tell which measurement results it depends on without manually decoding raw `rec[-k]` references.
 
 ## Chosen Direction
 
-The renderer should assign a global, monotonically increasing measurement anchor to each measurement result that appears in the fully expanded visual execution order. These anchors are renderer-only labels such as `m1`, `m2`, `m3`, and they do not change the QSTD101 JSON schema.
+The renderer should assign a global, monotonically increasing measurement anchor to each measurement result that appears in the fully expanded visual execution order. These anchors are renderer-only labels such as `m1`, `m2`, `m3`, and they do not change the QP101 JSON schema.
 
 `detector` and `observable_include` operations currently preserve their true source semantics through `rec[-k]`. The renderer should continue to respect those sources, but instead of displaying only raw relative references, it should resolve them against the visualized measurement history and render the resolved anchors. For example:
 
@@ -75,7 +75,7 @@ For exact semantic checks, SVG output is preferable to PDF because the resulting
 
 This refinement does not:
 
-- change the QSTD101 JSON schema
+- change the QP101 JSON schema
 - add geometric layout rendering from `coords`
 - draw explicit semantic connector lines
 - attempt to support every possible future measurement-producing operation in the first pass
