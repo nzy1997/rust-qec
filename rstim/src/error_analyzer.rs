@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+
+#[cfg(test)]
 use std::collections::BTreeSet;
 
 use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
@@ -25,6 +27,12 @@ impl SparseXorVec {
 
     fn xor_other(&mut self, other: &SparseXorVec) {
         for item in &other.targets {
+            self.xor_item(item.clone());
+        }
+    }
+
+    fn xor_targets(&mut self, targets: &[DemTarget]) {
+        for item in targets {
             self.xor_item(item.clone());
         }
     }
@@ -102,6 +110,14 @@ impl ErrorAnalyzer {
         options: AnalyzeOptions,
         decompose_channel_errors: bool,
     ) -> Result<DetectorErrorModel, String> {
+        let flattened_instrs;
+        let instrs = if instrs.iter().any(|instr| matches!(instr, StimInstr::Repeat { .. })) {
+            flattened_instrs = crate::transforms::flattened(instrs);
+            &flattened_instrs[..]
+        } else {
+            instrs
+        };
+
         let num_qubits = count_qubits(instrs);
         let num_measurements = count_measurements(instrs);
         let num_detectors = count_annotations(instrs, "DETECTOR");
@@ -1518,32 +1534,6 @@ fn collect_detector_annotations_inner(
     }
 }
 
-/// Extract the detector/observable target set from a list of DemTargets,
-/// ignoring separators. Returns a BTreeSet for XOR-style operations.
-fn target_set(targets: &[DemTarget]) -> BTreeSet<DemTarget> {
-    targets
-        .iter()
-        .filter(|t| !matches!(t, DemTarget::Separator))
-        .cloned()
-        .collect()
-}
-
-/// Symmetric difference of two BTreeSets.
-fn symmetric_difference(
-    a: &BTreeSet<DemTarget>,
-    b: &BTreeSet<DemTarget>,
-) -> BTreeSet<DemTarget> {
-    a.symmetric_difference(b).cloned().collect()
-}
-
-/// Count detector targets in a target set.
-fn detector_count(targets: &BTreeSet<DemTarget>) -> usize {
-    targets
-        .iter()
-        .filter(|t| matches!(t, DemTarget::Detector(_)))
-        .count()
-}
-
 /// Check if a single component (no separators) is graphlike (at most 2 detectors).
 fn component_is_graphlike(targets: &[DemTarget]) -> bool {
     // Split by separators and check each component
@@ -1565,9 +1555,202 @@ fn component_is_graphlike(targets: &[DemTarget]) -> bool {
     det_count <= 2
 }
 
-/// Convert a BTreeSet of targets into a sorted Vec.
+#[cfg(test)]
+fn symmetric_difference(
+    a: &BTreeSet<DemTarget>,
+    b: &BTreeSet<DemTarget>,
+) -> BTreeSet<DemTarget> {
+    a.symmetric_difference(b).cloned().collect()
+}
+
+#[cfg(test)]
+fn detector_count(targets: &BTreeSet<DemTarget>) -> usize {
+    targets
+        .iter()
+        .filter(|t| matches!(t, DemTarget::Detector(_)))
+        .count()
+}
+
+#[cfg(test)]
 fn set_to_targets(set: &BTreeSet<DemTarget>) -> Vec<DemTarget> {
     set.iter().cloned().collect()
+}
+
+fn detector_symptom_key(targets: &[DemTarget]) -> Vec<DemTarget> {
+    let mut key: Vec<DemTarget> = targets
+        .iter()
+        .filter(|target| matches!(target, DemTarget::Detector(_)))
+        .cloned()
+        .collect();
+    key.sort();
+    key
+}
+
+fn obs_mask_of_targets(targets: &[DemTarget]) -> Result<(u64, u64), String> {
+    if targets.len() >= 64 {
+        return Err("not implemented: decomposing errors with more than 64 terms".to_string());
+    }
+    let mut obs_mask = 0u64;
+    let mut used_mask = 0u64;
+    for (k, target) in targets.iter().enumerate() {
+        if let DemTarget::Observable(index) = target {
+            if *index >= 64 {
+                return Err(
+                    "not implemented: decomposing errors with observable ids larger than 63"
+                        .to_string(),
+                );
+            }
+            obs_mask |= 1u64 << index;
+            used_mask |= 1u64 << k;
+        }
+    }
+    Ok((obs_mask, used_mask))
+}
+
+fn brute_force_decomp_helper(
+    start: usize,
+    mut used_term_mask: u64,
+    remaining_obs_mask: u64,
+    problem: &[DemTarget],
+    known_symptoms: &BTreeMap<Vec<DemTarget>, Vec<DemTarget>>,
+    out_result: &mut Vec<Vec<DemTarget>>,
+) -> Result<bool, String> {
+    let mut start = start;
+    loop {
+        if start >= problem.len() {
+            return Ok(remaining_obs_mask == 0);
+        }
+        if ((used_term_mask >> start) & 1) == 0 {
+            break;
+        }
+        start += 1;
+    }
+    used_term_mask |= 1 << start;
+
+    for k in start + 1..=problem.len() {
+        let mut key = vec![problem[start].clone()];
+        if k < problem.len() {
+            if ((used_term_mask >> k) & 1) != 0 {
+                continue;
+            }
+            key.push(problem[k].clone());
+            key.sort();
+            used_term_mask ^= 1 << k;
+        }
+        if let Some(component) = known_symptoms.get(&key) {
+            let obs_change = obs_mask_of_targets(component)?.0;
+            if brute_force_decomp_helper(
+                start + 1,
+                used_term_mask,
+                remaining_obs_mask ^ obs_change,
+                problem,
+                known_symptoms,
+                out_result,
+            )? {
+                out_result.push(component.clone());
+                return Ok(true);
+            }
+        }
+        if k < problem.len() {
+            used_term_mask ^= 1 << k;
+        }
+    }
+
+    Ok(false)
+}
+
+fn brute_force_decomposition_into_known_graphlike_errors(
+    problem: &[DemTarget],
+    known_symptoms: &BTreeMap<Vec<DemTarget>, Vec<DemTarget>>,
+) -> Result<Option<Vec<DemTarget>>, String> {
+    let mut out = Vec::with_capacity(problem.len());
+    let (obs_mask, used_mask) = obs_mask_of_targets(problem)?;
+    let success = brute_force_decomp_helper(0, used_mask, obs_mask, problem, known_symptoms, &mut out)?;
+    if !success {
+        return Ok(None);
+    }
+
+    let mut flat = Vec::new();
+    for component in out.iter().rev() {
+        if !flat.is_empty() {
+            flat.push(DemTarget::Separator);
+        }
+        flat.extend(component.iter().cloned());
+    }
+    Ok(Some(flat))
+}
+
+fn decompose_component_with_remnants(
+    component: &[DemTarget],
+    known_symptoms: &BTreeMap<Vec<DemTarget>, Vec<DemTarget>>,
+) -> Option<Vec<DemTarget>> {
+    let mut done = vec![false; component.len()];
+    let mut num_component_detectors = 0usize;
+    for (k, target) in component.iter().enumerate() {
+        if matches!(target, DemTarget::Detector(_)) {
+            num_component_detectors += 1;
+        } else {
+            done[k] = true;
+        }
+    }
+    if num_component_detectors <= 2 {
+        return Some(component.to_vec());
+    }
+
+    let mut flat = Vec::new();
+    let mut sparse = SparseXorVec::default();
+    sparse.xor_targets(component);
+
+    for k in 0..component.len() {
+        if done[k] {
+            continue;
+        }
+        for k2 in k + 1..component.len() {
+            if done[k2] {
+                continue;
+            }
+            let key = detector_symptom_key(&[component[k].clone(), component[k2].clone()]);
+            if let Some(match_component) = known_symptoms.get(&key) {
+                done[k] = true;
+                done[k2] = true;
+                if !flat.is_empty() {
+                    flat.push(DemTarget::Separator);
+                }
+                flat.extend(match_component.iter().cloned());
+                sparse.xor_targets(match_component);
+                break;
+            }
+        }
+    }
+
+    let mut missed = 0usize;
+    for k in 0..component.len() {
+        if !done[k] {
+            let key = detector_symptom_key(&[component[k].clone()]);
+            if let Some(match_component) = known_symptoms.get(&key) {
+                done[k] = true;
+                if !flat.is_empty() {
+                    flat.push(DemTarget::Separator);
+                }
+                flat.extend(match_component.iter().cloned());
+                sparse.xor_targets(match_component);
+            }
+        }
+        if !done[k] {
+            missed += 1;
+        }
+    }
+
+    if missed > 2 {
+        return None;
+    }
+    if !sparse.is_empty() {
+        if !flat.is_empty() {
+            flat.push(DemTarget::Separator);
+        }
+        flat.extend(sparse.targets);
+    }
+    Some(flat)
 }
 
 /// Decompose non-graphlike errors in a DEM into graphlike components.
@@ -1578,107 +1761,76 @@ fn set_to_targets(set: &BTreeSet<DemTarget>) -> Vec<DemTarget> {
 /// non-graphlike error's detector set.
 pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
     let instrs = dem.instructions().to_vec();
-
-    // Build a lookup of known graphlike errors: target_set -> index
-    let mut graphlike_map: BTreeMap<BTreeSet<DemTarget>, usize> = BTreeMap::new();
-    let mut graphlike_sets: Vec<(usize, BTreeSet<DemTarget>)> = Vec::new();
-
-    // Classify errors
-    let mut non_graphlike_indices: Vec<usize> = Vec::new();
-
-    for (i, instr) in instrs.iter().enumerate() {
-        if let DemInstruction::Error { targets, .. } = instr {
-            if component_is_graphlike(targets) {
-                let tset = target_set(targets);
-                if !tset.is_empty() {
-                    graphlike_map.insert(tset.clone(), i);
-                    graphlike_sets.push((i, tset));
-                }
-            } else {
-                non_graphlike_indices.push(i);
-            }
-        }
-    }
-
-    if non_graphlike_indices.is_empty() {
+    if !instrs.iter().any(|instr| {
+        matches!(
+            instr,
+            DemInstruction::Error { targets, .. } if !component_is_graphlike(targets)
+        )
+    }) {
         return Ok(());
     }
 
-    // Try to decompose each non-graphlike error
     let mut new_instrs = instrs;
-
-    for &idx in &non_graphlike_indices {
-        let (prob, targets) = match &new_instrs[idx] {
-            DemInstruction::Error { probability, targets } => (*probability, targets.clone()),
-            _ => unreachable!(),
+    let mut known_symptoms: BTreeMap<Vec<DemTarget>, Vec<DemTarget>> = BTreeMap::new();
+    for instr in &new_instrs {
+        let DemInstruction::Error { probability, targets } = instr else {
+            continue;
         };
-
-        let error_set = target_set(&targets);
-        let mut decomposed = false;
-
-        // Strategy 1: find K1 such that K1 is graphlike, and S ^ K1 is also a known graphlike error
-        for (_, k1_set) in &graphlike_sets {
-            // K1 must be a subset of or overlap with error_set for the decomposition to reduce complexity
-            let remainder = symmetric_difference(&error_set, k1_set);
-            if detector_count(&remainder) <= 2 {
-                if let Some(_) = graphlike_map.get(&remainder) {
-                    // Decompose: error_set = k1_set ^ remainder
-                    let mut new_targets = set_to_targets(k1_set);
-                    new_targets.push(DemTarget::Separator);
-                    new_targets.extend(set_to_targets(&remainder));
-                    new_instrs[idx] = DemInstruction::Error {
-                        probability: prob,
-                        targets: new_targets,
-                    };
-                    decomposed = true;
-                    break;
-                }
-                // Even if remainder is not a known error, it's graphlike (<=2 detectors),
-                // so we can use it directly as a new component
-                let mut new_targets = set_to_targets(k1_set);
-                new_targets.push(DemTarget::Separator);
-                new_targets.extend(set_to_targets(&remainder));
-                new_instrs[idx] = DemInstruction::Error {
-                    probability: prob,
-                    targets: new_targets,
-                };
-                decomposed = true;
-                break;
-            }
-        }
-
-        if decomposed {
+        if *probability == 0.0 || targets.is_empty() {
             continue;
         }
 
-        // Strategy 2: find pairs (K1, K2) of known graphlike errors where K1 ^ K2 = S
-        let mut found_pair = false;
-        'outer: for (i, (_, k1_set)) in graphlike_sets.iter().enumerate() {
-            for (_, k2_set) in graphlike_sets.iter().skip(i) {
-                let combined = symmetric_difference(k1_set, k2_set);
-                if combined == error_set {
-                    let mut new_targets = set_to_targets(k1_set);
-                    new_targets.push(DemTarget::Separator);
-                    new_targets.extend(set_to_targets(k2_set));
-                    new_instrs[idx] = DemInstruction::Error {
-                        probability: prob,
-                        targets: new_targets,
-                    };
-                    found_pair = true;
-                    break 'outer;
+        let mut start = 0usize;
+        for k in 0..=targets.len() {
+            if k == targets.len() || matches!(targets[k], DemTarget::Separator) {
+                let component = &targets[start..k];
+                let key = detector_symptom_key(component);
+                if key.len() == 1 || key.len() == 2 {
+                    known_symptoms.insert(key, component.to_vec());
                 }
+                start = k + 1;
             }
-        }
-
-        if !found_pair {
-            return Err(format!(
-                "failed to decompose non-graphlike error into graphlike components: {:?}",
-                targets
-            ));
         }
     }
 
-    // Rebuild the DEM
+    for instr in &mut new_instrs {
+        let DemInstruction::Error { targets, .. } = instr else {
+            continue;
+        };
+        if component_is_graphlike(targets) {
+            continue;
+        }
+
+        let original_targets = targets.clone();
+        let mut rewritten = Vec::new();
+        let mut start = 0usize;
+        for k in 0..=original_targets.len() {
+            if k == original_targets.len() || matches!(original_targets[k], DemTarget::Separator) {
+                let component = &original_targets[start..k];
+                let decomposed = if let Some(flat) =
+                    brute_force_decomposition_into_known_graphlike_errors(component, &known_symptoms)?
+                {
+                    flat
+                } else if let Some(flat) =
+                    decompose_component_with_remnants(component, &known_symptoms)
+                {
+                    flat
+                } else {
+                    return Err(format!(
+                        "failed to decompose non-graphlike error into graphlike components: {:?}",
+                        original_targets
+                    ));
+                };
+                if !rewritten.is_empty() && !decomposed.is_empty() {
+                    rewritten.push(DemTarget::Separator);
+                }
+                rewritten.extend(decomposed);
+                start = k + 1;
+            }
+        }
+        *targets = rewritten;
+    }
+
     let mut merged_errors: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
     let mut annotations = Vec::new();
     for instr in new_instrs {

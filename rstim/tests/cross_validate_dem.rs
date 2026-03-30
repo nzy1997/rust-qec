@@ -1,8 +1,10 @@
 #![allow(unexpected_cfgs)]
 
 use rstim::codegen::{color_code::memory_xyz, repetition_code_memory, surface_code::rotated_memory_x};
+use rstim::dem::DetectorErrorModel;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::circuit_to_string;
+use rstim::showcase::dem_semantic_summary;
 use std::collections::BTreeMap;
 use std::fs;
 use std::process::Command;
@@ -31,6 +33,22 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 
 fn stim_analyze_errors(circuit_text: &str) -> String {
     stim_analyze_errors_flags(circuit_text, &[])
+}
+
+fn stim_python_generated_surface_code_circuit_text() -> String {
+    let output = Command::new("python3")
+        .arg("-c")
+        .arg(
+            "import stim; print(stim.Circuit.generated('surface_code:rotated_memory_z', rounds=9, distance=3, after_clifford_depolarization=0.001, after_reset_flip_probability=0.001, before_measure_flip_probability=0.001, before_round_data_depolarization=0.001))",
+        )
+        .output()
+        .expect("failed to run python3");
+    assert!(
+        output.status.success(),
+        "python3 stim generation failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
 }
 
 fn stim_analyze_errors_flags(circuit_text: &str, flags: &[&str]) -> String {
@@ -123,6 +141,14 @@ fn canonicalize_error_targets(targets: &str) -> String {
     components.join(" ^ ")
 }
 
+fn strip_stim_comments(circuit_text: &str) -> String {
+    circuit_text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn assert_all_graphlike_dem_text(dem_text: &str) {
     for line in dem_text.lines() {
         let line = line.trim();
@@ -156,6 +182,26 @@ fn assert_semantic_dem_parity(stim_dem_text: &str, rstim_dem_text: &str) {
     assert_eq!(
         stim_det_lines, rstim_det_lines,
         "detector annotations differ:\nstim:\n{stim_dem_text}\n\nrstim:\n{rstim_dem_text}"
+    );
+}
+
+fn assert_repeat_aware_dem_parity(stim_dem_text: &str, rstim_dem_text: &str) {
+    let stim_dem = DetectorErrorModel::parse(stim_dem_text).unwrap();
+    let rstim_dem = DetectorErrorModel::parse(rstim_dem_text).unwrap();
+    let stim_summary = dem_semantic_summary(&stim_dem);
+    let rstim_summary = dem_semantic_summary(&rstim_dem);
+    let context = format!(
+        "repeat-aware semantic error mismatch:\nstim:\n{stim_dem_text}\n\nrstim:\n{rstim_dem_text}"
+    );
+    assert_prob_maps_close(
+        &stim_summary.error_probabilities,
+        &rstim_summary.error_probabilities,
+        &context,
+    );
+    assert_eq!(
+        stim_summary.annotation_lines,
+        rstim_summary.annotation_lines,
+        "{context}"
     );
 }
 
@@ -217,6 +263,27 @@ error(0.26) D0 ^ D1
 ";
 
     assert_semantic_dem_parity(stim_dem_text, rstim_dem_text);
+}
+
+#[test]
+fn assert_repeat_aware_dem_parity_tolerates_float_roundoff() {
+    let stim_dem_text = "error(0.1) D0\nrepeat 2 {\n    error(0.2) D0 D1\n    shift_detectors 2\n    detector(5, 0) D0\n}\n";
+    let rstim_dem_text =
+        "error(0.10000000000000002) D0\nrepeat 2 {\n    error(0.20000000000000004) D0 D1\n    shift_detectors 2\n    detector(5, 0) D0\n}\n";
+
+    assert_repeat_aware_dem_parity(stim_dem_text, rstim_dem_text);
+}
+
+#[test]
+fn raw_repeat_surface_code_analysis_matches_explicitly_flattened_circuit() {
+    let circuit_text = strip_stim_comments(&stim_python_generated_surface_code_circuit_text());
+    let circuit = rstim::parser::parse_lines(&circuit_text).unwrap();
+    let flat_circuit = rstim::transforms::flattened(&circuit);
+
+    let raw_dem = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+    let flat_dem = ErrorAnalyzer::circuit_to_dem(&flat_circuit).unwrap();
+
+    assert_repeat_aware_dem_parity(&raw_dem.to_string(), &flat_dem.to_string());
 }
 
 #[test]
@@ -400,6 +467,79 @@ fn cross_validate_decomposed_surface_code_dem() {
     assert_all_graphlike_dem_text(&stim_dem_text);
     assert_all_graphlike_dem_text(&rstim_dem_text);
     assert_semantic_dem_parity(&stim_dem_text, &rstim_dem_text);
+}
+
+#[test]
+fn cross_validate_surface_code_dem_from_original_stim_generated_repeat_circuit() {
+    let _guard = lock_stim_env();
+    let circuit_text = strip_stim_comments(&stim_python_generated_surface_code_circuit_text());
+    let circuit = rstim::parser::parse_lines(&circuit_text).unwrap();
+    let rstim_dem_text = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap().to_string();
+
+    let dir = tempfile::tempdir().unwrap();
+    let dem_path = dir.path().join("rstim_repeat_surface_code.dem");
+    fs::write(&dem_path, &rstim_dem_text).unwrap();
+
+    // Stim's repeat-preserving DEM factorization is not identical to the
+    // factorization produced from an explicitly flattened circuit, so compare
+    // semantic sampling behavior instead of comparing DEM terms directly.
+    let script = r#"
+import pathlib
+import sys
+
+import numpy as np
+import stim
+
+shots = 200_000
+det_tol = 0.0015
+obs_tol = 0.0015
+pair_tol = 0.00075
+
+circuit = stim.Circuit.generated(
+    'surface_code:rotated_memory_z',
+    rounds=9,
+    distance=3,
+    after_clifford_depolarization=0.001,
+    after_reset_flip_probability=0.001,
+    before_measure_flip_probability=0.001,
+    before_round_data_depolarization=0.001,
+)
+dem = stim.DetectorErrorModel(pathlib.Path(sys.argv[1]).read_text())
+
+circuit_dets, circuit_obs = circuit.compile_detector_sampler(seed=1234).sample(
+    shots,
+    separate_observables=True,
+)
+dem_dets, dem_obs, _ = dem.compile_sampler(seed=1235).sample(shots)
+
+det_diff = float(np.max(np.abs(circuit_dets.mean(axis=0) - dem_dets.mean(axis=0))))
+obs_diff = float(np.max(np.abs(circuit_obs.mean(axis=0) - dem_obs.mean(axis=0))))
+
+pair_diff = 0.0
+for a, b in [(4, 12), (5, 13), (9, 17), (10, 18), (21, 29), (68, 69)]:
+    if a < circuit_dets.shape[1] and b < circuit_dets.shape[1]:
+        circuit_joint = float(np.mean(circuit_dets[:, a] & circuit_dets[:, b]))
+        dem_joint = float(np.mean(dem_dets[:, a] & dem_dets[:, b]))
+        pair_diff = max(pair_diff, abs(circuit_joint - dem_joint))
+
+if det_diff > det_tol or obs_diff > obs_tol or pair_diff > pair_tol:
+    print(f'max detector mean diff: {det_diff}')
+    print(f'max observable mean diff: {obs_diff}')
+    print(f'max pairwise joint diff: {pair_diff}')
+    sys.exit(1)
+"#;
+    let output = Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&dem_path)
+        .output()
+        .expect("failed to run python3");
+    assert!(
+        output.status.success(),
+        "python3 sampling parity check failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]

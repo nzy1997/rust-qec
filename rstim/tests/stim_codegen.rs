@@ -3,13 +3,35 @@
 // Avoids overlap with existing codegen_noise.rs tests.
 
 use rstim::codegen::*;
-use rstim::ir::circuit_to_string;
+use rstim::ir::{circuit_to_string, StimInstr, StimTarget};
 use rstim::sampler::sample_batch;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
 fn rng() -> StdRng {
     StdRng::seed_from_u64(77)
+}
+
+fn count_qubit_targets_named(instrs: &[StimInstr], op_name: &str) -> usize {
+    instrs
+        .iter()
+        .map(|instr| match instr {
+            StimInstr::Op { name, targets, .. } if name == op_name => targets
+                .iter()
+                .filter(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+                .count(),
+            StimInstr::Repeat { count, body } => (*count as usize) * count_qubit_targets_named(body, op_name),
+            _ => 0,
+        })
+        .sum()
+}
+
+fn tail_after_last_tick(instrs: &[StimInstr]) -> &[StimInstr] {
+    let last_tick = instrs
+        .iter()
+        .rposition(|instr| matches!(instr, StimInstr::Op { name, .. } if name == "TICK"))
+        .expect("surface-code circuit should contain TICK instructions");
+    &instrs[last_tick + 1..]
 }
 
 // --- NoiseParams::none produces clean circuit ---
@@ -79,6 +101,51 @@ fn surface_code_per_channel_noise_present() {
     let circuit = rotated_memory_z_with_params(3, 3, params);
     let text = circuit_to_string(&circuit);
     assert!(text.contains("DEPOLARIZE2(0.002)"), "2q depol: {text}");
+}
+
+#[test]
+fn surface_code_after_clifford_depolarization_matches_h_layer_noise_placement() {
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.001,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, 3, params);
+
+    let h_targets = count_qubit_targets_named(&circuit, "H");
+    let dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
+    assert_eq!(
+        dep1_targets,
+        h_targets,
+        "after_clifford_depolarization should add one DEPOLARIZE1 target per X-ancilla H target"
+    );
+}
+
+#[test]
+fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measurement_step() {
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.001,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, 3, params);
+
+    let total_dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
+    let final_data_measure_targets = count_qubit_targets_named(&circuit, "M");
+    assert_eq!(
+        total_dep1_targets,
+        3 * final_data_measure_targets,
+        "before_round_data_depolarization should apply once per round to data qubits, not again in the tail"
+    );
+
+    let tail_dep1_targets = count_qubit_targets_named(tail_after_last_tick(&circuit), "DEPOLARIZE1");
+    assert_eq!(
+        tail_dep1_targets,
+        0,
+        "the tail data-measurement step should not inject an extra DEPOLARIZE1 layer"
+    );
 }
 
 // --- surface code no noise ---

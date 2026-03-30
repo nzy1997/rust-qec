@@ -167,6 +167,15 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
+        if params.after_clifford_depolarization > 0.0 {
+            for &q in &x_measure_qubits {
+                instrs.push(op(
+                    "DEPOLARIZE1",
+                    &[params.after_clifford_depolarization],
+                    &[StimTarget::Qubit(q)],
+                ));
+            }
+        }
         // 4 CNOT layers
         for k in 0..4 {
             instrs.push(op("TICK", &[], &[]));
@@ -183,6 +192,15 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         // H on X ancilla
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
+        }
+        if params.after_clifford_depolarization > 0.0 {
+            for &q in &x_measure_qubits {
+                instrs.push(op(
+                    "DEPOLARIZE1",
+                    &[params.after_clifford_depolarization],
+                    &[StimTarget::Qubit(q)],
+                ));
+            }
         }
         instrs.push(op("TICK", &[], &[]));
 
@@ -237,11 +255,6 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
 
     // Tail: measure data qubits in chosen basis
     instrs.push(op("TICK", &[], &[]));
-    if params.before_round_data_depolarization > 0.0 {
-        for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
-        }
-    }
     if params.before_measure_flip_probability > 0.0 {
         for &q in &data_qubits {
             instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
