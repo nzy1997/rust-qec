@@ -20,8 +20,12 @@ struct SparseXorVec {
 impl SparseXorVec {
     fn xor_item(&mut self, item: DemTarget) {
         match self.targets.binary_search(&item) {
-            Ok(pos) => { self.targets.remove(pos); }
-            Err(pos) => { self.targets.insert(pos, item); }
+            Ok(pos) => {
+                self.targets.remove(pos);
+            }
+            Err(pos) => {
+                self.targets.insert(pos, item);
+            }
         }
     }
 
@@ -46,7 +50,9 @@ impl SparseXorVec {
     }
 
     fn has_observable(&self) -> bool {
-        self.targets.iter().any(|target| matches!(target, DemTarget::Observable(_)))
+        self.targets
+            .iter()
+            .any(|target| matches!(target, DemTarget::Observable(_)))
     }
 }
 
@@ -111,7 +117,10 @@ impl ErrorAnalyzer {
         decompose_channel_errors: bool,
     ) -> Result<DetectorErrorModel, String> {
         let flattened_instrs;
-        let instrs = if instrs.iter().any(|instr| matches!(instr, StimInstr::Repeat { .. })) {
+        let instrs = if instrs
+            .iter()
+            .any(|instr| matches!(instr, StimInstr::Repeat { .. }))
+        {
             flattened_instrs = crate::transforms::flattened(instrs);
             &flattened_instrs[..]
         } else {
@@ -146,7 +155,8 @@ impl ErrorAnalyzer {
         for (prob, targets) in analyzer.errors.into_iter().rev() {
             if prob > 0.0 && !targets.is_empty() {
                 let targets = canonicalize_error_targets(&targets);
-                merged.entry(targets)
+                merged
+                    .entry(targets)
                     .and_modify(|existing| {
                         *existing = *existing + prob - 2.0 * *existing * prob;
                     })
@@ -226,7 +236,12 @@ impl ErrorAnalyzer {
                         }
                     }
                 }
-                StimInstr::Op { name, args, targets, .. } => {
+                StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } => {
                     self.undo_op(name.as_str(), args, targets)?;
                 }
                 StimInstr::Repeat { count, body } => {
@@ -239,12 +254,7 @@ impl ErrorAnalyzer {
         Ok(())
     }
 
-    fn undo_op(
-        &mut self,
-        name: &str,
-        args: &[f64],
-        targets: &[StimTarget],
-    ) -> Result<(), String> {
+    fn undo_op(&mut self, name: &str, args: &[f64], targets: &[StimTarget]) -> Result<(), String> {
         match name {
             "I" | "X" | "Y" | "Z" => {}
             "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => {}
@@ -647,7 +657,9 @@ impl ErrorAnalyzer {
                             .to_string(),
                     );
                 }
-                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                let probs: Vec<f64> = (0..15)
+                    .map(|i| args.get(i).copied().unwrap_or(0.0))
+                    .collect();
                 let paulis: [(bool, bool, bool, bool); 15] = [
                     (false, false, true, false),
                     (false, false, true, true),
@@ -670,10 +682,18 @@ impl ErrorAnalyzer {
                     for (i, (xa, za, xb, zb)) in paulis.iter().enumerate() {
                         if probs[i] > 0.0 {
                             let mut sens = SparseXorVec::default();
-                            if *xa { sens.xor_other(&self.x_sens[qa]); }
-                            if *za { sens.xor_other(&self.z_sens[qa]); }
-                            if *xb { sens.xor_other(&self.x_sens[qb]); }
-                            if *zb { sens.xor_other(&self.z_sens[qb]); }
+                            if *xa {
+                                sens.xor_other(&self.x_sens[qa]);
+                            }
+                            if *za {
+                                sens.xor_other(&self.z_sens[qa]);
+                            }
+                            if *xb {
+                                sens.xor_other(&self.x_sens[qb]);
+                            }
+                            if *zb {
+                                sens.xor_other(&self.z_sens[qb]);
+                            }
                             if !sens.is_empty() {
                                 components.push((probs[i], sens.targets));
                             }
@@ -950,7 +970,9 @@ impl ErrorAnalyzer {
                 let slot = 1usize << k;
                 for target in &basis_errors[k] {
                     if let DemTarget::Detector(det) = target {
-                        let bit = if let Some(existing) = involved_detectors.iter().position(|value| value == det) {
+                        let bit = if let Some(existing) =
+                            involved_detectors.iter().position(|value| value == det)
+                        {
                             existing
                         } else {
                             involved_detectors.push(*det);
@@ -1006,7 +1028,9 @@ impl ErrorAnalyzer {
         if probability <= 0.0 || self.num_measurements == 0 {
             return;
         }
-        let targets = self.measurement_sens[self.num_measurements - 1].targets.clone();
+        let targets = self.measurement_sens[self.num_measurements - 1]
+            .targets
+            .clone();
         if !targets.is_empty() {
             self.errors.push((probability, targets));
         }
@@ -1085,11 +1109,12 @@ impl ErrorAnalyzer {
         instr: &StimInstr,
     ) -> Result<(f64, Vec<DemTarget>), String> {
         match instr {
-            StimInstr::Op { name, args, targets, .. }
-                if name == "CORRELATED_ERROR"
-                    || name == "E"
-                    || name == "ELSE_CORRELATED_ERROR" =>
-            {
+            StimInstr::Op {
+                name,
+                args,
+                targets,
+                ..
+            } if name == "CORRELATED_ERROR" || name == "E" || name == "ELSE_CORRELATED_ERROR" => {
                 Ok((
                     args.first().copied().unwrap_or(0.0),
                     self.correlated_targets(targets),
@@ -1131,8 +1156,12 @@ impl ErrorAnalyzer {
                 continue;
             }
             let anchor = product.terms.last().unwrap().0;
-            let non_anchor: Vec<usize> = product.terms.iter()
-                .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+            let non_anchor: Vec<usize> = product
+                .terms
+                .iter()
+                .map(|&(q, _)| q)
+                .filter(|&q| q != anchor)
+                .collect();
 
             for &(q, basis) in &product.terms {
                 match basis {
@@ -1170,8 +1199,12 @@ impl ErrorAnalyzer {
                 continue;
             }
             let anchor = product.terms.last().unwrap().0;
-            let non_anchor: Vec<usize> = product.terms.iter()
-                .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+            let non_anchor: Vec<usize> = product
+                .terms
+                .iter()
+                .map(|&(q, _)| q)
+                .filter(|&q| q != anchor)
+                .collect();
 
             for &(q, basis) in &product.terms {
                 match basis {
@@ -1254,7 +1287,11 @@ impl ErrorAnalyzer {
             }
         }
         if self.measurement_sens.iter().any(|sens| !sens.is_empty()) {
-            let kind = if self.measurement_sens.iter().any(SparseXorVec::has_observable) {
+            let kind = if self
+                .measurement_sens
+                .iter()
+                .any(SparseXorVec::has_observable)
+            {
                 "observable"
             } else {
                 "detector"
@@ -1286,7 +1323,9 @@ fn split_pauli_products(targets: &[StimTarget]) -> Vec<PauliProduct> {
         match target {
             StimTarget::Pauli { qubit, basis, .. } => {
                 if !after_combiner && !current_terms.is_empty() {
-                    products.push(PauliProduct { terms: std::mem::take(&mut current_terms) });
+                    products.push(PauliProduct {
+                        terms: std::mem::take(&mut current_terms),
+                    });
                 }
                 current_terms.push((*qubit as usize, *basis));
                 after_combiner = false;
@@ -1298,37 +1337,57 @@ fn split_pauli_products(targets: &[StimTarget]) -> Vec<PauliProduct> {
         }
     }
     if !current_terms.is_empty() {
-        products.push(PauliProduct { terms: current_terms });
+        products.push(PauliProduct {
+            terms: current_terms,
+        });
     }
     products
 }
 
 fn qubits(targets: &[StimTarget]) -> Vec<usize> {
-    targets.iter().filter_map(|t| match t {
-        StimTarget::Qubit(q) => Some(*q as usize),
-        _ => None,
-    }).collect()
+    targets
+        .iter()
+        .filter_map(|t| match t {
+            StimTarget::Qubit(q) => Some(*q as usize),
+            _ => None,
+        })
+        .collect()
 }
 
 fn qubits_inv(targets: &[StimTarget]) -> Vec<usize> {
-    targets.iter().filter_map(|t| match t {
-        StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Some(*q as usize),
-        _ => None,
-    }).collect()
+    targets
+        .iter()
+        .filter_map(|t| match t {
+            StimTarget::Qubit(q) | StimTarget::QubitInv(q) => Some(*q as usize),
+            _ => None,
+        })
+        .collect()
 }
 
 fn qubit_pairs(targets: &[StimTarget]) -> Vec<(usize, usize)> {
     let qs = qubits(targets);
-    qs.chunks(2).filter_map(|c| {
-        if c.len() == 2 { Some((c[0], c[1])) } else { None }
-    }).collect()
+    qs.chunks(2)
+        .filter_map(|c| {
+            if c.len() == 2 {
+                Some((c[0], c[1]))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn qubit_pairs_inv(targets: &[StimTarget]) -> Vec<(usize, usize)> {
     let qs = qubits_inv(targets);
-    qs.chunks(2).filter_map(|c| {
-        if c.len() == 2 { Some((c[0], c[1])) } else { None }
-    }).collect()
+    qs.chunks(2)
+        .filter_map(|c| {
+            if c.len() == 2 {
+                Some((c[0], c[1]))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn checked_rec_index(num_measurements: usize, offset: i32) -> Result<usize, String> {
@@ -1373,29 +1432,32 @@ fn count_measurements(instrs: &[StimInstr]) -> usize {
     let mut count = 0;
     for instr in instrs {
         match instr {
-            StimInstr::Op { name, targets, .. } => {
-                match name.as_str() {
-                    "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" => {
-                        count += targets.iter().filter(|t| matches!(t,
-                            StimTarget::Qubit(_) | StimTarget::QubitInv(_))).count();
-                    }
-                    "MPAD" => {
-                        count += targets.len();
-                    }
-                    "MPP" => {
-                        let products = split_pauli_products(targets);
-                        count += products.len();
-                    }
-                    "MXX" | "MYY" | "MZZ" => {
-                        let qs = qubits_inv(targets);
-                        count += qs.len() / 2;
-                    }
-                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
-                        count += targets.iter().filter(|t| matches!(t, StimTarget::Qubit(_))).count();
-                    }
-                    _ => {}
+            StimInstr::Op { name, targets, .. } => match name.as_str() {
+                "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" => {
+                    count += targets
+                        .iter()
+                        .filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+                        .count();
                 }
-            }
+                "MPAD" => {
+                    count += targets.len();
+                }
+                "MPP" => {
+                    let products = split_pauli_products(targets);
+                    count += products.len();
+                }
+                "MXX" | "MYY" | "MZZ" => {
+                    let qs = qubits_inv(targets);
+                    count += qs.len() / 2;
+                }
+                "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+                    count += targets
+                        .iter()
+                        .filter(|t| matches!(t, StimTarget::Qubit(_)))
+                        .count();
+                }
+                _ => {}
+            },
             StimInstr::Repeat { count: n, body } => {
                 count += (*n as usize) * count_measurements(body);
             }
@@ -1432,7 +1494,9 @@ fn depolarize1_to_independent(p: f64) -> f64 {
 
 fn ensure_valid_depolarize1_probability(p: f64) -> Result<(), String> {
     if p > 0.75 {
-        return Err(format!("DEPOLARIZE1({p}) exceeds exact-analysis limit of 3/4"));
+        return Err(format!(
+            "DEPOLARIZE1({p}) exceeds exact-analysis limit of 3/4"
+        ));
     }
     Ok(())
 }
@@ -1449,18 +1513,16 @@ fn depolarize2_to_independent(p: f64) -> f64 {
 
 fn ensure_valid_depolarize2_probability(p: f64) -> Result<(), String> {
     if p > 15.0 / 16.0 {
-        return Err(format!("DEPOLARIZE2({p}) exceeds exact-analysis limit of 15/16"));
+        return Err(format!(
+            "DEPOLARIZE2({p}) exceeds exact-analysis limit of 15/16"
+        ));
     }
     Ok(())
 }
 
 /// Convert disjoint (mutually exclusive) X/Y/Z probabilities to independent
 /// per-channel probabilities. Returns None if no exact solution exists.
-fn try_disjoint_to_independent_xyz(
-    x: f64,
-    y: f64,
-    z: f64,
-) -> Option<(f64, f64, f64)> {
+fn try_disjoint_to_independent_xyz(x: f64, y: f64, z: f64) -> Option<(f64, f64, f64)> {
     let i = (1.0 - x - y - z).max(0.0);
     // Re-arrange so identity is most likely
     if i < x {
@@ -1556,10 +1618,7 @@ fn component_is_graphlike(targets: &[DemTarget]) -> bool {
 }
 
 #[cfg(test)]
-fn symmetric_difference(
-    a: &BTreeSet<DemTarget>,
-    b: &BTreeSet<DemTarget>,
-) -> BTreeSet<DemTarget> {
+fn symmetric_difference(a: &BTreeSet<DemTarget>, b: &BTreeSet<DemTarget>) -> BTreeSet<DemTarget> {
     a.symmetric_difference(b).cloned().collect()
 }
 
@@ -1665,7 +1724,8 @@ fn brute_force_decomposition_into_known_graphlike_errors(
 ) -> Result<Option<Vec<DemTarget>>, String> {
     let mut out = Vec::with_capacity(problem.len());
     let (obs_mask, used_mask) = obs_mask_of_targets(problem)?;
-    let success = brute_force_decomp_helper(0, used_mask, obs_mask, problem, known_symptoms, &mut out)?;
+    let success =
+        brute_force_decomp_helper(0, used_mask, obs_mask, problem, known_symptoms, &mut out)?;
     if !success {
         return Ok(None);
     }
@@ -1773,7 +1833,11 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
     let mut new_instrs = instrs;
     let mut known_symptoms: BTreeMap<Vec<DemTarget>, Vec<DemTarget>> = BTreeMap::new();
     for instr in &new_instrs {
-        let DemInstruction::Error { probability, targets } = instr else {
+        let DemInstruction::Error {
+            probability,
+            targets,
+        } = instr
+        else {
             continue;
         };
         if *probability == 0.0 || targets.is_empty() {
@@ -1808,8 +1872,10 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
             if k == original_targets.len() || matches!(original_targets[k], DemTarget::Separator) {
                 let component = &original_targets[start..k];
                 let decomposed = if let Some(flat) =
-                    brute_force_decomposition_into_known_graphlike_errors(component, &known_symptoms)?
-                {
+                    brute_force_decomposition_into_known_graphlike_errors(
+                        component,
+                        &known_symptoms,
+                    )? {
                     flat
                 } else if let Some(flat) =
                     decompose_component_with_remnants(component, &known_symptoms)
@@ -1901,7 +1967,11 @@ mod internal_branch_tests {
     fn undo_op_reports_internal_else_correlated_error_without_leader() {
         let mut analyzer = make_analyzer(0, 0);
         let err = analyzer
-            .undo_op("ELSE_CORRELATED_ERROR", &[0.25], &[StimTarget::pauli(0, PauliBasis::X, false)])
+            .undo_op(
+                "ELSE_CORRELATED_ERROR",
+                &[0.25],
+                &[StimTarget::pauli(0, PauliBasis::X, false)],
+            )
             .unwrap_err();
         assert!(err.contains("ELSE_CORRELATED_ERROR"));
     }
@@ -1911,10 +1981,7 @@ mod internal_branch_tests {
         let mut analyzer = make_analyzer(0, 0);
         analyzer.emit_error_combinations(
             &[0.0, 0.1, 0.2, 0.3],
-            &[
-                vec![DemTarget::Detector(0)],
-                vec![DemTarget::Detector(0)],
-            ],
+            &[vec![DemTarget::Detector(0)], vec![DemTarget::Detector(0)]],
             true,
         );
 
@@ -2013,7 +2080,10 @@ mod internal_branch_tests {
             .len(),
             1
         );
-        assert_eq!(qubits(&[StimTarget::Qubit(2), StimTarget::Rec(-1)]), vec![2]);
+        assert_eq!(
+            qubits(&[StimTarget::Qubit(2), StimTarget::Rec(-1)]),
+            vec![2]
+        );
         assert_eq!(
             qubits_inv(&[StimTarget::QubitInv(3), StimTarget::Sweep(1)]),
             vec![3]
@@ -2027,6 +2097,147 @@ mod internal_branch_tests {
         assert!(try_disjoint_to_independent_xyz(0.0, 0.0, 0.9).is_some());
         assert!(try_disjoint_to_independent_xyz(0.3, 0.3, 0.0).is_none());
         assert!(try_disjoint_to_independent_xyz(0.0, 0.01, 0.01).is_none());
+    }
+
+    #[test]
+    fn obs_mask_of_targets_rejects_too_many_terms_and_large_observable_ids() {
+        let too_many_terms: Vec<_> = (0..64).map(DemTarget::Detector).collect();
+        let too_many_err = obs_mask_of_targets(&too_many_terms).unwrap_err();
+        assert!(too_many_err.contains("more than 64 terms"));
+
+        let observable_err = obs_mask_of_targets(&[DemTarget::Observable(64)]).unwrap_err();
+        assert!(observable_err.contains("larger than 63"));
+    }
+
+    #[test]
+    fn brute_force_decomposition_into_known_graphlike_errors_returns_none_when_unsolved() {
+        let problem = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+        ];
+        let known_symptoms = BTreeMap::new();
+
+        assert_eq!(
+            brute_force_decomposition_into_known_graphlike_errors(&problem, &known_symptoms)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn decompose_component_with_remnants_covers_graphlike_none_and_remainder_paths() {
+        let graphlike_component = vec![
+            DemTarget::Detector(0),
+            DemTarget::Observable(0),
+            DemTarget::Detector(1),
+        ];
+        assert_eq!(
+            decompose_component_with_remnants(&graphlike_component, &BTreeMap::new()),
+            Some(graphlike_component.clone())
+        );
+
+        let impossible_component = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+            DemTarget::Detector(3),
+            DemTarget::Detector(4),
+        ];
+        assert_eq!(
+            decompose_component_with_remnants(&impossible_component, &BTreeMap::new()),
+            None
+        );
+
+        let mut known_symptoms = BTreeMap::new();
+        known_symptoms.insert(
+            vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+            vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+        );
+        let remainder_component = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+        ];
+        assert_eq!(
+            decompose_component_with_remnants(&remainder_component, &known_symptoms),
+            Some(vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Separator,
+                DemTarget::Detector(2),
+            ])
+        );
+    }
+
+    #[test]
+    fn decompose_errors_returns_early_for_already_graphlike_models() {
+        let mut dem = DetectorErrorModel::new();
+        dem.push(DemInstruction::Error {
+            probability: 0.125,
+            targets: vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+        });
+        dem.push(DemInstruction::Detector {
+            index: 0,
+            coords: vec![1.0, 2.0],
+        });
+        let original = dem.clone();
+
+        decompose_errors(&mut dem).unwrap();
+
+        assert_eq!(dem, original);
+    }
+
+    #[test]
+    fn decompose_errors_skips_zero_probability_and_empty_target_entries() {
+        let mut dem = DetectorErrorModel::new();
+        dem.push(DemInstruction::Error {
+            probability: 0.0,
+            targets: vec![DemTarget::Detector(0)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.2,
+            targets: vec![],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![DemTarget::Detector(2)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.3,
+            targets: vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ],
+        });
+
+        decompose_errors(&mut dem).unwrap();
+
+        let error_targets: Vec<_> = dem
+            .instructions()
+            .iter()
+            .filter_map(|instr| match instr {
+                DemInstruction::Error {
+                    probability,
+                    targets,
+                } => Some((*probability, targets.clone())),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            error_targets
+                .iter()
+                .all(|(probability, _)| *probability > 0.0)
+        );
+        assert!(error_targets.iter().all(|(_, targets)| !targets.is_empty()));
+        assert!(error_targets.iter().any(|(_, targets)| {
+            targets.contains(&DemTarget::Separator) || component_is_graphlike(targets)
+        }));
     }
 
     #[test]
