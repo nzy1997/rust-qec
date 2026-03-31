@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 rstim = { path = "../rstim" }
-rmatching = { path = "../rmatching" }
 rand = "0.8"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
