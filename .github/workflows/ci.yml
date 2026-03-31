@@ -35,7 +35,7 @@ jobs:
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
       - name: Generate coverage
-        run: cargo tarpaulin --workspace --out xml
+        run: cargo tarpaulin --workspace --include-tests --out xml
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

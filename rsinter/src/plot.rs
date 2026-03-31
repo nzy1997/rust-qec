@@ -10,6 +10,10 @@ const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
 const CANVAS_WIDTH: u32 = 800;
 const CANVAS_HEIGHT: u32 = 600;
 
+fn identity_rate_transform(rate: f64, _stat: &TaskStats) -> f64 {
+    rate
+}
+
 pub fn plot_error_rate(
     stats: &[TaskStats],
     x_func: impl Fn(&TaskStats) -> f64,
@@ -21,7 +25,7 @@ pub fn plot_error_rate(
         x_func,
         group_func,
         "Logical Error Rate",
-        |rate, _stat| rate,
+        identity_rate_transform,
         output,
     )
 }
