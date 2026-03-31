@@ -371,10 +371,11 @@ mod tests {
         .unwrap();
 
         let content = std::fs::read_to_string(&out).unwrap();
-        assert!(
-            content.contains("fill=\"#E6194B\"") || content.contains("fill=\"#3CB44B\""),
-            "expected a series-colored filled confidence band in the SVG, got:\n{content}"
-        );
+        let has_band_color =
+            content.contains("fill=\"#E6194B\"") || content.contains("fill=\"#3CB44B\"");
+        let message =
+            format!("expected a series-colored filled confidence band in the SVG, got:\n{content}");
+        assert!(has_band_color, "{message}");
     }
 
     #[test]
@@ -396,10 +397,8 @@ mod tests {
         .unwrap();
 
         let content = std::fs::read_to_string(&out).unwrap();
-        assert!(
-            content.contains("<circle"),
-            "expected explicit point markers in the SVG, got:\n{content}"
-        );
+        let message = format!("expected explicit point markers in the SVG, got:\n{content}");
+        assert!(content.contains("<circle"), "{message}");
     }
 
     #[test]
@@ -418,9 +417,23 @@ mod tests {
 
         let content = std::fs::read_to_string(&out).unwrap();
         assert!(content.contains("<svg"), "output should be SVG");
-        assert!(
-            content.contains("<circle"),
-            "expected the sampled point marker in the SVG, got:\n{content}"
+        let message = format!("expected the sampled point marker in the SVG, got:\n{content}");
+        assert!(content.contains("<circle"), "{message}");
+    }
+
+    #[test]
+    fn test_fit_stat_rates_matches_binomial_fit_when_shots_are_zero() {
+        let stat = make_stat(0.01, 3, 9, 0, 0);
+        let (low, best, high) = fit_stat_rates(&stat, &|rate, _| rate);
+        assert_eq!((low, best, high), (0.0, 0.5, 1.0));
+    }
+
+    #[test]
+    fn test_confidence_band_polygon_clamps_zero_bounds_away_from_log_singularity() {
+        let points = vec![(1.0, 0.0, 0.0, 0.0)];
+        assert_eq!(
+            confidence_band_polygon(&points),
+            vec![(1.0, 1e-10), (1.0, 1e-10)]
         );
     }
 

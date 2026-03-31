@@ -45,10 +45,10 @@ fn stim_python_generated_surface_code_circuit_text() -> String {
         )
         .output()
         .expect("failed to run python3");
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     assert!(
         output.status.success(),
-        "python3 stim generation failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        "python3 stim generation failed: {stderr}"
     );
     String::from_utf8(output.stdout).unwrap()
 }
@@ -73,11 +73,8 @@ fn stim_analyze_errors_flags(circuit_text: &str, flags: &[&str]) -> String {
             .unwrap();
     }
     let output = child.wait_with_output().unwrap();
-    assert!(
-        output.status.success(),
-        "stim failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    assert!(output.status.success(), "stim failed: {stderr}");
     String::from_utf8(output.stdout).unwrap()
 }
 
@@ -304,11 +301,30 @@ fn panic_message_handles_static_str_and_non_string_payloads() {
 }
 
 #[test]
+fn lock_stim_env_recovers_from_poisoning() {
+    let panic = std::panic::catch_unwind(|| {
+        let _guard = lock_stim_env();
+        panic!("poison the stim env mutex");
+    });
+    assert!(panic.is_err());
+
+    let _guard = lock_stim_env();
+}
+
+#[test]
 fn canonicalize_error_targets_sorts_terms_and_components() {
     assert_eq!(
         canonicalize_error_targets(" D1   D0 ^  ^ L0 D2 "),
         "D0 D1 ^ D2 L0"
     );
+}
+
+#[test]
+fn parse_dem_helpers_ignore_malformed_error_lines_without_closing_paren() {
+    let malformed = "error(0.125 D0 D1\nerror(0.25) D2\n";
+    assert_eq!(parse_dem_errors(malformed).len(), 1);
+    assert_eq!(parse_dem_errors_multi(malformed)["D2"], vec![0.25]);
+    assert_eq!(parse_dem_error_semantics(malformed)["D2"], 0.25);
 }
 
 #[test]
@@ -331,6 +347,21 @@ fn assert_prob_maps_close_reports_missing_keys() {
     .unwrap_err();
     let text = panic_message(panic);
     assert!(text.contains("missing probability"));
+}
+
+#[test]
+fn assert_prob_maps_close_reports_probability_mismatch() {
+    let mut expected = BTreeMap::new();
+    expected.insert("D0 D1".to_string(), 0.125);
+    let mut actual = BTreeMap::new();
+    actual.insert("D0 D1".to_string(), 0.25);
+
+    let panic = std::panic::catch_unwind(|| {
+        assert_prob_maps_close(&expected, &actual, "probability mismatch");
+    })
+    .unwrap_err();
+    let text = panic_message(panic);
+    assert!(text.contains("probability mismatch"));
 }
 
 #[test]
@@ -367,6 +398,38 @@ fn assert_repeat_aware_dem_parity_reports_annotation_mismatch() {
     .unwrap_err();
     let text = panic_message(panic);
     assert!(text.contains("repeat-aware semantic error mismatch"));
+}
+
+#[test]
+fn stim_python_generated_surface_code_circuit_text_reports_python_failure() {
+    let _guard = lock_stim_env();
+    let dir = tempfile::tempdir().unwrap();
+    let python_path = dir.path().join("python3");
+    fs::write(
+        &python_path,
+        "#!/bin/sh\necho 'python exploded' >&2\nexit 1\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&python_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&python_path, perms).unwrap();
+    }
+
+    let old_path = std::env::var_os("PATH");
+    unsafe {
+        std::env::set_var("PATH", dir.path());
+    }
+    let result = std::panic::catch_unwind(stim_python_generated_surface_code_circuit_text);
+    match old_path {
+        Some(path) => unsafe { std::env::set_var("PATH", path) },
+        None => unsafe { std::env::remove_var("PATH") },
+    }
+
+    let panic_text = panic_message(result.unwrap_err());
+    assert!(panic_text.contains("python3 stim generation failed: python exploded"));
 }
 
 #[test]
@@ -462,11 +525,15 @@ DETECTOR rec[-1]
     let output = child.wait_with_output().unwrap();
     let instrs = rstim::parser::parse_lines(circuit_text).unwrap();
     let rstim_result = ErrorAnalyzer::circuit_to_dem_decomposed(&instrs);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let rstim_success = rstim_result
+        .as_ref()
+        .map(|dem| dem.to_string())
+        .unwrap_or_default();
 
     assert!(
         output.stdout.is_empty(),
-        "stim unexpectedly produced stdout:\n{}",
-        String::from_utf8_lossy(&output.stdout)
+        "stim unexpectedly produced stdout:\n{stdout}"
     );
     let stim_stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -475,8 +542,7 @@ DETECTOR rec[-1]
     );
     assert!(
         rstim_result.is_err(),
-        "rstim unexpectedly succeeded:\n{}",
-        rstim_result.unwrap().to_string()
+        "rstim unexpectedly succeeded:\n{rstim_success}"
     );
 }
 
@@ -575,11 +641,11 @@ if det_diff > det_tol or obs_diff > obs_tol or pair_diff > pair_tol:
         .arg(&dem_path)
         .output()
         .expect("failed to run python3");
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     assert!(
         output.status.success(),
-        "python3 sampling parity check failed:\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+        "python3 sampling parity check failed:\nstdout:\n{stdout}\nstderr:\n{stderr}"
     );
 }
 
@@ -608,11 +674,15 @@ fn cross_validate_decomposed_color_code_failure_mode() {
     }
     let output = child.wait_with_output().unwrap();
     let rstim_result = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let rstim_success = rstim_result
+        .as_ref()
+        .map(|dem| dem.to_string())
+        .unwrap_or_default();
 
     assert!(
         output.stdout.is_empty(),
-        "stim unexpectedly produced stdout:\n{}",
-        String::from_utf8_lossy(&output.stdout)
+        "stim unexpectedly produced stdout:\n{stdout}"
     );
     let stim_stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -621,8 +691,7 @@ fn cross_validate_decomposed_color_code_failure_mode() {
     );
     assert!(
         rstim_result.is_err(),
-        "rstim unexpectedly succeeded:\n{}",
-        rstim_result.unwrap().to_string()
+        "rstim unexpectedly succeeded:\n{rstim_success}"
     );
     let rstim_err = rstim_result.unwrap_err();
     assert!(
@@ -643,21 +712,17 @@ fn cross_validate_surface_code_dem() {
 
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
-
-    assert_eq!(
-        stim_errors.len(),
-        rstim_errors.len(),
+    let count_context = format!(
         "error count mismatch: stim={} rstim={}",
         stim_errors.len(),
         rstim_errors.len()
     );
 
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "{count_context}");
+
     for key in stim_errors.keys() {
-        assert!(
-            rstim_errors.contains_key(key),
-            "stim has error target '{}' not in rstim",
-            key
-        );
+        let missing_key_context = format!("stim has error target '{key}' not in rstim");
+        assert!(rstim_errors.contains_key(key), "{missing_key_context}");
     }
 
     let mut max_rel = 0.0f64;
@@ -667,14 +732,9 @@ fn cross_validate_surface_code_dem() {
         if rel > max_rel {
             max_rel = rel;
         }
-        assert!(
-            rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={} rel={}",
-            key,
-            stim_p,
-            rstim_p,
-            rel
-        );
+        let rel_context =
+            format!("probability mismatch for '{key}': stim={stim_p} rstim={rstim_p} rel={rel}");
+        assert!(rel < 1e-12, "{rel_context}");
     }
 
     let stim_det_lines: Vec<&str> = stim_dem_text
@@ -703,24 +763,19 @@ fn cross_validate_rep_code_dem_probabilities() {
 
     let stim_errors = parse_dem_errors(&stim_dem_text);
     let rstim_errors = parse_dem_errors(&rstim_dem_text);
-
-    assert_eq!(
-        stim_errors.len(),
-        rstim_errors.len(),
+    let count_context = format!(
         "error count mismatch: stim={} rstim={}",
         stim_errors.len(),
         rstim_errors.len()
     );
 
+    assert_eq!(stim_errors.len(), rstim_errors.len(), "{count_context}");
+
     for (key, stim_p) in &stim_errors {
         let rstim_p = rstim_errors.get(key).unwrap_or(&0.0);
         let rel = (stim_p - rstim_p).abs() / stim_p.max(1e-20);
-        assert!(
-            rel < 1e-12,
-            "probability mismatch for '{}': stim={} rstim={}",
-            key,
-            stim_p,
-            rstim_p
-        );
+        let rel_context =
+            format!("probability mismatch for '{key}': stim={stim_p} rstim={rstim_p}");
+        assert!(rel < 1e-12, "{rel_context}");
     }
 }
