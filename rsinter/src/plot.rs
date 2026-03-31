@@ -3,7 +3,7 @@ use std::path::Path;
 
 use plotters::prelude::*;
 
-use crate::stats::fit_binomial;
+use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 use crate::task_stats::TaskStats;
 
 const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
@@ -16,15 +16,50 @@ pub fn plot_error_rate(
     group_func: impl Fn(&TaskStats) -> String,
     output: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Group stats and compute (x, low, best, high) per group
+    plot_error_rate_transformed(
+        stats,
+        x_func,
+        group_func,
+        "Logical Error Rate",
+        |rate, _stat| rate,
+        output,
+    )
+}
+
+pub fn plot_error_rate_per_piece(
+    stats: &[TaskStats],
+    x_func: impl Fn(&TaskStats) -> f64,
+    group_func: impl Fn(&TaskStats) -> String,
+    pieces_func: impl Fn(&TaskStats) -> f64,
+    output: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    plot_error_rate_transformed(
+        stats,
+        x_func,
+        group_func,
+        "Logical Error Rate Per Round",
+        |rate, stat| shot_error_rate_to_piece_error_rate(rate, pieces_func(stat)),
+        output,
+    )
+}
+
+fn plot_error_rate_transformed<X, G, R>(
+    stats: &[TaskStats],
+    x_func: X,
+    group_func: G,
+    y_label: &str,
+    rate_transform: R,
+    output: &Path,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    X: Fn(&TaskStats) -> f64,
+    G: Fn(&TaskStats) -> String,
+    R: Fn(f64, &TaskStats) -> f64,
+{
     let mut groups: BTreeMap<String, Vec<(f64, f64, f64, f64)>> = BTreeMap::new();
     for stat in stats {
         let x = x_func(stat);
-        let effective_shots = stat.shots - stat.discards;
-        let fit = fit_binomial(effective_shots, stat.errors, MAX_LIKELIHOOD_FACTOR);
-        let best = fit.best.unwrap_or(0.0);
-        let low  = fit.low.unwrap_or(0.0);
-        let high = fit.high.unwrap_or(0.0);
+        let (low, best, high) = fit_stat_rates(stat, &rate_transform);
         groups.entry(group_func(stat)).or_default().push((x, low, best, high));
     }
     for pts in groups.values_mut() {
@@ -52,12 +87,36 @@ pub fn plot_error_rate(
     let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("svg").to_lowercase();
     if ext == "png" {
         let root = BitMapBackend::new(output, (CANVAS_WIDTH, CANVAS_HEIGHT)).into_drawing_area();
-        render(root, &groups, x_range, y_low..y_high)?;
+        render(root, &groups, x_range, y_low..y_high, y_label)?;
     } else {
         let root = SVGBackend::new(output, (CANVAS_WIDTH, CANVAS_HEIGHT)).into_drawing_area();
-        render(root, &groups, x_range, y_low..y_high)?;
+        render(root, &groups, x_range, y_low..y_high, y_label)?;
     }
     Ok(())
+}
+
+fn fit_stat_rates<R>(stat: &TaskStats, rate_transform: &R) -> (f64, f64, f64)
+where
+    R: Fn(f64, &TaskStats) -> f64,
+{
+    let effective_shots = stat.shots - stat.discards;
+    let fit = fit_binomial(effective_shots, stat.errors, MAX_LIKELIHOOD_FACTOR);
+    let low = rate_transform(fit.low.unwrap_or(0.0), stat);
+    let best = rate_transform(fit.best.unwrap_or(0.0), stat);
+    let high = rate_transform(fit.high.unwrap_or(0.0), stat);
+    (low, best, high)
+}
+
+fn confidence_band_polygon(points: &[(f64, f64, f64, f64)]) -> Vec<(f64, f64)> {
+    let mut polygon = Vec::with_capacity(points.len() * 2);
+    polygon.extend(points.iter().map(|(x, _low, _best, high)| (*x, high.max(1e-10))));
+    polygon.extend(
+        points
+            .iter()
+            .rev()
+            .map(|(x, low, _best, _high)| (*x, low.max(1e-10))),
+    );
+    polygon
 }
 
 fn render<DB: DrawingBackend>(
@@ -65,6 +124,7 @@ fn render<DB: DrawingBackend>(
     groups: &BTreeMap<String, Vec<(f64, f64, f64, f64)>>,
     x_range: std::ops::Range<f64>,
     y_range: std::ops::Range<f64>,
+    y_label: &str,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     DB::ErrorType: 'static,
@@ -83,16 +143,19 @@ where
     chart
         .configure_mesh()
         .x_desc("Physical Error Rate")
-        .y_desc("Logical Error Rate")
+        .y_desc(y_label)
         .draw()?;
-
-    // Multiplicative cap: each error bar whisker extends 1.5% of x on each side.
-    // This stays visually consistent on a log-scale x-axis.
-    const CAP_FACTOR: f64 = 1.015;
 
     for (i, (label, points)) in groups.iter().enumerate() {
         let color = Palette99::pick(i).mix(0.9);
         let legend_color = color.clone();
+
+        if points.len() > 1 {
+            chart.draw_series(std::iter::once(Polygon::new(
+                confidence_band_polygon(points),
+                ShapeStyle::from(&color.mix(0.2)).filled(),
+            )))?;
+        }
 
         // Line through best values
         chart.draw_series(LineSeries::new(
@@ -102,17 +165,28 @@ where
             PathElement::new(vec![(x, y), (x + 20, y)], ShapeStyle::from(&legend_color).stroke_width(2))
         });
 
-        // Error bars: vertical line from low to high, with horizontal caps
-        chart.draw_series(points.iter().flat_map(|(x, low, _best, high)| {
+        chart.draw_series(points.iter().map(|(x, _low, best, _high)| {
+            Circle::new(
+                (*x, best.max(1e-10)),
+                4,
+                ShapeStyle::from(&color).filled(),
+            )
+        }))?;
+
+        // Match sinter's behavior: multi-point series use a filled uncertainty
+        // highlight, while a single isolated point falls back to an error bar.
+        if points.len() == 1 {
+            const CAP_FACTOR: f64 = 1.015;
+            let (x, low, _best, high) = points[0];
             let low = low.max(1e-10);
             let x_lo = x / CAP_FACTOR;
             let x_hi = x * CAP_FACTOR;
-            vec![
-                PathElement::new(vec![(*x, low), (*x, *high)], ShapeStyle::from(&color).stroke_width(1)),
-                PathElement::new(vec![(x_lo, low),  (x_hi, low)],   ShapeStyle::from(&color).stroke_width(1)),
-                PathElement::new(vec![(x_lo, *high), (x_hi, *high)], ShapeStyle::from(&color).stroke_width(1)),
-            ]
-        }))?;
+            chart.draw_series([
+                PathElement::new(vec![(x, low), (x, high)], ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(x_lo, low), (x_hi, low)], ShapeStyle::from(&color).stroke_width(1)),
+                PathElement::new(vec![(x_lo, high), (x_hi, high)], ShapeStyle::from(&color).stroke_width(1)),
+            ])?;
+        }
     }
 
     chart.configure_series_labels()
@@ -128,14 +202,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stats::shot_error_rate_to_piece_error_rate;
     use std::collections::HashMap;
     use tempfile::tempdir;
 
-    fn make_stat(p: f64, d: u64, shots: u64, errors: u64) -> TaskStats {
+    fn make_stat(p: f64, d: u64, r: u64, shots: u64, errors: u64) -> TaskStats {
         TaskStats {
             strong_id: String::new(),
             decoder: String::new(),
-            metadata: serde_json::json!({"p": p, "d": d}),
+            metadata: serde_json::json!({"p": p, "d": d, "r": r}),
             shots,
             errors,
             discards: 0,
@@ -147,12 +222,12 @@ mod tests {
     #[test]
     fn test_plot_svg_created() {
         let stats = vec![
-            make_stat(0.001, 3, 10000, 10),
-            make_stat(0.005, 3, 10000, 100),
-            make_stat(0.01,  3, 10000, 500),
-            make_stat(0.001, 5, 10000, 1),
-            make_stat(0.005, 5, 10000, 20),
-            make_stat(0.01,  5, 10000, 150),
+            make_stat(0.001, 3, 9, 10000, 10),
+            make_stat(0.005, 3, 9, 10000, 100),
+            make_stat(0.01,  3, 9, 10000, 500),
+            make_stat(0.001, 5, 15, 10000, 1),
+            make_stat(0.005, 5, 15, 10000, 20),
+            make_stat(0.01,  5, 15, 10000, 150),
         ];
         let dir = tempdir().unwrap();
         let out = dir.path().join("plot.svg");
@@ -170,8 +245,8 @@ mod tests {
     #[test]
     fn test_plot_png_created() {
         let stats = vec![
-            make_stat(0.001, 3, 10000, 10),
-            make_stat(0.01,  3, 10000, 500),
+            make_stat(0.001, 3, 9, 10000, 10),
+            make_stat(0.01,  3, 9, 10000, 500),
         ];
         let dir = tempdir().unwrap();
         let out = dir.path().join("plot.png");
@@ -185,5 +260,111 @@ mod tests {
         // PNG magic bytes: 0x89 0x50 0x4E 0x47
         let bytes = std::fs::read(&out).unwrap();
         assert_eq!(&bytes[0..4], b"\x89PNG");
+    }
+
+    #[test]
+    fn test_plot_per_piece_svg_created() {
+        let stats = vec![
+            make_stat(0.008, 3, 9, 10_000, 120),
+            make_stat(0.010, 3, 9, 10_000, 220),
+            make_stat(0.008, 5, 15, 10_000, 30),
+            make_stat(0.010, 5, 15, 10_000, 70),
+        ];
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("plot_per_round.svg");
+        plot_error_rate_per_piece(
+            &stats,
+            |s| s.metadata["p"].as_f64().unwrap(),
+            |s| format!("d={}", s.metadata["d"].as_u64().unwrap()),
+            |s| s.metadata["r"].as_u64().unwrap() as f64,
+            &out,
+        )
+        .unwrap();
+        assert!(out.exists());
+        let content = std::fs::read_to_string(&out).unwrap();
+        assert!(content.contains("<svg"), "output should be SVG");
+    }
+
+    #[test]
+    fn test_plot_svg_uses_filled_uncertainty_bands_for_multi_point_series() {
+        let stats = vec![
+            make_stat(0.008, 3, 9, 10_000, 120),
+            make_stat(0.009, 3, 9, 10_000, 160),
+            make_stat(0.010, 3, 9, 10_000, 220),
+            make_stat(0.008, 5, 15, 10_000, 30),
+            make_stat(0.009, 5, 15, 10_000, 45),
+            make_stat(0.010, 5, 15, 10_000, 70),
+        ];
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("plot_with_bands.svg");
+        plot_error_rate_per_piece(
+            &stats,
+            |s| s.metadata["p"].as_f64().unwrap(),
+            |s| format!("d={}", s.metadata["d"].as_u64().unwrap()),
+            |s| s.metadata["r"].as_u64().unwrap() as f64,
+            &out,
+        )
+        .unwrap();
+
+        let content = std::fs::read_to_string(&out).unwrap();
+        assert!(
+            content.contains("fill=\"#E6194B\"") || content.contains("fill=\"#3CB44B\""),
+            "expected a series-colored filled confidence band in the SVG, got:\n{content}"
+        );
+    }
+
+    #[test]
+    fn test_plot_svg_marks_sampled_points_on_curve() {
+        let stats = vec![
+            make_stat(0.008, 3, 9, 10_000, 120),
+            make_stat(0.009, 3, 9, 10_000, 160),
+            make_stat(0.010, 3, 9, 10_000, 220),
+        ];
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("plot_with_markers.svg");
+        plot_error_rate_per_piece(
+            &stats,
+            |s| s.metadata["p"].as_f64().unwrap(),
+            |s| format!("d={}", s.metadata["d"].as_u64().unwrap()),
+            |s| s.metadata["r"].as_u64().unwrap() as f64,
+            &out,
+        )
+        .unwrap();
+
+        let content = std::fs::read_to_string(&out).unwrap();
+        assert!(
+            content.contains("<circle"),
+            "expected explicit point markers in the SVG, got:\n{content}"
+        );
+    }
+
+    #[test]
+    fn test_per_piece_fit_is_lower_than_per_shot_fit_for_multiple_rounds() {
+        let stat = make_stat(0.01, 3, 9, 10_000, 100);
+        let fit = fit_binomial(stat.shots, stat.errors, MAX_LIKELIHOOD_FACTOR);
+        let per_shot_best = fit.best.unwrap();
+        let per_piece_best =
+            shot_error_rate_to_piece_error_rate(per_shot_best, stat.metadata["r"].as_u64().unwrap() as f64);
+        assert!(per_piece_best < per_shot_best);
+    }
+
+    #[test]
+    fn test_confidence_band_polygon_traces_upper_then_lower_boundary() {
+        let points = vec![
+            (1.0, 0.1, 0.2, 0.3),
+            (2.0, 0.2, 0.3, 0.4),
+            (3.0, 0.3, 0.4, 0.5),
+        ];
+        assert_eq!(
+            confidence_band_polygon(&points),
+            vec![
+                (1.0, 0.3),
+                (2.0, 0.4),
+                (3.0, 0.5),
+                (3.0, 0.3),
+                (2.0, 0.2),
+                (1.0, 0.1),
+            ]
+        );
     }
 }

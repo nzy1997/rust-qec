@@ -347,31 +347,46 @@ round counts.
 ## Plot logical error rate vs physical error rate
 
 After collecting stats with `rsinter`, visualize the threshold with
-`rsinter::plot::plot_error_rate`. The x-axis is the physical error rate
-(from task metadata), the y-axis is the logical error rate with confidence
-intervals, and each curve is one code distance.
+`rsinter::plot::plot_error_rate_per_piece`. The x-axis is the physical error
+rate (from task metadata), the y-axis is the logical error rate per round
+with confidence intervals, and each curve is one code distance.
 
 ```rust
-use rsinter::plot::plot_error_rate;
+use rsinter::plot::plot_error_rate_per_piece;
 use std::path::Path;
 
 // `results` is Vec<TaskStats> from rsinter::collect::collect(...)
 // metadata contains {"d": 3, "p": 0.01, "r": 9} (d=distance, p=noise, r=rounds)
 
-plot_error_rate(
+plot_error_rate_per_piece(
     &results,
     |s| s.metadata["p"].as_f64().unwrap(),           // x: physical error rate
     |s| format!("d={}", s.metadata["d"].as_u64().unwrap()), // one curve per distance
+    |s| s.metadata["r"].as_u64().unwrap() as f64,    // convert per shot to per round
     Path::new("threshold.svg"),                       // .svg (default) or .png
 ).unwrap();
 ```
 
-The `errors / shots` ratio is used as the logical error rate. To express
-it per round instead of per shot, convert with `shot_error_rate_to_piece_error_rate`
-and store the result as the task's error count scaled accordingly, or plot
-the raw per-shot rate and label the axis accordingly.
+The `errors / shots` ratio is the logical error rate per shot. The
+`plot_error_rate_per_piece` helper converts it into a per-round logical error
+rate using the rounds count stored in task metadata.
 
-Example output for a rotated surface code under circuit-level noise near
-threshold (d = 3, 5, 7; p ∈ {0.008 … 0.012}):
+Illustrative example output for a rotated surface code under circuit-level
+noise near threshold (d = 3, 5, 7; p ∈ {0.008 … 0.012}). The bundled SVG below
+combines two views:
+
+1. Left: a real Rust threshold sweep using `rmatching`-backed MWPM decoding.
+2. Right: decode-only timing on identical Stim-generated DEM/syndrome batches,
+   comparing `rmatching` against `pymatching`.
+
+The timing panel excludes circuit generation, DEM extraction, and sampling, so
+it reflects decoder cost per shot only:
 
 ![Surface code threshold plot](surface_code_threshold.svg)
+
+To regenerate the combined figure, run:
+`python3 rmatching/benchmarks/surface_code_threshold_doc_figure.py --refresh-left-panel`.
+
+If `surface_code_threshold_live.svg` is already present, omit
+`--refresh-left-panel` to reuse the cached left panel and only refresh the
+timing panel plus the combined SVG.

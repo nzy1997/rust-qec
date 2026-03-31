@@ -1,8 +1,8 @@
 /// Generate a surface code threshold plot for the getting_started.md documentation.
 ///
 /// Uses synthetic data representative of a rotated surface code under circuit-level
-/// noise, with pymatching decoding. The logical error rate is expressed per round
-/// (pre-divided by rounds count).
+/// noise. This example exists to generate a static documentation asset; it does
+/// not sample circuits or run a decoder.
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -12,7 +12,7 @@ use rsinter::task_stats::TaskStats;
 fn make_stat(p: f64, d: u64, r: u64, shots: u64, errors: u64) -> TaskStats {
     TaskStats {
         strong_id: String::new(),
-        decoder: "pymatching".into(),
+        decoder: "synthetic".into(),
         metadata: serde_json::json!({"p": p, "d": d, "r": r}),
         shots,
         errors,
@@ -24,8 +24,7 @@ fn make_stat(p: f64, d: u64, r: u64, shots: u64, errors: u64) -> TaskStats {
 
 fn main() {
     // Synthetic data representative of rotated surface code under circuit-level noise.
-    // shots=100_000; errors chosen so errors/shots ≈ logical error rate per round.
-    // Threshold is near p≈0.01 for this noise model.
+    // shots=100_000; errors chosen so errors/shots approximates an illustrative curve.
     let stats = vec![
         // d=3, rounds=9
         make_stat(0.008, 3, 9,  100_000,  1_050),
