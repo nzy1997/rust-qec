@@ -373,20 +373,13 @@ rate using the rounds count stored in task metadata.
 
 Illustrative example output for a rotated surface code under circuit-level
 noise near threshold (d = 3, 5, 7; p ∈ {0.008 … 0.012}). The bundled SVG below
-combines two views:
-
-1. Left: a real Rust threshold sweep using `rmatching`-backed MWPM decoding.
-2. Right: decode-only timing on identical Stim-generated DEM/syndrome batches,
-   comparing `rmatching` against `pymatching`.
-
-The timing panel excludes circuit generation, DEM extraction, and sampling, so
-it reflects decoder cost per shot only:
+was generated from a real Rust threshold sweep using `rmatching`-backed MWPM
+decoding:
 
 ![Surface code threshold plot](surface_code_threshold.svg)
 
-To regenerate the combined figure, run:
-`python3 rmatching/benchmarks/surface_code_threshold_doc_figure.py --refresh-left-panel`.
+To regenerate it, run:
+`cargo run -p rsinter --example surface_code_threshold_live`
 
-If `surface_code_threshold_live.svg` is already present, omit
-`--refresh-left-panel` to reuse the cached left panel and only refresh the
-timing panel plus the combined SVG.
+This writes `rstim/doc/surface_code_threshold_live.svg`. If you want to refresh
+the bundled documentation asset, copy it over `rstim/doc/surface_code_threshold.svg`.
