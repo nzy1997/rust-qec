@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use rstim::dem::DetectorErrorModel;
 use rstim::parser::parse_lines;
@@ -9,6 +10,17 @@ use rstim::showcase::{
 
 fn stim_cmd() -> String {
     std::env::var("RSTIM_TEST_STIM").unwrap_or_else(|_| "stim".to_string())
+}
+
+fn stim_env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn lock_stim_env() -> MutexGuard<'static, ()> {
+    stim_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn run_capture(cmd: &str, args: &[String]) -> String {
@@ -56,6 +68,7 @@ fn panic_text(payload: Box<dyn std::any::Any + Send>) -> String {
 
 #[test]
 fn showcase_gen_parity_matches_structurally() {
+    let _guard = lock_stim_env();
     for case in showcase_cases() {
         let args = vec![
             "gen".to_string(),
@@ -74,12 +87,18 @@ fn showcase_gen_parity_matches_structurally() {
         let stim_norm = strip_comment_preamble(&stim_text);
         let stim_instrs = parse_lines(stim_norm).unwrap();
         let rstim_instrs = parse_lines(&rstim_text).unwrap();
-        assert_eq!(structural_circuit_summary(&stim_instrs), structural_circuit_summary(&rstim_instrs), "gen mismatch for {}", case.label());
+        assert_eq!(
+            structural_circuit_summary(&stim_instrs),
+            structural_circuit_summary(&rstim_instrs),
+            "gen mismatch for {}",
+            case.label()
+        );
     }
 }
 
 #[test]
 fn showcase_dem_parity_matches_semantically() {
+    let _guard = lock_stim_env();
     for case in showcase_cases() {
         let noisy_gen_args = vec![
             "gen".to_string(),
@@ -102,18 +121,37 @@ fn showcase_dem_parity_matches_semantically() {
 
         let stim_summary = dem_semantic_summary(&DetectorErrorModel::parse(&stim_dem).unwrap());
         let rstim_summary = dem_semantic_summary(&DetectorErrorModel::parse(&rstim_dem).unwrap());
-        assert_eq!(stim_summary.annotation_lines, rstim_summary.annotation_lines, "annotation mismatch for {}", case.label());
-        assert_eq!(stim_summary.error_probabilities.keys().collect::<Vec<_>>(), rstim_summary.error_probabilities.keys().collect::<Vec<_>>(), "target mismatch for {}", case.label());
+        assert_eq!(
+            stim_summary.annotation_lines,
+            rstim_summary.annotation_lines,
+            "annotation mismatch for {}",
+            case.label()
+        );
+        assert_eq!(
+            stim_summary.error_probabilities.keys().collect::<Vec<_>>(),
+            rstim_summary.error_probabilities.keys().collect::<Vec<_>>(),
+            "target mismatch for {}",
+            case.label()
+        );
         for (targets, stim_p) in &stim_summary.error_probabilities {
             let rstim_p = rstim_summary.error_probabilities[targets];
             let rel = (stim_p - rstim_p).abs() / stim_p.max(1e-20);
-            assert!(rel <= 1e-12, "probability mismatch for {} in {}: stim={} rstim={} rel={}", targets, case.label(), stim_p, rstim_p, rel);
+            assert!(
+                rel <= 1e-12,
+                "probability mismatch for {} in {}: stim={} rstim={} rel={}",
+                targets,
+                case.label(),
+                stim_p,
+                rstim_p,
+                rel
+            );
         }
     }
 }
 
 #[test]
 fn stim_cmd_respects_override_command() {
+    let _guard = lock_stim_env();
     let dir = tempfile::tempdir().unwrap();
     let fake_stim = dir.path().join("fake-stim");
     unsafe {
@@ -127,8 +165,11 @@ fn stim_cmd_respects_override_command() {
 
 #[test]
 fn run_with_stdin_forwards_input_to_child_process() {
-    let output =
-        run_with_stdin("/bin/sh", &["-c".to_string(), "cat".to_string()], "alpha\nbeta\n");
+    let output = run_with_stdin(
+        "/bin/sh",
+        &["-c".to_string(), "cat".to_string()],
+        "alpha\nbeta\n",
+    );
     assert_eq!(output, "alpha\nbeta\n");
 }
 
@@ -158,8 +199,16 @@ fn panic_text_handles_static_str_and_non_string_payloads() {
 #[test]
 fn run_with_stdin_includes_stderr_on_failure() {
     let panic = std::panic::catch_unwind(|| {
-        run_with_stdin("/bin/sh", &["-c".to_string(), "cat >/dev/null; echo nope >&2; exit 1".to_string()], "ignored\n")
-    }).unwrap_err();
+        run_with_stdin(
+            "/bin/sh",
+            &[
+                "-c".to_string(),
+                "cat >/dev/null; echo nope >&2; exit 1".to_string(),
+            ],
+            "ignored\n",
+        )
+    })
+    .unwrap_err();
     let text = panic_text(panic);
     assert!(text.contains("command failed"));
     assert!(text.contains("nope"));
