@@ -87,11 +87,11 @@ fn showcase_gen_parity_matches_structurally() {
         let stim_norm = strip_comment_preamble(&stim_text);
         let stim_instrs = parse_lines(stim_norm).unwrap();
         let rstim_instrs = parse_lines(&rstim_text).unwrap();
+        let label = case.label();
         assert_eq!(
             structural_circuit_summary(&stim_instrs),
             structural_circuit_summary(&rstim_instrs),
-            "gen mismatch for {}",
-            case.label()
+            "gen mismatch for {label}"
         );
     }
 }
@@ -121,30 +121,21 @@ fn showcase_dem_parity_matches_semantically() {
 
         let stim_summary = dem_semantic_summary(&DetectorErrorModel::parse(&stim_dem).unwrap());
         let rstim_summary = dem_semantic_summary(&DetectorErrorModel::parse(&rstim_dem).unwrap());
+        let label = case.label();
+        let stim_targets = stim_summary.error_probabilities.keys().collect::<Vec<_>>();
+        let rstim_targets = rstim_summary.error_probabilities.keys().collect::<Vec<_>>();
         assert_eq!(
-            stim_summary.annotation_lines,
-            rstim_summary.annotation_lines,
-            "annotation mismatch for {}",
-            case.label()
+            stim_summary.annotation_lines, rstim_summary.annotation_lines,
+            "annotation mismatch for {label}"
         );
-        assert_eq!(
-            stim_summary.error_probabilities.keys().collect::<Vec<_>>(),
-            rstim_summary.error_probabilities.keys().collect::<Vec<_>>(),
-            "target mismatch for {}",
-            case.label()
-        );
+        assert_eq!(stim_targets, rstim_targets, "target mismatch for {label}");
         for (targets, stim_p) in &stim_summary.error_probabilities {
             let rstim_p = rstim_summary.error_probabilities[targets];
             let rel = (stim_p - rstim_p).abs() / stim_p.max(1e-20);
-            assert!(
-                rel <= 1e-12,
-                "probability mismatch for {} in {}: stim={} rstim={} rel={}",
-                targets,
-                case.label(),
-                stim_p,
-                rstim_p,
-                rel
+            let mismatch = format!(
+                "probability mismatch for {targets} in {label}: stim={stim_p} rstim={rstim_p} rel={rel}"
             );
+            assert!(rel <= 1e-12, "{mismatch}");
         }
     }
 }

@@ -141,10 +141,9 @@ fn surface_code_after_clifford_depolarization_matches_h_layer_noise_placement() 
 
     let h_targets = count_qubit_targets_named(&circuit, "H");
     let dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
-    assert_eq!(
-        dep1_targets, h_targets,
-        "after_clifford_depolarization should add one DEPOLARIZE1 target per X-ancilla H target"
-    );
+    let context =
+        "after_clifford_depolarization should add one DEPOLARIZE1 target per X-ancilla H target";
+    assert_eq!(dep1_targets, h_targets, "{context}");
 }
 
 #[test]
@@ -159,18 +158,18 @@ fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measu
 
     let total_dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
     let final_data_measure_targets = count_qubit_targets_named(&circuit, "M");
+    let rounds_context = "before_round_data_depolarization should apply once per round to data qubits, not again in the tail";
     assert_eq!(
         total_dep1_targets,
         3 * final_data_measure_targets,
-        "before_round_data_depolarization should apply once per round to data qubits, not again in the tail"
+        "{rounds_context}"
     );
 
     let tail_dep1_targets =
         count_qubit_targets_named(tail_after_last_tick(&circuit), "DEPOLARIZE1");
-    assert_eq!(
-        tail_dep1_targets, 0,
-        "the tail data-measurement step should not inject an extra DEPOLARIZE1 layer"
-    );
+    let tail_context =
+        "the tail data-measurement step should not inject an extra DEPOLARIZE1 layer";
+    assert_eq!(tail_dep1_targets, 0, "{tail_context}");
 }
 
 // --- surface code no noise ---

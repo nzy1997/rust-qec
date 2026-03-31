@@ -1698,14 +1698,16 @@ fn brute_force_decomp_helper(
         }
         if let Some(component) = known_symptoms.get(&key) {
             let obs_change = obs_mask_of_targets(component)?.0;
-            if brute_force_decomp_helper(
+            let solve_attempt = brute_force_decomp_helper(
                 start + 1,
                 used_term_mask,
                 remaining_obs_mask ^ obs_change,
                 problem,
                 known_symptoms,
                 out_result,
-            )? {
+            );
+            let solved = solve_attempt?;
+            if solved {
                 out_result.push(component.clone());
                 return Ok(true);
             }
@@ -1871,11 +1873,12 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
         for k in 0..=original_targets.len() {
             if k == original_targets.len() || matches!(original_targets[k], DemTarget::Separator) {
                 let component = &original_targets[start..k];
-                let decomposed = if let Some(flat) =
-                    brute_force_decomposition_into_known_graphlike_errors(
-                        component,
-                        &known_symptoms,
-                    )? {
+                let brute_force_attempt = brute_force_decomposition_into_known_graphlike_errors(
+                    component,
+                    &known_symptoms,
+                );
+                let brute_force = brute_force_attempt?;
+                let decomposed = if let Some(flat) = brute_force {
                     flat
                 } else if let Some(flat) =
                     decompose_component_with_remnants(component, &known_symptoms)
@@ -2110,6 +2113,20 @@ mod internal_branch_tests {
     }
 
     #[test]
+    fn obs_mask_of_targets_tracks_observable_bits_and_term_positions() {
+        assert_eq!(
+            obs_mask_of_targets(&[
+                DemTarget::Detector(0),
+                DemTarget::Observable(1),
+                DemTarget::Detector(2),
+                DemTarget::Observable(3),
+            ])
+            .unwrap(),
+            (0b1010, 0b1010)
+        );
+    }
+
+    #[test]
     fn brute_force_decomposition_into_known_graphlike_errors_returns_none_when_unsolved() {
         let problem = vec![
             DemTarget::Detector(0),
@@ -2122,6 +2139,34 @@ mod internal_branch_tests {
             brute_force_decomposition_into_known_graphlike_errors(&problem, &known_symptoms)
                 .unwrap(),
             None
+        );
+    }
+
+    #[test]
+    fn brute_force_decomposition_into_known_graphlike_errors_handles_observable_slots() {
+        let problem = vec![
+            DemTarget::Detector(0),
+            DemTarget::Observable(0),
+            DemTarget::Detector(1),
+        ];
+        let mut known_symptoms = BTreeMap::new();
+        known_symptoms.insert(
+            vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Observable(0),
+            ],
+        );
+
+        assert_eq!(
+            brute_force_decomposition_into_known_graphlike_errors(&problem, &known_symptoms)
+                .unwrap(),
+            Some(vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Observable(0),
+            ])
         );
     }
 
@@ -2171,6 +2216,64 @@ mod internal_branch_tests {
     }
 
     #[test]
+    fn decompose_component_with_remnants_skips_done_pairs_and_separates_pair_matches() {
+        let component = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+            DemTarget::Detector(3),
+        ];
+        let mut known_symptoms = BTreeMap::new();
+        known_symptoms.insert(
+            vec![DemTarget::Detector(0), DemTarget::Detector(2)],
+            vec![DemTarget::Detector(0), DemTarget::Detector(2)],
+        );
+        known_symptoms.insert(
+            vec![DemTarget::Detector(1), DemTarget::Detector(3)],
+            vec![DemTarget::Detector(1), DemTarget::Detector(3)],
+        );
+
+        assert_eq!(
+            decompose_component_with_remnants(&component, &known_symptoms),
+            Some(vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(2),
+                DemTarget::Separator,
+                DemTarget::Detector(1),
+                DemTarget::Detector(3),
+            ])
+        );
+    }
+
+    #[test]
+    fn decompose_component_with_remnants_keeps_singletons_and_sparse_remainder() {
+        let component = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Detector(2),
+            DemTarget::Detector(3),
+        ];
+        let mut known_symptoms = BTreeMap::new();
+        known_symptoms.insert(
+            vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+            vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+        );
+        known_symptoms.insert(vec![DemTarget::Detector(2)], vec![DemTarget::Detector(2)]);
+
+        assert_eq!(
+            decompose_component_with_remnants(&component, &known_symptoms),
+            Some(vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Separator,
+                DemTarget::Detector(2),
+                DemTarget::Separator,
+                DemTarget::Detector(3),
+            ])
+        );
+    }
+
+    #[test]
     fn decompose_errors_returns_early_for_already_graphlike_models() {
         let mut dem = DetectorErrorModel::new();
         dem.push(DemInstruction::Error {
@@ -2215,6 +2318,10 @@ mod internal_branch_tests {
                 DemTarget::Detector(2),
             ],
         });
+        dem.push(DemInstruction::Detector {
+            index: 0,
+            coords: vec![0.0],
+        });
 
         decompose_errors(&mut dem).unwrap();
 
@@ -2238,6 +2345,125 @@ mod internal_branch_tests {
         assert!(error_targets.iter().any(|(_, targets)| {
             targets.contains(&DemTarget::Separator) || component_is_graphlike(targets)
         }));
+    }
+
+    #[test]
+    fn decompose_errors_bruteforces_multi_component_errors() {
+        let mut dem = DetectorErrorModel::new();
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Observable(0),
+            ],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![DemTarget::Detector(2)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![
+                DemTarget::Detector(3),
+                DemTarget::Detector(4),
+                DemTarget::Observable(1),
+            ],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![DemTarget::Detector(5)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.2,
+            targets: vec![
+                DemTarget::Detector(0),
+                DemTarget::Observable(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+                DemTarget::Separator,
+                DemTarget::Detector(3),
+                DemTarget::Observable(1),
+                DemTarget::Detector(4),
+                DemTarget::Detector(5),
+            ],
+        });
+
+        decompose_errors(&mut dem).unwrap();
+
+        assert!(dem.instructions().iter().any(|instr| {
+            matches!(
+                instr,
+                DemInstruction::Error { targets, .. }
+                    if targets
+                        == &vec![
+                            DemTarget::Detector(0),
+                            DemTarget::Detector(1),
+                            DemTarget::Observable(0),
+                            DemTarget::Separator,
+                            DemTarget::Detector(2),
+                            DemTarget::Separator,
+                            DemTarget::Detector(3),
+                            DemTarget::Detector(4),
+                            DemTarget::Observable(1),
+                            DemTarget::Separator,
+                            DemTarget::Detector(5),
+                        ]
+            )
+        }));
+    }
+
+    #[test]
+    fn pauli_channel_2_approximation_uses_all_qubit_sensitivities() {
+        let mut analyzer = make_analyzer(2, 0);
+        analyzer.options.approximate_disjoint_errors = true;
+        analyzer.x_sens[0].targets = vec![DemTarget::Detector(0)];
+        analyzer.z_sens[0].targets = vec![DemTarget::Detector(1)];
+        analyzer.x_sens[1].targets = vec![DemTarget::Detector(2)];
+        analyzer.z_sens[1].targets = vec![DemTarget::Detector(3)];
+
+        let mut probs = vec![0.0; 15];
+        probs[9] = 0.125;
+        analyzer
+            .undo_op(
+                "PAULI_CHANNEL_2",
+                &probs,
+                &[StimTarget::Qubit(0), StimTarget::Qubit(1)],
+            )
+            .unwrap();
+
+        assert_eq!(
+            analyzer.errors,
+            vec![(
+                0.125,
+                vec![
+                    DemTarget::Detector(0),
+                    DemTarget::Detector(1),
+                    DemTarget::Detector(2),
+                    DemTarget::Detector(3),
+                ],
+            )]
+        );
+    }
+
+    #[test]
+    fn qubit_pair_helpers_ignore_trailing_unpaired_targets() {
+        assert_eq!(
+            qubit_pairs(&[
+                StimTarget::Qubit(0),
+                StimTarget::Qubit(1),
+                StimTarget::Qubit(2),
+            ]),
+            vec![(0, 1)]
+        );
+        assert_eq!(
+            qubit_pairs_inv(&[
+                StimTarget::QubitInv(3),
+                StimTarget::QubitInv(4),
+                StimTarget::QubitInv(5),
+            ]),
+            vec![(3, 4)]
+        );
     }
 
     #[test]

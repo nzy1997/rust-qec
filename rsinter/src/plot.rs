@@ -152,14 +152,13 @@ where
 {
     root.fill(&WHITE)?;
 
+    let x_axis = (x_range.start..x_range.end).log_scale();
+    let y_axis = (y_range.start..y_range.end).log_scale();
     let mut chart = ChartBuilder::on(&root)
         .margin(40)
         .x_label_area_size(50)
         .y_label_area_size(70)
-        .build_cartesian_2d(
-            (x_range.start..x_range.end).log_scale(),
-            (y_range.start..y_range.end).log_scale(),
-        )?;
+        .build_cartesian_2d(x_axis, y_axis)?;
 
     chart
         .configure_mesh()
@@ -172,18 +171,20 @@ where
         let legend_color = color.clone();
 
         if points.len() > 1 {
-            chart.draw_series(std::iter::once(Polygon::new(
+            let band = Polygon::new(
                 confidence_band_polygon(points),
                 ShapeStyle::from(&color.mix(0.2)).filled(),
-            )))?;
+            );
+            chart.draw_series(std::iter::once(band))?;
         }
 
         // Line through best values
+        let best_line = LineSeries::new(
+            points.iter().map(|(x, _, best, _)| (*x, best.max(1e-10))),
+            ShapeStyle::from(&color).stroke_width(2),
+        );
         chart
-            .draw_series(LineSeries::new(
-                points.iter().map(|(x, _, best, _)| (*x, best.max(1e-10))),
-                ShapeStyle::from(&color).stroke_width(2),
-            ))?
+            .draw_series(best_line)?
             .label(label)
             .legend(move |(x, y)| {
                 PathElement::new(

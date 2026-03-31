@@ -23,6 +23,13 @@ fn lock_stim_env() -> MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+fn restore_path(path: Option<std::ffi::OsString>) {
+    match path {
+        Some(path) => unsafe { std::env::set_var("PATH", path) },
+        None => unsafe { std::env::remove_var("PATH") },
+    }
+}
+
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
     match payload.downcast::<String>() {
         Ok(message) => *message,
@@ -423,13 +430,41 @@ fn stim_python_generated_surface_code_circuit_text_reports_python_failure() {
         std::env::set_var("PATH", dir.path());
     }
     let result = std::panic::catch_unwind(stim_python_generated_surface_code_circuit_text);
-    match old_path {
-        Some(path) => unsafe { std::env::set_var("PATH", path) },
-        None => unsafe { std::env::remove_var("PATH") },
-    }
+    restore_path(old_path);
 
     let panic_text = panic_message(result.unwrap_err());
     assert!(panic_text.contains("python3 stim generation failed: python exploded"));
+}
+
+#[test]
+fn stim_python_generated_surface_code_circuit_text_restores_missing_path() {
+    let _guard = lock_stim_env();
+    let saved_path = std::env::var_os("PATH");
+    let dir = tempfile::tempdir().unwrap();
+    let python_path = dir.path().join("python3");
+    fs::write(
+        &python_path,
+        "#!/bin/sh\necho 'python exploded again' >&2\nexit 1\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&python_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&python_path, perms).unwrap();
+    }
+
+    unsafe {
+        std::env::remove_var("PATH");
+        std::env::set_var("PATH", dir.path());
+    }
+    let result = std::panic::catch_unwind(stim_python_generated_surface_code_circuit_text);
+    restore_path(None);
+    restore_path(saved_path);
+
+    let panic_text = panic_message(result.unwrap_err());
+    assert!(panic_text.contains("python3 stim generation failed: python exploded again"));
 }
 
 #[test]
