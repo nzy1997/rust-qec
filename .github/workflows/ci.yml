@@ -16,6 +16,8 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: sudo apt-get install -y libfontconfig1-dev
       - run: cargo test --workspace
   coverage:
     runs-on: ubuntu-latest
@@ -28,10 +30,12 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: sudo apt-get install -y libfontconfig1-dev
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
       - name: Generate coverage
-        run: cargo tarpaulin --workspace --out xml
+        run: cargo tarpaulin --workspace --include-tests --out xml
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

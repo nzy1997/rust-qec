@@ -2,14 +2,59 @@
 // Tests: noise parameter application in code generation.
 // Avoids overlap with existing codegen_noise.rs tests.
 
-use rstim::codegen::*;
-use rstim::ir::circuit_to_string;
-use rstim::sampler::sample_batch;
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
+use rstim::codegen::*;
+use rstim::ir::{StimInstr, StimTarget, circuit_to_string};
+use rstim::sampler::sample_batch;
 
 fn rng() -> StdRng {
     StdRng::seed_from_u64(77)
+}
+
+fn count_qubit_targets_named(instrs: &[StimInstr], op_name: &str) -> usize {
+    instrs
+        .iter()
+        .map(|instr| match instr {
+            StimInstr::Op { name, targets, .. } if name == op_name => targets
+                .iter()
+                .filter(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+                .count(),
+            StimInstr::Repeat { count, body } => {
+                (*count as usize) * count_qubit_targets_named(body, op_name)
+            }
+            _ => 0,
+        })
+        .sum()
+}
+
+fn tail_after_last_tick(instrs: &[StimInstr]) -> &[StimInstr] {
+    let last_tick = instrs
+        .iter()
+        .rposition(|instr| matches!(instr, StimInstr::Op { name, .. } if name == "TICK"))
+        .expect("surface-code circuit should contain TICK instructions");
+    &instrs[last_tick + 1..]
+}
+
+#[test]
+fn count_qubit_targets_named_counts_repeat_blocks_recursively() {
+    let instrs = vec![
+        StimInstr::Repeat {
+            count: 3,
+            body: vec![
+                StimInstr::new(
+                    "H",
+                    vec![],
+                    vec![StimTarget::Qubit(0), StimTarget::QubitInv(1)],
+                ),
+                StimInstr::new("M", vec![], vec![StimTarget::Qubit(2)]),
+            ],
+        },
+        StimInstr::new("H", vec![], vec![StimTarget::Qubit(3)]),
+    ];
+
+    assert_eq!(count_qubit_targets_named(&instrs, "H"), 7);
+    assert_eq!(count_qubit_targets_named(&instrs, "M"), 3);
 }
 
 // --- NoiseParams::none produces clean circuit ---
@@ -44,7 +89,10 @@ fn rep_code_per_channel_noise_all_present() {
     let circuit = repetition_code_memory_with_params(3, 2, params);
     let text = circuit_to_string(&circuit);
     assert!(text.contains("DEPOLARIZE1(0.011)"), "data depol: {text}");
-    assert!(text.contains("DEPOLARIZE2(0.022)"), "clifford depol: {text}");
+    assert!(
+        text.contains("DEPOLARIZE2(0.022)"),
+        "clifford depol: {text}"
+    );
     assert!(text.contains("X_ERROR(0.033)"), "measure flip: {text}");
     assert!(text.contains("X_ERROR(0.044)"), "reset flip: {text}");
 }
@@ -79,6 +127,49 @@ fn surface_code_per_channel_noise_present() {
     let circuit = rotated_memory_z_with_params(3, 3, params);
     let text = circuit_to_string(&circuit);
     assert!(text.contains("DEPOLARIZE2(0.002)"), "2q depol: {text}");
+}
+
+#[test]
+fn surface_code_after_clifford_depolarization_matches_h_layer_noise_placement() {
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.001,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, 3, params);
+
+    let h_targets = count_qubit_targets_named(&circuit, "H");
+    let dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
+    let context =
+        "after_clifford_depolarization should add one DEPOLARIZE1 target per X-ancilla H target";
+    assert_eq!(dep1_targets, h_targets, "{context}");
+}
+
+#[test]
+fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measurement_step() {
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.001,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, 3, params);
+
+    let total_dep1_targets = count_qubit_targets_named(&circuit, "DEPOLARIZE1");
+    let final_data_measure_targets = count_qubit_targets_named(&circuit, "M");
+    let rounds_context = "before_round_data_depolarization should apply once per round to data qubits, not again in the tail";
+    assert_eq!(
+        total_dep1_targets,
+        3 * final_data_measure_targets,
+        "{rounds_context}"
+    );
+
+    let tail_dep1_targets =
+        count_qubit_targets_named(tail_after_last_tick(&circuit), "DEPOLARIZE1");
+    let tail_context =
+        "the tail data-measurement step should not inject an extra DEPOLARIZE1 layer";
+    assert_eq!(tail_dep1_targets, 0, "{tail_context}");
 }
 
 // --- surface code no noise ---
@@ -159,7 +250,10 @@ fn noise_params_independent_channels() {
     let circuit = repetition_code_memory_with_params(3, 2, params);
     let text = circuit_to_string(&circuit);
     // Only DEPOLARIZE2 should be present, no X_ERROR.
-    assert!(text.contains("DEPOLARIZE2(0.05)"), "should have 2q depol: {text}");
+    assert!(
+        text.contains("DEPOLARIZE2(0.05)"),
+        "should have 2q depol: {text}"
+    );
     assert!(!text.contains("X_ERROR"), "no X_ERROR: {text}");
     assert!(!text.contains("DEPOLARIZE1"), "no 1q depol: {text}");
 }
