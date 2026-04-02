@@ -71,3 +71,19 @@ fn tracked_dem_records_repeat_iteration_target_slot_and_branch() {
     assert_eq!(source.op_path, vec![0, 0]);
     assert_eq!(source.target_qubits, vec![7]);
 }
+
+#[test]
+fn tracked_dem_merge_keeps_exact_source_union() {
+    let circuit = parse_lines(
+        "R 0\nX_ERROR(0.1) 0\nX_ERROR(0.2) 0\nM 0\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+    assert_eq!(tracked.dem.instructions().len(), 1);
+    assert_eq!(tracked.dem_error_to_sources.len(), 1);
+    assert_eq!(tracked.dem_error_to_sources[0].len(), 2);
+    assert_eq!(tracked.source_to_dem_errors[0], vec![0]);
+    assert_eq!(tracked.source_to_dem_errors[1], vec![0]);
+}

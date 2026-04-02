@@ -87,6 +87,42 @@ fn canonicalize_error_targets(targets: &[DemTarget]) -> Vec<DemTarget> {
     out
 }
 
+fn merge_tracked_terms(terms: Vec<TrackedErrorTerm>) -> Vec<TrackedErrorTerm> {
+    let mut merged: BTreeMap<Vec<DemTarget>, (f64, Vec<usize>)> = BTreeMap::new();
+    for term in terms.into_iter().rev() {
+        if term.probability <= 0.0 || term.targets.is_empty() {
+            continue;
+        }
+
+        let targets = canonicalize_error_targets(&term.targets);
+        merged
+            .entry(targets)
+            .and_modify(|(probability, source_ids)| {
+                *probability = *probability + term.probability - 2.0 * *probability * term.probability;
+                source_ids.extend(term.source_ids.iter().copied());
+                source_ids.sort_unstable();
+                source_ids.dedup();
+            })
+            .or_insert_with(|| {
+                let mut source_ids = term.source_ids;
+                source_ids.sort_unstable();
+                source_ids.dedup();
+                (term.probability, source_ids)
+            });
+    }
+
+    merged
+        .into_iter()
+        .filter_map(|(targets, (probability, source_ids))| {
+            (probability > 0.0).then_some(TrackedErrorTerm {
+                probability,
+                targets,
+                source_ids,
+            })
+        })
+        .collect()
+}
+
 pub struct ErrorAnalyzer {
     x_sens: Vec<SparseXorVec>,
     z_sens: Vec<SparseXorVec>,
@@ -144,8 +180,9 @@ impl ErrorAnalyzer {
         analyzer.ensure_no_pending_gauge()?;
 
         let annotations = collect_detector_annotations(instrs);
+        let merged_terms = merge_tracked_terms(analyzer.tracked_terms);
         let mut tracked =
-            TrackedDemResult::from_terms_and_sources(analyzer.tracked_sources, analyzer.tracked_terms);
+            TrackedDemResult::from_terms_and_sources(analyzer.tracked_sources, merged_terms);
         tracked.dem.set_min_counts(num_detectors, num_observables);
         for ann in annotations {
             tracked.dem.push(ann);
@@ -1012,6 +1049,51 @@ impl ErrorAnalyzer {
                         SourceBranch::Z,
                         branch_probability,
                         z_targets,
+                    );
+                }
+                Ok(())
+            }
+            "X_ERROR" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                for (target_slot, q) in qubits(targets).into_iter().enumerate() {
+                    self.emit_tracked_source_term(
+                        context,
+                        "X_ERROR",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::X,
+                        p,
+                        self.x_sens[q].targets.clone(),
+                    );
+                }
+                Ok(())
+            }
+            "Y_ERROR" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                for (target_slot, q) in qubits(targets).into_iter().enumerate() {
+                    self.emit_tracked_source_term(
+                        context,
+                        "Y_ERROR",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::Y,
+                        p,
+                        Self::xor_sorted_targets(&self.x_sens[q].targets, &self.z_sens[q].targets),
+                    );
+                }
+                Ok(())
+            }
+            "Z_ERROR" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                for (target_slot, q) in qubits(targets).into_iter().enumerate() {
+                    self.emit_tracked_source_term(
+                        context,
+                        "Z_ERROR",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::Z,
+                        p,
+                        self.z_sens[q].targets.clone(),
                     );
                 }
                 Ok(())
