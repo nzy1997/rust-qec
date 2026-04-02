@@ -182,6 +182,8 @@ pub enum Commands {
         out: Option<String>,
         #[arg(long, default_value = "pretty")]
         format: String,
+        #[arg(long = "highlight_dem_error")]
+        highlight_dem_error: Option<usize>,
     },
 }
 
@@ -408,11 +410,16 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 )
             }
         }
-        Some(Commands::ExportJson { r#in, out, format }) => {
+        Some(Commands::ExportJson {
+            r#in,
+            out,
+            format,
+            highlight_dem_error,
+        }) => {
             let text = read_input(r#in.as_deref())?;
             let format = parse_json_output_format(&format)?;
             let mut w = open_output(out.as_deref())?;
-            run_export_json(&text, format, &mut w)
+            run_export_json(&text, format, highlight_dem_error, &mut w)
         }
         None => {
             println!("rstim {}", crate::version());
@@ -689,9 +696,27 @@ pub fn run_analyze_errors_with_flags(
         .map_err(|e| format!("write error: {e}"))
 }
 
-fn run_export_json(text: &str, format: JsonOutputFormat, w: &mut dyn Write) -> Result<(), String> {
+fn run_export_json(
+    text: &str,
+    format: JsonOutputFormat,
+    highlight_dem_error: Option<usize>,
+    w: &mut dyn Write,
+) -> Result<(), String> {
     let instrs = parse_lines(text)?;
-    let doc = crate::qp101::export_qp101(&instrs)?;
+    let doc = match highlight_dem_error {
+        Some(index) => {
+            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs)?;
+            crate::qp101::export_qp101_with_highlighted_dem_error(&instrs, &tracked, index)
+                .map_err(|err| {
+                    if err.starts_with("DEM error index ") && err.contains(" out of range ") {
+                        format!("DEM error index out of range: {err}")
+                    } else {
+                        err
+                    }
+                })?
+        }
+        None => crate::qp101::export_qp101(&instrs)?,
+    };
     match format {
         JsonOutputFormat::Pretty => {
             serde_json::to_writer_pretty(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?

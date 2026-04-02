@@ -134,3 +134,31 @@ fn export_json_invalid_circuit_fails_cleanly() {
     assert!(stderr.contains("REPEAT") || stderr.contains("repeat"));
     assert!(!stderr.contains("panicked"));
 }
+
+#[test]
+fn export_json_can_highlight_dem_error_origins() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "REPEAT 2 {\n  DEPOLARIZE1(0.3) 5 7\n}\nM 5 7\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        value["extensions"]["rstim_query_highlights"]["query"]["dem_error_index"],
+        0
+    );
+}
+
+#[test]
+fn export_json_rejects_invalid_highlight_dem_error_index() {
+    let output =
+        run_export_json_with_stdin(&["--highlight_dem_error", "99"], "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("DEM error index out of range"));
+}
