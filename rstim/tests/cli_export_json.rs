@@ -149,7 +149,7 @@ fn export_json_can_highlight_dem_error_origins() {
 
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
-        value["extensions"]["rstim_query_highlights"]["query"]["dem_error_index"],
+        value["operations"][0]["body"][0]["annotations"][0]["context"]["dem_error_index"],
         0
     );
 }
@@ -190,7 +190,7 @@ fn export_json_can_highlight_dem_error_to_compact_output_file() {
 
     let value: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(
-        value["extensions"]["rstim_query_highlights"]["query"]["dem_error_index"],
+        value["operations"][0]["body"][0]["annotations"][0]["context"]["dem_error_index"],
         0
     );
 }

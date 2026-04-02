@@ -1,7 +1,8 @@
 use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    export_qp101, Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document,
+    Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
 };
 use serde_json::json;
 
@@ -20,6 +21,7 @@ fn serializes_minimal_gate_document_full_contract() {
             raw_targets: None,
             display: None,
             tags: Vec::new(),
+            annotations: Vec::new(),
         }],
         metadata: None,
         extensions: None,
@@ -49,10 +51,15 @@ fn serializes_tick_and_repeat_operations_full_contract() {
         version: "1.0".to_string(),
         num_qubits: 1,
         operations: vec![
-            Qp101Operation::Tick,
+            Qp101Operation::Tick {
+                annotations: Vec::new(),
+            },
             Qp101Operation::Repeat {
                 count: 3,
-                body: vec![Qp101Operation::Tick],
+                body: vec![Qp101Operation::Tick {
+                    annotations: Vec::new(),
+                }],
+                annotations: Vec::new(),
             },
         ],
         metadata: None,
@@ -128,10 +135,12 @@ fn serializes_display_annotation_and_remaining_target_variants() {
                     label: Some("feedback".to_string()),
                 }),
                 tags: vec!["tagged".to_string()],
+                annotations: Vec::new(),
             },
             Qp101Operation::Annotation {
                 kind: "note".to_string(),
                 text: "hello".to_string(),
+                annotations: Vec::new(),
             },
         ],
         metadata: None,
@@ -180,12 +189,68 @@ fn serializes_display_annotation_and_remaining_target_variants() {
 }
 
 #[test]
+fn serializes_operation_annotations_when_present() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 1,
+        operations: vec![Qp101Operation::Noise {
+            gate: "X_ERROR".to_string(),
+            params: vec![0.001],
+            raw_targets: vec![Qp101TargetRef::Qubit {
+                index: 0,
+                inverted: None,
+            }],
+            annotations: vec![Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![0],
+                label: Some("X".to_string()),
+                text: Some("repeat[2]".to_string()),
+                style: Some(Qp101AnnotationStyle {
+                    preset: Some("danger".to_string()),
+                    color: Some("red".to_string()),
+                    highlight: Some(true),
+                }),
+                tags: vec!["dem-origin".to_string()],
+                context: Some(json!({
+                    "dem_error_index": 17,
+                    "source_branch": "X"
+                })),
+            }],
+        }],
+        metadata: None,
+        extensions: None,
+    };
+
+    let value = serde_json::to_value(doc).unwrap();
+    assert_eq!(
+        value["operations"][0]["annotations"][0],
+        json!({
+            "kind": "marker",
+            "target_slots": [0],
+            "label": "X",
+            "text": "repeat[2]",
+            "style": {
+                "preset": "danger",
+                "color": "red",
+                "highlight": true
+            },
+            "tags": ["dem-origin"],
+            "context": {
+                "dem_error_index": 17,
+                "source_branch": "X"
+            }
+        })
+    );
+}
+
+#[test]
 fn export_preserves_repeat_and_tick() {
     let instrs = parse_lines("H 0\nTICK\nREPEAT 2 {\n  M 0\n}\n").unwrap();
     let doc = export_qp101(&instrs).unwrap();
-    assert!(matches!(doc.operations[1], Qp101Operation::Tick));
+    assert!(matches!(doc.operations[1], Qp101Operation::Tick { .. }));
     match &doc.operations[2] {
-        Qp101Operation::Repeat { count, body } => {
+        Qp101Operation::Repeat { count, body, .. } => {
             assert_eq!(*count, 2);
             assert_eq!(body.len(), 1);
             match &body[0] {
@@ -211,14 +276,18 @@ fn export_preserves_detector_and_coords() {
     let instrs = parse_lines("QUBIT_COORDS(1,2) 0\nM 0\nDETECTOR(5,6) rec[-1]\n").unwrap();
     let doc = export_qp101(&instrs).unwrap();
     match &doc.operations[0] {
-        Qp101Operation::QubitCoords { coords, targets } => {
+        Qp101Operation::QubitCoords {
+            coords, targets, ..
+        } => {
             assert_eq!(coords, &vec![1.0, 2.0]);
             assert_eq!(targets, &vec![0]);
         }
         other => panic!("unexpected coords op: {other:?}"),
     }
     match &doc.operations[2] {
-        Qp101Operation::Detector { coords, sources } => {
+        Qp101Operation::Detector {
+            coords, sources, ..
+        } => {
             assert_eq!(coords, &vec![5.0, 6.0]);
             assert_eq!(sources, &vec![Qp101TargetRef::Rec { offset: -1 }]);
         }
@@ -370,7 +439,9 @@ fn export_preserves_observable_noise_tags_and_special_targets() {
     let doc = export_qp101(&instrs).unwrap();
 
     match &doc.operations[0] {
-        Qp101Operation::ObservableInclude { index, sources } => {
+        Qp101Operation::ObservableInclude {
+            index, sources, ..
+        } => {
             assert_eq!(*index, 2);
             assert_eq!(sources, &vec![Qp101TargetRef::Rec { offset: -1 }]);
         }
@@ -382,6 +453,7 @@ fn export_preserves_observable_noise_tags_and_special_targets() {
             gate,
             params,
             raw_targets,
+            ..
         } => {
             assert_eq!(gate, "DEPOLARIZE1");
             assert_eq!(params, &vec![0.125]);

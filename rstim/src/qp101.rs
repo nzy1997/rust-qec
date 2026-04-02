@@ -18,6 +18,33 @@ pub struct Qp101Document {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Qp101Annotation {
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_slots: Vec<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<Qp101AnnotationStyle>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Qp101AnnotationStyle {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub highlight: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Qp101Operation {
     #[serde(rename = "gate")]
@@ -36,43 +63,62 @@ pub enum Qp101Operation {
         display: Option<Qp101Display>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         tags: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "tick")]
-    Tick,
+    Tick {
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
+    },
     #[serde(rename = "repeat")]
     Repeat {
         count: u64,
         body: Vec<Qp101Operation>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "qubit_coords")]
     QubitCoords {
         coords: Vec<f64>,
         targets: Vec<u32>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "shift_coords")]
     ShiftCoords {
         delta: Vec<f64>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "detector")]
     Detector {
         coords: Vec<f64>,
         sources: Vec<Qp101TargetRef>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "observable_include")]
     ObservableInclude {
         index: u32,
         sources: Vec<Qp101TargetRef>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "noise")]
     Noise {
         gate: String,
         params: Vec<f64>,
         raw_targets: Vec<Qp101TargetRef>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
     #[serde(rename = "annotation")]
     Annotation {
         kind: String,
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        annotations: Vec<Qp101Annotation>,
     },
 }
 
@@ -145,7 +191,6 @@ pub fn export_qp101_with_highlighted_dem_error(
 
     let mut doc = export_qp101(instrs)?;
     let mut seen = BTreeSet::new();
-    let mut highlights = Vec::new();
     for &source_id in source_ids {
         let source = tracked.sources.get(source_id).ok_or_else(|| {
             format!(
@@ -160,21 +205,29 @@ pub fn export_qp101_with_highlighted_dem_error(
             highlight.branch.clone(),
         );
         if seen.insert(dedupe_key) {
-            highlights.push(highlight);
+            let annotation = Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: highlight.target_slots.clone(),
+                label: Some(highlight.label.clone()),
+                text: format_repeat_annotation_text(&highlight.repeat_iterations),
+                style: Some(Qp101AnnotationStyle {
+                    preset: Some("danger".to_string()),
+                    color: Some("red".to_string()),
+                    highlight: Some(true),
+                }),
+                tags: vec!["dem-origin".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "dem_error_origin",
+                    "dem_error_index": dem_error_index,
+                    "op_path": highlight.op_path,
+                    "repeat_iterations": highlight.repeat_iterations,
+                    "target_qubits": highlight.target_qubits,
+                    "source_branch": highlight.branch,
+                })),
+            };
+            add_annotation_at_path(&mut doc.operations, &source.op_path, annotation)?;
         }
     }
-
-    let highlight_extension = json!({
-        "rstim_query_highlights": {
-            "version": "1",
-            "query": {
-                "kind": "dem_error_origin",
-                "dem_error_index": dem_error_index,
-            },
-            "highlights": highlights,
-        }
-    });
-    doc.extensions = Some(highlight_extension);
     Ok(doc)
 }
 
@@ -185,6 +238,7 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
             StimInstr::Repeat { count, body } => ops.push(Qp101Operation::Repeat {
                 count: *count,
                 body: export_operations(body)?,
+                annotations: Vec::new(),
             }),
             StimInstr::Op {
                 name,
@@ -196,30 +250,37 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
                 let op = match name.as_str() {
                     "TICK" => {
                         validate_no_args_or_targets(name, args, targets)?;
-                        Qp101Operation::Tick
+                        Qp101Operation::Tick {
+                            annotations: Vec::new(),
+                        }
                     }
                     "QUBIT_COORDS" => Qp101Operation::QubitCoords {
                         coords: args.clone(),
                         targets: export_plain_qubit_targets(name, targets)?,
+                        annotations: Vec::new(),
                     },
                     "SHIFT_COORDS" => {
                         validate_no_targets(name, targets)?;
                         Qp101Operation::ShiftCoords {
                             delta: args.clone(),
+                            annotations: Vec::new(),
                         }
                     }
                     "DETECTOR" => Qp101Operation::Detector {
                         coords: args.clone(),
                         sources: export_rec_sources(name, targets)?,
+                        annotations: Vec::new(),
                     },
                     "OBSERVABLE_INCLUDE" => Qp101Operation::ObservableInclude {
                         index: parse_observable_index(args)?,
                         sources: export_rec_sources(name, targets)?,
+                        annotations: Vec::new(),
                     },
                     n if is_noise_op(n) => Qp101Operation::Noise {
                         gate: n.to_string(),
                         params: args.clone(),
                         raw_targets: export_targets(targets),
+                        annotations: Vec::new(),
                     },
                     _ => {
                         let targets_out: Vec<u32> =
@@ -240,6 +301,7 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
                             },
                             display: None,
                             tags: tag.iter().cloned().collect(),
+                            annotations: Vec::new(),
                         }
                     }
                 };
@@ -248,6 +310,58 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
         }
     }
     Ok(ops)
+}
+
+fn format_repeat_annotation_text(repeat_iterations: &[u64]) -> Option<String> {
+    (!repeat_iterations.is_empty()).then(|| {
+        format!(
+            "repeat[{}]",
+            repeat_iterations
+                .iter()
+                .map(u64::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    })
+}
+
+fn add_annotation_at_path(
+    operations: &mut [Qp101Operation],
+    op_path: &[usize],
+    annotation: Qp101Annotation,
+) -> Result<(), String> {
+    let Some((&head, tail)) = op_path.split_first() else {
+        return Err("highlight source is missing an op_path".to_string());
+    };
+    let op = operations
+        .get_mut(head)
+        .ok_or_else(|| format!("highlight op_path component {head} out of range"))?;
+    if tail.is_empty() {
+        op.annotations_mut().push(annotation);
+        return Ok(());
+    }
+    match op {
+        Qp101Operation::Repeat { body, .. } => add_annotation_at_path(body, tail, annotation),
+        _ => Err(format!(
+            "highlight op_path descends into non-repeat operation at component {head}"
+        )),
+    }
+}
+
+impl Qp101Operation {
+    fn annotations_mut(&mut self) -> &mut Vec<Qp101Annotation> {
+        match self {
+            Qp101Operation::Gate { annotations, .. }
+            | Qp101Operation::Tick { annotations }
+            | Qp101Operation::Repeat { annotations, .. }
+            | Qp101Operation::QubitCoords { annotations, .. }
+            | Qp101Operation::ShiftCoords { annotations, .. }
+            | Qp101Operation::Detector { annotations, .. }
+            | Qp101Operation::ObservableInclude { annotations, .. }
+            | Qp101Operation::Noise { annotations, .. }
+            | Qp101Operation::Annotation { annotations, .. } => annotations,
+        }
+    }
 }
 
 fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, String> {

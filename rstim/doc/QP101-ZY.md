@@ -19,6 +19,7 @@ Quantum computing frameworks use diverse internal representations for circuits, 
 - a generic gate model for ordinary circuit interchange
 - an ordered `operations` stream for semantics that are not just gates
 - extension points for framework-specific metadata and rendering hints
+- generic per-operation annotations for visualization, debugging, and query results
 - a foundation for visualization, analysis, and future layout-aware renderers
 
 ## Scope And Applicability
@@ -67,41 +68,57 @@ The top-level `gates` array used by earlier draft text is not part of this draft
 
 Execution order lives in `operations`. Non-sequential or auxiliary data belongs in `metadata` or `extensions`.
 
-### rstim Query Highlight Extension
-
-`rstim` may attach query-specific visualization metadata under `extensions.rstim_query_highlights`.
-
-This extension is not part of the generic QP101-ZY core schema. It exists to preserve query results such as "which circuit-side noise sources produced DEM error line N" without mutating the base circuit structure.
-
-Example payload:
-
-```json
-{
-  "extensions": {
-    "rstim_query_highlights": {
-      "version": "1",
-      "query": {
-        "kind": "dem_error_origin",
-        "dem_error_index": 17
-      },
-      "highlights": [
-        {
-          "op_path": [12, 3, 5],
-          "repeat_iterations": [4, 2],
-          "target_slots": [1],
-          "target_qubits": [5],
-          "branch": "Y",
-          "label": "Y"
-        }
-      ]
-    }
-  }
-}
-```
-
 ## Operation Model
 
 Each item in `operations` MUST contain a string `type` field. The protocol defines one generic core operation and a set of standard extension operations.
+
+### Common Operation Fields
+
+Any operation MAY carry an `annotations` array. This field is intended for renderer hints, analysis overlays, query results, and other optional markings that should stay attached to a specific operation instead of living in top-level extension state.
+
+Example:
+
+```json
+{
+  "type": "noise",
+  "gate": "DEPOLARIZE1",
+  "params": [0.001],
+  "raw_targets": [
+    { "kind": "qubit", "index": 5 }
+  ],
+  "annotations": [
+    {
+      "kind": "marker",
+      "target_slots": [0],
+      "label": "X",
+      "text": "repeat[3]",
+      "style": {
+        "preset": "danger",
+        "color": "red",
+        "highlight": true
+      },
+      "tags": ["dem-origin", "query-result"],
+      "context": {
+        "dem_error_index": 17,
+        "op_path": [12, 3, 5],
+        "repeat_iterations": [3],
+        "source_branch": "X",
+        "target_qubits": [5]
+      }
+    }
+  ]
+}
+```
+
+Annotation objects use the following common fields:
+
+- `kind` (required): Annotation subtype such as `"marker"` or `"note"`.
+- `target_slots` (optional): Zero-based target-slot indices within the owning operation.
+- `label` (optional): Short inline label such as `"X"`, `"Y"`, or `"repeat"`.
+- `text` (optional): Longer renderer-facing text shown near the marker.
+- `style` (optional): Generic style hints such as `preset`, `color`, and `highlight`.
+- `tags` (optional): String tags for filtering or downstream processing.
+- `context` (optional): Arbitrary machine-readable JSON payload for tool-specific metadata.
 
 ### Core Gate Operation
 

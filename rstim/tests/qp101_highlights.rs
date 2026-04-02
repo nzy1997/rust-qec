@@ -15,24 +15,22 @@ fn qp101_export_includes_dem_origin_highlights() {
 
     let doc = export_qp101_with_highlighted_dem_error(&circuit, &tracked, 0).unwrap();
     let value = serde_json::to_value(doc).unwrap();
+    let annotations = value["operations"][0]["body"][0]["annotations"]
+        .as_array()
+        .unwrap();
 
-    assert_eq!(
-        value["extensions"]["rstim_query_highlights"]["query"]["kind"],
-        "dem_error_origin"
-    );
-    assert_eq!(value["extensions"]["rstim_query_highlights"]["version"], "1");
-    assert_eq!(
-        value["extensions"]["rstim_query_highlights"]["highlights"][0]["target_slots"],
-        serde_json::json!([0])
-    );
-    assert_eq!(
-        value["extensions"]["rstim_query_highlights"]["highlights"][0]["label"],
-        value["extensions"]["rstim_query_highlights"]["highlights"][0]["branch"]
-    );
-    assert!(
-        value["extensions"]["rstim_query_highlights"]["highlights"][0]["repeat_iterations"]
-            .is_array()
-    );
+    assert_eq!(annotations.len(), 4);
+    for annotation in annotations {
+        assert_eq!(annotation["kind"], "marker");
+        assert_eq!(annotation["target_slots"], serde_json::json!([0]));
+        assert_eq!(annotation["label"], annotation["context"]["source_branch"]);
+        assert_eq!(annotation["style"]["preset"], "danger");
+        assert_eq!(annotation["style"]["color"], "red");
+        assert_eq!(annotation["style"]["highlight"], true);
+        assert!(annotation["context"]["repeat_iterations"].is_array());
+        assert!(annotation["text"].as_str().unwrap().starts_with("repeat["));
+        assert_eq!(annotation["tags"], serde_json::json!(["dem-origin", "query-result"]));
+    }
 }
 
 #[test]
@@ -94,13 +92,15 @@ fn qp101_export_dedupes_equivalent_source_highlights() {
     );
 
     let doc = export_qp101_with_highlighted_dem_error(&circuit, &tracked, 0).unwrap();
-    let highlights = serde_json::to_value(doc).unwrap()["extensions"]["rstim_query_highlights"]
-        ["highlights"]
+    let highlights = serde_json::to_value(doc).unwrap()["operations"][1]["annotations"]
         .as_array()
         .unwrap()
         .clone();
 
     assert_eq!(highlights.len(), 1);
-    assert_eq!(highlights[0]["repeat_iterations"], serde_json::json!([2]));
-    assert_eq!(highlights[0]["target_qubits"], serde_json::json!([0]));
+    assert_eq!(
+        highlights[0]["context"]["repeat_iterations"],
+        serde_json::json!([2])
+    );
+    assert_eq!(highlights[0]["context"]["target_qubits"], serde_json::json!([0]));
 }
