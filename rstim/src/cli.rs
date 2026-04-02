@@ -705,7 +705,15 @@ fn run_export_json(
     let instrs = parse_lines(text)?;
     let doc = match highlight_dem_error {
         Some(index) => {
-            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs)?;
+            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs).map_err(|err| {
+                if err.starts_with("tracked DEM does not yet support instruction ") {
+                    format!(
+                        "--highlight_dem_error currently supports a subset of noise instructions: {err}"
+                    )
+                } else {
+                    err
+                }
+            })?;
             crate::qp101::export_qp101_with_highlighted_dem_error(&instrs, &tracked, index)
                 .map_err(|err| {
                     if err.starts_with("DEM error index ") && err.contains(" out of range ") {

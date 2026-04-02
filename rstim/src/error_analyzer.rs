@@ -1043,7 +1043,7 @@ impl ErrorAnalyzer {
                     return Ok(());
                 }
 
-                let branch_probability = p / 3.0;
+                let branch_probability = depolarize1_to_independent(p);
                 for (target_slot, q) in qubits(targets).into_iter().enumerate() {
                     let x_targets = self.x_sens[q].targets.clone();
                     let z_targets = self.z_sens[q].targets.clone();

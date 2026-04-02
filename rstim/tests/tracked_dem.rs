@@ -115,3 +115,13 @@ fn tracked_dem_decomposition_propagates_failure() {
 
     assert!(err.contains("failed to decompose non-graphlike error"));
 }
+
+#[test]
+fn tracked_dem_matches_plain_dem_for_depolarize1() {
+    let circuit = parse_lines("R 0\nDEPOLARIZE1(0.3) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let plain = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+    assert_eq!(tracked.dem.to_string(), plain.to_string());
+}

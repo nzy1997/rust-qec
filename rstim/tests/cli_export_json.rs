@@ -162,3 +162,17 @@ fn export_json_rejects_invalid_highlight_dem_error_index() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("DEM error index out of range"));
 }
+
+#[test]
+fn export_json_reports_unsupported_highlight_instruction_clearly() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "R 0 1\nDEPOLARIZE2(0.1) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(
+        "--highlight_dem_error currently supports a subset of noise instructions"
+    ));
+    assert!(stderr.contains("DEPOLARIZE2"));
+}
