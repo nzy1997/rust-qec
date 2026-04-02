@@ -57,6 +57,30 @@ pub struct TrackedSource {
     pub probability_fragment: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HighlightRecord {
+    pub op_path: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
+    pub target_slots: Vec<usize>,
+    pub target_qubits: Vec<u32>,
+    pub branch: String,
+    pub label: String,
+}
+
+impl HighlightRecord {
+    pub fn from_source(source: &TrackedSource) -> Self {
+        let branch = source.branch.label();
+        Self {
+            op_path: source.op_path.clone(),
+            repeat_iterations: source.repeat_iterations.clone(),
+            target_slots: source.target_slots.clone(),
+            target_qubits: source.target_qubits.clone(),
+            branch: branch.clone(),
+            label: format!("{} {}", source.instr_name, branch),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrackedErrorTerm {
     pub probability: f64,

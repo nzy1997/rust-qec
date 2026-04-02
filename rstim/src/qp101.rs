@@ -1,3 +1,6 @@
+use std::collections::BTreeSet;
+
+use crate::dem_provenance::{HighlightRecord, TrackedDemResult};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -125,6 +128,59 @@ pub fn export_qp101(instrs: &[StimInstr]) -> Result<Qp101Document, String> {
     })
 }
 
+pub fn export_qp101_with_highlighted_dem_error(
+    instrs: &[StimInstr],
+    tracked: &TrackedDemResult,
+    dem_error_index: usize,
+) -> Result<Qp101Document, String> {
+    let source_ids = tracked
+        .dem_error_to_sources
+        .get(dem_error_index)
+        .ok_or_else(|| {
+            format!(
+                "DEM error index {dem_error_index} out of range for {} tracked DEM errors",
+                tracked.dem_error_to_sources.len()
+            )
+        })?;
+
+    let mut doc = export_qp101(instrs)?;
+    let mut seen = BTreeSet::new();
+    let mut highlights = Vec::new();
+    for &source_id in source_ids {
+        let source = tracked.sources.get(source_id).ok_or_else(|| {
+            format!(
+                "tracked source index {source_id} missing for DEM error {dem_error_index}"
+            )
+        })?;
+        let highlight = HighlightRecord::from_source(source);
+        let dedupe_key = (
+            highlight.op_path.clone(),
+            highlight.repeat_iterations.clone(),
+            highlight.target_slots.clone(),
+            highlight.branch.clone(),
+        );
+        if seen.insert(dedupe_key) {
+            highlights.push(highlight);
+        }
+    }
+
+    let highlight_extension = json!({
+        "rstim_query_highlights": {
+            "version": 1,
+            "query": {
+                "kind": "dem_error_origin",
+                "dem_error_index": dem_error_index,
+            },
+            "highlights": highlights,
+        }
+    });
+    doc.extensions = Some(match doc.extensions.take() {
+        Some(existing) => merge_extension_objects(existing, highlight_extension),
+        None => highlight_extension,
+    });
+    Ok(doc)
+}
+
 fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String> {
     let mut ops = Vec::with_capacity(instrs.len());
     for instr in instrs {
@@ -195,6 +251,16 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
         }
     }
     Ok(ops)
+}
+
+fn merge_extension_objects(existing: serde_json::Value, added: serde_json::Value) -> serde_json::Value {
+    match (existing, added) {
+        (serde_json::Value::Object(mut existing_map), serde_json::Value::Object(added_map)) => {
+            existing_map.extend(added_map);
+            serde_json::Value::Object(existing_map)
+        }
+        (_, added) => added,
+    }
 }
 
 fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, String> {
