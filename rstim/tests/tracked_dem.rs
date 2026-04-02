@@ -91,7 +91,7 @@ fn tracked_dem_merge_keeps_exact_source_union() {
 #[test]
 fn tracked_dem_decomposition_keeps_reverse_links() {
     let circuit = parse_lines(
-        "R 0 1 2\nX_ERROR(0.1) 0\nCX 0 1\nCX 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+        "R 0 1 2\nX_ERROR(0.1) 0\nX_ERROR(0.1) 1\nCX 0 1\nCX 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
     )
     .unwrap();
 
@@ -102,4 +102,16 @@ fn tracked_dem_decomposition_keeps_reverse_links() {
     for &dem_id in dem_ids {
         assert!(tracked.dem_error_to_sources[dem_id].contains(&0));
     }
+}
+
+#[test]
+fn tracked_dem_decomposition_propagates_failure() {
+    let circuit = parse_lines(
+        "R 0 1 2\nX_ERROR(0.1) 0\nCX 0 1\nCX 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let err = ErrorAnalyzer::circuit_to_tracked_dem_decomposed(&circuit).unwrap_err();
+
+    assert!(err.contains("failed to decompose non-graphlike error"));
 }

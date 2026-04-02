@@ -2402,13 +2402,10 @@ fn decompose_tracked_terms(terms: Vec<TrackedErrorTerm>) -> Result<Vec<TrackedEr
                 return Ok(term);
             }
 
-            let targets = match rewrite_error_targets_with_known_symptoms(
+            let targets = rewrite_error_targets_with_known_symptoms(
                 &term.targets,
                 &known_symptoms,
-            ) {
-                Ok(targets) => targets,
-                Err(_) => term.targets,
-            };
+            )?;
             Ok(TrackedErrorTerm {
                 probability: term.probability,
                 targets,
