@@ -76,7 +76,7 @@ impl HighlightRecord {
             target_slots: source.target_slots.clone(),
             target_qubits: source.target_qubits.clone(),
             branch: branch.clone(),
-            label: format!("{} {}", source.instr_name, branch),
+            label: branch,
         }
     }
 }

@@ -166,7 +166,7 @@ pub fn export_qp101_with_highlighted_dem_error(
 
     let highlight_extension = json!({
         "rstim_query_highlights": {
-            "version": 1,
+            "version": "1",
             "query": {
                 "kind": "dem_error_origin",
                 "dem_error_index": dem_error_index,

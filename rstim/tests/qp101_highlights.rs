@@ -17,9 +17,14 @@ fn qp101_export_includes_dem_origin_highlights() {
         value["extensions"]["rstim_query_highlights"]["query"]["kind"],
         "dem_error_origin"
     );
+    assert_eq!(value["extensions"]["rstim_query_highlights"]["version"], "1");
     assert_eq!(
         value["extensions"]["rstim_query_highlights"]["highlights"][0]["target_slots"],
         serde_json::json!([0])
+    );
+    assert_eq!(
+        value["extensions"]["rstim_query_highlights"]["highlights"][0]["label"],
+        value["extensions"]["rstim_query_highlights"]["highlights"][0]["branch"]
     );
     assert!(
         value["extensions"]["rstim_query_highlights"]["highlights"][0]["repeat_iterations"]
