@@ -174,10 +174,7 @@ pub fn export_qp101_with_highlighted_dem_error(
             "highlights": highlights,
         }
     });
-    doc.extensions = Some(match doc.extensions.take() {
-        Some(existing) => merge_extension_objects(existing, highlight_extension),
-        None => highlight_extension,
-    });
+    doc.extensions = Some(highlight_extension);
     Ok(doc)
 }
 
@@ -251,16 +248,6 @@ fn export_operations(instrs: &[StimInstr]) -> Result<Vec<Qp101Operation>, String
         }
     }
     Ok(ops)
-}
-
-fn merge_extension_objects(existing: serde_json::Value, added: serde_json::Value) -> serde_json::Value {
-    match (existing, added) {
-        (serde_json::Value::Object(mut existing_map), serde_json::Value::Object(added_map)) => {
-            existing_map.extend(added_map);
-            serde_json::Value::Object(existing_map)
-        }
-        (_, added) => added,
-    }
 }
 
 fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, String> {

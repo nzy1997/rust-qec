@@ -51,6 +51,36 @@ fn tracked_result_builds_reverse_indices() {
 }
 
 #[test]
+fn source_branch_labels_match_expected_markers() {
+    let cases = [
+        (SourceBranch::X, "X"),
+        (SourceBranch::Y, "Y"),
+        (SourceBranch::Z, "Z"),
+        (SourceBranch::XX, "XX"),
+        (SourceBranch::XY, "XY"),
+        (SourceBranch::XZ, "XZ"),
+        (SourceBranch::YX, "YX"),
+        (SourceBranch::YY, "YY"),
+        (SourceBranch::YZ, "YZ"),
+        (SourceBranch::ZX, "ZX"),
+        (SourceBranch::ZY, "ZY"),
+        (SourceBranch::ZZ, "ZZ"),
+        (SourceBranch::MeasurementFlip, "M"),
+        (SourceBranch::CorrelatedBranch { index: 7 }, "E7"),
+        (
+            SourceBranch::Custom {
+                label: "custom".to_string(),
+            },
+            "custom",
+        ),
+    ];
+
+    for (branch, expected) in cases {
+        assert_eq!(branch.label(), expected);
+    }
+}
+
+#[test]
 fn tracked_dem_records_repeat_iteration_target_slot_and_branch() {
     let circuit = parse_lines(
         "REPEAT 2 {\n  DEPOLARIZE1(0.3) 5 7\n  TICK\n}\nM 5 7\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
@@ -122,6 +152,58 @@ fn tracked_dem_matches_plain_dem_for_depolarize1() {
 
     let plain = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
     let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+    assert_eq!(tracked.dem.to_string(), plain.to_string());
+}
+
+#[test]
+fn tracked_dem_matches_plain_dem_for_supported_single_qubit_pauli_errors() {
+    let cases = [
+        ("X_ERROR", "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n"),
+        ("Y_ERROR", "R 0\nY_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n"),
+        ("Z_ERROR", "H 0\nZ_ERROR(0.1) 0\nH 0\nM 0\nDETECTOR rec[-1]\n"),
+    ];
+
+    for (name, text) in cases {
+        let circuit = parse_lines(text).unwrap();
+        let plain = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+        let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+        assert_eq!(tracked.dem.to_string(), plain.to_string(), "{name}");
+    }
+}
+
+#[test]
+fn tracked_dem_matches_plain_dem_for_supported_measurement_noise_ops() {
+    let cases = [
+        ("M", "R 0\nM(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MZ", "R 0\nMZ(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MX", "RX 0\nMX(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MY", "RY 0\nMY(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MR", "R 0\nMR(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MRZ", "R 0\nMRZ(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MRX", "RX 0\nMRX(0.125) 0\nDETECTOR rec[-1]\n"),
+        ("MRY", "RY 0\nMRY(0.125) 0\nDETECTOR rec[-1]\n"),
+    ];
+
+    for (name, text) in cases {
+        let circuit = parse_lines(text).unwrap();
+        let plain = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+        let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+        assert_eq!(tracked.dem.to_string(), plain.to_string(), "{name}");
+    }
+}
+
+#[test]
+fn tracked_dem_decomposed_matches_plain_dem_decomposed() {
+    let circuit = parse_lines(
+        "R 0 1 2\nX_ERROR(0.1) 0\nX_ERROR(0.1) 1\nCX 0 1\nCX 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let plain = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem_decomposed(&circuit).unwrap();
 
     assert_eq!(tracked.dem.to_string(), plain.to_string());
 }
