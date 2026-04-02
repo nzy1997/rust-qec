@@ -2,6 +2,8 @@ use rstim::dem::DemTarget;
 use rstim::dem_provenance::{
     SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource,
 };
+use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::parser::parse_lines;
 
 #[test]
 fn tracked_result_builds_reverse_indices() {
@@ -46,4 +48,26 @@ fn tracked_result_builds_reverse_indices() {
     assert_eq!(result.dem_error_to_sources[1], vec![0, 1]);
     assert_eq!(result.source_to_dem_errors[0], vec![0, 1]);
     assert_eq!(result.source_to_dem_errors[1], vec![1]);
+}
+
+#[test]
+fn tracked_dem_records_repeat_iteration_target_slot_and_branch() {
+    let circuit = parse_lines(
+        "REPEAT 2 {\n  DEPOLARIZE1(0.3) 5 7\n  TICK\n}\nM 5 7\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+    let source = tracked
+        .sources
+        .iter()
+        .find(|source| {
+            source.repeat_iterations == vec![1]
+                && source.target_slots == vec![1]
+                && source.branch.label() == "Y"
+        })
+        .unwrap();
+
+    assert_eq!(source.op_path, vec![0, 0]);
+    assert_eq!(source.target_qubits, vec![7]);
 }

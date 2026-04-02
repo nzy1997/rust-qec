@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
+use crate::dem_provenance::{SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -93,6 +94,8 @@ pub struct ErrorAnalyzer {
     num_measurements: usize,
     det_index: usize,
     errors: Vec<(f64, Vec<DemTarget>)>,
+    tracked_sources: Vec<TrackedSource>,
+    tracked_terms: Vec<TrackedErrorTerm>,
     decompose_channel_errors: bool,
     // Phase 2 options are threaded first and consumed by later tasks.
     #[allow(dead_code)]
@@ -109,6 +112,45 @@ impl ErrorAnalyzer {
         options: AnalyzeOptions,
     ) -> Result<DetectorErrorModel, String> {
         Self::circuit_to_dem_inner(instrs, options, false)
+    }
+
+    pub fn circuit_to_tracked_dem(instrs: &[StimInstr]) -> Result<TrackedDemResult, String> {
+        Self::circuit_to_tracked_dem_with_options(instrs, AnalyzeOptions::default())
+    }
+
+    pub fn circuit_to_tracked_dem_with_options(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+    ) -> Result<TrackedDemResult, String> {
+        let num_qubits = count_qubits(instrs);
+        let num_measurements = count_measurements(instrs);
+        let num_detectors = count_annotations(instrs, "DETECTOR");
+        let num_observables = count_annotations(instrs, "OBSERVABLE_INCLUDE");
+
+        let mut analyzer = ErrorAnalyzer {
+            x_sens: vec![SparseXorVec::default(); num_qubits],
+            z_sens: vec![SparseXorVec::default(); num_qubits],
+            measurement_sens: vec![SparseXorVec::default(); num_measurements],
+            num_measurements,
+            det_index: num_detectors,
+            errors: Vec::new(),
+            tracked_sources: Vec::new(),
+            tracked_terms: Vec::new(),
+            decompose_channel_errors: false,
+            options,
+        };
+
+        analyzer.undo_circuit_tracked(instrs, &TrackedTraversalContext::root())?;
+        analyzer.ensure_no_pending_gauge()?;
+
+        let annotations = collect_detector_annotations(instrs);
+        let mut tracked =
+            TrackedDemResult::from_terms_and_sources(analyzer.tracked_sources, analyzer.tracked_terms);
+        tracked.dem.set_min_counts(num_detectors, num_observables);
+        for ann in annotations {
+            tracked.dem.push(ann);
+        }
+        Ok(tracked)
     }
 
     fn circuit_to_dem_inner(
@@ -139,6 +181,8 @@ impl ErrorAnalyzer {
             num_measurements,
             det_index: num_detectors,
             errors: Vec::new(),
+            tracked_sources: Vec::new(),
+            tracked_terms: Vec::new(),
             decompose_channel_errors,
             options,
         };
@@ -247,6 +291,35 @@ impl ErrorAnalyzer {
                 StimInstr::Repeat { count, body } => {
                     for _ in 0..*count {
                         self.undo_circuit(body)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn undo_circuit_tracked(
+        &mut self,
+        instrs: &[StimInstr],
+        context: &TrackedTraversalContext,
+    ) -> Result<(), String> {
+        let mut i = instrs.len();
+        while i > 0 {
+            i -= 1;
+            match &instrs[i] {
+                StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } => {
+                    let op_context = context.with_op_index(i);
+                    self.undo_op_tracked(name.as_str(), args, targets, &op_context)?;
+                }
+                StimInstr::Repeat { count, body } => {
+                    for iteration in (0..*count).rev() {
+                        let repeat_context = context.with_repeat_iteration(i, iteration);
+                        self.undo_circuit_tracked(body, &repeat_context)?;
                     }
                 }
             }
@@ -790,6 +863,177 @@ impl ErrorAnalyzer {
         Ok(())
     }
 
+    fn undo_op_tracked(
+        &mut self,
+        name: &str,
+        args: &[f64],
+        targets: &[StimTarget],
+        context: &TrackedTraversalContext,
+    ) -> Result<(), String> {
+        match name {
+            "M" | "MZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.undo_mz(q);
+                }
+                Ok(())
+            }
+            "MX" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.undo_mx(q);
+                }
+                Ok(())
+            }
+            "MY" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.undo_my(q);
+                }
+                Ok(())
+            }
+            "MR" | "MRZ" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_z_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.x_sens[q].clear();
+                    self.z_sens[q].clear();
+                    self.undo_mz(q);
+                }
+                Ok(())
+            }
+            "MRX" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_x_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.x_sens[q].clear();
+                    self.z_sens[q].clear();
+                    self.undo_mx(q);
+                }
+                Ok(())
+            }
+            "MRY" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                let qubits = qubits_inv(targets);
+                for (target_slot, q) in qubits.iter().copied().enumerate().rev() {
+                    self.ensure_y_collapse_is_deterministic(q)?;
+                    self.emit_measurement_noise_tracked(
+                        p,
+                        context,
+                        target_slot,
+                        q as u32,
+                        name,
+                    );
+                    self.x_sens[q].clear();
+                    self.z_sens[q].clear();
+                    self.undo_my(q);
+                }
+                Ok(())
+            }
+            "DEPOLARIZE1" => {
+                let p = args.first().copied().unwrap_or(0.0);
+                ensure_valid_depolarize1_probability(p)?;
+                if p <= 0.0 {
+                    return Ok(());
+                }
+
+                let branch_probability = p / 3.0;
+                for (target_slot, q) in qubits(targets).into_iter().enumerate() {
+                    let x_targets = self.x_sens[q].targets.clone();
+                    let z_targets = self.z_sens[q].targets.clone();
+                    let y_targets = Self::xor_sorted_targets(&x_targets, &z_targets);
+
+                    self.emit_tracked_source_term(
+                        context,
+                        "DEPOLARIZE1",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::X,
+                        branch_probability,
+                        x_targets,
+                    );
+                    self.emit_tracked_source_term(
+                        context,
+                        "DEPOLARIZE1",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::Y,
+                        branch_probability,
+                        y_targets,
+                    );
+                    self.emit_tracked_source_term(
+                        context,
+                        "DEPOLARIZE1",
+                        target_slot,
+                        q as u32,
+                        SourceBranch::Z,
+                        branch_probability,
+                        z_targets,
+                    );
+                }
+                Ok(())
+            }
+            "I" | "X" | "Y" | "Z" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "H" | "S"
+            | "SQRT_Z" | "S_DAG" | "SQRT_Z_DAG" | "SQRT_X" | "SQRT_X_DAG" | "SQRT_Y"
+            | "SQRT_Y_DAG" | "H_XY" | "H_YZ" | "C_XYZ" | "C_NXYZ" | "C_XNYZ"
+            | "C_XYNZ" | "C_ZYX" | "C_NZYX" | "C_ZNYX" | "C_ZYNX" | "H_NXY"
+            | "H_NXZ" | "H_NYZ" | "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ"
+            | "ZCZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" | "SWAP"
+            | "ISWAP" | "ISWAP_DAG" | "CXSWAP" | "SWAPCX" | "CZSWAP" | "R" | "RZ"
+            | "RX" | "RY" | "MPAD" | "DETECTOR" | "OBSERVABLE_INCLUDE" | "MPP" | "SPP"
+            | "SPP_DAG" | "MXX" | "MYY" | "MZZ" | "I_ERROR" | "II_ERROR" => {
+                self.undo_op(name, args, targets)
+            }
+            _ => Err(format!(
+                "tracked DEM does not yet support instruction {}",
+                name
+            )),
+        }
+    }
+
     fn undo_mz(&mut self, q: usize) {
         self.num_measurements -= 1;
         let m_idx = self.num_measurements;
@@ -1034,6 +1278,63 @@ impl ErrorAnalyzer {
         if !targets.is_empty() {
             self.errors.push((probability, targets));
         }
+    }
+
+    fn emit_measurement_noise_tracked(
+        &mut self,
+        probability: f64,
+        context: &TrackedTraversalContext,
+        target_slot: usize,
+        target_qubit: u32,
+        instr_name: &str,
+    ) {
+        if probability <= 0.0 || self.num_measurements == 0 {
+            return;
+        }
+        let targets = self.measurement_sens[self.num_measurements - 1]
+            .targets
+            .clone();
+        self.emit_tracked_source_term(
+            context,
+            instr_name,
+            target_slot,
+            target_qubit,
+            SourceBranch::MeasurementFlip,
+            probability,
+            targets,
+        );
+    }
+
+    fn emit_tracked_source_term(
+        &mut self,
+        context: &TrackedTraversalContext,
+        instr_name: &str,
+        target_slot: usize,
+        target_qubit: u32,
+        branch: SourceBranch,
+        probability_fragment: f64,
+        targets: Vec<DemTarget>,
+    ) {
+        if probability_fragment <= 0.0 || targets.is_empty() {
+            return;
+        }
+
+        let source_id = self.tracked_sources.len();
+        self.tracked_sources.push(TrackedSource {
+            source_id,
+            op_path: context.op_path.clone(),
+            repeat_iterations: context.repeat_iterations.clone(),
+            instr_name: instr_name.to_string(),
+            target_slots: vec![target_slot],
+            target_qubits: vec![target_qubit],
+            branch,
+            probability_fragment,
+        });
+        self.tracked_terms.push(TrackedErrorTerm {
+            probability: probability_fragment,
+            targets,
+            source_ids: vec![source_id],
+        });
     }
 
     fn undo_h(&mut self, q: usize) {
@@ -1306,6 +1607,38 @@ impl ErrorAnalyzer {
             "observable"
         } else {
             "detector"
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct TrackedTraversalContext {
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+}
+
+impl TrackedTraversalContext {
+    fn root() -> Self {
+        Self::default()
+    }
+
+    fn with_op_index(&self, op_index: usize) -> Self {
+        let mut op_path = self.op_path.clone();
+        op_path.push(op_index);
+        Self {
+            op_path,
+            repeat_iterations: self.repeat_iterations.clone(),
+        }
+    }
+
+    fn with_repeat_iteration(&self, repeat_op_index: usize, iteration: u64) -> Self {
+        let mut op_path = self.op_path.clone();
+        op_path.push(repeat_op_index);
+        let mut repeat_iterations = self.repeat_iterations.clone();
+        repeat_iterations.push(iteration);
+        Self {
+            op_path,
+            repeat_iterations,
         }
     }
 }
