@@ -158,6 +158,27 @@ impl ErrorAnalyzer {
         instrs: &[StimInstr],
         options: AnalyzeOptions,
     ) -> Result<TrackedDemResult, String> {
+        Self::circuit_to_tracked_dem_inner(instrs, options, false)
+    }
+
+    pub fn circuit_to_tracked_dem_decomposed(
+        instrs: &[StimInstr],
+    ) -> Result<TrackedDemResult, String> {
+        Self::circuit_to_tracked_dem_with_options_decomposed(instrs, AnalyzeOptions::default())
+    }
+
+    pub fn circuit_to_tracked_dem_with_options_decomposed(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+    ) -> Result<TrackedDemResult, String> {
+        Self::circuit_to_tracked_dem_inner(instrs, options, true)
+    }
+
+    fn circuit_to_tracked_dem_inner(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+        decompose_errors_after_merge: bool,
+    ) -> Result<TrackedDemResult, String> {
         let num_qubits = count_qubits(instrs);
         let num_measurements = count_measurements(instrs);
         let num_detectors = count_annotations(instrs, "DETECTOR");
@@ -181,6 +202,11 @@ impl ErrorAnalyzer {
 
         let annotations = collect_detector_annotations(instrs);
         let merged_terms = merge_tracked_terms(analyzer.tracked_terms);
+        let merged_terms = if decompose_errors_after_merge {
+            merge_tracked_terms(decompose_tracked_terms(merged_terms)?)
+        } else {
+            merged_terms
+        };
         let mut tracked =
             TrackedDemResult::from_terms_and_sources(analyzer.tracked_sources, merged_terms);
         tracked.dem.set_min_counts(num_detectors, num_observables);
@@ -2248,31 +2274,15 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
     }
 
     let mut new_instrs = instrs;
-    let mut known_symptoms: BTreeMap<Vec<DemTarget>, Vec<DemTarget>> = BTreeMap::new();
-    for instr in &new_instrs {
-        let DemInstruction::Error {
-            probability,
-            targets,
-        } = instr
-        else {
-            continue;
-        };
-        if *probability == 0.0 || targets.is_empty() {
-            continue;
-        }
-
-        let mut start = 0usize;
-        for k in 0..=targets.len() {
-            if k == targets.len() || matches!(targets[k], DemTarget::Separator) {
-                let component = &targets[start..k];
-                let key = detector_symptom_key(component);
-                if key.len() == 1 || key.len() == 2 {
-                    known_symptoms.insert(key, component.to_vec());
-                }
-                start = k + 1;
-            }
-        }
-    }
+    let known_symptoms = collect_known_graphlike_symptoms(
+        new_instrs.iter().filter_map(|instr| match instr {
+            DemInstruction::Error {
+                probability,
+                targets,
+            } if *probability > 0.0 && !targets.is_empty() => Some(targets.as_slice()),
+            _ => None,
+        }),
+    );
 
     for instr in &mut new_instrs {
         let DemInstruction::Error { targets, .. } = instr else {
@@ -2282,37 +2292,7 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
             continue;
         }
 
-        let original_targets = targets.clone();
-        let mut rewritten = Vec::new();
-        let mut start = 0usize;
-        for k in 0..=original_targets.len() {
-            if k == original_targets.len() || matches!(original_targets[k], DemTarget::Separator) {
-                let component = &original_targets[start..k];
-                let brute_force_attempt = brute_force_decomposition_into_known_graphlike_errors(
-                    component,
-                    &known_symptoms,
-                );
-                let brute_force = brute_force_attempt?;
-                let decomposed = if let Some(flat) = brute_force {
-                    flat
-                } else if let Some(flat) =
-                    decompose_component_with_remnants(component, &known_symptoms)
-                {
-                    flat
-                } else {
-                    return Err(format!(
-                        "failed to decompose non-graphlike error into graphlike components: {:?}",
-                        original_targets
-                    ));
-                };
-                if !rewritten.is_empty() && !decomposed.is_empty() {
-                    rewritten.push(DemTarget::Separator);
-                }
-                rewritten.extend(decomposed);
-                start = k + 1;
-            }
-        }
-        *targets = rewritten;
+        *targets = rewrite_error_targets_with_known_symptoms(targets, &known_symptoms)?;
     }
 
     let mut merged_errors: BTreeMap<Vec<DemTarget>, f64> = BTreeMap::new();
@@ -2354,6 +2334,90 @@ pub fn decompose_errors(dem: &mut DetectorErrorModel) -> Result<(), String> {
     Ok(())
 }
 
+fn collect_known_graphlike_symptoms<'a>(
+    error_targets: impl Iterator<Item = &'a [DemTarget]>,
+) -> BTreeMap<Vec<DemTarget>, Vec<DemTarget>> {
+    let mut known_symptoms = BTreeMap::new();
+    for targets in error_targets {
+        let mut start = 0usize;
+        for k in 0..=targets.len() {
+            if k == targets.len() || matches!(targets[k], DemTarget::Separator) {
+                let component = &targets[start..k];
+                let key = detector_symptom_key(component);
+                if key.len() == 1 || key.len() == 2 {
+                    known_symptoms.insert(key, component.to_vec());
+                }
+                start = k + 1;
+            }
+        }
+    }
+    known_symptoms
+}
+
+fn rewrite_error_targets_with_known_symptoms(
+    original_targets: &[DemTarget],
+    known_symptoms: &BTreeMap<Vec<DemTarget>, Vec<DemTarget>>,
+) -> Result<Vec<DemTarget>, String> {
+    let mut rewritten = Vec::new();
+    let mut start = 0usize;
+    for k in 0..=original_targets.len() {
+        if k == original_targets.len() || matches!(original_targets[k], DemTarget::Separator) {
+            let component = &original_targets[start..k];
+            let brute_force =
+                brute_force_decomposition_into_known_graphlike_errors(component, known_symptoms)?;
+            let decomposed = if let Some(flat) = brute_force {
+                flat
+            } else if let Some(flat) = decompose_component_with_remnants(component, known_symptoms)
+            {
+                flat
+            } else {
+                return Err(format!(
+                    "failed to decompose non-graphlike error into graphlike components: {:?}",
+                    original_targets
+                ));
+            };
+            if !rewritten.is_empty() && !decomposed.is_empty() {
+                rewritten.push(DemTarget::Separator);
+            }
+            rewritten.extend(decomposed);
+            start = k + 1;
+        }
+    }
+    Ok(rewritten)
+}
+
+fn decompose_tracked_terms(terms: Vec<TrackedErrorTerm>) -> Result<Vec<TrackedErrorTerm>, String> {
+    let known_symptoms = collect_known_graphlike_symptoms(
+        terms.iter()
+            .filter(|term| term.probability > 0.0 && !term.targets.is_empty())
+            .map(|term| term.targets.as_slice()),
+    );
+
+    terms.into_iter()
+        .map(|term| {
+            if term.probability <= 0.0
+                || term.targets.is_empty()
+                || component_is_graphlike(&term.targets)
+            {
+                return Ok(term);
+            }
+
+            let targets = match rewrite_error_targets_with_known_symptoms(
+                &term.targets,
+                &known_symptoms,
+            ) {
+                Ok(targets) => targets,
+                Err(_) => term.targets,
+            };
+            Ok(TrackedErrorTerm {
+                probability: term.probability,
+                targets,
+                source_ids: term.source_ids,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod internal_branch_tests {
     use super::*;
@@ -2367,6 +2431,8 @@ mod internal_branch_tests {
             num_measurements,
             det_index: 0,
             errors: Vec::new(),
+            tracked_sources: Vec::new(),
+            tracked_terms: Vec::new(),
             decompose_channel_errors: false,
             options: AnalyzeOptions::default(),
         }

@@ -87,3 +87,19 @@ fn tracked_dem_merge_keeps_exact_source_union() {
     assert_eq!(tracked.source_to_dem_errors[0], vec![0]);
     assert_eq!(tracked.source_to_dem_errors[1], vec![0]);
 }
+
+#[test]
+fn tracked_dem_decomposition_keeps_reverse_links() {
+    let circuit = parse_lines(
+        "R 0 1 2\nX_ERROR(0.1) 0\nCX 0 1\nCX 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem_decomposed(&circuit).unwrap();
+
+    let dem_ids = &tracked.source_to_dem_errors[0];
+    assert!(!dem_ids.is_empty());
+    for &dem_id in dem_ids {
+        assert!(tracked.dem_error_to_sources[dem_id].contains(&0));
+    }
+}
