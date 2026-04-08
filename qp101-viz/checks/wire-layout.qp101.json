@@ -1,0 +1,10 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 2,
+  "operations": [
+    { "type": "qubit_coords", "targets": [0], "coords": [1.0, 2.0] },
+    { "type": "shift_coords", "delta": [0.5, 0.25] },
+    { "type": "gate", "gate": "M", "targets": [0] }
+  ]
+}

@@ -1,0 +1,345 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 17,
+  "operations": [
+    {
+      "type": "qubit_coords",
+      "coords": [0.0, 4.0],
+      "targets": [0]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [1.0, 1.0],
+      "targets": [1]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [1.0, 3.0],
+      "targets": [2]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [1.0, 5.0],
+      "targets": [3]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [2.0, 0.0],
+      "targets": [4]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [2.0, 2.0],
+      "targets": [5]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [2.0, 4.0],
+      "targets": [6]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [3.0, 1.0],
+      "targets": [7]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [3.0, 3.0],
+      "targets": [8]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [3.0, 5.0],
+      "targets": [9]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [4.0, 2.0],
+      "targets": [10]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [4.0, 4.0],
+      "targets": [11]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [4.0, 6.0],
+      "targets": [12]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [5.0, 1.0],
+      "targets": [13]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [5.0, 3.0],
+      "targets": [14]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [5.0, 5.0],
+      "targets": [15]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [6.0, 2.0],
+      "targets": [16]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [1]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [2]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [3]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [7]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [8]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [9]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [13]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [14]
+    },
+    {
+      "type": "gate",
+      "gate": "RX",
+      "targets": [15]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [0]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [4]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [5]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [6]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [10]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [11]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [12]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [16]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [4]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [6]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [10]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [12]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [4, 7, 6, 9, 10, 14, 3, 0, 8, 5, 15, 11]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [4, 1, 6, 3, 10, 8, 2, 0, 7, 5, 14, 11]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [6, 8, 10, 13, 12, 15, 2, 5, 9, 11, 14, 16]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [6, 2, 10, 7, 12, 9, 1, 5, 8, 11, 13, 16]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [4]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [6]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [10]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [12]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [0]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [4]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [5]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [6]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [10]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [11]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [12]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [16]
+    },
+    {
+      "type": "detector",
+      "coords": [2.0, 0.0, 0.0],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -7
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [2.0, 4.0, 0.0],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -5
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [4.0, 2.0, 0.0],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -4
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [4.0, 6.0, 0.0],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        }
+      ]
+    },
+    {
+      "type": "shift_coords",
+      "delta": [0.0, 0.0, 1.0]
+    },
+    {
+      "type": "tick"
+    }
+  ]
+}

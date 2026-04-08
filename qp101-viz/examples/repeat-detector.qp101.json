@@ -1,0 +1,38 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 3,
+  "operations": [
+    { "type": "qubit_coords", "coords": [0.0, 0.0], "targets": [0] },
+    { "type": "qubit_coords", "coords": [1.0, 0.0], "targets": [1] },
+    { "type": "qubit_coords", "coords": [2.0, 0.0], "targets": [2] },
+    { "type": "tick" },
+    {
+      "type": "repeat",
+      "count": 2,
+      "body": [
+        { "type": "gate", "gate": "CX", "targets": [0, 1] },
+        { "type": "gate", "gate": "CX", "targets": [1, 2] },
+        { "type": "tick" },
+        { "type": "gate", "gate": "M", "targets": [1] },
+        {
+          "type": "detector",
+          "coords": [1.0, 0.0, 0.0],
+          "sources": [
+            { "kind": "rec", "offset": -1 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "observable_include",
+      "index": 0,
+      "sources": [
+        { "kind": "rec", "offset": -1 }
+      ]
+    }
+  ],
+  "metadata": {
+    "framework": "rstim"
+  }
+}

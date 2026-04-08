@@ -1,0 +1,144 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 1,
+  "operations": [
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "X_ERROR",
+      "params": [
+        0.1
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 0
+        }
+      ],
+      "annotations": [
+        {
+          "kind": "marker",
+          "target_slots": [
+            0
+          ],
+          "label": "X",
+          "style": {
+            "preset": "danger",
+            "color": "red",
+            "highlight": true
+          },
+          "tags": [
+            "dem-origin",
+            "query-result"
+          ],
+          "context": {
+            "dem_error_index": 0,
+            "op_path": [
+              1
+            ],
+            "query_kind": "dem_error_origin",
+            "repeat_iterations": [],
+            "source_branch": "X",
+            "target_qubits": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "X_ERROR",
+      "params": [
+        0.2
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 0
+        }
+      ],
+      "annotations": [
+        {
+          "kind": "marker",
+          "target_slots": [
+            0
+          ],
+          "label": "X",
+          "style": {
+            "preset": "danger",
+            "color": "red",
+            "highlight": true
+          },
+          "tags": [
+            "dem-origin",
+            "query-result"
+          ],
+          "context": {
+            "dem_error_index": 0,
+            "op_path": [
+              2
+            ],
+            "query_kind": "dem_error_origin",
+            "repeat_iterations": [],
+            "source_branch": "X",
+            "target_qubits": [
+              0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        }
+      ],
+      "annotations": [
+        {
+          "kind": "marker",
+          "label": "D0",
+          "style": {
+            "preset": "danger",
+            "color": "red",
+            "highlight": true
+          },
+          "tags": [
+            "dem-symptom",
+            "query-result"
+          ],
+          "context": {
+            "dem_error_index": 0,
+            "detector_index": 0,
+            "op_path": [
+              4
+            ],
+            "query_kind": "dem_error_origin",
+            "repeat_iterations": []
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "framework": "rstim"
+  }
+}

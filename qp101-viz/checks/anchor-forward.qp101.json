@@ -1,0 +1,13 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 1,
+  "operations": [
+    { "type": "gate", "gate": "M", "targets": [0] },
+    {
+      "type": "detector",
+      "sources": [{ "kind": "rec", "offset": 0 }]
+    },
+    { "type": "gate", "gate": "M", "targets": [0] }
+  ]
+}

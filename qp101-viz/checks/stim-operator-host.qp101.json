@@ -1,0 +1,28 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 2,
+  "operations": [
+    { "type": "gate", "gate": "M", "targets": [0] },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    {
+      "type": "detector",
+      "sources": [
+        { "kind": "rec", "offset": -5 },
+        { "kind": "rec", "offset": -6 }
+      ]
+    },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    {
+      "type": "observable_include",
+      "index": 0,
+      "sources": [
+        { "kind": "rec", "offset": -1 }
+      ]
+    }
+  ]
+}

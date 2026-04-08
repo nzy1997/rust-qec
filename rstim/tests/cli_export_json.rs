@@ -134,3 +134,115 @@ fn export_json_invalid_circuit_fails_cleanly() {
     assert!(stderr.contains("REPEAT") || stderr.contains("repeat"));
     assert!(!stderr.contains("panicked"));
 }
+
+#[test]
+fn export_json_can_highlight_dem_error_origins() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "REPEAT 2 {\n  DEPOLARIZE1(0.3) 5 7\n}\nM 5 7\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        value["operations"][0]["body"][0]["annotations"][0]["context"]["dem_error_index"],
+        0
+    );
+    assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+    assert_eq!(
+        value["operations"][2]["annotations"][0]["context"]["detector_index"],
+        0
+    );
+}
+
+#[test]
+fn export_json_can_highlight_dem_error_to_compact_output_file() {
+    let input = tempfile::NamedTempFile::new().unwrap();
+    let out = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(
+        input.path(),
+        "REPEAT 2 {\n  DEPOLARIZE1(0.3) 5 7\n}\nM 5 7\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let output = rstim_cmd()
+        .arg("export_json")
+        .arg("--in")
+        .arg(input.path())
+        .arg("--out")
+        .arg(out.path())
+        .arg("--format")
+        .arg("compact")
+        .arg("--highlight_dem_error")
+        .arg("0")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stdout.is_empty());
+
+    let text = std::fs::read_to_string(out.path()).unwrap();
+    let text = text.trim_end_matches('\n');
+    assert!(!text.contains('\n'));
+
+    let value: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(
+        value["operations"][0]["body"][0]["annotations"][0]["context"]["dem_error_index"],
+        0
+    );
+}
+
+#[test]
+fn export_json_rejects_invalid_highlight_dem_error_index() {
+    let output =
+        run_export_json_with_stdin(&["--highlight_dem_error", "99"], "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("DEM error index out of range"));
+}
+
+#[test]
+fn export_json_reports_unsupported_highlight_instruction_clearly() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "R 0 1\nDEPOLARIZE2(0.1) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(
+        "--highlight_dem_error currently supports a subset of noise instructions"
+    ));
+    assert!(stderr.contains("DEPOLARIZE2"));
+}
+
+#[test]
+fn export_json_preserves_non_support_tracking_errors_when_highlighting() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "R 0\nDEPOLARIZE1(0.9) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("DEPOLARIZE1(0.9) exceeds exact-analysis limit of 3/4"));
+    assert!(!stderr.contains("subset of noise instructions"));
+}
+
+#[test]
+fn export_json_preserves_non_range_export_errors_when_highlighting() {
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "0"],
+        "QUBIT_COORDS(1,2) !0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("QUBIT_COORDS expects qubit targets"));
+    assert!(!stderr.contains("DEM error index out of range"));
+}

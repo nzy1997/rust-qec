@@ -1,0 +1,13 @@
+[package]
+name = "qp101-viz"
+version = "0.1.0"
+compiler = "0.13.0"
+entrypoint = "lib.typ"
+authors = [
+  "nzy",
+  "Codex"
+]
+license = "MIT"
+description = "Timeline visualization helpers for QP101-ZY circuit JSON."
+categories = ["visualization"]
+exclude = ["examples/", "checks/"]

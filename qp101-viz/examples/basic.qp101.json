@@ -1,0 +1,14 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 2,
+  "operations": [
+    { "type": "gate", "gate": "H", "targets": [0] },
+    { "type": "gate", "gate": "X", "targets": [1], "controls": [0], "control_configs": [true] },
+    { "type": "tick" },
+    { "type": "gate", "gate": "M", "targets": [0, 1] }
+  ],
+  "metadata": {
+    "source": "basic-example"
+  }
+}
