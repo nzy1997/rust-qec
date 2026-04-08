@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::dem::{DemInstruction, DemTarget};
 use crate::dem_provenance::{HighlightRecord, TrackedDemResult};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use serde::{Deserialize, Serialize};
@@ -189,15 +190,32 @@ pub fn export_qp101_with_highlighted_dem_error(
             )
         })?;
 
-    let mut doc = export_qp101(instrs)?;
-    let mut seen = BTreeSet::new();
+    let mut source_highlights = Vec::with_capacity(source_ids.len());
     for &source_id in source_ids {
         let source = tracked.sources.get(source_id).ok_or_else(|| {
-            format!(
-                "tracked source index {source_id} missing for DEM error {dem_error_index}"
-            )
+            format!("tracked source index {source_id} missing for DEM error {dem_error_index}")
         })?;
-        let highlight = HighlightRecord::from_source(source);
+        source_highlights.push((source, HighlightRecord::from_source(source)));
+    }
+
+    let dem_targets = match tracked.dem.instructions().get(dem_error_index) {
+        Some(DemInstruction::Error { targets, .. }) => targets.clone(),
+        Some(_) => {
+            return Err(format!(
+                "DEM error index {dem_error_index} does not point to an error instruction"
+            ));
+        }
+        None => {
+            return Err(format!(
+                "DEM error index {dem_error_index} out of range for {} tracked DEM errors",
+                tracked.dem_error_to_sources.len()
+            ));
+        }
+    };
+
+    let mut doc = export_qp101(instrs)?;
+    let mut seen = BTreeSet::new();
+    for (source, highlight) in source_highlights {
         let dedupe_key = (
             highlight.op_path.clone(),
             highlight.repeat_iterations.clone(),
@@ -210,11 +228,7 @@ pub fn export_qp101_with_highlighted_dem_error(
                 target_slots: highlight.target_slots.clone(),
                 label: Some(highlight.label.clone()),
                 text: format_repeat_annotation_text(&highlight.repeat_iterations),
-                style: Some(Qp101AnnotationStyle {
-                    preset: Some("danger".to_string()),
-                    color: Some("red".to_string()),
-                    highlight: Some(true),
-                }),
+                style: Some(danger_annotation_style()),
                 tags: vec!["dem-origin".to_string(), "query-result".to_string()],
                 context: Some(json!({
                     "query_kind": "dem_error_origin",
@@ -228,6 +242,7 @@ pub fn export_qp101_with_highlighted_dem_error(
             add_annotation_at_path(&mut doc.operations, &source.op_path, annotation)?;
         }
     }
+    add_symptom_annotations(&mut doc.operations, instrs, &dem_targets, dem_error_index)?;
     Ok(doc)
 }
 
@@ -323,6 +338,183 @@ fn format_repeat_annotation_text(repeat_iterations: &[u64]) -> Option<String> {
                 .join(",")
         )
     })
+}
+
+fn danger_annotation_style() -> Qp101AnnotationStyle {
+    Qp101AnnotationStyle {
+        preset: Some("danger".to_string()),
+        color: Some("red".to_string()),
+        highlight: Some(true),
+    }
+}
+
+#[derive(Debug, Clone)]
+struct QueryAnnotationLocation {
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct QueryTraversalContext {
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+}
+
+impl QueryTraversalContext {
+    fn with_op_index(&self, op_index: usize) -> Self {
+        let mut op_path = self.op_path.clone();
+        op_path.push(op_index);
+        Self {
+            op_path,
+            repeat_iterations: self.repeat_iterations.clone(),
+        }
+    }
+
+    fn with_repeat_iteration(&self, repeat_op_index: usize, iteration: u64) -> Self {
+        let mut op_path = self.op_path.clone();
+        op_path.push(repeat_op_index);
+        let mut repeat_iterations = self.repeat_iterations.clone();
+        repeat_iterations.push(iteration);
+        Self {
+            op_path,
+            repeat_iterations,
+        }
+    }
+}
+
+fn add_symptom_annotations(
+    operations: &mut [Qp101Operation],
+    instrs: &[StimInstr],
+    dem_targets: &[DemTarget],
+    dem_error_index: usize,
+) -> Result<(), String> {
+    let mut detector_locations = Vec::new();
+    let mut observable_locations = Vec::new();
+    collect_query_annotation_locations(
+        instrs,
+        &QueryTraversalContext::default(),
+        &mut detector_locations,
+        &mut observable_locations,
+    )?;
+
+    let mut seen = BTreeSet::new();
+    for target in dem_targets {
+        match target {
+            DemTarget::Detector(index) => {
+                let location = detector_locations.get(*index).ok_or_else(|| {
+                    format!("detector index {index} missing from exported QP101 operations")
+                })?;
+                let key = (
+                    "D".to_string(),
+                    *index,
+                    location.op_path.clone(),
+                    location.repeat_iterations.clone(),
+                );
+                if seen.insert(key) {
+                    add_annotation_at_path(
+                        operations,
+                        &location.op_path,
+                        Qp101Annotation {
+                            kind: "marker".to_string(),
+                            target_slots: Vec::new(),
+                            label: Some(format!("D{index}")),
+                            text: format_repeat_annotation_text(&location.repeat_iterations),
+                            style: Some(danger_annotation_style()),
+                            tags: vec!["dem-symptom".to_string(), "query-result".to_string()],
+                            context: Some(json!({
+                                "query_kind": "dem_error_origin",
+                                "dem_error_index": dem_error_index,
+                                "detector_index": index,
+                                "op_path": location.op_path,
+                                "repeat_iterations": location.repeat_iterations,
+                            })),
+                        },
+                    )?;
+                }
+            }
+            DemTarget::Observable(index) => {
+                let matching_locations: Vec<_> = observable_locations
+                    .iter()
+                    .filter(|entry| entry.0 == *index)
+                    .collect();
+                // A DEM logical observable target only names the aggregate observable index.
+                // If that index is emitted by multiple OBSERVABLE_INCLUDE ops, the exact site is ambiguous.
+                if let [location] = matching_locations.as_slice() {
+                    let key = (
+                        "L".to_string(),
+                        *index,
+                        location.1.op_path.clone(),
+                        location.1.repeat_iterations.clone(),
+                    );
+                    if seen.insert(key) {
+                        add_annotation_at_path(
+                            operations,
+                            &location.1.op_path,
+                            Qp101Annotation {
+                                kind: "marker".to_string(),
+                                target_slots: Vec::new(),
+                                label: Some(format!("L{index}")),
+                                text: format_repeat_annotation_text(&location.1.repeat_iterations),
+                                style: Some(danger_annotation_style()),
+                                tags: vec!["dem-symptom".to_string(), "query-result".to_string()],
+                                context: Some(json!({
+                                    "query_kind": "dem_error_origin",
+                                    "dem_error_index": dem_error_index,
+                                    "observable_index": index,
+                                    "op_path": location.1.op_path,
+                                    "repeat_iterations": location.1.repeat_iterations,
+                                })),
+                            },
+                        )?;
+                    }
+                }
+            }
+            DemTarget::Separator => {}
+        }
+    }
+    Ok(())
+}
+
+fn collect_query_annotation_locations(
+    instrs: &[StimInstr],
+    context: &QueryTraversalContext,
+    detector_locations: &mut Vec<QueryAnnotationLocation>,
+    observable_locations: &mut Vec<(usize, QueryAnnotationLocation)>,
+) -> Result<(), String> {
+    for (i, instr) in instrs.iter().enumerate() {
+        match instr {
+            StimInstr::Repeat { count, body } => {
+                for iteration in 0..*count {
+                    let repeat_context = context.with_repeat_iteration(i, iteration);
+                    collect_query_annotation_locations(
+                        body,
+                        &repeat_context,
+                        detector_locations,
+                        observable_locations,
+                    )?;
+                }
+            }
+            StimInstr::Op { name, args, .. } => {
+                let op_context = context.with_op_index(i);
+                if name == "DETECTOR" {
+                    detector_locations.push(QueryAnnotationLocation {
+                        op_path: op_context.op_path,
+                        repeat_iterations: op_context.repeat_iterations,
+                    });
+                } else if name == "OBSERVABLE_INCLUDE" {
+                    let index = args.first().copied().unwrap_or(0.0) as usize;
+                    observable_locations.push((
+                        index,
+                        QueryAnnotationLocation {
+                            op_path: op_context.op_path,
+                            repeat_iterations: op_context.repeat_iterations,
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn add_annotation_at_path(

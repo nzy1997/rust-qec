@@ -2,10 +2,10 @@
 
 #set page(width: auto, height: auto, margin: 10pt)
 
-= rotated surface code memory Z, d=3, r=5, dem error 136
+= rotated surface code memory Z, d=3, r=5, dem error 137
 
 #qp101-timeline-file(
-  "examples/surface_code_rotated_memory_z_d3_r5_supported_noise_dem_error_136.qp101.json",
+  "examples/surface_code_rotated_memory_z_d3_r5_supported_noise_dem_error_137.qp101.json",
   theme: timeline-theme(
     step_width: 4.2em,
     font_size: 6.6pt,

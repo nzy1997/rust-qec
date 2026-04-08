@@ -2453,7 +2453,7 @@
         {
           "kind": "marker",
           "target_slots": [
-            7
+            6
           ],
           "label": "X",
           "style": {
@@ -2466,7 +2466,7 @@
             "query-result"
           ],
           "context": {
-            "dem_error_index": 136,
+            "dem_error_index": 137,
             "op_path": [
               203
             ],
@@ -2474,14 +2474,14 @@
             "repeat_iterations": [],
             "source_branch": "X",
             "target_qubits": [
-              14
+              13
             ]
           }
         },
         {
           "kind": "marker",
           "target_slots": [
-            7
+            6
           ],
           "label": "Y",
           "style": {
@@ -2494,7 +2494,7 @@
             "query-result"
           ],
           "context": {
-            "dem_error_index": 136,
+            "dem_error_index": 137,
             "op_path": [
               203
             ],
@@ -2502,7 +2502,7 @@
             "repeat_iterations": [],
             "source_branch": "Y",
             "target_qubits": [
-              14
+              13
             ]
           }
         }
@@ -2831,7 +2831,7 @@
         {
           "kind": "marker",
           "target_slots": [
-            7
+            6
           ],
           "label": "X",
           "style": {
@@ -2844,7 +2844,7 @@
             "query-result"
           ],
           "context": {
-            "dem_error_index": 136,
+            "dem_error_index": 137,
             "op_path": [
               227
             ],
@@ -2852,7 +2852,7 @@
             "repeat_iterations": [],
             "source_branch": "X",
             "target_qubits": [
-              14
+              13
             ]
           }
         }
@@ -3001,30 +3001,6 @@
           "kind": "rec",
           "offset": -1
         }
-      ],
-      "annotations": [
-        {
-          "kind": "marker",
-          "label": "D38",
-          "style": {
-            "preset": "danger",
-            "color": "red",
-            "highlight": true
-          },
-          "tags": [
-            "dem-symptom",
-            "query-result"
-          ],
-          "context": {
-            "dem_error_index": 136,
-            "detector_index": 38,
-            "op_path": [
-              239
-            ],
-            "query_kind": "dem_error_origin",
-            "repeat_iterations": []
-          }
-        }
       ]
     },
     {
@@ -3062,7 +3038,7 @@
             "query-result"
           ],
           "context": {
-            "dem_error_index": 136,
+            "dem_error_index": 137,
             "detector_index": 39,
             "op_path": [
               240
@@ -3088,6 +3064,30 @@
         {
           "kind": "rec",
           "offset": -3
+        }
+      ],
+      "annotations": [
+        {
+          "kind": "marker",
+          "label": "L0",
+          "style": {
+            "preset": "danger",
+            "color": "red",
+            "highlight": true
+          },
+          "tags": [
+            "dem-symptom",
+            "query-result"
+          ],
+          "context": {
+            "dem_error_index": 137,
+            "observable_index": 0,
+            "op_path": [
+              241
+            ],
+            "query_kind": "dem_error_origin",
+            "repeat_iterations": []
+          }
         }
       ]
     }

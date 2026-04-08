@@ -152,6 +152,11 @@ fn export_json_can_highlight_dem_error_origins() {
         value["operations"][0]["body"][0]["annotations"][0]["context"]["dem_error_index"],
         0
     );
+    assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+    assert_eq!(
+        value["operations"][2]["annotations"][0]["context"]["detector_index"],
+        0
+    );
 }
 
 #[test]

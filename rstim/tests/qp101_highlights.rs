@@ -1,5 +1,5 @@
-use rstim::dem::DetectorErrorModel;
 use rstim::dem::DemTarget;
+use rstim::dem::DetectorErrorModel;
 use rstim::dem_provenance::{SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource};
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::parser::parse_lines;
@@ -29,8 +29,24 @@ fn qp101_export_includes_dem_origin_highlights() {
         assert_eq!(annotation["style"]["highlight"], true);
         assert!(annotation["context"]["repeat_iterations"].is_array());
         assert!(annotation["text"].as_str().unwrap().starts_with("repeat["));
-        assert_eq!(annotation["tags"], serde_json::json!(["dem-origin", "query-result"]));
+        assert_eq!(
+            annotation["tags"],
+            serde_json::json!(["dem-origin", "query-result"])
+        );
     }
+
+    let detector_annotations = value["operations"][2]["annotations"].as_array().unwrap();
+    assert_eq!(detector_annotations.len(), 1);
+    assert_eq!(detector_annotations[0]["kind"], "marker");
+    assert_eq!(detector_annotations[0]["label"], "D0");
+    assert_eq!(
+        detector_annotations[0]["tags"],
+        serde_json::json!(["dem-symptom", "query-result"])
+    );
+    assert_eq!(
+        detector_annotations[0]["context"]["detector_index"],
+        serde_json::json!(0)
+    );
 }
 
 #[test]
@@ -102,5 +118,46 @@ fn qp101_export_dedupes_equivalent_source_highlights() {
         highlights[0]["context"]["repeat_iterations"],
         serde_json::json!([2])
     );
-    assert_eq!(highlights[0]["context"]["target_qubits"], serde_json::json!([0]));
+    assert_eq!(
+        highlights[0]["context"]["target_qubits"],
+        serde_json::json!([0])
+    );
+}
+
+#[test]
+fn qp101_export_skips_ambiguous_observable_symptom_highlights() {
+    let circuit = parse_lines(
+        "R 0 1\nX_ERROR(0.1) 0\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+    let doc = export_qp101_with_highlighted_dem_error(&circuit, &tracked, 0).unwrap();
+    let value = serde_json::to_value(doc).unwrap();
+
+    assert_eq!(value["operations"][3]["type"], "observable_include");
+    assert_eq!(value["operations"][4]["type"], "observable_include");
+    assert!(value["operations"][3]["annotations"].is_null());
+    assert!(value["operations"][4]["annotations"].is_null());
+}
+
+#[test]
+fn qp101_export_marks_unambiguous_observable_symptom_highlights() {
+    let circuit = parse_lines("R 0\nX_ERROR(0.1) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
+
+    let doc = export_qp101_with_highlighted_dem_error(&circuit, &tracked, 0).unwrap();
+    let value = serde_json::to_value(doc).unwrap();
+    let observable_annotations = value["operations"][3]["annotations"].as_array().unwrap();
+
+    assert_eq!(observable_annotations.len(), 1);
+    assert_eq!(observable_annotations[0]["label"], "L0");
+    assert_eq!(
+        observable_annotations[0]["tags"],
+        serde_json::json!(["dem-symptom", "query-result"])
+    );
+    assert_eq!(
+        observable_annotations[0]["context"]["observable_index"],
+        serde_json::json!(0)
+    );
 }
