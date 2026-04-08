@@ -3,6 +3,9 @@
 ## Project Structure & Module Organization
 This repository is a Cargo workspace with two Rust crates and one Typst package. `rstim/` contains the simulator, CLI, code generators, QP101 export, and most circuit logic; key submodules live under `rstim/src/codegen/` and `rstim/src/sim/`. `rsinter/` builds analysis and reporting tools on top of `rstim`. Integration tests are organized by feature in `rstim/tests/` and `rsinter/tests/` with file names such as `cli_export_json.rs` or `dem_ir.rs`. `qp101-viz/` is a local Typst package: `lib.typ` is the entrypoint, `examples/` holds committed demos, and `checks/` holds renderer fixtures. Scratch material belongs in ignored paths like root `drafts/`, `qp101-viz/drafts/`, and `qp101-viz/draft_figs/`.
 
+## Agent Rules
+Use `.AGENTS/rules/visualization-update-flow.md` for the end-to-end sync process when QP101 export changes affect docs, fixtures, and Typst rendering. Use `.AGENTS/rules/QP101-ZY.md` for the narrower rule that treats `rstim/doc/QP101-ZY.md` as the format contract and lists the exact files that must be kept in sync with it.
+
 ## Build, Test, and Development Commands
 - `cargo build --workspace`: build both Rust crates.
 - `cargo test --workspace`: run the full Rust test suite.
