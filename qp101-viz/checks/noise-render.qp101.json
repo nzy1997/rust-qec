@@ -1,0 +1,36 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 6,
+  "operations": [
+    {
+      "type": "noise",
+      "gate": "X_ERROR",
+      "params": [0.001],
+      "raw_targets": [{ "kind": "qubit", "index": 0 }]
+    },
+    { "type": "tick" },
+    {
+      "type": "noise",
+      "gate": "DEPOLARIZE1",
+      "params": [0.001],
+      "raw_targets": [
+        { "kind": "qubit", "index": 0 },
+        { "kind": "qubit", "index": 2 },
+        { "kind": "qubit", "index": 4 }
+      ]
+    },
+    { "type": "tick" },
+    {
+      "type": "noise",
+      "gate": "DEPOLARIZE2",
+      "params": [0.001],
+      "raw_targets": [
+        { "kind": "qubit", "index": 0 },
+        { "kind": "qubit", "index": 1 },
+        { "kind": "qubit", "index": 4 },
+        { "kind": "qubit", "index": 3 }
+      ]
+    }
+  ]
+}

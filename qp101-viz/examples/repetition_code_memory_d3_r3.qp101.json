@@ -1,0 +1,462 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 5,
+  "operations": [
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        1
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        2
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [
+        0.0,
+        0.0
+      ],
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [
+        2.0,
+        0.0
+      ],
+      "targets": [
+        1
+      ]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [
+        4.0,
+        0.0
+      ],
+      "targets": [
+        2
+      ]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [
+        1.0,
+        0.0
+      ],
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "qubit_coords",
+      "coords": [
+        3.0,
+        0.0
+      ],
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        0,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        2,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        3.0,
+        0.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        0,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        2,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        1.0,
+        0.0,
+        1.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -4
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        3.0,
+        0.0,
+        1.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        },
+        {
+          "kind": "rec",
+          "offset": -3
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        0,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        2,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        3
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        1.0,
+        0.0,
+        2.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -4
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        3.0,
+        0.0,
+        2.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        },
+        {
+          "kind": "rec",
+          "offset": -3
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        1
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "M",
+      "targets": [
+        2
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        1.0,
+        0.0,
+        3.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -3
+        },
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -5
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        3.0,
+        0.0,
+        3.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -1
+        },
+        {
+          "kind": "rec",
+          "offset": -4
+        }
+      ]
+    },
+    {
+      "type": "observable_include",
+      "index": 0,
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -3
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "framework": "rstim"
+  }
+}
