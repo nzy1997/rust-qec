@@ -3,6 +3,7 @@ pub enum DecodeError {
     EmptyMatrix,
     InvalidProbability,
     InvalidColumnIndex { column: usize, num_bits: usize },
+    InvalidRowIndex { row: usize, num_checks: usize },
     DimensionMismatch {
         what: &'static str,
         expected: usize,
@@ -20,7 +21,13 @@ impl core::fmt::Display for DecodeError {
             Self::InvalidColumnIndex { column, num_bits } => {
                 write!(
                     f,
-                    "invalid column index {column} for code with {num_bits} bits"
+                    "column index {column} is out of bounds for code with {num_bits} bits"
+                )
+            }
+            Self::InvalidRowIndex { row, num_checks } => {
+                write!(
+                    f,
+                    "row index {row} is out of bounds for matrix with {num_checks} checks"
                 )
             }
             Self::DimensionMismatch {
