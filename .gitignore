@@ -1,6 +1,7 @@
 /Stim/
 /yao-rs/
 /rmatching/
+/ldpc/
 /.worktrees/
 
 Cargo.lock
