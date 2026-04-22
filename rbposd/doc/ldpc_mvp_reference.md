@@ -31,9 +31,8 @@ Excluded:
 - CLI/API integration outside this crate's foundational type contract
 
 Reference fixtures:
-- `rbposd/tests/smoke.rs`:
-  default configuration and channel model contract checks
-- `rbposd/tests/smoke.rs`:
-  decode error formatting and `std::error::Error` trait conformance check
-- `rbposd/doc/ldpc_mvp_reference.md`:
-  this written contract used as the task-level source of truth
+- Repetition-style 4-check / 5-bit code with a single-flip syndrome that BP
+  should solve without OSD.
+- Small 2-check / 3-bit code that is solved by `OSD_0` when BP is disabled.
+- Small sparse non-identity matrix built from sparse columns to verify
+  constructor symmetry.
