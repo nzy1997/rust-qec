@@ -23,7 +23,7 @@ pub(crate) fn solve_with_column_order(
     let mut pivot_columns = Vec::new();
     let mut row = 0usize;
 
-    for &column in column_order {
+    for (pivot_position, &column) in column_order.iter().enumerate() {
         if row == matrix.len() {
             break;
         }
@@ -33,7 +33,7 @@ pub(crate) fn solve_with_column_order(
             rhs.swap(row, pivot_row);
             for other in 0..matrix.len() {
                 if other != row && matrix[other][column] {
-                    for c in column..column_order.len() {
+                    for c in pivot_position..column_order.len() {
                         let physical = column_order[c];
                         matrix[other][physical] ^= matrix[row][physical];
                     }
@@ -80,6 +80,18 @@ mod tests {
             ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
         let syndrome = Syndrome::from(vec![true, false]);
         let order = vec![0, 1, 2];
+
+        let correction = solve_with_column_order(&pcm, &syndrome, &order).unwrap();
+
+        assert_eq!(pcm.multiply(&correction), syndrome);
+    }
+
+    #[test]
+    fn solve_with_column_order_reordered_returns_a_valid_solution() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![false, true]);
+        let order = vec![2, 0, 1];
 
         let correction = solve_with_column_order(&pcm, &syndrome, &order).unwrap();
 
