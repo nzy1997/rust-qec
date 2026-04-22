@@ -1,4 +1,4 @@
-use rbposd::{BpVariant, ChannelModel, DecoderConfig, OsdVariant, Schedule};
+use rbposd::{BpVariant, ChannelModel, DecodeError, DecoderConfig, OsdVariant, Schedule};
 
 #[test]
 fn decoder_config_default_contract() {
@@ -18,4 +18,19 @@ fn channel_model_contract() {
 
     let bit_flips = ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]);
     assert_eq!(bit_flips, ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]));
+}
+
+#[test]
+fn decode_error_contract() {
+    let e = DecodeError::InvalidColumnIndex {
+        column: 7,
+        num_bits: 5,
+    };
+    assert_eq!(
+        e.to_string(),
+        "invalid column index 7 for code with 5 bits"
+    );
+
+    fn takes_std_error(_: &dyn std::error::Error) {}
+    takes_std_error(&e);
 }
