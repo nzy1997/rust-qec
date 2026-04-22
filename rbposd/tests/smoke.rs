@@ -28,7 +28,7 @@ fn decode_error_contract() {
     };
     assert_eq!(
         e.to_string(),
-        "invalid column index 7 for code with 5 bits"
+        "column index 7 is out of bounds for 5 bits"
     );
 
     fn takes_std_error(_: &dyn std::error::Error) {}

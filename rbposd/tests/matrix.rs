@@ -22,3 +22,12 @@ fn sparse_columns_and_sparse_rows_encode_the_same_code() {
     assert_eq!(from_rows.multiply(&correction), expected);
     assert_eq!(from_cols.multiply(&correction), expected);
 }
+
+#[test]
+fn sparse_columns_reject_an_out_of_bounds_row() {
+    let err = ParityCheckMatrix::from_sparse_columns(2, 3, vec![vec![0], vec![2], vec![]])
+        .unwrap_err();
+
+    assert!(err.to_string().contains("row index 2"));
+    assert!(err.to_string().contains("out of bounds"));
+}

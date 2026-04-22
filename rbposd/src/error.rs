@@ -21,7 +21,7 @@ impl core::fmt::Display for DecodeError {
             Self::InvalidColumnIndex { column, num_bits } => {
                 write!(
                     f,
-                    "column index {column} is out of bounds for code with {num_bits} bits"
+                    "column index {column} is out of bounds for {num_bits} bits"
                 )
             }
             Self::InvalidRowIndex { row, num_checks } => {
