@@ -9,6 +9,7 @@ pub enum DecodeError {
         expected: usize,
         actual: usize,
     },
+    SingularSystem,
     BpDidNotConverge,
     NoOsdSolution,
 }
@@ -37,6 +38,10 @@ impl core::fmt::Display for DecodeError {
             } => write!(
                 f,
                 "dimension mismatch for {what}: expected {expected}, got {actual}"
+            ),
+            Self::SingularSystem => write!(
+                f,
+                "singular system cannot satisfy the target syndrome"
             ),
             Self::BpDidNotConverge => write!(f, "belief propagation did not converge"),
             Self::NoOsdSolution => write!(f, "no OSD solution found"),
