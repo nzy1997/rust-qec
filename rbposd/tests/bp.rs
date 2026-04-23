@@ -49,3 +49,24 @@ fn minimum_sum_keeps_a_converged_solution_when_early_stop_is_disabled() {
     assert_eq!(pcm.multiply(&result.correction), syndrome);
     assert_eq!(result.correction, Correction::from(vec![false, false, true]));
 }
+
+#[test]
+fn zero_syndrome_can_return_a_prior_favored_nullspace_correction() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::BitFlipProbabilities(vec![0.9, 0.9]),
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let syndrome = Syndrome::from(vec![false]);
+    let result = decoder.decode(&syndrome).unwrap();
+
+    assert!(result.converged);
+    assert!(!result.used_osd);
+    assert_eq!(result.bp_iterations, 0);
+    assert_eq!(result.residual_syndrome_weight, 0);
+    assert_eq!(result.correction, Correction::from(vec![true, true]));
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+}

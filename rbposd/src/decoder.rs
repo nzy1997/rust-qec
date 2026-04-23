@@ -45,6 +45,17 @@ impl BpOsdDecoder {
         }
 
         if syndrome.weight() == 0 {
+            let prior_correction = prior_hard_decision(&self.prior_llrs);
+            if self.pcm.multiply(&prior_correction) == *syndrome {
+                return Ok(DecodeResult {
+                    correction: prior_correction,
+                    converged: true,
+                    bp_iterations: 0,
+                    used_osd: false,
+                    residual_syndrome_weight: 0,
+                });
+            }
+
             return Ok(DecodeResult {
                 correction: Correction::zero(self.pcm.num_bits()),
                 converged: true,
@@ -113,4 +124,8 @@ fn validate_probability(probability: f64) -> Result<f64, DecodeError> {
 
 fn probability_to_llr(probability: f64) -> f64 {
     ((1.0 - probability) / probability).ln()
+}
+
+fn prior_hard_decision(prior_llrs: &[f64]) -> Correction {
+    Correction::from(prior_llrs.iter().map(|&llr| llr < 0.0).collect::<Vec<_>>())
 }

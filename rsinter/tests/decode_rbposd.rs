@@ -61,3 +61,25 @@ fn collect_runs_with_the_rbposd_adapter() {
     assert_eq!(results.len(), 1);
     assert!(results[0].shots > 0);
 }
+
+#[test]
+fn rbposd_dem_decoder_handles_observable_only_terms() {
+    let dem = DetectorErrorModel::parse("error(0.75) L0\n").unwrap();
+    let decoder = RbposdDemDecoder::new(DecoderConfig::default());
+    let compiled = decoder.compile_for_dem(&dem);
+
+    let predictions = compiled.decode_shots_bit_packed(&[], 1, 0, 1);
+
+    assert_eq!(predictions, vec![0b0000_0001]);
+}
+
+#[test]
+fn rbposd_dem_decoder_handles_exact_probability_terms() {
+    let dem = DetectorErrorModel::parse("error(1) D0 L0\nerror(0) D1\n").unwrap();
+    let decoder = RbposdDemDecoder::new(DecoderConfig::default());
+    let compiled = decoder.compile_for_dem(&dem);
+
+    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+
+    assert_eq!(predictions, vec![0b0000_0001]);
+}

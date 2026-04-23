@@ -16,28 +16,79 @@ impl RbposdDemDecoder {
 }
 
 struct CompiledRbposdDemDecoder {
-    decoder: BpOsdDecoder,
+    decoder: Option<BpOsdDecoder>,
     num_dets: usize,
     num_obs: usize,
     observable_columns: Vec<Vec<usize>>,
+    forced_syndrome: Vec<bool>,
+    baseline_observables: Vec<bool>,
 }
 
 impl Decoder for RbposdDemDecoder {
     fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-        let (pcm, probabilities, observable_columns, num_dets, num_obs) =
+        let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
             dem_to_matrix_problem(dem);
-        let decoder = BpOsdDecoder::new(
-            pcm,
-            ChannelModel::BitFlipProbabilities(probabilities),
-            self.config.clone(),
-        )
-        .expect("DEM lowering produced an invalid rbposd problem");
+
+        let mut filtered_detector_columns = Vec::new();
+        let mut filtered_observable_columns = Vec::new();
+        let mut filtered_probabilities = Vec::new();
+        let mut forced_syndrome = vec![false; num_dets];
+        let mut baseline_observables = vec![false; num_obs];
+
+        for ((detectors, observables), probability) in detector_columns
+            .into_iter()
+            .zip(observable_columns.into_iter())
+            .zip(probabilities.into_iter())
+        {
+            if probability <= 0.0 {
+                continue;
+            }
+
+            if probability >= 1.0 {
+                xor_indices(&mut forced_syndrome, &detectors);
+                xor_indices(&mut baseline_observables, &observables);
+                continue;
+            }
+
+            if detectors.is_empty() {
+                if probability > 0.5 {
+                    xor_indices(&mut baseline_observables, &observables);
+                }
+                continue;
+            }
+
+            filtered_detector_columns.push(detectors);
+            filtered_observable_columns.push(observables);
+            filtered_probabilities.push(probability);
+        }
+
+        let decoder = if filtered_detector_columns.is_empty() {
+            None
+        } else {
+            let pcm = ParityCheckMatrix::from_sparse_columns(
+                num_dets,
+                filtered_detector_columns.len(),
+                filtered_detector_columns,
+            )
+            .expect("generated DEM matrix should be valid");
+
+            Some(
+                BpOsdDecoder::new(
+                    pcm,
+                    ChannelModel::BitFlipProbabilities(filtered_probabilities),
+                    self.config.clone(),
+                )
+                .expect("DEM lowering produced an invalid rbposd problem"),
+            )
+        };
 
         Box::new(CompiledRbposdDemDecoder {
             decoder,
             num_dets,
             num_obs,
-            observable_columns,
+            observable_columns: filtered_observable_columns,
+            forced_syndrome,
+            baseline_observables,
         })
     }
 }
@@ -62,15 +113,20 @@ impl CompiledDecoder for CompiledRbposdDemDecoder {
                 syndrome_bits[det] = ((byte >> (det % 8)) & 1) != 0;
             }
 
-            let result = self
-                .decoder
-                .decode(&Syndrome::from(syndrome_bits))
-                .expect("rbposd decode failed");
-            let observable_bits = correction_to_observables(
-                &result.correction,
-                &self.observable_columns,
-                self.num_obs,
-            );
+            xor_bits(&mut syndrome_bits, &self.forced_syndrome);
+
+            let mut observable_bits = self.baseline_observables.clone();
+            if let Some(decoder) = &self.decoder {
+                let result = decoder
+                    .decode(&Syndrome::from(syndrome_bits))
+                    .expect("rbposd decode failed");
+                let decoded_observables = correction_to_observables(
+                    &result.correction,
+                    &self.observable_columns,
+                    self.num_obs,
+                );
+                xor_bits(&mut observable_bits, &decoded_observables);
+            }
 
             for obs in 0..num_obs.min(self.num_obs) {
                 if observable_bits[obs] {
@@ -102,7 +158,7 @@ fn correction_to_observables(
 
 fn dem_to_matrix_problem(
     dem: &DetectorErrorModel,
-) -> (ParityCheckMatrix, Vec<f64>, Vec<Vec<usize>>, usize, usize) {
+) -> (Vec<Vec<usize>>, Vec<f64>, Vec<Vec<usize>>, usize, usize) {
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
     let mut detector_columns = Vec::new();
@@ -117,11 +173,13 @@ fn dem_to_matrix_problem(
         &mut probabilities,
     );
 
-    let pcm =
-        ParityCheckMatrix::from_sparse_columns(num_dets, detector_columns.len(), detector_columns)
-            .expect("generated DEM matrix should be valid");
-
-    (pcm, probabilities, observable_columns, num_dets, num_obs)
+    (
+        detector_columns,
+        probabilities,
+        observable_columns,
+        num_dets,
+        num_obs,
+    )
 }
 
 fn visit_dem(
@@ -195,6 +253,18 @@ fn toggle_target(set: &mut BTreeSet<usize>, value: usize) {
     }
 }
 
+fn xor_indices(bits: &mut [bool], indices: &[usize]) {
+    for &index in indices {
+        bits[index] ^= true;
+    }
+}
+
+fn xor_bits(bits: &mut [bool], other: &[bool]) {
+    for (lhs, rhs) in bits.iter_mut().zip(other.iter()) {
+        *lhs ^= *rhs;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::dem_to_matrix_problem;
@@ -204,13 +274,12 @@ mod tests {
     fn separator_targets_stay_in_one_dem_column() {
         let dem = DetectorErrorModel::parse("error(0.25) D0 ^ D1 L0\n").unwrap();
 
-        let (pcm, probabilities, observable_columns, num_dets, num_obs) =
+        let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
             dem_to_matrix_problem(&dem);
 
         assert_eq!(num_dets, 2);
         assert_eq!(num_obs, 1);
-        assert_eq!(pcm.num_bits(), 1);
-        assert_eq!(pcm.column_neighbors(0), &[0, 1]);
+        assert_eq!(detector_columns, vec![vec![0, 1]]);
         assert_eq!(probabilities, vec![0.25]);
         assert_eq!(observable_columns, vec![vec![0]]);
     }
