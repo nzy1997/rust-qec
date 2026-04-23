@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use rbposd::{BpOsdDecoder, ChannelModel, Correction, DecoderConfig, ParityCheckMatrix, Syndrome};
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 
@@ -173,22 +175,43 @@ fn push_error_columns(
     observable_columns: &mut Vec<Vec<usize>>,
     probabilities: &mut Vec<f64>,
 ) {
-    let mut current_dets = Vec::new();
-    let mut current_obs = Vec::new();
+    let mut current_dets = BTreeSet::new();
+    let mut current_obs = BTreeSet::new();
     for target in targets {
         match target {
-            DemTarget::Detector(det) => current_dets.push(detector_offset + det),
-            DemTarget::Observable(obs) => current_obs.push(*obs),
-            DemTarget::Separator => {
-                detector_columns.push(current_dets);
-                observable_columns.push(current_obs);
-                probabilities.push(probability);
-                current_dets = Vec::new();
-                current_obs = Vec::new();
-            }
+            DemTarget::Detector(det) => toggle_target(&mut current_dets, detector_offset + det),
+            DemTarget::Observable(obs) => toggle_target(&mut current_obs, *obs),
+            DemTarget::Separator => {}
         }
     }
-    detector_columns.push(current_dets);
-    observable_columns.push(current_obs);
+    detector_columns.push(current_dets.into_iter().collect());
+    observable_columns.push(current_obs.into_iter().collect());
     probabilities.push(probability);
+}
+
+fn toggle_target(set: &mut BTreeSet<usize>, value: usize) {
+    if !set.insert(value) {
+        set.remove(&value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dem_to_matrix_problem;
+    use rstim::dem::DetectorErrorModel;
+
+    #[test]
+    fn separator_targets_stay_in_one_dem_column() {
+        let dem = DetectorErrorModel::parse("error(0.25) D0 ^ D1 L0\n").unwrap();
+
+        let (pcm, probabilities, observable_columns, num_dets, num_obs) =
+            dem_to_matrix_problem(&dem);
+
+        assert_eq!(num_dets, 2);
+        assert_eq!(num_obs, 1);
+        assert_eq!(pcm.num_bits(), 1);
+        assert_eq!(pcm.column_neighbors(0), &[0, 1]);
+        assert_eq!(probabilities, vec![0.25]);
+        assert_eq!(observable_columns, vec![vec![0]]);
+    }
 }
