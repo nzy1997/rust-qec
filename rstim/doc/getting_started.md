@@ -239,6 +239,24 @@ Shots with detection events: 837/1000
 Actual observable flips: 103/1000
 ```
 
+## Decode with rbposd through rsinter
+
+When `rbposd` is available in the same workspace, `rsinter` can compile a DEM
+into an in-tree BP+OSD decoder:
+
+```rust
+use std::collections::HashMap;
+
+use rbposd::DecoderConfig;
+use rsinter::decode::RbposdDemDecoder;
+
+let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
+decoders.insert(
+    "rbposd".into(),
+    Box::new(RbposdDemDecoder::new(DecoderConfig::default())),
+);
+```
+
 ## Estimate threshold
 
 A threshold experiment sweeps over code distances and noise rates. Below

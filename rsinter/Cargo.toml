@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 rstim = { path = "../rstim" }
+rbposd = { path = "../rbposd" }
 rand = "0.8"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
