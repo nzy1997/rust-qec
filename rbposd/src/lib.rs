@@ -24,11 +24,13 @@ pub mod matrix;
 pub mod vector;
 
 mod bp;
+mod css;
 mod decoder;
 mod gf2;
 mod osd;
 
 pub use config::{BpVariant, ChannelModel, DecoderConfig, OsdVariant, Schedule};
+pub use css::CssDecoders;
 pub use decoder::{BpOsdDecoder, DecodeResult};
 pub use error::DecodeError;
 pub use matrix::ParityCheckMatrix;
