@@ -6,6 +6,7 @@ pub mod vector;
 mod bp;
 mod decoder;
 mod gf2;
+mod osd;
 
 pub use config::{BpVariant, ChannelModel, DecoderConfig, OsdVariant, Schedule};
 pub use decoder::{BpOsdDecoder, DecodeResult};

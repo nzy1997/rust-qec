@@ -2,6 +2,7 @@ use crate::bp::run_minimum_sum;
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
+use crate::osd::decode_osd0;
 use crate::vector::{Correction, Syndrome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,16 +55,24 @@ impl BpOsdDecoder {
         }
 
         let snapshot = run_minimum_sum(&self.pcm, syndrome, &self.prior_llrs, &self.config);
-        if snapshot.residual_weight != 0 {
-            return Err(DecodeError::BpDidNotConverge);
+        if snapshot.residual_weight == 0 {
+            return Ok(DecodeResult {
+                correction: snapshot.hard_decision,
+                converged: snapshot.converged,
+                bp_iterations: snapshot.iterations,
+                used_osd: false,
+                residual_syndrome_weight: snapshot.residual_weight,
+            });
         }
 
+        let correction = decode_osd0(&self.pcm, syndrome, &snapshot.reliability)?;
+
         Ok(DecodeResult {
-            correction: snapshot.hard_decision,
+            correction,
             converged: snapshot.converged,
             bp_iterations: snapshot.iterations,
-            used_osd: false,
-            residual_syndrome_weight: snapshot.residual_weight,
+            used_osd: true,
+            residual_syndrome_weight: 0,
         })
     }
 }
