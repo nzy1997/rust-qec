@@ -28,3 +28,24 @@ fn minimum_sum_decodes_a_single_flip_without_osd() {
         Correction::from(vec![true, false, false, false, false])
     );
 }
+
+#[test]
+fn minimum_sum_keeps_a_converged_solution_when_early_stop_is_disabled() {
+    let pcm =
+        ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![0, 1, 2]]).unwrap();
+    let config = DecoderConfig {
+        early_stop: false,
+        ..DecoderConfig::default()
+    };
+    let decoder = BpOsdDecoder::new(pcm.clone(), ChannelModel::Bsc { error_rate: 0.05 }, config)
+        .unwrap();
+
+    let syndrome = Syndrome::from(vec![false, true]);
+    let result = decoder.decode(&syndrome).unwrap();
+
+    assert!(result.converged);
+    assert!(!result.used_osd);
+    assert_eq!(result.residual_syndrome_weight, 0);
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+    assert_eq!(result.correction, Correction::from(vec![false, false, true]));
+}

@@ -30,6 +30,7 @@ pub(crate) fn run_minimum_sum(
     let mut c_to_v: Vec<Vec<f64>> = (0..pcm.num_checks())
         .map(|check| vec![0.0; pcm.row_neighbors(check).len()])
         .collect();
+    let mut best = None;
     let mut posterior_llrs = prior_llrs.to_vec();
     let mut hard_decision = Correction::from(
         posterior_llrs
@@ -124,6 +125,7 @@ pub(crate) fn run_minimum_sum(
             if config.early_stop {
                 return snapshot;
             }
+            best = Some(snapshot);
         }
 
         for check in 0..pcm.num_checks() {
@@ -133,11 +135,11 @@ pub(crate) fn run_minimum_sum(
         }
     }
 
-    BpSnapshot {
+    best.unwrap_or_else(|| BpSnapshot {
         hard_decision,
         reliability: posterior_llrs.iter().map(|value| value.abs()).collect(),
         iterations: config.max_bp_iterations,
         converged: residual_weight == 0,
         residual_weight,
-    }
+    })
 }
