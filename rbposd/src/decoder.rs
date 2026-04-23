@@ -55,14 +55,6 @@ impl BpOsdDecoder {
                     residual_syndrome_weight: 0,
                 });
             }
-
-            return Ok(DecodeResult {
-                correction: Correction::zero(self.pcm.num_bits()),
-                converged: true,
-                bp_iterations: 0,
-                used_osd: false,
-                residual_syndrome_weight: 0,
-            });
         }
 
         let snapshot = run_minimum_sum(&self.pcm, syndrome, &self.prior_llrs, &self.config);

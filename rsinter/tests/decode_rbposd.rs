@@ -83,3 +83,14 @@ fn rbposd_dem_decoder_handles_exact_probability_terms() {
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
+
+#[test]
+fn rbposd_dem_decoder_handles_zero_syndrome_map_cases() {
+    let dem = DetectorErrorModel::parse("error(0.9) D0 L0\nerror(0.2) D0\n").unwrap();
+    let decoder = RbposdDemDecoder::new(DecoderConfig::default());
+    let compiled = decoder.compile_for_dem(&dem);
+
+    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0000], 1, 1, 1);
+
+    assert_eq!(predictions, vec![0b0000_0001]);
+}

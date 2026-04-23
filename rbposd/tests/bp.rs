@@ -70,3 +70,23 @@ fn zero_syndrome_can_return_a_prior_favored_nullspace_correction() {
     assert_eq!(result.correction, Correction::from(vec![true, true]));
     assert_eq!(pcm.multiply(&result.correction), syndrome);
 }
+
+#[test]
+fn zero_syndrome_falls_back_to_bp_or_osd_when_hard_decision_is_invalid() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::BitFlipProbabilities(vec![0.9, 0.2]),
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let syndrome = Syndrome::from(vec![false]);
+    let result = decoder.decode(&syndrome).unwrap();
+
+    assert!(result.converged);
+    assert!(!result.used_osd);
+    assert_eq!(result.residual_syndrome_weight, 0);
+    assert_eq!(result.correction, Correction::from(vec![true, true]));
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+}
