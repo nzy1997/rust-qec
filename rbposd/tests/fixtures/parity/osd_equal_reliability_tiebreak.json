@@ -1,0 +1,31 @@
+{
+  "name": "osd_equal_reliability_tiebreak",
+  "matrix": {
+    "num_checks": 2,
+    "num_bits": 3,
+    "rows": [[0, 1], [1, 2]]
+  },
+  "channel": {
+    "kind": "bit_flip_probabilities",
+    "probabilities": [0.1, 0.1, 0.3]
+  },
+  "syndrome": [true, false],
+  "config": {
+    "max_bp_iterations": 0,
+    "early_stop": true,
+    "bp_variant": "minimum_sum",
+    "schedule": "parallel",
+    "osd_variant": "osd0"
+  },
+  "expected": {
+    "status": "success",
+    "correction": [true, false, false],
+    "diagnostics": {
+      "converged": false,
+      "bp_iterations": 0,
+      "used_osd": true,
+      "residual_syndrome_weight": 0
+    }
+  },
+  "tags": ["static-baseline", "osd", "tiebreak"]
+}

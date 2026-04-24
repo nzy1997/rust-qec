@@ -36,3 +36,17 @@ Reference fixtures:
 - Small 2-check / 3-bit code that is solved by `OSD_0` when BP is disabled.
 - Small sparse non-identity matrix built from sparse columns to verify
   constructor symmetry.
+
+## Parity Fixture Baseline
+
+Static parity fixtures live in `rbposd/tests/fixtures/parity/`.
+
+Seed cases:
+
+- `bp_repetition_single_flip.json`
+- `osd_small_sparse_code.json`
+- `osd_equal_reliability_tiebreak.json`
+
+Checked-in fixtures must include an `expected` outcome copied from the Python
+`ldpc` reference behavior. Dynamically generated scan cases may omit
+`expected`.

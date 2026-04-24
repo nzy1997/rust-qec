@@ -1,0 +1,30 @@
+{
+  "name": "bp_repetition_single_flip",
+  "matrix": {
+    "num_checks": 4,
+    "num_bits": 5,
+    "rows": [[0, 1], [1, 2], [2, 3], [3, 4]]
+  },
+  "channel": {
+    "kind": "bsc",
+    "error_rate": 0.05
+  },
+  "syndrome": [true, false, false, false],
+  "config": {
+    "max_bp_iterations": 30,
+    "early_stop": true,
+    "bp_variant": "minimum_sum",
+    "schedule": "parallel",
+    "osd_variant": "osd0"
+  },
+  "expected": {
+    "status": "success",
+    "correction": [true, false, false, false, false],
+    "diagnostics": {
+      "converged": true,
+      "used_osd": false,
+      "residual_syndrome_weight": 0
+    }
+  },
+  "tags": ["static-baseline", "bp-only"]
+}
