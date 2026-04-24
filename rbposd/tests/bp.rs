@@ -1,4 +1,7 @@
-use rbposd::{BpOsdDecoder, ChannelModel, Correction, DecoderConfig, ParityCheckMatrix, Syndrome};
+use rbposd::{
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix,
+    Syndrome,
+};
 
 fn repetition_pcm() -> ParityCheckMatrix {
     ParityCheckMatrix::from_sparse_rows(4, 5, vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]])
@@ -89,4 +92,61 @@ fn zero_syndrome_falls_back_to_bp_or_osd_when_hard_decision_is_invalid() {
     assert_eq!(result.residual_syndrome_weight, 0);
     assert_eq!(result.correction, Correction::from(vec![true, true]));
     assert_eq!(pcm.multiply(&result.correction), syndrome);
+}
+
+#[test]
+fn decoder_rejects_syndrome_and_channel_dimension_mismatches() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::Bsc { error_rate: 0.05 },
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let err = decoder.decode(&Syndrome::from(vec![true, false])).unwrap_err();
+    assert_eq!(
+        err,
+        DecodeError::DimensionMismatch {
+            what: "syndrome",
+            expected: 1,
+            actual: 2,
+        }
+    );
+
+    let err = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.1]),
+        DecoderConfig::default(),
+    )
+    .unwrap_err();
+    assert_eq!(
+        err,
+        DecodeError::DimensionMismatch {
+            what: "channel probabilities",
+            expected: 2,
+            actual: 1,
+        }
+    );
+}
+
+#[test]
+fn decoder_rejects_invalid_probability_inputs() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+
+    let err = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::Bsc { error_rate: 0.0 },
+        DecoderConfig::default(),
+    )
+    .unwrap_err();
+    assert_eq!(err, DecodeError::InvalidProbability);
+
+    let err = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.1, 1.0]),
+        DecoderConfig::default(),
+    )
+    .unwrap_err();
+    assert_eq!(err, DecodeError::InvalidProbability);
 }

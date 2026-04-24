@@ -283,4 +283,21 @@ mod tests {
         assert_eq!(probabilities, vec![0.25]);
         assert_eq!(observable_columns, vec![vec![0]]);
     }
+
+    #[test]
+    fn repeat_shift_and_annotation_instructions_lower_with_offsets() {
+        let dem = DetectorErrorModel::parse(
+            "repeat 2 {\n    error(0.25) D0 D0 D1 D2 L0 L0\n    shift_detectors 3\n    detector(5, 0) D0\n    logical_observable L0\n}\n",
+        )
+        .unwrap();
+
+        let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
+            dem_to_matrix_problem(&dem);
+
+        assert_eq!(num_dets, 7);
+        assert_eq!(num_obs, 1);
+        assert_eq!(detector_columns, vec![vec![1, 2], vec![4, 5]]);
+        assert_eq!(probabilities, vec![0.25, 0.25]);
+        assert_eq!(observable_columns, vec![Vec::<usize>::new(), Vec::<usize>::new()]);
+    }
 }

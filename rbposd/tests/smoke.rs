@@ -1,4 +1,4 @@
-use rbposd::{BpVariant, ChannelModel, DecodeError, DecoderConfig, OsdVariant, Schedule};
+use rbposd::{BpVariant, ChannelModel, Correction, DecodeError, DecoderConfig, OsdVariant, Schedule};
 
 #[test]
 fn decoder_config_default_contract() {
@@ -33,4 +33,41 @@ fn decode_error_contract() {
 
     fn takes_std_error(_: &dyn std::error::Error) {}
     takes_std_error(&e);
+}
+
+#[test]
+fn correction_helpers_and_error_display_cover_remaining_contracts() {
+    let zero = Correction::zero(3);
+    assert_eq!(zero.len(), 3);
+    assert_eq!(zero.as_slice(), &[false, false, false]);
+
+    assert_eq!(
+        DecodeError::EmptyMatrix.to_string(),
+        "parity-check matrix is empty"
+    );
+    assert_eq!(
+        DecodeError::InvalidProbability.to_string(),
+        "invalid probability value"
+    );
+    assert_eq!(
+        DecodeError::DimensionMismatch {
+            what: "syndrome",
+            expected: 2,
+            actual: 3,
+        }
+        .to_string(),
+        "dimension mismatch for syndrome: expected 2, got 3"
+    );
+    assert_eq!(
+        DecodeError::SingularSystem.to_string(),
+        "singular system cannot satisfy the target syndrome"
+    );
+    assert_eq!(
+        DecodeError::BpDidNotConverge.to_string(),
+        "belief propagation did not converge"
+    );
+    assert_eq!(
+        DecodeError::NoOsdSolution.to_string(),
+        "no OSD solution found"
+    );
 }
