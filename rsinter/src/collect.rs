@@ -61,7 +61,7 @@ pub fn collect(
                     .expect("decoder not found")
                     .compile_for_dem(&task.dem);
 
-                let num_dets = task.dem.num_detectors();
+                let num_dets = task.dem.effective_num_detectors();
                 let num_obs = task.dem.num_observables();
                 let obs_bytes_per_shot = (num_obs + 7) / 8;
 

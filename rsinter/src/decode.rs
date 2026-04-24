@@ -1,5 +1,7 @@
 use rstim::dem::DetectorErrorModel;
 
+pub use crate::rbposd_adapter::RbposdDemDecoder;
+
 pub trait CompiledDecoder: Send {
     /// Decode bit-packed detection events into bit-packed observable predictions.
     /// `dets`: `num_shots * ceil(num_dets/8)` bytes, b8 format.
