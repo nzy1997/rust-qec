@@ -13,8 +13,8 @@ fn checked_in_parity_fixtures_match_exact_expected_outputs() {
     for case in parity_schema::load_cases(&fixture_dir) {
         let report = parity_runner::run_case(&case);
         assert_eq!(
-            report.matches_expected,
-            Some(true),
+            report.expected.as_ref(),
+            Some(&report.actual),
             "case={} expected={:?} actual={:?}",
             report.name,
             report.expected,
@@ -26,10 +26,29 @@ fn checked_in_parity_fixtures_match_exact_expected_outputs() {
 #[test]
 fn parity_fixture_directory_contains_the_seed_contract_cases() {
     let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
+    let mut files: Vec<String> = fs::read_dir(&fixture_dir)
+        .unwrap()
+        .map(|entry| {
+            entry
+                .unwrap()
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    files.sort();
 
-    assert!(fixture_dir.join("bp_repetition_single_flip.json").exists());
-    assert!(fixture_dir.join("osd_small_sparse_code.json").exists());
-    assert!(fixture_dir.join("osd_equal_reliability_tiebreak.json").exists());
+    assert_eq!(
+        files,
+        vec![
+            "bp_repetition_single_flip.json",
+            "osd_equal_reliability_tiebreak.json",
+            "osd_small_sparse_code.json",
+        ]
+    );
 }
 
 #[test]

@@ -22,6 +22,7 @@
     "correction": [true, false, false, false, false],
     "diagnostics": {
       "converged": true,
+      "bp_iterations": 2,
       "used_osd": false,
       "residual_syndrome_weight": 0
     }
