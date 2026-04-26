@@ -18,8 +18,8 @@ jobs:
       - name: Run static fixture parity tests
         run: cargo test -p rbposd --test reference --test parity_cli --test tooling
       - name: Run rbposd parity harness
-        run: python3 rbposd/scripts/parity_harness.py --repo-root . --json-output rbposd-parity-report.json
-      - name: Upload parity report artifact
+        run: python3 rbposd/scripts/parity_harness.py --repo-root . --fixtures-dir rbposd/tests/fixtures/parity --json-output rbposd-parity-report.json
+      - name: Upload parity report
         uses: actions/upload-artifact@v4
         with:
           name: rbposd-parity-report
