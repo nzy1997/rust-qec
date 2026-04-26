@@ -6,6 +6,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+REAL_MISMATCH_CLASSES = {
+    "status_mismatch",
+    "error_mismatch",
+    "correction_mismatch",
+}
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -104,10 +110,21 @@ def run_rust_case(repo_root: Path, case_path: Path) -> dict[str, Any]:
         check=False,
     )
     if completed.returncode != 0:
+        stdout = completed.stdout.strip()
+        stderr = completed.stderr.strip()
         raise RuntimeError(
-            f"parity_driver failed for {case_path}: {completed.stderr.strip()}"
+            f"parity_driver failed for {case_path} with exit code "
+            f"{completed.returncode}. stdout={stdout!r} stderr={stderr!r}"
         )
-    return json.loads(completed.stdout)
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        stdout = completed.stdout.strip()
+        stderr = completed.stderr.strip()
+        raise RuntimeError(
+            f"parity_driver produced invalid JSON for {case_path}: {error}. "
+            f"stdout={stdout!r} stderr={stderr!r}"
+        ) from error
 
 
 def map_config_to_ldpc_kwargs(config: dict[str, Any]) -> dict[str, Any]:
@@ -168,13 +185,19 @@ def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
     elif channel["kind"] == "bit_flip_probabilities":
         decoder_kwargs["error_channel"] = list(channel["probabilities"])
     else:
-        return {"status": "error", "error": "UnsupportedChannel"}
+        return {
+            "status": "error",
+            "error": f"UnsupportedChannel(kind={channel.get('kind')})",
+        }
 
     try:
         decoder = BpOsdDecoder(matrix, **decoder_kwargs)
         correction_arr = decoder.decode(syndrome)
     except Exception as error:  # pragma: no cover - exercised by full harness runs
-        return {"status": "error", "error": type(error).__name__}
+        return {
+            "status": "error",
+            "error": f"{type(error).__name__}: {error}",
+        }
 
     correction = [bool(int(value)) for value in correction_arr.tolist()]
     syndrome_bool = [bool(bit) for bit in syndrome.tolist()]
@@ -211,12 +234,18 @@ def classify_mismatch(
     if rust_actual.get("status") == "success":
         if rust_actual.get("correction") != python_actual.get("correction"):
             return "correction_mismatch"
+        if rust_actual.get("diagnostics") != python_actual.get("diagnostics"):
+            return "diagnostics_mismatch"
         return "exact_match"
     if rust_actual.get("status") == "error":
         if rust_actual.get("error") != python_actual.get("error"):
             return "error_mismatch"
         return "exact_match"
     return "payload_mismatch"
+
+
+def is_real_mismatch(classification: str) -> bool:
+    return classification in REAL_MISMATCH_CLASSES
 
 
 def build_entries(
@@ -274,7 +303,7 @@ def build_entries(
                 "name": case["name"],
                 "source": item["source"],
                 "mismatch_classification": classification,
-                "is_mismatch": classification != "exact_match",
+                "is_mismatch": is_real_mismatch(classification),
                 "rust_actual": rust_actual,
                 "python_actual": python_actual,
                 "tags": case.get("tags", []),
@@ -294,6 +323,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     mismatch_count = sum(1 for entry in entries if entry["is_mismatch"])
     total_count = len(entries)
+
+    for entry in entries:
+        classification = entry["mismatch_classification"]
+        if classification == "exact_match":
+            continue
+        suffix = ""
+        if classification == "diagnostics_mismatch":
+            suffix = " (diagnostics drift only; not counted as mismatch)"
+        print(f"{entry['name']}: {classification}{suffix}")
 
     if args.json_output is not None:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
