@@ -6,6 +6,7 @@ from unittest import mock
 from parity_harness import (
     build_entries,
     classify_mismatch,
+    is_real_mismatch,
     iter_generated_cases,
     map_config_to_ldpc_kwargs,
     matrix_to_dense,
@@ -87,6 +88,16 @@ class ParityHarnessTests(unittest.TestCase):
         self.assertEqual(
             classify_mismatch(rust_actual, python_actual), "diagnostics_mismatch"
         )
+
+    def test_classify_mismatch_payload_mismatch(self) -> None:
+        rust_actual = {"status": "unexpected_payload_shape"}
+        python_actual = {"status": "unexpected_payload_shape"}
+        self.assertEqual(
+            classify_mismatch(rust_actual, python_actual), "payload_mismatch"
+        )
+
+    def test_payload_mismatch_counts_as_real_mismatch(self) -> None:
+        self.assertTrue(is_real_mismatch("payload_mismatch"))
 
     def test_matrix_to_dense(self) -> None:
         matrix = {

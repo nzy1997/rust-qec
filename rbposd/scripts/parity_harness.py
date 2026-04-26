@@ -10,6 +10,7 @@ REAL_MISMATCH_CLASSES = {
     "status_mismatch",
     "error_mismatch",
     "correction_mismatch",
+    "payload_mismatch",
 }
 
 

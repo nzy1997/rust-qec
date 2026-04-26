@@ -47,6 +47,12 @@ Seed cases:
 - `osd_small_sparse_code.json`
 - `osd_equal_reliability_tiebreak.json`
 
-Checked-in fixtures must include an `expected` outcome copied from the Python
-`ldpc` reference behavior. Dynamically generated scan cases may omit
-`expected`.
+Checked-in fixtures are the exact Rust stability baseline and are enforced by
+reference tests in this repository.
+
+Python `ldpc` is used by `rbposd/scripts/parity_harness.py` as a differential
+comparison baseline for correction parity against the same cases.
+
+Diagnostics drift (`diagnostics_mismatch`) is reported separately as
+informational and does not fail parity on its own unless status or correction
+parity also changes.
