@@ -110,6 +110,45 @@ def run_rust_case(repo_root: Path, case_path: Path) -> dict[str, Any]:
     return json.loads(completed.stdout)
 
 
+def map_config_to_ldpc_kwargs(config: dict[str, Any]) -> dict[str, Any]:
+    bp_variant = config.get("bp_variant")
+    bp_method_map = {
+        "minimum_sum": "minimum_sum",
+    }
+    if bp_variant not in bp_method_map:
+        raise ValueError(f"Unsupported bp_variant: {bp_variant}")
+
+    schedule = config.get("schedule")
+    schedule_map = {
+        "parallel": "parallel",
+    }
+    if schedule not in schedule_map:
+        raise ValueError(f"Unsupported schedule: {schedule}")
+
+    osd_variant = config.get("osd_variant")
+    osd_method_map = {
+        "osd0": "OSD_0",
+    }
+    if osd_variant not in osd_method_map:
+        raise ValueError(f"Unsupported osd_variant: {osd_variant}")
+
+    early_stop = config.get("early_stop")
+    if early_stop is not True:
+        raise ValueError(
+            f"Unsupported early_stop value: {early_stop}. "
+            "Python ldpc parity harness currently requires early_stop=true."
+        )
+
+    return {
+        "max_iter": int(config["max_bp_iterations"]),
+        "bp_method": bp_method_map[bp_variant],
+        "schedule": schedule_map[schedule],
+        "osd_method": osd_method_map[osd_variant],
+        "osd_order": 0,
+        "input_vector_type": "syndrome",
+    }
+
+
 def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
     import numpy as np
     from ldpc import BpOsdDecoder
@@ -119,14 +158,10 @@ def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
     config = case["config"]
     channel = case["channel"]
 
-    decoder_kwargs: dict[str, Any] = {
-        "max_iter": int(config["max_bp_iterations"]),
-        "bp_method": "minimum_sum",
-        "schedule": "parallel",
-        "osd_method": "osd0",
-        "osd_order": 0,
-        "input_vector_type": "syndrome",
-    }
+    try:
+        decoder_kwargs = map_config_to_ldpc_kwargs(config)
+    except ValueError as error:
+        return {"status": "error", "error": str(error)}
 
     if channel["kind"] == "bsc":
         decoder_kwargs["error_rate"] = float(channel["error_rate"])
