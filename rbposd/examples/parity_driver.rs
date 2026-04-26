@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::fs;
 use std::process::ExitCode;
 
+#[allow(dead_code)]
 #[path = "../dev/parity_schema.rs"]
 mod parity_schema;
 #[path = "../dev/parity_runner.rs"]
@@ -14,8 +15,29 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    let case = parity_schema::load_case(Path::new(&case_path));
+    let contents = match fs::read_to_string(&case_path) {
+        Ok(contents) => contents,
+        Err(err) => {
+            eprintln!("failed to read {}: {err}", case_path);
+            return ExitCode::FAILURE;
+        }
+    };
+    let case: parity_schema::ParityCase = match serde_json::from_str(&contents) {
+        Ok(case) => case,
+        Err(err) => {
+            eprintln!("failed to parse {}: {err}", case_path);
+            return ExitCode::FAILURE;
+        }
+    };
     let report = parity_runner::run_case(&case);
-    println!("{}", serde_json::to_string_pretty(&report).unwrap());
-    ExitCode::SUCCESS
+    match serde_json::to_string_pretty(&report) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("failed to serialize report: {err}");
+            ExitCode::FAILURE
+        }
+    }
 }
