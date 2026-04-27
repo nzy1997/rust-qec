@@ -62,9 +62,10 @@ fn task_6_documentation_surfaces_exist() {
     assert!(profile_example.exists(), "missing {}", profile_example.display());
 
     let lib_contents = fs::read_to_string(&lib_rs).unwrap();
+    let lib_rs_display = lib_rs.display().to_string();
     assert!(
         lib_contents.contains("use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};"),
         "missing crate-level usage example in {}",
-        lib_rs.display()
+        lib_rs_display
     );
 }

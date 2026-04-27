@@ -54,10 +54,11 @@ fn parity_driver_runs_case_and_prints_json_report() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
+    let status_code = output.status.code();
     assert!(
         output.status.success(),
         "parity_driver failed\nstatus={:?}\nstdout=\n{}\nstderr=\n{}",
-        output.status.code(),
+        status_code,
         stdout,
         stderr
     );
@@ -68,10 +69,11 @@ fn parity_driver_runs_case_and_prints_json_report() {
         report["actual"]["correction"],
         serde_json::json!([true, false, false])
     );
+    let matches_expected = report["matches_expected"].clone();
     assert!(
-        report["matches_expected"].is_null() || report["matches_expected"] == true,
+        matches_expected.is_null() || matches_expected == true,
         "unexpected matches_expected value: {}",
-        report["matches_expected"]
+        matches_expected
     );
 }
 
