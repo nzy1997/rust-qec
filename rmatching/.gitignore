@@ -1,7 +1,5 @@
-/Stim/
-/yao-rs/
-/ldpc/
 /.worktrees/
+PyMatching/
 
 Cargo.lock
 
@@ -9,12 +7,11 @@ Cargo.lock
 
 /target
 .cursor/
+__pycache__/
+*.py[cod]
 
 # Coverage reports
 cobertura.xml
 
 # Build artifacts
 *.rlib
-
-drafts/
-.DS_Store
