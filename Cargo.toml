@@ -1,3 +1,3 @@
 [workspace]
-members = ["rstim", "rsinter", "rbposd"]
+members = ["rstim", "rsinter", "rbposd", "rmatching"]
 resolver = "3"
