@@ -1,62 +1,54 @@
 use std::fs;
 use std::path::PathBuf;
 
-use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};
+#[path = "../dev/parity_runner.rs"]
+mod parity_runner;
+#[path = "../dev/parity_schema.rs"]
+mod parity_schema;
 
-struct ReferenceCase {
-    name: &'static str,
-    pcm: ParityCheckMatrix,
-    channel: ChannelModel,
-    syndrome: Syndrome,
-    expect_osd: bool,
-    max_bp_iterations: Option<usize>,
-}
+#[test]
+fn checked_in_parity_fixtures_match_exact_expected_outputs() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
 
-fn repetition_pcm() -> ParityCheckMatrix {
-    ParityCheckMatrix::from_sparse_rows(4, 5, vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]])
-        .unwrap()
-}
-
-fn reference_cases() -> Vec<ReferenceCase> {
-    vec![
-        ReferenceCase {
-            name: "bp repetition single flip",
-            pcm: repetition_pcm(),
-            channel: ChannelModel::Bsc { error_rate: 0.05 },
-            syndrome: Syndrome::from(vec![true, false, false, false]),
-            expect_osd: false,
-            max_bp_iterations: None,
-        },
-        ReferenceCase {
-            name: "osd fallback small sparse code",
-            pcm: ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap(),
-            channel: ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]),
-            syndrome: Syndrome::from(vec![true, false]),
-            expect_osd: true,
-            max_bp_iterations: Some(0),
-        },
-    ]
+    for case in parity_schema::load_cases(&fixture_dir) {
+        let report = parity_runner::run_case(&case);
+        assert_eq!(
+            report.expected.as_ref(),
+            Some(&report.actual),
+            "case={} expected={:?} actual={:?}",
+            report.name,
+            report.expected,
+            report.actual
+        );
+    }
 }
 
 #[test]
-fn reference_contract_loop_matches_plan_cases() {
-    for case in reference_cases() {
-        let mut config = DecoderConfig::default();
-        if let Some(max_bp_iterations) = case.max_bp_iterations {
-            config.max_bp_iterations = max_bp_iterations;
-        }
+fn parity_fixture_directory_contains_the_seed_contract_cases() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
+    let mut files: Vec<String> = fs::read_dir(&fixture_dir)
+        .unwrap()
+        .map(|entry| {
+            entry
+                .unwrap()
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    files.sort();
 
-        let decoder = BpOsdDecoder::new(case.pcm.clone(), case.channel.clone(), config).unwrap();
-        let result = decoder.decode(&case.syndrome).unwrap();
-
-        assert_eq!(result.used_osd, case.expect_osd, "case={}", case.name);
-        assert_eq!(
-            case.pcm.multiply(&result.correction),
-            case.syndrome,
-            "case={}",
-            case.name
-        );
-    }
+    assert_eq!(
+        files,
+        vec![
+            "bp_repetition_single_flip.json",
+            "osd_equal_reliability_tiebreak.json",
+            "osd_small_sparse_code.json",
+        ]
+    );
 }
 
 #[test]
@@ -70,9 +62,10 @@ fn task_6_documentation_surfaces_exist() {
     assert!(profile_example.exists(), "missing {}", profile_example.display());
 
     let lib_contents = fs::read_to_string(&lib_rs).unwrap();
+    let lib_rs_display = lib_rs.display().to_string();
     assert!(
         lib_contents.contains("use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};"),
         "missing crate-level usage example in {}",
-        lib_rs.display()
+        lib_rs_display
     );
 }

@@ -1,0 +1,26 @@
+name: rbposd parity
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Python parity dependencies
+        run: python3 -m pip install -r rbposd/scripts/requirements-parity.txt
+      - name: Run static fixture parity tests
+        run: cargo test -p rbposd --test reference --test parity_cli --test tooling
+      - name: Run rbposd parity harness
+        run: python3 rbposd/scripts/parity_harness.py --repo-root . --fixtures-dir rbposd/tests/fixtures/parity --json-output rbposd-parity-report.json
+      - name: Upload parity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbposd-parity-report
+          path: rbposd-parity-report.json
