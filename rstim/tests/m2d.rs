@@ -147,6 +147,15 @@ fn m2d_ran_without_feedback_compensates_simple_classical_x_feedback() {
 }
 
 #[test]
+fn m2d_counts_loss_visible_measurement_bits() {
+    let instrs = parse_lines("ML 0\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n").unwrap();
+    let meas = single_shot_table(2, &[true, true]);
+    let out = measurements_to_detections(&instrs, &meas).unwrap();
+    assert!(out.detections.get(0, 0));
+    assert!(out.detections.get(1, 0));
+}
+
+#[test]
 fn run_m2d_with_options_matches_default_wrapper() {
     let circuit = "R 0\nM 0\nDETECTOR rec[-1]";
     let data = b"1\n";

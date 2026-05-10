@@ -32,6 +32,18 @@ fn num_measurements_mpp() {
 }
 
 #[test]
+fn num_measurements_loss_visible_single_qubit_family() {
+    let instrs = parse_lines("ML 0\nMRXL 1 2\n").unwrap();
+    assert_eq!(stats::num_measurements(&instrs), 6);
+}
+
+#[test]
+fn loss_does_not_count_as_measurement() {
+    let instrs = parse_lines("LOSS(0.25) 0 1 2\nM 0\n").unwrap();
+    assert_eq!(stats::num_measurements(&instrs), 1);
+}
+
+#[test]
 fn num_detectors_simple() {
     let instrs = parse_lines("M 0\nDETECTOR rec[-1]\nDETECTOR rec[-1]").unwrap();
     assert_eq!(stats::num_detectors(&instrs), 2);
