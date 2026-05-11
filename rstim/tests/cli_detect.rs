@@ -125,3 +125,13 @@ fn detect_obs_out_and_append_observables_both_work() {
     assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "11");
     assert_eq!(std::fs::read_to_string(&obs_path).unwrap().trim(), "1");
 }
+
+#[test]
+fn detect_loss_visible_measurement_can_feed_detector() {
+    let output = run_with_stdin(
+        &["detect", "--shots", "1"],
+        "LOSS(1) 0\nML 0\nDETECTOR rec[-2]\n",
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "1");
+}

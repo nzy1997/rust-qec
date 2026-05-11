@@ -9,6 +9,13 @@ fn run(program: &str) -> Vec<bool> {
     ex.run(&mut rng).unwrap().measurements
 }
 
+fn run_seed(program: &str, seed: u64) -> Vec<bool> {
+    let instrs = parse_lines(program).unwrap();
+    let mut ex = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(seed);
+    ex.run(&mut rng).unwrap().measurements
+}
+
 #[test]
 fn i_error_is_noop() {
     let m = run("I_ERROR(0.1) 0 1\nM 0 1\n");
@@ -255,6 +262,51 @@ fn heralded_pauli_channel_1_deterministic_y() {
     let mut rng = StdRng::seed_from_u64(42);
     let out = ex.run(&mut rng).unwrap();
     assert_eq!(out.measurements, vec![true, true]); // herald=true, Y|0⟩→|1⟩
+}
+
+#[test]
+fn loss_default_measurement_reads_as_one() {
+    let m = run("LOSS(1) 0\nM 0\n");
+    assert_eq!(m, vec![true]);
+}
+
+#[test]
+fn loss_skips_single_qubit_gate_until_reset() {
+    let m = run("LOSS(1) 0\nX 0\nM 0\nR 0\nX 0\nM 0\n");
+    assert_eq!(m, vec![true, true]);
+}
+
+#[test]
+fn loss_skips_only_affected_pair_in_multi_pair_gate() {
+    let m = run("X 2\nLOSS(1) 1\nCX 0 1 2 3\nM 1 3\n");
+    assert_eq!(m, vec![true, true]);
+}
+
+#[test]
+fn mr_on_lost_qubit_reports_one_and_recovers() {
+    let m = run("LOSS(1) 0\nMR 0\nM 0\n");
+    assert_eq!(m, vec![true, false]);
+}
+
+#[test]
+fn ml_reports_loss_flag_then_value_bit() {
+    let m = run("R 0\nML 0\nLOSS(1) 1\nML 1\n");
+    assert_eq!(m, vec![false, false, true, true]);
+}
+
+#[test]
+fn mrl_reports_loss_and_recovers_for_followup_measurement() {
+    let m = run("LOSS(1) 0\nMRL 0\nM 0\n");
+    assert_eq!(m, vec![true, true, false]);
+}
+
+#[test]
+fn loss_channel_is_seeded_but_independent_per_target() {
+    let a = run_seed("LOSS(0.5) 0 1 2 3\nM 0 1 2 3\n", 7);
+    let b = run_seed("LOSS(0.5) 0 1 2 3\nM 0 1 2 3\n", 7);
+    assert_eq!(a, b);
+    assert!(a.iter().any(|&bit| bit));
+    assert!(a.iter().any(|&bit| !bit));
 }
 
 #[test]

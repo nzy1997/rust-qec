@@ -130,6 +130,28 @@ fn analyze_errors_rejects_unsupported_correlated_block() {
 }
 
 #[test]
+fn analyze_errors_rejects_atom_loss_instruction() {
+    let output = run_with_stdin(
+        &["analyze_errors"],
+        "LOSS(0.1) 0\nM 0\nDETECTOR rec[-1]",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unsupported instruction LOSS"));
+}
+
+#[test]
+fn analyze_errors_rejects_loss_visible_measurement() {
+    let output = run_with_stdin(
+        &["analyze_errors"],
+        "ML 0\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unsupported instruction ML"));
+}
+
+#[test]
 fn analyze_errors_allow_gauge_detectors_flag_accepts_gauge_circuit() {
     let output = run_with_stdin(
         &["analyze_errors", "--allow_gauge_detectors"],

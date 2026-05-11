@@ -22,3 +22,35 @@ fn parses_detector_with_rec() {
         _ => panic!("expected Op"),
     }
 }
+
+#[test]
+fn parses_loss_instruction() {
+    let instrs = parse_lines("LOSS(0.125) 0 2\n").unwrap();
+    match &instrs[0] {
+        StimInstr::Op { name, args, targets, .. } => {
+            assert_eq!(name, "LOSS");
+            assert_eq!(args, &[0.125]);
+            assert_eq!(targets, &vec![StimTarget::Qubit(0), StimTarget::Qubit(2)]);
+        }
+        _ => panic!("expected Op"),
+    }
+}
+
+#[test]
+fn parses_loss_visible_measurements() {
+    let instrs = parse_lines("ML 0\nMRXL !1\n").unwrap();
+    match &instrs[0] {
+        StimInstr::Op { name, targets, .. } => {
+            assert_eq!(name, "ML");
+            assert_eq!(targets, &vec![StimTarget::Qubit(0)]);
+        }
+        _ => panic!("expected Op"),
+    }
+    match &instrs[1] {
+        StimInstr::Op { name, targets, .. } => {
+            assert_eq!(name, "MRXL");
+            assert_eq!(targets, &vec![StimTarget::QubitInv(1)]);
+        }
+        _ => panic!("expected Op"),
+    }
+}

@@ -84,3 +84,13 @@ fn sample_skip_reference_sample_matches_default_on_zero_reference() {
     assert!(skipped_out.status.success(), "stderr: {}", String::from_utf8_lossy(&skipped_out.stderr));
     assert_eq!(default_out.stdout, skipped_out.stdout);
 }
+
+#[test]
+fn sample_loss_visible_measurements_expand_output_bits() {
+    let output = run_with_stdin(
+        &["sample", "--shots", "1", "--seed", "42"],
+        "LOSS(1) 0\nML 0\n",
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "11");
+}

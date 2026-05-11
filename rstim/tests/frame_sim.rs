@@ -84,6 +84,13 @@ fn reference_sample_reset() {
 }
 
 #[test]
+fn reference_sample_loss_is_noiseless_but_ml_adds_extra_bits() {
+    let instrs = parse_lines("LOSS(1) 0\nML 0\nMRXL 1\n").unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample, vec![false, false, false, false]);
+}
+
+#[test]
 fn reference_sample_with_sweep_bits_applies_cy_control() {
     let instrs = parse_lines("R 0\nCY sweep[0] 0\nM 0\n").unwrap();
     let inactive = reference_sample_with_sweep_bits(&instrs, Some(&[false])).unwrap();
@@ -326,5 +333,21 @@ fn sample_batch_repeat() {
         for m_idx in 0..3 {
             assert_eq!(out.measurements.get(m_idx, shot), true);
         }
+    }
+}
+
+#[test]
+fn sample_batch_loss_uses_executor_semantics() {
+    let instrs = parse_lines("LOSS(1) 0\nML 0\nMRL 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 8, &mut rng).unwrap();
+    assert_eq!(out.measurements.num_major(), 5);
+    for shot in 0..8 {
+        assert_eq!(out.measurements.get(0, shot), true);
+        assert_eq!(out.measurements.get(1, shot), true);
+        assert_eq!(out.measurements.get(2, shot), true);
+        assert_eq!(out.measurements.get(3, shot), true);
+        assert_eq!(out.measurements.get(4, shot), false);
+        assert_eq!(out.detections.get(0, shot), false);
     }
 }

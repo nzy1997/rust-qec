@@ -191,6 +191,20 @@ fn repetition_code_style() {
 }
 
 #[test]
+fn atom_loss_instruction_is_rejected_by_error_analyzer() {
+    let result = circuit_to_dem_err("LOSS(0.1) 0\nM 0\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("unsupported instruction LOSS"));
+}
+
+#[test]
+fn loss_visible_measurement_is_rejected_by_error_analyzer() {
+    let result = circuit_to_dem_err("ML 0\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("unsupported instruction ML"));
+}
+
+#[test]
 fn swap_gate_swaps_sensitivities() {
     let dem = circuit_to_dem(
         "R 0 1\nX_ERROR(0.1) 0\nSWAP 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]"

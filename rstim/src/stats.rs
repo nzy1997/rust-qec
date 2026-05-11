@@ -72,6 +72,7 @@ pub fn num_qubits(instrs: &[StimInstr]) -> usize {
 }
 
 /// Total measurement count. M/MX/MY/MZ/MR/MRX/MRY/MRZ produce 1 per target;
+/// ML/MXL/MYL/MZL/MRL/MRXL/MRYL/MRZL produce 2 per target;
 /// MPP produces 1 per Pauli product; MXX/MYY/MZZ produce 1 per pair;
 /// MPAD produces its arg count; HERALDED_* produce 1 per target.
 pub fn num_measurements(instrs: &[StimInstr]) -> usize {
@@ -86,6 +87,9 @@ pub fn num_measurements(instrs: &[StimInstr]) -> usize {
             } => {
                 count += match name.as_str() {
                     "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => targets.len(),
+                    "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
+                        2 * targets.len()
+                    }
                     "MPP" => targets
                         .split(|t| matches!(t, crate::ir::StimTarget::Combiner))
                         .filter(|g| !g.is_empty())
