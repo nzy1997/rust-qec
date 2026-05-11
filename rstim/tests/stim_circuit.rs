@@ -237,6 +237,16 @@ fn str_roundtrip_complex() {
     assert_eq!(s, s2);
 }
 
+#[test]
+fn str_roundtrip_atom_loss_sampling_ops() {
+    let input = "LOSS(0.125) 0 2\nML 0\nMRXL !1\nM 2";
+    let instrs = parse_lines(input).unwrap();
+    let s = circuit_to_string(&instrs);
+    let re_parsed = parse_lines(&s).unwrap();
+    let s2 = circuit_to_string(&re_parsed);
+    assert_eq!(s, s2);
+}
+
 // ========== repeat_validation ==========
 
 #[test]

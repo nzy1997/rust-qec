@@ -1439,6 +1439,12 @@ fn count_measurements(instrs: &[StimInstr]) -> usize {
                         .filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
                         .count();
                 }
+                "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
+                    count += 2 * targets
+                        .iter()
+                        .filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+                        .count();
+                }
                 "MPAD" => {
                     count += targets.len();
                 }
