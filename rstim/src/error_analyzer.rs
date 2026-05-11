@@ -1443,7 +1443,7 @@ fn count_measurements(instrs: &[StimInstr]) -> usize {
                     count += 2 * targets
                         .iter()
                         .filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
-                        .count();
+                        .count()
                 }
                 "MPAD" => {
                     count += targets.len();
@@ -2036,6 +2036,141 @@ mod internal_branch_tests {
                 DemTarget::Detector(2),
             ]
         );
+    }
+
+    #[test]
+    fn count_qubits_counts_repeat_bodies() {
+        let instrs = vec![StimInstr::Repeat {
+            count: 3,
+            body: vec![StimInstr::new("M", vec![], vec![StimTarget::Qubit(4)])],
+        }];
+
+        assert_eq!(count_qubits(&instrs), 5);
+    }
+
+    #[test]
+    fn count_measurements_counts_loss_visible_measurements() {
+        let instrs = vec![StimInstr::Repeat {
+            count: 2,
+            body: vec![StimInstr::new(
+                "ML",
+                vec![],
+                vec![StimTarget::Qubit(0), StimTarget::QubitInv(1)],
+            )],
+        }];
+
+        assert_eq!(count_measurements(&instrs), 8);
+    }
+
+    #[test]
+    fn count_annotations_counts_repeat_bodies() {
+        let instrs = vec![StimInstr::Repeat {
+            count: 3,
+            body: vec![
+                StimInstr::new("DETECTOR", vec![1.0, 2.0], vec![StimTarget::Rec(-1)]),
+                StimInstr::new("OBSERVABLE_INCLUDE", vec![0.0], vec![StimTarget::Rec(-1)]),
+            ],
+        }];
+
+        assert_eq!(count_annotations(&instrs, "DETECTOR"), 3);
+        assert_eq!(count_annotations(&instrs, "OBSERVABLE_INCLUDE"), 3);
+    }
+
+    #[test]
+    fn collect_detector_annotations_inner_counts_repeat_bodies() {
+        let instrs = vec![StimInstr::Repeat {
+            count: 2,
+            body: vec![
+                StimInstr::new("SHIFT_COORDS", vec![1.0, -2.0], vec![]),
+                StimInstr::new("DETECTOR", vec![0.5], vec![StimTarget::Rec(-1)]),
+            ],
+        }];
+        let mut result = Vec::new();
+        let mut det_index = 0;
+
+        collect_detector_annotations_inner(&instrs, &mut result, &mut det_index);
+
+        assert_eq!(det_index, 2);
+        assert_eq!(
+            result,
+            vec![
+                DemInstruction::ShiftDetectors {
+                    detector_offset: 0,
+                    coord_offsets: vec![1.0, -2.0],
+                },
+                DemInstruction::Detector {
+                    index: 0,
+                    coords: vec![0.5],
+                },
+                DemInstruction::ShiftDetectors {
+                    detector_offset: 0,
+                    coord_offsets: vec![1.0, -2.0],
+                },
+                DemInstruction::Detector {
+                    index: 1,
+                    coords: vec![0.5],
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn undo_circuit_repeats_body() {
+        let mut analyzer = make_analyzer(0, 0);
+        let instrs = vec![StimInstr::Repeat {
+            count: 2,
+            body: vec![StimInstr::new("TICK", vec![], vec![])],
+        }];
+
+        analyzer.undo_circuit(&instrs).unwrap();
+        assert!(analyzer.errors.is_empty());
+    }
+
+    #[test]
+    fn decompose_errors_merges_duplicate_rewritten_components() {
+        let mut dem = DetectorErrorModel::new();
+        dem.push(DemInstruction::Error {
+            probability: 0.1,
+            targets: vec![DemTarget::Detector(0), DemTarget::Detector(1)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.2,
+            targets: vec![DemTarget::Detector(2)],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.3,
+            targets: vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ],
+        });
+        dem.push(DemInstruction::Error {
+            probability: 0.4,
+            targets: vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ],
+        });
+
+        decompose_errors(&mut dem).unwrap();
+
+        let merged_targets = vec![
+            DemTarget::Detector(0),
+            DemTarget::Detector(1),
+            DemTarget::Separator,
+            DemTarget::Detector(2),
+        ];
+        let merged_probability = 0.3 + 0.4 - 2.0 * 0.3 * 0.4;
+        assert!(dem.instructions().iter().any(|instr| {
+            matches!(
+                instr,
+                DemInstruction::Error { probability, targets }
+                    if (*probability - merged_probability).abs() < 1e-12
+                        && *targets == merged_targets
+            )
+        }));
     }
 
     #[test]

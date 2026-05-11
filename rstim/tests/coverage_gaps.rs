@@ -1,9 +1,9 @@
 //! Targeted tests for remaining coverage gaps.
-use rstim::parser::parse_lines;
-use rstim::executor::Executor;
-use rstim::sampler::sample_batch;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::executor::Executor;
+use rstim::parser::parse_lines;
+use rstim::sampler::sample_batch;
 
 // --- executor.rs: CZ (lines 72-73) ---
 #[test]
@@ -32,12 +32,14 @@ fn executor_qubit_coords_bad_target() {
     // QUBIT_COORDS with rec target should error
     let result = parse_lines("QUBIT_COORDS(0) rec[-1]");
     // parser may reject this; if not, executor should
-    assert!(result.is_err() || {
-        let instrs = result.unwrap();
-        let mut exec = Executor::from_instrs(instrs).unwrap();
-        let mut rng = StdRng::seed_from_u64(0);
-        exec.run(&mut rng).is_err()
-    });
+    assert!(
+        result.is_err() || {
+            let instrs = result.unwrap();
+            let mut exec = Executor::from_instrs(instrs).unwrap();
+            let mut rng = StdRng::seed_from_u64(0);
+            exec.run(&mut rng).is_err()
+        }
+    );
 }
 
 // --- executor.rs: sweep in qubits() (line 780-781) ---
@@ -91,8 +93,8 @@ fn recorder_edge_cases() {
     use rstim::recorder::Recorder;
     let mut r = Recorder::default();
     r.push(true);
-    assert_eq!(r.rec(1), None);   // positive offset
-    assert_eq!(r.rec(-5), None);  // out of range
+    assert_eq!(r.rec(1), None); // positive offset
+    assert_eq!(r.rec(-5), None); // out of range
     assert_eq!(r.rec(-1), Some(true));
 }
 
@@ -172,8 +174,8 @@ fn frame_sim_detector_with_ref_parity() {
 // --- explain_errors.rs: REPEAT path (lines 64-69) via DEM with repeat ---
 #[test]
 fn explain_errors_dem_with_repeat() {
-    use rstim::explain_errors::explain;
     use rstim::error_analyzer::ErrorAnalyzer;
+    use rstim::explain_errors::explain;
     // Circuit with REPEAT produces DEM with REPEAT block
     let circuit = "REPEAT 2 {\n  X_ERROR(0.1) 0\n  M 0\n  DETECTOR rec[-1]\n}";
     let instrs = parse_lines(circuit).unwrap();
@@ -187,8 +189,8 @@ fn explain_errors_dem_with_repeat() {
 // --- explain_errors.rs: empty DEM (line 28 — None branch) ---
 #[test]
 fn explain_errors_empty_dem() {
-    use rstim::explain_errors::explain;
     use rstim::dem::DetectorErrorModel;
+    use rstim::explain_errors::explain;
     let dem = DetectorErrorModel::new();
     let explanations = explain(&dem, &[0]);
     assert!(explanations.is_empty());
@@ -256,6 +258,123 @@ fn unrotated_surface_code_z_with_noise() {
         matches!(i, StimInstr::Op { name, .. } if name == "DEPOLARIZE1" || name == "DEPOLARIZE2")
     });
     assert!(has_noise);
+}
+
+#[test]
+fn loss_visible_variants_cover_executor_paths() {
+    let circuit = "LOSS(1) 0\n\
+                   MXL 0\n\
+                   LOSS(1) 0\n\
+                   MYL 0\n\
+                   LOSS(1) 0\n\
+                   MRXL 0\n\
+                   LOSS(1) 0\n\
+                   MRYL 0\n\
+                   LOSS(1) 0 1\n\
+                   MPP X0*X1\n\
+                   MXX 0 1\n\
+                   MYY 0 1\n\
+                   MZZ 0 1\n";
+    let instrs = parse_lines(circuit).unwrap();
+
+    let mut exec = Executor::from_instrs(instrs.clone()).unwrap();
+    let mut rng = StdRng::seed_from_u64(0);
+    let out = exec.run(&mut rng).unwrap();
+    assert_eq!(out.measurements.len(), 12);
+    assert!(out.measurements.iter().all(|&b| b));
+}
+
+#[test]
+fn loss_visible_variants_cover_reference_sample_paths() {
+    use rstim::executor::reference_sample;
+
+    let circuit = "H 0\n\
+                   MXL 0\n\
+                   H 0\n\
+                   S 0\n\
+                   MYL 0\n\
+                   H 0\n\
+                   MRXL 0\n\
+                   MRXL 0\n\
+                   H 0\n\
+                   S 0\n\
+                   MRYL 0\n\
+                   MRYL 0\n\
+                   H 0\n\
+                   H 1\n\
+                   MPP X0*X1\n\
+                   H 0\n\
+                   H 1\n\
+                   MXX 0 1\n\
+                   H 0\n\
+                   S 0\n\
+                   H 1\n\
+                   S 1\n\
+                   MYY 0 1\n\
+                   MZZ 0 1\n";
+    let instrs = parse_lines(circuit).unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    assert_eq!(ref_sample.len(), 16);
+    assert!(ref_sample.iter().all(|&b| !b));
+}
+
+#[test]
+fn sample_batch_recurses_into_loss_visible_repeat() {
+    let instrs = parse_lines("REPEAT 2 {\n  LOSS(1) 0\n  ML 0\n}\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(0);
+    let out = sample_batch(&instrs, 1, &mut rng).unwrap();
+    assert_eq!(out.measurements.num_major(), 4);
+    for m in 0..4 {
+        assert!(out.measurements.get(m, 0));
+    }
+}
+
+#[test]
+fn parser_accepts_empty_arg_lists_with_and_without_tags() {
+    let plain = parse_lines("X_ERROR() 0\n").unwrap();
+    match &plain[0] {
+        rstim::ir::StimInstr::Op {
+            name,
+            args,
+            targets,
+            ..
+        } => {
+            assert_eq!(name, "X_ERROR");
+            assert!(args.is_empty());
+            assert_eq!(targets, &vec![rstim::ir::StimTarget::Qubit(0)]);
+        }
+        _ => panic!("expected Op"),
+    }
+
+    let tagged = parse_lines("X_ERROR[LEAK]() 0\n").unwrap();
+    match &tagged[0] {
+        rstim::ir::StimInstr::Op {
+            name,
+            tag,
+            args,
+            targets,
+            ..
+        } => {
+            assert_eq!(name, "X_ERROR");
+            assert_eq!(tag.as_deref(), Some("LEAK"));
+            assert!(args.is_empty());
+            assert_eq!(targets, &vec![rstim::ir::StimTarget::Qubit(0)]);
+        }
+        _ => panic!("expected Op"),
+    }
+}
+
+#[test]
+fn m2d_detector_ignores_non_rec_targets() {
+    use rstim::m2d::measurements_to_detections;
+    use rstim::sim::bit_table::BitTable;
+
+    let instrs = parse_lines("R 0\nM 0\nDETECTOR rec[-1] 0\n").unwrap();
+    let mut meas = BitTable::new(1, 1);
+    meas.set(0, 0, false);
+    let out = measurements_to_detections(&instrs, &meas).unwrap();
+    assert_eq!(out.detections.num_major(), 1);
+    assert!(!out.detections.get(0, 0));
 }
 
 // --- error_analyzer.rs: empty MPP product (lines 635-636) ---

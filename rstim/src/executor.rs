@@ -35,7 +35,12 @@ impl Executor {
 
         for instr in &self.instrs {
             match instr {
-                StimInstr::Op { name, args, targets, .. } => {
+                StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } => {
                     match name.as_str() {
                         "I" | "I_ERROR" | "II_ERROR" => {}
                         "H" => for_each_present_qubit(targets, &lost, |q| state.h(q))?,
@@ -58,86 +63,104 @@ impl Executor {
                         "Z" => for_each_present_qubit(targets, &lost, |q| state.z_gate(q))?,
                         "C_XYZ" => for_each_present_qubit(targets, &lost, |q| state.c_xyz(q))?,
                         "C_ZYX" => for_each_present_qubit(targets, &lost, |q| state.c_zyx(q))?,
-                        "C_NXYZ" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_nxyz(q))?
-                        }
-                        "C_NZYX" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_nzyx(q))?
-                        }
-                        "C_XNYZ" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_xnyz(q))?
-                        }
-                        "C_XYNZ" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_xynz(q))?
-                        }
-                        "C_ZNYX" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_znyx(q))?
-                        }
-                        "C_ZYNX" => {
-                            for_each_present_qubit(targets, &lost, |q| state.c_zynx(q))?
-                        }
+                        "C_NXYZ" => for_each_present_qubit(targets, &lost, |q| state.c_nxyz(q))?,
+                        "C_NZYX" => for_each_present_qubit(targets, &lost, |q| state.c_nzyx(q))?,
+                        "C_XNYZ" => for_each_present_qubit(targets, &lost, |q| state.c_xnyz(q))?,
+                        "C_XYNZ" => for_each_present_qubit(targets, &lost, |q| state.c_xynz(q))?,
+                        "C_ZNYX" => for_each_present_qubit(targets, &lost, |q| state.c_znyx(q))?,
+                        "C_ZYNX" => for_each_present_qubit(targets, &lost, |q| state.c_zynx(q))?,
                         "H_NXY" => for_each_present_qubit(targets, &lost, |q| state.h_nxy(q))?,
                         "H_NXZ" => for_each_present_qubit(targets, &lost, |q| state.h_nxz(q))?,
                         "H_NYZ" => for_each_present_qubit(targets, &lost, |q| state.h_nyz(q))?,
                         "CX" | "CNOT" | "ZCX" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (c, t) in pairs { state.cx(c, t); }
+                            for (c, t) in pairs {
+                                state.cx(c, t);
+                            }
                         }
                         "CY" | "ZCY" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (c, t) in pairs { state.cy(c, t); }
+                            for (c, t) in pairs {
+                                state.cy(c, t);
+                            }
                         }
                         "CZ" | "ZCZ" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (c, t) in pairs { state.cz(c, t); }
+                            for (c, t) in pairs {
+                                state.cz(c, t);
+                            }
                         }
                         "XCX" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.xcx(a, b); }
+                            for (a, b) in pairs {
+                                state.xcx(a, b);
+                            }
                         }
                         "XCY" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.xcy(a, b); }
+                            for (a, b) in pairs {
+                                state.xcy(a, b);
+                            }
                         }
                         "XCZ" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.xcz(a, b); }
+                            for (a, b) in pairs {
+                                state.xcz(a, b);
+                            }
                         }
                         "YCX" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.ycx(a, b); }
+                            for (a, b) in pairs {
+                                state.ycx(a, b);
+                            }
                         }
                         "YCY" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.ycy(a, b); }
+                            for (a, b) in pairs {
+                                state.ycy(a, b);
+                            }
                         }
                         "YCZ" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.ycz(a, b); }
+                            for (a, b) in pairs {
+                                state.ycz(a, b);
+                            }
                         }
                         "SWAP" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.swap(a, b); }
+                            for (a, b) in pairs {
+                                state.swap(a, b);
+                            }
                         }
                         "ISWAP" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.iswap(a, b); }
+                            for (a, b) in pairs {
+                                state.iswap(a, b);
+                            }
                         }
                         "ISWAP_DAG" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.iswap_dag(a, b); }
+                            for (a, b) in pairs {
+                                state.iswap_dag(a, b);
+                            }
                         }
                         "CXSWAP" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.cxswap(a, b); }
+                            for (a, b) in pairs {
+                                state.cxswap(a, b);
+                            }
                         }
                         "SWAPCX" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.swapcx(a, b); }
+                            for (a, b) in pairs {
+                                state.swapcx(a, b);
+                            }
                         }
                         "CZSWAP" => {
                             let pairs = present_qubit_pairs(targets, &lost)?;
-                            for (a, b) in pairs { state.czswap(a, b); }
+                            for (a, b) in pairs {
+                                state.czswap(a, b);
+                            }
                         }
                         "M" | "MZ" => {
                             for (q, inv) in qubits_with_inversion(targets)? {
@@ -156,38 +179,17 @@ impl Executor {
                         }
                         "MR" | "MRZ" => {
                             for (q, inv) in qubits_with_inversion(targets)? {
-                                measure_reset_z(
-                                    &mut state,
-                                    &mut lost,
-                                    q,
-                                    inv,
-                                    rng,
-                                    &mut recorder,
-                                );
+                                measure_reset_z(&mut state, &mut lost, q, inv, rng, &mut recorder);
                             }
                         }
                         "MRX" => {
                             for (q, inv) in qubits_with_inversion(targets)? {
-                                measure_reset_x(
-                                    &mut state,
-                                    &mut lost,
-                                    q,
-                                    inv,
-                                    rng,
-                                    &mut recorder,
-                                );
+                                measure_reset_x(&mut state, &mut lost, q, inv, rng, &mut recorder);
                             }
                         }
                         "MRY" => {
                             for (q, inv) in qubits_with_inversion(targets)? {
-                                measure_reset_y(
-                                    &mut state,
-                                    &mut lost,
-                                    q,
-                                    inv,
-                                    rng,
-                                    &mut recorder,
-                                );
+                                measure_reset_y(&mut state, &mut lost, q, inv, rng, &mut recorder);
                             }
                         }
                         "ML" | "MZL" => {
@@ -414,11 +416,7 @@ impl Executor {
                             let p = args.first().copied().unwrap_or(0.0);
                             let products = split_pauli_products(targets)?;
                             for product in &products {
-                                let mut bit = if product
-                                    .terms
-                                    .iter()
-                                    .any(|(q, _)| lost[*q])
-                                {
+                                let mut bit = if product.terms.iter().any(|(q, _)| lost[*q]) {
                                     true
                                 } else {
                                     measure_pauli_product(
@@ -464,13 +462,26 @@ impl Executor {
                             }
                         }
                         "PAULI_CHANNEL_2" => {
-                            let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                            let probs: Vec<f64> = (0..15)
+                                .map(|i| args.get(i).copied().unwrap_or(0.0))
+                                .collect();
                             let pairs = present_qubit_pairs(targets, &lost)?;
                             let paulis: [(u8, u8); 15] = [
-                                (0, 1), (0, 2), (0, 3),
-                                (1, 0), (1, 1), (1, 2), (1, 3),
-                                (2, 0), (2, 1), (2, 2), (2, 3),
-                                (3, 0), (3, 1), (3, 2), (3, 3),
+                                (0, 1),
+                                (0, 2),
+                                (0, 3),
+                                (1, 0),
+                                (1, 1),
+                                (1, 2),
+                                (1, 3),
+                                (2, 0),
+                                (2, 1),
+                                (2, 2),
+                                (2, 3),
+                                (3, 0),
+                                (3, 1),
+                                (3, 2),
+                                (3, 3),
                             ];
                             for (a, b) in pairs {
                                 let r: f64 = rng.r#gen();
@@ -602,8 +613,21 @@ fn ref_sample_instrs(
 ) -> Result<(), String> {
     for instr in instrs {
         match instr {
-            StimInstr::Op { name, args, targets, .. } => {
-                ref_sample_op(state, lost, measurements, name.as_str(), args, targets, sweep_bits)?;
+            StimInstr::Op {
+                name,
+                args,
+                targets,
+                ..
+            } => {
+                ref_sample_op(
+                    state,
+                    lost,
+                    measurements,
+                    name.as_str(),
+                    args,
+                    targets,
+                    sweep_bits,
+                )?;
             }
             StimInstr::Repeat { count, body } => {
                 for _ in 0..*count {
@@ -664,40 +688,64 @@ fn ref_sample_op(
             apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
         }
         "XCX" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.xcx(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.xcx(a, b);
+            }
         }
         "XCY" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.xcy(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.xcy(a, b);
+            }
         }
         "XCZ" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.xcz(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.xcz(a, b);
+            }
         }
         "YCX" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.ycx(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.ycx(a, b);
+            }
         }
         "YCY" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.ycy(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.ycy(a, b);
+            }
         }
         "YCZ" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.ycz(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.ycz(a, b);
+            }
         }
         "SWAP" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.swap(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.swap(a, b);
+            }
         }
         "ISWAP" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.iswap(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.iswap(a, b);
+            }
         }
         "ISWAP_DAG" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.iswap_dag(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.iswap_dag(a, b);
+            }
         }
         "CXSWAP" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.cxswap(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.cxswap(a, b);
+            }
         }
         "SWAPCX" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.swapcx(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.swapcx(a, b);
+            }
         }
         "CZSWAP" => {
-            for (a, b) in present_qubit_pairs(targets, lost)? { state.czswap(a, b); }
+            for (a, b) in present_qubit_pairs(targets, lost)? {
+                state.czswap(a, b);
+            }
         }
 
         // Measurements (biased)
@@ -787,59 +835,39 @@ fn ref_sample_op(
                 state.reset_y_biased(q);
             }
         }
-        "LOSS" => {
-            for _q in qubits(targets)? {}
-        }
+        "LOSS" => for _q in qubits(targets)? {},
 
         // Multi-qubit Pauli measurements (biased)
         "MPP" => {
             let products = split_pauli_products(targets)?;
             for product in &products {
-                let bit = if product.terms.iter().any(|(q, _)| lost[*q]) {
-                    true
-                } else {
-                    measure_pauli_product_biased(
-                        state,
-                        &product.terms,
-                        product.inverted,
-                    )
-                };
+                let bit = reference_measure_pauli_product_biased(
+                    state,
+                    lost,
+                    &product.terms,
+                    product.inverted,
+                );
                 measurements.push(bit);
             }
         }
         "MXX" => {
             let pairs = qubits_with_inversion_pairs(targets)?;
             for ((a, inv_a), (b, _)) in pairs {
-                let bit = if lost[a] || lost[b] {
-                    true ^ inv_a
-                } else {
-                    let terms = vec![(a, PauliBasis::X), (b, PauliBasis::X)];
-                    measure_pauli_product_biased(state, &terms, inv_a)
-                };
+                let bit = reference_measure_pair_biased(state, lost, a, b, PauliBasis::X, inv_a);
                 measurements.push(bit);
             }
         }
         "MYY" => {
             let pairs = qubits_with_inversion_pairs(targets)?;
             for ((a, inv_a), (b, _)) in pairs {
-                let bit = if lost[a] || lost[b] {
-                    true ^ inv_a
-                } else {
-                    let terms = vec![(a, PauliBasis::Y), (b, PauliBasis::Y)];
-                    measure_pauli_product_biased(state, &terms, inv_a)
-                };
+                let bit = reference_measure_pair_biased(state, lost, a, b, PauliBasis::Y, inv_a);
                 measurements.push(bit);
             }
         }
         "MZZ" => {
             let pairs = qubits_with_inversion_pairs(targets)?;
             for ((a, inv_a), (b, _)) in pairs {
-                let bit = if lost[a] || lost[b] {
-                    true ^ inv_a
-                } else {
-                    let terms = vec![(a, PauliBasis::Z), (b, PauliBasis::Z)];
-                    measure_pauli_product_biased(state, &terms, inv_a)
-                };
+                let bit = reference_measure_pair_biased(state, lost, a, b, PauliBasis::Z, inv_a);
                 measurements.push(bit);
             }
         }
@@ -866,17 +894,28 @@ fn ref_sample_op(
         }
 
         // Noise instructions: skip
-        "X_ERROR" | "Z_ERROR" | "Y_ERROR"
-        | "DEPOLARIZE1" | "DEPOLARIZE2"
-        | "CORRELATED_ERROR" | "E" | "ELSE_CORRELATED_ERROR"
-        | "PAULI_CHANNEL_1" | "PAULI_CHANNEL_2"
-        | "I_ERROR" | "II_ERROR" => {}
+        "X_ERROR"
+        | "Z_ERROR"
+        | "Y_ERROR"
+        | "DEPOLARIZE1"
+        | "DEPOLARIZE2"
+        | "CORRELATED_ERROR"
+        | "E"
+        | "ELSE_CORRELATED_ERROR"
+        | "PAULI_CHANNEL_1"
+        | "PAULI_CHANNEL_2"
+        | "I_ERROR"
+        | "II_ERROR" => {}
 
         // Metadata: skip
-        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS"
-        | "DETECTOR" | "OBSERVABLE_INCLUDE" => {}
+        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => {}
 
-        _ => return Err(format!("reference_sample: unsupported instruction {}", name)),
+        _ => {
+            return Err(format!(
+                "reference_sample: unsupported instruction {}",
+                name
+            ));
+        }
     }
     Ok(())
 }
@@ -940,7 +979,11 @@ fn measure_pauli_product_biased(
     }
 
     let anchor = terms.last().unwrap().0;
-    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    let non_anchor: Vec<usize> = terms
+        .iter()
+        .map(|&(q, _)| q)
+        .filter(|&q| q != anchor)
+        .collect();
     for &q in &non_anchor {
         state.cx(q, anchor);
     }
@@ -961,6 +1004,35 @@ fn measure_pauli_product_biased(
     }
 
     result
+}
+
+fn reference_measure_pauli_product_biased(
+    state: &mut StabilizerState,
+    lost: &[bool],
+    terms: &[(usize, PauliBasis)],
+    inverted: bool,
+) -> bool {
+    if terms.iter().any(|(q, _)| lost[*q]) {
+        true
+    } else {
+        measure_pauli_product_biased(state, terms, inverted)
+    }
+}
+
+fn reference_measure_pair_biased(
+    state: &mut StabilizerState,
+    lost: &[bool],
+    a: usize,
+    b: usize,
+    basis: PauliBasis,
+    inverted: bool,
+) -> bool {
+    if lost[a] || lost[b] {
+        true ^ inverted
+    } else {
+        let terms = [(a, basis), (b, basis)];
+        measure_pauli_product_biased(state, &terms, inverted)
+    }
 }
 
 fn recorder_bits(r: Recorder) -> Vec<bool> {
@@ -1023,7 +1095,9 @@ fn qubits_with_inversion(targets: &[StimTarget]) -> Result<Vec<(usize, bool)>, S
     Ok(out)
 }
 
-fn qubits_with_inversion_pairs(targets: &[StimTarget]) -> Result<Vec<((usize, bool), (usize, bool))>, String> {
+fn qubits_with_inversion_pairs(
+    targets: &[StimTarget],
+) -> Result<Vec<((usize, bool), (usize, bool))>, String> {
     let flat = qubits_with_inversion(targets)?;
     if flat.len() % 2 != 0 {
         return Err("odd number of targets for pair measurement".to_string());
@@ -1048,7 +1122,9 @@ fn for_each_present_qubit<F: FnMut(usize)>(
 fn expect_qubit(t: &StimTarget) -> Result<usize, String> {
     match t {
         StimTarget::Qubit(q) => Ok(*q as usize),
-        StimTarget::QubitInv(_) => Err("inverted qubit target only valid for measurement".to_string()),
+        StimTarget::QubitInv(_) => {
+            Err("inverted qubit target only valid for measurement".to_string())
+        }
         StimTarget::Sweep(_) => Err("sweep[] target unexpected here".to_string()),
         _ => Err("expected qubit target".to_string()),
     }
@@ -1070,7 +1146,10 @@ fn qubit_pairs(targets: &[StimTarget]) -> Result<Vec<(usize, usize)>, String> {
     Ok(out)
 }
 
-fn present_qubit_pairs(targets: &[StimTarget], lost: &[bool]) -> Result<Vec<(usize, usize)>, String> {
+fn present_qubit_pairs(
+    targets: &[StimTarget],
+    lost: &[bool],
+) -> Result<Vec<(usize, usize)>, String> {
     Ok(qubit_pairs(targets)?
         .into_iter()
         .filter(|(a, b)| !lost[*a] && !lost[*b])
@@ -1526,7 +1605,11 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
 
     for target in targets {
         match target {
-            StimTarget::Pauli { qubit, basis, inverted: inv } => {
+            StimTarget::Pauli {
+                qubit,
+                basis,
+                inverted: inv,
+            } => {
                 if !after_combiner && !current_terms.is_empty() {
                     products.push(PauliProduct {
                         terms: std::mem::take(&mut current_terms),
@@ -1547,7 +1630,10 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
         }
     }
     if !current_terms.is_empty() {
-        products.push(PauliProduct { terms: current_terms, inverted });
+        products.push(PauliProduct {
+            terms: current_terms,
+            inverted,
+        });
     }
     Ok(products)
 }
@@ -1573,7 +1659,11 @@ fn measure_pauli_product(
 
     // CX fold: chain all qubits' Z parity onto anchor (last qubit)
     let anchor = terms.last().unwrap().0;
-    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    let non_anchor: Vec<usize> = terms
+        .iter()
+        .map(|&(q, _)| q)
+        .filter(|&q| q != anchor)
+        .collect();
     for &q in &non_anchor {
         state.cx(q, anchor);
     }
@@ -1618,7 +1708,11 @@ fn apply_spp(
     }
 
     let anchor = terms.last().unwrap().0;
-    let non_anchor: Vec<usize> = terms.iter().map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+    let non_anchor: Vec<usize> = terms
+        .iter()
+        .map(|&(q, _)| q)
+        .filter(|&q| q != anchor)
+        .collect();
     for &q in &non_anchor {
         state.cx(q, anchor);
     }
@@ -1665,4 +1759,101 @@ fn pair_measure(
         recorder.push(bit);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reference_measurement_helpers_return_one_for_lost_qubits() {
+        let mut state = StabilizerState::new(1);
+        let lost = vec![true];
+        let mut measurements = Vec::new();
+
+        record_reference_measure_z(&mut state, &lost, 0, false, &mut measurements);
+        record_reference_measure_x(&mut state, &lost, 0, true, &mut measurements);
+        record_reference_measure_y(&mut state, &lost, 0, false, &mut measurements);
+
+        assert_eq!(measurements, vec![true, false, true]);
+    }
+
+    #[test]
+    fn reference_measure_reset_helpers_clear_loss_and_reset_state() {
+        let mut state = StabilizerState::new(3);
+        let mut lost = vec![true, true, true];
+        let mut measurements = Vec::new();
+
+        reference_measure_reset_z(&mut state, &mut lost, 0, false, &mut measurements);
+        reference_measure_reset_x(&mut state, &mut lost, 1, true, &mut measurements);
+        reference_measure_reset_y(&mut state, &mut lost, 2, false, &mut measurements);
+
+        assert_eq!(measurements, vec![true, false, true]);
+        assert_eq!(lost, vec![false, false, false]);
+
+        let mut post_reset_measurements = Vec::new();
+        record_reference_measure_z(&mut state, &lost, 0, false, &mut post_reset_measurements);
+        record_reference_measure_x(&mut state, &lost, 1, false, &mut post_reset_measurements);
+        record_reference_measure_y(&mut state, &lost, 2, false, &mut post_reset_measurements);
+        assert_eq!(post_reset_measurements, vec![false, false, false]);
+    }
+
+    #[test]
+    fn reference_measure_reset_x_and_y_correct_one_outcomes() {
+        let mut state = StabilizerState::new(2);
+        let mut lost = vec![false, false];
+        let mut measurements = Vec::new();
+
+        state.h(0);
+        state.z_gate(0);
+        reference_measure_reset_x(&mut state, &mut lost, 0, false, &mut measurements);
+
+        state.h(1);
+        state.s_dag(1);
+        reference_measure_reset_y(&mut state, &mut lost, 1, false, &mut measurements);
+
+        assert_eq!(measurements, vec![true, true]);
+
+        let mut post_reset_measurements = Vec::new();
+        record_reference_measure_x(&mut state, &lost, 0, false, &mut post_reset_measurements);
+        record_reference_measure_y(&mut state, &lost, 1, false, &mut post_reset_measurements);
+        assert_eq!(post_reset_measurements, vec![false, false]);
+    }
+
+    #[test]
+    fn reference_multi_pauli_measurements_report_loss() {
+        let mut state = StabilizerState::new(2);
+        let lost = vec![true, false];
+
+        assert!(reference_measure_pauli_product_biased(
+            &mut state,
+            &lost,
+            &[(0, PauliBasis::X), (1, PauliBasis::Y)],
+            true,
+        ));
+        assert!(reference_measure_pair_biased(
+            &mut state,
+            &lost,
+            0,
+            1,
+            PauliBasis::X,
+            false,
+        ));
+        assert!(!reference_measure_pair_biased(
+            &mut state,
+            &lost,
+            0,
+            1,
+            PauliBasis::Y,
+            true,
+        ));
+        assert!(reference_measure_pair_biased(
+            &mut state,
+            &lost,
+            0,
+            1,
+            PauliBasis::Z,
+            false,
+        ));
+    }
 }

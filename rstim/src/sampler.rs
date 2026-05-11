@@ -101,15 +101,7 @@ fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
             StimInstr::Op { name, .. } => {
                 if matches!(
                     name.as_str(),
-                    "LOSS"
-                        | "ML"
-                        | "MXL"
-                        | "MYL"
-                        | "MZL"
-                        | "MRL"
-                        | "MRXL"
-                        | "MRYL"
-                        | "MRZL"
+                    "LOSS" | "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
                 ) {
                     return true;
                 }
@@ -122,4 +114,39 @@ fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    use crate::data_path::ReferenceSampleMode;
+    use crate::ir::StimTarget;
+
+    #[test]
+    fn sample_batch_with_executor_errors_on_reference_sample_mismatch() {
+        let instrs = vec![StimInstr::new("ML", vec![], vec![StimTarget::Sweep(0)])];
+        let mut rng = StdRng::seed_from_u64(0);
+
+        let result = sample_batch_with_executor(
+            &instrs,
+            1,
+            &mut rng,
+            SampleOptions {
+                reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
+            },
+        );
+
+        let err = match result {
+            Ok(_) => panic!("expected reference sample mismatch"),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            err,
+            "executor produced 0 measurements but reference sample expects 2"
+        );
+    }
 }
