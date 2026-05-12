@@ -228,6 +228,14 @@ fn export_json_rejects_invalid_highlight_dem_error_index() {
 }
 
 #[test]
+fn export_json_rejects_seed_without_sample_shot() {
+    let output = run_export_json_with_stdin(&["--seed", "1"], "M 0\n");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--seed is only supported with --sample_shot"));
+}
+
+#[test]
 fn export_json_rejects_sample_shot_with_highlight_dem_error() {
     let output = run_export_json_with_stdin(
         &["--sample_shot", "--highlight_dem_error", "0"],

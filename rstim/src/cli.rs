@@ -712,6 +712,9 @@ fn run_export_json(
     w: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = parse_lines(text)?;
+    if seed.is_some() && !sample_shot {
+        return Err("--seed is only supported with --sample_shot".to_string());
+    }
     if sample_shot && highlight_dem_error.is_some() {
         return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
     }
