@@ -1,8 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::dem::{DemInstruction, DemTarget};
 use crate::dem_provenance::{HighlightRecord, TrackedDemResult};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
+use crate::sample_trace::{MeasurementComponent, MeasurementEvent, SampleTrace};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -173,6 +174,19 @@ pub fn export_qp101(instrs: &[StimInstr]) -> Result<Qp101Document, String> {
         metadata: Some(json!({ "framework": "rstim" })),
         extensions: None,
     })
+}
+
+pub fn export_qp101_with_sample_trace(
+    instrs: &[StimInstr],
+    trace: &SampleTrace,
+) -> Result<Qp101Document, String> {
+    let mut doc = export_qp101(instrs)?;
+
+    add_sample_noise_annotations(&mut doc.operations, trace)?;
+    add_sample_measurement_annotations(&mut doc.operations, trace)?;
+    add_sample_detector_annotations(&mut doc.operations, trace)?;
+
+    Ok(doc)
 }
 
 pub fn export_qp101_with_highlighted_dem_error(
@@ -348,6 +362,30 @@ fn danger_annotation_style() -> Qp101AnnotationStyle {
     }
 }
 
+fn info_annotation_style() -> Qp101AnnotationStyle {
+    Qp101AnnotationStyle {
+        preset: Some("info".to_string()),
+        color: Some("blue".to_string()),
+        highlight: Some(true),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct LossVisibleMeasurementKey {
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+    target_slot: usize,
+    target_qubit: u32,
+    instr_name: String,
+}
+
+#[derive(Debug, Clone)]
+struct LossVisibleMeasurementGroup {
+    key: LossVisibleMeasurementKey,
+    loss_flag: Option<MeasurementEvent>,
+    value: Option<MeasurementEvent>,
+}
+
 #[derive(Debug, Clone)]
 struct QueryAnnotationLocation {
     op_path: Vec<usize>,
@@ -517,6 +555,228 @@ fn collect_query_annotation_locations(
     Ok(())
 }
 
+fn add_sample_noise_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    for event in &trace.noise_events {
+        if !event.occurred {
+            continue;
+        }
+        let branch_label = event.branch_label.as_ref().ok_or_else(|| {
+            format!(
+                "sample trace noise event at {:?} is marked occurred but has no branch label",
+                event.op_path
+            )
+        })?;
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: event.target_slots.clone(),
+                label: Some(branch_label.clone()),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: Some(danger_annotation_style()),
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "noise",
+                    "instr_name": event.instr_name,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "target_qubits": event.target_qubits,
+                    "branch_label": branch_label,
+                })),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn add_sample_measurement_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    let mut grouped = BTreeMap::<LossVisibleMeasurementKey, LossVisibleMeasurementGroup>::new();
+    let mut grouped_order = Vec::new();
+
+    for event in &trace.measurement_events {
+        if is_loss_visible_measurement_op(&event.instr_name) {
+            let key = LossVisibleMeasurementKey {
+                op_path: event.op_path.clone(),
+                repeat_iterations: event.repeat_iterations.clone(),
+                target_slot: event.target_slot,
+                target_qubit: event.target_qubit,
+                instr_name: event.instr_name.clone(),
+            };
+            let group = grouped.entry(key.clone()).or_insert_with(|| {
+                grouped_order.push(key.clone());
+                LossVisibleMeasurementGroup {
+                    key,
+                    loss_flag: None,
+                    value: None,
+                }
+            });
+            match event.component {
+                MeasurementComponent::LossFlag => group.loss_flag = Some(event.clone()),
+                MeasurementComponent::Value => group.value = Some(event.clone()),
+            }
+            continue;
+        }
+
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![event.target_slot],
+                label: Some(format_measurement_label(event)),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: None,
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "measurement",
+                    "instr_name": event.instr_name,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "measurement_index": event.measurement_index,
+                    "target_qubit": event.target_qubit,
+                    "bit": event.bit,
+                    "loss_cause": event.loss_cause,
+                    "component": measurement_component_name(&event.component),
+                })),
+            },
+        )?;
+    }
+
+    for key in grouped_order {
+        let Some(group) = grouped.remove(&key) else {
+            continue;
+        };
+        add_annotation_at_path(
+            operations,
+            &group.key.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![group.key.target_slot],
+                label: Some(format_loss_visible_measurement_label(&group)),
+                text: format_repeat_annotation_text(&group.key.repeat_iterations),
+                style: None,
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(loss_visible_measurement_context(&group)),
+            },
+        )?;
+    }
+
+    Ok(())
+}
+
+fn add_sample_detector_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    for event in &trace.detector_events {
+        if !event.flipped {
+            continue;
+        }
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: Vec::new(),
+                label: Some(format!("D{}", event.detector_index)),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: Some(info_annotation_style()),
+                tags: vec!["dem-symptom".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "detector",
+                    "detector_index": event.detector_index,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "flipped": event.flipped,
+                })),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn is_loss_visible_measurement_op(name: &str) -> bool {
+    matches!(
+        name,
+        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+    )
+}
+
+fn format_measurement_label(event: &MeasurementEvent) -> String {
+    if event.loss_cause {
+        "1[L]".to_string()
+    } else if event.bit {
+        "1".to_string()
+    } else {
+        "0".to_string()
+    }
+}
+
+fn format_loss_visible_measurement_label(group: &LossVisibleMeasurementGroup) -> String {
+    let loss_flag = group
+        .loss_flag
+        .as_ref()
+        .map(|event| if event.bit { "1" } else { "0" })
+        .unwrap_or("?");
+    let value = group
+        .value
+        .as_ref()
+        .map(format_measurement_label)
+        .unwrap_or_else(|| "?".to_string());
+    format!("L={loss_flag} | M={value}")
+}
+
+fn measurement_component_name(component: &MeasurementComponent) -> &'static str {
+    match component {
+        MeasurementComponent::Value => "value",
+        MeasurementComponent::LossFlag => "loss_flag",
+    }
+}
+
+fn loss_visible_measurement_context(group: &LossVisibleMeasurementGroup) -> serde_json::Value {
+    let mut components = serde_json::Map::new();
+    if let Some(loss_flag) = &group.loss_flag {
+        components.insert(
+            "loss_flag".to_string(),
+            json!({
+                "measurement_index": loss_flag.measurement_index,
+                "bit": loss_flag.bit,
+            }),
+        );
+    }
+    if let Some(value) = &group.value {
+        components.insert(
+            "value".to_string(),
+            json!({
+                "measurement_index": value.measurement_index,
+                "bit": value.bit,
+                "loss_cause": value.loss_cause,
+            }),
+        );
+    }
+
+    json!({
+        "query_kind": "sample_trace",
+        "annotation_kind": "measurement",
+        "loss_visible": true,
+        "instr_name": group.key.instr_name,
+        "op_path": group.key.op_path,
+        "repeat_iterations": group.key.repeat_iterations,
+        "target_qubit": group.key.target_qubit,
+        "components": components,
+    })
+}
+
 fn add_annotation_at_path(
     operations: &mut [Qp101Operation],
     op_path: &[usize],
@@ -667,5 +927,6 @@ fn is_noise_op(name: &str) -> bool {
             | "HERALDED_PAULI_CHANNEL_1"
             | "I_ERROR"
             | "II_ERROR"
+            | "LOSS"
     )
 }
