@@ -7,7 +7,7 @@ fn sample_trace_holds_noise_measurement_and_detector_events() {
     let trace = SampleTrace {
         noise_events: vec![NoiseEvent {
             op_path: vec![1],
-            repeat_iterations: vec![0],
+            repeat_iterations: vec![0_u64],
             instr_name: "DEPOLARIZE1".to_string(),
             target_slots: vec![0],
             target_qubits: vec![5],
@@ -16,7 +16,7 @@ fn sample_trace_holds_noise_measurement_and_detector_events() {
         }],
         measurement_events: vec![MeasurementEvent {
             op_path: vec![2],
-            repeat_iterations: vec![0],
+            repeat_iterations: vec![0_u64],
             target_slot: 0,
             target_qubit: 5,
             instr_name: "M".to_string(),
@@ -27,7 +27,7 @@ fn sample_trace_holds_noise_measurement_and_detector_events() {
         }],
         detector_events: vec![DetectorEvent {
             op_path: vec![3],
-            repeat_iterations: vec![0],
+            repeat_iterations: vec![0_u64],
             detector_index: 0,
             flipped: true,
         }],

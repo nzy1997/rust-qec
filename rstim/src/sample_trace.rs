@@ -8,7 +8,7 @@ pub struct SampleTrace {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoiseEvent {
     pub op_path: Vec<usize>,
-    pub repeat_iterations: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
     pub instr_name: String,
     pub target_slots: Vec<usize>,
     pub target_qubits: Vec<u32>,
@@ -19,7 +19,7 @@ pub struct NoiseEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeasurementEvent {
     pub op_path: Vec<usize>,
-    pub repeat_iterations: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
     pub target_slot: usize,
     pub target_qubit: u32,
     pub instr_name: String,
@@ -32,7 +32,7 @@ pub struct MeasurementEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectorEvent {
     pub op_path: Vec<usize>,
-    pub repeat_iterations: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
     pub detector_index: usize,
     pub flipped: bool,
 }
