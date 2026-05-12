@@ -162,8 +162,8 @@ fn export_json_can_highlight_dem_error_origins() {
 #[test]
 fn export_json_can_embed_sample_trace_annotations() {
     let output = run_export_json_with_stdin(
-        &["--sample_shot", "--seed", "1"],
-        "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+        &["--sample_shot", "--seed", "7"],
+        "DEPOLARIZE1(1) 0\nLOSS(1) 1\nM 1\nML 0\nDETECTOR rec[-3]\n",
     );
     assert!(
         output.status.success(),
@@ -172,9 +172,11 @@ fn export_json_can_embed_sample_trace_annotations() {
     );
 
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
-    assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
-    assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+    assert_eq!(value["operations"][0]["annotations"][0]["label"], "X");
+    assert_eq!(value["operations"][1]["annotations"][0]["label"], "L");
+    assert_eq!(value["operations"][2]["annotations"][0]["label"], "1[L]");
+    assert_eq!(value["operations"][3]["annotations"][0]["label"], "L=0 | M=1");
+    assert_eq!(value["operations"][4]["annotations"][0]["label"], "D0");
 }
 
 #[test]
