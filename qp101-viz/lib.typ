@@ -525,7 +525,7 @@
 
 #let noise-policy(op) = {
   let gate = op.at("gate", default: "")
-  if gate == "X_ERROR" or gate == "Z_ERROR" or gate == "DEPOLARIZE1" {
+  if gate == "X_ERROR" or gate == "Z_ERROR" or gate == "DEPOLARIZE1" or gate == "LOSS" {
     return "single"
   }
   if gate == "DEPOLARIZE2" {
@@ -646,6 +646,13 @@
   iteration_starts: iteration_starts,
 )
 
+#let measurement-output-count(gate) = {
+  if gate == "ML" or gate == "MXL" or gate == "MYL" or gate == "MZL" or gate == "MRL" or gate == "MRXL" or gate == "MRYL" or gate == "MRZL" {
+    return 2
+  }
+  1
+}
+
 #let stim-operator-entry(
   op,
   measurements,
@@ -687,7 +694,7 @@
     return none
   }
   let gate = op.at("gate", default: "")
-  if gate != "M" and gate != "MX" and gate != "MR" {
+  if gate != "M" and gate != "MX" and gate != "MY" and gate != "MZ" and gate != "MR" and gate != "MRX" and gate != "MRY" and gate != "MRZ" and gate != "ML" and gate != "MXL" and gate != "MYL" and gate != "MZL" and gate != "MRL" and gate != "MRXL" and gate != "MRYL" and gate != "MRZL" {
     return none
   }
   let out = ()
@@ -696,6 +703,7 @@
       target_index: target_index,
       qubit: qubit,
       gate: gate,
+      output_count: measurement-output-count(gate),
     ))
   }
   out
@@ -830,18 +838,36 @@
         let detailed_targets = ()
         let current_moment_index = moment_base + moments.len()
         for target in measurement_targets {
-          measurement_index += 1
-          let detail = (
-            measurement_index: measurement_index,
-            anchor: "m" + str(measurement_index),
+          let indices = ()
+          for _ in range(target.output_count) {
+            measurement_index += 1
+            let detail = (
+              measurement_index: measurement_index,
+              anchor: "m" + str(measurement_index),
+              moment_index: current_moment_index,
+              render_moment_index: current_moment_index,
+              target_index: target.target_index,
+              qubit: target.qubit,
+              gate: target.gate,
+            )
+            indices.push(measurement_index)
+            measurements.push(detail)
+          }
+          let anchor = if indices.len() == 1 {
+            "m" + str(indices.first())
+          } else {
+            "m" + str(indices.first()) + "-" + str(indices.last())
+          }
+          detailed_targets.push((
+            measurement_index: indices.first(),
+            anchor: anchor,
             moment_index: current_moment_index,
             render_moment_index: current_moment_index,
             target_index: target.target_index,
             qubit: target.qubit,
             gate: target.gate,
-          )
-          detailed_targets.push(detail)
-          measurements.push(detail)
+            output_count: target.output_count,
+          ))
         }
         current = moment-add-main(
           current,
@@ -911,30 +937,28 @@
   dy: top-label-clearance(theme),
 )
 
-#let measurement-gate-labels(target, theme) = ((measurement-anchor-label(target, theme)),)
-
-#let measurement-box-label(target) = {
-  if target.gate == "MX" {
-    return "MX"
+#let measurement-gate-labels(target, theme, marker: none) = {
+  let labels = ((measurement-anchor-label(target, theme)),)
+  for label in operation-marker-labels(marker, theme) {
+    labels.push(label)
   }
-  if target.gate == "MR" {
-    return "MR"
-  }
-  "M"
+  labels
 }
+
+#let measurement-box-label(target) = target.gate
 
 #let measurement-box-width(target, theme) = reserved-gate-width((
   estimated-text-width(measurement-box-label(target), theme.note_font_size, padding: 0.9em),
   estimated-text-width(target.anchor, theme.note_font_size - 1pt, padding: 0.9em),
 ), minimum: 2.2em)
 
-#let measurement-box-gate(target, theme) = tequila.gate(
+#let measurement-box-gate(target, theme, marker: none) = tequila.gate(
   target.qubit,
   text(size: theme.note_font_size, fill: theme.note_color)[#measurement-box-label(target)],
   fill: white,
   stroke: .6pt + theme.note_color,
   width: measurement-box-width(target, theme),
-  label: (measurement-anchor-label(target, theme),),
+  label: measurement-gate-labels(target, theme, marker: marker),
 )
 
 #let light-gate(qubit, label, theme) = tequila.gate(
@@ -1154,11 +1178,13 @@
   let visible = shifted-qubits(gate-qubits(op))
   let gate = op.at("gate")
   let measurement_targets = entry.measurement_targets
+  let matched_annotations = entry-annotations(entry)
 
   if measurement_targets != none {
     let ops = ()
     for target in measurement_targets {
-      ops.push(measurement-box-gate(target, theme))
+      let marker = marker-info-for-slot(matched_annotations, target.target_index)
+      ops.push(measurement-box-gate(target, theme, marker: marker))
     }
     return ops
   }
