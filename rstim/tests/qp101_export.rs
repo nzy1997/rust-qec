@@ -569,6 +569,54 @@ fn export_qp101_with_sample_trace_adds_noise_measurement_and_detector_annotation
 }
 
 #[test]
+fn export_qp101_with_sample_trace_rejects_duplicate_loss_visible_components() {
+    let circuit = parse_lines("MRL 0\n").unwrap();
+    let trace = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 1,
+                bit: true,
+                loss_cause: false,
+                component: MeasurementComponent::LossFlag,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 2,
+                bit: false,
+                loss_cause: false,
+                component: MeasurementComponent::LossFlag,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 3,
+                bit: true,
+                loss_cause: true,
+                component: MeasurementComponent::Value,
+            },
+        ],
+        detector_events: vec![],
+    };
+
+    let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
+    assert!(err.contains("duplicate"));
+    assert!(err.contains("loss_flag"));
+}
+
+#[test]
 fn export_preserves_observable_noise_tags_and_special_targets() {
     let instrs = vec![
         StimInstr::Op {

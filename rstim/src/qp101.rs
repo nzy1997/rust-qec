@@ -619,8 +619,24 @@ fn add_sample_measurement_annotations(
                 }
             });
             match event.component {
-                MeasurementComponent::LossFlag => group.loss_flag = Some(event.clone()),
-                MeasurementComponent::Value => group.value = Some(event.clone()),
+                MeasurementComponent::LossFlag => {
+                    if group.loss_flag.is_some() {
+                        return Err(format!(
+                            "duplicate loss_flag component for loss-visible measurement at {:?} slot {}",
+                            group.key.op_path, group.key.target_slot
+                        ));
+                    }
+                    group.loss_flag = Some(event.clone());
+                }
+                MeasurementComponent::Value => {
+                    if group.value.is_some() {
+                        return Err(format!(
+                            "duplicate value component for loss-visible measurement at {:?} slot {}",
+                            group.key.op_path, group.key.target_slot
+                        ));
+                    }
+                    group.value = Some(event.clone());
+                }
             }
             continue;
         }
@@ -655,17 +671,18 @@ fn add_sample_measurement_annotations(
         let Some(group) = grouped.remove(&key) else {
             continue;
         };
+        let (loss_flag, value) = loss_visible_group_components(&group)?;
         add_annotation_at_path(
             operations,
             &group.key.op_path,
             Qp101Annotation {
                 kind: "marker".to_string(),
                 target_slots: vec![group.key.target_slot],
-                label: Some(format_loss_visible_measurement_label(&group)),
+                label: Some(format_loss_visible_measurement_label(loss_flag, value)),
                 text: format_repeat_annotation_text(&group.key.repeat_iterations),
                 style: None,
                 tags: vec!["sample-trace".to_string(), "query-result".to_string()],
-                context: Some(loss_visible_measurement_context(&group)),
+                context: Some(loss_visible_measurement_context(&group, loss_flag, value)),
             },
         )?;
     }
@@ -722,17 +739,30 @@ fn format_measurement_label(event: &MeasurementEvent) -> String {
     }
 }
 
-fn format_loss_visible_measurement_label(group: &LossVisibleMeasurementGroup) -> String {
-    let loss_flag = group
-        .loss_flag
-        .as_ref()
-        .map(|event| if event.bit { "1" } else { "0" })
-        .unwrap_or("?");
-    let value = group
-        .value
-        .as_ref()
-        .map(format_measurement_label)
-        .unwrap_or_else(|| "?".to_string());
+fn loss_visible_group_components(
+    group: &LossVisibleMeasurementGroup,
+) -> Result<(&MeasurementEvent, &MeasurementEvent), String> {
+    let loss_flag = group.loss_flag.as_ref().ok_or_else(|| {
+        format!(
+            "loss-visible measurement at {:?} slot {} is missing loss_flag component",
+            group.key.op_path, group.key.target_slot
+        )
+    })?;
+    let value = group.value.as_ref().ok_or_else(|| {
+        format!(
+            "loss-visible measurement at {:?} slot {} is missing value component",
+            group.key.op_path, group.key.target_slot
+        )
+    })?;
+    Ok((loss_flag, value))
+}
+
+fn format_loss_visible_measurement_label(
+    loss_flag: &MeasurementEvent,
+    value: &MeasurementEvent,
+) -> String {
+    let loss_flag = if loss_flag.bit { "1" } else { "0" };
+    let value = format_measurement_label(value);
     format!("L={loss_flag} | M={value}")
 }
 
@@ -743,28 +773,11 @@ fn measurement_component_name(component: &MeasurementComponent) -> &'static str 
     }
 }
 
-fn loss_visible_measurement_context(group: &LossVisibleMeasurementGroup) -> serde_json::Value {
-    let mut components = serde_json::Map::new();
-    if let Some(loss_flag) = &group.loss_flag {
-        components.insert(
-            "loss_flag".to_string(),
-            json!({
-                "measurement_index": loss_flag.measurement_index,
-                "bit": loss_flag.bit,
-            }),
-        );
-    }
-    if let Some(value) = &group.value {
-        components.insert(
-            "value".to_string(),
-            json!({
-                "measurement_index": value.measurement_index,
-                "bit": value.bit,
-                "loss_cause": value.loss_cause,
-            }),
-        );
-    }
-
+fn loss_visible_measurement_context(
+    group: &LossVisibleMeasurementGroup,
+    loss_flag: &MeasurementEvent,
+    value: &MeasurementEvent,
+) -> serde_json::Value {
     json!({
         "query_kind": "sample_trace",
         "annotation_kind": "measurement",
@@ -773,7 +786,17 @@ fn loss_visible_measurement_context(group: &LossVisibleMeasurementGroup) -> serd
         "op_path": group.key.op_path,
         "repeat_iterations": group.key.repeat_iterations,
         "target_qubit": group.key.target_qubit,
-        "components": components,
+        "components": {
+            "loss_flag": {
+                "measurement_index": loss_flag.measurement_index,
+                "bit": loss_flag.bit,
+            },
+            "value": {
+                "measurement_index": value.measurement_index,
+                "bit": value.bit,
+                "loss_cause": value.loss_cause,
+            }
+        },
     })
 }
 
