@@ -160,6 +160,24 @@ fn export_json_can_highlight_dem_error_origins() {
 }
 
 #[test]
+fn export_json_can_embed_sample_trace_annotations() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--seed", "1"],
+        "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
+    assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+    assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+}
+
+#[test]
 fn export_json_can_highlight_dem_error_to_compact_output_file() {
     let input = tempfile::NamedTempFile::new().unwrap();
     let out = tempfile::NamedTempFile::new().unwrap();
@@ -207,6 +225,17 @@ fn export_json_rejects_invalid_highlight_dem_error_index() {
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("DEM error index out of range"));
+}
+
+#[test]
+fn export_json_rejects_sample_shot_with_highlight_dem_error() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--highlight_dem_error", "0"],
+        "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--sample_shot cannot be combined with --highlight_dem_error"));
 }
 
 #[test]

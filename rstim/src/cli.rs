@@ -6,6 +6,7 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
+use crate::executor::Executor;
 use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
@@ -184,6 +185,10 @@ pub enum Commands {
         format: String,
         #[arg(long = "highlight_dem_error")]
         highlight_dem_error: Option<usize>,
+        #[arg(long = "sample_shot")]
+        sample_shot: bool,
+        #[arg(long)]
+        seed: Option<u64>,
     },
 }
 
@@ -415,11 +420,13 @@ pub fn run(cli: Cli) -> Result<(), String> {
             out,
             format,
             highlight_dem_error,
+            sample_shot,
+            seed,
         }) => {
             let text = read_input(r#in.as_deref())?;
             let format = parse_json_output_format(&format)?;
             let mut w = open_output(out.as_deref())?;
-            run_export_json(&text, format, highlight_dem_error, &mut w)
+            run_export_json(&text, format, highlight_dem_error, sample_shot, seed, &mut w)
         }
         None => {
             println!("rstim {}", crate::version());
@@ -700,9 +707,14 @@ fn run_export_json(
     text: &str,
     format: JsonOutputFormat,
     highlight_dem_error: Option<usize>,
+    sample_shot: bool,
+    seed: Option<u64>,
     w: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = parse_lines(text)?;
+    if sample_shot && highlight_dem_error.is_some() {
+        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
+    }
     let doc = match highlight_dem_error {
         Some(index) => {
             let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs).map_err(|err| {
@@ -722,6 +734,12 @@ fn run_export_json(
                         err
                     }
                 })?
+        }
+        None if sample_shot => {
+            let mut ex = Executor::from_instrs(instrs.clone())?;
+            let mut rng = make_rng(seed);
+            let (_out, trace) = ex.run_with_trace(&mut rng)?;
+            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace)?
         }
         None => crate::qp101::export_qp101(&instrs)?,
     };
