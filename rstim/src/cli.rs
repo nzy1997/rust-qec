@@ -742,7 +742,16 @@ fn run_export_json(
             let mut ex = Executor::from_instrs(instrs.clone())?;
             let mut rng = make_rng(seed);
             let (_out, trace) = ex.run_with_trace(&mut rng)?;
-            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace)?
+            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace).map_err(|err| {
+                if err.starts_with("sample trace visualization does not yet support instruction ")
+                {
+                    format!(
+                        "--sample_shot currently supports a subset of sample visualization instructions: {err}"
+                    )
+                } else {
+                    err
+                }
+            })?
         }
         None => crate::qp101::export_qp101(&instrs)?,
     };

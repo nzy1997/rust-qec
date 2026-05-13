@@ -180,6 +180,7 @@ pub fn export_qp101_with_sample_trace(
     instrs: &[StimInstr],
     trace: &SampleTrace,
 ) -> Result<Qp101Document, String> {
+    validate_sample_trace_visualization_support(instrs)?;
     let mut doc = export_qp101(instrs)?;
 
     add_sample_noise_annotations(&mut doc.operations, trace)?;
@@ -726,6 +727,88 @@ fn is_loss_visible_measurement_op(name: &str) -> bool {
     matches!(
         name,
         "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+    )
+}
+
+fn validate_sample_trace_visualization_support(instrs: &[StimInstr]) -> Result<(), String> {
+    validate_sample_trace_visualization_support_inner(instrs, &mut Vec::new())
+}
+
+fn validate_sample_trace_visualization_support_inner(
+    instrs: &[StimInstr],
+    op_path: &mut Vec<usize>,
+) -> Result<(), String> {
+    for (op_index, instr) in instrs.iter().enumerate() {
+        op_path.push(op_index);
+        match instr {
+            StimInstr::Repeat { body, .. } => {
+                validate_sample_trace_visualization_support_inner(body, op_path)?;
+            }
+            StimInstr::Op { name, .. }
+                if emits_measurement_bits(name)
+                    && !is_sample_trace_visualization_measurement_op(name) =>
+            {
+                return Err(format!(
+                    "sample trace visualization does not yet support instruction {name} at op_path {:?}",
+                    op_path
+                ));
+            }
+            _ => {}
+        }
+        op_path.pop();
+    }
+    Ok(())
+}
+
+// Keep this in sync with qp101-viz/lib.typ's measurement-render-spec table.
+fn is_sample_trace_visualization_measurement_op(name: &str) -> bool {
+    matches!(
+        name,
+        "M"
+            | "MX"
+            | "MY"
+            | "MZ"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MRZ"
+            | "ML"
+            | "MXL"
+            | "MYL"
+            | "MZL"
+            | "MRL"
+            | "MRXL"
+            | "MRYL"
+            | "MRZL"
+    )
+}
+
+fn emits_measurement_bits(name: &str) -> bool {
+    matches!(
+        name,
+        "M"
+            | "MX"
+            | "MY"
+            | "MZ"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MRZ"
+            | "ML"
+            | "MXL"
+            | "MYL"
+            | "MZL"
+            | "MRL"
+            | "MRXL"
+            | "MRYL"
+            | "MRZL"
+            | "MPP"
+            | "MXX"
+            | "MYY"
+            | "MZZ"
+            | "MPAD"
+            | "HERALDED_ERASE"
+            | "HERALDED_PAULI_CHANNEL_1"
     )
 }
 

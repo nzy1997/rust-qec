@@ -617,6 +617,37 @@ fn export_qp101_with_sample_trace_rejects_duplicate_loss_visible_components() {
 }
 
 #[test]
+fn export_qp101_with_sample_trace_rejects_unsupported_measurement_instruction_families() {
+    let trace = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![],
+        detector_events: vec![],
+    };
+
+    for (gate, circuit_text) in [
+        ("MXX", "MXX 0 1\nDETECTOR rec[-1]\n"),
+        ("MYY", "MYY 0 1\nDETECTOR rec[-1]\n"),
+        ("MZZ", "MZZ 0 1\nDETECTOR rec[-1]\n"),
+        ("MPP", "MPP X0*Z1\nDETECTOR rec[-1]\n"),
+        ("MPAD", "MPAD(0) 0\nDETECTOR rec[-1]\n"),
+        ("HERALDED_ERASE", "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n"),
+        (
+            "HERALDED_PAULI_CHANNEL_1",
+            "HERALDED_PAULI_CHANNEL_1(0,1,0,0) 0\nDETECTOR rec[-1]\n",
+        ),
+    ] {
+        let circuit = parse_lines(circuit_text).unwrap();
+        let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
+        assert!(
+            err.contains(&format!(
+                "sample trace visualization does not yet support instruction {gate}"
+            )),
+            "unexpected error for {gate}: {err}"
+        );
+    }
+}
+
+#[test]
 fn export_preserves_observable_noise_tags_and_special_targets() {
     let instrs = vec![
         StimInstr::Op {

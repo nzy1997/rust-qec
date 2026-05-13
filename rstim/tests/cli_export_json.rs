@@ -315,6 +315,20 @@ fn export_json_reports_unsupported_highlight_instruction_clearly() {
 }
 
 #[test]
+fn export_json_reports_unsupported_sample_visualization_instruction_clearly() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--seed", "1"],
+        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(
+        "--sample_shot currently supports a subset of sample visualization instructions"
+    ));
+    assert!(stderr.contains("HERALDED_ERASE"));
+}
+
+#[test]
 fn export_json_preserves_non_support_tracking_errors_when_highlighting() {
     let output = run_export_json_with_stdin(
         &["--highlight_dem_error", "0"],
