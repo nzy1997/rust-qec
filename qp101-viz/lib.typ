@@ -646,11 +646,31 @@
   iteration_starts: iteration_starts,
 )
 
+#let measurement-render-spec(gate) = (
+  "M": (output_count: 1),
+  "MX": (output_count: 1),
+  "MY": (output_count: 1),
+  "MZ": (output_count: 1),
+  "MR": (output_count: 1),
+  "MRX": (output_count: 1),
+  "MRY": (output_count: 1),
+  "MRZ": (output_count: 1),
+  "ML": (output_count: 2),
+  "MXL": (output_count: 2),
+  "MYL": (output_count: 2),
+  "MZL": (output_count: 2),
+  "MRL": (output_count: 2),
+  "MRXL": (output_count: 2),
+  "MRYL": (output_count: 2),
+  "MRZL": (output_count: 2),
+).at(gate, default: none)
+
 #let measurement-output-count(gate) = {
-  if gate == "ML" or gate == "MXL" or gate == "MYL" or gate == "MZL" or gate == "MRL" or gate == "MRXL" or gate == "MRYL" or gate == "MRZL" {
-    return 2
+  let spec = measurement-render-spec(gate)
+  if spec == none {
+    return none
   }
-  1
+  spec.output_count
 }
 
 #let stim-operator-entry(
@@ -694,7 +714,8 @@
     return none
   }
   let gate = op.at("gate", default: "")
-  if gate != "M" and gate != "MX" and gate != "MY" and gate != "MZ" and gate != "MR" and gate != "MRX" and gate != "MRY" and gate != "MRZ" and gate != "ML" and gate != "MXL" and gate != "MYL" and gate != "MZL" and gate != "MRL" and gate != "MRXL" and gate != "MRYL" and gate != "MRZL" {
+  let spec = measurement-render-spec(gate)
+  if spec == none {
     return none
   }
   let out = ()
@@ -703,7 +724,7 @@
       target_index: target_index,
       qubit: qubit,
       gate: gate,
-      output_count: measurement-output-count(gate),
+      output_count: spec.output_count,
     ))
   }
   out
