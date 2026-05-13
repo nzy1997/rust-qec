@@ -52,6 +52,14 @@ detector. The matching `qp101-viz` demo lives at
 with its exported sample result in
 [`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json).
 
+For a larger example, see
+[`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ),
+which shows both the source circuit and one seeded sample shot for a rotated
+surface-code memory-X experiment with `d=3`, `r=3`, and atom-loss noise
+inserted onto every data qubit at the start of each round. This example uses
+the default measurement path, so loss-caused outcomes appear as `1[L]` on the
+ordinary measurement gates instead of a separate loss-flag/value pair.
+
 Use `rstim stats` to inspect a circuit before running heavier workflows:
 
 ```sh

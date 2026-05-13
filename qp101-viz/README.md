@@ -44,6 +44,16 @@ The source circuit is
 exported sample result is
 [`examples/atom-loss-sample.qp101.json`](examples/atom-loss-sample.qp101.json).
 
+For a denser end-to-end example, compile:
+
+```sh
+typst compile --root qp101-viz qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ /tmp/surface-code-rotated-memory-x-d3-r3-atom-loss.pdf
+```
+
+That file renders both the source circuit and a seeded sample shot for a
+rotated surface-code memory-X circuit with `d=3`, `r=3`, and per-round atom
+loss on the data qubits.
+
 ## Repository Layout
 
 - `examples/` keeps a small set of human-facing rendered demos.
