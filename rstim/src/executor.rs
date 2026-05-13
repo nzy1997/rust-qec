@@ -2450,6 +2450,48 @@ fn pair_measure(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::parse_lines;
+    use rand::RngCore;
+    use std::collections::VecDeque;
+
+    struct ScriptRng {
+        values: VecDeque<u64>,
+    }
+
+    impl ScriptRng {
+        fn new(values: Vec<u64>) -> Self {
+            Self {
+                values: values.into(),
+            }
+        }
+
+        fn next_value(&mut self) -> u64 {
+            self.values.pop_front().unwrap_or(0)
+        }
+    }
+
+    impl RngCore for ScriptRng {
+        fn next_u32(&mut self) -> u32 {
+            self.next_value() as u32
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.next_value()
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for chunk in dest.chunks_mut(8) {
+                let bytes = self.next_u64().to_ne_bytes();
+                let len = chunk.len();
+                chunk.copy_from_slice(&bytes[..len]);
+            }
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
 
     #[test]
     fn reference_measurement_helpers_return_one_for_lost_qubits() {
@@ -2541,5 +2583,241 @@ mod tests {
             PauliBasis::Z,
             false,
         ));
+    }
+
+    #[test]
+    fn executor_helpers_cover_branchy_paths_and_errors() {
+        let mut traced = Executor::from_instrs(parse_lines("H 0\nREPEAT 1 {\n  M 0\n}\n").unwrap())
+            .unwrap();
+        let _ = traced.run_with_trace(&mut ScriptRng::new(vec![0, 0])).unwrap();
+
+        let ctx = ExecutionTraversalContext::default();
+        let mut exec = ExecutionState::new(4, true);
+
+        execute_op(
+            "DEPOLARIZE1",
+            &[1.0],
+            &[StimTarget::Qubit(0)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0, 0]),
+        )
+        .unwrap();
+        execute_op(
+            "DEPOLARIZE1",
+            &[1.0],
+            &[StimTarget::Qubit(1)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0, 1]),
+        )
+        .unwrap();
+        execute_op(
+            "DEPOLARIZE1",
+            &[1.0],
+            &[StimTarget::Qubit(2)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0, 2]),
+        )
+        .unwrap();
+
+        exec.lost[3] = true;
+        execute_op(
+            "PAULI_CHANNEL_1",
+            &[1.0, 0.0, 0.0],
+            &[StimTarget::Qubit(3)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0]),
+        )
+        .unwrap();
+        execute_op(
+            "PAULI_CHANNEL_1",
+            &[1.0, 0.0, 0.0],
+            &[StimTarget::Qubit(0)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0]),
+        )
+        .unwrap();
+        execute_op(
+            "PAULI_CHANNEL_1",
+            &[0.0, 1.0, 0.0],
+            &[StimTarget::Qubit(1)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0]),
+        )
+        .unwrap();
+        execute_op(
+            "PAULI_CHANNEL_1",
+            &[0.0, 0.0, 1.0],
+            &[StimTarget::Qubit(2)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0]),
+        )
+        .unwrap();
+        execute_op(
+            "PAULI_CHANNEL_1",
+            &[0.0, 0.0, 0.0],
+            &[StimTarget::Qubit(2)],
+            &ctx,
+            &mut exec,
+            &mut ScriptRng::new(vec![0]),
+        )
+        .unwrap();
+
+        let branches = exec
+            .trace
+            .noise_events
+            .iter()
+            .map(|e| e.branch_label.as_deref())
+            .collect::<Vec<_>>();
+        assert_eq!(branches.len(), 6);
+        assert!(branches.contains(&Some("X")));
+        assert!(branches.contains(&Some("Y")));
+        assert!(branches.contains(&Some("Z")));
+
+        assert!(execute_op("BOGUS", &[], &[], &ctx, &mut exec, &mut ScriptRng::new(vec![0])).is_err());
+
+        assert_eq!(qubits(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(), vec![0]);
+        assert!(qubits(&[StimTarget::Pauli {
+            qubit: 0,
+            basis: PauliBasis::X,
+            inverted: false,
+        }])
+        .is_err());
+
+        assert_eq!(
+            qubit_slots(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),
+            vec![(0, 0)]
+        );
+        assert!(qubit_slots(&[StimTarget::QubitInv(0)]).is_err());
+
+        assert_eq!(
+            qubits_with_inversion(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),
+            vec![(0, false)]
+        );
+        assert!(qubits_with_inversion(&[StimTarget::Pauli {
+            qubit: 0,
+            basis: PauliBasis::X,
+            inverted: false,
+        }])
+        .is_err());
+
+        assert_eq!(
+            qubits_with_inversion_slots(&[StimTarget::Sweep(0), StimTarget::QubitInv(1)]).unwrap(),
+            vec![(1, 1, true)]
+        );
+        assert!(qubits_with_inversion_slots(&[StimTarget::Pauli {
+            qubit: 0,
+            basis: PauliBasis::X,
+            inverted: false,
+        }])
+        .is_err());
+
+        assert!(qubits_with_inversion_pairs(&[StimTarget::Qubit(0)]).is_err());
+
+        assert_eq!(expect_qubit(&StimTarget::Qubit(0)).unwrap(), 0);
+        assert!(expect_qubit(&StimTarget::QubitInv(0)).is_err());
+        assert!(expect_qubit(&StimTarget::Sweep(0)).is_err());
+        assert!(expect_qubit(&StimTarget::Pauli {
+            qubit: 0,
+            basis: PauliBasis::X,
+            inverted: false,
+        })
+        .is_err());
+
+        assert!(qubit_pairs(&[StimTarget::Qubit(0)]).is_err());
+        assert_eq!(
+            qubit_pairs(&[StimTarget::Sweep(0), StimTarget::Qubit(1)]).unwrap(),
+            Vec::<(usize, usize)>::new()
+        );
+
+        assert!(present_qubit_pairs(&[StimTarget::Qubit(0), StimTarget::Qubit(1)], &[false, true])
+            .map(|pairs| pairs.is_empty())
+            .unwrap());
+        assert!(present_qubit_pair_slots(&[StimTarget::Qubit(0)] , &[false]).is_err());
+        assert_eq!(
+            present_qubit_pair_slots(&[StimTarget::Sweep(0), StimTarget::Qubit(1)], &[false, false])
+                .unwrap(),
+            Vec::<((usize, usize), (usize, usize))>::new()
+        );
+
+        let recorder = Recorder::default();
+        assert!(xor_recs(&recorder, &[StimTarget::Qubit(0)]).is_err());
+        assert!(apply_pauli_targets(
+            &mut exec.state,
+            &[StimTarget::Qubit(0)]
+        )
+        .is_err());
+        assert_eq!(
+            correlated_trace_payload(&[StimTarget::Qubit(0)]).unwrap(),
+            None
+        );
+        assert_eq!(pauli_pair_label(4, 4), "??");
+        apply_pauli(&mut exec.state, 0, 4);
+        assert!(measure_pauli_product(&mut exec.state, &[], true, &mut ScriptRng::new(vec![0])));
+        apply_spp(&mut exec.state, &[], false, false);
+    }
+
+    #[test]
+    fn reference_controlled_pairs_cover_sweep_and_error_paths() {
+        let mut state = StabilizerState::new(2);
+        let sweep_bits = [true];
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "CX",
+            &[StimTarget::Qubit(0)],
+            None,
+        )
+        .is_err());
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "BAD",
+            &[StimTarget::Qubit(0), StimTarget::Qubit(1)],
+            None,
+        )
+        .is_err());
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "BAD",
+            &[StimTarget::Sweep(0), StimTarget::Qubit(1)],
+            Some(&sweep_bits),
+        )
+        .is_err());
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "CX",
+            &[StimTarget::Qubit(0), StimTarget::Sweep(0)],
+            Some(&sweep_bits),
+        )
+        .is_err());
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "CX",
+            &[StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            }, StimTarget::Qubit(1)],
+            None,
+        )
+        .is_err());
+
+        assert!(apply_reference_controlled_pairs(
+            &mut state,
+            "CX",
+            &[StimTarget::Qubit(0), StimTarget::Qubit(1), StimTarget::Qubit(0)],
+            None,
+        )
+        .is_err());
     }
 }
