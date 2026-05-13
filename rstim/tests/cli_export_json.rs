@@ -160,10 +160,10 @@ fn export_json_can_highlight_dem_error_origins() {
 }
 
 #[test]
-fn export_json_can_embed_sample_trace_annotations() {
+fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
     let output = run_export_json_with_stdin(
         &["--sample_shot", "--seed", "7"],
-        "DEPOLARIZE1(1) 0\nLOSS(1) 1\nM 1\nML 0\nDETECTOR rec[-3]\n",
+        "DEPOLARIZE1(1) 0\nLOSS(1) 1\nLOSS(1) 2\nM 1\nMRL 2\nDETECTOR rec[-3]\n",
     );
     assert!(
         output.status.success(),
@@ -172,11 +172,159 @@ fn export_json_can_embed_sample_trace_annotations() {
     );
 
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value["operations"][0]["annotations"][0]["label"], "X");
-    assert_eq!(value["operations"][1]["annotations"][0]["label"], "L");
-    assert_eq!(value["operations"][2]["annotations"][0]["label"], "1[L]");
-    assert_eq!(value["operations"][3]["annotations"][0]["label"], "L=0 | M=1");
-    assert_eq!(value["operations"][4]["annotations"][0]["label"], "D0");
+    let operations = value["operations"].as_array().unwrap();
+    let contract = operations
+        .iter()
+        .map(|op| {
+            let gate = op
+                .as_object()
+                .unwrap()
+                .get("gate")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            serde_json::json!({
+                "type": op["type"],
+                "gate": gate,
+                "annotations": op["annotations"],
+            })
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        contract,
+        vec![
+            serde_json::json!({
+                "type": "noise",
+                "gate": "DEPOLARIZE1",
+                "annotations": [{
+                    "kind": "marker",
+                    "target_slots": [0],
+                    "label": "X",
+                    "style": { "preset": "danger", "color": "red", "highlight": true },
+                    "tags": ["sample-trace", "query-result"],
+                    "context": {
+                        "annotation_kind": "noise",
+                        "branch_label": "X",
+                        "instr_name": "DEPOLARIZE1",
+                        "op_path": [0],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                        "target_qubits": [0],
+                    }
+                }],
+            }),
+            serde_json::json!({
+                "type": "noise",
+                "gate": "LOSS",
+                "annotations": [{
+                    "kind": "marker",
+                    "target_slots": [0],
+                    "label": "L",
+                    "style": { "preset": "danger", "color": "red", "highlight": true },
+                    "tags": ["sample-trace", "query-result"],
+                    "context": {
+                        "annotation_kind": "noise",
+                        "branch_label": "L",
+                        "instr_name": "LOSS",
+                        "op_path": [1],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                        "target_qubits": [1],
+                    }
+                }],
+            }),
+            serde_json::json!({
+                "type": "noise",
+                "gate": "LOSS",
+                "annotations": [{
+                    "kind": "marker",
+                    "target_slots": [0],
+                    "label": "L",
+                    "style": { "preset": "danger", "color": "red", "highlight": true },
+                    "tags": ["sample-trace", "query-result"],
+                    "context": {
+                        "annotation_kind": "noise",
+                        "branch_label": "L",
+                        "instr_name": "LOSS",
+                        "op_path": [2],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                        "target_qubits": [2],
+                    }
+                }],
+            }),
+            serde_json::json!({
+                "type": "gate",
+                "gate": "M",
+                "annotations": [{
+                    "kind": "marker",
+                    "target_slots": [0],
+                    "label": "1[L]",
+                    "tags": ["sample-trace", "query-result"],
+                    "context": {
+                        "annotation_kind": "measurement",
+                        "bit": true,
+                        "component": "value",
+                        "instr_name": "M",
+                        "loss_cause": true,
+                        "measurement_index": 1,
+                        "op_path": [3],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                        "target_qubit": 1,
+                    }
+                }],
+            }),
+            serde_json::json!({
+                "type": "gate",
+                "gate": "MRL",
+                "annotations": [{
+                    "kind": "marker",
+                    "target_slots": [0],
+                    "label": "L=1 | M=1[L]",
+                    "tags": ["sample-trace", "query-result"],
+                    "context": {
+                        "annotation_kind": "measurement",
+                        "components": {
+                            "loss_flag": {
+                                "bit": true,
+                                "measurement_index": 2,
+                            },
+                            "value": {
+                                "bit": true,
+                                "loss_cause": true,
+                                "measurement_index": 3,
+                            }
+                        },
+                        "instr_name": "MRL",
+                        "loss_visible": true,
+                        "op_path": [4],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                        "target_qubit": 2,
+                    }
+                }],
+            }),
+            serde_json::json!({
+                "type": "detector",
+                "gate": serde_json::Value::Null,
+                "annotations": [{
+                    "kind": "marker",
+                    "label": "D0",
+                    "style": { "preset": "info", "color": "blue", "highlight": true },
+                    "tags": ["dem-symptom", "query-result"],
+                    "context": {
+                        "annotation_kind": "detector",
+                        "detector_index": 0,
+                        "flipped": true,
+                        "op_path": [5],
+                        "query_kind": "sample_trace",
+                        "repeat_iterations": [],
+                    }
+                }],
+            }),
+        ]
+    );
 }
 
 #[test]
