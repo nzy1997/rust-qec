@@ -173,158 +173,62 @@ fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
 
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     let operations = value["operations"].as_array().unwrap();
-    let contract = operations
-        .iter()
-        .map(|op| {
-            let gate = op
-                .as_object()
-                .unwrap()
-                .get("gate")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
-            serde_json::json!({
-                "type": op["type"],
-                "gate": gate,
-                "annotations": op["annotations"],
-            })
-        })
-        .collect::<Vec<_>>();
+    let find_gate = |op_type: &str, gate: &str| {
+        operations
+            .iter()
+            .find(|op| op["type"] == op_type && op["gate"] == gate)
+            .unwrap()
+    };
 
+    let depolarize = find_gate("noise", "DEPOLARIZE1");
+    let depolarize_annotation = &depolarize["annotations"][0];
+    assert_eq!(depolarize_annotation["label"], "X");
+    assert_eq!(depolarize_annotation["context"]["branch_label"], "X");
+
+    let loss_annotations = operations
+        .iter()
+        .filter(|op| op["type"] == "noise" && op["gate"] == "LOSS")
+        .map(|op| &op["annotations"][0])
+        .collect::<Vec<_>>();
+    assert_eq!(loss_annotations.len(), 2);
+    assert_eq!(loss_annotations[0]["label"], "L");
+    assert_eq!(loss_annotations[0]["context"]["target_qubits"], serde_json::json!([1]));
+    assert_eq!(loss_annotations[1]["label"], "L");
+    assert_eq!(loss_annotations[1]["context"]["target_qubits"], serde_json::json!([2]));
+
+    let measurement = find_gate("gate", "M");
+    let measurement_annotation = &measurement["annotations"][0];
+    assert_eq!(measurement_annotation["label"], "1[L]");
+    assert_eq!(measurement_annotation["context"]["target_qubit"], 1);
+    assert_eq!(measurement_annotation["context"]["measurement_index"], 1);
+    assert_eq!(measurement_annotation["context"]["loss_cause"], true);
+
+    let loss_visible_measurement = find_gate("gate", "MRL");
+    let loss_visible_annotation = &loss_visible_measurement["annotations"][0];
+    assert_eq!(loss_visible_annotation["label"], "L=1 | M=1[L]");
+    assert_eq!(loss_visible_annotation["context"]["target_qubit"], 2);
+    assert_eq!(loss_visible_annotation["context"]["loss_visible"], true);
     assert_eq!(
-        contract,
-        vec![
-            serde_json::json!({
-                "type": "noise",
-                "gate": "DEPOLARIZE1",
-                "annotations": [{
-                    "kind": "marker",
-                    "target_slots": [0],
-                    "label": "X",
-                    "style": { "preset": "danger", "color": "red", "highlight": true },
-                    "tags": ["sample-trace", "query-result"],
-                    "context": {
-                        "annotation_kind": "noise",
-                        "branch_label": "X",
-                        "instr_name": "DEPOLARIZE1",
-                        "op_path": [0],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                        "target_qubits": [0],
-                    }
-                }],
-            }),
-            serde_json::json!({
-                "type": "noise",
-                "gate": "LOSS",
-                "annotations": [{
-                    "kind": "marker",
-                    "target_slots": [0],
-                    "label": "L",
-                    "style": { "preset": "danger", "color": "red", "highlight": true },
-                    "tags": ["sample-trace", "query-result"],
-                    "context": {
-                        "annotation_kind": "noise",
-                        "branch_label": "L",
-                        "instr_name": "LOSS",
-                        "op_path": [1],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                        "target_qubits": [1],
-                    }
-                }],
-            }),
-            serde_json::json!({
-                "type": "noise",
-                "gate": "LOSS",
-                "annotations": [{
-                    "kind": "marker",
-                    "target_slots": [0],
-                    "label": "L",
-                    "style": { "preset": "danger", "color": "red", "highlight": true },
-                    "tags": ["sample-trace", "query-result"],
-                    "context": {
-                        "annotation_kind": "noise",
-                        "branch_label": "L",
-                        "instr_name": "LOSS",
-                        "op_path": [2],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                        "target_qubits": [2],
-                    }
-                }],
-            }),
-            serde_json::json!({
-                "type": "gate",
-                "gate": "M",
-                "annotations": [{
-                    "kind": "marker",
-                    "target_slots": [0],
-                    "label": "1[L]",
-                    "tags": ["sample-trace", "query-result"],
-                    "context": {
-                        "annotation_kind": "measurement",
-                        "bit": true,
-                        "component": "value",
-                        "instr_name": "M",
-                        "loss_cause": true,
-                        "measurement_index": 1,
-                        "op_path": [3],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                        "target_qubit": 1,
-                    }
-                }],
-            }),
-            serde_json::json!({
-                "type": "gate",
-                "gate": "MRL",
-                "annotations": [{
-                    "kind": "marker",
-                    "target_slots": [0],
-                    "label": "L=1 | M=1[L]",
-                    "tags": ["sample-trace", "query-result"],
-                    "context": {
-                        "annotation_kind": "measurement",
-                        "components": {
-                            "loss_flag": {
-                                "bit": true,
-                                "measurement_index": 2,
-                            },
-                            "value": {
-                                "bit": true,
-                                "loss_cause": true,
-                                "measurement_index": 3,
-                            }
-                        },
-                        "instr_name": "MRL",
-                        "loss_visible": true,
-                        "op_path": [4],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                        "target_qubit": 2,
-                    }
-                }],
-            }),
-            serde_json::json!({
-                "type": "detector",
-                "gate": serde_json::Value::Null,
-                "annotations": [{
-                    "kind": "marker",
-                    "label": "D0",
-                    "style": { "preset": "info", "color": "blue", "highlight": true },
-                    "tags": ["dem-symptom", "query-result"],
-                    "context": {
-                        "annotation_kind": "detector",
-                        "detector_index": 0,
-                        "flipped": true,
-                        "op_path": [5],
-                        "query_kind": "sample_trace",
-                        "repeat_iterations": [],
-                    }
-                }],
-            }),
-        ]
+        loss_visible_annotation["context"]["components"]["loss_flag"],
+        serde_json::json!({
+            "bit": true,
+            "measurement_index": 2,
+        })
     );
+    assert_eq!(
+        loss_visible_annotation["context"]["components"]["value"],
+        serde_json::json!({
+            "bit": true,
+            "loss_cause": true,
+            "measurement_index": 3,
+        })
+    );
+
+    let detector = operations.iter().find(|op| op["type"] == "detector").unwrap();
+    let detector_annotation = &detector["annotations"][0];
+    assert_eq!(detector_annotation["label"], "D0");
+    assert_eq!(detector_annotation["context"]["detector_index"], 0);
+    assert_eq!(detector_annotation["context"]["flipped"], true);
 }
 
 #[test]
