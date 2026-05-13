@@ -617,6 +617,117 @@ fn export_qp101_with_sample_trace_rejects_duplicate_loss_visible_components() {
 }
 
 #[test]
+fn export_qp101_with_sample_trace_rejects_duplicate_loss_visible_values() {
+    let circuit = parse_lines("MRL 0\n").unwrap();
+    let trace = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 1,
+                bit: true,
+                loss_cause: false,
+                component: MeasurementComponent::LossFlag,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 2,
+                bit: true,
+                loss_cause: true,
+                component: MeasurementComponent::Value,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "MRL".to_string(),
+                measurement_index: 3,
+                bit: false,
+                loss_cause: false,
+                component: MeasurementComponent::Value,
+            },
+        ],
+        detector_events: vec![],
+    };
+
+    let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
+    assert!(err.contains("duplicate"));
+    assert!(err.contains("value"));
+}
+
+#[test]
+fn export_qp101_with_sample_trace_rejects_missing_noise_branch_label() {
+    let circuit = parse_lines("LOSS(1) 0\n").unwrap();
+    let trace = SampleTrace {
+        noise_events: vec![NoiseEvent {
+            op_path: vec![0],
+            repeat_iterations: vec![],
+            instr_name: "LOSS".to_string(),
+            target_slots: vec![0],
+            target_qubits: vec![0],
+            occurred: true,
+            branch_label: None,
+        }],
+        measurement_events: vec![],
+        detector_events: vec![],
+    };
+
+    let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
+    assert!(err.contains("marked occurred"));
+    assert!(err.contains("no branch label"));
+}
+
+#[test]
+fn export_qp101_with_sample_trace_rejects_missing_loss_visible_components() {
+    let circuit = parse_lines("MRL 0\n").unwrap();
+
+    let missing_loss_flag = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![MeasurementEvent {
+            op_path: vec![0],
+            repeat_iterations: vec![],
+            target_slot: 0,
+            target_qubit: 0,
+            instr_name: "MRL".to_string(),
+            measurement_index: 1,
+            bit: true,
+            loss_cause: true,
+            component: MeasurementComponent::Value,
+        }],
+        detector_events: vec![],
+    };
+    let err = export_qp101_with_sample_trace(&circuit, &missing_loss_flag).unwrap_err();
+    assert!(err.contains("missing loss_flag"));
+
+    let missing_value = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![MeasurementEvent {
+            op_path: vec![0],
+            repeat_iterations: vec![],
+            target_slot: 0,
+            target_qubit: 0,
+            instr_name: "MRL".to_string(),
+            measurement_index: 1,
+            bit: true,
+            loss_cause: false,
+            component: MeasurementComponent::LossFlag,
+        }],
+        detector_events: vec![],
+    };
+    let err = export_qp101_with_sample_trace(&circuit, &missing_value).unwrap_err();
+    assert!(err.contains("missing value"));
+}
+
+#[test]
 fn export_qp101_with_sample_trace_rejects_unsupported_measurement_instruction_families() {
     let trace = SampleTrace {
         noise_events: vec![],
@@ -746,4 +857,59 @@ fn export_rejects_shift_coords_with_targets() {
     let instrs = parse_lines("SHIFT_COORDS(1) 0\n").unwrap();
     let err = export_qp101(&instrs).unwrap_err();
     assert!(err.contains("SHIFT_COORDS"));
+}
+
+#[test]
+fn export_qp101_with_sample_trace_formats_non_loss_measurement_bits_and_components() {
+    let circuit = parse_lines("M 0 1 2\n").unwrap();
+    let trace = SampleTrace {
+        noise_events: vec![],
+        measurement_events: vec![
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 0,
+                target_qubit: 0,
+                instr_name: "M".to_string(),
+                measurement_index: 1,
+                bit: true,
+                loss_cause: false,
+                component: MeasurementComponent::Value,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 1,
+                target_qubit: 1,
+                instr_name: "M".to_string(),
+                measurement_index: 2,
+                bit: false,
+                loss_cause: false,
+                component: MeasurementComponent::Value,
+            },
+            MeasurementEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                target_slot: 2,
+                target_qubit: 2,
+                instr_name: "M".to_string(),
+                measurement_index: 3,
+                bit: true,
+                loss_cause: false,
+                component: MeasurementComponent::LossFlag,
+            },
+        ],
+        detector_events: vec![],
+    };
+
+    let doc = export_qp101_with_sample_trace(&circuit, &trace).unwrap();
+    let value = serde_json::to_value(doc).unwrap();
+    let annotations = value["operations"][0]["annotations"].as_array().unwrap();
+
+    assert_eq!(annotations[0]["label"], "1");
+    assert_eq!(annotations[0]["context"]["component"], "value");
+    assert_eq!(annotations[1]["label"], "0");
+    assert_eq!(annotations[1]["context"]["component"], "value");
+    assert_eq!(annotations[2]["label"], "1");
+    assert_eq!(annotations[2]["context"]["component"], "loss_flag");
 }

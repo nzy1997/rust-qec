@@ -1048,3 +1048,68 @@ fn parse_fired_detectors(
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_export_json_sample_shot_without_seed_exports_annotations_in_process() {
+        let mut out = Vec::new();
+        run_export_json(
+            "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+            JsonOutputFormat::Pretty,
+            None,
+            true,
+            None,
+            &mut out,
+        )
+        .unwrap();
+
+        let value: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(value["standard"], "QP101-ZY");
+        assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
+        assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+        assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+    }
+
+    #[test]
+    fn run_export_json_sample_shot_preserves_non_support_export_errors_in_process() {
+        let err = run_export_json(
+            "SHIFT_COORDS(1) 0\nLOSS(1) 0\nM 0\n",
+            JsonOutputFormat::Pretty,
+            None,
+            true,
+            Some(7),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("SHIFT_COORDS"));
+        assert!(!err.contains("subset of sample visualization instructions"));
+    }
+
+    #[test]
+    fn run_dispatches_export_json_sample_shot_command_in_process() {
+        let input = tempfile::NamedTempFile::new().unwrap();
+        let output = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(input.path(), "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+        run(Cli {
+            command: Some(Commands::ExportJson {
+                r#in: Some(input.path().display().to_string()),
+                out: Some(output.path().display().to_string()),
+                format: "pretty".to_string(),
+                highlight_dem_error: None,
+                sample_shot: true,
+                seed: Some(7),
+            }),
+        })
+        .unwrap();
+
+        let text = std::fs::read_to_string(output.path()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
+        assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+    }
+}
