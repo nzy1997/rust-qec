@@ -32,6 +32,18 @@ It does not yet implement a geometry-based layout renderer. The schema and rende
 )
 ```
 
+For a sample-trace render that highlights atom loss, measurement outcomes, and
+detector flips from one seeded shot, compile:
+
+```sh
+typst compile --root qp101-viz qp101-viz/examples/atom-loss-sample.typ /tmp/atom-loss-sample.pdf
+```
+
+The source circuit is
+[`examples/atom-loss-sample.stim`](examples/atom-loss-sample.stim), and the
+exported sample result is
+[`examples/atom-loss-sample.qp101.json`](examples/atom-loss-sample.qp101.json).
+
 ## Repository Layout
 
 - `examples/` keeps a small set of human-facing rendered demos.
@@ -49,8 +61,8 @@ It does not yet implement a geometry-based layout renderer. The schema and rende
 - `R` and `RX` are rendered as lightweight reset boxes.
 - `X_ERROR`, `Z_ERROR`, and `DEPOLARIZE1` render as compact single-qubit noise boxes with short labels such as `XE`, `ZE`, and `D1`, even when one op targets many qubits.
 - `DEPOLARIZE2` renders as connected two-box noise gates, and each rendered pair carries its own parameter note above it.
-- `M`, `MX`, and `MR` are rendered as compact measurement boxes with plain-text anchors such as `m1` above the gate.
-- measurement-producing gates currently recognized for semantic anchors are `M`, `MX`, and `MR`.
+- single-qubit measurement families such as `M`, `MX`, `MY`, `MR`, `ML`, and `MRL` are rendered as compact measurement boxes with plain-text anchors such as `m1` above the gate.
+- sample-trace annotations render inline on supported single-qubit measurements, including loss markers such as `1[L]` and `L=1 | M=1[L]`.
 - measurement and detector/observable operators reserve extra horizontal space for their labels so dense timelines do not collide as easily.
 - circuit-top measurement and Stim-style operator labels now share a single theme clearance value so they stay above the wire instead of drifting into gate bodies.
 - `detector` and `observable_include` render inline on the circuit in a Stim-like single-wire box style.
