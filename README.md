@@ -127,3 +127,33 @@ To reproduce the table locally:
 cargo build -p rstim --bin rstim
 cargo run -p rstim --example stim_parity_showcase
 ```
+
+## Releasing
+
+This repository now follows the same tag-driven release entrypoint as
+`problem-reductions`.
+
+To cut a new version:
+
+```sh
+make release V=0.1.1
+```
+
+That target:
+
+- bumps the version in all workspace crates
+- runs `cargo check --workspace`
+- creates a release commit
+- creates an annotated tag `vX.Y.Z`
+- pushes the default branch and tags to `origin`
+
+Pushing a tag that matches `v*.*.*` triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which creates
+a GitHub Release with generated notes.
+
+The default branch is currently `master`. If that changes later, override it
+when running the release target:
+
+```sh
+make release V=0.1.1 DEFAULT_BRANCH=main
+```
