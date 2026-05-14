@@ -6,6 +6,7 @@ use rand::rngs::StdRng;
 
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
+use crate::executor::Executor;
 use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::output::{
     OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
@@ -184,6 +185,10 @@ pub enum Commands {
         format: String,
         #[arg(long = "highlight_dem_error")]
         highlight_dem_error: Option<usize>,
+        #[arg(long = "sample_shot")]
+        sample_shot: bool,
+        #[arg(long)]
+        seed: Option<u64>,
     },
 }
 
@@ -415,11 +420,13 @@ pub fn run(cli: Cli) -> Result<(), String> {
             out,
             format,
             highlight_dem_error,
+            sample_shot,
+            seed,
         }) => {
             let text = read_input(r#in.as_deref())?;
             let format = parse_json_output_format(&format)?;
             let mut w = open_output(out.as_deref())?;
-            run_export_json(&text, format, highlight_dem_error, &mut w)
+            run_export_json(&text, format, highlight_dem_error, sample_shot, seed, &mut w)
         }
         None => {
             println!("rstim {}", crate::version());
@@ -700,9 +707,17 @@ fn run_export_json(
     text: &str,
     format: JsonOutputFormat,
     highlight_dem_error: Option<usize>,
+    sample_shot: bool,
+    seed: Option<u64>,
     w: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = parse_lines(text)?;
+    if seed.is_some() && !sample_shot {
+        return Err("--seed is only supported with --sample_shot".to_string());
+    }
+    if sample_shot && highlight_dem_error.is_some() {
+        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
+    }
     let doc = match highlight_dem_error {
         Some(index) => {
             let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs).map_err(|err| {
@@ -722,6 +737,21 @@ fn run_export_json(
                         err
                     }
                 })?
+        }
+        None if sample_shot => {
+            let mut ex = Executor::from_instrs(instrs.clone())?;
+            let mut rng = make_rng(seed);
+            let (_out, trace) = ex.run_with_trace(&mut rng)?;
+            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace).map_err(|err| {
+                if err.starts_with("sample trace visualization does not yet support instruction ")
+                {
+                    format!(
+                        "--sample_shot currently supports a subset of sample visualization instructions: {err}"
+                    )
+                } else {
+                    err
+                }
+            })?
         }
         None => crate::qp101::export_qp101(&instrs)?,
     };
@@ -1016,5 +1046,70 @@ fn parse_fired_detectors(
         _ => Err(format!(
             "unsupported in_format for explain_errors: {format}"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_export_json_sample_shot_without_seed_exports_annotations_in_process() {
+        let mut out = Vec::new();
+        run_export_json(
+            "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+            JsonOutputFormat::Pretty,
+            None,
+            true,
+            None,
+            &mut out,
+        )
+        .unwrap();
+
+        let value: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(value["standard"], "QP101-ZY");
+        assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
+        assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+        assert_eq!(value["operations"][2]["annotations"][0]["label"], "D0");
+    }
+
+    #[test]
+    fn run_export_json_sample_shot_preserves_non_support_export_errors_in_process() {
+        let err = run_export_json(
+            "SHIFT_COORDS(1) 0\nLOSS(1) 0\nM 0\n",
+            JsonOutputFormat::Pretty,
+            None,
+            true,
+            Some(7),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+
+        assert!(err.contains("SHIFT_COORDS"));
+        assert!(!err.contains("subset of sample visualization instructions"));
+    }
+
+    #[test]
+    fn run_dispatches_export_json_sample_shot_command_in_process() {
+        let input = tempfile::NamedTempFile::new().unwrap();
+        let output = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(input.path(), "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+        run(Cli {
+            command: Some(Commands::ExportJson {
+                r#in: Some(input.path().display().to_string()),
+                out: Some(output.path().display().to_string()),
+                format: "pretty".to_string(),
+                highlight_dem_error: None,
+                sample_shot: true,
+                seed: Some(7),
+            }),
+        })
+        .unwrap();
+
+        let text = std::fs::read_to_string(output.path()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
+        assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
     }
 }

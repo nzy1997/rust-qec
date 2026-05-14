@@ -1,8 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::dem::{DemInstruction, DemTarget};
 use crate::dem_provenance::{HighlightRecord, TrackedDemResult};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
+use crate::sample_trace::{MeasurementComponent, MeasurementEvent, SampleTrace};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -173,6 +174,20 @@ pub fn export_qp101(instrs: &[StimInstr]) -> Result<Qp101Document, String> {
         metadata: Some(json!({ "framework": "rstim" })),
         extensions: None,
     })
+}
+
+pub fn export_qp101_with_sample_trace(
+    instrs: &[StimInstr],
+    trace: &SampleTrace,
+) -> Result<Qp101Document, String> {
+    validate_sample_trace_visualization_support(instrs)?;
+    let mut doc = export_qp101(instrs)?;
+
+    add_sample_noise_annotations(&mut doc.operations, trace)?;
+    add_sample_measurement_annotations(&mut doc.operations, trace)?;
+    add_sample_detector_annotations(&mut doc.operations, trace)?;
+
+    Ok(doc)
 }
 
 pub fn export_qp101_with_highlighted_dem_error(
@@ -348,6 +363,30 @@ fn danger_annotation_style() -> Qp101AnnotationStyle {
     }
 }
 
+fn info_annotation_style() -> Qp101AnnotationStyle {
+    Qp101AnnotationStyle {
+        preset: Some("info".to_string()),
+        color: Some("blue".to_string()),
+        highlight: Some(true),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct LossVisibleMeasurementKey {
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+    target_slot: usize,
+    target_qubit: u32,
+    instr_name: String,
+}
+
+#[derive(Debug, Clone)]
+struct LossVisibleMeasurementGroup {
+    key: LossVisibleMeasurementKey,
+    loss_flag: Option<MeasurementEvent>,
+    value: Option<MeasurementEvent>,
+}
+
 #[derive(Debug, Clone)]
 struct QueryAnnotationLocation {
     op_path: Vec<usize>,
@@ -517,6 +556,333 @@ fn collect_query_annotation_locations(
     Ok(())
 }
 
+fn add_sample_noise_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    for event in &trace.noise_events {
+        if !event.occurred {
+            continue;
+        }
+        let branch_label = event.branch_label.as_ref().ok_or_else(|| {
+            format!(
+                "sample trace noise event at {:?} is marked occurred but has no branch label",
+                event.op_path
+            )
+        })?;
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: event.target_slots.clone(),
+                label: Some(branch_label.clone()),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: Some(danger_annotation_style()),
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "noise",
+                    "instr_name": event.instr_name,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "target_qubits": event.target_qubits,
+                    "branch_label": branch_label,
+                })),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn add_sample_measurement_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    let mut grouped = BTreeMap::<LossVisibleMeasurementKey, LossVisibleMeasurementGroup>::new();
+    let mut grouped_order = Vec::new();
+
+    for event in &trace.measurement_events {
+        if is_loss_visible_measurement_op(&event.instr_name) {
+            let key = LossVisibleMeasurementKey {
+                op_path: event.op_path.clone(),
+                repeat_iterations: event.repeat_iterations.clone(),
+                target_slot: event.target_slot,
+                target_qubit: event.target_qubit,
+                instr_name: event.instr_name.clone(),
+            };
+            let group = grouped.entry(key.clone()).or_insert_with(|| {
+                grouped_order.push(key.clone());
+                LossVisibleMeasurementGroup {
+                    key,
+                    loss_flag: None,
+                    value: None,
+                }
+            });
+            match event.component {
+                MeasurementComponent::LossFlag => {
+                    if group.loss_flag.is_some() {
+                        return Err(format!(
+                            "duplicate loss_flag component for loss-visible measurement at {:?} slot {}",
+                            group.key.op_path, group.key.target_slot
+                        ));
+                    }
+                    group.loss_flag = Some(event.clone());
+                }
+                MeasurementComponent::Value => {
+                    if group.value.is_some() {
+                        return Err(format!(
+                            "duplicate value component for loss-visible measurement at {:?} slot {}",
+                            group.key.op_path, group.key.target_slot
+                        ));
+                    }
+                    group.value = Some(event.clone());
+                }
+            }
+            continue;
+        }
+
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![event.target_slot],
+                label: Some(format_measurement_label(event)),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: None,
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "measurement",
+                    "instr_name": event.instr_name,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "measurement_index": event.measurement_index,
+                    "target_qubit": event.target_qubit,
+                    "bit": event.bit,
+                    "loss_cause": event.loss_cause,
+                    "component": measurement_component_name(&event.component),
+                })),
+            },
+        )?;
+    }
+
+    for key in grouped_order {
+        let Some(group) = grouped.remove(&key) else {
+            continue;
+        };
+        let (loss_flag, value) = loss_visible_group_components(&group)?;
+        add_annotation_at_path(
+            operations,
+            &group.key.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![group.key.target_slot],
+                label: Some(format_loss_visible_measurement_label(loss_flag, value)),
+                text: format_repeat_annotation_text(&group.key.repeat_iterations),
+                style: None,
+                tags: vec!["sample-trace".to_string(), "query-result".to_string()],
+                context: Some(loss_visible_measurement_context(&group, loss_flag, value)),
+            },
+        )?;
+    }
+
+    Ok(())
+}
+
+fn add_sample_detector_annotations(
+    operations: &mut [Qp101Operation],
+    trace: &SampleTrace,
+) -> Result<(), String> {
+    for event in &trace.detector_events {
+        if !event.flipped {
+            continue;
+        }
+        add_annotation_at_path(
+            operations,
+            &event.op_path,
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: Vec::new(),
+                label: Some(format!("D{}", event.detector_index)),
+                text: format_repeat_annotation_text(&event.repeat_iterations),
+                style: Some(info_annotation_style()),
+                tags: vec!["dem-symptom".to_string(), "query-result".to_string()],
+                context: Some(json!({
+                    "query_kind": "sample_trace",
+                    "annotation_kind": "detector",
+                    "detector_index": event.detector_index,
+                    "op_path": event.op_path,
+                    "repeat_iterations": event.repeat_iterations,
+                    "flipped": event.flipped,
+                })),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn is_loss_visible_measurement_op(name: &str) -> bool {
+    matches!(
+        name,
+        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+    )
+}
+
+fn validate_sample_trace_visualization_support(instrs: &[StimInstr]) -> Result<(), String> {
+    validate_sample_trace_visualization_support_inner(instrs, &mut Vec::new())
+}
+
+fn validate_sample_trace_visualization_support_inner(
+    instrs: &[StimInstr],
+    op_path: &mut Vec<usize>,
+) -> Result<(), String> {
+    for (op_index, instr) in instrs.iter().enumerate() {
+        op_path.push(op_index);
+        match instr {
+            StimInstr::Repeat { body, .. } => {
+                validate_sample_trace_visualization_support_inner(body, op_path)?;
+            }
+            StimInstr::Op { name, .. }
+                if emits_measurement_bits(name)
+                    && !is_sample_trace_visualization_measurement_op(name) =>
+            {
+                return Err(format!(
+                    "sample trace visualization does not yet support instruction {name} at op_path {:?}",
+                    op_path
+                ));
+            }
+            _ => {}
+        }
+        op_path.pop();
+    }
+    Ok(())
+}
+
+// Keep this in sync with qp101-viz/lib.typ's measurement-render-spec table.
+fn is_sample_trace_visualization_measurement_op(name: &str) -> bool {
+    matches!(
+        name,
+        "M"
+            | "MX"
+            | "MY"
+            | "MZ"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MRZ"
+            | "ML"
+            | "MXL"
+            | "MYL"
+            | "MZL"
+            | "MRL"
+            | "MRXL"
+            | "MRYL"
+            | "MRZL"
+    )
+}
+
+fn emits_measurement_bits(name: &str) -> bool {
+    matches!(
+        name,
+        "M"
+            | "MX"
+            | "MY"
+            | "MZ"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MRZ"
+            | "ML"
+            | "MXL"
+            | "MYL"
+            | "MZL"
+            | "MRL"
+            | "MRXL"
+            | "MRYL"
+            | "MRZL"
+            | "MPP"
+            | "MXX"
+            | "MYY"
+            | "MZZ"
+            | "MPAD"
+            | "HERALDED_ERASE"
+            | "HERALDED_PAULI_CHANNEL_1"
+    )
+}
+
+fn format_measurement_label(event: &MeasurementEvent) -> String {
+    if event.loss_cause {
+        "1[L]".to_string()
+    } else if event.bit {
+        "1".to_string()
+    } else {
+        "0".to_string()
+    }
+}
+
+fn loss_visible_group_components(
+    group: &LossVisibleMeasurementGroup,
+) -> Result<(&MeasurementEvent, &MeasurementEvent), String> {
+    let loss_flag = group.loss_flag.as_ref().ok_or_else(|| {
+        format!(
+            "loss-visible measurement at {:?} slot {} is missing loss_flag component",
+            group.key.op_path, group.key.target_slot
+        )
+    })?;
+    let value = group.value.as_ref().ok_or_else(|| {
+        format!(
+            "loss-visible measurement at {:?} slot {} is missing value component",
+            group.key.op_path, group.key.target_slot
+        )
+    })?;
+    Ok((loss_flag, value))
+}
+
+fn format_loss_visible_measurement_label(
+    loss_flag: &MeasurementEvent,
+    value: &MeasurementEvent,
+) -> String {
+    let loss_flag = if loss_flag.bit { "1" } else { "0" };
+    let value = format_measurement_label(value);
+    format!("L={loss_flag} | M={value}")
+}
+
+fn measurement_component_name(component: &MeasurementComponent) -> &'static str {
+    match component {
+        MeasurementComponent::Value => "value",
+        MeasurementComponent::LossFlag => "loss_flag",
+    }
+}
+
+fn loss_visible_measurement_context(
+    group: &LossVisibleMeasurementGroup,
+    loss_flag: &MeasurementEvent,
+    value: &MeasurementEvent,
+) -> serde_json::Value {
+    json!({
+        "query_kind": "sample_trace",
+        "annotation_kind": "measurement",
+        "loss_visible": true,
+        "instr_name": group.key.instr_name,
+        "op_path": group.key.op_path,
+        "repeat_iterations": group.key.repeat_iterations,
+        "target_qubit": group.key.target_qubit,
+        "components": {
+            "loss_flag": {
+                "measurement_index": loss_flag.measurement_index,
+                "bit": loss_flag.bit,
+            },
+            "value": {
+                "measurement_index": value.measurement_index,
+                "bit": value.bit,
+                "loss_cause": value.loss_cause,
+            }
+        },
+    })
+}
+
 fn add_annotation_at_path(
     operations: &mut [Qp101Operation],
     op_path: &[usize],
@@ -667,5 +1033,196 @@ fn is_noise_op(name: &str) -> bool {
             | "HERALDED_PAULI_CHANNEL_1"
             | "I_ERROR"
             | "II_ERROR"
+            | "LOSS"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sample_trace::{
+        DetectorEvent, MeasurementComponent, MeasurementEvent, NoiseEvent, SampleTrace,
+    };
+
+    #[test]
+    fn sample_trace_annotation_helpers_cover_continues_and_errors() {
+        let circuit = crate::parser::parse_lines("LOSS(1) 0\nMRL 0\nDETECTOR rec[-1]\n").unwrap();
+        let mut doc = export_qp101(&circuit).unwrap();
+
+        let trace = SampleTrace {
+            noise_events: vec![NoiseEvent {
+                op_path: vec![0],
+                repeat_iterations: vec![],
+                instr_name: "LOSS".to_string(),
+                target_slots: vec![0],
+                target_qubits: vec![0],
+                occurred: false,
+                branch_label: None,
+            }],
+            measurement_events: vec![
+                MeasurementEvent {
+                    op_path: vec![1],
+                    repeat_iterations: vec![],
+                    target_slot: 0,
+                    target_qubit: 0,
+                    instr_name: "MRL".to_string(),
+                    measurement_index: 1,
+                    bit: true,
+                    loss_cause: false,
+                    component: MeasurementComponent::LossFlag,
+                },
+                MeasurementEvent {
+                    op_path: vec![1],
+                    repeat_iterations: vec![],
+                    target_slot: 0,
+                    target_qubit: 0,
+                    instr_name: "MRL".to_string(),
+                    measurement_index: 2,
+                    bit: true,
+                    loss_cause: true,
+                    component: MeasurementComponent::Value,
+                },
+            ],
+            detector_events: vec![DetectorEvent {
+                op_path: vec![2],
+                repeat_iterations: vec![],
+                detector_index: 0,
+                flipped: true,
+            }],
+        };
+
+        add_sample_noise_annotations(&mut doc.operations, &trace).unwrap();
+        add_sample_measurement_annotations(&mut doc.operations, &trace).unwrap();
+        add_sample_detector_annotations(&mut doc.operations, &trace).unwrap();
+
+        match &doc.operations[0] {
+            Qp101Operation::Noise { annotations, .. } => assert!(annotations.is_empty()),
+            other => panic!("unexpected op: {other:?}"),
+        }
+        match &doc.operations[1] {
+            Qp101Operation::Gate { annotations, .. } => assert_eq!(annotations.len(), 1),
+            other => panic!("unexpected op: {other:?}"),
+        }
+        match &doc.operations[2] {
+            Qp101Operation::Detector { annotations, .. } => assert_eq!(annotations.len(), 1),
+            other => panic!("unexpected op: {other:?}"),
+        }
+
+        let mut repeat_doc = export_qp101(&crate::parser::parse_lines("REPEAT 1 {\n  MRL 0\n}\n").unwrap()).unwrap();
+        let err = add_annotation_at_path(
+            &mut repeat_doc.operations,
+            &[],
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![],
+                label: None,
+                text: None,
+                style: None,
+                tags: vec![],
+                context: None,
+            },
+        )
+        .unwrap_err();
+        assert!(err.contains("missing an op_path"));
+        assert!(add_annotation_at_path(
+            &mut repeat_doc.operations,
+            &[99],
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![],
+                label: None,
+                text: None,
+                style: None,
+                tags: vec![],
+                context: None,
+            },
+        )
+        .is_err());
+        assert!(add_annotation_at_path(
+            &mut repeat_doc.operations,
+            &[0, 0],
+            Qp101Annotation {
+                kind: "marker".to_string(),
+                target_slots: vec![],
+                label: None,
+                text: None,
+                style: None,
+                tags: vec![],
+                context: None,
+            },
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn export_helpers_cover_remaining_target_and_basis_paths() {
+        assert_eq!(
+            export_pauli_basis(PauliBasis::X),
+            Qp101PauliBasis::X
+        );
+        assert_eq!(
+            export_pauli_basis(PauliBasis::Y),
+            Qp101PauliBasis::Y
+        );
+        assert_eq!(
+            export_pauli_basis(PauliBasis::Z),
+            Qp101PauliBasis::Z
+        );
+
+        assert_eq!(
+            export_targets(&[
+                StimTarget::Qubit(1),
+                StimTarget::QubitInv(2),
+                StimTarget::Rec(-3),
+                StimTarget::Pauli {
+                    qubit: 4,
+                    basis: PauliBasis::X,
+                    inverted: true,
+                },
+                StimTarget::Combiner,
+                StimTarget::Sweep(9),
+            ]),
+            vec![
+                Qp101TargetRef::Qubit {
+                    index: 1,
+                    inverted: None,
+                },
+                Qp101TargetRef::Qubit {
+                    index: 2,
+                    inverted: Some(true),
+                },
+                Qp101TargetRef::Rec { offset: -3 },
+                Qp101TargetRef::Pauli {
+                    basis: Qp101PauliBasis::X,
+                    qubit: 4,
+                    inverted: Some(true),
+                },
+                Qp101TargetRef::Combiner,
+                Qp101TargetRef::Sweep { index: 9 },
+            ]
+        );
+
+        assert_eq!(
+            export_rec_sources("DETECTOR", &[StimTarget::Rec(-1)]).unwrap(),
+            vec![Qp101TargetRef::Rec { offset: -1 }]
+        );
+        assert!(export_rec_sources("DETECTOR", &[StimTarget::Qubit(0)]).is_err());
+
+        assert!(validate_no_args_or_targets("TICK", &[1.0], &[]).is_err());
+        assert!(validate_no_args_or_targets("TICK", &[], &[StimTarget::Qubit(0)]).is_err());
+        assert!(validate_no_targets("TICK", &[StimTarget::Qubit(0)]).is_err());
+        assert!(validate_no_targets("TICK", &[]).is_ok());
+
+        assert_eq!(parse_observable_index(&[2.0]).unwrap(), 2);
+        assert!(parse_observable_index(&[]).is_err());
+        assert!(parse_observable_index(&[-1.0]).is_err());
+        assert!(parse_observable_index(&[0.5]).is_err());
+        assert!(parse_observable_index(&[u32::MAX as f64 + 1.0]).is_err());
+
+        assert!(export_plain_qubit_targets("QUBIT_COORDS", &[StimTarget::Qubit(0)]).is_ok());
+        assert!(export_plain_qubit_targets("QUBIT_COORDS", &[StimTarget::Rec(-1)]).is_err());
+
+        assert!(is_noise_op("LOSS"));
+        assert!(!is_noise_op("H"));
+    }
 }

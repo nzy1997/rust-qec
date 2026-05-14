@@ -160,6 +160,78 @@ fn export_json_can_highlight_dem_error_origins() {
 }
 
 #[test]
+fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--seed", "7"],
+        "DEPOLARIZE1(1) 0\nLOSS(1) 1\nLOSS(1) 2\nM 1\nMRL 2\nDETECTOR rec[-3]\n",
+    );
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let operations = value["operations"].as_array().unwrap();
+    let find_gate = |op_type: &str, gate: &str| {
+        operations
+            .iter()
+            .find(|op| op["type"] == op_type && op["gate"] == gate)
+            .unwrap()
+    };
+
+    let depolarize = find_gate("noise", "DEPOLARIZE1");
+    let depolarize_annotation = &depolarize["annotations"][0];
+    assert_eq!(depolarize_annotation["label"], "X");
+    assert_eq!(depolarize_annotation["context"]["branch_label"], "X");
+
+    let loss_annotations = operations
+        .iter()
+        .filter(|op| op["type"] == "noise" && op["gate"] == "LOSS")
+        .map(|op| &op["annotations"][0])
+        .collect::<Vec<_>>();
+    assert_eq!(loss_annotations.len(), 2);
+    assert_eq!(loss_annotations[0]["label"], "L");
+    assert_eq!(loss_annotations[0]["context"]["target_qubits"], serde_json::json!([1]));
+    assert_eq!(loss_annotations[1]["label"], "L");
+    assert_eq!(loss_annotations[1]["context"]["target_qubits"], serde_json::json!([2]));
+
+    let measurement = find_gate("gate", "M");
+    let measurement_annotation = &measurement["annotations"][0];
+    assert_eq!(measurement_annotation["label"], "1[L]");
+    assert_eq!(measurement_annotation["context"]["target_qubit"], 1);
+    assert_eq!(measurement_annotation["context"]["measurement_index"], 1);
+    assert_eq!(measurement_annotation["context"]["loss_cause"], true);
+
+    let loss_visible_measurement = find_gate("gate", "MRL");
+    let loss_visible_annotation = &loss_visible_measurement["annotations"][0];
+    assert_eq!(loss_visible_annotation["label"], "L=1 | M=1[L]");
+    assert_eq!(loss_visible_annotation["context"]["target_qubit"], 2);
+    assert_eq!(loss_visible_annotation["context"]["loss_visible"], true);
+    assert_eq!(
+        loss_visible_annotation["context"]["components"]["loss_flag"],
+        serde_json::json!({
+            "bit": true,
+            "measurement_index": 2,
+        })
+    );
+    assert_eq!(
+        loss_visible_annotation["context"]["components"]["value"],
+        serde_json::json!({
+            "bit": true,
+            "loss_cause": true,
+            "measurement_index": 3,
+        })
+    );
+
+    let detector = operations.iter().find(|op| op["type"] == "detector").unwrap();
+    let detector_annotation = &detector["annotations"][0];
+    assert_eq!(detector_annotation["label"], "D0");
+    assert_eq!(detector_annotation["context"]["detector_index"], 0);
+    assert_eq!(detector_annotation["context"]["flipped"], true);
+}
+
+#[test]
 fn export_json_can_highlight_dem_error_to_compact_output_file() {
     let input = tempfile::NamedTempFile::new().unwrap();
     let out = tempfile::NamedTempFile::new().unwrap();
@@ -210,6 +282,25 @@ fn export_json_rejects_invalid_highlight_dem_error_index() {
 }
 
 #[test]
+fn export_json_rejects_seed_without_sample_shot() {
+    let output = run_export_json_with_stdin(&["--seed", "1"], "M 0\n");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--seed is only supported with --sample_shot"));
+}
+
+#[test]
+fn export_json_rejects_sample_shot_with_highlight_dem_error() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--highlight_dem_error", "0"],
+        "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--sample_shot cannot be combined with --highlight_dem_error"));
+}
+
+#[test]
 fn export_json_reports_unsupported_highlight_instruction_clearly() {
     let output = run_export_json_with_stdin(
         &["--highlight_dem_error", "0"],
@@ -221,6 +312,20 @@ fn export_json_reports_unsupported_highlight_instruction_clearly() {
         "--highlight_dem_error currently supports a subset of noise instructions"
     ));
     assert!(stderr.contains("DEPOLARIZE2"));
+}
+
+#[test]
+fn export_json_reports_unsupported_sample_visualization_instruction_clearly() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--seed", "1"],
+        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(
+        "--sample_shot currently supports a subset of sample visualization instructions"
+    ));
+    assert!(stderr.contains("HERALDED_ERASE"));
 }
 
 #[test]

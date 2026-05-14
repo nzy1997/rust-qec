@@ -7,15 +7,58 @@ A Rust implementation of Stim-like stabilizer circuit simulation.
 
 ## Current Features
 - Clifford/stabilizer simulator with basic gates and measurements
+- Atom-loss-aware simulation with `LOSS`, loss-visible measurement gates, and loss-caused measurement outcomes
 - Detector/observable semantics with `rec[]`
 - `REPEAT` blocks and case-insensitive parsing
 - Coordinate annotations: `QUBIT_COORDS`, `SHIFT_COORDS`, `TICK`
 - Pauli noise channels: `X_ERROR`, `Z_ERROR`, `DEPOLARIZE1/2`
+- QP101 export for both raw circuits and single-shot sample overlays
 
 ## CLI Workflow
 
 `rstim` already includes a CLI for inspecting, sampling, analyzing, generating,
 and exporting circuits.
+
+## Atom Loss Workflow
+
+Atom loss is a first-class workflow in `rstim`, not an afterthought bolted onto
+generic Pauli noise. The simulator can model explicit `LOSS` events, carry that
+state through later gates, and distinguish between an ordinary `1` measurement
+and a `1` that happened because the atom was lost.
+
+For example, this circuit injects a Pauli error on `q0`, loses atoms on `q1`
+and `q2`, then records both a normal measurement and a loss-visible
+measurement:
+
+```stim
+DEPOLARIZE1(1) 0
+LOSS(1) 1
+LOSS(1) 2
+M 1
+MRL 2
+DETECTOR rec[-3]
+```
+
+You can export one seeded sample shot as QP101 JSON with inline annotations:
+
+```sh
+cargo run -p rstim --bin rstim -- export_json --sample_shot --seed 7 < qp101-viz/examples/atom-loss-sample.stim
+```
+
+That shot marks the fired depolarizing branch, the two loss events, the `1[L]`
+measurement caused by loss, the `MRL` pair `L=1 | M=1[L]`, and the flipped
+detector. The matching `qp101-viz` demo lives at
+[`qp101-viz/examples/atom-loss-sample.typ`](qp101-viz/examples/atom-loss-sample.typ)
+with its exported sample result in
+[`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json).
+
+For a larger example, see
+[`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ),
+which shows both the source circuit and one seeded sample shot for a rotated
+surface-code memory-X experiment with `d=3`, `r=3`, and atom-loss noise
+inserted onto every data qubit at the start of each round. This example uses
+the default measurement path, so loss-caused outcomes appear as `1[L]` on the
+ordinary measurement gates instead of a separate loss-flag/value pair.
 
 Use `rstim stats` to inspect a circuit before running heavier workflows:
 

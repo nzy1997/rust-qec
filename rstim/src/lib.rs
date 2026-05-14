@@ -23,3 +23,4 @@ pub mod codegen;
 pub mod m2d;
 pub mod explain_errors;
 pub mod qp101;
+pub mod sample_trace;
