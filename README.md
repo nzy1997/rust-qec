@@ -55,10 +55,26 @@ with its exported sample result in
 For a larger example, see
 [`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ),
 which shows both the source circuit and one seeded sample shot for a rotated
-surface-code memory-X experiment with `d=3`, `r=3`, and atom-loss noise
-inserted onto every data qubit at the start of each round. This example uses
-the default measurement path, so loss-caused outcomes appear as `1[L]` on the
-ordinary measurement gates instead of a separate loss-flag/value pair.
+surface-code memory-X experiment with `d=3`, `r=3`, sparse `LOSS`,
+`X_ERROR`, `Z_ERROR`, `DEPOLARIZE1`, and `DEPOLARIZE2` insertions, and fixed
+sample seed `7`. This example uses the default measurement path, so
+loss-caused outcomes appear as `1[L]` on the ordinary measurement gates
+instead of a separate loss-flag/value pair.
+
+To regenerate the source `.stim`, base QP101 JSON, and seeded sample QP101
+JSON for that showcase, run:
+
+```sh
+cargo run -p rstim --example mixed_noise_showcase
+```
+
+That command rewrites:
+
+- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim`
+- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.qp101.json`
+- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss-sample.qp101.json`
+- `rstim/tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise.json`
+- `rstim/tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json`
 
 Use `rstim stats` to inspect a circuit before running heavier workflows:
 

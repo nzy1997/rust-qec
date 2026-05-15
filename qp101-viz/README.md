@@ -51,8 +51,16 @@ typst compile --root qp101-viz qp101-viz/examples/surface-code-rotated-memory-x-
 ```
 
 That file renders both the source circuit and a seeded sample shot for a
-rotated surface-code memory-X circuit with `d=3`, `r=3`, and per-round atom
-loss on the data qubits.
+rotated surface-code memory-X circuit with `d=3`, `r=3`, sparse mixed noise
+(`LOSS`, `X_ERROR`, `Z_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`), and fixed sample
+seed `7`.
+
+To regenerate the bundled source `.stim` plus both JSON artifacts for that
+showcase, run from the repository root:
+
+```sh
+cargo run -p rstim --example mixed_noise_showcase
+```
 
 ## Repository Layout
 

@@ -10,7 +10,7 @@
   gate_padding: 0.28em,
 )
 
-= rotated surface code memory X, d=3, r=3, atom loss on data each round
+= rotated surface code memory X, d=3, r=3, sparse mixed noise
 
 == Source circuit
 
