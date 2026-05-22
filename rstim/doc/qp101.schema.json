@@ -1,0 +1,462 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nzy1997.github.io/rstim/qp101.schema.json",
+  "title": "QP101-ZY Quantum Circuit JSON Format",
+  "description": "Structural JSON Schema for QP101-ZY draft v1.0 quantum circuit documents. Semantic validation rules remain in the QP101-ZY markdown specification.",
+  "type": "object",
+  "required": ["standard", "version", "num_qubits", "operations"],
+  "additionalProperties": true,
+  "properties": {
+    "standard": {
+      "const": "QP101-ZY",
+      "description": "Protocol identifier."
+    },
+    "version": {
+      "const": "1.0",
+      "description": "Protocol version string for this draft."
+    },
+    "num_qubits": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Total number of qubits in the circuit."
+    },
+    "operations": {
+      "type": "array",
+      "description": "Ordered operation stream preserving execution order.",
+      "items": {
+        "$ref": "#/$defs/operation"
+      }
+    },
+    "metadata": {
+      "$ref": "#/$defs/objectValue",
+      "description": "Framework-neutral metadata such as source tool, generator info, description, or authoring notes."
+    },
+    "extensions": {
+      "$ref": "#/$defs/objectValue",
+      "description": "Non-sequential extension data for rendering, interoperability, or future domains."
+    }
+  },
+  "$defs": {
+    "jsonValue": {
+      "description": "Any JSON value.",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        }
+      ]
+    },
+    "objectValue": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "numberArray": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "qubitIndexArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonNegativeInteger"
+      }
+    },
+    "operation": {
+      "description": "One ordered QP101-ZY operation.",
+      "oneOf": [
+        { "$ref": "#/$defs/gateOperation" },
+        { "$ref": "#/$defs/repeatOperation" },
+        { "$ref": "#/$defs/tickOperation" },
+        { "$ref": "#/$defs/qubitCoordsOperation" },
+        { "$ref": "#/$defs/shiftCoordsOperation" },
+        { "$ref": "#/$defs/detectorOperation" },
+        { "$ref": "#/$defs/observableIncludeOperation" },
+        { "$ref": "#/$defs/noiseOperation" },
+        { "$ref": "#/$defs/annotationOperation" }
+      ]
+    },
+    "operationAnnotations": {
+      "type": "array",
+      "description": "Renderer hints, analysis overlays, query results, or other optional markings attached to this operation.",
+      "items": {
+        "$ref": "#/$defs/annotation"
+      }
+    },
+    "gateOperation": {
+      "type": "object",
+      "description": "Generic circuit gate operation.",
+      "required": ["type", "gate"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "gate" },
+        "gate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targets": {
+          "$ref": "#/$defs/qubitIndexArray"
+        },
+        "controls": {
+          "$ref": "#/$defs/qubitIndexArray"
+        },
+        "control_configs": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "params": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "raw_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/targetRef"
+          }
+        },
+        "display": {
+          "$ref": "#/$defs/display"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["targets"],
+          "properties": {
+            "targets": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["controls"],
+          "properties": {
+            "controls": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["raw_targets"],
+          "properties": {
+            "raw_targets": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "repeatOperation": {
+      "type": "object",
+      "description": "Nested repeat block preserving hierarchical circuit structure.",
+      "required": ["type", "count", "body"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "repeat" },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "tickOperation": {
+      "type": "object",
+      "description": "Explicit execution marker.",
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "tick" },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "qubitCoordsOperation": {
+      "type": "object",
+      "description": "Coordinate declaration for one or more qubits.",
+      "required": ["type", "coords", "targets"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "qubit_coords" },
+        "coords": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "targets": {
+          "$ref": "#/$defs/qubitIndexArray"
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "shiftCoordsOperation": {
+      "type": "object",
+      "description": "Coordinate offset marker.",
+      "required": ["type", "delta"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "shift_coords" },
+        "delta": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "detectorOperation": {
+      "type": "object",
+      "description": "Detector annotation over measurement record sources.",
+      "required": ["type", "sources"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "detector" },
+        "coords": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/targetRef"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "observableIncludeOperation": {
+      "type": "object",
+      "description": "Logical observable include annotation over measurement record sources.",
+      "required": ["type", "index", "sources"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "observable_include" },
+        "index": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/targetRef"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "noiseOperation": {
+      "type": "object",
+      "description": "Noise or fault operator.",
+      "required": ["type", "gate", "raw_targets"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "noise" },
+        "gate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "$ref": "#/$defs/numberArray"
+        },
+        "raw_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/targetRef"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "annotationOperation": {
+      "type": "object",
+      "description": "Human-readable annotation operation inside the ordered stream.",
+      "required": ["type", "kind", "text"],
+      "additionalProperties": true,
+      "properties": {
+        "type": { "const": "annotation" },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string"
+        },
+        "annotations": {
+          "$ref": "#/$defs/operationAnnotations"
+        }
+      }
+    },
+    "targetRef": {
+      "description": "Raw target or source-reference object.",
+      "oneOf": [
+        { "$ref": "#/$defs/qubitTargetRef" },
+        { "$ref": "#/$defs/recTargetRef" },
+        { "$ref": "#/$defs/pauliTargetRef" },
+        { "$ref": "#/$defs/combinerTargetRef" },
+        { "$ref": "#/$defs/sweepTargetRef" }
+      ]
+    },
+    "qubitTargetRef": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "const": "qubit" },
+        "index": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "inverted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "recTargetRef": {
+      "type": "object",
+      "required": ["kind", "offset"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "const": "rec" },
+        "offset": {
+          "type": "integer"
+        }
+      }
+    },
+    "pauliTargetRef": {
+      "type": "object",
+      "required": ["kind", "basis", "qubit"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "const": "pauli" },
+        "basis": {
+          "enum": ["X", "Y", "Z"]
+        },
+        "qubit": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "inverted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "combinerTargetRef": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "const": "combiner" }
+      }
+    },
+    "sweepTargetRef": {
+      "type": "object",
+      "required": ["kind", "index"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "const": "sweep" },
+        "index": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "description": "Operation-local renderer hint, analysis overlay, or query result marker.",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        },
+        "label": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/annotationStyle"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "context": {
+          "$ref": "#/$defs/objectValue"
+        }
+      }
+    },
+    "annotationStyle": {
+      "type": "object",
+      "description": "Generic style hints for operation-local annotations.",
+      "additionalProperties": true,
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "highlight": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

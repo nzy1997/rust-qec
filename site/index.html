@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QP101-ZY Schema Browser</title>
+    <meta
+      name="description"
+      content="Download and browse the QP101-ZY quantum circuit JSON Schema."
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="top-nav" aria-label="Primary">
+        <a href="#schema-browser">Schema</a>
+        <a href="#operations">Operations</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#examples">Examples</a>
+      </nav>
+      <div class="hero">
+        <p class="eyebrow">Quantum circuit interchange</p>
+        <h1>QP101-ZY</h1>
+        <p class="hero-copy">
+          A JSON format for ordered quantum circuits, repeat blocks, detector
+          annotations, noise events, and visualization metadata used by
+          <code>rstim</code> and <code>qp101-viz</code>.
+        </p>
+        <div class="actions" aria-label="QP101 resources">
+          <a class="button primary" href="qp101.schema.json" download>
+            Download JSON Schema
+          </a>
+          <a class="button" href="QP101-ZY.md">Read Protocol Draft</a>
+          <a class="button" href="examples/basic.qp101.json">View Example</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro-grid" aria-label="QP101 summary">
+        <article>
+          <h2>Core Model</h2>
+          <p>
+            QP101 documents keep execution order in an <code>operations</code>
+            stream instead of flattening everything into gates. The schema
+            covers gates, ticks, repeats, coordinates, detectors, observables,
+            noise, and annotations.
+          </p>
+        </article>
+        <article>
+          <h2>Extensible By Design</h2>
+          <p>
+            Tool-specific data belongs in <code>metadata</code>,
+            <code>extensions</code>, or operation-local annotations. The schema
+            validates the stable structure while keeping room for downstream
+            renderers and analysis tools.
+          </p>
+        </article>
+        <article>
+          <h2>Validation Boundary</h2>
+          <p>
+            The schema checks document shape. Whole-document semantic rules,
+            such as comparing target indices with <code>num_qubits</code>, stay
+            in the protocol draft.
+          </p>
+        </article>
+      </section>
+
+      <section id="schema-browser" class="panel">
+        <div class="section-heading">
+          <p class="eyebrow">Interactive reference</p>
+          <h2>Schema Browser</h2>
+        </div>
+        <div class="schema-shell">
+          <aside class="schema-nav" aria-label="Schema navigation">
+            <div class="schema-nav-header">
+              <span>Definitions</span>
+              <span id="schema-status" class="status">Loading</span>
+            </div>
+            <div id="schema-nav-list" class="schema-nav-list"></div>
+          </aside>
+          <article id="schema-detail" class="schema-detail" aria-live="polite">
+            <h3>Loading schema</h3>
+            <p>Fetching <code>qp101.schema.json</code>.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="operations">
+        <div class="section-heading">
+          <p class="eyebrow">Ordered operation stream</p>
+          <h2>Operation Types</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Purpose</th>
+                <th>Core Fields</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>gate</code></td>
+                <td>Generic quantum gate or measurement operation.</td>
+                <td><code>gate</code>, <code>targets</code>, <code>controls</code>, <code>raw_targets</code></td>
+              </tr>
+              <tr>
+                <td><code>repeat</code></td>
+                <td>Nested block that preserves repeated circuit structure.</td>
+                <td><code>count</code>, <code>body</code></td>
+              </tr>
+              <tr>
+                <td><code>tick</code></td>
+                <td>Explicit timing separator.</td>
+                <td><code>type</code></td>
+              </tr>
+              <tr>
+                <td><code>qubit_coords</code></td>
+                <td>Coordinate declaration for one or more qubits.</td>
+                <td><code>coords</code>, <code>targets</code></td>
+              </tr>
+              <tr>
+                <td><code>shift_coords</code></td>
+                <td>Coordinate offset marker.</td>
+                <td><code>delta</code></td>
+              </tr>
+              <tr>
+                <td><code>detector</code></td>
+                <td>Detector annotation over measurement record sources.</td>
+                <td><code>coords</code>, <code>sources</code></td>
+              </tr>
+              <tr>
+                <td><code>observable_include</code></td>
+                <td>Logical observable include annotation.</td>
+                <td><code>index</code>, <code>sources</code></td>
+              </tr>
+              <tr>
+                <td><code>noise</code></td>
+                <td>Noise or fault operator preserving raw targets.</td>
+                <td><code>gate</code>, <code>params</code>, <code>raw_targets</code></td>
+              </tr>
+              <tr>
+                <td><code>annotation</code></td>
+                <td>Human-readable stream annotation.</td>
+                <td><code>kind</code>, <code>text</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="gallery">
+        <div class="section-heading">
+          <p class="eyebrow">Rendered with qp101-viz</p>
+          <h2>Circuit Gallery</h2>
+        </div>
+        <div class="gallery-grid">
+          <article class="gallery-card">
+            <div class="gallery-copy">
+              <div class="example-heading">
+                <h3>Basic Circuit</h3>
+                <a href="examples/basic.qp101.json">JSON</a>
+              </div>
+              <p>
+                Minimal gate, control, tick, and measurement structure rendered
+                from the same QP101 example shipped with the site.
+              </p>
+              <div class="gallery-links">
+                <a href="examples/basic.qp101.json">Example JSON</a>
+                <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/basic-site.typ">Typst source</a>
+              </div>
+            </div>
+            <div class="gallery-preview">
+              <img
+                src="gallery/basic-site.svg"
+                alt="Rendered basic QP101 circuit with H, controlled X, tick, and measurement"
+              >
+            </div>
+          </article>
+          <article class="gallery-card">
+            <div class="gallery-copy">
+              <div class="example-heading">
+                <h3>Repeat Detector</h3>
+                <a href="examples/repeat-detector.qp101.json">JSON</a>
+              </div>
+              <p>
+                A compact QEC-style example showing repeat structure,
+                measurement anchors, and detector semantics.
+              </p>
+              <div class="gallery-links">
+                <a href="examples/repeat-detector.qp101.json">Example JSON</a>
+                <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/repeat-detector-site.typ">Typst source</a>
+              </div>
+            </div>
+            <div class="gallery-preview">
+              <img
+                src="gallery/repeat-detector-site.svg"
+                alt="Rendered repeated QP101 detector circuit with CX, measurement, and detector box"
+              >
+            </div>
+          </article>
+          <article class="gallery-card">
+            <div class="gallery-copy">
+              <div class="example-heading">
+                <h3>Atom Loss Sample</h3>
+                <a href="examples/atom-loss-sample.qp101.json">JSON</a>
+              </div>
+              <p>
+                Sample-trace annotations rendered inline, including atom loss,
+                measurement results, and detector flips.
+              </p>
+              <div class="gallery-links">
+                <a href="examples/atom-loss-sample.qp101.json">Example JSON</a>
+                <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/atom-loss-sample.typ">Typst source</a>
+              </div>
+            </div>
+            <div class="gallery-preview">
+              <img
+                src="gallery/atom-loss-sample.svg"
+                alt="Rendered atom loss sample circuit with inline noise and detector annotations"
+              >
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="examples">
+        <div class="section-heading">
+          <p class="eyebrow">Concrete documents</p>
+          <h2>Examples</h2>
+        </div>
+        <div class="example-grid">
+          <article>
+            <div class="example-heading">
+              <h3>Minimal Gate Circuit</h3>
+              <a href="examples/basic.qp101.json">Download</a>
+            </div>
+            <pre><code>{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 2,
+  "operations": [
+    { "type": "gate", "gate": "H", "targets": [0] },
+    {
+      "type": "gate",
+      "gate": "X",
+      "targets": [1],
+      "controls": [0],
+      "control_configs": [true]
+    },
+    { "type": "tick" },
+    { "type": "gate", "gate": "M", "targets": [0, 1] }
+  ]
+}</code></pre>
+          </article>
+          <article>
+            <div class="example-heading">
+              <h3>Repeat And Detector</h3>
+              <a href="examples/repeat-detector.qp101.json">Download</a>
+            </div>
+            <pre><code>{
+  "type": "repeat",
+  "count": 2,
+  "body": [
+    { "type": "gate", "gate": "CX", "targets": [0, 1] },
+    { "type": "tick" },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    {
+      "type": "detector",
+      "coords": [1.0, 0.0, 0.0],
+      "sources": [
+        { "kind": "rec", "offset": -1 }
+      ]
+    }
+  ]
+}</code></pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>QP101-ZY draft v1.0</span>
+      <a href="https://github.com/nzy1997/rstim">Repository</a>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-.PHONY: help test check release
+.PHONY: help test check build-site release
 
 DEFAULT_BRANCH ?= master
 
@@ -9,6 +9,7 @@ help:
 	@echo "Available targets:"
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
+	@echo "  build-site           - Build the QP101 GitHub Pages site into _site"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -16,6 +17,19 @@ test:
 
 check:
 	cargo check --workspace
+
+build-site:
+	rm -rf _site
+	mkdir -p _site/examples _site/gallery
+	cp site/index.html site/styles.css site/app.js _site/
+	cp rstim/doc/qp101.schema.json _site/qp101.schema.json
+	cp rstim/doc/QP101-ZY.md _site/QP101-ZY.md
+	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
+	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
+	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
+	typst compile --format svg --root qp101-viz qp101-viz/examples/basic-site.typ _site/gallery/basic-site.svg
+	typst compile --format svg --root qp101-viz qp101-viz/examples/repeat-detector-site.typ _site/gallery/repeat-detector-site.svg
+	typst compile --format svg --root qp101-viz qp101-viz/examples/atom-loss-sample.typ _site/gallery/atom-loss-sample.svg
 
 # Release a new version: make release V=0.2.0
 release:

@@ -15,6 +15,7 @@ cobertura.xml
 
 # Build artifacts
 *.rlib
+/_site/
 
 drafts/
 .DS_Store

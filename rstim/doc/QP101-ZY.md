@@ -68,6 +68,18 @@ The top-level `gates` array used by earlier draft text is not part of this draft
 
 Execution order lives in `operations`. Non-sequential or auxiliary data belongs in `metadata` or `extensions`.
 
+### Machine-Readable Schema
+
+This draft includes a structural JSON Schema at
+[`qp101.schema.json`](qp101.schema.json). The schema is intended for download,
+editor integration, and automated validation of the core document shape.
+
+The schema intentionally remains extension-friendly: tool-specific fields may
+appear in protocol objects, and `metadata`, `extensions`, and annotation
+`context` values may carry arbitrary JSON objects. Semantic rules that depend
+on whole-document context, such as checking qubit indices against
+`num_qubits`, remain part of this markdown specification's validation rules.
+
 ## Operation Model
 
 Each item in `operations` MUST contain a string `type` field. The protocol defines one generic core operation and a set of standard extension operations.
