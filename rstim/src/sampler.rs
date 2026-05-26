@@ -1,5 +1,8 @@
 use rand::Rng;
 
+use crate::compiled::{
+    choose_sampler_path, compile_circuit, sample_compiled_batch, CompiledPathDecision,
+};
 use crate::data_path::build_reference_sample;
 use crate::executor::Executor;
 use crate::executor::max_qubit;
@@ -14,12 +17,60 @@ pub struct BatchOutput {
     pub observable_flips: BitTable,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SamplingBackend {
+    #[default]
+    Auto,
+    Interpreted,
+    Compiled,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SampleOptions {
     pub reference_sample_mode: crate::data_path::ReferenceSampleMode,
+    pub backend: SamplingBackend,
 }
 
 pub fn sample_batch_with_options(
+    instrs: &[StimInstr],
+    n_shots: usize,
+    rng: &mut impl Rng,
+    options: SampleOptions,
+) -> Result<BatchOutput, String> {
+    match options.backend {
+        SamplingBackend::Interpreted => sample_batch_interpreted(instrs, n_shots, rng, options),
+        SamplingBackend::Compiled => {
+            let compiled = compile_circuit(instrs)?;
+            match choose_sampler_path(&compiled) {
+                CompiledPathDecision::FastPath => {
+                    sample_compiled_batch(&compiled, n_shots, rng, options)
+                }
+                CompiledPathDecision::Fallback(reason) => Err(reason.to_string()),
+            }
+        }
+        SamplingBackend::Auto => {
+            let compiled = compile_circuit(instrs)?;
+            match choose_sampler_path(&compiled) {
+                CompiledPathDecision::FastPath => {
+                    sample_compiled_batch(&compiled, n_shots, rng, options)
+                }
+                CompiledPathDecision::Fallback(_) => {
+                    sample_batch_interpreted(instrs, n_shots, rng, options)
+                }
+            }
+        }
+    }
+}
+
+pub fn sample_batch(
+    instrs: &[StimInstr],
+    n_shots: usize,
+    rng: &mut impl Rng,
+) -> Result<BatchOutput, String> {
+    sample_batch_with_options(instrs, n_shots, rng, SampleOptions::default())
+}
+
+fn sample_batch_interpreted(
     instrs: &[StimInstr],
     n_shots: usize,
     rng: &mut impl Rng,
@@ -43,14 +94,6 @@ pub fn sample_batch_with_options(
         detections,
         observable_flips,
     })
-}
-
-pub fn sample_batch(
-    instrs: &[StimInstr],
-    n_shots: usize,
-    rng: &mut impl Rng,
-) -> Result<BatchOutput, String> {
-    sample_batch_with_options(instrs, n_shots, rng, SampleOptions::default())
 }
 
 fn sample_batch_with_executor(
@@ -136,6 +179,7 @@ mod tests {
             &mut rng,
             SampleOptions {
                 reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
+                ..SampleOptions::default()
             },
         );
 

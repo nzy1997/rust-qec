@@ -605,6 +605,7 @@ pub fn run_sample(
         } else {
             crate::data_path::ReferenceSampleMode::SimulateNoiseless
         },
+        ..SampleOptions::default()
     };
     let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
     match fmt {
@@ -690,6 +691,7 @@ pub fn run_analyze_errors_with_flags(
 ) -> Result<(), String> {
     let instrs = parse_lines(circuit_text)?;
     let options = crate::error_analyzer::AnalyzeOptions {
+        backend: crate::error_analyzer::AnalyzeBackend::Auto,
         approximate_disjoint_errors,
         allow_gauge_detectors,
     };

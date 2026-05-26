@@ -30,6 +30,7 @@ fn circuit_to_dem_with_options(
     ErrorAnalyzer::circuit_to_dem_with_options(
         &instrs,
         AnalyzeOptions {
+            backend: Default::default(),
             approximate_disjoint_errors,
             allow_gauge_detectors,
         },
@@ -849,6 +850,7 @@ fn circuit_to_dem_with_options_decomposed_respects_phase2_flags() {
     let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
         &instrs,
         AnalyzeOptions {
+            backend: Default::default(),
             approximate_disjoint_errors: true,
             allow_gauge_detectors: false,
         },
@@ -863,6 +865,7 @@ fn circuit_to_dem_with_options_decomposed_allows_gauge_detectors() {
     let dem = ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
         &instrs,
         AnalyzeOptions {
+            backend: Default::default(),
             approximate_disjoint_errors: false,
             allow_gauge_detectors: true,
         },

@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::compiled::CompiledBlock;
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
@@ -44,6 +45,29 @@ impl FrameSimulator {
                 StimInstr::Repeat { count, body } => {
                     for _ in 0..*count {
                         self.run(body, ref_sample, rng)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn run_compiled_blocks(
+        &mut self,
+        blocks: &[CompiledBlock],
+        ref_sample: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        for block in blocks {
+            match block {
+                CompiledBlock::Ops(ops) => {
+                    for op in ops {
+                        self.exec_op(op.name.as_str(), &op.args, &op.targets, ref_sample, rng)?;
+                    }
+                }
+                CompiledBlock::Repeat(region) => {
+                    for _ in 0..region.count {
+                        self.run_compiled_blocks(&region.body, ref_sample, rng)?;
                     }
                 }
             }

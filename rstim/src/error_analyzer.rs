@@ -7,8 +7,17 @@ use crate::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use crate::dem_provenance::{SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AnalyzeBackend {
+    #[default]
+    Auto,
+    Flattened,
+    Compiled,
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AnalyzeOptions {
+    pub backend: AnalyzeBackend,
     pub approximate_disjoint_errors: bool,
     pub allow_gauge_detectors: bool,
 }
@@ -140,14 +149,14 @@ pub struct ErrorAnalyzer {
 
 impl ErrorAnalyzer {
     pub fn circuit_to_dem(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
-        Self::circuit_to_dem_inner(instrs, AnalyzeOptions::default(), false)
+        Self::circuit_to_dem_with_options(instrs, AnalyzeOptions::default())
     }
 
     pub fn circuit_to_dem_with_options(
         instrs: &[StimInstr],
         options: AnalyzeOptions,
     ) -> Result<DetectorErrorModel, String> {
-        Self::circuit_to_dem_inner(instrs, options, false)
+        Self::circuit_to_dem_backend(instrs, options, false)
     }
 
     pub fn circuit_to_tracked_dem(instrs: &[StimInstr]) -> Result<TrackedDemResult, String> {
@@ -289,7 +298,7 @@ impl ErrorAnalyzer {
     }
 
     pub fn circuit_to_dem_decomposed(instrs: &[StimInstr]) -> Result<DetectorErrorModel, String> {
-        let mut dem = Self::circuit_to_dem_inner(instrs, AnalyzeOptions::default(), true)?;
+        let mut dem = Self::circuit_to_dem_backend(instrs, AnalyzeOptions::default(), true)?;
         decompose_errors(&mut dem)?;
         Ok(dem)
     }
@@ -298,9 +307,44 @@ impl ErrorAnalyzer {
         instrs: &[StimInstr],
         options: AnalyzeOptions,
     ) -> Result<DetectorErrorModel, String> {
-        let mut dem = Self::circuit_to_dem_inner(instrs, options, true)?;
+        let mut dem = Self::circuit_to_dem_backend(instrs, options, true)?;
         decompose_errors(&mut dem)?;
         Ok(dem)
+    }
+
+    fn circuit_to_dem_backend(
+        instrs: &[StimInstr],
+        options: AnalyzeOptions,
+        decompose_channel_errors: bool,
+    ) -> Result<DetectorErrorModel, String> {
+        match options.backend {
+            AnalyzeBackend::Flattened => {
+                Self::circuit_to_dem_inner(instrs, options, decompose_channel_errors)
+            }
+            AnalyzeBackend::Compiled => {
+                let compiled = crate::compiled::compile_circuit(instrs)?;
+                crate::compiled::analyze_compiled_circuit(
+                    &compiled,
+                    options,
+                    decompose_channel_errors,
+                )
+            }
+            AnalyzeBackend::Auto => {
+                let compiled = crate::compiled::compile_circuit(instrs)?;
+                match crate::compiled::choose_analyzer_path(&compiled) {
+                    crate::compiled::CompiledPathDecision::FastPath => {
+                        crate::compiled::analyze_compiled_circuit(
+                            &compiled,
+                            options,
+                            decompose_channel_errors,
+                        )
+                    }
+                    crate::compiled::CompiledPathDecision::Fallback(_) => {
+                        Self::circuit_to_dem_inner(instrs, options, decompose_channel_errors)
+                    }
+                }
+            }
+        }
     }
 
     fn undo_circuit(&mut self, instrs: &[StimInstr]) -> Result<(), String> {
