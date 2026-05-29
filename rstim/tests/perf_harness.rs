@@ -1,8 +1,9 @@
-use rstim::compiled::{CompiledPathDecision, choose_analyzer_path, compile_circuit};
+use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
 use rstim::parser::parse_lines;
 use rstim::perf::{
-    PerfBenchmarkCase, PerfCircuitSource, PerfRecord, PerfVariant, PerfWorkload,
     benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
+    PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfMeasurementRecord, PerfVariant,
+    PerfWorkload,
 };
 use serde_json::Value;
 
@@ -35,32 +36,56 @@ fn benchmark_cases_cover_sampling_detect_and_repeat_analysis() {
 }
 
 #[test]
-fn perf_record_json_line_contains_required_keys() {
-    let record = PerfRecord {
-        case_label: "surface-detect-d13".to_string(),
-        tool_variant: "rstim-auto".to_string(),
-        workload: PerfWorkload::Detect.as_str().to_string(),
+fn benchmark_cases_define_gating_and_report_only_contracts() {
+    let cases = benchmark_cases();
+
+    assert!(
+        cases.iter().any(|case| case.tier == PerfCaseTier::Gating),
+        "expected at least one gating case"
+    );
+    assert!(
+        cases
+            .iter()
+            .any(|case| case.tier == PerfCaseTier::ReportOnly),
+        "expected at least one report-only case"
+    );
+
+    let loss_case = cases
+        .iter()
+        .find(|case| case.label == "loss-protection-sample")
+        .expect("loss protection case");
+    assert_eq!(loss_case.tier, PerfCaseTier::Gating);
+    assert!(loss_case.requires_fallback);
+    assert!(!loss_case.requires_compiled);
+}
+
+#[test]
+fn perf_measurement_record_json_line_contains_round_metadata() {
+    let record = PerfMeasurementRecord {
+        case_label: "rep-sample-d13-r13".to_string(),
+        tool_variant: PerfVariant::RstimCompiled.label().to_string(),
+        workload: PerfWorkload::Sample.as_str().to_string(),
+        tier: PerfCaseTier::Gating.as_str().to_string(),
+        measurement_index: 3,
+        warmup: false,
         qubits: 25,
         measurements: 48,
-        detectors: 24,
-        observables: 1,
+        detectors: 0,
+        observables: 0,
         repeat_depth: 1,
         repeat_count: 13,
-        shots: Some(10_000),
-        wall_time_ns: 123_456,
-        peak_memory_bytes: None,
+        shots: Some(20_000),
+        wall_time_ns: 456_789,
+        peak_memory_bytes: Some(8_192),
     };
 
     let line = record.to_json_line();
     let json: Value = serde_json::from_str(line.trim_end()).unwrap();
 
-    assert!(line.ends_with('\n'));
-    assert_eq!(json["case_label"], "surface-detect-d13");
-    assert_eq!(json["tool_variant"], "rstim-auto");
-    assert_eq!(json["workload"], "detect");
-    assert_eq!(json["repeat_count"], 13);
-    assert_eq!(json["shots"], 10_000);
-    assert_eq!(json["peak_memory_bytes"], Value::Null);
+    assert_eq!(json["tier"], "gating");
+    assert_eq!(json["measurement_index"], 3);
+    assert_eq!(json["warmup"], false);
+    assert_eq!(json["peak_memory_bytes"], 8_192);
 }
 
 #[test]
@@ -97,16 +122,17 @@ fn perf_workload_and_variant_labels_are_stable() {
 fn benchmark_cases_include_a_compiled_analyzer_compatible_repeat_case() {
     let cases = benchmark_cases();
 
-    let compatible = cases.iter().filter(|case| case.workload == PerfWorkload::AnalyzeErrors).any(
-        |case| match case.source {
+    let compatible = cases
+        .iter()
+        .filter(|case| case.workload == PerfWorkload::AnalyzeErrors)
+        .any(|case| match case.source {
             rstim::perf::PerfCircuitSource::Inline { text } => {
                 let instrs = parse_lines(text).unwrap();
                 let compiled = compile_circuit(&instrs).unwrap();
                 choose_analyzer_path(&compiled) == CompiledPathDecision::FastPath
             }
             rstim::perf::PerfCircuitSource::Generator { .. } => false,
-        },
-    );
+        });
 
     assert!(
         compatible,
@@ -124,6 +150,10 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
             text: "X_ERROR(0.001) 0\nM 0\n",
         },
         shots: Some(32),
+        tier: PerfCaseTier::Gating,
+        requires_compiled: true,
+        requires_fallback: false,
+        comparisons: &[],
     };
     let analyze_instrs =
         parse_lines("REPEAT 8 {\n  X_ERROR(0.001) 0\n  MR 0\n  DETECTOR rec[-1]\n}\n").unwrap();
@@ -134,6 +164,10 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
             text: "REPEAT 8 {\n  X_ERROR(0.001) 0\n  MR 0\n  DETECTOR rec[-1]\n}\n",
         },
         shots: None,
+        tier: PerfCaseTier::Gating,
+        requires_compiled: true,
+        requires_fallback: false,
+        comparisons: &[],
     };
 
     assert_eq!(
