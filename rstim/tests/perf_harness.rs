@@ -1,9 +1,10 @@
+use rstim::codegen::{repetition_code_memory, rotated_memory_x};
 use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
 use rstim::parser::parse_lines;
 use rstim::perf::{
     benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
-    PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfMeasurementRecord, PerfVariant,
-    PerfWorkload,
+    PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
+    PerfRecord, PerfVariant, PerfWorkload,
 };
 use serde_json::Value;
 
@@ -101,7 +102,9 @@ fn perf_measurement_record_json_line_contains_round_metadata() {
     };
 
     let line = record.to_json_line();
+    assert!(line.ends_with('\n'));
     let json: Value = serde_json::from_str(line.trim_end()).unwrap();
+    let parsed = PerfMeasurementRecord::from_json_line(line.trim_end()).unwrap();
 
     assert_eq!(json["case_label"], "rep-sample-d13-r13");
     assert_eq!(json["tool_variant"], "rstim-compiled");
@@ -118,6 +121,111 @@ fn perf_measurement_record_json_line_contains_round_metadata() {
     assert_eq!(json["shots"], 20_000);
     assert_eq!(json["wall_time_ns"], 456_789);
     assert_eq!(json["peak_memory_bytes"], 8_192);
+    assert_eq!(parsed, record);
+}
+
+#[test]
+fn legacy_perf_record_json_line_infers_tier_for_known_benchmark_case() {
+    let record = PerfRecord {
+        case_label: "repeat-analyze-stress-report".to_string(),
+        tool_variant: PerfVariant::RstimAnalyzerCompiled.label().to_string(),
+        workload: PerfWorkload::AnalyzeErrors.as_str().to_string(),
+        qubits: 1,
+        measurements: 1,
+        detectors: 1,
+        observables: 0,
+        repeat_depth: 1,
+        repeat_count: 8192,
+        shots: None,
+        wall_time_ns: 123,
+        peak_memory_bytes: Some(456),
+    };
+
+    let line = record.to_json_line();
+    let json: Value = serde_json::from_str(line.trim_end()).unwrap();
+
+    assert!(line.ends_with('\n'));
+    assert_eq!(json["case_label"], "repeat-analyze-stress-report");
+    assert_eq!(json["tier"], "report_only");
+}
+
+#[test]
+fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
+    let expectations = [
+        (
+            "rep-sample-d13-r13",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimInterpreted,
+                PerfVariant::RstimCompiled,
+            ],
+            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+        ),
+        (
+            "surface-detect-d13-r13",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimInterpreted,
+                PerfVariant::RstimCompiled,
+            ],
+            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+        ),
+        (
+            "repeat-analyze-large",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimAnalyzerFlattened,
+                PerfVariant::RstimAnalyzerCompiled,
+            ],
+            vec![PerfComparisonKind::AnalyzerCompiledVsFlattened],
+        ),
+        (
+            "loss-protection-sample",
+            vec![PerfVariant::StimCli, PerfVariant::RstimInterpreted],
+            Vec::new(),
+        ),
+        (
+            "repeat-analyze-stress-report",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimAnalyzerFlattened,
+                PerfVariant::RstimAnalyzerCompiled,
+            ],
+            vec![PerfComparisonKind::AnalyzerCompiledVsFlattened],
+        ),
+    ];
+
+    for (label, expected_variants, expected_comparisons) in expectations {
+        let case = benchmark_cases()
+            .into_iter()
+            .find(|case| case.label == label)
+            .unwrap_or_else(|| panic!("missing benchmark case {label}"));
+        let instrs = match case.source {
+            PerfCircuitSource::Generator {
+                code,
+                task,
+                distance,
+                rounds,
+                noise,
+            } => match (code, task) {
+                ("repetition_code", "memory") => repetition_code_memory(distance, rounds, noise),
+                ("surface_code", "rotated_memory_x") => rotated_memory_x(distance, rounds, noise),
+                _ => panic!("unsupported generator source for {label}"),
+            },
+            PerfCircuitSource::Inline { text } => parse_lines(text).unwrap(),
+        };
+
+        let variants = benchmark_case_variants(case, &instrs).unwrap();
+        assert_eq!(
+            variants, expected_variants,
+            "unexpected variants for {label}"
+        );
+        assert_eq!(
+            case.comparisons,
+            expected_comparisons.as_slice(),
+            "unexpected comparisons for {label}"
+        );
+    }
 }
 
 #[test]
