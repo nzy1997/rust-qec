@@ -562,6 +562,18 @@ pub fn run_gen(
     noise: f64,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
+    out.write_all(circuit_text.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
+}
+
+pub(crate) fn generate_common_circuit_text(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+) -> Result<String, String> {
     let instrs = match (code, task) {
         ("repetition_code", "memory") => {
             crate::codegen::repetition_code_memory(distance, rounds, noise)
@@ -583,9 +595,7 @@ pub fn run_gen(
         }
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
-    let circuit_text = crate::ir::circuit_to_string(&instrs);
-    out.write_all(circuit_text.as_bytes())
-        .map_err(|e| format!("write error: {e}"))
+    Ok(crate::ir::circuit_to_string(&instrs))
 }
 
 pub fn run_sample(

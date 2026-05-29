@@ -5,9 +5,8 @@ use std::time::Instant;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
-use crate::codegen;
+use crate::cli::generate_common_circuit_text;
 use crate::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
-use crate::ir::circuit_to_string;
 use crate::parser::parse_lines;
 use crate::sampler::{SampleOptions, SamplingBackend, sample_batch_with_options};
 use crate::stats::summarize;
@@ -32,39 +31,25 @@ impl Default for PerfRunOptions {
     }
 }
 
-fn source_text(source: super::PerfCircuitSource) -> String {
+impl PerfRunOptions {
+    fn validate(self) -> Result<Self, String> {
+        if self.measured_rounds == 0 {
+            return Err("PerfRunOptions.measured_rounds must be greater than 0".to_string());
+        }
+        Ok(self)
+    }
+}
+
+fn source_text(source: super::PerfCircuitSource) -> Result<String, String> {
     match source {
-        super::PerfCircuitSource::Inline { text } => text.to_string(),
+        super::PerfCircuitSource::Inline { text } => Ok(text.to_string()),
         super::PerfCircuitSource::Generator {
             code,
             task,
             distance,
             rounds,
             noise,
-        } => {
-            let instrs = match (code, task) {
-                ("repetition_code", "memory") => {
-                    codegen::repetition_code_memory(distance, rounds, noise)
-                }
-                ("surface_code", "rotated_memory_x") => {
-                    codegen::surface_code::rotated_memory_x(distance, rounds, noise)
-                }
-                ("surface_code", "rotated_memory_z") => {
-                    codegen::surface_code::rotated_memory_z(distance, rounds, noise)
-                }
-                ("surface_code", "unrotated_memory_x") => {
-                    codegen::surface_code::unrotated_memory_x(distance, rounds, noise)
-                }
-                ("surface_code", "unrotated_memory_z") => {
-                    codegen::surface_code::unrotated_memory_z(distance, rounds, noise)
-                }
-                ("color_code", "memory_xyz") => {
-                    codegen::color_code::memory_xyz(distance, rounds, noise)
-                }
-                _ => panic!("unknown benchmark code/task: {code}/{task}"),
-            };
-            circuit_to_string(&instrs)
-        }
+        } => generate_common_circuit_text(code, task, distance, rounds, noise),
     }
 }
 
@@ -185,10 +170,12 @@ pub fn run_case_measurements(
     variants: &[PerfVariant],
     options: PerfRunOptions,
 ) -> Result<Vec<PerfMeasurementRecord>, String> {
+    let options = options.validate()?;
     let instrs = parse_lines(text)?;
     let summary = summarize(&instrs);
     let mut records = Vec::new();
     let total_rounds = options.warmup_rounds + options.measured_rounds;
+    let repeat_count = effective_repeat_count(&instrs);
 
     for variant in variants {
         for measurement_index in 0..total_rounds {
@@ -206,7 +193,7 @@ pub fn run_case_measurements(
                 detectors: summary.num_detectors,
                 observables: summary.num_observables,
                 repeat_depth: summary.max_repeat_depth,
-                repeat_count: effective_repeat_count(&instrs),
+                repeat_count,
                 shots: case.shots,
                 wall_time_ns,
                 peak_memory_bytes: current_peak_memory_bytes(),
@@ -217,19 +204,120 @@ pub fn run_case_measurements(
     Ok(records)
 }
 
+pub(crate) fn write_case_measurements_to_writer(
+    out: &mut dyn Write,
+    case: PerfBenchmarkCase,
+    text: &str,
+    variants: &[PerfVariant],
+    options: PerfRunOptions,
+) -> Result<(), String> {
+    let records = run_case_measurements(case, text, variants, options)?;
+    for record in records {
+        out.write_all(record.to_json_line().as_bytes())
+            .map_err(|e| format!("failed to write perf record: {e}"))?;
+    }
+    Ok(())
+}
+
 pub fn run_benchmark_suite_to_writer(
     out: &mut dyn Write,
     options: PerfRunOptions,
 ) -> Result<(), String> {
     for case in benchmark_cases() {
-        let text = source_text(case.source);
+        let text = source_text(case.source)?;
         let instrs = parse_lines(&text)?;
         let variants = benchmark_case_variants(case, &instrs)?;
-        let records = run_case_measurements(case, &text, &variants, options)?;
-        for record in records {
-            out.write_all(record.to_json_line().as_bytes())
-                .map_err(|e| format!("failed to write perf record: {e}"))?;
-        }
+        write_case_measurements_to_writer(out, case, &text, &variants, options)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::perf::{PerfCaseTier, PerfCircuitSource};
+
+    #[test]
+    fn source_text_returns_error_for_unknown_generator_pair() {
+        let result = source_text(PerfCircuitSource::Generator {
+            code: "surface_code",
+            task: "unknown_task",
+            distance: 3,
+            rounds: 3,
+            noise: 0.001,
+        });
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unknown code/task"));
+    }
+
+    #[test]
+    fn writer_helper_emits_jsonl_records_with_newlines_and_variant_order() {
+        let case = PerfBenchmarkCase {
+            label: "inline-sample",
+            workload: PerfWorkload::Sample,
+            source: PerfCircuitSource::Inline {
+                text: "X_ERROR(0.001) 0\nM 0\n",
+            },
+            shots: Some(32),
+            tier: PerfCaseTier::Gating,
+            requires_compiled: true,
+            requires_fallback: false,
+            comparisons: &[],
+        };
+        let variants = [PerfVariant::RstimInterpreted, PerfVariant::RstimCompiled];
+        let mut out = Vec::new();
+
+        write_case_measurements_to_writer(
+            &mut out,
+            case,
+            "X_ERROR(0.001) 0\nM 0\n",
+            &variants,
+            PerfRunOptions {
+                warmup_rounds: 1,
+                measured_rounds: 2,
+            },
+        )
+        .expect("write case measurements");
+
+        let text = String::from_utf8(out).expect("utf8 jsonl");
+        let lines: Vec<&str> = text.lines().collect();
+        let records: Vec<PerfMeasurementRecord> = lines
+            .iter()
+            .map(|line| PerfMeasurementRecord::from_json_line(line).expect("jsonl record"))
+            .collect();
+
+        assert_eq!(lines.len(), 6);
+        assert!(text.ends_with('\n'));
+        assert_eq!(text.matches('\n').count(), lines.len());
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.tool_variant.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "rstim-interpreted",
+                "rstim-interpreted",
+                "rstim-interpreted",
+                "rstim-compiled",
+                "rstim-compiled",
+                "rstim-compiled",
+            ]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| (record.measurement_index, record.warmup))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, true),
+                (1, false),
+                (2, false),
+                (0, true),
+                (1, false),
+                (2, false),
+            ]
+        );
+        assert!(records.iter().all(|record| record.case_label == "inline-sample"));
+    }
 }

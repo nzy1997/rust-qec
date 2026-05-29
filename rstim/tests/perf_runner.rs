@@ -2,17 +2,20 @@ use rstim::perf::{
     PerfRunOptions, PerfVariant, benchmark_cases, run_case_measurements,
 };
 
-#[test]
-fn runner_emits_one_warmup_and_five_measured_records_by_default() {
-    let case = benchmark_cases()
+const LOSS_PROTECTION_CIRCUIT: &str = "LOSS(1) 0\nMRL 0\nDETECTOR rec[-1]\n";
+
+fn loss_protection_case() -> rstim::perf::PerfBenchmarkCase {
+    benchmark_cases()
         .into_iter()
         .find(|case| case.label == "loss-protection-sample")
-        .expect("loss protection case");
-    let circuit = "LOSS(1) 0\nMRL 0\nDETECTOR rec[-1]\n";
+        .expect("loss protection case")
+}
 
+#[test]
+fn runner_emits_one_warmup_and_five_measured_records_by_default() {
     let records = run_case_measurements(
-        case,
-        circuit,
+        loss_protection_case(),
+        LOSS_PROTECTION_CIRCUIT,
         &[PerfVariant::RstimInterpreted],
         PerfRunOptions::default(),
     )
@@ -31,4 +34,20 @@ fn runner_emits_one_warmup_and_five_measured_records_by_default() {
     assert!(records
         .iter()
         .all(|record| record.case_label == "loss-protection-sample"));
+}
+
+#[test]
+fn runner_rejects_zero_measured_rounds() {
+    let result = run_case_measurements(
+        loss_protection_case(),
+        LOSS_PROTECTION_CIRCUIT,
+        &[PerfVariant::RstimInterpreted],
+        PerfRunOptions {
+            warmup_rounds: 1,
+            measured_rounds: 0,
+        },
+    );
+
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("measured_rounds"));
 }
