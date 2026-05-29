@@ -50,13 +50,34 @@ fn benchmark_cases_define_gating_and_report_only_contracts() {
         "expected at least one report-only case"
     );
 
-    let loss_case = cases
-        .iter()
-        .find(|case| case.label == "loss-protection-sample")
-        .expect("loss protection case");
-    assert_eq!(loss_case.tier, PerfCaseTier::Gating);
-    assert!(loss_case.requires_fallback);
-    assert!(!loss_case.requires_compiled);
+    let expectations = [
+        ("rep-sample-d13-r13", PerfCaseTier::Gating, true, false),
+        ("surface-detect-d13-r13", PerfCaseTier::Gating, true, false),
+        ("repeat-analyze-large", PerfCaseTier::Gating, true, false),
+        ("loss-protection-sample", PerfCaseTier::Gating, false, true),
+        (
+            "repeat-analyze-stress-report",
+            PerfCaseTier::ReportOnly,
+            true,
+            false,
+        ),
+    ];
+
+    for (label, tier, requires_compiled, requires_fallback) in expectations {
+        let case = cases
+            .iter()
+            .find(|case| case.label == label)
+            .unwrap_or_else(|| panic!("missing benchmark case {label}"));
+        assert_eq!(case.tier, tier, "unexpected tier for {label}");
+        assert_eq!(
+            case.requires_compiled, requires_compiled,
+            "unexpected requires_compiled for {label}"
+        );
+        assert_eq!(
+            case.requires_fallback, requires_fallback,
+            "unexpected requires_fallback for {label}"
+        );
+    }
 }
 
 #[test]
@@ -82,9 +103,20 @@ fn perf_measurement_record_json_line_contains_round_metadata() {
     let line = record.to_json_line();
     let json: Value = serde_json::from_str(line.trim_end()).unwrap();
 
+    assert_eq!(json["case_label"], "rep-sample-d13-r13");
+    assert_eq!(json["tool_variant"], "rstim-compiled");
+    assert_eq!(json["workload"], "sample");
     assert_eq!(json["tier"], "gating");
     assert_eq!(json["measurement_index"], 3);
     assert_eq!(json["warmup"], false);
+    assert_eq!(json["qubits"], 25);
+    assert_eq!(json["measurements"], 48);
+    assert_eq!(json["detectors"], 0);
+    assert_eq!(json["observables"], 0);
+    assert_eq!(json["repeat_depth"], 1);
+    assert_eq!(json["repeat_count"], 13);
+    assert_eq!(json["shots"], 20_000);
+    assert_eq!(json["wall_time_ns"], 456_789);
     assert_eq!(json["peak_memory_bytes"], 8_192);
 }
 

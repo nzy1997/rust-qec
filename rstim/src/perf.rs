@@ -6,4 +6,4 @@ pub use cases::{
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfVariant,
     PerfWorkload,
 };
-pub use record::PerfMeasurementRecord;
+pub use record::{PerfMeasurementRecord, PerfRecord};

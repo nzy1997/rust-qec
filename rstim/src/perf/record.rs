@@ -1,6 +1,30 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PerfRecord {
+    pub case_label: String,
+    pub tool_variant: String,
+    pub workload: String,
+    pub qubits: usize,
+    pub measurements: usize,
+    pub detectors: usize,
+    pub observables: usize,
+    pub repeat_depth: usize,
+    pub repeat_count: usize,
+    pub shots: Option<usize>,
+    pub wall_time_ns: u128,
+    pub peak_memory_bytes: Option<u64>,
+}
+
+impl PerfRecord {
+    pub fn to_json_line(&self) -> String {
+        let mut line = serde_json::to_string(self).expect("serialize perf record");
+        line.push('\n');
+        line
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PerfMeasurementRecord {
     pub case_label: String,
     pub tool_variant: String,
