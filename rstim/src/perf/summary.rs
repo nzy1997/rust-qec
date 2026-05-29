@@ -10,6 +10,7 @@ use super::{
 pub enum PerfSummaryIssueKind {
     DuplicateMeasurement,
     MetadataMismatch,
+    MissingComparisonVariants,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -121,16 +122,30 @@ fn comparison_variants(kind: PerfComparisonKind) -> (&'static str, &'static str)
     }
 }
 
+fn push_issue(
+    issues: &mut Vec<PerfSummaryIssue>,
+    kind: PerfSummaryIssueKind,
+    case_label: &str,
+    message: impl Into<String>,
+) {
+    issues.push(PerfSummaryIssue {
+        kind,
+        case_label: case_label.to_string(),
+        message: message.into(),
+    });
+}
+
 fn push_metadata_issue(
     issues: &mut Vec<PerfSummaryIssue>,
     case_label: &str,
     message: impl Into<String>,
 ) {
-    issues.push(PerfSummaryIssue {
-        kind: PerfSummaryIssueKind::MetadataMismatch,
-        case_label: case_label.to_string(),
-        message: message.into(),
-    });
+    push_issue(
+        issues,
+        PerfSummaryIssueKind::MetadataMismatch,
+        case_label,
+        message,
+    );
 }
 
 pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
@@ -161,17 +176,18 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
             record.warmup,
         );
         if !seen_measurements.insert(slot) {
-            issues.push(PerfSummaryIssue {
-                kind: PerfSummaryIssueKind::DuplicateMeasurement,
-                case_label: record.case_label.clone(),
-                message: format!(
+            push_issue(
+                &mut issues,
+                PerfSummaryIssueKind::DuplicateMeasurement,
+                &record.case_label,
+                format!(
                     "duplicate measurement slot for case={} variant={} index={} warmup={}",
                     record.case_label,
                     record.tool_variant,
                     record.measurement_index,
                     record.warmup
                 ),
-            });
+            );
         }
 
         if record.workload != case_def.workload.as_str() {
@@ -268,9 +284,33 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
         for kind in case.comparisons {
             let (lhs_variant, rhs_variant) = comparison_variants(*kind);
             let Some(lhs) = variant_lookup.get(lhs_variant) else {
+                push_issue(
+                    &mut issues,
+                    PerfSummaryIssueKind::MissingComparisonVariants,
+                    case.label,
+                    format!(
+                        "missing comparison variants for {}: expected `{}` and `{}`, missing `{}`",
+                        kind.as_str(),
+                        lhs_variant,
+                        rhs_variant,
+                        lhs_variant
+                    ),
+                );
                 continue;
             };
             let Some(rhs) = variant_lookup.get(rhs_variant) else {
+                push_issue(
+                    &mut issues,
+                    PerfSummaryIssueKind::MissingComparisonVariants,
+                    case.label,
+                    format!(
+                        "missing comparison variants for {}: expected `{}` and `{}`, missing `{}`",
+                        kind.as_str(),
+                        lhs_variant,
+                        rhs_variant,
+                        rhs_variant
+                    ),
+                );
                 continue;
             };
             let ratio = if rhs.median_wall_time_ns == 0 {

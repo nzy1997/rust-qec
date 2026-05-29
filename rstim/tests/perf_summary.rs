@@ -64,3 +64,19 @@ fn markdown_report_groups_gating_cases() {
     assert!(report.contains("repeat-analyze-stress-report"));
     assert!(report.contains("sampler_compiled_vs_interpreted"));
 }
+
+#[test]
+fn report_surfaces_skipped_comparison_context_when_variants_are_missing() {
+    let summary = summarize_jsonl_str(RAW_JSONL).expect("summary");
+
+    assert!(summary.issues.iter().any(|issue| {
+        issue.case_label == "repeat-analyze-stress-report"
+            && issue.message.contains("analyzer_compiled_vs_flattened")
+    }));
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("## Summary Issues"));
+    assert!(report.contains("repeat-analyze-stress-report"));
+    assert!(report.contains("analyzer_compiled_vs_flattened"));
+    assert!(report.contains("missing comparison variants"));
+}
