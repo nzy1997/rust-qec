@@ -35,6 +35,17 @@ impl PerfComparisonKind {
     }
 }
 
+pub fn comparison_variant_labels(kind: PerfComparisonKind) -> (&'static str, &'static str) {
+    match kind {
+        PerfComparisonKind::SamplerCompiledVsInterpreted => {
+            ("rstim-compiled", "rstim-interpreted")
+        }
+        PerfComparisonKind::AnalyzerCompiledVsFlattened => {
+            ("rstim-analyzer-compiled", "rstim-analyzer-flattened")
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PerfWorkload {
     Sample,
@@ -71,6 +82,25 @@ impl PerfVariant {
             PerfVariant::RstimAnalyzerCompiled => "rstim-analyzer-compiled",
         }
     }
+}
+
+pub fn expected_variant_labels(case: PerfBenchmarkCase) -> Vec<&'static str> {
+    let mut variants = vec![PerfVariant::StimCli.label()];
+    match case.workload {
+        PerfWorkload::Sample | PerfWorkload::Detect => {
+            variants.push(PerfVariant::RstimInterpreted.label());
+            if case.requires_compiled {
+                variants.push(PerfVariant::RstimCompiled.label());
+            }
+        }
+        PerfWorkload::AnalyzeErrors => {
+            variants.push(PerfVariant::RstimAnalyzerFlattened.label());
+            if case.requires_compiled {
+                variants.push(PerfVariant::RstimAnalyzerCompiled.label());
+            }
+        }
+    }
+    variants
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

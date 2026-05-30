@@ -567,17 +567,7 @@ fn run_perf_ci(
     let summary_path = std::path::Path::new(out_dir).join("summary.json");
     let report_path = std::path::Path::new(out_dir).join("report.md");
 
-    {
-        let mut raw = open_output(raw_path.to_str()).map_err(PerfCiError::Infrastructure)?;
-        crate::perf::run_benchmark_suite_to_writer(
-            &mut raw,
-            crate::perf::PerfRunOptions {
-                warmup_rounds,
-                measured_rounds: measure_rounds,
-            },
-        )
-        .map_err(PerfCiError::Infrastructure)?;
-    }
+    write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds)?;
 
     let raw_text = std::fs::read_to_string(&raw_path)
         .map_err(|e| PerfCiError::Infrastructure(format!(
@@ -590,6 +580,32 @@ fn run_perf_ci(
         &report_path,
         crate::perf::PerfGateConfig::default(),
     )
+}
+
+fn write_perf_ci_raw_artifact(
+    raw_path: &std::path::Path,
+    warmup_rounds: usize,
+    measure_rounds: usize,
+) -> Result<(), PerfCiError> {
+    if let Ok(source_path) = std::env::var("RSTIM_TEST_PERF_CI_RAW") {
+        std::fs::copy(&source_path, raw_path).map_err(|e| {
+            PerfCiError::Infrastructure(format!(
+                "failed to copy test perf raw artifact from {source_path} to {}: {e}",
+                raw_path.display()
+            ))
+        })?;
+        return Ok(());
+    }
+
+    let mut raw = open_output(raw_path.to_str()).map_err(PerfCiError::Infrastructure)?;
+    crate::perf::run_benchmark_suite_to_writer(
+        &mut raw,
+        crate::perf::PerfRunOptions {
+            warmup_rounds,
+            measured_rounds: measure_rounds,
+        },
+    )
+    .map_err(PerfCiError::Infrastructure)
 }
 
 fn finalize_perf_ci_artifacts(

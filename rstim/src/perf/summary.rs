@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    PerfBenchmarkCase, PerfComparisonKind, PerfMeasurementRecord, PerfWorkload, benchmark_cases,
+    PerfMeasurementRecord, benchmark_cases, comparison_variant_labels, expected_variant_labels,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -69,25 +69,6 @@ struct CaseMetadata {
     shots: Option<usize>,
 }
 
-fn expected_variants(case: PerfBenchmarkCase) -> Vec<String> {
-    let mut variants = vec!["stim-cli".to_string()];
-    match case.workload {
-        PerfWorkload::Sample | PerfWorkload::Detect => {
-            variants.push("rstim-interpreted".to_string());
-            if case.requires_compiled {
-                variants.push("rstim-compiled".to_string());
-            }
-        }
-        PerfWorkload::AnalyzeErrors => {
-            variants.push("rstim-analyzer-flattened".to_string());
-            if case.requires_compiled {
-                variants.push("rstim-analyzer-compiled".to_string());
-            }
-        }
-    }
-    variants
-}
-
 fn median_u128(mut values: Vec<u128>) -> u128 {
     values.sort_unstable();
     values[values.len() / 2]
@@ -109,17 +90,6 @@ fn case_metadata(record: &PerfMeasurementRecord) -> CaseMetadata {
         repeat_depth: record.repeat_depth,
         repeat_count: record.repeat_count,
         shots: record.shots,
-    }
-}
-
-fn comparison_variants(kind: PerfComparisonKind) -> (&'static str, &'static str) {
-    match kind {
-        PerfComparisonKind::SamplerCompiledVsInterpreted => {
-            ("rstim-compiled", "rstim-interpreted")
-        }
-        PerfComparisonKind::AnalyzerCompiledVsFlattened => {
-            ("rstim-analyzer-compiled", "rstim-analyzer-flattened")
-        }
     }
 }
 
@@ -290,7 +260,7 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
 
         let mut comparisons = Vec::new();
         for kind in case.comparisons {
-            let (lhs_variant, rhs_variant) = comparison_variants(*kind);
+            let (lhs_variant, rhs_variant) = comparison_variant_labels(*kind);
             let Some(lhs) = variant_lookup.get(lhs_variant) else {
                 push_issue(
                     &mut issues,
@@ -340,7 +310,10 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
             tier: case.tier.as_str().to_string(),
             requires_compiled: case.requires_compiled,
             requires_fallback: case.requires_fallback,
-            expected_variants: expected_variants(case),
+            expected_variants: expected_variant_labels(case)
+                .into_iter()
+                .map(ToString::to_string)
+                .collect(),
             present_variants,
             variants,
             comparisons,
