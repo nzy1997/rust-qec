@@ -584,11 +584,25 @@ fn run_perf_ci(
             "failed to read raw perf artifact {}: {e}",
             raw_path.display()
         )))?;
-    let summary = crate::perf::summarize_jsonl_str(&raw_text).map_err(PerfCiError::Infrastructure)?;
-    let verdict = crate::perf::evaluate_summary(&summary, crate::perf::PerfGateConfig::default());
+    finalize_perf_ci_artifacts(
+        &raw_text,
+        &summary_path,
+        &report_path,
+        crate::perf::PerfGateConfig::default(),
+    )
+}
+
+fn finalize_perf_ci_artifacts(
+    raw_text: &str,
+    summary_path: &std::path::Path,
+    report_path: &std::path::Path,
+    config: crate::perf::PerfGateConfig,
+) -> Result<(), PerfCiError> {
+    let summary = crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
+    let verdict = crate::perf::evaluate_summary(&summary, config);
 
     std::fs::write(
-        &summary_path,
+        summary_path,
         serde_json::to_string_pretty(&summary)
             .map_err(|e| PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}")))?,
     )
@@ -598,11 +612,12 @@ fn run_perf_ci(
     )))?;
 
     let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
-    std::fs::write(&report_path, report)
-        .map_err(|e| PerfCiError::Infrastructure(format!(
+    std::fs::write(report_path, report).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
             "failed to write perf report {}: {e}",
             report_path.display()
-        )))?;
+        ))
+    })?;
 
     if verdict.status == crate::perf::PerfGateStatus::Pass {
         Ok(())
@@ -1318,5 +1333,51 @@ mod tests {
 
         let err = err.unwrap_err();
         assert!(!err.starts_with("InfrastructureFailure"));
+    }
+
+    #[test]
+    fn finalize_perf_ci_artifacts_writes_outputs_before_returning_gate_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let summary_path = dir.path().join("summary.json");
+        let report_path = dir.path().join("report.md");
+        let raw = concat!(
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":111,\"peak_memory_bytes\":2048}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":240,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":210,\"peak_memory_bytes\":8192}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":170,\"peak_memory_bytes\":6144}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"stim-cli\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":700,\"peak_memory_bytes\":512}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-flattened\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":600,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-compiled\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":500,\"peak_memory_bytes\":768}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256}\n"
+        );
+
+        let err = finalize_perf_ci_artifacts(
+            raw,
+            &summary_path,
+            &report_path,
+            crate::perf::PerfGateConfig {
+                sampler_ratio_threshold: 1.10,
+                analyzer_ratio_threshold: 1.10,
+            },
+        )
+        .unwrap_err();
+
+        match err {
+            PerfCiError::Gate(message) => {
+                assert!(message.contains("RegressionFailure") || message.contains("exceeds threshold"));
+            }
+            PerfCiError::Infrastructure(message) => {
+                panic!("unexpected infrastructure failure: {message}");
+            }
+        }
+
+        let summary_text = std::fs::read_to_string(&summary_path).unwrap();
+        let report_text = std::fs::read_to_string(&report_path).unwrap();
+        assert!(summary_text.contains("\"cases\""));
+        assert!(report_text.contains("## Gate Verdict"));
+        assert!(report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold"));
     }
 }
