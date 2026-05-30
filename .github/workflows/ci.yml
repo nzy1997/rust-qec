@@ -19,6 +19,35 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get install -y libfontconfig1-dev
       - run: cargo test --workspace
+  perf-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev
+      - name: Install Stim CLI
+        run: python3 -m pip install stim
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run perf CI pipeline
+        id: perf_ci
+        continue-on-error: true
+        run: |
+          mkdir -p perf-artifacts
+          cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts
+      - name: Publish perf report
+        if: always()
+        run: cat perf-artifacts/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rstim-perf-artifacts
+          path: perf-artifacts/
+      - name: Fail on perf gate error
+        if: steps.perf_ci.outcome != 'success'
+        run: exit 1
   coverage:
     runs-on: ubuntu-latest
     steps:
