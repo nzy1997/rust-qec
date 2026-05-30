@@ -38,7 +38,10 @@ jobs:
           cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts
       - name: Publish perf report
         if: always()
-        run: cat perf-artifacts/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ -f perf-artifacts/report.md ]; then
+            cat perf-artifacts/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload perf artifacts
         if: always()
         uses: actions/upload-artifact@v4

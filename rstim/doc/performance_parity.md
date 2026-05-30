@@ -1,4 +1,4 @@
-# Performance Parity Benchmark Guide
+# Performance Evidence Gate Guide
 
 This document tracks the rerun workflow for the performance parity evidence
 gate.
