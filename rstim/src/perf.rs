@@ -1,4 +1,5 @@
 mod cases;
+mod gate;
 mod record;
 mod report;
 mod runner;
@@ -9,6 +10,7 @@ pub use cases::{
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfVariant,
     PerfWorkload,
 };
+pub use gate::{PerfGateConfig, PerfGateStatus, PerfGateVerdict, evaluate_summary};
 pub use record::{PerfMeasurementRecord, PerfRecord};
 pub use report::render_markdown_report;
 pub use runner::{PerfRunOptions, run_benchmark_suite_to_writer, run_case_measurements};
