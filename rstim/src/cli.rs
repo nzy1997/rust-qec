@@ -248,6 +248,11 @@ enum JsonOutputFormat {
     Compact,
 }
 
+enum PerfCiError {
+    Infrastructure(String),
+    Gate(String),
+}
+
 fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
     match format {
         "pretty" => Ok(JsonOutputFormat::Pretty),
@@ -536,8 +541,12 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 out_dir,
                 warmup_rounds,
                 measure_rounds,
-            } => run_perf_ci(&out_dir, warmup_rounds, measure_rounds)
-                .map_err(|e| format!("InfrastructureFailure\n- {e}")),
+            } => run_perf_ci(&out_dir, warmup_rounds, measure_rounds).map_err(|e| match e {
+                PerfCiError::Infrastructure(message) => {
+                    format!("InfrastructureFailure\n- {message}")
+                }
+                PerfCiError::Gate(message) => message,
+            }),
         },
         None => {
             println!("rstim {}", crate::version());
@@ -546,45 +555,59 @@ pub fn run(cli: Cli) -> Result<(), String> {
     }
 }
 
-fn run_perf_ci(out_dir: &str, warmup_rounds: usize, measure_rounds: usize) -> Result<(), String> {
+fn run_perf_ci(
+    out_dir: &str,
+    warmup_rounds: usize,
+    measure_rounds: usize,
+) -> Result<(), PerfCiError> {
     std::fs::create_dir_all(out_dir)
-        .map_err(|e| format!("failed to create perf out dir {out_dir}: {e}"))?;
+        .map_err(|e| PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}")))?;
 
     let raw_path = std::path::Path::new(out_dir).join("raw.jsonl");
     let summary_path = std::path::Path::new(out_dir).join("summary.json");
     let report_path = std::path::Path::new(out_dir).join("report.md");
 
     {
-        let mut raw = open_output(raw_path.to_str())?;
+        let mut raw = open_output(raw_path.to_str()).map_err(PerfCiError::Infrastructure)?;
         crate::perf::run_benchmark_suite_to_writer(
             &mut raw,
             crate::perf::PerfRunOptions {
                 warmup_rounds,
                 measured_rounds: measure_rounds,
             },
-        )?;
+        )
+        .map_err(PerfCiError::Infrastructure)?;
     }
 
     let raw_text = std::fs::read_to_string(&raw_path)
-        .map_err(|e| format!("failed to read raw perf artifact {}: {e}", raw_path.display()))?;
-    let summary = crate::perf::summarize_jsonl_str(&raw_text)?;
+        .map_err(|e| PerfCiError::Infrastructure(format!(
+            "failed to read raw perf artifact {}: {e}",
+            raw_path.display()
+        )))?;
+    let summary = crate::perf::summarize_jsonl_str(&raw_text).map_err(PerfCiError::Infrastructure)?;
     let verdict = crate::perf::evaluate_summary(&summary, crate::perf::PerfGateConfig::default());
 
     std::fs::write(
         &summary_path,
         serde_json::to_string_pretty(&summary)
-            .map_err(|e| format!("failed to serialize perf summary: {e}"))?,
+            .map_err(|e| PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}")))?,
     )
-    .map_err(|e| format!("failed to write perf summary {}: {e}", summary_path.display()))?;
+    .map_err(|e| PerfCiError::Infrastructure(format!(
+        "failed to write perf summary {}: {e}",
+        summary_path.display()
+    )))?;
 
     let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
     std::fs::write(&report_path, report)
-        .map_err(|e| format!("failed to write perf report {}: {e}", report_path.display()))?;
+        .map_err(|e| PerfCiError::Infrastructure(format!(
+            "failed to write perf report {}: {e}",
+            report_path.display()
+        )))?;
 
     if verdict.status == crate::perf::PerfGateStatus::Pass {
         Ok(())
     } else {
-        Err(verdict.summary_markdown())
+        Err(PerfCiError::Gate(verdict.summary_markdown()))
     }
 }
 
@@ -1276,5 +1299,24 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
         assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+    }
+
+    #[test]
+    fn perf_ci_preserves_gate_failures_without_infrastructure_prefix() {
+        let verdict = crate::perf::PerfGateVerdict {
+            status: crate::perf::PerfGateStatus::RegressionFailure,
+            messages: vec!["regression".to_string()],
+        };
+        let err = Err::<(), PerfCiError>(PerfCiError::Gate(verdict.summary_markdown())).map_err(
+            |e| match e {
+                PerfCiError::Infrastructure(message) => {
+                    format!("InfrastructureFailure\n- {message}")
+                }
+                PerfCiError::Gate(message) => message,
+            },
+        );
+
+        let err = err.unwrap_err();
+        assert!(!err.starts_with("InfrastructureFailure"));
     }
 }
