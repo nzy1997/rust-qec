@@ -1,4 +1,4 @@
-use super::{PerfCaseTier, PerfSummary};
+use super::{PerfCaseTier, PerfSummary, benchmark_cases};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PerfGateConfig {
@@ -44,14 +44,29 @@ impl PerfGateVerdict {
 }
 
 pub fn evaluate_summary(summary: &PerfSummary, config: PerfGateConfig) -> PerfGateVerdict {
-    if !summary.issues.is_empty() {
+    let gating_case_labels = summary
+        .cases
+        .iter()
+        .filter(|case| case.tier == PerfCaseTier::Gating.as_str())
+        .map(|case| case.case_label.as_str())
+        .chain(
+            benchmark_cases()
+                .into_iter()
+                .filter(|case| case.tier == PerfCaseTier::Gating)
+                .map(|case| case.label),
+        )
+        .collect::<std::collections::BTreeSet<_>>();
+    let gating_issue_messages = summary
+        .issues
+        .iter()
+        .filter(|issue| gating_case_labels.contains(issue.case_label.as_str()))
+        .map(|issue| format!("{:?}: {}", issue.kind, issue.message))
+        .collect::<Vec<_>>();
+
+    if !gating_issue_messages.is_empty() {
         return PerfGateVerdict {
             status: PerfGateStatus::ContractFailure,
-            messages: summary
-                .issues
-                .iter()
-                .map(|issue| format!("{:?}: {}", issue.kind, issue.message))
-                .collect(),
+            messages: gating_issue_messages,
         };
     }
 

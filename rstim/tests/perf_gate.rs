@@ -1,6 +1,6 @@
 use rstim::perf::{
     PerfCaseSummary, PerfComparisonSummary, PerfGateConfig, PerfGateStatus, PerfSummary,
-    PerfVariantSummary, evaluate_summary,
+    PerfSummaryIssue, PerfSummaryIssueKind, PerfVariantSummary, evaluate_summary,
 };
 
 fn sample_variant(tool_variant: &str, median_wall_time_ns: u128) -> PerfVariantSummary {
@@ -96,4 +96,64 @@ fn gate_accepts_gating_fallback_case_without_compiled_variant() {
     let verdict = evaluate_summary(&summary, PerfGateConfig::default());
     assert_eq!(verdict.status, PerfGateStatus::Pass);
     assert!(verdict.messages.is_empty());
+}
+
+#[test]
+fn gate_ignores_report_only_summary_issues() {
+    let summary = PerfSummary {
+        cases: vec![PerfCaseSummary {
+            case_label: "repeat-analyze-stress-report".to_string(),
+            workload: "analyze_errors".to_string(),
+            tier: "report_only".to_string(),
+            requires_compiled: true,
+            requires_fallback: false,
+            expected_variants: vec![
+                "stim-cli".to_string(),
+                "rstim-analyzer-flattened".to_string(),
+                "rstim-analyzer-compiled".to_string(),
+            ],
+            present_variants: vec!["stim-cli".to_string()],
+            variants: vec![sample_variant("stim-cli", 600)],
+            comparisons: vec![],
+        }],
+        issues: vec![PerfSummaryIssue {
+            kind: PerfSummaryIssueKind::MissingComparisonVariants,
+            case_label: "repeat-analyze-stress-report".to_string(),
+            message: "missing comparison variants for analyzer_compiled_vs_flattened".to_string(),
+        }],
+    };
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::Pass);
+    assert!(verdict.messages.is_empty());
+}
+
+#[test]
+fn gate_rejects_gating_summary_issues() {
+    let summary = PerfSummary {
+        cases: vec![PerfCaseSummary {
+            case_label: "rep-sample-d13-r13".to_string(),
+            workload: "sample".to_string(),
+            tier: "gating".to_string(),
+            requires_compiled: true,
+            requires_fallback: false,
+            expected_variants: vec![
+                "stim-cli".to_string(),
+                "rstim-interpreted".to_string(),
+                "rstim-compiled".to_string(),
+            ],
+            present_variants: vec!["stim-cli".to_string(), "rstim-interpreted".to_string()],
+            variants: vec![sample_variant("rstim-interpreted", 100)],
+            comparisons: vec![],
+        }],
+        issues: vec![PerfSummaryIssue {
+            kind: PerfSummaryIssueKind::MissingBenchmarkCaseData,
+            case_label: "surface-detect-d13-r13".to_string(),
+            message: "missing benchmark case data for surface-detect-d13-r13".to_string(),
+        }],
+    };
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::ContractFailure);
+    assert!(verdict.messages[0].contains("MissingBenchmarkCaseData"));
 }
