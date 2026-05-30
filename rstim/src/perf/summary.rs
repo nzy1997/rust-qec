@@ -11,6 +11,7 @@ pub enum PerfSummaryIssueKind {
     DuplicateMeasurement,
     MetadataMismatch,
     MissingComparisonVariants,
+    MissingBenchmarkCaseData,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -188,6 +189,7 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
                     record.warmup
                 ),
             );
+            continue;
         }
 
         if record.workload != case_def.workload.as_str() {
@@ -237,6 +239,12 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
     let mut cases = Vec::new();
     for case in benchmark_cases() {
         let Some(variant_records) = grouped.remove(case.label) else {
+            push_issue(
+                &mut issues,
+                PerfSummaryIssueKind::MissingBenchmarkCaseData,
+                case.label,
+                format!("missing benchmark case data for {}", case.label),
+            );
             continue;
         };
 

@@ -80,3 +80,47 @@ fn report_surfaces_skipped_comparison_context_when_variants_are_missing() {
     assert!(report.contains("analyzer_compiled_vs_flattened"));
     assert!(report.contains("missing comparison variants"));
 }
+
+#[test]
+fn report_surfaces_missing_benchmark_cases() {
+    let summary = summarize_jsonl_str(RAW_JSONL).expect("summary");
+
+    assert!(summary.issues.iter().any(|issue| {
+        issue.case_label == "surface-detect-d13-r13"
+            && issue.message.contains("missing benchmark case data")
+    }));
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("## Summary Issues"));
+    assert!(report.contains("surface-detect-d13-r13"));
+    assert!(report.contains("missing benchmark case data"));
+}
+
+#[test]
+fn duplicate_measurements_do_not_pollute_variant_aggregates() {
+    const DUPLICATE_RAW_JSONL: &str = concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":1,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":10,\"peak_memory_bytes\":100}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":2,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":30,\"peak_memory_bytes\":100}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":2,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":1000,\"peak_memory_bytes\":100}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":3,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":50,\"peak_memory_bytes\":100}\n"
+    );
+
+    let summary = summarize_jsonl_str(DUPLICATE_RAW_JSONL).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .expect("sample case");
+    let interpreted = case
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "rstim-interpreted")
+        .expect("interpreted variant");
+
+    assert!(summary.issues.iter().any(|issue| {
+        issue.case_label == "rep-sample-d13-r13"
+            && issue.message.contains("duplicate measurement slot")
+    }));
+    assert_eq!(interpreted.sample_count, 3);
+    assert_eq!(interpreted.median_wall_time_ns, 30);
+}
