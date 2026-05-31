@@ -1,8 +1,10 @@
-use rstim::compiled::{CompiledPathDecision, choose_analyzer_path, compile_circuit};
+use rstim::codegen::{repetition_code_memory, rotated_memory_x};
+use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
 use rstim::parser::parse_lines;
 use rstim::perf::{
-    PerfBenchmarkCase, PerfCircuitSource, PerfRecord, PerfVariant, PerfWorkload,
     benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
+    PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
+    PerfRecord, PerfVariant, PerfWorkload,
 };
 use serde_json::Value;
 
@@ -35,32 +37,195 @@ fn benchmark_cases_cover_sampling_detect_and_repeat_analysis() {
 }
 
 #[test]
-fn perf_record_json_line_contains_required_keys() {
-    let record = PerfRecord {
-        case_label: "surface-detect-d13".to_string(),
-        tool_variant: "rstim-auto".to_string(),
-        workload: PerfWorkload::Detect.as_str().to_string(),
+fn benchmark_cases_define_gating_and_report_only_contracts() {
+    let cases = benchmark_cases();
+
+    assert!(
+        cases.iter().any(|case| case.tier == PerfCaseTier::Gating),
+        "expected at least one gating case"
+    );
+    assert!(
+        cases
+            .iter()
+            .any(|case| case.tier == PerfCaseTier::ReportOnly),
+        "expected at least one report-only case"
+    );
+
+    let expectations = [
+        ("rep-sample-d13-r13", PerfCaseTier::Gating, true, false),
+        ("surface-detect-d13-r13", PerfCaseTier::Gating, true, false),
+        ("repeat-analyze-large", PerfCaseTier::Gating, true, false),
+        ("loss-protection-sample", PerfCaseTier::Gating, false, true),
+        (
+            "repeat-analyze-stress-report",
+            PerfCaseTier::ReportOnly,
+            true,
+            false,
+        ),
+    ];
+
+    for (label, tier, requires_compiled, requires_fallback) in expectations {
+        let case = cases
+            .iter()
+            .find(|case| case.label == label)
+            .unwrap_or_else(|| panic!("missing benchmark case {label}"));
+        assert_eq!(case.tier, tier, "unexpected tier for {label}");
+        assert_eq!(
+            case.requires_compiled, requires_compiled,
+            "unexpected requires_compiled for {label}"
+        );
+        assert_eq!(
+            case.requires_fallback, requires_fallback,
+            "unexpected requires_fallback for {label}"
+        );
+    }
+}
+
+#[test]
+fn perf_measurement_record_json_line_contains_round_metadata() {
+    let record = PerfMeasurementRecord {
+        case_label: "rep-sample-d13-r13".to_string(),
+        tool_variant: PerfVariant::RstimCompiled.label().to_string(),
+        workload: PerfWorkload::Sample.as_str().to_string(),
+        tier: PerfCaseTier::Gating.as_str().to_string(),
+        measurement_index: 3,
+        warmup: false,
         qubits: 25,
         measurements: 48,
-        detectors: 24,
-        observables: 1,
+        detectors: 0,
+        observables: 0,
         repeat_depth: 1,
         repeat_count: 13,
-        shots: Some(10_000),
-        wall_time_ns: 123_456,
-        peak_memory_bytes: None,
+        shots: Some(20_000),
+        wall_time_ns: 456_789,
+        peak_memory_bytes: Some(8_192),
+    };
+
+    let line = record.to_json_line();
+    assert!(line.ends_with('\n'));
+    let json: Value = serde_json::from_str(line.trim_end()).unwrap();
+    let parsed = PerfMeasurementRecord::from_json_line(line.trim_end()).unwrap();
+
+    assert_eq!(json["case_label"], "rep-sample-d13-r13");
+    assert_eq!(json["tool_variant"], "rstim-compiled");
+    assert_eq!(json["workload"], "sample");
+    assert_eq!(json["tier"], "gating");
+    assert_eq!(json["measurement_index"], 3);
+    assert_eq!(json["warmup"], false);
+    assert_eq!(json["qubits"], 25);
+    assert_eq!(json["measurements"], 48);
+    assert_eq!(json["detectors"], 0);
+    assert_eq!(json["observables"], 0);
+    assert_eq!(json["repeat_depth"], 1);
+    assert_eq!(json["repeat_count"], 13);
+    assert_eq!(json["shots"], 20_000);
+    assert_eq!(json["wall_time_ns"], 456_789);
+    assert_eq!(json["peak_memory_bytes"], 8_192);
+    assert_eq!(parsed, record);
+}
+
+#[test]
+fn legacy_perf_record_json_line_infers_tier_for_known_benchmark_case() {
+    let record = PerfRecord {
+        case_label: "repeat-analyze-stress-report".to_string(),
+        tool_variant: PerfVariant::RstimAnalyzerCompiled.label().to_string(),
+        workload: PerfWorkload::AnalyzeErrors.as_str().to_string(),
+        qubits: 1,
+        measurements: 1,
+        detectors: 1,
+        observables: 0,
+        repeat_depth: 1,
+        repeat_count: 8192,
+        shots: None,
+        wall_time_ns: 123,
+        peak_memory_bytes: Some(456),
     };
 
     let line = record.to_json_line();
     let json: Value = serde_json::from_str(line.trim_end()).unwrap();
 
     assert!(line.ends_with('\n'));
-    assert_eq!(json["case_label"], "surface-detect-d13");
-    assert_eq!(json["tool_variant"], "rstim-auto");
-    assert_eq!(json["workload"], "detect");
-    assert_eq!(json["repeat_count"], 13);
-    assert_eq!(json["shots"], 10_000);
-    assert_eq!(json["peak_memory_bytes"], Value::Null);
+    assert_eq!(json["case_label"], "repeat-analyze-stress-report");
+    assert_eq!(json["tier"], "report_only");
+}
+
+#[test]
+fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
+    let expectations = [
+        (
+            "rep-sample-d13-r13",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimInterpreted,
+                PerfVariant::RstimCompiled,
+            ],
+            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+        ),
+        (
+            "surface-detect-d13-r13",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimInterpreted,
+                PerfVariant::RstimCompiled,
+            ],
+            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+        ),
+        (
+            "repeat-analyze-large",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimAnalyzerFlattened,
+                PerfVariant::RstimAnalyzerCompiled,
+            ],
+            vec![PerfComparisonKind::AnalyzerCompiledVsFlattened],
+        ),
+        (
+            "loss-protection-sample",
+            vec![PerfVariant::StimCli, PerfVariant::RstimInterpreted],
+            Vec::new(),
+        ),
+        (
+            "repeat-analyze-stress-report",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimAnalyzerFlattened,
+                PerfVariant::RstimAnalyzerCompiled,
+            ],
+            vec![PerfComparisonKind::AnalyzerCompiledVsFlattened],
+        ),
+    ];
+
+    for (label, expected_variants, expected_comparisons) in expectations {
+        let case = benchmark_cases()
+            .into_iter()
+            .find(|case| case.label == label)
+            .unwrap_or_else(|| panic!("missing benchmark case {label}"));
+        let instrs = match case.source {
+            PerfCircuitSource::Generator {
+                code,
+                task,
+                distance,
+                rounds,
+                noise,
+            } => match (code, task) {
+                ("repetition_code", "memory") => repetition_code_memory(distance, rounds, noise),
+                ("surface_code", "rotated_memory_x") => rotated_memory_x(distance, rounds, noise),
+                _ => panic!("unsupported generator source for {label}"),
+            },
+            PerfCircuitSource::Inline { text } => parse_lines(text).unwrap(),
+        };
+
+        let variants = benchmark_case_variants(case, &instrs).unwrap();
+        assert_eq!(
+            variants, expected_variants,
+            "unexpected variants for {label}"
+        );
+        assert_eq!(
+            case.comparisons,
+            expected_comparisons.as_slice(),
+            "unexpected comparisons for {label}"
+        );
+    }
 }
 
 #[test]
@@ -97,16 +262,17 @@ fn perf_workload_and_variant_labels_are_stable() {
 fn benchmark_cases_include_a_compiled_analyzer_compatible_repeat_case() {
     let cases = benchmark_cases();
 
-    let compatible = cases.iter().filter(|case| case.workload == PerfWorkload::AnalyzeErrors).any(
-        |case| match case.source {
+    let compatible = cases
+        .iter()
+        .filter(|case| case.workload == PerfWorkload::AnalyzeErrors)
+        .any(|case| match case.source {
             rstim::perf::PerfCircuitSource::Inline { text } => {
                 let instrs = parse_lines(text).unwrap();
                 let compiled = compile_circuit(&instrs).unwrap();
                 choose_analyzer_path(&compiled) == CompiledPathDecision::FastPath
             }
             rstim::perf::PerfCircuitSource::Generator { .. } => false,
-        },
-    );
+        });
 
     assert!(
         compatible,
@@ -124,6 +290,10 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
             text: "X_ERROR(0.001) 0\nM 0\n",
         },
         shots: Some(32),
+        tier: PerfCaseTier::Gating,
+        requires_compiled: true,
+        requires_fallback: false,
+        comparisons: &[],
     };
     let analyze_instrs =
         parse_lines("REPEAT 8 {\n  X_ERROR(0.001) 0\n  MR 0\n  DETECTOR rec[-1]\n}\n").unwrap();
@@ -134,6 +304,10 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
             text: "REPEAT 8 {\n  X_ERROR(0.001) 0\n  MR 0\n  DETECTOR rec[-1]\n}\n",
         },
         shots: None,
+        tier: PerfCaseTier::Gating,
+        requires_compiled: true,
+        requires_fallback: false,
+        comparisons: &[],
     };
 
     assert_eq!(

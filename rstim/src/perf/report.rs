@@ -1,0 +1,83 @@
+use super::{PerfCaseTier, PerfSummary};
+
+pub fn render_markdown_report(summary: &PerfSummary, verdict_summary: Option<&str>) -> String {
+    let mut out = String::new();
+    out.push_str("# rstim Performance Evidence Report\n\n");
+
+    if let Some(verdict_summary) = verdict_summary {
+        out.push_str("## Gate Verdict\n\n");
+        out.push_str(verdict_summary);
+        if !verdict_summary.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+
+    let gating_cases = summary
+        .cases
+        .iter()
+        .filter(|case| case.tier == PerfCaseTier::Gating.as_str())
+        .collect::<Vec<_>>();
+    let report_only_cases = summary
+        .cases
+        .iter()
+        .filter(|case| case.tier == PerfCaseTier::ReportOnly.as_str())
+        .collect::<Vec<_>>();
+
+    out.push_str("## Gating Cases\n\n");
+    if gating_cases.is_empty() {
+        out.push_str("_None._\n\n");
+    } else {
+        for case in gating_cases {
+            render_case_section(&mut out, case);
+        }
+    }
+
+    out.push_str("## Report-Only Cases\n\n");
+    if report_only_cases.is_empty() {
+        out.push_str("_None._\n\n");
+    } else {
+        for case in report_only_cases {
+            render_case_section(&mut out, case);
+        }
+    }
+
+    if !summary.issues.is_empty() {
+        out.push_str("## Summary Issues\n\n");
+        for issue in &summary.issues {
+            out.push_str(&format!(
+                "- `{:?}` in `{}`: {}\n",
+                issue.kind, issue.case_label, issue.message
+            ));
+        }
+        out.push('\n');
+    }
+
+    out
+}
+
+fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
+    out.push_str(&format!("### {}\n\n", case.case_label));
+    out.push_str(&format!("- workload: `{}`\n", case.workload));
+    out.push_str(&format!(
+        "- expected variants: `{}`\n",
+        case.expected_variants.join("`, `")
+    ));
+    out.push_str(&format!(
+        "- present variants: `{}`\n",
+        case.present_variants.join("`, `")
+    ));
+    for variant in &case.variants {
+        out.push_str(&format!(
+            "- {} median wall time: `{}` ns over `{}` measured rounds\n",
+            variant.tool_variant, variant.median_wall_time_ns, variant.sample_count
+        ));
+    }
+    for comparison in &case.comparisons {
+        out.push_str(&format!(
+            "- {}: `{}` / `{}` = `{:.6}`\n",
+            comparison.kind, comparison.lhs_variant, comparison.rhs_variant, comparison.ratio
+        ));
+    }
+    out.push('\n');
+}

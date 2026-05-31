@@ -190,12 +190,67 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Run performance evidence workflows
+    Perf {
+        #[command(subcommand)]
+        command: PerfCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PerfCommands {
+    /// Emit raw benchmark JSONL
+    Run {
+        #[arg(long)]
+        out: Option<String>,
+        #[arg(long, default_value_t = 1)]
+        warmup_rounds: usize,
+        #[arg(long, default_value_t = 5)]
+        measure_rounds: usize,
+    },
+    /// Aggregate raw JSONL into summary JSON
+    Summarize {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Evaluate summary JSON and return non-zero on gate failure
+    Gate {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long, default_value_t = 1.10)]
+        sampler_threshold: f64,
+        #[arg(long, default_value_t = 1.10)]
+        analyzer_threshold: f64,
+    },
+    /// Render summary JSON as Markdown
+    Report {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Run the full perf pipeline and write raw / summary / report artifacts
+    Ci {
+        #[arg(long = "out-dir")]
+        out_dir: String,
+        #[arg(long, default_value_t = 1)]
+        warmup_rounds: usize,
+        #[arg(long, default_value_t = 5)]
+        measure_rounds: usize,
+    },
 }
 
 #[derive(Clone, Copy)]
 enum JsonOutputFormat {
     Pretty,
     Compact,
+}
+
+enum PerfCiError {
+    Infrastructure(String),
+    Gate(String),
 }
 
 fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
@@ -428,10 +483,162 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let mut w = open_output(out.as_deref())?;
             run_export_json(&text, format, highlight_dem_error, sample_shot, seed, &mut w)
         }
+        Some(Commands::Perf { command }) => match command {
+            PerfCommands::Run {
+                out,
+                warmup_rounds,
+                measure_rounds,
+            } => {
+                let mut w = open_output(out.as_deref())?;
+                crate::perf::run_benchmark_suite_to_writer(
+                    &mut w,
+                    crate::perf::PerfRunOptions {
+                        warmup_rounds,
+                        measured_rounds: measure_rounds,
+                    },
+                )
+            }
+            PerfCommands::Summarize { r#in, out } => {
+                let raw = read_input(r#in.as_deref())?;
+                let summary = crate::perf::summarize_jsonl_str(&raw)?;
+                let mut w = open_output(out.as_deref())?;
+                serde_json::to_writer_pretty(&mut *w, &summary)
+                    .map_err(|e| format!("failed to write perf summary: {e}"))?;
+                w.write_all(b"\n")
+                    .map_err(|e| format!("failed to write perf summary newline: {e}"))
+            }
+            PerfCommands::Gate {
+                r#in,
+                sampler_threshold,
+                analyzer_threshold,
+            } => {
+                let text = read_input(r#in.as_deref())?;
+                let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
+                    .map_err(|e| format!("failed to parse perf summary: {e}"))?;
+                let verdict = crate::perf::evaluate_summary(
+                    &summary,
+                    crate::perf::PerfGateConfig {
+                        sampler_ratio_threshold: sampler_threshold,
+                        analyzer_ratio_threshold: analyzer_threshold,
+                    },
+                );
+                if verdict.status == crate::perf::PerfGateStatus::Pass {
+                    Ok(())
+                } else {
+                    Err(verdict.summary_markdown())
+                }
+            }
+            PerfCommands::Report { r#in, out } => {
+                let text = read_input(r#in.as_deref())?;
+                let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
+                    .map_err(|e| format!("failed to parse perf summary: {e}"))?;
+                let report = crate::perf::render_markdown_report(&summary, None);
+                let mut w = open_output(out.as_deref())?;
+                w.write_all(report.as_bytes())
+                    .map_err(|e| format!("failed to write perf report: {e}"))
+            }
+            PerfCommands::Ci {
+                out_dir,
+                warmup_rounds,
+                measure_rounds,
+            } => run_perf_ci(&out_dir, warmup_rounds, measure_rounds).map_err(|e| match e {
+                PerfCiError::Infrastructure(message) => {
+                    format!("InfrastructureFailure\n- {message}")
+                }
+                PerfCiError::Gate(message) => message,
+            }),
+        },
         None => {
             println!("rstim {}", crate::version());
             Ok(())
         }
+    }
+}
+
+fn run_perf_ci(
+    out_dir: &str,
+    warmup_rounds: usize,
+    measure_rounds: usize,
+) -> Result<(), PerfCiError> {
+    std::fs::create_dir_all(out_dir)
+        .map_err(|e| PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}")))?;
+
+    let raw_path = std::path::Path::new(out_dir).join("raw.jsonl");
+    let summary_path = std::path::Path::new(out_dir).join("summary.json");
+    let report_path = std::path::Path::new(out_dir).join("report.md");
+
+    write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds)?;
+
+    let raw_text = std::fs::read_to_string(&raw_path)
+        .map_err(|e| PerfCiError::Infrastructure(format!(
+            "failed to read raw perf artifact {}: {e}",
+            raw_path.display()
+        )))?;
+    finalize_perf_ci_artifacts(
+        &raw_text,
+        &summary_path,
+        &report_path,
+        crate::perf::PerfGateConfig::default(),
+    )
+}
+
+fn write_perf_ci_raw_artifact(
+    raw_path: &std::path::Path,
+    warmup_rounds: usize,
+    measure_rounds: usize,
+) -> Result<(), PerfCiError> {
+    if let Ok(source_path) = std::env::var("RSTIM_TEST_PERF_CI_RAW") {
+        std::fs::copy(&source_path, raw_path).map_err(|e| {
+            PerfCiError::Infrastructure(format!(
+                "failed to copy test perf raw artifact from {source_path} to {}: {e}",
+                raw_path.display()
+            ))
+        })?;
+        return Ok(());
+    }
+
+    let mut raw = open_output(raw_path.to_str()).map_err(PerfCiError::Infrastructure)?;
+    crate::perf::run_benchmark_suite_to_writer(
+        &mut raw,
+        crate::perf::PerfRunOptions {
+            warmup_rounds,
+            measured_rounds: measure_rounds,
+        },
+    )
+    .map_err(PerfCiError::Infrastructure)
+}
+
+fn finalize_perf_ci_artifacts(
+    raw_text: &str,
+    summary_path: &std::path::Path,
+    report_path: &std::path::Path,
+    config: crate::perf::PerfGateConfig,
+) -> Result<(), PerfCiError> {
+    let summary = crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
+    let verdict = crate::perf::evaluate_summary(&summary, config);
+
+    std::fs::write(
+        summary_path,
+        serde_json::to_string_pretty(&summary)
+            .map_err(|e| PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}")))?,
+    )
+    .map_err(|e| PerfCiError::Infrastructure(format!(
+        "failed to write perf summary {}: {e}",
+        summary_path.display()
+    )))?;
+
+    let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
+    std::fs::write(report_path, report).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
+            "failed to write perf report {}: {e}",
+            report_path.display()
+        ))
+    })?;
+
+    if verdict.status == crate::perf::PerfGateStatus::Pass {
+        Ok(())
+    } else {
+        Err(PerfCiError::Gate(verdict.summary_markdown()))
     }
 }
 
@@ -562,6 +769,18 @@ pub fn run_gen(
     noise: f64,
     out: &mut dyn Write,
 ) -> Result<(), String> {
+    let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
+    out.write_all(circuit_text.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
+}
+
+pub(crate) fn generate_common_circuit_text(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+) -> Result<String, String> {
     let instrs = match (code, task) {
         ("repetition_code", "memory") => {
             crate::codegen::repetition_code_memory(distance, rounds, noise)
@@ -583,9 +802,7 @@ pub fn run_gen(
         }
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
-    let circuit_text = crate::ir::circuit_to_string(&instrs);
-    out.write_all(circuit_text.as_bytes())
-        .map_err(|e| format!("write error: {e}"))
+    Ok(crate::ir::circuit_to_string(&instrs))
 }
 
 pub fn run_sample(
@@ -1054,6 +1271,32 @@ fn parse_fired_detectors(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    const PERF_PASS_RAW: &str = concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":80,\"peak_memory_bytes\":2048}\n",
+        "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":240,\"peak_memory_bytes\":4096}\n",
+        "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":210,\"peak_memory_bytes\":8192}\n",
+        "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":170,\"peak_memory_bytes\":6144}\n",
+        "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"stim-cli\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":700,\"peak_memory_bytes\":512}\n",
+        "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-flattened\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":600,\"peak_memory_bytes\":1024}\n",
+        "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-compiled\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":500,\"peak_memory_bytes\":768}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256}\n"
+    );
+
+    fn cli_test_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn lock_cli_test_env() -> MutexGuard<'static, ()> {
+        cli_test_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 
     #[test]
     fn run_export_json_sample_shot_without_seed_exports_annotations_in_process() {
@@ -1113,5 +1356,233 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(value["operations"][0]["annotations"][0]["label"], "L");
         assert_eq!(value["operations"][1]["annotations"][0]["label"], "1[L]");
+    }
+
+    #[test]
+    fn run_without_subcommand_reports_version() {
+        run(Cli { command: None }).unwrap();
+    }
+
+    #[test]
+    fn run_dispatches_perf_ci_error_paths_in_process() {
+        let _guard = lock_cli_test_env();
+        let dir = tempfile::tempdir().unwrap();
+        let regression_raw_path = dir.path().join("regression.jsonl");
+        let gate_out_dir = dir.path().join("gate");
+        let missing_raw_path = dir.path().join("missing.jsonl");
+        let infra_out_dir = dir.path().join("infra");
+        let regression_raw = PERF_PASS_RAW.replacen(
+            "\"shots\":20000,\"wall_time_ns\":80,\"peak_memory_bytes\":2048",
+            "\"shots\":20000,\"wall_time_ns\":111,\"peak_memory_bytes\":2048",
+            1,
+        );
+        std::fs::write(&regression_raw_path, regression_raw).unwrap();
+
+        unsafe {
+            std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &regression_raw_path);
+        }
+        let gate_err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Ci {
+                    out_dir: gate_out_dir.display().to_string(),
+                    warmup_rounds: 1,
+                    measure_rounds: 5,
+                },
+            }),
+        })
+        .unwrap_err();
+        unsafe {
+            std::env::remove_var("RSTIM_TEST_PERF_CI_RAW");
+        }
+
+        assert!(!gate_err.starts_with("InfrastructureFailure"));
+        assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
+        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
+            .unwrap()
+            .contains("\"cases\""));
+
+        unsafe {
+            std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
+        }
+        let infra_err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Ci {
+                    out_dir: infra_out_dir.display().to_string(),
+                    warmup_rounds: 1,
+                    measure_rounds: 5,
+                },
+            }),
+        })
+        .unwrap_err();
+        unsafe {
+            std::env::remove_var("RSTIM_TEST_PERF_CI_RAW");
+        }
+
+        assert!(infra_err.starts_with("InfrastructureFailure"));
+        assert!(infra_err.contains("failed to copy test perf raw artifact"));
+    }
+
+    #[test]
+    fn finalize_perf_ci_artifacts_writes_outputs_before_returning_gate_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let summary_path = dir.path().join("summary.json");
+        let report_path = dir.path().join("report.md");
+        let raw = concat!(
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":111,\"peak_memory_bytes\":2048}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":240,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":210,\"peak_memory_bytes\":8192}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":170,\"peak_memory_bytes\":6144}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"stim-cli\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":700,\"peak_memory_bytes\":512}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-flattened\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":600,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-compiled\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":500,\"peak_memory_bytes\":768}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256}\n"
+        );
+
+        let err = finalize_perf_ci_artifacts(
+            raw,
+            &summary_path,
+            &report_path,
+            crate::perf::PerfGateConfig {
+                sampler_ratio_threshold: 1.10,
+                analyzer_ratio_threshold: 1.10,
+            },
+        )
+        .unwrap_err();
+
+        match err {
+            PerfCiError::Gate(message) => {
+                assert!(message.contains("RegressionFailure") || message.contains("exceeds threshold"));
+            }
+            PerfCiError::Infrastructure(message) => {
+                panic!("unexpected infrastructure failure: {message}");
+            }
+        }
+
+        let summary_text = std::fs::read_to_string(&summary_path).unwrap();
+        let report_text = std::fs::read_to_string(&report_path).unwrap();
+        assert!(summary_text.contains("\"cases\""));
+        assert!(report_text.contains("## Gate Verdict"));
+        assert!(report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold"));
+    }
+
+    #[test]
+    fn finalize_perf_ci_artifacts_returns_ok_for_passing_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        let summary_path = dir.path().join("summary.json");
+        let report_path = dir.path().join("report.md");
+
+        finalize_perf_ci_artifacts(
+            PERF_PASS_RAW,
+            &summary_path,
+            &report_path,
+            crate::perf::PerfGateConfig::default(),
+        )
+        .unwrap_or_else(|_| panic!("passing perf ci artifacts"));
+
+        let report_text = std::fs::read_to_string(&report_path).unwrap();
+        assert!(report_text.contains("## Gate Verdict"));
+        assert!(report_text.contains("PASS"));
+    }
+
+    #[test]
+    fn run_gen_and_generator_helpers_cover_supported_perf_sources() {
+        let mut out = Vec::new();
+        run_gen("surface_code", "rotated_memory_z", 3, 1, 0.0, &mut out).unwrap();
+        assert!(!out.is_empty());
+        for (code, task, rounds) in [
+            ("repetition_code", "memory", 1),
+            ("surface_code", "rotated_memory_x", 1),
+            ("surface_code", "unrotated_memory_x", 1),
+            ("surface_code", "unrotated_memory_z", 1),
+            ("color_code", "memory_xyz", 2),
+        ] {
+            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                .unwrap()
+                .contains("QUBIT_COORDS"));
+        }
+        assert!(generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
+            .unwrap_err()
+            .contains("unknown code/task"));
+    }
+
+    #[test]
+    fn run_dispatches_perf_summarize_gate_and_report_commands_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let raw_path = dir.path().join("raw.jsonl");
+        let summary_path = dir.path().join("summary.json");
+        let report_path = dir.path().join("report.md");
+        std::fs::write(&raw_path, PERF_PASS_RAW).unwrap();
+
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Summarize {
+                    r#in: Some(raw_path.display().to_string()),
+                    out: Some(summary_path.display().to_string()),
+                },
+            }),
+        })
+        .unwrap();
+
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Gate {
+                    r#in: Some(summary_path.display().to_string()),
+                    sampler_threshold: 1.10,
+                    analyzer_threshold: 1.10,
+                },
+            }),
+        })
+        .unwrap();
+
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Report {
+                    r#in: Some(summary_path.display().to_string()),
+                    out: Some(report_path.display().to_string()),
+                },
+            }),
+        })
+        .unwrap();
+
+        let report_text = std::fs::read_to_string(&report_path).unwrap();
+        assert!(report_text.contains("## Gating Cases"));
+        assert!(report_text.contains("rep-sample-d13-r13"));
+    }
+
+    #[test]
+    fn run_dispatches_perf_gate_failure_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let summary_path = dir.path().join("summary.json");
+        let summary = crate::perf::summarize_jsonl_str(concat!(
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":111,\"peak_memory_bytes\":2048}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":240,\"peak_memory_bytes\":4096}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":210,\"peak_memory_bytes\":8192}\n",
+            "{\"case_label\":\"surface-detect-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"detect\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":169,\"measurements\":312,\"detectors\":144,\"observables\":1,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":10000,\"wall_time_ns\":170,\"peak_memory_bytes\":6144}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"stim-cli\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":700,\"peak_memory_bytes\":512}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-flattened\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":600,\"peak_memory_bytes\":1024}\n",
+            "{\"case_label\":\"repeat-analyze-large\",\"tool_variant\":\"rstim-analyzer-compiled\",\"workload\":\"analyze_errors\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":4096,\"shots\":null,\"wall_time_ns\":500,\"peak_memory_bytes\":768}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256}\n"
+        ))
+        .unwrap();
+        std::fs::write(&summary_path, serde_json::to_vec_pretty(&summary).unwrap()).unwrap();
+
+        let err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Gate {
+                    r#in: Some(summary_path.display().to_string()),
+                    sampler_threshold: 1.10,
+                    analyzer_threshold: 1.10,
+                },
+            }),
+        })
+        .unwrap_err();
+
+        assert!(err.contains("RegressionFailure") || err.contains("exceeds threshold"));
     }
 }
