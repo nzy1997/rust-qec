@@ -1271,6 +1271,7 @@ fn parse_fired_detectors(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
 
     const PERF_PASS_RAW: &str = concat!(
         "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
@@ -1285,6 +1286,17 @@ mod tests {
         "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
         "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256}\n"
     );
+
+    fn cli_test_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn lock_cli_test_env() -> MutexGuard<'static, ()> {
+        cli_test_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 
     #[test]
     fn run_export_json_sample_shot_without_seed_exports_annotations_in_process() {
@@ -1347,22 +1359,67 @@ mod tests {
     }
 
     #[test]
-    fn perf_ci_preserves_gate_failures_without_infrastructure_prefix() {
-        let verdict = crate::perf::PerfGateVerdict {
-            status: crate::perf::PerfGateStatus::RegressionFailure,
-            messages: vec!["regression".to_string()],
-        };
-        let err = Err::<(), PerfCiError>(PerfCiError::Gate(verdict.summary_markdown())).map_err(
-            |e| match e {
-                PerfCiError::Infrastructure(message) => {
-                    format!("InfrastructureFailure\n- {message}")
-                }
-                PerfCiError::Gate(message) => message,
-            },
-        );
+    fn run_without_subcommand_reports_version() {
+        run(Cli { command: None }).unwrap();
+    }
 
-        let err = err.unwrap_err();
-        assert!(!err.starts_with("InfrastructureFailure"));
+    #[test]
+    fn run_dispatches_perf_ci_error_paths_in_process() {
+        let _guard = lock_cli_test_env();
+        let dir = tempfile::tempdir().unwrap();
+        let regression_raw_path = dir.path().join("regression.jsonl");
+        let gate_out_dir = dir.path().join("gate");
+        let missing_raw_path = dir.path().join("missing.jsonl");
+        let infra_out_dir = dir.path().join("infra");
+        let regression_raw = PERF_PASS_RAW.replacen(
+            "\"shots\":20000,\"wall_time_ns\":80,\"peak_memory_bytes\":2048",
+            "\"shots\":20000,\"wall_time_ns\":111,\"peak_memory_bytes\":2048",
+            1,
+        );
+        std::fs::write(&regression_raw_path, regression_raw).unwrap();
+
+        unsafe {
+            std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &regression_raw_path);
+        }
+        let gate_err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Ci {
+                    out_dir: gate_out_dir.display().to_string(),
+                    warmup_rounds: 1,
+                    measure_rounds: 5,
+                },
+            }),
+        })
+        .unwrap_err();
+        unsafe {
+            std::env::remove_var("RSTIM_TEST_PERF_CI_RAW");
+        }
+
+        assert!(!gate_err.starts_with("InfrastructureFailure"));
+        assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
+        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
+            .unwrap()
+            .contains("\"cases\""));
+
+        unsafe {
+            std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
+        }
+        let infra_err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Ci {
+                    out_dir: infra_out_dir.display().to_string(),
+                    warmup_rounds: 1,
+                    measure_rounds: 5,
+                },
+            }),
+        })
+        .unwrap_err();
+        unsafe {
+            std::env::remove_var("RSTIM_TEST_PERF_CI_RAW");
+        }
+
+        assert!(infra_err.starts_with("InfrastructureFailure"));
+        assert!(infra_err.contains("failed to copy test perf raw artifact"));
     }
 
     #[test]
@@ -1428,6 +1485,27 @@ mod tests {
         let report_text = std::fs::read_to_string(&report_path).unwrap();
         assert!(report_text.contains("## Gate Verdict"));
         assert!(report_text.contains("PASS"));
+    }
+
+    #[test]
+    fn run_gen_and_generator_helpers_cover_supported_perf_sources() {
+        let mut out = Vec::new();
+        run_gen("surface_code", "rotated_memory_z", 3, 1, 0.0, &mut out).unwrap();
+        assert!(!out.is_empty());
+        for (code, task, rounds) in [
+            ("repetition_code", "memory", 1),
+            ("surface_code", "rotated_memory_x", 1),
+            ("surface_code", "unrotated_memory_x", 1),
+            ("surface_code", "unrotated_memory_z", 1),
+            ("color_code", "memory_xyz", 2),
+        ] {
+            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                .unwrap()
+                .contains("QUBIT_COORDS"));
+        }
+        assert!(generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
+            .unwrap_err()
+            .contains("unknown code/task"));
     }
 
     #[test]
