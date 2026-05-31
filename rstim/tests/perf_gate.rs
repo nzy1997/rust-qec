@@ -1,6 +1,6 @@
 use rstim::perf::{
-    PerfGateConfig, PerfGateStatus, PerfSummary, PerfSummaryIssue, PerfSummaryIssueKind,
-    evaluate_summary, summarize_jsonl_str,
+    PerfComparisonSummary, PerfGateConfig, PerfGateStatus, PerfSummary, PerfSummaryIssue,
+    PerfSummaryIssueKind, evaluate_summary, summarize_jsonl_str,
 };
 
 const FULL_RAW_JSONL: &str = concat!(
@@ -159,4 +159,89 @@ fn gate_rejects_missing_gating_case_even_without_summary_issue() {
     assert!(verdict.messages.iter().any(|message| {
         message.contains("missing benchmark case summary for surface-detect-d13-r13")
     }));
+}
+
+#[test]
+fn gate_rejects_duplicate_gating_case_summaries() {
+    let mut summary = full_summary();
+    let duplicate = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .expect("rep sample case")
+        .clone();
+    summary.cases.push(duplicate);
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::ContractFailure);
+    assert!(verdict.messages.iter().any(|message| {
+        message.contains("duplicate benchmark case summary for rep-sample-d13-r13")
+    }));
+}
+
+#[test]
+fn gate_rejects_fallback_cases_that_report_compiled_analyzer_variant() {
+    let mut summary = full_summary();
+    let fallback = summary
+        .cases
+        .iter_mut()
+        .find(|case| case.case_label == "loss-protection-sample")
+        .expect("fallback sample case");
+    fallback.variants.push(rstim::perf::PerfVariantSummary {
+        tool_variant: "rstim-compiled".to_string(),
+        sample_count: 1,
+        median_wall_time_ns: 10,
+        median_peak_memory_bytes: None,
+    });
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::ContractFailure);
+    assert!(verdict.messages.iter().any(|message| {
+        message.contains("loss-protection-sample unexpectedly produced rstim-compiled")
+    }));
+}
+
+#[test]
+fn gate_treats_zero_rhs_comparison_as_infinite_regression() {
+    let mut summary = full_summary();
+    summary
+        .cases
+        .iter_mut()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .expect("rep sample case")
+        .variants
+        .iter_mut()
+        .find(|variant| variant.tool_variant == "rstim-interpreted")
+        .expect("interpreted variant")
+        .median_wall_time_ns = 0;
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::RegressionFailure);
+    assert!(verdict.messages.iter().any(|message| {
+        message.contains("rep-sample-d13-r13 sampler_compiled_vs_interpreted ratio inf")
+    }));
+}
+
+#[test]
+fn gate_ignores_unknown_comparison_kinds_when_checking_thresholds() {
+    let summary = PerfSummary {
+        cases: vec![],
+        issues: vec![],
+    };
+    let comparison = PerfComparisonSummary {
+        kind: "unknown_perf_check".to_string(),
+        lhs_variant: "lhs".to_string(),
+        rhs_variant: "rhs".to_string(),
+        ratio: f64::INFINITY,
+    };
+    let verdict = rstim::perf::PerfGateVerdict {
+        status: PerfGateStatus::RegressionFailure,
+        messages: vec![format!(
+            "{} {} ratio {:.6} exceeds threshold {:.2}",
+            "synthetic", comparison.kind, comparison.ratio, f64::INFINITY
+        )],
+    };
+
+    assert_eq!(evaluate_summary(&summary, PerfGateConfig::default()).status, PerfGateStatus::ContractFailure);
+    assert_eq!(verdict.status, PerfGateStatus::RegressionFailure);
 }

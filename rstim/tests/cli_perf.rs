@@ -149,3 +149,21 @@ fn perf_ci_writes_artifacts_before_returning_gate_failure() {
     assert!(report_text.contains("## Gate Verdict"));
     assert!(report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold"));
 }
+
+#[test]
+fn perf_ci_returns_infrastructure_failure_when_override_raw_path_is_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let out_dir = dir.path().join("perf-artifacts");
+    let missing_raw = dir.path().join("missing.jsonl");
+
+    let output = rstim_cmd()
+        .env("RSTIM_TEST_PERF_CI_RAW", missing_raw.to_str().unwrap())
+        .args(["perf", "ci", "--out-dir", out_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("InfrastructureFailure"));
+    assert!(stderr.contains("failed to copy test perf raw artifact"));
+}
