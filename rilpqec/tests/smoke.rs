@@ -12,7 +12,7 @@ fn default_decoder_config_prefers_auto_backend() {
 }
 
 #[test]
-fn explicit_backend_config_is_copyable_and_comparable() {
+fn explicit_backend_config_supports_equality_comparison() {
     let cfg = BackendConfig {
         kind: BackendKind::Highs,
         time_limit_seconds: Some(12.5),
