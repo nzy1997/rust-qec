@@ -21,9 +21,13 @@ fn explicit_backend_config_is_copyable_and_comparable() {
         verbose: true,
     };
 
-    assert_eq!(cfg.kind, BackendKind::Highs);
-    assert_eq!(cfg.time_limit_seconds, Some(12.5));
-    assert_eq!(cfg.mip_gap, Some(0.01));
-    assert_eq!(cfg.threads, Some(4));
-    assert!(cfg.verbose);
+    let expected = BackendConfig {
+        kind: BackendKind::Highs,
+        time_limit_seconds: Some(12.5),
+        mip_gap: Some(0.01),
+        threads: Some(4),
+        verbose: true,
+    };
+
+    assert_eq!(cfg, expected);
 }
