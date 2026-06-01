@@ -1,3 +1,5 @@
+use crate::error::IlpDecodeError;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnTerm {
     pub detectors: Vec<usize>,
@@ -15,7 +17,17 @@ pub struct LoweredDemProblem {
 }
 
 impl LoweredDemProblem {
-    pub fn observables_from_correction(&self, correction: &[bool]) -> Vec<bool> {
+    pub fn observables_from_correction(
+        &self,
+        correction: &[bool],
+    ) -> Result<Vec<bool>, IlpDecodeError> {
+        if correction.len() != self.columns.len() {
+            return Err(IlpDecodeError::CorrectionWidthMismatch {
+                expected: self.columns.len(),
+                actual: correction.len(),
+            });
+        }
+
         let mut out = self.baseline_observables.clone();
         for (column, enabled) in self.columns.iter().zip(correction.iter().copied()) {
             if !enabled {
@@ -25,6 +37,6 @@ impl LoweredDemProblem {
                 out[obs] ^= true;
             }
         }
-        out
+        Ok(out)
     }
 }

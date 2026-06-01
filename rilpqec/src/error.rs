@@ -6,6 +6,8 @@ pub enum IlpDecodeError {
     InvalidProbability(f64),
     #[error("detector width mismatch: expected {expected}, got {actual}")]
     DetectorWidthMismatch { expected: usize, actual: usize },
+    #[error("correction width mismatch: expected {expected}, got {actual}")]
+    CorrectionWidthMismatch { expected: usize, actual: usize },
     #[error("observable width mismatch: expected {expected}, got {actual}")]
     ObservableWidthMismatch { expected: usize, actual: usize },
     #[error("no ILP backend is available for kind {requested:?}")]
