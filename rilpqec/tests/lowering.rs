@@ -80,3 +80,29 @@ fn observables_from_correction_applies_columns_when_width_matches() {
         vec![true]
     );
 }
+
+#[test]
+fn lowering_rejects_invalid_probability() {
+    let dem = DetectorErrorModel::parse("error(1.25) D0\n").unwrap();
+
+    assert_eq!(
+        lower_dem_to_problem(&dem).unwrap_err(),
+        IlpDecodeError::InvalidProbability(1.25)
+    );
+}
+
+#[test]
+fn detector_and_logical_observable_annotations_do_not_create_columns() {
+    let dem = DetectorErrorModel::parse(
+        "error(0.25) D0 L0\ndetector(1, 2) D0\nlogical_observable L3\n",
+    )
+    .unwrap();
+
+    let problem = lower_dem_to_problem(&dem).unwrap();
+
+    assert_eq!(problem.num_detectors, 1);
+    assert_eq!(problem.num_observables, 4);
+    assert_eq!(problem.columns.len(), 1);
+    assert_eq!(problem.columns[0].detectors, vec![0]);
+    assert_eq!(problem.columns[0].observables, vec![0]);
+}
