@@ -1,5 +1,6 @@
 use rstim::dem::DetectorErrorModel;
 
+pub use crate::ilpqec_adapter::IlpDemDecoder;
 pub use crate::rbposd_adapter::RbposdDemDecoder;
 
 pub trait CompiledDecoder: Send {

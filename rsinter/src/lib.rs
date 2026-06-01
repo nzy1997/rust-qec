@@ -1,3 +1,4 @@
+mod ilpqec_adapter;
 mod rbposd_adapter;
 
 pub mod collect;

@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 use std::os::raw::c_int;
 
-use highs::{ColProblem, HighsModelStatus, Model};
+use highs::{ColProblem, HighsModelStatus, HighsSolutionStatus, Model};
 
 use crate::backend::BatchBackend;
 use crate::config::IlpDecoderConfig;
@@ -12,7 +12,7 @@ use crate::problem::LoweredDemProblem;
 pub struct HighsBatchBackend {
     model: Option<Model>,
     num_detectors: usize,
-    num_columns: usize,
+    num_error_columns: usize,
     forced_syndrome: Vec<bool>,
 }
 
@@ -30,6 +30,9 @@ impl HighsBatchBackend {
         for column in &problem.columns {
             let entries = column.detectors.iter().map(|&det| (rows[det], 1.0));
             col_problem.add_integer_column(column.weight, 0.0..=1.0, entries);
+        }
+        for &row in &rows {
+            col_problem.add_integer_column(0.0, 0.0.., [(row, -2.0)]);
         }
 
         let mut model = Model::try_new(col_problem)
@@ -54,9 +57,20 @@ impl HighsBatchBackend {
         Ok(Self {
             model: Some(model),
             num_detectors: problem.num_detectors,
-            num_columns: problem.columns.len(),
+            num_error_columns: problem.columns.len(),
             forced_syndrome: problem.forced_syndrome.clone(),
         })
+    }
+}
+
+fn accept_solved_model_status(
+    model_status: HighsModelStatus,
+    primal_status: HighsSolutionStatus,
+) -> bool {
+    match model_status {
+        HighsModelStatus::Optimal => true,
+        HighsModelStatus::ReachedTimeLimit => primal_status == HighsSolutionStatus::Feasible,
+        _ => false,
     }
 }
 
@@ -90,25 +104,69 @@ impl BatchBackend for HighsBatchBackend {
         let solved = model
             .try_solve()
             .map_err(|err| IlpDecodeError::Highs(format!("solve failed: {err:?}")))?;
-        if solved.status() != HighsModelStatus::Optimal {
-            let status = solved.status();
+        let model_status = solved.status();
+        let primal_status = solved.primal_solution_status();
+        if !accept_solved_model_status(model_status, primal_status) {
             self.model = Some(solved.into());
             return Err(IlpDecodeError::Highs(format!(
-                "expected optimal solution, got {status:?}"
+                "unexpected HiGHS solve status: model={model_status:?}, primal={primal_status:?}"
             )));
         }
 
         let columns = solved.get_solution().columns().to_vec();
         self.model = Some(solved.into());
 
-        if columns.len() != self.num_columns {
+        let expected_solution_width = self.num_error_columns + self.num_detectors;
+        if columns.len() != expected_solution_width {
             return Err(IlpDecodeError::Highs(format!(
                 "solution width mismatch: expected {}, got {}",
-                self.num_columns,
+                expected_solution_width,
                 columns.len()
             )));
         }
 
-        Ok(columns.into_iter().map(|value| value > 0.5).collect())
+        Ok(columns[..self.num_error_columns]
+            .iter()
+            .map(|&value| value > 0.5)
+            .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use highs::{HighsModelStatus, HighsSolutionStatus};
+
+    use super::accept_solved_model_status;
+
+    #[test]
+    fn accepts_optimal_solution() {
+        assert!(accept_solved_model_status(
+            HighsModelStatus::Optimal,
+            HighsSolutionStatus::Feasible,
+        ));
+    }
+
+    #[test]
+    fn accepts_time_limited_feasible_solution() {
+        assert!(accept_solved_model_status(
+            HighsModelStatus::ReachedTimeLimit,
+            HighsSolutionStatus::Feasible,
+        ));
+    }
+
+    #[test]
+    fn rejects_time_limited_run_without_feasible_solution() {
+        assert!(!accept_solved_model_status(
+            HighsModelStatus::ReachedTimeLimit,
+            HighsSolutionStatus::None,
+        ));
+    }
+
+    #[test]
+    fn rejects_other_non_optimal_statuses_even_with_feasible_solution() {
+        assert!(!accept_solved_model_status(
+            HighsModelStatus::ReachedInterrupt,
+            HighsSolutionStatus::Feasible,
+        ));
     }
 }

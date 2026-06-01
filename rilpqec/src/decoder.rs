@@ -45,7 +45,24 @@ impl IlpDemDecoder {
 
         let det_bytes = num_dets.div_ceil(8);
         let obs_bytes = num_obs.div_ceil(8);
+        let expected_det_len = num_shots * det_bytes;
+        if dets.len() != expected_det_len {
+            return Err(IlpDecodeError::PackedDetectionsLengthMismatch {
+                expected: expected_det_len,
+                actual: dets.len(),
+            });
+        }
         let mut out = vec![0u8; num_shots * obs_bytes];
+        if self.problem.columns.is_empty() {
+            for shot in 0..num_shots {
+                for obs in 0..num_obs {
+                    if self.problem.baseline_observables[obs] {
+                        out[shot * obs_bytes + (obs / 8)] |= 1 << (obs % 8);
+                    }
+                }
+            }
+            return Ok(out);
+        }
         let mut backend = build_batch_backend(&self.problem, &self.config)?;
 
         for shot in 0..num_shots {
