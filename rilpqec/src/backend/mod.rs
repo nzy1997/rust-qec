@@ -14,7 +14,10 @@ pub fn build_batch_backend(
 ) -> Result<Box<dyn BatchBackend>, IlpDecodeError> {
     match config.backend.kind {
         BackendKind::Highs => Ok(Box::new(highs::HighsBatchBackend::new(problem, config)?)),
-        BackendKind::Auto | BackendKind::Gurobi => Err(IlpDecodeError::BackendUnavailable {
+        BackendKind::Auto => Err(IlpDecodeError::BackendUnavailable {
+            requested: BackendKind::Auto,
+        }),
+        BackendKind::Gurobi => Err(IlpDecodeError::BackendUnavailable {
             requested: BackendKind::Gurobi,
         }),
     }
