@@ -3,9 +3,14 @@ name = "rsinter"
 version = "0.1.1"
 edition = "2024"
 
+[features]
+default = []
+gurobi = ["rilpqec/gurobi"]
+
 [dependencies]
 rstim = { path = "../rstim" }
 rbposd = { path = "../rbposd" }
+rilpqec = { path = "../rilpqec" }
 rand = "0.8"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
