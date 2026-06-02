@@ -1,0 +1,6 @@
+numpy>=2.0
+stim>=1.15
+pymatching>=2.3
+matplotlib>=3.8
+ldpc>=2.4.1
+ilpqec>=0.1.0
