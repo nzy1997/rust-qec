@@ -1,0 +1,14 @@
+{
+  "distance": 3,
+  "rounds": 3,
+  "p": 0.001,
+  "seed": 12345,
+  "tier": "smoke",
+  "num_dets": 24,
+  "num_obs": 1,
+  "num_shots": 2000,
+  "circuit_path": "benchmarks/surface_decoder_compare/results/smoke/cases/d3_p0.001/circuit.stim",
+  "dem_path": "benchmarks/surface_decoder_compare/results/smoke/cases/d3_p0.001/model.dem",
+  "dets_b8_path": "benchmarks/surface_decoder_compare/results/smoke/cases/d3_p0.001/detections.b8",
+  "obs_b8_path": "benchmarks/surface_decoder_compare/results/smoke/cases/d3_p0.001/observables.b8"
+}
