@@ -1,0 +1,20 @@
+[package]
+name = "surface_decoder_compare_bridge"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+gurobi = ["rsinter/gurobi", "rilpqec/gurobi"]
+
+[dependencies]
+rbposd = { path = "../../../rbposd" }
+rmatching = { path = "../../../rmatching", features = ["rsinter"] }
+rilpqec = { path = "../../../rilpqec" }
+rsinter = { path = "../../../rsinter" }
+rstim = { path = "../../../rstim" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
