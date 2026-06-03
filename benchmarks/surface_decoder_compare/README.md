@@ -31,12 +31,17 @@ make surface-decoder-compare-full
 Both commands write `results.csv` and `surface_decoder_compare.png` under
 `benchmarks/surface_decoder_compare/results/<tier>/`.
 
+Only the `full` tier artifacts are tracked in git. The `smoke` tier is for
+local iteration and is ignored.
+
 ## Notes
 
 - Shared workload: `stim gen surface_code:rotated_memory_x`
 - Smoke sweep: `distance in {3}` and `p in {0.002, 0.005, 0.010}`
 - Full sweep: `distance in {3, 5}` and `p in {0.002, 0.005, 0.010}`
 - Full tier budgets: `max_shots=10000`, `max_errors=200`
+- Plotting uses one color per `(decoder family, distance)` pair and uses
+  solid/dashed lines to distinguish paired implementations within a family
 - Shared public shot pool for all decoders per case
 - Time metric: decode time only
 - ILP decoders prefer `gurobi` when available and record the actual backend used;

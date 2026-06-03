@@ -15,6 +15,23 @@ import matplotlib.pyplot as plt
 from sinter import fit_binomial
 
 
+def _decoder_family(decoder: str) -> str:
+    families = {
+        "pymatching": "mwpm",
+        "rmatching": "mwpm",
+        "ilpqec": "ilp",
+        "rilpqec": "ilp",
+        "ldpc": "bp",
+        "rbposd": "bp",
+    }
+    return families.get(decoder, decoder)
+
+
+def _line_style_for_decoder(decoder: str) -> str:
+    dashed_decoders = {"rmatching", "rilpqec", "rbposd"}
+    return "--" if decoder in dashed_decoders else "-"
+
+
 def _load_ok_rows(results_path: Path) -> list[dict[str, str]]:
     with results_path.open() as handle:
         rows = list(csv.DictReader(handle))
@@ -41,14 +58,14 @@ def _logical_error_display_rate(row: dict[str, str]) -> float:
 def render_axes(ax_left, ax_right, rows: list[dict[str, str]]) -> None:
     grouped: dict[tuple[str, int], list[dict[str, str]]] = defaultdict(list)
     distances = sorted({int(row["distance"]) for row in rows})
-    decoders = sorted({row["decoder"] for row in rows})
-    line_styles = {
-        distance: style for distance, style in zip(distances, ["-", "--", ":"], strict=False)
-    }
+    families = sorted({_decoder_family(row["decoder"]) for row in rows})
     color_cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     colors = {
-        decoder: color_cycle[index % len(color_cycle)]
-        for index, decoder in enumerate(decoders)
+        (family, distance): color_cycle[
+            (family_index * max(len(distances), 1) + distance_index) % len(color_cycle)
+        ]
+        for family_index, family in enumerate(families)
+        for distance_index, distance in enumerate(distances)
     }
 
     for row in rows:
@@ -60,19 +77,22 @@ def render_axes(ax_left, ax_right, rows: list[dict[str, str]]) -> None:
         y_left = [_logical_error_display_rate(row) for row in items]
         y_right = [float(row["decode_us_per_shot"]) for row in items]
         label = f"{decoder} d={distance}"
+        family = _decoder_family(decoder)
+        color = colors[(family, distance)]
+        line_style = _line_style_for_decoder(decoder)
         ax_left.plot(
             x,
             y_left,
-            color=colors[decoder],
-            linestyle=line_styles[distance],
+            color=color,
+            linestyle=line_style,
             marker="o",
             label=label,
         )
         ax_right.plot(
             x,
             y_right,
-            color=colors[decoder],
-            linestyle=line_styles[distance],
+            color=color,
+            linestyle=line_style,
             marker="o",
             label=label,
         )
