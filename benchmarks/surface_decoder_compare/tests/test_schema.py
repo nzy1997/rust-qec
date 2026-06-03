@@ -5,22 +5,26 @@ from benchmarks.surface_decoder_compare.schema import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_DISTANCES,
     DEFAULT_P_VALUES,
+    FULL_DISTANCES,
+    FULL_P_VALUES,
     TIER_CONFIGS,
 )
 
 
 class SchemaTest(unittest.TestCase):
     def test_sweep_and_tiers_are_pinned(self) -> None:
-        self.assertEqual(DEFAULT_DISTANCES, (3, 5, 7))
+        self.assertEqual(DEFAULT_DISTANCES, (3,))
         self.assertEqual(
             DEFAULT_P_VALUES,
-            (0.001, 0.002, 0.003, 0.005, 0.007, 0.010, 0.015),
+            (0.002, 0.005, 0.010),
         )
+        self.assertEqual(FULL_DISTANCES, (3, 5))
+        self.assertEqual(FULL_P_VALUES, (0.002, 0.005, 0.010))
         self.assertEqual(DEFAULT_BATCH_SIZE, 256)
         self.assertEqual(TIER_CONFIGS["smoke"].max_shots, 2_000)
         self.assertEqual(TIER_CONFIGS["smoke"].max_errors, 20)
-        self.assertEqual(TIER_CONFIGS["full"].max_shots, 100_000)
-        self.assertEqual(TIER_CONFIGS["full"].max_errors, 1_000)
+        self.assertEqual(TIER_CONFIGS["full"].max_shots, 10_000)
+        self.assertEqual(TIER_CONFIGS["full"].max_errors, 200)
 
     def test_csv_header_keeps_accuracy_and_timing_columns(self) -> None:
         self.assertEqual(

@@ -11,11 +11,18 @@ from benchmarks.surface_decoder_compare.schema import CaseSpec, TIER_CONFIGS
 
 
 class CaseBuilderTest(unittest.TestCase):
-    def test_case_specs_cover_the_distance_p_grid(self) -> None:
+    def test_case_specs_cover_the_default_smoke_grid(self) -> None:
         specs = build_case_specs()
-        self.assertEqual(len(specs), 21)
-        self.assertEqual(specs[0], CaseSpec(distance=3, rounds=3, p=0.001))
-        self.assertEqual(specs[-1], CaseSpec(distance=7, rounds=7, p=0.015))
+        self.assertEqual(len(specs), 3)
+        self.assertEqual(specs[0], CaseSpec(distance=3, rounds=3, p=0.002))
+        self.assertEqual(specs[-1], CaseSpec(distance=3, rounds=3, p=0.010))
+        self.assertTrue(all(spec.rounds == spec.distance for spec in specs))
+
+    def test_case_specs_cover_the_focused_full_grid(self) -> None:
+        specs = build_case_specs(tier_name="full")
+        self.assertEqual(len(specs), 6)
+        self.assertEqual(specs[0], CaseSpec(distance=3, rounds=3, p=0.002))
+        self.assertEqual(specs[-1], CaseSpec(distance=5, rounds=5, p=0.010))
         self.assertTrue(all(spec.rounds == spec.distance for spec in specs))
 
     def test_materialize_case_bundle_writes_reproducible_artifacts(self) -> None:

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -78,6 +79,78 @@ class DriverRegistryTest(unittest.TestCase):
         self.assertEqual(row.logical_errors, 2)
         self.assertEqual(row.compile_us, 100.0)
         self.assertEqual(row.total_decode_us, 200.0)
+
+    @mock.patch("subprocess.run")
+    def test_rust_bridge_driver_parses_json_after_gurobi_banner(
+        self, run_mock: mock.Mock
+    ) -> None:
+        run_mock.return_value = subprocess.CompletedProcess(
+            args=["bridge"],
+            returncode=0,
+            stdout=(
+                "Set parameter Username\n"
+                "Academic license - for non-commercial use only\n"
+                + json.dumps(
+                    {
+                        "status": "ok",
+                        "decoder": "rilpqec",
+                        "backend": "gurobi",
+                        "shots_used": 10,
+                        "logical_errors": 2,
+                        "compile_us": 100.0,
+                        "total_decode_us": 200.0,
+                        "error": "",
+                    }
+                )
+                + "\n"
+            ),
+            stderr="",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = make_synthetic_bundle(Path(tmpdir))
+            row = RustBridgeDriver("rilpqec").run_case(bundle, batch_size=32)
+
+        self.assertEqual(row.backend, "gurobi")
+        self.assertEqual(row.shots_used, 10)
+
+    @mock.patch.dict(
+        os.environ,
+        {
+            "GUROBI_HOME": "/tmp/gurobi",
+            "GRB_LICENSE_FILE": "/tmp/gurobi.lic",
+        },
+        clear=False,
+    )
+    @mock.patch("subprocess.run")
+    def test_rust_bridge_driver_enables_gurobi_feature_when_env_present(
+        self, run_mock: mock.Mock
+    ) -> None:
+        run_mock.return_value = subprocess.CompletedProcess(
+            args=["bridge"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "ok",
+                    "decoder": "rilpqec",
+                    "backend": "gurobi",
+                    "shots_used": 1,
+                    "logical_errors": 0,
+                    "compile_us": 100.0,
+                    "total_decode_us": 200.0,
+                    "error": "",
+                }
+            ),
+            stderr="",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = make_synthetic_bundle(Path(tmpdir))
+            RustBridgeDriver("rilpqec").run_case(bundle, batch_size=32)
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--features", command)
+        self.assertIn("gurobi", command)
 
     def test_pymatching_driver_decodes_a_synthetic_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

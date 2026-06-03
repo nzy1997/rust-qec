@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,20 @@ from .base import BenchmarkDriver
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _gurobi_env_available() -> bool:
+    return bool(os.environ.get("GUROBI_HOME") and os.environ.get("GRB_LICENSE_FILE"))
+
+
+def _load_bridge_payload(stdout: str) -> dict[str, object]:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if not lines:
+        raise RuntimeError("rust bridge returned empty stdout")
+    for line in reversed(lines):
+        if line.startswith("{"):
+            return json.loads(line)
+    raise RuntimeError(f"rust bridge did not emit a JSON payload: {stdout.strip()}")
 
 
 class RustBridgeDriver(BenchmarkDriver):
@@ -29,14 +44,17 @@ class RustBridgeDriver(BenchmarkDriver):
             "max_errors": bundle.tier.max_errors,
             "batch_size": batch_size,
         }
+        command = [
+            "cargo",
+            "run",
+            "--quiet",
+            "-p",
+            "surface_decoder_compare_bridge",
+        ]
+        if self.name == "rilpqec" and _gurobi_env_available():
+            command.extend(["--features", "gurobi"])
         completed = subprocess.run(
-            [
-                "cargo",
-                "run",
-                "--quiet",
-                "-p",
-                "surface_decoder_compare_bridge",
-            ],
+            command,
             cwd=REPO_ROOT,
             input=json.dumps(request),
             text=True,
@@ -48,7 +66,7 @@ class RustBridgeDriver(BenchmarkDriver):
                 f"rust bridge failed for {self.name}: {completed.stderr.strip()}"
             )
 
-        payload = json.loads(completed.stdout)
+        payload = _load_bridge_payload(completed.stdout)
         if payload["status"] != "ok":
             raise RuntimeError(
                 f"rust bridge reported error for {self.name}: {payload['error']}"

@@ -2,8 +2,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
-DEFAULT_DISTANCES = (3, 5, 7)
-DEFAULT_P_VALUES = (0.001, 0.002, 0.003, 0.005, 0.007, 0.010, 0.015)
+DEFAULT_DISTANCES = (3,)
+DEFAULT_P_VALUES = (0.002, 0.005, 0.010)
+FULL_DISTANCES = (3, 5)
+FULL_P_VALUES = (0.002, 0.005, 0.010)
 DEFAULT_BATCH_SIZE = 256
 
 
@@ -16,7 +18,7 @@ class TierConfig:
 
 TIER_CONFIGS = {
     "smoke": TierConfig(name="smoke", max_shots=2_000, max_errors=20),
-    "full": TierConfig(name="full", max_shots=100_000, max_errors=1_000),
+    "full": TierConfig(name="full", max_shots=10_000, max_errors=200),
 }
 
 

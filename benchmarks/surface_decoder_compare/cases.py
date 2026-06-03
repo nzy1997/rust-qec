@@ -4,14 +4,27 @@ from pathlib import Path
 import numpy as np
 import stim
 
-from .schema import CaseBundle, CaseSpec, DEFAULT_DISTANCES, DEFAULT_P_VALUES, TierConfig
+from .schema import (
+    CaseBundle,
+    CaseSpec,
+    DEFAULT_DISTANCES,
+    DEFAULT_P_VALUES,
+    FULL_DISTANCES,
+    FULL_P_VALUES,
+    TierConfig,
+)
 
 
-def build_case_specs() -> list[CaseSpec]:
+def build_case_specs(*, tier_name: str | None = None) -> list[CaseSpec]:
+    distances = DEFAULT_DISTANCES
+    p_values = DEFAULT_P_VALUES
+    if tier_name == "full":
+        distances = FULL_DISTANCES
+        p_values = FULL_P_VALUES
     return [
         CaseSpec(distance=distance, rounds=distance, p=p)
-        for distance in DEFAULT_DISTANCES
-        for p in DEFAULT_P_VALUES
+        for distance in distances
+        for p in p_values
     ]
 
 

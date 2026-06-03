@@ -113,6 +113,38 @@ class RunCompareTest(unittest.TestCase):
             self.assertEqual(len(error_rows), 2)
             self.assertTrue(all("exploded" in row["error"] for row in error_rows))
 
+    def test_run_suite_uses_focused_full_defaults(self) -> None:
+        def fake_bundle_factory(root: Path, spec: CaseSpec, tier, seed: int) -> CaseBundle:
+            return CaseBundle(
+                spec=spec,
+                tier=tier,
+                seed=seed,
+                num_dets=2,
+                num_obs=1,
+                num_shots=tier.max_shots,
+                circuit_path=root / f"{spec.slug}.stim",
+                dem_path=root / f"{spec.slug}.dem",
+                dets_b8_path=root / f"{spec.slug}.dets.b8",
+                obs_b8_path=root / f"{spec.slug}.obs.b8",
+                metadata_path=root / f"{spec.slug}.json",
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows = run_suite(
+                tier_name="full",
+                output_dir=Path(tmpdir),
+                seed=12345,
+                drivers={"alpha": FakeDriver("alpha")},
+                case_bundle_factory=fake_bundle_factory,
+                batch_size=32,
+            )
+
+        self.assertEqual(len(rows), 6)
+        self.assertEqual({row.distance for row in rows}, {3, 5})
+        self.assertEqual({row.p for row in rows}, {0.002, 0.005, 0.01})
+        self.assertTrue(all(row.shots_budget == 10_000 for row in rows))
+        self.assertTrue(all(row.errors_budget == 200 for row in rows))
+
 
 if __name__ == "__main__":
     unittest.main()

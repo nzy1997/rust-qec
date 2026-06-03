@@ -29,7 +29,11 @@ def run_suite(
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> list[ResultRow]:
     tier = TIER_CONFIGS[tier_name]
-    specs = list(case_specs) if case_specs is not None else build_case_specs()
+    specs = (
+        list(case_specs)
+        if case_specs is not None
+        else build_case_specs(tier_name=tier_name)
+    )
     registry = drivers or build_driver_registry()
 
     rows: list[ResultRow] = []
@@ -124,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         registry = {name: driver for name, driver in registry.items() if name in wanted}
 
     case_specs = _filter_case_specs(
-        build_case_specs(),
+        build_case_specs(tier_name=args.tier),
         _parse_csv_ints(args.distances),
         _parse_csv_floats(args.p_values),
     )
