@@ -2,13 +2,16 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import matplotlib.colors as mcolors
 
 from benchmarks.surface_decoder_compare.plot_compare import (
     _logical_error_display_rate,
+    _load_ok_rows,
     _decoder_family,
     _line_style_for_decoder,
+    main,
     render_axes,
     render_plot,
 )
@@ -198,6 +201,34 @@ class PlotCompareTest(unittest.TestCase):
             render_plot(results_path, out_path)
             self.assertTrue(out_path.exists())
             self.assertGreater(out_path.stat().st_size, 0)
+
+    def test_load_ok_rows_filters_out_errors(self) -> None:
+        rows = [
+            {"decoder": "a", "status": "ok"},
+            {"decoder": "b", "status": "error"},
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "results.csv"
+            with path.open("w", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["decoder", "status"])
+                writer.writeheader()
+                writer.writerows(rows)
+            loaded = _load_ok_rows(path)
+        self.assertEqual(loaded, [{"decoder": "a", "status": "ok"}])
+
+    @mock.patch("benchmarks.surface_decoder_compare.plot_compare.render_plot")
+    def test_main_renders_requested_tier(self, render_plot_mock: mock.Mock) -> None:
+        exit_code = main(["--tier", "full"])
+        self.assertEqual(exit_code, 0)
+        results_path, out_path = render_plot_mock.call_args.args
+        self.assertEqual(
+            results_path,
+            Path("benchmarks/surface_decoder_compare/results/full/results.csv"),
+        )
+        self.assertEqual(
+            out_path,
+            Path("benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png"),
+        )
 
 
 if __name__ == "__main__":

@@ -2,11 +2,13 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from benchmarks.surface_decoder_compare.run_compare import (
     _filter_case_specs,
     _parse_csv_floats,
     _parse_csv_ints,
+    main,
     run_suite,
 )
 from benchmarks.surface_decoder_compare.schema import (
@@ -144,6 +146,51 @@ class RunCompareTest(unittest.TestCase):
         self.assertEqual({row.p for row in rows}, {0.002, 0.005, 0.01})
         self.assertTrue(all(row.shots_budget == 10_000 for row in rows))
         self.assertTrue(all(row.errors_budget == 200 for row in rows))
+
+    def test_parse_csv_helpers_return_none_for_empty_values(self) -> None:
+        self.assertIsNone(_parse_csv_ints(None))
+        self.assertIsNone(_parse_csv_ints(""))
+        self.assertIsNone(_parse_csv_floats(None))
+        self.assertIsNone(_parse_csv_floats(""))
+
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.run_suite")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_case_specs")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_driver_registry")
+    def test_main_filters_decoders_and_dispatches(
+        self,
+        registry_mock: mock.Mock,
+        case_specs_mock: mock.Mock,
+        run_suite_mock: mock.Mock,
+    ) -> None:
+        registry_mock.return_value = {"alpha": object(), "beta": object()}
+        case_specs_mock.return_value = [
+            CaseSpec(distance=3, rounds=3, p=0.002),
+            CaseSpec(distance=5, rounds=5, p=0.005),
+        ]
+
+        exit_code = main(
+            [
+                "--tier",
+                "smoke",
+                "--decoders",
+                "beta",
+                "--distances",
+                "5",
+                "--p-values",
+                "0.005",
+            ]
+        )
+
+        self.assertEqual(exit_code, 0)
+        case_specs_mock.assert_called_once_with(tier_name="smoke")
+        run_suite_mock.assert_called_once()
+        kwargs = run_suite_mock.call_args.kwargs
+        self.assertEqual(kwargs["tier_name"], "smoke")
+        self.assertEqual(set(kwargs["drivers"]), {"beta"})
+        self.assertEqual(
+            kwargs["case_specs"],
+            [CaseSpec(distance=5, rounds=5, p=0.005)],
+        )
 
 
 if __name__ == "__main__":

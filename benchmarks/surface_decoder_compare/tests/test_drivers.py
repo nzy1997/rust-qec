@@ -9,9 +9,15 @@ from unittest import mock
 import numpy as np
 
 from benchmarks.surface_decoder_compare.drivers import build_driver_registry
+from benchmarks.surface_decoder_compare.drivers.base import BenchmarkDriver
 from benchmarks.surface_decoder_compare.drivers.ilpqec_driver import IlpqecDriver
+from benchmarks.surface_decoder_compare.drivers.ilpqec_driver import _preferred_solver
 from benchmarks.surface_decoder_compare.drivers.pymatching_driver import PymatchingDriver
-from benchmarks.surface_decoder_compare.drivers.rust_bridge import RustBridgeDriver
+from benchmarks.surface_decoder_compare.drivers.rust_bridge import (
+    RustBridgeDriver,
+    _gurobi_env_available,
+    _load_bridge_payload,
+)
 from benchmarks.surface_decoder_compare.schema import CaseBundle, CaseSpec, TIER_CONFIGS
 
 
@@ -171,6 +177,80 @@ class DriverRegistryTest(unittest.TestCase):
         self.assertIn(row.backend, {"highs", "gurobi"})
         self.assertEqual(row.shots_used, 1)
         self.assertEqual(row.logical_errors, 0)
+
+    def test_load_bridge_payload_rejects_empty_stdout(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "empty stdout"):
+            _load_bridge_payload("")
+
+    def test_load_bridge_payload_rejects_missing_json(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "did not emit a JSON payload"):
+            _load_bridge_payload("Set parameter Username")
+
+    @mock.patch("subprocess.run")
+    def test_rust_bridge_driver_raises_on_nonzero_exit(self, run_mock: mock.Mock) -> None:
+        run_mock.return_value = subprocess.CompletedProcess(
+            args=["bridge"],
+            returncode=1,
+            stdout="",
+            stderr="bridge failed",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = make_synthetic_bundle(Path(tmpdir))
+            with self.assertRaisesRegex(RuntimeError, "bridge failed"):
+                RustBridgeDriver("rmatching").run_case(bundle, batch_size=32)
+
+    @mock.patch("subprocess.run")
+    def test_rust_bridge_driver_raises_on_error_payload(self, run_mock: mock.Mock) -> None:
+        run_mock.return_value = subprocess.CompletedProcess(
+            args=["bridge"],
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "status": "error",
+                    "decoder": "rilpqec",
+                    "backend": "gurobi",
+                    "shots_used": 0,
+                    "logical_errors": 0,
+                    "compile_us": 0.0,
+                    "total_decode_us": 0.0,
+                    "error": "solver exploded",
+                }
+            ),
+            stderr="",
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = make_synthetic_bundle(Path(tmpdir))
+            with self.assertRaisesRegex(RuntimeError, "solver exploded"):
+                RustBridgeDriver("rilpqec").run_case(bundle, batch_size=32)
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_gurobi_env_available_requires_both_vars(self) -> None:
+        self.assertFalse(_gurobi_env_available())
+
+    @mock.patch("benchmarks.surface_decoder_compare.drivers.ilpqec_driver.get_available_solvers")
+    def test_preferred_solver_falls_back_to_highs(self, solvers_mock: mock.Mock) -> None:
+        solvers_mock.return_value = ["highs"]
+        self.assertEqual(_preferred_solver(), "highs")
+
+    def test_base_finish_handles_zero_shots(self) -> None:
+        class MinimalDriver(BenchmarkDriver):
+            name = "minimal"
+
+            def run_case(self, bundle: CaseBundle, batch_size: int) -> ResultRow:
+                raise NotImplementedError
+
+        driver = MinimalDriver()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bundle = make_synthetic_bundle(Path(tmpdir))
+            row = driver._finish(
+                bundle=bundle,
+                compile_us=1.0,
+                total_decode_us=2.0,
+                shots_used=0,
+                logical_errors=0,
+            )
+        self.assertEqual(row.logical_error_rate, 0.0)
+        self.assertEqual(row.decode_us_per_shot, 0.0)
 
 
 def make_synthetic_bundle(root: Path) -> CaseBundle:

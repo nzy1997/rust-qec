@@ -23,6 +23,20 @@ class DemMatrixTest(unittest.TestCase):
         self.assertEqual(problem.observable_columns, [[0], [0], []])
         self.assertEqual(problem.probabilities, [1.0, 0.25, 0.2])
 
+    def test_lower_dem_to_matrix_problem_ignores_non_error_lines_and_toggles_duplicates(
+        self,
+    ) -> None:
+        problem = lower_dem_to_matrix_problem(
+            "repeat 2 {\n"
+            "    error(0.3) D0 D0 L0 L0\n"
+            "}\n"
+            "detector(1, 2) D0\n"
+        )
+
+        self.assertEqual(problem.detector_columns, [[], []])
+        self.assertEqual(problem.observable_columns, [[], []])
+        self.assertEqual(problem.probabilities, [0.3, 0.3])
+
     def test_ldpc_driver_decodes_a_synthetic_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
