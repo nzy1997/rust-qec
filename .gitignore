@@ -8,6 +8,8 @@ Cargo.lock
 # Added by cargo
 
 /target
+/benchmarks/surface_decoder_compare/results/*/cases/
+/benchmarks/surface_decoder_compare/results/smoke/
 .cursor/
 
 # Coverage reports

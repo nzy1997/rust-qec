@@ -1,3 +1,10 @@
 [workspace]
-members = ["rstim", "rsinter", "rbposd", "rmatching", "rilpqec"]
+members = [
+    "rstim",
+    "rsinter",
+    "rbposd",
+    "rmatching",
+    "rilpqec",
+    "benchmarks/surface_decoder_compare/rust_bridge",
+]
 resolver = "3"

@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release
+.PHONY: help test check build-site release surface-decoder-compare-smoke surface-decoder-compare-full
 
 DEFAULT_BRANCH ?= master
 
@@ -10,6 +10,8 @@ help:
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  build-site           - Build the QP101 GitHub Pages site into _site"
+	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
+	@echo "  surface-decoder-compare-full  - Run the full surface decoder comparison benchmark"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -30,6 +32,14 @@ build-site:
 	typst compile --format svg --root qp101-viz qp101-viz/examples/basic-site.typ _site/gallery/basic-site.svg
 	typst compile --format svg --root qp101-viz qp101-viz/examples/repeat-detector-site.typ _site/gallery/repeat-detector-site.svg
 	typst compile --format svg --root qp101-viz qp101-viz/examples/atom-loss-sample.typ _site/gallery/atom-loss-sample.svg
+
+surface-decoder-compare-smoke:
+	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier smoke
+	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.plot_compare --tier smoke
+
+surface-decoder-compare-full:
+	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier full
+	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.plot_compare --tier full
 
 # Release a new version: make release V=0.2.0
 release:
