@@ -11,6 +11,9 @@ Cargo.lock
 /benchmarks/surface_decoder_compare/results/*/cases/
 /benchmarks/surface_decoder_compare/results/smoke/
 .cursor/
+.venv-surface-decoder/
+__pycache__/
+*.pyc
 
 # Coverage reports
 cobertura.xml

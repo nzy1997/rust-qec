@@ -56,3 +56,10 @@ comparison baseline for correction parity against the same cases.
 Diagnostics drift (`diagnostics_mismatch`) is reported separately as
 informational and does not fail parity on its own unless status or correction
 parity also changes.
+
+Cases with `max_bp_iterations=0` are also tracked separately when Rust and
+Python `ldpc` both return valid residual-zero solutions but choose different
+decode paths or corrections. These are reported as
+`zero_iter_semantics_mismatch` and do not fail parity, because Rust treats
+`max_bp_iterations=0` as "disable BP and run OSD" while Python `ldpc` does not
+share that contract.

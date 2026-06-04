@@ -68,7 +68,12 @@ impl BpOsdDecoder {
             });
         }
 
-        let correction = decode_osd0(&self.pcm, syndrome, &snapshot.reliability)?;
+        let correction = decode_osd0(
+            &self.pcm,
+            syndrome,
+            &snapshot.hard_decision,
+            &snapshot.reliability,
+        )?;
 
         Ok(DecodeResult {
             correction,

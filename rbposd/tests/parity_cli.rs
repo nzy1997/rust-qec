@@ -67,7 +67,7 @@ fn parity_driver_runs_case_and_prints_json_report() {
     assert_eq!(report["actual"]["status"], "success");
     assert_eq!(
         report["actual"]["correction"],
-        serde_json::json!([true, false, false])
+        serde_json::json!([false, true, true])
     );
     let matches_expected = report["matches_expected"].clone();
     assert!(

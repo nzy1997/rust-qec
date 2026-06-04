@@ -245,6 +245,22 @@ def classify_mismatch(
     return "payload_mismatch"
 
 
+def classify_case_mismatch(
+    case: dict[str, Any], rust_actual: dict[str, Any], python_actual: dict[str, Any]
+) -> str:
+    classification = classify_mismatch(rust_actual, python_actual)
+    if (
+        classification == "correction_mismatch"
+        and int(case.get("config", {}).get("max_bp_iterations", -1)) == 0
+        and rust_actual.get("status") == "success"
+        and python_actual.get("status") == "success"
+        and rust_actual.get("diagnostics", {}).get("residual_syndrome_weight") == 0
+        and python_actual.get("diagnostics", {}).get("residual_syndrome_weight") == 0
+    ):
+        return "zero_iter_semantics_mismatch"
+    return classification
+
+
 def is_real_mismatch(classification: str) -> bool:
     return classification in REAL_MISMATCH_CLASSES
 
@@ -297,7 +313,7 @@ def build_entries(
 
         rust_actual = rust_report["actual"]
         python_actual = run_python_ldpc(case)
-        classification = classify_mismatch(rust_actual, python_actual)
+        classification = classify_case_mismatch(case, rust_actual, python_actual)
 
         entries.append(
             {
@@ -332,6 +348,11 @@ def main(argv: list[str] | None = None) -> int:
         suffix = ""
         if classification == "diagnostics_mismatch":
             suffix = " (diagnostics drift only; not counted as mismatch)"
+        elif classification == "zero_iter_semantics_mismatch":
+            suffix = (
+                " (max_bp_iterations=0 uses different runtime semantics; "
+                "not counted as mismatch)"
+            )
         print(f"{entry['name']}: {classification}{suffix}")
 
     if args.json_output is not None:

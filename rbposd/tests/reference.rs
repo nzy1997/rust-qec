@@ -10,6 +10,8 @@ mod parity_schema;
 fn checked_in_parity_fixtures_match_exact_expected_outputs() {
     let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity");
 
+    // These checked-in fixtures lock the current Rust decoder contract. Cross-runtime
+    // drift against Python ldpc is tracked separately by the parity harness.
     for case in parity_schema::load_cases(&fixture_dir) {
         let report = parity_runner::run_case(&case);
         assert_eq!(
