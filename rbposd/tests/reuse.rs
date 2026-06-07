@@ -22,6 +22,9 @@ fn decoder_reuse_handles_zero_and_nonzero_syndromes_in_sequence() {
         pcm.multiply(&zero.correction),
         Syndrome::from(vec![false, false, false, false])
     );
+    assert!(zero.converged);
+    assert!(!zero.used_osd);
+    assert_eq!(zero.bp_iterations, 0);
 
     let nonzero = decoder
         .decode(&Syndrome::from(vec![false, true, false, false]))

@@ -328,6 +328,10 @@ mod tests {
         let residual_weight =
             recompute_residual_from_hard_decision(&graph, &syndrome, &mut workspace);
 
+        assert_eq!(
+            pcm.multiply(&Correction::from(workspace.hard_decision_bits.clone())),
+            Syndrome::from(vec![false, true])
+        );
         assert_eq!(residual_weight, 1);
         assert_eq!(workspace.unsatisfied_checks, vec![false, true]);
         assert_eq!(workspace.residual_weight, 1);
