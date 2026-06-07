@@ -6,10 +6,13 @@ from unittest import mock
 
 from benchmarks.surface_decoder_compare.run_compare import (
     _filter_case_specs,
+    _load_existing_rows,
+    _merge_rows,
     _parse_csv_floats,
     _parse_csv_ints,
     main,
     run_suite,
+    write_results,
 )
 from benchmarks.surface_decoder_compare.schema import (
     CaseBundle,
@@ -153,6 +156,94 @@ class RunCompareTest(unittest.TestCase):
         self.assertIsNone(_parse_csv_floats(None))
         self.assertIsNone(_parse_csv_floats(""))
 
+    def test_merge_rows_replaces_matching_keys_and_preserves_others(self) -> None:
+        existing_rows = [
+            {
+                "tier": "full",
+                "decoder": "ldpc",
+                "backend": "native",
+                "distance": "3",
+                "rounds": "3",
+                "p": "0.002",
+                "seed": "12345",
+                "num_dets": "24",
+                "num_obs": "1",
+                "shots_budget": "10000",
+                "errors_budget": "200",
+                "shots_used": "10000",
+                "logical_errors": "11",
+                "logical_error_rate": "0.0011",
+                "compile_us": "10.0",
+                "total_decode_us": "20.0",
+                "decode_us_per_shot": "0.002",
+                "status": "ok",
+                "error": "",
+            },
+            {
+                "tier": "full",
+                "decoder": "pymatching",
+                "backend": "native",
+                "distance": "3",
+                "rounds": "3",
+                "p": "0.002",
+                "seed": "12345",
+                "num_dets": "24",
+                "num_obs": "1",
+                "shots_budget": "10000",
+                "errors_budget": "200",
+                "shots_used": "10000",
+                "logical_errors": "2",
+                "logical_error_rate": "0.0002",
+                "compile_us": "5.0",
+                "total_decode_us": "6.0",
+                "decode_us_per_shot": "0.0006",
+                "status": "ok",
+                "error": "",
+            },
+        ]
+        new_rows = [
+            ResultRow(
+                tier="full",
+                decoder="ldpc",
+                backend="gurobi",
+                distance=3,
+                rounds=3,
+                p=0.002,
+                seed=12345,
+                num_dets=24,
+                num_obs=1,
+                shots_budget=10000,
+                errors_budget=200,
+                shots_used=8192,
+                logical_errors=7,
+                logical_error_rate=7 / 8192,
+                compile_us=12.0,
+                total_decode_us=24.0,
+                decode_us_per_shot=24.0 / 8192,
+                status="error",
+                error="solver failed",
+            )
+        ]
+
+        merged = _merge_rows(existing_rows, new_rows)
+
+        self.assertEqual(len(merged), 2)
+        self.assertEqual([row["decoder"] for row in merged], ["ldpc", "pymatching"])
+        self.assertEqual(merged[0]["backend"], "gurobi")
+        self.assertEqual(merged[0]["status"], "error")
+        self.assertEqual(merged[0]["error"], "solver failed")
+        self.assertEqual(merged[1]["decoder"], "pymatching")
+
+    def test_load_existing_rows_returns_empty_when_file_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing = Path(tmpdir) / "missing.csv"
+            self.assertEqual(_load_existing_rows(missing), [])
+
+    def test_main_rejects_merge_without_decoders(self) -> None:
+        with self.assertRaises(SystemExit) as ctx:
+            main(["--tier", "full", "--merge-into-existing"])
+        self.assertNotEqual(ctx.exception.code, 0)
+
     @mock.patch("benchmarks.surface_decoder_compare.run_compare.run_suite")
     @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_case_specs")
     @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_driver_registry")
@@ -191,6 +282,163 @@ class RunCompareTest(unittest.TestCase):
             kwargs["case_specs"],
             [CaseSpec(distance=5, rounds=5, p=0.005)],
         )
+
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.write_results")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare._merge_rows")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare._load_existing_rows")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.run_suite")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_case_specs")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_driver_registry")
+    def test_main_merges_into_existing_results_when_requested(
+        self,
+        registry_mock: mock.Mock,
+        case_specs_mock: mock.Mock,
+        run_suite_mock: mock.Mock,
+        load_existing_rows_mock: mock.Mock,
+        merge_rows_mock: mock.Mock,
+        write_results_mock: mock.Mock,
+    ) -> None:
+        registry_mock.return_value = {"ldpc": object(), "rbposd": object()}
+        case_specs_mock.return_value = [CaseSpec(distance=3, rounds=3, p=0.002)]
+        run_suite_mock.return_value = [
+            ResultRow(
+                tier="full",
+                decoder="ldpc",
+                backend="native",
+                distance=3,
+                rounds=3,
+                p=0.002,
+                seed=12345,
+                num_dets=24,
+                num_obs=1,
+                shots_budget=10000,
+                errors_budget=200,
+                shots_used=10000,
+                logical_errors=3,
+                logical_error_rate=0.0003,
+                compile_us=1.0,
+                total_decode_us=2.0,
+                decode_us_per_shot=0.0002,
+                status="ok",
+                error="",
+            )
+        ]
+        load_existing_rows_mock.return_value = [{"decoder": "pymatching"}]
+        merge_rows_mock.return_value = [{"decoder": "ldpc"}, {"decoder": "pymatching"}]
+
+        exit_code = main(
+            [
+                "--tier",
+                "full",
+                "--decoders",
+                "ldpc",
+                "--merge-into-existing",
+            ]
+        )
+
+        self.assertEqual(exit_code, 0)
+        write_results_mock.assert_called_once_with(
+            merge_rows_mock.return_value,
+            Path("benchmarks/surface_decoder_compare/results/full/results.csv"),
+        )
+        load_existing_rows_mock.assert_called_once_with(
+            Path("benchmarks/surface_decoder_compare/results/full/results.csv")
+        )
+        merge_rows_mock.assert_called_once_with(
+            load_existing_rows_mock.return_value,
+            run_suite_mock.return_value,
+        )
+
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_case_specs")
+    @mock.patch("benchmarks.surface_decoder_compare.run_compare.build_driver_registry")
+    def test_main_merge_mode_preserves_existing_rows_even_if_run_suite_writes_subset(
+        self,
+        registry_mock: mock.Mock,
+        case_specs_mock: mock.Mock,
+    ) -> None:
+        registry_mock.return_value = {"ldpc": object()}
+        case_specs_mock.return_value = [CaseSpec(distance=3, rounds=3, p=0.002)]
+
+        existing_rows = [
+            {
+                "tier": "full",
+                "decoder": "pymatching",
+                "backend": "native",
+                "distance": "3",
+                "rounds": "3",
+                "p": "0.002",
+                "seed": "12345",
+                "num_dets": "24",
+                "num_obs": "1",
+                "shots_budget": "10000",
+                "errors_budget": "200",
+                "shots_used": "10000",
+                "logical_errors": "2",
+                "logical_error_rate": "0.0002",
+                "compile_us": "5.0",
+                "total_decode_us": "6.0",
+                "decode_us_per_shot": "0.0006",
+                "status": "ok",
+                "error": "",
+            }
+        ]
+        new_rows = [
+            ResultRow(
+                tier="full",
+                decoder="ldpc",
+                backend="native",
+                distance=3,
+                rounds=3,
+                p=0.002,
+                seed=12345,
+                num_dets=24,
+                num_obs=1,
+                shots_budget=10000,
+                errors_budget=200,
+                shots_used=10000,
+                logical_errors=3,
+                logical_error_rate=0.0003,
+                compile_us=1.0,
+                total_decode_us=2.0,
+                decode_us_per_shot=0.0002,
+                status="ok",
+                error="",
+            )
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "results"
+            results_path = output_dir / "full" / "results.csv"
+            write_results(existing_rows, results_path)
+
+            def fake_run_suite(**kwargs):
+                if kwargs["write_output"]:
+                    write_results(new_rows, results_path)
+                return new_rows
+
+            with mock.patch(
+                "benchmarks.surface_decoder_compare.run_compare.run_suite",
+                side_effect=fake_run_suite,
+            ):
+                exit_code = main(
+                    [
+                        "--tier",
+                        "full",
+                        "--output-dir",
+                        str(output_dir),
+                        "--decoders",
+                        "ldpc",
+                        "--merge-into-existing",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            with results_path.open() as handle:
+                merged_rows = list(csv.DictReader(handle))
+            self.assertEqual(
+                [row["decoder"] for row in merged_rows],
+                ["ldpc", "pymatching"],
+            )
 
 
 if __name__ == "__main__":

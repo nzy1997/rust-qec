@@ -9,13 +9,59 @@ from .drivers import build_driver_registry
 from .schema import CSV_HEADER, DEFAULT_BATCH_SIZE, ResultRow, TIER_CONFIGS
 
 
-def write_results(rows: list[ResultRow], path: Path) -> None:
+def write_results(rows: list[dict[str, object]] | list[ResultRow], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    normalized_rows: list[dict[str, object]] = []
+    for row in rows:
+        if isinstance(row, ResultRow):
+            normalized_rows.append(row.to_csv_row())
+        else:
+            normalized_rows.append(dict(row))
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_HEADER)
         writer.writeheader()
-        for row in rows:
-            writer.writerow(row.to_csv_row())
+        for row in normalized_rows:
+            writer.writerow(row)
+
+
+def _load_existing_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open() as handle:
+        return list(csv.DictReader(handle))
+
+
+def _row_identity(row: dict[str, object]) -> tuple[str, str, str, str, str, str]:
+    return (
+        str(row["tier"]),
+        str(row["decoder"]),
+        str(row["distance"]),
+        str(row["rounds"]),
+        str(row["p"]),
+        str(row["seed"]),
+    )
+
+
+def _sort_key(row: dict[str, object]) -> tuple[str, float, float, int]:
+    return (
+        str(row["decoder"]),
+        float(row["distance"]),
+        float(row["p"]),
+        int(row["seed"]),
+    )
+
+
+def _merge_rows(
+    existing_rows: list[dict[str, str]],
+    new_rows: list[ResultRow],
+) -> list[dict[str, object]]:
+    normalized_new_rows = [row.to_csv_row() for row in new_rows]
+    replacement_keys = {_row_identity(row) for row in normalized_new_rows}
+    kept_rows = [
+        row for row in existing_rows if _row_identity(row) not in replacement_keys
+    ]
+    merged = kept_rows + normalized_new_rows
+    return sorted(merged, key=_sort_key)
 
 
 def run_suite(
@@ -27,6 +73,7 @@ def run_suite(
     case_specs=None,
     case_bundle_factory=materialize_case_bundle,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    write_output: bool = True,
 ) -> list[ResultRow]:
     tier = TIER_CONFIGS[tier_name]
     specs = (
@@ -71,7 +118,8 @@ def run_suite(
                     )
                 )
 
-    write_results(rows, output_dir / tier.name / "results.csv")
+    if write_output:
+        write_results(rows, output_dir / tier.name / "results.csv")
     return rows
 
 
@@ -120,6 +168,11 @@ def main(argv: list[str] | None = None) -> int:
         "--decoders",
         help="Optional comma-separated decoder filter",
     )
+    parser.add_argument(
+        "--merge-into-existing",
+        action="store_true",
+        help="Replace matching rows inside the canonical tier results.csv",
+    )
     args = parser.parse_args(argv)
 
     registry = build_driver_registry()
@@ -127,20 +180,29 @@ def main(argv: list[str] | None = None) -> int:
         wanted = {name.strip() for name in args.decoders.split(",") if name.strip()}
         registry = {name: driver for name, driver in registry.items() if name in wanted}
 
+    if args.merge_into_existing and not args.decoders:
+        parser.error("--merge-into-existing requires --decoders")
+
     case_specs = _filter_case_specs(
         build_case_specs(tier_name=args.tier),
         _parse_csv_ints(args.distances),
         _parse_csv_floats(args.p_values),
     )
 
-    run_suite(
+    rows = run_suite(
         tier_name=args.tier,
         output_dir=args.output_dir,
         seed=args.seed,
         batch_size=args.batch_size,
         drivers=registry,
         case_specs=case_specs,
+        write_output=not args.merge_into_existing,
     )
+
+    if args.merge_into_existing:
+        results_path = args.output_dir / args.tier / "results.csv"
+        merged_rows = _merge_rows(_load_existing_rows(results_path), rows)
+        write_results(merged_rows, results_path)
     return 0
 
 
