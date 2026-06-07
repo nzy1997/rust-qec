@@ -126,6 +126,8 @@ fn recompute_residual_from_hard_decision(
     workspace: &mut BpWorkspace,
 ) -> usize {
     let mut residual_weight = 0;
+    workspace.unsatisfied_checks.fill(false);
+
     for check in 0..graph.num_checks {
         let start = graph.check_edge_offsets[check];
         let end = graph.check_edge_offsets[check + 1];
@@ -251,7 +253,9 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{run_minimum_sum_compiled, BpWorkspace, CompiledGraph};
+    use super::{
+        recompute_residual_from_hard_decision, run_minimum_sum_compiled, BpWorkspace, CompiledGraph,
+    };
 
     #[test]
     fn compiled_graph_flattens_sparse_rows_into_stable_edge_ranges() {
@@ -309,6 +313,24 @@ mod tests {
         let mut workspace = BpWorkspace::new(&first_graph);
 
         workspace.reset(&second_graph, &[0.5, 0.25, 0.125]);
+    }
+
+    #[test]
+    fn residual_tracker_matches_pcm_multiply_for_manual_hard_decision() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let syndrome = Syndrome::from(vec![false, false]);
+        let mut workspace = BpWorkspace::new(&graph);
+        workspace.unsatisfied_checks.fill(true);
+        workspace.hard_decision_bits = vec![true, false, true];
+
+        let residual_weight =
+            recompute_residual_from_hard_decision(&graph, &syndrome, &mut workspace);
+
+        assert_eq!(residual_weight, 1);
+        assert_eq!(workspace.unsatisfied_checks, vec![false, true]);
+        assert_eq!(workspace.residual_weight, 1);
     }
 
     #[test]
