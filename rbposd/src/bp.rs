@@ -108,6 +108,7 @@ pub(crate) struct BpSnapshot {
     pub(crate) residual_weight: usize,
 }
 
+#[allow(dead_code)]
 pub(crate) fn run_minimum_sum(
     pcm: &ParityCheckMatrix,
     syndrome: &Syndrome,
@@ -150,13 +151,17 @@ pub(crate) fn run_minimum_sum_compiled(
     workspace.reset(graph, prior_llrs);
 
     if config.max_bp_iterations == 0 {
-        let hard_decision = Correction::from(vec![false; graph.num_bits]);
+        for bit in 0..graph.num_bits {
+            workspace.hard_decision_bits[bit] = prior_llrs[bit] < 0.0;
+            workspace.reliability[bit] = prior_llrs[bit].abs();
+        }
+        let residual_weight = recompute_residual_from_hard_decision(graph, syndrome, workspace);
         return BpSnapshot {
-            hard_decision,
-            reliability: vec![0.0; graph.num_bits],
+            hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
+            reliability: workspace.reliability.clone(),
             iterations: 0,
-            converged: false,
-            residual_weight: syndrome.weight(),
+            converged: residual_weight == 0,
+            residual_weight,
         };
     }
 
@@ -332,5 +337,32 @@ mod tests {
             snapshot.hard_decision,
             Correction::from(vec![true, false, false, false, false])
         );
+    }
+
+    #[test]
+    fn compiled_minimum_sum_zero_iterations_preserves_prior_snapshot() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]])
+            .unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let mut workspace = BpWorkspace::new(&graph);
+        let config = DecoderConfig {
+            max_bp_iterations: 0,
+            ..DecoderConfig::default()
+        };
+        let prior_llrs = vec![2.0, 1.0, -3.0];
+
+        let snapshot = run_minimum_sum_compiled(
+            &graph,
+            &Syndrome::from(vec![true, false]),
+            &prior_llrs,
+            &config,
+            &mut workspace,
+        );
+
+        assert_eq!(snapshot.hard_decision, Correction::from(vec![false, false, true]));
+        assert_eq!(snapshot.reliability, vec![2.0, 1.0, 3.0]);
+        assert_eq!(snapshot.iterations, 0);
+        assert!(!snapshot.converged);
+        assert_eq!(snapshot.residual_weight, 2);
     }
 }
