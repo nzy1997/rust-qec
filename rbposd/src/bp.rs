@@ -19,26 +19,24 @@ impl CompiledGraph {
     pub(crate) fn from_pcm(pcm: &ParityCheckMatrix) -> Self {
         let mut edge_bits = Vec::new();
         let mut edge_checks = Vec::new();
+        let mut bit_edge_buckets = vec![Vec::new(); pcm.num_bits()];
         let mut check_edge_offsets = Vec::with_capacity(pcm.num_checks() + 1);
         check_edge_offsets.push(0);
         for check in 0..pcm.num_checks() {
             for &bit in pcm.row_neighbors(check) {
+                let edge = edge_bits.len();
                 edge_bits.push(bit);
                 edge_checks.push(check);
+                bit_edge_buckets[bit].push(edge);
             }
             check_edge_offsets.push(edge_bits.len());
         }
 
         let mut bit_edge_offsets = Vec::with_capacity(pcm.num_bits() + 1);
-        let mut bit_edges = Vec::new();
+        let mut bit_edges = Vec::with_capacity(edge_bits.len());
         bit_edge_offsets.push(0);
-        for bit in 0..pcm.num_bits() {
-            for &check in pcm.column_neighbors(bit) {
-                let edge = (check_edge_offsets[check]..check_edge_offsets[check + 1])
-                    .find(|&edge_idx| edge_bits[edge_idx] == bit)
-                    .unwrap();
-                bit_edges.push(edge);
-            }
+        for bucket in bit_edge_buckets {
+            bit_edges.extend(bucket);
             bit_edge_offsets.push(bit_edges.len());
         }
 
@@ -81,6 +79,15 @@ impl BpWorkspace {
     }
 
     pub(crate) fn reset(&mut self, graph: &CompiledGraph, prior_llrs: &[f64]) {
+        debug_assert_eq!(self.v_to_c.len(), graph.edge_bits.len());
+        debug_assert_eq!(self.c_to_v.len(), graph.edge_bits.len());
+        debug_assert_eq!(self.posterior_llr.len(), graph.num_bits);
+        debug_assert_eq!(self.incoming_llr_sum.len(), graph.num_bits);
+        debug_assert_eq!(self.hard_decision_bits.len(), graph.num_bits);
+        debug_assert_eq!(self.unsatisfied_checks.len(), graph.num_checks);
+        debug_assert_eq!(self.reliability.len(), graph.num_bits);
+        debug_assert_eq!(prior_llrs.len(), graph.num_bits);
+
         self.v_to_c.fill(0.0);
         self.c_to_v.fill(0.0);
         self.posterior_llr.copy_from_slice(prior_llrs);
@@ -89,8 +96,6 @@ impl BpWorkspace {
         self.unsatisfied_checks.fill(false);
         self.reliability.fill(0.0);
         self.residual_weight = 0;
-
-        debug_assert_eq!(self.posterior_llr.len(), graph.num_bits);
     }
 }
 
@@ -282,5 +287,19 @@ mod tests {
         assert_eq!(workspace.unsatisfied_checks, vec![false; 2]);
         assert_eq!(workspace.reliability, vec![0.0; 3]);
         assert_eq!(workspace.residual_weight, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn bp_workspace_reset_rejects_workspace_from_different_graph() {
+        let first_pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let second_pcm =
+            ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+        let first_graph = CompiledGraph::from_pcm(&first_pcm);
+        let second_graph = CompiledGraph::from_pcm(&second_pcm);
+        let mut workspace = BpWorkspace::new(&first_graph);
+
+        workspace.reset(&second_graph, &[0.5, 0.25, 0.125]);
     }
 }
