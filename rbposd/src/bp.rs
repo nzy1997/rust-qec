@@ -79,14 +79,14 @@ impl BpWorkspace {
     }
 
     pub(crate) fn reset(&mut self, graph: &CompiledGraph, prior_llrs: &[f64]) {
-        debug_assert_eq!(self.v_to_c.len(), graph.edge_bits.len());
-        debug_assert_eq!(self.c_to_v.len(), graph.edge_bits.len());
-        debug_assert_eq!(self.posterior_llr.len(), graph.num_bits);
-        debug_assert_eq!(self.incoming_llr_sum.len(), graph.num_bits);
-        debug_assert_eq!(self.hard_decision_bits.len(), graph.num_bits);
-        debug_assert_eq!(self.unsatisfied_checks.len(), graph.num_checks);
-        debug_assert_eq!(self.reliability.len(), graph.num_bits);
-        debug_assert_eq!(prior_llrs.len(), graph.num_bits);
+        assert_eq!(self.v_to_c.len(), graph.edge_bits.len());
+        assert_eq!(self.c_to_v.len(), graph.edge_bits.len());
+        assert_eq!(self.posterior_llr.len(), graph.num_bits);
+        assert_eq!(self.incoming_llr_sum.len(), graph.num_bits);
+        assert_eq!(self.hard_decision_bits.len(), graph.num_bits);
+        assert_eq!(self.unsatisfied_checks.len(), graph.num_checks);
+        assert_eq!(self.reliability.len(), graph.num_bits);
+        assert_eq!(prior_llrs.len(), graph.num_bits);
 
         self.v_to_c.fill(0.0);
         self.c_to_v.fill(0.0);
