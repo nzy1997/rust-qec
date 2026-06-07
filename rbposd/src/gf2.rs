@@ -14,6 +14,7 @@ pub(crate) fn sort_columns_by_reliability(scores: &[f64]) -> Vec<usize> {
     order
 }
 
+#[cfg(test)]
 pub(crate) fn sort_columns_by_unreliability(scores: &[f64]) -> Vec<usize> {
     let mut order: Vec<usize> = (0..scores.len()).collect();
     order.sort_by(|&a, &b| {
@@ -25,52 +26,85 @@ pub(crate) fn sort_columns_by_unreliability(scores: &[f64]) -> Vec<usize> {
     order
 }
 
+#[cfg(test)]
 pub(crate) fn solve_with_column_order(
     pcm: &ParityCheckMatrix,
     syndrome: &Syndrome,
     column_order: &[usize],
 ) -> Result<Correction, DecodeError> {
-    let mut matrix = pcm.dense_rows();
-    let mut rhs = syndrome.as_slice().to_vec();
-    let mut pivot_columns = Vec::new();
-    let mut row = 0usize;
+    PreparedLinearSystem::from_pcm(pcm).solve_with_column_order(syndrome, column_order)
+}
 
-    for (pivot_position, &column) in column_order.iter().enumerate() {
-        if row == matrix.len() {
-            break;
+#[derive(Debug)]
+pub(crate) struct PreparedLinearSystem {
+    base_rows: Vec<Vec<bool>>,
+    scratch_rows: Vec<Vec<bool>>,
+    scratch_rhs: Vec<bool>,
+    pivot_columns: Vec<usize>,
+    num_bits: usize,
+}
+
+impl PreparedLinearSystem {
+    pub(crate) fn from_pcm(pcm: &ParityCheckMatrix) -> Self {
+        let base_rows = pcm.dense_rows();
+        let scratch_rows = base_rows.clone();
+        Self {
+            base_rows,
+            scratch_rows,
+            scratch_rhs: vec![false; pcm.num_checks()],
+            pivot_columns: Vec::with_capacity(pcm.num_checks()),
+            num_bits: pcm.num_bits(),
         }
-        let pivot = (row..matrix.len()).find(|&candidate| matrix[candidate][column]);
-        if let Some(pivot_row) = pivot {
-            matrix.swap(row, pivot_row);
-            rhs.swap(row, pivot_row);
-            for other in 0..matrix.len() {
-                if other != row && matrix[other][column] {
-                    for c in pivot_position..column_order.len() {
-                        let physical = column_order[c];
-                        matrix[other][physical] ^= matrix[row][physical];
-                    }
-                    rhs[other] ^= rhs[row];
-                }
+    }
+
+    pub(crate) fn solve_with_column_order(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+    ) -> Result<Correction, DecodeError> {
+        self.scratch_rows.clone_from(&self.base_rows);
+        self.scratch_rhs.copy_from_slice(syndrome.as_slice());
+        self.pivot_columns.clear();
+        let mut row = 0usize;
+
+        for (pivot_position, &column) in column_order.iter().enumerate() {
+            if row == self.scratch_rows.len() {
+                break;
             }
-            pivot_columns.push(column);
-            row += 1;
+            let pivot = (row..self.scratch_rows.len())
+                .find(|&candidate| self.scratch_rows[candidate][column]);
+            if let Some(pivot_row) = pivot {
+                self.scratch_rows.swap(row, pivot_row);
+                self.scratch_rhs.swap(row, pivot_row);
+                for other in 0..self.scratch_rows.len() {
+                    if other != row && self.scratch_rows[other][column] {
+                        for &physical in column_order.iter().skip(pivot_position) {
+                            self.scratch_rows[other][physical] ^=
+                                self.scratch_rows[row][physical];
+                        }
+                        self.scratch_rhs[other] ^= self.scratch_rhs[row];
+                    }
+                }
+                self.pivot_columns.push(column);
+                row += 1;
+            }
         }
-    }
 
-    if rhs.iter().skip(row).any(|&bit| bit) {
-        return Err(DecodeError::SingularSystem);
-    }
-
-    let mut solution = vec![false; pcm.num_bits()];
-    for (pivot_row, &column) in pivot_columns.iter().enumerate().rev() {
-        let mut value = rhs[pivot_row];
-        for later_column in pivot_columns.iter().skip(pivot_row + 1) {
-            value ^= matrix[pivot_row][*later_column] && solution[*later_column];
+        if self.scratch_rhs.iter().skip(row).any(|&bit| bit) {
+            return Err(DecodeError::SingularSystem);
         }
-        solution[column] = value;
-    }
 
-    Ok(Correction::from(solution))
+        let mut solution = vec![false; self.num_bits];
+        for (pivot_row, &column) in self.pivot_columns.iter().enumerate().rev() {
+            let mut value = self.scratch_rhs[pivot_row];
+            for later_column in self.pivot_columns.iter().skip(pivot_row + 1) {
+                value ^= self.scratch_rows[pivot_row][*later_column] && solution[*later_column];
+            }
+            solution[column] = value;
+        }
+
+        Ok(Correction::from(solution))
+    }
 }
 
 #[cfg(test)]
@@ -80,6 +114,7 @@ mod tests {
 
     use super::{
         solve_with_column_order, sort_columns_by_reliability, sort_columns_by_unreliability,
+        PreparedLinearSystem,
     };
 
     #[test]
@@ -116,6 +151,23 @@ mod tests {
         let correction = solve_with_column_order(&pcm, &syndrome, &order).unwrap();
 
         assert_eq!(pcm.multiply(&correction), syndrome);
+    }
+
+    #[test]
+    fn prepared_system_solves_multiple_rhs_without_rebuilding_matrix_storage() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+
+        let first = prepared
+            .solve_with_column_order(&Syndrome::from(vec![true, false]), &[0, 1, 2])
+            .unwrap();
+        let second = prepared
+            .solve_with_column_order(&Syndrome::from(vec![false, true]), &[2, 0, 1])
+            .unwrap();
+
+        assert_eq!(pcm.multiply(&first), Syndrome::from(vec![true, false]));
+        assert_eq!(pcm.multiply(&second), Syndrome::from(vec![false, true]));
     }
 
     #[test]

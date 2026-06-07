@@ -4,7 +4,7 @@ use crate::bp::{run_minimum_sum_compiled, BpWorkspace, CompiledGraph};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
-use crate::osd::decode_osd0;
+use crate::osd::{decode_osd0_with_workspace, OsdWorkspace};
 use crate::vector::{Correction, Syndrome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +23,7 @@ pub struct BpOsdDecoder {
     config: DecoderConfig,
     prior_llrs: Vec<f64>,
     bp_workspace: Mutex<BpWorkspace>,
+    osd_workspace: Mutex<OsdWorkspace>,
 }
 
 impl Clone for BpOsdDecoder {
@@ -33,6 +34,7 @@ impl Clone for BpOsdDecoder {
             config: self.config.clone(),
             prior_llrs: self.prior_llrs.clone(),
             bp_workspace: Mutex::new(BpWorkspace::new(&self.graph)),
+            osd_workspace: Mutex::new(OsdWorkspace::new(&self.pcm)),
         }
     }
 }
@@ -46,12 +48,14 @@ impl BpOsdDecoder {
         let prior_llrs = compute_prior_llrs(&pcm, &channel)?;
         let graph = CompiledGraph::from_pcm(&pcm);
         let bp_workspace = Mutex::new(BpWorkspace::new(&graph));
+        let osd_workspace = Mutex::new(OsdWorkspace::new(&pcm));
         Ok(Self {
             pcm,
             graph,
             config,
             prior_llrs,
             bp_workspace,
+            osd_workspace,
         })
     }
 
@@ -97,12 +101,16 @@ impl BpOsdDecoder {
             });
         }
 
-        let correction = decode_osd0(
-            &self.pcm,
-            syndrome,
-            &snapshot.hard_decision,
-            &snapshot.reliability,
-        )?;
+        let correction = {
+            let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            decode_osd0_with_workspace(
+                &self.pcm,
+                syndrome,
+                &snapshot.hard_decision,
+                &snapshot.reliability,
+                &mut osd_workspace,
+            )?
+        };
 
         Ok(DecodeResult {
             correction,
