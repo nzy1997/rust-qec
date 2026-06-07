@@ -49,19 +49,31 @@ impl OsdWorkspace {
 pub(crate) fn decode_osd0_with_workspace(
     pcm: &ParityCheckMatrix,
     syndrome: &Syndrome,
-    base_correction: &Correction,
+    base_correction_bits: &[bool],
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
 ) -> Result<Correction, DecodeError> {
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
     debug_assert_eq!(workspace.num_bits, pcm.num_bits());
-    debug_assert_eq!(base_correction.len(), pcm.num_bits());
+    debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
     debug_assert_eq!(reliability.len(), pcm.num_bits());
-    let target_syndrome = xor_syndromes(&pcm.multiply(base_correction), syndrome);
+    let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
     let residual = workspace
         .solve_residual_by_unreliability(&target_syndrome, reliability)
         .map_err(|_| DecodeError::NoOsdSolution)?;
-    Ok(xor_corrections(base_correction, &residual))
+    Ok(xor_correction_bits(base_correction_bits, &residual))
+}
+
+fn multiply_bits(pcm: &ParityCheckMatrix, bits: &[bool]) -> Syndrome {
+    let mut syndrome = vec![false; pcm.num_checks()];
+    for (check, value) in syndrome.iter_mut().enumerate() {
+        let mut parity = false;
+        for &bit in pcm.row_neighbors(check) {
+            parity ^= bits[bit];
+        }
+        *value = parity;
+    }
+    Syndrome::from(syndrome)
 }
 
 fn xor_syndromes(lhs: &Syndrome, rhs: &Syndrome) -> Syndrome {
@@ -74,10 +86,9 @@ fn xor_syndromes(lhs: &Syndrome, rhs: &Syndrome) -> Syndrome {
     )
 }
 
-fn xor_corrections(lhs: &Correction, rhs: &Correction) -> Correction {
+fn xor_correction_bits(lhs: &[bool], rhs: &Correction) -> Correction {
     Correction::from(
-        lhs.as_slice()
-            .iter()
+        lhs.iter()
             .zip(rhs.as_slice().iter())
             .map(|(a, b)| *a ^ *b)
             .collect::<Vec<_>>(),
@@ -100,9 +111,14 @@ mod tests {
         let reliability = vec![1.0, 1.0, 2.0];
         let mut workspace = OsdWorkspace::new(&pcm);
 
-        let correction =
-            decode_osd0_with_workspace(&pcm, &syndrome, &base, &reliability, &mut workspace)
-                .unwrap();
+        let correction = decode_osd0_with_workspace(
+            &pcm,
+            &syndrome,
+            base.as_slice(),
+            &reliability,
+            &mut workspace,
+        )
+        .unwrap();
 
         assert_eq!(correction, Correction::from(vec![false, true, false]));
     }

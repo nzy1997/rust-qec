@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use crate::bp::{run_minimum_sum_compiled, BpWorkspace, CompiledGraph};
+use crate::bp::{run_minimum_sum_compiled_in_place, BpWorkspace, CompiledGraph};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
@@ -81,23 +81,21 @@ impl BpOsdDecoder {
             }
         }
 
-        let snapshot = {
-            let mut workspace = self.bp_workspace.lock().unwrap();
-            run_minimum_sum_compiled(
-                &self.graph,
-                syndrome,
-                &self.prior_llrs,
-                &self.config,
-                &mut workspace,
-            )
-        };
-        if snapshot.residual_weight == 0 {
+        let mut bp_workspace = self.bp_workspace.lock().unwrap();
+        let bp_info = run_minimum_sum_compiled_in_place(
+            &self.graph,
+            syndrome,
+            &self.prior_llrs,
+            &self.config,
+            &mut bp_workspace,
+        );
+        if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {
-                correction: snapshot.hard_decision,
-                converged: snapshot.converged,
-                bp_iterations: snapshot.iterations,
+                correction: Correction::from(bp_workspace.hard_decision_bits.clone()),
+                converged: bp_info.converged,
+                bp_iterations: bp_info.iterations,
                 used_osd: false,
-                residual_syndrome_weight: snapshot.residual_weight,
+                residual_syndrome_weight: bp_info.residual_weight,
             });
         }
 
@@ -106,16 +104,17 @@ impl BpOsdDecoder {
             decode_osd0_with_workspace(
                 &self.pcm,
                 syndrome,
-                &snapshot.hard_decision,
-                &snapshot.reliability,
+                &bp_workspace.hard_decision_bits,
+                &bp_workspace.reliability,
                 &mut osd_workspace,
             )?
         };
+        drop(bp_workspace);
 
         Ok(DecodeResult {
             correction,
-            converged: snapshot.converged,
-            bp_iterations: snapshot.iterations,
+            converged: bp_info.converged,
+            bp_iterations: bp_info.iterations,
             used_osd: true,
             residual_syndrome_weight: 0,
         })

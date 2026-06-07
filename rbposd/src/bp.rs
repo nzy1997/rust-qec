@@ -59,8 +59,10 @@ pub(crate) struct BpWorkspace {
     pub(crate) posterior_llr: Vec<f64>,
     pub(crate) incoming_llr_sum: Vec<f64>,
     pub(crate) hard_decision_bits: Vec<bool>,
+    pub(crate) best_hard_decision_bits: Vec<bool>,
     pub(crate) unsatisfied_checks: Vec<bool>,
     pub(crate) reliability: Vec<f64>,
+    pub(crate) best_reliability: Vec<f64>,
     pub(crate) residual_weight: usize,
 }
 
@@ -72,8 +74,10 @@ impl BpWorkspace {
             posterior_llr: vec![0.0; graph.num_bits],
             incoming_llr_sum: vec![0.0; graph.num_bits],
             hard_decision_bits: vec![false; graph.num_bits],
+            best_hard_decision_bits: vec![false; graph.num_bits],
             unsatisfied_checks: vec![false; graph.num_checks],
             reliability: vec![0.0; graph.num_bits],
+            best_reliability: vec![0.0; graph.num_bits],
             residual_weight: 0,
         }
     }
@@ -84,8 +88,10 @@ impl BpWorkspace {
         assert_eq!(self.posterior_llr.len(), graph.num_bits);
         assert_eq!(self.incoming_llr_sum.len(), graph.num_bits);
         assert_eq!(self.hard_decision_bits.len(), graph.num_bits);
+        assert_eq!(self.best_hard_decision_bits.len(), graph.num_bits);
         assert_eq!(self.unsatisfied_checks.len(), graph.num_checks);
         assert_eq!(self.reliability.len(), graph.num_bits);
+        assert_eq!(self.best_reliability.len(), graph.num_bits);
         assert_eq!(prior_llrs.len(), graph.num_bits);
 
         self.v_to_c.fill(0.0);
@@ -93,16 +99,26 @@ impl BpWorkspace {
         self.posterior_llr.copy_from_slice(prior_llrs);
         self.incoming_llr_sum.fill(0.0);
         self.hard_decision_bits.fill(false);
+        self.best_hard_decision_bits.fill(false);
         self.unsatisfied_checks.fill(false);
         self.reliability.fill(0.0);
+        self.best_reliability.fill(0.0);
         self.residual_weight = 0;
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct BpSnapshot {
     pub(crate) hard_decision: Correction,
     pub(crate) reliability: Vec<f64>,
+    pub(crate) iterations: usize,
+    pub(crate) converged: bool,
+    pub(crate) residual_weight: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BpRunInfo {
     pub(crate) iterations: usize,
     pub(crate) converged: bool,
     pub(crate) residual_weight: usize,
@@ -143,6 +159,57 @@ fn recompute_residual_from_hard_decision(
     residual_weight
 }
 
+fn update_check_to_variable_messages(
+    graph: &CompiledGraph,
+    syndrome: &Syndrome,
+    workspace: &mut BpWorkspace,
+) {
+    for check in 0..graph.num_checks {
+        let start = graph.check_edge_offsets[check];
+        let end = graph.check_edge_offsets[check + 1];
+        let syndrome_sign = if syndrome.as_slice()[check] { -1.0 } else { 1.0 };
+
+        if end - start == 1 {
+            workspace.c_to_v[start] = syndrome_sign * CERTAINTY_LLR;
+            continue;
+        }
+
+        let mut total_sign = syndrome_sign;
+        let mut min_abs = f64::INFINITY;
+        let mut second_min_abs = f64::INFINITY;
+        let mut min_count = 0usize;
+
+        for edge in start..end {
+            let msg = workspace.v_to_c[edge];
+            if msg < 0.0 {
+                total_sign = -total_sign;
+            }
+            let abs = msg.abs();
+            if abs < min_abs {
+                second_min_abs = min_abs;
+                min_abs = abs;
+                min_count = 1;
+            } else if abs == min_abs {
+                min_count += 1;
+            } else if abs < second_min_abs {
+                second_min_abs = abs;
+            }
+        }
+
+        for edge in start..end {
+            let msg = workspace.v_to_c[edge];
+            let sign = if msg < 0.0 { -total_sign } else { total_sign };
+            let abs = msg.abs();
+            let excluded_min_abs = if abs == min_abs && min_count == 1 {
+                second_min_abs
+            } else {
+                min_abs
+            };
+            workspace.c_to_v[edge] = sign * excluded_min_abs;
+        }
+    }
+}
+
 pub(crate) fn run_minimum_sum_compiled(
     graph: &CompiledGraph,
     syndrome: &Syndrome,
@@ -150,6 +217,23 @@ pub(crate) fn run_minimum_sum_compiled(
     config: &DecoderConfig,
     workspace: &mut BpWorkspace,
 ) -> BpSnapshot {
+    let info = run_minimum_sum_compiled_in_place(graph, syndrome, prior_llrs, config, workspace);
+    BpSnapshot {
+        hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
+        reliability: workspace.reliability.clone(),
+        iterations: info.iterations,
+        converged: info.converged,
+        residual_weight: info.residual_weight,
+    }
+}
+
+pub(crate) fn run_minimum_sum_compiled_in_place(
+    graph: &CompiledGraph,
+    syndrome: &Syndrome,
+    prior_llrs: &[f64],
+    config: &DecoderConfig,
+    workspace: &mut BpWorkspace,
+) -> BpRunInfo {
     workspace.reset(graph, prior_llrs);
 
     if config.max_bp_iterations == 0 {
@@ -158,9 +242,7 @@ pub(crate) fn run_minimum_sum_compiled(
             workspace.reliability[bit] = prior_llrs[bit].abs();
         }
         let residual_weight = recompute_residual_from_hard_decision(graph, syndrome, workspace);
-        return BpSnapshot {
-            hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
-            reliability: workspace.reliability.clone(),
+        return BpRunInfo {
             iterations: 0,
             converged: residual_weight == 0,
             residual_weight,
@@ -171,34 +253,10 @@ pub(crate) fn run_minimum_sum_compiled(
         workspace.v_to_c[edge] = prior_llrs[graph.edge_bits[edge]];
     }
 
-    let mut best = None;
+    let mut best_info = None;
 
     for iteration in 1..=config.max_bp_iterations {
-        for check in 0..graph.num_checks {
-            let start = graph.check_edge_offsets[check];
-            let end = graph.check_edge_offsets[check + 1];
-            let syndrome_sign = if syndrome.as_slice()[check] { -1.0 } else { 1.0 };
-
-            for edge in start..end {
-                let mut sign = syndrome_sign;
-                let mut min_abs = f64::INFINITY;
-                for other in start..end {
-                    if other == edge {
-                        continue;
-                    }
-                    let msg = workspace.v_to_c[other];
-                    if msg < 0.0 {
-                        sign = -sign;
-                    }
-                    min_abs = min_abs.min(msg.abs());
-                }
-                workspace.c_to_v[edge] = if end - start == 1 {
-                    syndrome_sign * CERTAINTY_LLR
-                } else {
-                    sign * min_abs
-                };
-            }
-        }
+        update_check_to_variable_messages(graph, syndrome, workspace);
 
         workspace.incoming_llr_sum.fill(0.0);
         for bit in 0..graph.num_bits {
@@ -215,17 +273,19 @@ pub(crate) fn run_minimum_sum_compiled(
 
         let residual_weight = recompute_residual_from_hard_decision(graph, syndrome, workspace);
         if residual_weight == 0 {
-            let snapshot = BpSnapshot {
-                hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
-                reliability: workspace.reliability.clone(),
+            let info = BpRunInfo {
                 iterations: iteration,
                 converged: true,
                 residual_weight: 0,
             };
             if config.early_stop {
-                return snapshot;
+                return info;
             }
-            best = Some(snapshot);
+            workspace
+                .best_hard_decision_bits
+                .copy_from_slice(&workspace.hard_decision_bits);
+            workspace.best_reliability.copy_from_slice(&workspace.reliability);
+            best_info = Some(info);
         }
 
         for bit in 0..graph.num_bits {
@@ -238,13 +298,20 @@ pub(crate) fn run_minimum_sum_compiled(
         }
     }
 
-    best.unwrap_or_else(|| BpSnapshot {
-        hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
-        reliability: workspace.reliability.clone(),
+    if let Some(info) = best_info {
+        workspace
+            .hard_decision_bits
+            .copy_from_slice(&workspace.best_hard_decision_bits);
+        workspace.reliability.copy_from_slice(&workspace.best_reliability);
+        workspace.residual_weight = 0;
+        return info;
+    }
+
+    BpRunInfo {
         iterations: config.max_bp_iterations,
         converged: workspace.residual_weight == 0,
         residual_weight: workspace.residual_weight,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -254,7 +321,9 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        recompute_residual_from_hard_decision, run_minimum_sum_compiled, BpWorkspace, CompiledGraph,
+        recompute_residual_from_hard_decision, run_minimum_sum_compiled,
+        run_minimum_sum_compiled_in_place, BpWorkspace, CompiledGraph,
+        update_check_to_variable_messages,
     };
 
     #[test]
@@ -338,6 +407,18 @@ mod tests {
     }
 
     #[test]
+    fn check_update_uses_second_minimum_when_unique_smallest_edge_is_excluded() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let mut workspace = BpWorkspace::new(&graph);
+        workspace.v_to_c = vec![0.1, 2.0, -3.0];
+
+        update_check_to_variable_messages(&graph, &Syndrome::from(vec![false]), &mut workspace);
+
+        assert_eq!(workspace.c_to_v, vec![-2.0, -0.1, 0.1]);
+    }
+
+    #[test]
     fn compiled_minimum_sum_matches_the_repetition_reference_case() {
         let pcm = ParityCheckMatrix::from_sparse_rows(
             4,
@@ -363,6 +444,35 @@ mod tests {
             snapshot.hard_decision,
             Correction::from(vec![true, false, false, false, false])
         );
+    }
+
+    #[test]
+    fn compiled_minimum_sum_in_place_leaves_snapshot_state_in_workspace() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(
+            4,
+            5,
+            vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]],
+        )
+        .unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let mut workspace = BpWorkspace::new(&graph);
+        let prior_llrs = vec![((1.0_f64 - 0.05) / 0.05).ln(); 5];
+
+        let info = run_minimum_sum_compiled_in_place(
+            &graph,
+            &Syndrome::from(vec![true, false, false, false]),
+            &prior_llrs,
+            &DecoderConfig::default(),
+            &mut workspace,
+        );
+
+        assert!(info.converged);
+        assert_eq!(info.residual_weight, 0);
+        assert_eq!(
+            workspace.hard_decision_bits,
+            vec![true, false, false, false, false]
+        );
+        assert!(workspace.reliability.iter().all(|value| value.is_finite()));
     }
 
     #[test]
