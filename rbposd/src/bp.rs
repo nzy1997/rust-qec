@@ -114,108 +114,106 @@ pub(crate) fn run_minimum_sum(
     prior_llrs: &[f64],
     config: &DecoderConfig,
 ) -> BpSnapshot {
-    let mut v_to_c: Vec<Vec<f64>> = (0..pcm.num_checks())
-        .map(|check| {
-            pcm.row_neighbors(check)
-                .iter()
-                .map(|&bit| prior_llrs[bit])
-                .collect()
-        })
-        .collect();
-    let mut c_to_v: Vec<Vec<f64>> = (0..pcm.num_checks())
-        .map(|check| vec![0.0; pcm.row_neighbors(check).len()])
-        .collect();
-    let mut best = None;
-    let mut posterior_llrs = prior_llrs.to_vec();
-    let mut hard_decision = Correction::from(
-        posterior_llrs
-            .iter()
-            .map(|&llr| llr < 0.0)
-            .collect::<Vec<_>>(),
-    );
-    let mut residual_weight = pcm
-        .multiply(&hard_decision)
-        .as_slice()
-        .iter()
-        .zip(syndrome.as_slice().iter())
-        .filter(|(lhs, rhs)| lhs != rhs)
-        .count();
+    let graph = CompiledGraph::from_pcm(pcm);
+    let mut workspace = BpWorkspace::new(&graph);
+    run_minimum_sum_compiled(&graph, syndrome, prior_llrs, config, &mut workspace)
+}
+
+fn recompute_residual_from_hard_decision(
+    graph: &CompiledGraph,
+    syndrome: &Syndrome,
+    workspace: &mut BpWorkspace,
+) -> usize {
+    let mut residual_weight = 0;
+    for check in 0..graph.num_checks {
+        let start = graph.check_edge_offsets[check];
+        let end = graph.check_edge_offsets[check + 1];
+        let mut parity = false;
+        for edge in start..end {
+            parity ^= workspace.hard_decision_bits[graph.edge_bits[edge]];
+        }
+        let unsatisfied = parity != syndrome.as_slice()[check];
+        workspace.unsatisfied_checks[check] = unsatisfied;
+        residual_weight += usize::from(unsatisfied);
+    }
+    workspace.residual_weight = residual_weight;
+    residual_weight
+}
+
+pub(crate) fn run_minimum_sum_compiled(
+    graph: &CompiledGraph,
+    syndrome: &Syndrome,
+    prior_llrs: &[f64],
+    config: &DecoderConfig,
+    workspace: &mut BpWorkspace,
+) -> BpSnapshot {
+    workspace.reset(graph, prior_llrs);
 
     if config.max_bp_iterations == 0 {
+        let hard_decision = Correction::from(vec![false; graph.num_bits]);
         return BpSnapshot {
             hard_decision,
-            reliability: posterior_llrs.iter().map(|value| value.abs()).collect(),
+            reliability: vec![0.0; graph.num_bits],
             iterations: 0,
-            converged: residual_weight == 0,
-            residual_weight,
+            converged: false,
+            residual_weight: syndrome.weight(),
         };
     }
 
-    for iteration in 1..=config.max_bp_iterations {
-        for check in 0..pcm.num_checks() {
-            let syndrome_sign = if syndrome.as_slice()[check] {
-                -1.0
-            } else {
-                1.0
-            };
-            let row_messages = &v_to_c[check];
+    for edge in 0..graph.edge_bits.len() {
+        workspace.v_to_c[edge] = prior_llrs[graph.edge_bits[edge]];
+    }
 
-            for edge_idx in 0..row_messages.len() {
-                let message = if row_messages.len() == 1 {
+    let mut best = None;
+
+    for iteration in 1..=config.max_bp_iterations {
+        for check in 0..graph.num_checks {
+            let start = graph.check_edge_offsets[check];
+            let end = graph.check_edge_offsets[check + 1];
+            let syndrome_sign = if syndrome.as_slice()[check] { -1.0 } else { 1.0 };
+
+            for edge in start..end {
+                let mut sign = syndrome_sign;
+                let mut min_abs = f64::INFINITY;
+                for other in start..end {
+                    if other == edge {
+                        continue;
+                    }
+                    let msg = workspace.v_to_c[other];
+                    if msg < 0.0 {
+                        sign = -sign;
+                    }
+                    min_abs = min_abs.min(msg.abs());
+                }
+                workspace.c_to_v[edge] = if end - start == 1 {
                     syndrome_sign * CERTAINTY_LLR
                 } else {
-                    let mut sign = syndrome_sign;
-                    let mut min_abs = f64::INFINITY;
-
-                    for (other_idx, &other_message) in row_messages.iter().enumerate() {
-                        if other_idx == edge_idx {
-                            continue;
-                        }
-                        if other_message < 0.0 {
-                            sign = -sign;
-                        }
-                        min_abs = min_abs.min(other_message.abs());
-                    }
-
                     sign * min_abs
                 };
-                c_to_v[check][edge_idx] = message;
             }
         }
 
-        let mut incoming = vec![0.0; pcm.num_bits()];
-        for check in 0..pcm.num_checks() {
-            for (edge_idx, &bit) in pcm.row_neighbors(check).iter().enumerate() {
-                incoming[bit] += c_to_v[check][edge_idx];
+        workspace.incoming_llr_sum.fill(0.0);
+        for bit in 0..graph.num_bits {
+            let start = graph.bit_edge_offsets[bit];
+            let end = graph.bit_edge_offsets[bit + 1];
+            for slot in start..end {
+                let edge = graph.bit_edges[slot];
+                workspace.incoming_llr_sum[bit] += workspace.c_to_v[edge];
             }
+            workspace.posterior_llr[bit] = prior_llrs[bit] + workspace.incoming_llr_sum[bit];
+            workspace.hard_decision_bits[bit] = workspace.posterior_llr[bit] < 0.0;
+            workspace.reliability[bit] = workspace.posterior_llr[bit].abs();
         }
 
-        posterior_llrs = prior_llrs
-            .iter()
-            .zip(incoming.iter())
-            .map(|(prior, sum)| prior + sum)
-            .collect();
-        hard_decision = Correction::from(
-            posterior_llrs
-                .iter()
-                .map(|&llr| llr < 0.0)
-                .collect::<Vec<_>>(),
-        );
-        residual_weight = pcm
-            .multiply(&hard_decision)
-            .as_slice()
-            .iter()
-            .zip(syndrome.as_slice().iter())
-            .filter(|(lhs, rhs)| lhs != rhs)
-            .count();
-
+        let residual_weight = recompute_residual_from_hard_decision(graph, syndrome, workspace);
         if residual_weight == 0 {
             let snapshot = BpSnapshot {
-                hard_decision: hard_decision.clone(),
-                reliability: posterior_llrs.iter().map(|value| value.abs()).collect(),
+                hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
+                reliability: workspace.reliability.clone(),
                 iterations: iteration,
                 converged: true,
-                residual_weight,
+                residual_weight: 0,
             };
             if config.early_stop {
                 return snapshot;
@@ -223,27 +221,32 @@ pub(crate) fn run_minimum_sum(
             best = Some(snapshot);
         }
 
-        for check in 0..pcm.num_checks() {
-            for (edge_idx, &bit) in pcm.row_neighbors(check).iter().enumerate() {
-                v_to_c[check][edge_idx] = posterior_llrs[bit] - c_to_v[check][edge_idx];
+        for bit in 0..graph.num_bits {
+            let start = graph.bit_edge_offsets[bit];
+            let end = graph.bit_edge_offsets[bit + 1];
+            for slot in start..end {
+                let edge = graph.bit_edges[slot];
+                workspace.v_to_c[edge] = workspace.posterior_llr[bit] - workspace.c_to_v[edge];
             }
         }
     }
 
     best.unwrap_or_else(|| BpSnapshot {
-        hard_decision,
-        reliability: posterior_llrs.iter().map(|value| value.abs()).collect(),
+        hard_decision: Correction::from(workspace.hard_decision_bits.clone()),
+        reliability: workspace.reliability.clone(),
         iterations: config.max_bp_iterations,
-        converged: residual_weight == 0,
-        residual_weight,
+        converged: workspace.residual_weight == 0,
+        residual_weight: workspace.residual_weight,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::config::DecoderConfig;
     use crate::matrix::ParityCheckMatrix;
+    use crate::vector::{Correction, Syndrome};
 
-    use super::{BpWorkspace, CompiledGraph};
+    use super::{run_minimum_sum_compiled, BpWorkspace, CompiledGraph};
 
     #[test]
     fn compiled_graph_flattens_sparse_rows_into_stable_edge_ranges() {
@@ -301,5 +304,33 @@ mod tests {
         let mut workspace = BpWorkspace::new(&first_graph);
 
         workspace.reset(&second_graph, &[0.5, 0.25, 0.125]);
+    }
+
+    #[test]
+    fn compiled_minimum_sum_matches_the_repetition_reference_case() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(
+            4,
+            5,
+            vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]],
+        )
+        .unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let mut workspace = BpWorkspace::new(&graph);
+        let prior_llrs = vec![((1.0_f64 - 0.05) / 0.05).ln(); 5];
+
+        let snapshot = run_minimum_sum_compiled(
+            &graph,
+            &Syndrome::from(vec![true, false, false, false]),
+            &prior_llrs,
+            &DecoderConfig::default(),
+            &mut workspace,
+        );
+
+        assert!(snapshot.converged);
+        assert_eq!(snapshot.residual_weight, 0);
+        assert_eq!(
+            snapshot.hard_decision,
+            Correction::from(vec![true, false, false, false, false])
+        );
     }
 }

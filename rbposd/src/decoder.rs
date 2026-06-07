@@ -1,4 +1,6 @@
-use crate::bp::run_minimum_sum;
+use std::sync::Mutex;
+
+use crate::bp::{run_minimum_sum_compiled, BpWorkspace, CompiledGraph};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
@@ -14,11 +16,25 @@ pub struct DecodeResult {
     pub residual_syndrome_weight: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BpOsdDecoder {
     pcm: ParityCheckMatrix,
+    graph: CompiledGraph,
     config: DecoderConfig,
     prior_llrs: Vec<f64>,
+    bp_workspace: Mutex<BpWorkspace>,
+}
+
+impl Clone for BpOsdDecoder {
+    fn clone(&self) -> Self {
+        Self {
+            pcm: self.pcm.clone(),
+            graph: self.graph.clone(),
+            config: self.config.clone(),
+            prior_llrs: self.prior_llrs.clone(),
+            bp_workspace: Mutex::new(BpWorkspace::new(&self.graph)),
+        }
+    }
 }
 
 impl BpOsdDecoder {
@@ -28,10 +44,14 @@ impl BpOsdDecoder {
         config: DecoderConfig,
     ) -> Result<Self, DecodeError> {
         let prior_llrs = compute_prior_llrs(&pcm, &channel)?;
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let bp_workspace = Mutex::new(BpWorkspace::new(&graph));
         Ok(Self {
             pcm,
+            graph,
             config,
             prior_llrs,
+            bp_workspace,
         })
     }
 
@@ -57,7 +77,16 @@ impl BpOsdDecoder {
             }
         }
 
-        let snapshot = run_minimum_sum(&self.pcm, syndrome, &self.prior_llrs, &self.config);
+        let snapshot = {
+            let mut workspace = self.bp_workspace.lock().unwrap();
+            run_minimum_sum_compiled(
+                &self.graph,
+                syndrome,
+                &self.prior_llrs,
+                &self.config,
+                &mut workspace,
+            )
+        };
         if snapshot.residual_weight == 0 {
             return Ok(DecodeResult {
                 correction: snapshot.hard_decision,
