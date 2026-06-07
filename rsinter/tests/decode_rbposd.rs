@@ -20,6 +20,21 @@ fn rbposd_dem_decoder_predicts_a_single_observable_flip() {
 }
 
 #[test]
+fn rbposd_dem_decoder_reuses_one_compiled_instance_across_multiple_batch_calls() {
+    let dem = DetectorErrorModel::parse("error(0.125) D0 L0\nerror(0.25) D1\n").unwrap();
+    let decoder = RbposdDemDecoder::new(DecoderConfig::default());
+    let compiled = decoder.compile_for_dem(&dem);
+
+    let first = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+    let second = compiled.decode_shots_bit_packed(&[0b0000_0000], 1, 2, 1);
+    let third = compiled.decode_shots_bit_packed(&[0b0000_0001, 0b0000_0000], 2, 2, 1);
+
+    assert_eq!(first, vec![0b0000_0001]);
+    assert_eq!(second, vec![0b0000_0000]);
+    assert_eq!(third, vec![0b0000_0001, 0b0000_0000]);
+}
+
+#[test]
 fn collect_runs_with_the_rbposd_adapter() {
     let circuit =
         parse_lines("R 0\nX_ERROR(0.05) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
