@@ -285,6 +285,25 @@ mod tests {
     }
 
     #[test]
+    fn packed_dets_to_detection_events_handles_cross_byte_bits() {
+        let packed = [0b0000_0101u8, 0b0000_0010u8];
+        let mut out = vec![999];
+
+        packed_dets_to_detection_events_into(&packed, 10, &mut out);
+
+        assert_eq!(out, vec![0, 2, 9]);
+    }
+
+    #[test]
+    fn obs_mask_to_bit_packed_predictions_into_clears_stale_bits() {
+        let mut out = vec![0xFF, 0xFF];
+
+        obs_mask_to_bit_packed_predictions_into(1u64 << 8, 9, &mut out);
+
+        assert_eq!(out, vec![0, 1]);
+    }
+
+    #[test]
     fn apply_negative_weight_events_into_filters_and_sorts() {
         let detection_events = vec![0, 2, 4];
         let neg_det_set = HashSet::from([2usize, 3usize]);
@@ -328,6 +347,39 @@ mod tests {
         let actual =
             decode_events_to_prediction(mwpm, &effective_events, num_observables, neg_obs_mask);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_matches_byte_syndrome_decode() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let syndrome = vec![0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let expected = matching.decode(&syndrome);
+
+        let mut packed_out = vec![0xAA];
+        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut packed_out);
+
+        assert_eq!(expected, vec![1]);
+        assert_eq!(packed_out, vec![1]);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_reuses_matching_buffers_after_warmup() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let mut out = Vec::new();
+        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut out);
+
+        reset_allocation_count();
+        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut out);
+
+        assert_eq!(allocation_count(), 0);
     }
 
     #[test]
