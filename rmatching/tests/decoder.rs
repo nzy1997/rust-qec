@@ -125,3 +125,20 @@ error(0.05) d1
     assert_eq!(second.len(), 2);
     assert_eq!(second, vec![0b0000_0000, 0b0000_0001]);
 }
+
+#[test]
+fn mwpm_decoder_zero_fills_when_requested_obs_width_exceeds_dem() {
+    let compiled = compile_test_decoder(
+        "\
+error(0.1) d0 l0
+error(0.05) d0
+",
+    );
+
+    let num_dets: usize = 1;
+    let requested_num_obs: usize = 9;
+    let result = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, num_dets, requested_num_obs);
+
+    assert_eq!(result.len(), requested_num_obs.div_ceil(8));
+    assert_eq!(result, vec![0b0000_0001, 0b0000_0000]);
+}
