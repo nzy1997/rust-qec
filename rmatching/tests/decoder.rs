@@ -142,3 +142,19 @@ error(0.05) d0
     assert_eq!(result.len(), requested_num_obs.div_ceil(8));
     assert_eq!(result, vec![0b0000_0001, 0b0000_0000]);
 }
+
+#[test]
+fn mwpm_decoder_zero_fills_declared_but_unused_observable_width() {
+    let compiled = compile_test_decoder(
+        "\
+error(0.1) d0 l0
+error(0.05) d0
+logical_observable L8
+",
+    );
+
+    let result = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 1, 9);
+
+    assert_eq!(result.len(), 2);
+    assert_eq!(result, vec![0b0000_0001, 0b0000_0000]);
+}
