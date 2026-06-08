@@ -147,6 +147,8 @@ impl Matching {
         let detection_events_buf = &mut self.detection_events_buf;
         let effective_events_buf = &mut self.effective_events_buf;
         let mwpm = user_graph.get_mwpm();
+        let graph_num_observables = mwpm.flooder.graph.num_observables;
+        debug_assert_eq!(num_obs, graph_num_observables);
         let neg_obs_mask =
             compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
 
@@ -161,7 +163,7 @@ impl Matching {
         process_timeline_until_completion(mwpm, effective_events_buf);
         let mut res = shatter_and_extract(mwpm, effective_events_buf);
         res.obs_mask ^= neg_obs_mask;
-        obs_mask_to_bit_packed_predictions_into(res.obs_mask, num_obs, out);
+        obs_mask_to_bit_packed_predictions_into(res.obs_mask, graph_num_observables, out);
         mwpm.reset();
     }
 
