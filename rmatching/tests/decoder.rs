@@ -58,17 +58,19 @@ error(0.05) d8
 
     let num_dets: usize = 9;
     let num_obs: usize = 1;
-    let num_shots: usize = 2;
+    let num_shots: usize = 3;
     let dets = vec![
         0b0000_0000, 0b0000_0001, // shot 1: only D8 fires
         0b0000_0001, 0b0000_0000, // shot 2: only D0 fires
+        0b0000_0000, 0b1000_0000, // shot 3: only a padding bit after D8 is set
     ];
 
     let result = compiled.decode_shots_bit_packed(&dets, num_shots, num_dets, num_obs);
 
-    assert_eq!(result.len(), 2);
+    assert_eq!(result.len(), 3);
     assert_eq!(result[0] & 1, 1, "D8 must decode through the second input byte");
     assert_eq!(result[1] & 1, 0, "D0 should not flip L0 in this DEM");
+    assert_eq!(result[2] & 1, 0, "padding bits beyond num_dets must be ignored");
 }
 
 #[test]
@@ -113,10 +115,13 @@ error(0.05) d1
 
     let num_dets: usize = 2;
     let num_obs: usize = 9;
-    let dets = vec![0b0000_0001, 0b0000_0010];
+    let first_dets = vec![0b0000_0001, 0b0000_0010];
+    let second_dets = vec![0b0000_0010];
 
-    let first = compiled.decode_shots_bit_packed(&dets, 2, num_dets, num_obs);
-    let second = compiled.decode_shots_bit_packed(&dets, 2, num_dets, num_obs);
+    let first = compiled.decode_shots_bit_packed(&first_dets, 2, num_dets, num_obs);
+    let second = compiled.decode_shots_bit_packed(&second_dets, 1, num_dets, num_obs);
 
-    assert_eq!(second, first);
+    assert_eq!(first, vec![0b0000_0001, 0b0000_0000, 0b0000_0000, 0b0000_0001]);
+    assert_eq!(second.len(), 2);
+    assert_eq!(second, vec![0b0000_0000, 0b0000_0001]);
 }
