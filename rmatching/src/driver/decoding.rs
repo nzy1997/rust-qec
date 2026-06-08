@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn packed_dets_to_detection_events_handles_cross_byte_bits() {
-        let packed = [0b0000_0101u8, 0b1111_0010u8];
+        let packed = [0b0000_0101u8, 0b1111_1110u8];
         let mut out = vec![999];
 
         packed_dets_to_detection_events_into(&packed, 10, &mut out);
@@ -373,13 +373,18 @@ mod tests {
         matching.add_boundary_edge(0, 3.0, &[], 0.05);
         matching.add_boundary_edge(8, 3.0, &[0], 0.05);
 
+        let warmup_packed = [0u8, 1u8];
+        let second_packed = [1u8, 0u8];
+        let expected_second = matching.decode(&[1, 0, 0, 0, 0, 0, 0, 0, 0]);
         let mut out = Vec::new();
-        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut out);
+        matching.decode_bit_packed_into(&warmup_packed, 9, 1, &mut out);
+        out[0] = 0xAA;
 
         reset_allocation_count();
-        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut out);
+        matching.decode_bit_packed_into(&second_packed, 9, 1, &mut out);
 
-        assert_eq!(out, vec![1]);
+        assert_eq!(expected_second, vec![0]);
+        assert_eq!(out, expected_second);
         assert_eq!(allocation_count(), 0);
     }
 
