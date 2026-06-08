@@ -136,6 +136,10 @@ impl Matching {
         out.truncate(syndromes.len());
     }
 
+    pub(crate) fn graph_num_observables(&mut self) -> usize {
+        self.user_graph.get_mwpm().flooder.graph.num_observables
+    }
+
     pub(crate) fn decode_bit_packed_into(
         &mut self,
         packed_dets: &[u8],
@@ -448,6 +452,20 @@ mod tests {
         assert_eq!(expected_second.as_slice(), &[0]);
         assert_eq!(out, expected_second);
         assert_eq!(allocation_count(), 0);
+    }
+
+    #[test]
+    fn graph_num_observables_ignores_declared_but_unused_dem_observables() {
+        let mut matching = Matching::from_dem(
+            "\
+error(0.1) D0 L0
+error(0.05) D0
+logical_observable L8
+",
+        )
+        .unwrap();
+
+        assert_eq!(matching.graph_num_observables(), 1);
     }
 
     #[test]

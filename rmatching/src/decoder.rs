@@ -62,10 +62,9 @@ impl CompiledDecoder for CompiledMwpmDecoder {
 impl Decoder for MwpmDecoder {
     fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
         let mut matching = Matching::from_dem(&dem.to_string()).unwrap();
-        let mut graph_prediction_buf = Vec::new();
-        matching.decode_into(&[], &mut graph_prediction_buf);
+        let graph_num_obs = matching.graph_num_observables();
         Box::new(CompiledMwpmDecoder {
-            graph_num_obs: graph_prediction_buf.len(),
+            graph_num_obs,
             state: Mutex::new(CompiledMwpmDecoderState {
                 matching,
                 packed_prediction_buf: Vec::new(),
