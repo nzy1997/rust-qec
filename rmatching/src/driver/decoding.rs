@@ -136,6 +136,35 @@ impl Matching {
         out.truncate(syndromes.len());
     }
 
+    pub(crate) fn decode_bit_packed_into(
+        &mut self,
+        packed_dets: &[u8],
+        num_dets: usize,
+        num_obs: usize,
+        out: &mut Vec<u8>,
+    ) {
+        let user_graph = &mut self.user_graph;
+        let detection_events_buf = &mut self.detection_events_buf;
+        let effective_events_buf = &mut self.effective_events_buf;
+        let mwpm = user_graph.get_mwpm();
+        let neg_obs_mask =
+            compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
+
+        packed_dets_to_detection_events_into(packed_dets, num_dets, detection_events_buf);
+        apply_negative_weight_events_into(
+            detection_events_buf,
+            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.is_user_graph_boundary_node,
+            effective_events_buf,
+        );
+
+        process_timeline_until_completion(mwpm, effective_events_buf);
+        let mut res = shatter_and_extract(mwpm, effective_events_buf);
+        res.obs_mask ^= neg_obs_mask;
+        obs_mask_to_bit_packed_predictions_into(res.obs_mask, num_obs, out);
+        mwpm.reset();
+    }
+
     /// Decode a syndrome and return matched pairs as `(node1, node2)`.
     /// Boundary matches use `-1` for the boundary node.
     pub fn decode_to_edges(&mut self, syndrome: &[u8]) -> Vec<(i64, i64)> {
@@ -211,6 +240,37 @@ fn syndrome_to_detection_events_into(syndrome: &[u8], out: &mut Vec<usize>) {
             .filter(|(_, v)| **v != 0)
             .map(|(i, _)| i),
     );
+}
+
+fn packed_dets_to_detection_events_into(packed: &[u8], num_dets: usize, out: &mut Vec<usize>) {
+    out.clear();
+    let det_bytes = num_dets.div_ceil(8);
+    for (byte_index, &byte) in packed.iter().take(det_bytes).enumerate() {
+        let mut bits = byte;
+        while bits != 0 {
+            let bit = bits.trailing_zeros() as usize;
+            let det = byte_index * 8 + bit;
+            if det < num_dets {
+                out.push(det);
+            }
+            bits &= bits - 1;
+        }
+    }
+}
+
+fn obs_mask_to_bit_packed_predictions_into(
+    obs_mask: ObsMask,
+    num_observables: usize,
+    out: &mut Vec<u8>,
+) {
+    let obs_bytes = num_observables.div_ceil(8);
+    out.clear();
+    out.resize(obs_bytes, 0);
+    for obs in 0..num_observables.min(64) {
+        if ((obs_mask >> obs) & 1) != 0 {
+            out[obs / 8] |= 1 << (obs % 8);
+        }
+    }
 }
 
 fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMask {
@@ -374,8 +434,8 @@ mod tests {
         matching.add_boundary_edge(8, 3.0, &[0], 0.05);
 
         let warmup_packed = [0u8, 1u8];
-        let second_packed = [1u8, 0u8];
-        let expected_second = matching.decode(&[1, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let second_packed = [0u8, 0u8];
+        let expected_second = matching.decode(&[0, 0, 0, 0, 0, 0, 0, 0, 0]);
         let mut out = Vec::new();
         matching.decode_bit_packed_into(&warmup_packed, 9, 1, &mut out);
         out[0] = 0xAA;
@@ -383,7 +443,7 @@ mod tests {
         reset_allocation_count();
         matching.decode_bit_packed_into(&second_packed, 9, 1, &mut out);
 
-        assert_eq!(expected_second, vec![0]);
+        assert_eq!(expected_second.as_slice(), &[0]);
         assert_eq!(out, expected_second);
         assert_eq!(allocation_count(), 0);
     }
