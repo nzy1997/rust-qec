@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn packed_dets_to_detection_events_handles_cross_byte_bits() {
-        let packed = [0b0000_0101u8, 0b0000_0010u8];
+        let packed = [0b0000_0101u8, 0b1111_0010u8];
         let mut out = vec![999];
 
         packed_dets_to_detection_events_into(&packed, 10, &mut out);
@@ -379,6 +379,7 @@ mod tests {
         reset_allocation_count();
         matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut out);
 
+        assert_eq!(out, vec![1]);
         assert_eq!(allocation_count(), 0);
     }
 
