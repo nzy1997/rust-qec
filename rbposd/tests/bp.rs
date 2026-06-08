@@ -54,6 +54,42 @@ fn minimum_sum_keeps_a_converged_solution_when_early_stop_is_disabled() {
 }
 
 #[test]
+fn minimum_sum_decoder_reuses_one_instance_for_multiple_syndromes() {
+    let pcm = repetition_pcm();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::Bsc { error_rate: 0.05 },
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let cases = [
+        (
+            Syndrome::from(vec![true, false, false, false]),
+            Correction::from(vec![true, false, false, false, false]),
+        ),
+        (
+            Syndrome::from(vec![false, true, false, false]),
+            Correction::from(vec![true, true, false, false, false]),
+        ),
+        (
+            Syndrome::from(vec![false, false, true, false]),
+            Correction::from(vec![false, false, false, true, true]),
+        ),
+    ];
+
+    for _ in 0..3 {
+        for (syndrome, expected) in &cases {
+            let result = decoder.decode(syndrome).unwrap();
+            assert!(result.converged);
+            assert!(!result.used_osd);
+            assert_eq!(result.correction, *expected);
+            assert_eq!(pcm.multiply(&result.correction), syndrome.clone());
+        }
+    }
+}
+
+#[test]
 fn zero_syndrome_can_return_a_prior_favored_nullspace_correction() {
     let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
     let decoder = BpOsdDecoder::new(
