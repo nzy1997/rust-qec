@@ -523,6 +523,22 @@ mod tests {
     }
 
     #[test]
+    fn decode_negative_weight_graph_keeps_byte_and_packed_paths_aligned() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 1, -1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 2.0, &[], 0.1);
+        matching.add_boundary_edge(1, 2.0, &[], 0.1);
+
+        let syndrome = vec![1u8, 0u8];
+        let expected = matching.decode(&syndrome);
+        let mut packed_out = vec![0xAA];
+
+        matching.decode_bit_packed_into(&[0b0000_0001], 2, 1, &mut packed_out);
+
+        assert_eq!(packed_out, vec![expected[0]]);
+    }
+
+    #[test]
     fn decode_bit_packed_into_reuses_matching_buffers_after_warmup() {
         let mut matching = Matching::new();
         matching.add_edge(0, 8, 1.0, &[0], 0.1);
