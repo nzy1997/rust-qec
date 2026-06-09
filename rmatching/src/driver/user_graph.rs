@@ -230,6 +230,7 @@ impl UserGraph {
             }
         }
 
+        mg.finalize_derived_state();
         mg
     }
 

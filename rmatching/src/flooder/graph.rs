@@ -10,6 +10,10 @@ pub struct MatchingGraph {
     pub nodes: Vec<DetectorNode>,
     pub num_observables: usize,
     pub negative_weight_detection_events_set: HashSet<usize>,
+    /// Derived, sorted cache of `negative_weight_detection_events_set`.
+    /// Finalize with `finalize_derived_state()` after graph construction and
+    /// before decode-time consumers read this cache.
+    pub negative_weight_detection_events_sorted: Vec<usize>,
     pub negative_weight_observables_set: HashSet<usize>,
     pub negative_weight_obs_mask: ObsMask,
     pub negative_weight_sum: TotalWeight,
@@ -23,6 +27,7 @@ impl MatchingGraph {
             nodes: (0..num_nodes).map(|_| DetectorNode::new()).collect(),
             num_observables,
             negative_weight_detection_events_set: HashSet::new(),
+            negative_weight_detection_events_sorted: Vec::new(),
             negative_weight_observables_set: HashSet::new(),
             negative_weight_obs_mask: 0,
             negative_weight_sum: 0,
@@ -107,5 +112,14 @@ impl MatchingGraph {
         self.nodes[u].neighbors.push(BOUNDARY_NODE);
         self.nodes[u].neighbor_weights.push(abs_weight);
         self.nodes[u].neighbor_observables.push(obs_mask);
+    }
+
+    /// Refresh derived caches after all edge insertions are complete.
+    pub fn finalize_derived_state(&mut self) {
+        self.negative_weight_detection_events_sorted.clear();
+        self.negative_weight_detection_events_sorted.extend(
+            self.negative_weight_detection_events_set.iter().copied(),
+        );
+        self.negative_weight_detection_events_sorted.sort_unstable();
     }
 }
