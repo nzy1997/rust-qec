@@ -387,6 +387,40 @@ mod tests {
     }
 
     #[test]
+    fn apply_negative_weight_events_into_merges_sorted_inputs_without_hashing() {
+        let detection_events = vec![1, 3, 6];
+        let neg_det_sorted = vec![0, 3, 4, 7];
+        let is_boundary = vec![false; 8];
+        let mut out = vec![999];
+
+        apply_negative_weight_events_into(
+            &detection_events,
+            &neg_det_sorted,
+            &is_boundary,
+            &mut out,
+        );
+
+        assert_eq!(out, vec![0, 1, 4, 6, 7]);
+    }
+
+    #[test]
+    fn apply_negative_weight_events_into_filters_boundary_nodes_from_both_inputs() {
+        let detection_events = vec![0, 2, 5];
+        let neg_det_sorted = vec![1, 2, 4, 6];
+        let is_boundary = vec![false, true, false, false, true, false, false];
+        let mut out = vec![999];
+
+        apply_negative_weight_events_into(
+            &detection_events,
+            &neg_det_sorted,
+            &is_boundary,
+            &mut out,
+        );
+
+        assert_eq!(out, vec![0, 5, 6]);
+    }
+
+    #[test]
     fn decode_events_to_prediction_matches_public_decode() {
         let mut matching = Matching::new();
         matching.add_edge(0, 1, 1.0, &[0], 0.1);
