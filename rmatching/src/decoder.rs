@@ -8,8 +8,14 @@ use crate::Matching;
 /// MWPM decoder implementing rsinter's `Decoder` trait.
 pub struct MwpmDecoder;
 
+struct CompiledMwpmDecoderState {
+    matching: Matching,
+    packed_prediction_buf: Vec<u8>,
+}
+
 struct CompiledMwpmDecoder {
-    matching: Mutex<Matching>,
+    graph_num_obs: usize,
+    state: Mutex<CompiledMwpmDecoderState>,
 }
 
 impl CompiledDecoder for CompiledMwpmDecoder {
@@ -20,33 +26,33 @@ impl CompiledDecoder for CompiledMwpmDecoder {
         num_dets: usize,
         num_obs: usize,
     ) -> Vec<u8> {
-        let det_bytes = (num_dets + 7) / 8;
-        let obs_bytes = (num_obs + 7) / 8;
-        let mut out = Vec::with_capacity(num_shots * obs_bytes);
-        let mut matching = self.matching.lock().unwrap();
-        let mut predictions = Vec::new();
+        let det_bytes = num_dets.div_ceil(8);
+        let obs_bytes = num_obs.div_ceil(8);
+        let graph_obs_bytes = self.graph_num_obs.div_ceil(8);
+        let mut out = vec![0u8; num_shots * obs_bytes];
+        let mut state = self.state.lock().unwrap();
 
         for shot in 0..num_shots {
-            let shot_dets = &dets[shot * det_bytes..(shot + 1) * det_bytes];
+            let det_start = shot * det_bytes;
+            let det_end = det_start + det_bytes;
+            let CompiledMwpmDecoderState {
+                matching,
+                packed_prediction_buf,
+            } = &mut *state;
+            matching.decode_bit_packed_into(
+                &dets[det_start..det_end],
+                num_dets,
+                self.graph_num_obs,
+                packed_prediction_buf,
+            );
+            let shot_out = &mut out[shot * obs_bytes..(shot + 1) * obs_bytes];
+            let copied_bytes = graph_obs_bytes.min(obs_bytes);
+            shot_out[..copied_bytes].copy_from_slice(&packed_prediction_buf[..copied_bytes]);
 
-            // Unpack bit-packed detectors into one-byte-per-detector syndrome
-            let mut syndrome = vec![0u8; num_dets];
-            for d in 0..num_dets {
-                if shot_dets[d / 8] & (1 << (d % 8)) != 0 {
-                    syndrome[d] = 1;
-                }
+            if obs_bytes > 0 && num_obs % 8 != 0 {
+                let tail_mask = (1u8 << (num_obs % 8)) - 1;
+                shot_out[obs_bytes - 1] &= tail_mask;
             }
-
-            matching.decode_into(&syndrome, &mut predictions);
-
-            // Pack predictions into bit-packed format
-            let mut packed = vec![0u8; obs_bytes];
-            for (o, &val) in predictions.iter().enumerate() {
-                if val != 0 {
-                    packed[o / 8] |= 1 << (o % 8);
-                }
-            }
-            out.extend_from_slice(&packed);
         }
 
         out
@@ -55,9 +61,14 @@ impl CompiledDecoder for CompiledMwpmDecoder {
 
 impl Decoder for MwpmDecoder {
     fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-        let matching = Matching::from_dem(&dem.to_string()).unwrap();
+        let mut matching = Matching::from_dem(&dem.to_string()).unwrap();
+        let graph_num_obs = matching.graph_num_observables();
         Box::new(CompiledMwpmDecoder {
-            matching: Mutex::new(matching),
+            graph_num_obs,
+            state: Mutex::new(CompiledMwpmDecoderState {
+                matching,
+                packed_prediction_buf: Vec::new(),
+            }),
         })
     }
 }

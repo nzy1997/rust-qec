@@ -136,6 +136,41 @@ impl Matching {
         out.truncate(syndromes.len());
     }
 
+    pub(crate) fn graph_num_observables(&mut self) -> usize {
+        self.user_graph.get_mwpm().flooder.graph.num_observables
+    }
+
+    pub(crate) fn decode_bit_packed_into(
+        &mut self,
+        packed_dets: &[u8],
+        num_dets: usize,
+        num_obs: usize,
+        out: &mut Vec<u8>,
+    ) {
+        let user_graph = &mut self.user_graph;
+        let detection_events_buf = &mut self.detection_events_buf;
+        let effective_events_buf = &mut self.effective_events_buf;
+        let mwpm = user_graph.get_mwpm();
+        let graph_num_observables = mwpm.flooder.graph.num_observables;
+        debug_assert_eq!(num_obs, graph_num_observables);
+        let neg_obs_mask =
+            compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
+
+        packed_dets_to_detection_events_into(packed_dets, num_dets, detection_events_buf);
+        apply_negative_weight_events_into(
+            detection_events_buf,
+            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.is_user_graph_boundary_node,
+            effective_events_buf,
+        );
+
+        process_timeline_until_completion(mwpm, effective_events_buf);
+        let mut res = shatter_and_extract(mwpm, effective_events_buf);
+        res.obs_mask ^= neg_obs_mask;
+        obs_mask_to_bit_packed_predictions_into(res.obs_mask, graph_num_observables, out);
+        mwpm.reset();
+    }
+
     /// Decode a syndrome and return matched pairs as `(node1, node2)`.
     /// Boundary matches use `-1` for the boundary node.
     pub fn decode_to_edges(&mut self, syndrome: &[u8]) -> Vec<(i64, i64)> {
@@ -213,6 +248,37 @@ fn syndrome_to_detection_events_into(syndrome: &[u8], out: &mut Vec<usize>) {
     );
 }
 
+fn packed_dets_to_detection_events_into(packed: &[u8], num_dets: usize, out: &mut Vec<usize>) {
+    out.clear();
+    let det_bytes = num_dets.div_ceil(8);
+    for (byte_index, &byte) in packed.iter().take(det_bytes).enumerate() {
+        let mut bits = byte;
+        while bits != 0 {
+            let bit = bits.trailing_zeros() as usize;
+            let det = byte_index * 8 + bit;
+            if det < num_dets {
+                out.push(det);
+            }
+            bits &= bits - 1;
+        }
+    }
+}
+
+fn obs_mask_to_bit_packed_predictions_into(
+    obs_mask: ObsMask,
+    num_observables: usize,
+    out: &mut Vec<u8>,
+) {
+    let obs_bytes = num_observables.div_ceil(8);
+    out.clear();
+    out.resize(obs_bytes, 0);
+    for obs in 0..num_observables.min(64) {
+        if ((obs_mask >> obs) & 1) != 0 {
+            out[obs / 8] |= 1 << (obs % 8);
+        }
+    }
+}
+
 fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMask {
     let mut mask: ObsMask = 0;
     for &obs in neg_obs_set {
@@ -285,6 +351,25 @@ mod tests {
     }
 
     #[test]
+    fn packed_dets_to_detection_events_handles_cross_byte_bits() {
+        let packed = [0b0000_0101u8, 0b1111_1110u8];
+        let mut out = vec![999];
+
+        packed_dets_to_detection_events_into(&packed, 10, &mut out);
+
+        assert_eq!(out, vec![0, 2, 9]);
+    }
+
+    #[test]
+    fn obs_mask_to_bit_packed_predictions_into_clears_stale_bits() {
+        let mut out = vec![0xFF, 0xFF];
+
+        obs_mask_to_bit_packed_predictions_into(1u64 << 8, 9, &mut out);
+
+        assert_eq!(out, vec![0, 1]);
+    }
+
+    #[test]
     fn apply_negative_weight_events_into_filters_and_sorts() {
         let detection_events = vec![0, 2, 4];
         let neg_det_set = HashSet::from([2usize, 3usize]);
@@ -328,6 +413,59 @@ mod tests {
         let actual =
             decode_events_to_prediction(mwpm, &effective_events, num_observables, neg_obs_mask);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_matches_byte_syndrome_decode() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let syndrome = vec![0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let expected = matching.decode(&syndrome);
+
+        let mut packed_out = vec![0xAA];
+        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut packed_out);
+
+        assert_eq!(expected, vec![1]);
+        assert_eq!(packed_out, vec![1]);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_reuses_matching_buffers_after_warmup() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let warmup_packed = [0u8, 1u8];
+        let second_packed = [0u8, 0u8];
+        let expected_second = matching.decode(&[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let mut out = Vec::new();
+        matching.decode_bit_packed_into(&warmup_packed, 9, 1, &mut out);
+        out[0] = 0xAA;
+
+        reset_allocation_count();
+        matching.decode_bit_packed_into(&second_packed, 9, 1, &mut out);
+
+        assert_eq!(expected_second.as_slice(), &[0]);
+        assert_eq!(out, expected_second);
+        assert_eq!(allocation_count(), 0);
+    }
+
+    #[test]
+    fn graph_num_observables_ignores_declared_but_unused_dem_observables() {
+        let mut matching = Matching::from_dem(
+            "\
+error(0.1) D0 L0
+error(0.05) D0
+logical_observable L8
+",
+        )
+        .unwrap();
+
+        assert_eq!(matching.graph_num_observables(), 1);
     }
 
     #[test]
