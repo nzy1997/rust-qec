@@ -81,7 +81,7 @@ impl Matching {
         syndrome_to_detection_events_into(syndrome, detection_events_buf);
         apply_negative_weight_events_into(
             detection_events_buf,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             effective_events_buf,
         );
@@ -120,7 +120,7 @@ impl Matching {
             syndrome_to_detection_events_into(syndrome, detection_events_buf);
             apply_negative_weight_events_into(
                 detection_events_buf,
-                &mwpm.flooder.graph.negative_weight_detection_events_set,
+                &mwpm.flooder.graph.negative_weight_detection_events_sorted,
                 &mwpm.flooder.graph.is_user_graph_boundary_node,
                 effective_events_buf,
             );
@@ -159,7 +159,7 @@ impl Matching {
         packed_dets_to_detection_events_into(packed_dets, num_dets, detection_events_buf);
         apply_negative_weight_events_into(
             detection_events_buf,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             effective_events_buf,
         );
@@ -180,7 +180,7 @@ impl Matching {
 
         let effective_events = apply_negative_weight_events(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
         );
 
@@ -291,22 +291,26 @@ fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMa
 /// detection events, filtering out user-graph boundary nodes.
 fn apply_negative_weight_events(
     detection_events: &[usize],
-    neg_det_set: &std::collections::HashSet<usize>,
+    neg_det_sorted: &[usize],
     is_boundary: &[bool],
 ) -> Vec<usize> {
     let mut result = Vec::new();
-    apply_negative_weight_events_into(detection_events, neg_det_set, is_boundary, &mut result);
+    apply_negative_weight_events_into(
+        detection_events,
+        neg_det_sorted,
+        is_boundary,
+        &mut result,
+    );
     result
 }
 
 fn apply_negative_weight_events_into(
     detection_events: &[usize],
-    neg_det_set: &std::collections::HashSet<usize>,
+    neg_det_sorted: &[usize],
     is_boundary: &[bool],
     out: &mut Vec<usize>,
 ) {
-    if neg_det_set.is_empty() {
-        // Fast path: filter out boundary nodes only
+    if neg_det_sorted.is_empty() {
         out.clear();
         out.extend(
             detection_events
@@ -317,27 +321,53 @@ fn apply_negative_weight_events_into(
         return;
     }
 
-    // Symmetric difference via XOR-toggle in a set
-    let mut active: std::collections::HashSet<usize> = detection_events.iter().copied().collect();
-    for &d in neg_det_set {
-        if !active.remove(&d) {
-            active.insert(d);
+    out.clear();
+    let mut det_i = 0;
+    let mut neg_i = 0;
+
+    while det_i < detection_events.len() && neg_i < neg_det_sorted.len() {
+        let det = detection_events[det_i];
+        let neg = neg_det_sorted[neg_i];
+
+        if det == neg {
+            det_i += 1;
+            neg_i += 1;
+            continue;
+        }
+
+        let candidate = if det < neg {
+            det_i += 1;
+            det
+        } else {
+            neg_i += 1;
+            neg
+        };
+
+        if candidate >= is_boundary.len() || !is_boundary[candidate] {
+            out.push(candidate);
         }
     }
 
-    out.clear();
-    out.extend(
-        active
-            .into_iter()
-            .filter(|&d| d >= is_boundary.len() || !is_boundary[d]),
-    );
-    out.sort_unstable();
+    while det_i < detection_events.len() {
+        let det = detection_events[det_i];
+        det_i += 1;
+        if det >= is_boundary.len() || !is_boundary[det] {
+            out.push(det);
+        }
+    }
+
+    while neg_i < neg_det_sorted.len() {
+        let neg = neg_det_sorted[neg_i];
+        neg_i += 1;
+        if neg >= is_boundary.len() || !is_boundary[neg] {
+            out.push(neg);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use crate::test_alloc::{allocation_count, reset_allocation_count};
 
     #[test]
@@ -372,13 +402,13 @@ mod tests {
     #[test]
     fn apply_negative_weight_events_into_filters_and_sorts() {
         let detection_events = vec![0, 2, 4];
-        let neg_det_set = HashSet::from([2usize, 3usize]);
+        let neg_det_sorted = vec![2usize, 3usize];
         let is_boundary = vec![false, false, false, true, false];
         let mut out = vec![999];
 
         apply_negative_weight_events_into(
             &detection_events,
-            &neg_det_set,
+            &neg_det_sorted,
             &is_boundary,
             &mut out,
         );
@@ -421,6 +451,21 @@ mod tests {
     }
 
     #[test]
+    fn negative_weight_detector_cache_is_sorted_after_graph_build() {
+        let mut matching = Matching::new();
+        matching.add_edge(5, 1, -1.0, &[], 0.1);
+        matching.add_edge(3, 5, -1.0, &[], 0.1);
+        matching.add_boundary_edge(2, -1.0, &[], 0.1);
+
+        let mwpm = matching.user_graph.get_mwpm();
+
+        assert_eq!(
+            mwpm.flooder.graph.negative_weight_detection_events_sorted,
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
     fn decode_events_to_prediction_matches_public_decode() {
         let mut matching = Matching::new();
         matching.add_edge(0, 1, 1.0, &[0], 0.1);
@@ -439,7 +484,7 @@ mod tests {
         syndrome_to_detection_events_into(&syndrome, &mut detection_events);
         apply_negative_weight_events_into(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             &mut effective_events,
         );
@@ -520,7 +565,7 @@ logical_observable L8
         syndrome_to_detection_events_into(&syndrome, &mut detection_events);
         apply_negative_weight_events_into(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             &mut effective_events,
         );
