@@ -289,6 +289,8 @@ fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMa
 
 /// Compute the symmetric difference of detection events and negative-weight
 /// detection events, filtering out user-graph boundary nodes.
+///
+/// Precondition: both inputs are strictly increasing unique detector indices.
 fn apply_negative_weight_events(
     detection_events: &[usize],
     neg_det_sorted: &[usize],
@@ -310,6 +312,15 @@ fn apply_negative_weight_events_into(
     is_boundary: &[bool],
     out: &mut Vec<usize>,
 ) {
+    debug_assert!(
+        detection_events.windows(2).all(|w| w[0] < w[1]),
+        "detection_events must be strictly increasing and unique",
+    );
+    debug_assert!(
+        neg_det_sorted.windows(2).all(|w| w[0] < w[1]),
+        "neg_det_sorted must be strictly increasing and unique",
+    );
+
     if neg_det_sorted.is_empty() {
         out.clear();
         out.extend(

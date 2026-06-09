@@ -10,6 +10,9 @@ pub struct MatchingGraph {
     pub nodes: Vec<DetectorNode>,
     pub num_observables: usize,
     pub negative_weight_detection_events_set: HashSet<usize>,
+    /// Derived, sorted cache of `negative_weight_detection_events_set`.
+    /// Finalize with `finalize_derived_state()` after graph construction and
+    /// before decode-time consumers read this cache.
     pub negative_weight_detection_events_sorted: Vec<usize>,
     pub negative_weight_observables_set: HashSet<usize>,
     pub negative_weight_obs_mask: ObsMask,
@@ -111,6 +114,7 @@ impl MatchingGraph {
         self.nodes[u].neighbor_observables.push(obs_mask);
     }
 
+    /// Refresh derived caches after all edge insertions are complete.
     pub fn finalize_derived_state(&mut self) {
         self.negative_weight_detection_events_sorted.clear();
         self.negative_weight_detection_events_sorted.extend(
