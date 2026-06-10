@@ -1,4 +1,5 @@
 pub mod binary;
+pub mod cli;
 pub mod code;
 pub mod codes;
 pub mod css;
