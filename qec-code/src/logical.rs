@@ -37,19 +37,12 @@ pub fn extract_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
         }
     }
 
-    for i in 0..logicals.len() {
-        for j in (i + 1)..logicals.len() {
-            if logicals[i].try_anticommutes_with(&logicals[j])? {
-                return Ok(LogicalBasis {
-                    k,
-                    logical_x: vec![logicals[i].clone()],
-                    logical_z: vec![logicals[j].clone()],
-                });
-            }
-        }
-    }
-
-    Err(QecError::LogicalBasisNotFound)
+    let (logical_x, logical_z) = select_anticommuting_pair(&logicals)?;
+    Ok(LogicalBasis {
+        k,
+        logical_x: vec![logical_x],
+        logical_z: vec![logical_z],
+    })
 }
 
 fn all_paulis(n: usize) -> Result<Vec<Pauli>> {
@@ -76,4 +69,46 @@ fn all_paulis(n: usize) -> Result<Vec<Pauli>> {
     }
 
     Ok(paulis)
+}
+
+fn select_anticommuting_pair(logicals: &[Pauli]) -> Result<(Pauli, Pauli)> {
+    for i in 0..logicals.len() {
+        for j in (i + 1)..logicals.len() {
+            if logicals[i].try_anticommutes_with(&logicals[j])? {
+                return Ok((logicals[i].clone(), logicals[j].clone()));
+            }
+        }
+    }
+
+    Err(QecError::LogicalBasisNotFound)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::select_anticommuting_pair;
+    use crate::{Pauli, QecError};
+
+    #[test]
+    fn select_anticommuting_pair_returns_the_first_found_pair() {
+        let logical_x = Pauli::from_xz_bits(vec![1, 1], vec![0, 0]).unwrap();
+        let logical_z = Pauli::from_xz_bits(vec![0, 0], vec![1, 0]).unwrap();
+        let commuting = Pauli::from_xz_bits(vec![0, 0], vec![0, 1]).unwrap();
+
+        let (x, z) = select_anticommuting_pair(&[logical_x.clone(), logical_z.clone(), commuting])
+            .unwrap();
+
+        assert_eq!(x, logical_x);
+        assert_eq!(z, logical_z);
+    }
+
+    #[test]
+    fn select_anticommuting_pair_reports_when_no_pair_exists() {
+        let x0 = Pauli::from_xz_bits(vec![1, 0], vec![0, 0]).unwrap();
+        let x1 = Pauli::from_xz_bits(vec![0, 1], vec![0, 0]).unwrap();
+
+        assert_eq!(
+            select_anticommuting_pair(&[x0, x1]),
+            Err(QecError::LogicalBasisNotFound)
+        );
+    }
 }

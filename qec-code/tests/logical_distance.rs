@@ -47,6 +47,34 @@ fn logical_basis_rejects_multi_logical_codes_until_supported() {
 }
 
 #[test]
+fn logical_basis_for_zero_logical_qubits_is_empty() {
+    let code = StabilizerCode::from_stabilizers(1, vec![
+        Pauli::from_xz_bits(vec![1], vec![0]).unwrap(),
+    ])
+    .unwrap();
+
+    let basis = extract_logical_basis(&code).unwrap();
+
+    assert_eq!(basis.k, 0);
+    assert!(basis.logical_x.is_empty());
+    assert!(basis.logical_z.is_empty());
+}
+
+#[test]
+fn distance_returns_no_witness_for_zero_logical_qubit_code() {
+    let code = StabilizerCode::from_stabilizers(
+        2,
+        vec![
+            Pauli::from_xz_bits(vec![1, 0], vec![0, 0]).unwrap(),
+            Pauli::from_xz_bits(vec![0, 0], vec![0, 1]).unwrap(),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(compute_distance(&code), Err(QecError::DistanceWitnessNotFound));
+}
+
+#[test]
 fn exhaustive_logical_and_distance_search_reject_large_codes_instead_of_panicking() {
     let stabilizers = (0..31)
         .map(|qubit| {

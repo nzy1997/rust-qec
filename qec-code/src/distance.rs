@@ -87,3 +87,20 @@ fn classify_logical(pauli: &Pauli) -> LogicalClass {
         (false, false) => unreachable!("logical witnesses are non-identity"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LogicalClass, classify_logical};
+    use crate::Pauli;
+
+    #[test]
+    fn classify_logical_distinguishes_x_z_and_mixed_supports() {
+        let x_like = Pauli::from_xz_bits(vec![1, 0], vec![0, 0]).unwrap();
+        let z_like = Pauli::from_xz_bits(vec![0, 0], vec![0, 1]).unwrap();
+        let mixed = Pauli::from_xz_bits(vec![0, 1], vec![0, 1]).unwrap();
+
+        assert_eq!(classify_logical(&x_like), LogicalClass::XLike);
+        assert_eq!(classify_logical(&z_like), LogicalClass::ZLike);
+        assert_eq!(classify_logical(&mixed), LogicalClass::Mixed);
+    }
+}

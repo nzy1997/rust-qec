@@ -14,6 +14,19 @@ fn stabilizer_code_rejects_noncommuting_generators() {
 }
 
 #[test]
+fn stabilizer_code_rejects_generators_with_the_wrong_width() {
+    let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
+
+    assert_eq!(
+        StabilizerCode::from_stabilizers(2, vec![x0]),
+        Err(QecError::InvalidPauliWidth {
+            x_width: 1,
+            z_width: 2,
+        })
+    );
+}
+
+#[test]
 fn stabilizer_code_rejects_dependent_commuting_generators() {
     let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
     let duplicate_x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
@@ -79,4 +92,6 @@ fn steane_exposes_expected_invariants() {
     assert_eq!(code.stabilizer_rank(), 6);
     assert_eq!(code.num_logical_qubits(), 1);
     assert_eq!(code.stabilizers().len(), 6);
+    assert_eq!(code.stabilizer_rows().len(), 6);
+    assert_eq!(code.stabilizer_rows()[0].len(), 14);
 }

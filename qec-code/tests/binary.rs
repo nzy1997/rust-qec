@@ -1,6 +1,9 @@
 use qec_code::Pauli;
 use qec_code::QecError;
-use qec_code::binary::{binary_rank, in_row_span, try_binary_rank, try_in_row_span};
+use qec_code::binary::{
+    binary_rank, eliminate_to_row_echelon, in_row_span, try_binary_rank,
+    try_eliminate_to_row_echelon, try_in_row_span,
+};
 
 #[test]
 fn binary_rank_ignores_dependent_rows() {
@@ -28,6 +31,13 @@ fn in_row_span_for_empty_generator_set_only_contains_zero_vector() {
 
 #[test]
 fn pauli_from_xz_bits_rejects_non_binary_values() {
+    assert_eq!(
+        Pauli::from_xz_bits(vec![1, 0], vec![0]),
+        Err(QecError::InvalidPauliWidth {
+            x_width: 2,
+            z_width: 1,
+        })
+    );
     assert_eq!(
         Pauli::from_xz_bits(vec![2, 0], vec![0, 1]),
         Err(QecError::InvalidPauliBit {
@@ -61,6 +71,40 @@ fn checked_binary_helpers_report_invalid_input_without_panicking() {
             row: 0,
             col: 1,
             value: 2,
+        })
+    );
+}
+
+#[test]
+fn row_echelon_helpers_handle_pivots_elimination_and_input_validation() {
+    let matrix = vec![vec![0, 1, 1], vec![0, 1, 0]];
+
+    assert_eq!(
+        eliminate_to_row_echelon(&matrix),
+        vec![vec![0, 1, 1], vec![0, 0, 1]]
+    );
+    assert_eq!(
+        try_eliminate_to_row_echelon(&matrix),
+        Ok(vec![vec![0, 1, 1], vec![0, 0, 1]])
+    );
+    assert_eq!(
+        try_eliminate_to_row_echelon(&[vec![1, 2]]),
+        Err(QecError::InvalidBinaryEntry {
+            row: 0,
+            col: 1,
+            value: 2,
+        })
+    );
+}
+
+#[test]
+fn checked_row_span_reports_empty_and_width_mismatch_cases() {
+    assert_eq!(try_in_row_span(&[], &[0, 1, 0]), Ok(false));
+    assert_eq!(
+        try_in_row_span(&[vec![1, 0], vec![0, 1]], &[1, 0, 0]),
+        Err(QecError::RowWidthMismatch {
+            expected: 2,
+            actual: 3,
         })
     );
 }
