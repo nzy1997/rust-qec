@@ -1,5 +1,6 @@
 mod ilpqec_adapter;
 mod rbposd_adapter;
+mod rmatching_adapter;
 
 pub mod collect;
 pub mod csv_io;

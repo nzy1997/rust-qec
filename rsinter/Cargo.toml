@@ -9,6 +9,7 @@ gurobi = ["rilpqec/gurobi"]
 
 [dependencies]
 rstim = { path = "../rstim" }
+rmatching = { path = "../rmatching" }
 rbposd = { path = "../rbposd" }
 rilpqec = { path = "../rilpqec" }
 rand = "0.8"

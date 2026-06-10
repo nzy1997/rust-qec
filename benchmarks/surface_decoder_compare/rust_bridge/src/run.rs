@@ -4,8 +4,7 @@ use std::time::Instant;
 use rbposd::DecoderConfig;
 use rilpqec::backend::{BatchBackend, build_batch_backend};
 use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem, lower_dem_to_problem};
-use rmatching::decoder::MwpmDecoder;
-use rsinter::decode::{CompiledDecoder, Decoder, RbposdDemDecoder};
+use rsinter::decode::{CompiledDecoder, Decoder, RbposdDemDecoder, RmatchingDemDecoder};
 use rstim::dem::DetectorErrorModel;
 
 use crate::protocol::{BridgeRequest, BridgeResponse};
@@ -56,7 +55,7 @@ fn try_handle_request(request: BridgeRequest) -> Result<BridgeResponse, String> 
 
     match request.decoder.as_str() {
         "rmatching" => {
-            let decoder = MwpmDecoder;
+            let decoder = RmatchingDemDecoder;
             run_native_decoder(request, dem, dets, obs, "native", &decoder)
         }
         "rbposd" => {
