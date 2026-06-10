@@ -1,4 +1,5 @@
 use rsinter::bench::spec::BenchmarkSpec;
+use std::path::Path;
 
 #[test]
 fn benchmark_spec_parses_minimal_independent_surface_decoder_doc() {
@@ -43,4 +44,24 @@ label = "Logical Error Rate"
     assert_eq!(spec.mode.as_str(), "independent");
     assert_eq!(spec.runners.len(), 1);
     assert_eq!(spec.plot.panels.len(), 1);
+}
+
+#[test]
+fn benchmark_spec_loads_from_toml_fixture() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/minimal_surface_decoder.toml");
+    let text = std::fs::read_to_string(path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    assert_eq!(spec.runners[0].impl_key, "rmatching");
+    assert_eq!(spec.plot.x.field, "params.p");
+}
+
+#[test]
+fn benchmark_spec_rejects_empty_plot_panels() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/invalid_plot.toml");
+    let text = std::fs::read_to_string(path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let err = spec.validate().unwrap_err();
+    assert!(err.contains("at least one plot panel"));
 }

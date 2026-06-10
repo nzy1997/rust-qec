@@ -1,0 +1,51 @@
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3, 5]
+rounds = [3, 5]
+p = [0.002, 0.005]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[[runner]]
+name = "pymatching"
+language = "python"
+impl_key = "pymatching"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.distance"]
+label_template = "{runner} d={params.distance}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+
+[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "log"
+label = "Decode Time Per Shot"
