@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader, Read, Write};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -8,80 +9,45 @@ pub type CaseSummary = BTreeMap<String, Value>;
 pub type ParamMap = BTreeMap<String, Value>;
 pub type MetricMap = BTreeMap<String, f64>;
 
-pub trait PairMapExt<K, V>: Sized {
-    fn from_pairs<I>(pairs: I) -> Self
-    where
-        I: IntoIterator<Item = (K, V)>;
+pub trait PairMapExt<K, V> {
+    fn from_pairs<const N: usize>(pairs: [(K, V); N]) -> Self;
 }
 
-impl<K> PairMapExt<K, String> for BTreeMap<String, String>
-where
-    K: Into<String>,
-{
-    fn from_pairs<I>(pairs: I) -> Self
-    where
-        I: IntoIterator<Item = (K, String)>,
-    {
-        pairs
-            .into_iter()
-            .map(|(key, value)| (key.into(), value))
-            .collect()
+impl PairMapExt<&str, Value> for BTreeMap<String, Value> {
+    fn from_pairs<const N: usize>(pairs: [(&str, Value); N]) -> Self {
+        pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
     }
 }
 
-impl<K> PairMapExt<K, Value> for BTreeMap<String, Value>
-where
-    K: Into<String>,
-{
-    fn from_pairs<I>(pairs: I) -> Self
-    where
-        I: IntoIterator<Item = (K, Value)>,
-    {
-        pairs
-            .into_iter()
-            .map(|(key, value)| (key.into(), value))
-            .collect()
-    }
-}
-
-impl<K> PairMapExt<K, f64> for BTreeMap<String, f64>
-where
-    K: Into<String>,
-{
-    fn from_pairs<I>(pairs: I) -> Self
-    where
-        I: IntoIterator<Item = (K, f64)>,
-    {
-        pairs
-            .into_iter()
-            .map(|(key, value)| (key.into(), value))
-            .collect()
+impl PairMapExt<&str, f64> for MetricMap {
+    fn from_pairs<const N: usize>(pairs: [(&str, f64); N]) -> Self {
+        pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RunManifest {
     pub benchmark: String,
-    pub version: u64,
+    pub benchmark_version: u64,
     pub runner: String,
     pub language: String,
-    pub artifact_dir: String,
+    pub output_dir: String,
 }
 
 impl RunManifest {
     pub fn new(
         benchmark: String,
-        version: u64,
+        benchmark_version: u64,
         runner: String,
         language: String,
-        artifact_dir: String,
+        output_dir: String,
     ) -> Self {
         Self {
             benchmark,
-            version,
+            benchmark_version,
             runner,
             language,
-            artifact_dir,
+            output_dir,
         }
     }
 }
@@ -97,4 +63,29 @@ pub struct BenchmarkResultRow {
     pub metrics: MetricMap,
     pub artifacts: ArtifactMap,
     pub error: Option<String>,
+}
+
+pub fn write_results_jsonl(
+    rows: &[BenchmarkResultRow],
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    for row in rows {
+        serde_json::to_writer(&mut *out, row).map_err(|e| e.to_string())?;
+        out.write_all(b"\n").map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn read_results_jsonl(input: impl Read) -> Result<Vec<BenchmarkResultRow>, String> {
+    let reader = BufReader::new(input);
+    let mut rows = Vec::new();
+    for line in reader.lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let row = serde_json::from_str::<BenchmarkResultRow>(&line).map_err(|e| e.to_string())?;
+        rows.push(row);
+    }
+    Ok(rows)
 }
