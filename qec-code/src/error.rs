@@ -20,6 +20,8 @@ pub enum QecError {
     DependentStabilizers,
     #[error("CSS X/Z checks are not orthogonal")]
     InvalidCssOrthogonality,
+    #[error("logical basis extraction is unsupported for {k} logical qubits")]
+    UnsupportedLogicalBasis { k: usize },
     #[error("logical basis not found")]
     LogicalBasisNotFound,
     #[error("distance witness not found")]

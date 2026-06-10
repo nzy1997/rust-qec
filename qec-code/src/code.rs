@@ -51,6 +51,13 @@ impl StabilizerCode {
         &self.stabilizers
     }
 
+    pub fn stabilizer_rows(&self) -> Vec<Vec<u8>> {
+        self.stabilizers
+            .iter()
+            .map(Pauli::to_symplectic_row)
+            .collect()
+    }
+
     pub fn stabilizer_rank(&self) -> usize {
         self.stabilizer_rank
     }
