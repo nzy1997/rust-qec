@@ -44,10 +44,10 @@ fn all_normalizer_candidates(code: &StabilizerCode) -> Result<Vec<Pauli>> {
     let n = code.n();
     let symplectic_bits = n
         .checked_mul(2)
-        .expect("symplectic width must fit in usize");
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
     let total = 1usize
         .checked_shl(symplectic_bits as u32)
-        .expect("exhaustive Pauli enumeration requires 2n < usize::BITS");
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
     let stabilizer_rows = code.stabilizer_rows();
     let mut candidates = Vec::new();
 

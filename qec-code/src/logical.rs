@@ -26,7 +26,7 @@ pub fn extract_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
     let stabilizer_rows = code.stabilizer_rows();
     let mut logicals = Vec::new();
 
-    for candidate in all_paulis(code.n()) {
+    for candidate in all_paulis(code.n())? {
         if code
             .stabilizers()
             .iter()
@@ -52,13 +52,13 @@ pub fn extract_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
     Err(QecError::LogicalBasisNotFound)
 }
 
-fn all_paulis(n: usize) -> Vec<Pauli> {
+fn all_paulis(n: usize) -> Result<Vec<Pauli>> {
     let symplectic_bits = n
         .checked_mul(2)
-        .expect("symplectic width must fit in usize");
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
     let total = 1usize
         .checked_shl(symplectic_bits as u32)
-        .expect("exhaustive Pauli enumeration requires 2n < usize::BITS");
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
     let mut paulis = Vec::with_capacity(total.saturating_sub(1));
 
     for mask in 1..total {
@@ -75,5 +75,5 @@ fn all_paulis(n: usize) -> Vec<Pauli> {
         );
     }
 
-    paulis
+    Ok(paulis)
 }

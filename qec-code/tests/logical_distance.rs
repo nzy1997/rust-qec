@@ -1,7 +1,7 @@
 use qec_code::codes::steane::Steane;
 use qec_code::distance::compute_distance;
 use qec_code::logical::extract_logical_basis;
-use qec_code::{QecError, StabilizerCode};
+use qec_code::{Pauli, QecError, StabilizerCode};
 
 #[test]
 fn steane_logical_basis_contains_one_anticommuting_pair() {
@@ -43,5 +43,26 @@ fn logical_basis_rejects_multi_logical_codes_until_supported() {
     assert_eq!(
         extract_logical_basis(&code),
         Err(QecError::UnsupportedLogicalBasis { k: 2 })
+    );
+}
+
+#[test]
+fn exhaustive_logical_and_distance_search_reject_large_codes_instead_of_panicking() {
+    let stabilizers = (0..31)
+        .map(|qubit| {
+            let mut z = vec![0; 32];
+            z[qubit] = 1;
+            Pauli::from_xz_bits(vec![0; 32], z).unwrap()
+        })
+        .collect();
+    let code = StabilizerCode::from_stabilizers(32, stabilizers).unwrap();
+
+    assert_eq!(
+        extract_logical_basis(&code),
+        Err(QecError::UnsupportedExhaustiveEnumeration { n: 32 })
+    );
+    assert_eq!(
+        compute_distance(&code),
+        Err(QecError::UnsupportedExhaustiveEnumeration { n: 32 })
     );
 }

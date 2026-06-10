@@ -22,6 +22,8 @@ pub enum QecError {
     InvalidCssOrthogonality,
     #[error("logical basis extraction is unsupported for {k} logical qubits")]
     UnsupportedLogicalBasis { k: usize },
+    #[error("exhaustive Pauli enumeration is unsupported for {n} qubits on this target")]
+    UnsupportedExhaustiveEnumeration { n: usize },
     #[error("logical basis not found")]
     LogicalBasisNotFound,
     #[error("distance witness not found")]
