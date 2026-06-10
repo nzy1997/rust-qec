@@ -128,6 +128,13 @@ The timing numbers below are median wall-clock times over 5 local runs on one
 development machine, so they should be treated as illustrative instead of a
 portable benchmark.
 
+The repository also includes a reusable `rsinter` benchmark framework. The
+current migrated example is the surface decoder benchmark:
+
+```sh
+make bench-surface-smoke
+```
+
 | Case | Gen | DEM | Max Rel Error | Stim Gen ms | rstim Gen ms | Stim DEM ms | rstim DEM ms | Gen Ratio | DEM Ratio |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | repetition_code/memory d=5 r=5 | normalized | match | 2.032e-16 | 18.794 | 1.852 | 19.482 | 2.449 | 0.10x | 0.13x |

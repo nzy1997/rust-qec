@@ -65,10 +65,7 @@ pub struct BenchmarkResultRow {
     pub error: Option<String>,
 }
 
-pub fn write_results_jsonl(
-    rows: &[BenchmarkResultRow],
-    out: &mut dyn Write,
-) -> Result<(), String> {
+pub fn write_results_jsonl(rows: &[BenchmarkResultRow], out: &mut dyn Write) -> Result<(), String> {
     for row in rows {
         serde_json::to_writer(&mut *out, row).map_err(|e| e.to_string())?;
         out.write_all(b"\n").map_err(|e| e.to_string())?;
