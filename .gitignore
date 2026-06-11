@@ -13,6 +13,9 @@ Cargo.lock
 /benchmarks/out/
 **/__pycache__/
 .cursor/
+.venv-surface-decoder/
+__pycache__/
+*.pyc
 
 # Coverage reports
 .coverage

@@ -23,13 +23,28 @@ python3 -m venv .venv-surface-decoder
 
 ## Run
 
+Comparison benchmark:
+
+```bash
+make surface-decoder-compare-smoke
+make surface-decoder-compare-full
+```
+
+Both commands write `results.csv` and `surface_decoder_compare.png` under
+`benchmarks/surface_decoder_compare/results/<tier>/`.
+
+Only the `full` tier artifacts are tracked in git. The `smoke` tier is for
+local iteration and is ignored.
+
+`rsinter` framework flow:
+
 ```bash
 make bench-surface-smoke
 make bench-surface-full
 ```
 
-Both commands now route through the `rsinter` benchmark framework. Rust runners
-are executed by the `rsinter` CLI, Python runners are executed by the Python
+These commands route through the `rsinter` benchmark framework. Rust runners are
+executed by the `rsinter` CLI, Python runners are executed by the Python
 benchmark entrypoint, and the final merged plot is rendered by `rsinter`.
 Artifacts are written under `benchmarks/out/surface_decoder/`.
 

@@ -81,7 +81,7 @@ impl Matching {
         syndrome_to_detection_events_into(syndrome, detection_events_buf);
         apply_negative_weight_events_into(
             detection_events_buf,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             effective_events_buf,
         );
@@ -120,7 +120,7 @@ impl Matching {
             syndrome_to_detection_events_into(syndrome, detection_events_buf);
             apply_negative_weight_events_into(
                 detection_events_buf,
-                &mwpm.flooder.graph.negative_weight_detection_events_set,
+                &mwpm.flooder.graph.negative_weight_detection_events_sorted,
                 &mwpm.flooder.graph.is_user_graph_boundary_node,
                 effective_events_buf,
             );
@@ -154,7 +154,12 @@ impl Matching {
             let det_offset = shot * det_bytes;
             let shot_dets = &dets[det_offset..det_offset + det_bytes];
             let shot_out = &mut out[shot * obs_bytes..(shot + 1) * obs_bytes];
-            self.decode_bit_packed_into(shot_dets, num_dets, &mut packed_prediction);
+            self.decode_bit_packed_into(
+                shot_dets,
+                num_dets,
+                graph_num_observables,
+                &mut packed_prediction,
+            );
             shot_out.fill(0);
             let copied_bytes = shot_out.len().min(packed_prediction.len());
             shot_out[..copied_bytes].copy_from_slice(&packed_prediction[..copied_bytes]);
@@ -164,14 +169,15 @@ impl Matching {
         out
     }
 
-    fn graph_num_observables(&mut self) -> usize {
+    pub fn graph_num_observables(&mut self) -> usize {
         self.user_graph.get_mwpm().flooder.graph.num_observables
     }
 
-    fn decode_bit_packed_into(
+    pub(crate) fn decode_bit_packed_into(
         &mut self,
         packed_dets: &[u8],
         num_dets: usize,
+        num_obs: usize,
         out: &mut Vec<u8>,
     ) {
         let user_graph = &mut self.user_graph;
@@ -179,13 +185,14 @@ impl Matching {
         let effective_events_buf = &mut self.effective_events_buf;
         let mwpm = user_graph.get_mwpm();
         let graph_num_observables = mwpm.flooder.graph.num_observables;
+        debug_assert_eq!(num_obs, graph_num_observables);
         let neg_obs_mask =
             compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
 
         packed_dets_to_detection_events_into(packed_dets, num_dets, detection_events_buf);
         apply_negative_weight_events_into(
             detection_events_buf,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             effective_events_buf,
         );
@@ -206,7 +213,7 @@ impl Matching {
 
         let effective_events = apply_negative_weight_events(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
         );
 
@@ -327,24 +334,34 @@ fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMa
 
 /// Compute the symmetric difference of detection events and negative-weight
 /// detection events, filtering out user-graph boundary nodes.
+///
+/// Precondition: both inputs are strictly increasing unique detector indices.
 fn apply_negative_weight_events(
     detection_events: &[usize],
-    neg_det_set: &std::collections::HashSet<usize>,
+    neg_det_sorted: &[usize],
     is_boundary: &[bool],
 ) -> Vec<usize> {
     let mut result = Vec::new();
-    apply_negative_weight_events_into(detection_events, neg_det_set, is_boundary, &mut result);
+    apply_negative_weight_events_into(detection_events, neg_det_sorted, is_boundary, &mut result);
     result
 }
 
 fn apply_negative_weight_events_into(
     detection_events: &[usize],
-    neg_det_set: &std::collections::HashSet<usize>,
+    neg_det_sorted: &[usize],
     is_boundary: &[bool],
     out: &mut Vec<usize>,
 ) {
-    if neg_det_set.is_empty() {
-        // Fast path: filter out boundary nodes only
+    debug_assert!(
+        detection_events.windows(2).all(|w| w[0] < w[1]),
+        "detection_events must be strictly increasing and unique",
+    );
+    debug_assert!(
+        neg_det_sorted.windows(2).all(|w| w[0] < w[1]),
+        "neg_det_sorted must be strictly increasing and unique",
+    );
+
+    if neg_det_sorted.is_empty() {
         out.clear();
         out.extend(
             detection_events
@@ -355,27 +372,53 @@ fn apply_negative_weight_events_into(
         return;
     }
 
-    // Symmetric difference via XOR-toggle in a set
-    let mut active: std::collections::HashSet<usize> = detection_events.iter().copied().collect();
-    for &d in neg_det_set {
-        if !active.remove(&d) {
-            active.insert(d);
+    out.clear();
+    let mut det_i = 0;
+    let mut neg_i = 0;
+
+    while det_i < detection_events.len() && neg_i < neg_det_sorted.len() {
+        let det = detection_events[det_i];
+        let neg = neg_det_sorted[neg_i];
+
+        if det == neg {
+            det_i += 1;
+            neg_i += 1;
+            continue;
+        }
+
+        let candidate = if det < neg {
+            det_i += 1;
+            det
+        } else {
+            neg_i += 1;
+            neg
+        };
+
+        if candidate >= is_boundary.len() || !is_boundary[candidate] {
+            out.push(candidate);
         }
     }
 
-    out.clear();
-    out.extend(
-        active
-            .into_iter()
-            .filter(|&d| d >= is_boundary.len() || !is_boundary[d]),
-    );
-    out.sort_unstable();
+    while det_i < detection_events.len() {
+        let det = detection_events[det_i];
+        det_i += 1;
+        if det >= is_boundary.len() || !is_boundary[det] {
+            out.push(det);
+        }
+    }
+
+    while neg_i < neg_det_sorted.len() {
+        let neg = neg_det_sorted[neg_i];
+        neg_i += 1;
+        if neg >= is_boundary.len() || !is_boundary[neg] {
+            out.push(neg);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
     use crate::test_alloc::{allocation_count, reset_allocation_count};
 
     #[test]
@@ -389,20 +432,88 @@ mod tests {
     }
 
     #[test]
+    fn packed_dets_to_detection_events_handles_cross_byte_bits() {
+        let packed = [0b0000_0101u8, 0b1111_1110u8];
+        let mut out = vec![999];
+
+        packed_dets_to_detection_events_into(&packed, 10, &mut out);
+
+        assert_eq!(out, vec![0, 2, 9]);
+    }
+
+    #[test]
+    fn obs_mask_to_bit_packed_predictions_into_clears_stale_bits() {
+        let mut out = vec![0xFF, 0xFF];
+
+        obs_mask_to_bit_packed_predictions_into(1u64 << 8, 9, &mut out);
+
+        assert_eq!(out, vec![0, 1]);
+    }
+
+    #[test]
     fn apply_negative_weight_events_into_filters_and_sorts() {
         let detection_events = vec![0, 2, 4];
-        let neg_det_set = HashSet::from([2usize, 3usize]);
+        let neg_det_sorted = vec![2usize, 3usize];
         let is_boundary = vec![false, false, false, true, false];
         let mut out = vec![999];
 
         apply_negative_weight_events_into(
             &detection_events,
-            &neg_det_set,
+            &neg_det_sorted,
             &is_boundary,
             &mut out,
         );
 
         assert_eq!(out, vec![0, 4]);
+    }
+
+    #[test]
+    fn apply_negative_weight_events_into_merges_sorted_inputs_without_hashing() {
+        let detection_events = vec![1, 3, 6];
+        let neg_det_sorted = vec![0, 3, 4, 7];
+        let is_boundary = vec![false; 8];
+        let mut out = vec![999];
+
+        apply_negative_weight_events_into(
+            &detection_events,
+            &neg_det_sorted,
+            &is_boundary,
+            &mut out,
+        );
+
+        assert_eq!(out, vec![0, 1, 4, 6, 7]);
+    }
+
+    #[test]
+    fn apply_negative_weight_events_into_filters_boundary_nodes_from_both_inputs() {
+        let detection_events = vec![0, 2, 5];
+        let neg_det_sorted = vec![1, 2, 4, 6];
+        let is_boundary = vec![false, true, false, false, true, false, false];
+        let mut out = vec![999];
+
+        apply_negative_weight_events_into(
+            &detection_events,
+            &neg_det_sorted,
+            &is_boundary,
+            &mut out,
+        );
+
+        assert_eq!(out, vec![0, 5, 6]);
+    }
+
+    #[test]
+    fn negative_weight_detector_cache_is_sorted_after_graph_build() {
+        let mut matching = Matching::new();
+        matching.add_edge(5, 1, -1.0, &[], 0.1);
+        matching.add_edge(3, 5, -1.0, &[], 0.1);
+        matching.add_boundary_edge(2, -1.0, &[], 0.1);
+
+        let mwpm = matching.user_graph.get_mwpm();
+
+        assert_eq!(
+            mwpm.flooder.graph.negative_weight_detection_events_sorted,
+            vec![1, 2, 3]
+        );
     }
 
     #[test]
@@ -417,14 +528,15 @@ mod tests {
 
         let mwpm = matching.user_graph.get_mwpm();
         let num_observables = mwpm.flooder.graph.num_observables;
-        let neg_obs_mask = compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
+        let neg_obs_mask =
+            compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
         let mut detection_events = Vec::new();
         let mut effective_events = Vec::new();
 
         syndrome_to_detection_events_into(&syndrome, &mut detection_events);
         apply_negative_weight_events_into(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             &mut effective_events,
         );
@@ -432,6 +544,75 @@ mod tests {
         let actual =
             decode_events_to_prediction(mwpm, &effective_events, num_observables, neg_obs_mask);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_matches_byte_syndrome_decode() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let syndrome = vec![0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let expected = matching.decode(&syndrome);
+
+        let mut packed_out = vec![0xAA];
+        matching.decode_bit_packed_into(&[0u8, 1u8], 9, 1, &mut packed_out);
+
+        assert_eq!(expected, vec![1]);
+        assert_eq!(packed_out, vec![1]);
+    }
+
+    #[test]
+    fn decode_negative_weight_graph_keeps_byte_and_packed_paths_aligned() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 1, -1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 2.0, &[], 0.1);
+        matching.add_boundary_edge(1, 2.0, &[], 0.1);
+
+        let syndrome = vec![1u8, 0u8];
+        let expected = matching.decode(&syndrome);
+        let mut packed_out = vec![0xAA];
+
+        matching.decode_bit_packed_into(&[0b0000_0001], 2, 1, &mut packed_out);
+
+        assert_eq!(packed_out, vec![expected[0]]);
+    }
+
+    #[test]
+    fn decode_bit_packed_into_reuses_matching_buffers_after_warmup() {
+        let mut matching = Matching::new();
+        matching.add_edge(0, 8, 1.0, &[0], 0.1);
+        matching.add_boundary_edge(0, 3.0, &[], 0.05);
+        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
+
+        let warmup_packed = [0u8, 1u8];
+        let second_packed = [0u8, 0u8];
+        let expected_second = matching.decode(&[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let mut out = Vec::new();
+        matching.decode_bit_packed_into(&warmup_packed, 9, 1, &mut out);
+        out[0] = 0xAA;
+
+        reset_allocation_count();
+        matching.decode_bit_packed_into(&second_packed, 9, 1, &mut out);
+
+        assert_eq!(expected_second.as_slice(), &[0]);
+        assert_eq!(out, expected_second);
+        assert_eq!(allocation_count(), 0);
+    }
+
+    #[test]
+    fn graph_num_observables_ignores_declared_but_unused_dem_observables() {
+        let mut matching = Matching::from_dem(
+            "\
+error(0.1) D0 L0
+error(0.05) D0
+logical_observable L8
+",
+        )
+        .unwrap();
+
+        assert_eq!(matching.graph_num_observables(), 1);
     }
 
     #[test]
@@ -452,7 +633,7 @@ mod tests {
         syndrome_to_detection_events_into(&syndrome, &mut detection_events);
         apply_negative_weight_events_into(
             &detection_events,
-            &mwpm.flooder.graph.negative_weight_detection_events_set,
+            &mwpm.flooder.graph.negative_weight_detection_events_sorted,
             &mwpm.flooder.graph.is_user_graph_boundary_node,
             &mut effective_events,
         );
@@ -505,61 +686,6 @@ mod tests {
 
         assert_eq!(allocation_count(), 0);
     }
-
-    #[test]
-    fn decode_bit_packed_into_matches_byte_syndrome_decode() {
-        let mut matching = Matching::new();
-        matching.add_edge(0, 8, 1.0, &[0], 0.1);
-        matching.add_boundary_edge(0, 3.0, &[], 0.05);
-        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
-
-        let syndrome = vec![0, 0, 0, 0, 0, 0, 0, 0, 1];
-        let expected = matching.decode(&syndrome);
-
-        let mut packed_out = vec![0xAA];
-        matching.decode_bit_packed_into(&[0u8, 1u8], 9, &mut packed_out);
-
-        assert_eq!(expected, vec![1]);
-        assert_eq!(packed_out, vec![1]);
-    }
-
-    #[test]
-    fn decode_negative_weight_graph_keeps_byte_and_packed_paths_aligned() {
-        let mut matching = Matching::new();
-        matching.add_edge(0, 1, -1.0, &[0], 0.1);
-        matching.add_boundary_edge(0, 2.0, &[], 0.1);
-        matching.add_boundary_edge(1, 2.0, &[], 0.1);
-
-        let syndrome = vec![1u8, 0u8];
-        let expected = matching.decode(&syndrome);
-        let mut packed_out = vec![0xAA];
-
-        matching.decode_bit_packed_into(&[0b0000_0001], 2, &mut packed_out);
-
-        assert_eq!(packed_out, vec![expected[0]]);
-    }
-
-    #[test]
-    fn decode_bit_packed_into_reuses_matching_buffers_after_warmup() {
-        let mut matching = Matching::new();
-        matching.add_edge(0, 8, 1.0, &[0], 0.1);
-        matching.add_boundary_edge(0, 3.0, &[], 0.05);
-        matching.add_boundary_edge(8, 3.0, &[0], 0.05);
-
-        let warmup_packed = [0u8, 1u8];
-        let second_packed = [0u8, 0u8];
-        let expected_second = matching.decode(&[0, 0, 0, 0, 0, 0, 0, 0, 0]);
-        let mut out = Vec::new();
-        matching.decode_bit_packed_into(&warmup_packed, 9, &mut out);
-        out[0] = 0xAA;
-
-        reset_allocation_count();
-        matching.decode_bit_packed_into(&second_packed, 9, &mut out);
-
-        assert_eq!(expected_second.as_slice(), &[0]);
-        assert_eq!(out, expected_second);
-        assert_eq!(allocation_count(), 0);
-    }
 }
 
 fn process_timeline_until_completion(mwpm: &mut Mwpm, detection_events: &[usize]) {
@@ -597,7 +723,11 @@ fn shatter_and_extract(mwpm: &mut Mwpm, detection_events: &[usize]) -> MatchingR
             // pair_and_shatter_subblossoms needs region_that_arrived_top to
             // locate sub-blossoms.
             nodes_to_clean.clear();
-            collect_shell_nodes_recursive(mwpm.flooder.region_arena.items(), top, &mut nodes_to_clean);
+            collect_shell_nodes_recursive(
+                mwpm.flooder.region_arena.items(),
+                top,
+                &mut nodes_to_clean,
+            );
             let match_region = mwpm.flooder.region_arena[top.0]
                 .match_
                 .as_ref()
@@ -642,7 +772,11 @@ fn extract_match_edges(mwpm: &mut Mwpm, detection_events: &[usize]) -> Vec<(i64,
             let top = mwpm.flooder.graph.nodes[i].region_that_arrived_top.unwrap();
             // Collect shell-area nodes to reset after shattering
             nodes_to_clean.clear();
-            collect_shell_nodes_recursive(mwpm.flooder.region_arena.items(), top, &mut nodes_to_clean);
+            collect_shell_nodes_recursive(
+                mwpm.flooder.region_arena.items(),
+                top,
+                &mut nodes_to_clean,
+            );
             let match_region = mwpm.flooder.region_arena[top.0]
                 .match_
                 .as_ref()

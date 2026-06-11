@@ -1,8 +1,10 @@
-use crate::bp::run_minimum_sum;
+use std::sync::Mutex;
+
+use crate::bp::{run_minimum_sum_compiled_in_place, BpWorkspace, CompiledGraph};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
-use crate::osd::decode_osd0;
+use crate::osd::{decode_osd0_with_workspace, OsdWorkspace};
 use crate::vector::{Correction, Syndrome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,11 +16,27 @@ pub struct DecodeResult {
     pub residual_syndrome_weight: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BpOsdDecoder {
     pcm: ParityCheckMatrix,
+    graph: CompiledGraph,
     config: DecoderConfig,
     prior_llrs: Vec<f64>,
+    bp_workspace: Mutex<BpWorkspace>,
+    osd_workspace: Mutex<OsdWorkspace>,
+}
+
+impl Clone for BpOsdDecoder {
+    fn clone(&self) -> Self {
+        Self {
+            pcm: self.pcm.clone(),
+            graph: self.graph.clone(),
+            config: self.config.clone(),
+            prior_llrs: self.prior_llrs.clone(),
+            bp_workspace: Mutex::new(BpWorkspace::new(&self.graph)),
+            osd_workspace: Mutex::new(OsdWorkspace::new(&self.pcm)),
+        }
+    }
 }
 
 impl BpOsdDecoder {
@@ -28,10 +46,16 @@ impl BpOsdDecoder {
         config: DecoderConfig,
     ) -> Result<Self, DecodeError> {
         let prior_llrs = compute_prior_llrs(&pcm, &channel)?;
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let bp_workspace = Mutex::new(BpWorkspace::new(&graph));
+        let osd_workspace = Mutex::new(OsdWorkspace::new(&pcm));
         Ok(Self {
             pcm,
+            graph,
             config,
             prior_llrs,
+            bp_workspace,
+            osd_workspace,
         })
     }
 
@@ -57,23 +81,40 @@ impl BpOsdDecoder {
             }
         }
 
-        let snapshot = run_minimum_sum(&self.pcm, syndrome, &self.prior_llrs, &self.config);
-        if snapshot.residual_weight == 0 {
+        let mut bp_workspace = self.bp_workspace.lock().unwrap();
+        let bp_info = run_minimum_sum_compiled_in_place(
+            &self.graph,
+            syndrome,
+            &self.prior_llrs,
+            &self.config,
+            &mut bp_workspace,
+        );
+        if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {
-                correction: snapshot.hard_decision,
-                converged: snapshot.converged,
-                bp_iterations: snapshot.iterations,
+                correction: Correction::from(bp_workspace.hard_decision_bits.clone()),
+                converged: bp_info.converged,
+                bp_iterations: bp_info.iterations,
                 used_osd: false,
-                residual_syndrome_weight: snapshot.residual_weight,
+                residual_syndrome_weight: bp_info.residual_weight,
             });
         }
 
-        let correction = decode_osd0(&self.pcm, syndrome, &snapshot.reliability)?;
+        let correction = {
+            let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            decode_osd0_with_workspace(
+                &self.pcm,
+                syndrome,
+                &bp_workspace.hard_decision_bits,
+                &bp_workspace.reliability,
+                &mut osd_workspace,
+            )?
+        };
+        drop(bp_workspace);
 
         Ok(DecodeResult {
             correction,
-            converged: snapshot.converged,
-            bp_iterations: snapshot.iterations,
+            converged: bp_info.converged,
+            bp_iterations: bp_info.iterations,
             used_osd: true,
             residual_syndrome_weight: 0,
         })

@@ -200,6 +200,66 @@ class ParityHarnessTests(unittest.TestCase):
         self.assertEqual(entries[0]["mismatch_classification"], "diagnostics_mismatch")
         self.assertFalse(entries[0]["is_mismatch"])
 
+    def test_build_entries_zero_iter_solution_drift_is_not_counted_as_mismatch(
+        self,
+    ) -> None:
+        case = {
+            "name": "fixture_case",
+            "matrix": {"num_checks": 2, "num_bits": 3, "rows": [[0, 1], [1, 2]]},
+            "channel": {
+                "kind": "bit_flip_probabilities",
+                "probabilities": [0.1, 0.2, 0.3],
+            },
+            "syndrome": [True, False],
+            "config": {
+                "max_bp_iterations": 0,
+                "early_stop": True,
+                "bp_variant": "minimum_sum",
+                "schedule": "parallel",
+                "osd_variant": "osd0",
+            },
+            "tags": ["fixture"],
+        }
+        rust_report = {
+            "actual": {
+                "status": "success",
+                "correction": [False, True, True],
+                "diagnostics": {
+                    "converged": False,
+                    "bp_iterations": 0,
+                    "used_osd": True,
+                    "residual_syndrome_weight": 0,
+                },
+            }
+        }
+        python_actual = {
+            "status": "success",
+            "correction": [True, False, False],
+            "diagnostics": {
+                "converged": True,
+                "bp_iterations": 2,
+                "used_osd": False,
+                "residual_syndrome_weight": 0,
+            },
+        }
+        with mock.patch("parity_harness.fixture_case_paths", return_value=[Path("a.json")]):
+            with mock.patch("parity_harness.load_case", return_value=case):
+                with mock.patch("parity_harness.run_rust_case", return_value=rust_report):
+                    with mock.patch(
+                        "parity_harness.run_python_ldpc", return_value=python_actual
+                    ):
+                        entries = build_entries(
+                            repo_root=Path("."),
+                            fixtures_dir=Path("."),
+                            skip_generated=True,
+                            case_limit=None,
+                        )
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(
+            entries[0]["mismatch_classification"], "zero_iter_semantics_mismatch"
+        )
+        self.assertFalse(entries[0]["is_mismatch"])
+
 
 if __name__ == "__main__":
     unittest.main()

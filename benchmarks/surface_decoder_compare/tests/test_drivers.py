@@ -18,7 +18,12 @@ from benchmarks.surface_decoder_compare.drivers.rust_bridge import (
     _gurobi_env_available,
     _load_bridge_payload,
 )
-from benchmarks.surface_decoder_compare.schema import CaseBundle, CaseSpec, TIER_CONFIGS
+from benchmarks.surface_decoder_compare.schema import (
+    CaseBundle,
+    CaseSpec,
+    ResultRow,
+    TIER_CONFIGS,
+)
 
 
 class DriverRegistryTest(unittest.TestCase):

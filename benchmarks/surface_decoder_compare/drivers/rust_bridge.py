@@ -48,6 +48,7 @@ class RustBridgeDriver(BenchmarkDriver):
             "cargo",
             "run",
             "--quiet",
+            "--release",
             "-p",
             "surface_decoder_compare_bridge",
         ]
