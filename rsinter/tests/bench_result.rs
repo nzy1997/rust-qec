@@ -88,3 +88,23 @@ fn results_jsonl_round_trip_multiple_rows() {
     assert_eq!(decoded[1].status, "error");
     assert_eq!(decoded[1].error.as_deref(), Some("solver failed"));
 }
+
+#[test]
+fn results_jsonl_ignores_blank_lines() {
+    let input = concat!(
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"rmatching\",\"language\":\"rust\",\"status\":\"ok\",",
+        "\"params\":{\"distance\":3},\"case_summary\":{},\"metrics\":{\"shots_used\":2.0},",
+        "\"artifacts\":{},\"error\":null}\n",
+        "\n",
+        " \n",
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"pymatching\",\"language\":\"python\",\"status\":\"ok\",",
+        "\"params\":{\"distance\":5},\"case_summary\":{},\"metrics\":{\"shots_used\":4.0},",
+        "\"artifacts\":{},\"error\":null}\n"
+    );
+
+    let decoded = read_results_jsonl(input.as_bytes()).unwrap();
+
+    assert_eq!(decoded.len(), 2);
+    assert_eq!(decoded[0].runner, "rmatching");
+    assert_eq!(decoded[1].runner, "pymatching");
+}

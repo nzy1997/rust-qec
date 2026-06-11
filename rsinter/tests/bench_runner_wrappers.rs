@@ -1,0 +1,53 @@
+use rsinter::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
+use rsinter::bench::runners::rbposd::RbposdRunner;
+use rsinter::bench::runners::rilpqec::RilpqecRunner;
+
+#[test]
+fn rbposd_runner_handles_zero_shot_benchmark_points() {
+    let runner = RbposdRunner;
+    let point = BenchCasePoint {
+        distance: 3,
+        rounds: 3,
+        p: 0.002,
+        max_shots: 0,
+        max_errors: 2,
+        batch_size: 4,
+    };
+    let ctx = BenchRunContext {
+        benchmark_name: "surface_decoder".into(),
+        runner_name: "rbposd_alias".into(),
+        language: "rust".into(),
+        seed: 12_345,
+    };
+
+    let row = runner.run_point(&point, &ctx).unwrap();
+
+    assert_eq!(runner.name(), "rbposd");
+    assert_eq!(row.runner, "rbposd_alias");
+    assert_eq!(row.metrics["shots_used"], 0.0);
+}
+
+#[test]
+fn rilpqec_runner_handles_zero_shot_benchmark_points() {
+    let runner = RilpqecRunner;
+    let point = BenchCasePoint {
+        distance: 3,
+        rounds: 3,
+        p: 0.002,
+        max_shots: 0,
+        max_errors: 2,
+        batch_size: 4,
+    };
+    let ctx = BenchRunContext {
+        benchmark_name: "surface_decoder".into(),
+        runner_name: "rilpqec_alias".into(),
+        language: "rust".into(),
+        seed: 12_345,
+    };
+
+    let row = runner.run_point(&point, &ctx).unwrap();
+
+    assert_eq!(runner.name(), "rilpqec");
+    assert_eq!(row.runner, "rilpqec_alias");
+    assert_eq!(row.metrics["shots_used"], 0.0);
+}

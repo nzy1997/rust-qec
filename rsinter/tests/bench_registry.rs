@@ -76,6 +76,13 @@ fn expand_runner_points_rejects_invalid_entries_and_accepts_integer_p() {
     assert_eq!(points[0].p, 1.0);
 }
 
+#[test]
+#[should_panic(expected = "expected expand_runner_points to fail")]
+fn expand_points_err_panics_when_points_expand_successfully() {
+    let params = valid_runner_params();
+    let _ = expand_points_err(&params);
+}
+
 fn valid_runner_params() -> BTreeMap<String, toml::Value> {
     BTreeMap::from([
         (

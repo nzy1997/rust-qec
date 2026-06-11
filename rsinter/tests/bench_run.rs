@@ -216,3 +216,56 @@ label = "Logical Error Rate"
     assert!(err.contains("distance"));
     assert!(!results_path.exists());
 }
+
+#[test]
+fn rust_benchmark_run_clears_stale_staging_dir_before_writing() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 8
+max_errors = 2
+batch_size = 4
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let staging_dir = dir.path().join("rmatching").join("test-run.tmp");
+    fs::create_dir_all(&staging_dir).unwrap();
+    fs::write(staging_dir.join("stale.txt"), "stale").unwrap();
+
+    let registry = build_default_rust_runner_registry();
+    let artifact_root = run_rust_benchmark(&spec, "rust", dir.path(), &registry).unwrap();
+    let artifact_dir = artifact_root.join("rmatching").join("test-run");
+
+    assert!(artifact_dir.join("run_manifest.json").exists());
+    assert!(artifact_dir.join("results.jsonl").exists());
+    assert!(!staging_dir.exists());
+}
