@@ -10,12 +10,15 @@ Cargo.lock
 /target
 /benchmarks/surface_decoder_compare/results/*/cases/
 /benchmarks/surface_decoder_compare/results/smoke/
+/benchmarks/out/
+**/__pycache__/
 .cursor/
 .venv-surface-decoder/
 __pycache__/
 *.pyc
 
 # Coverage reports
+.coverage
 cobertura.xml
 
 # Build artifacts

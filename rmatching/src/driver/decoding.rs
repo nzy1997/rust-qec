@@ -136,7 +136,40 @@ impl Matching {
         out.truncate(syndromes.len());
     }
 
-    pub(crate) fn graph_num_observables(&mut self) -> usize {
+    /// Decode bit-packed syndromes into bit-packed observable predictions.
+    pub fn decode_shots_bit_packed(
+        &mut self,
+        dets: &[u8],
+        num_shots: usize,
+        num_dets: usize,
+        num_obs: usize,
+    ) -> Vec<u8> {
+        let det_bytes = num_dets.div_ceil(8);
+        let obs_bytes = num_obs.div_ceil(8);
+        let mut out = vec![0u8; num_shots * obs_bytes];
+        let graph_num_observables = self.graph_num_observables();
+        let mut packed_prediction = Vec::new();
+
+        for shot in 0..num_shots {
+            let det_offset = shot * det_bytes;
+            let shot_dets = &dets[det_offset..det_offset + det_bytes];
+            let shot_out = &mut out[shot * obs_bytes..(shot + 1) * obs_bytes];
+            self.decode_bit_packed_into(
+                shot_dets,
+                num_dets,
+                graph_num_observables,
+                &mut packed_prediction,
+            );
+            shot_out.fill(0);
+            let copied_bytes = shot_out.len().min(packed_prediction.len());
+            shot_out[..copied_bytes].copy_from_slice(&packed_prediction[..copied_bytes]);
+            truncate_obs_bytes_in_place(shot_out, num_obs, graph_num_observables);
+        }
+
+        out
+    }
+
+    pub fn graph_num_observables(&mut self) -> usize {
         self.user_graph.get_mwpm().flooder.graph.num_observables
     }
 
@@ -279,6 +312,18 @@ fn obs_mask_to_bit_packed_predictions_into(
     }
 }
 
+fn truncate_obs_bytes_in_place(out: &mut [u8], requested_num_obs: usize, graph_num_obs: usize) {
+    let valid_obs = requested_num_obs.min(graph_num_obs);
+    let valid_bytes = valid_obs.div_ceil(8);
+    for byte in out.iter_mut().skip(valid_bytes) {
+        *byte = 0;
+    }
+    if valid_bytes > 0 && valid_obs % 8 != 0 {
+        let tail_mask = (1u8 << (valid_obs % 8)) - 1;
+        out[valid_bytes - 1] &= tail_mask;
+    }
+}
+
 fn compute_neg_obs_mask(neg_obs_set: &std::collections::HashSet<usize>) -> ObsMask {
     let mut mask: ObsMask = 0;
     for &obs in neg_obs_set {
@@ -297,12 +342,7 @@ fn apply_negative_weight_events(
     is_boundary: &[bool],
 ) -> Vec<usize> {
     let mut result = Vec::new();
-    apply_negative_weight_events_into(
-        detection_events,
-        neg_det_sorted,
-        is_boundary,
-        &mut result,
-    );
+    apply_negative_weight_events_into(detection_events, neg_det_sorted, is_boundary, &mut result);
     result
 }
 
@@ -488,7 +528,8 @@ mod tests {
 
         let mwpm = matching.user_graph.get_mwpm();
         let num_observables = mwpm.flooder.graph.num_observables;
-        let neg_obs_mask = compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
+        let neg_obs_mask =
+            compute_neg_obs_mask(&mwpm.flooder.graph.negative_weight_observables_set);
         let mut detection_events = Vec::new();
         let mut effective_events = Vec::new();
 
@@ -682,7 +723,11 @@ fn shatter_and_extract(mwpm: &mut Mwpm, detection_events: &[usize]) -> MatchingR
             // pair_and_shatter_subblossoms needs region_that_arrived_top to
             // locate sub-blossoms.
             nodes_to_clean.clear();
-            collect_shell_nodes_recursive(mwpm.flooder.region_arena.items(), top, &mut nodes_to_clean);
+            collect_shell_nodes_recursive(
+                mwpm.flooder.region_arena.items(),
+                top,
+                &mut nodes_to_clean,
+            );
             let match_region = mwpm.flooder.region_arena[top.0]
                 .match_
                 .as_ref()
@@ -727,7 +772,11 @@ fn extract_match_edges(mwpm: &mut Mwpm, detection_events: &[usize]) -> Vec<(i64,
             let top = mwpm.flooder.graph.nodes[i].region_that_arrived_top.unwrap();
             // Collect shell-area nodes to reset after shattering
             nodes_to_clean.clear();
-            collect_shell_nodes_recursive(mwpm.flooder.region_arena.items(), top, &mut nodes_to_clean);
+            collect_shell_nodes_recursive(
+                mwpm.flooder.region_arena.items(),
+                top,
+                &mut nodes_to_clean,
+            );
             let match_region = mwpm.flooder.region_arena[top.0]
                 .match_
                 .as_ref()

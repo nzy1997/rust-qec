@@ -1,0 +1,130 @@
+use std::fs;
+use std::process::Command;
+
+#[test]
+fn rsinter_cli_help_mentions_bench_subcommands() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .arg("--help")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("bench"));
+    assert!(stdout.contains("run"));
+    assert!(stdout.contains("merge"));
+    assert!(stdout.contains("plot"));
+}
+
+#[test]
+fn rsinter_bench_run_writes_artifacts_from_fixture_spec() {
+    let dir = tempfile::tempdir().unwrap();
+    let spec = "tests/fixtures/bench/minimal_surface_decoder.toml";
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "run",
+            "--spec",
+            spec,
+            "--language",
+            "rust",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let entries: Vec<_> = fs::read_dir(dir.path()).unwrap().collect();
+    assert!(!entries.is_empty());
+}
+
+#[test]
+fn rsinter_bench_merge_writes_combined_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.jsonl");
+    let second = dir.path().join("second.jsonl");
+    let out = dir.path().join("merged").join("merged.jsonl");
+
+    fs::write(
+        &first,
+        concat!(
+            "{\"benchmark\":\"surface_decoder\",\"runner\":\"z\",\"language\":\"rust\",\"status\":\"ok\",",
+            "\"params\":{\"distance\":5,\"p\":0.005},\"case_summary\":{},\"metrics\":{\"logical_error_rate\":0.01},",
+            "\"artifacts\":{},\"error\":null}\n"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        &second,
+        concat!(
+            "{\"benchmark\":\"surface_decoder\",\"runner\":\"a\",\"language\":\"python\",\"status\":\"ok\",",
+            "\"params\":{\"distance\":3,\"p\":0.002},\"case_summary\":{},\"metrics\":{\"logical_error_rate\":0.001},",
+            "\"artifacts\":{},\"error\":null}\n"
+        ),
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "merge",
+            "--spec",
+            "tests/fixtures/bench/minimal_surface_decoder.toml",
+            "--input",
+            first.to_str().unwrap(),
+            "--input",
+            second.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let merged = fs::read_to_string(out).unwrap();
+    assert!(merged.contains("\"runner\":\"a\""));
+    assert!(merged.contains("\"runner\":\"z\""));
+}
+
+#[test]
+fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("rows.jsonl");
+    let out = dir.path().join("plots").join("plot.svg");
+    fs::write(
+        &input,
+        concat!(
+            "{\"benchmark\":\"surface_decoder\",\"runner\":\"rmatching\",\"language\":\"rust\",\"status\":\"ok\",",
+            "\"params\":{\"distance\":3,\"p\":0.002},\"case_summary\":{},",
+            "\"metrics\":{\"logical_error_rate\":0.001,\"decode_us_per_shot\":12.0,\"shots_used\":2000,\"logical_errors\":2},",
+            "\"artifacts\":{},\"error\":null}\n",
+            "{\"benchmark\":\"surface_decoder\",\"runner\":\"rmatching\",\"language\":\"rust\",\"status\":\"ok\",",
+            "\"params\":{\"distance\":3,\"p\":0.005},\"case_summary\":{},",
+            "\"metrics\":{\"logical_error_rate\":0.01,\"decode_us_per_shot\":18.0,\"shots_used\":2000,\"logical_errors\":20},",
+            "\"artifacts\":{},\"error\":null}\n"
+        ),
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "plot",
+            "--spec",
+            "tests/fixtures/bench/minimal_surface_decoder.toml",
+            "--input",
+            input.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(
+        fs::read_to_string(dir.path().join("plots").join("plot.svg"))
+            .unwrap()
+            .contains("<svg")
+    );
+}

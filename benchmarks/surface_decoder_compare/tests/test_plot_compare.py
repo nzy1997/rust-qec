@@ -1,4 +1,5 @@
 import csv
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,29 @@ from benchmarks.surface_decoder_compare.plot_compare import (
 
 
 class PlotCompareTest(unittest.TestCase):
+    def test_rsinter_bench_plot_cli_help_is_available(self) -> None:
+        completed = subprocess.run(
+            [
+                "cargo",
+                "run",
+                "-p",
+                "rsinter",
+                "--bin",
+                "rsinter",
+                "--",
+                "bench",
+                "plot",
+                "--help",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0)
+        self.assertIn("--spec", completed.stdout)
+        self.assertIn("--input", completed.stdout)
+        self.assertIn("--out", completed.stdout)
+
     def test_zero_logical_error_rate_uses_positive_sinter_upper_bound(self) -> None:
         display = _logical_error_display_rate(
             {

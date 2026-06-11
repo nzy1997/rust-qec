@@ -4,11 +4,9 @@ version = "0.1.1"
 edition = "2024"
 
 [features]
-rsinter = ["dep:rsinter", "dep:rstim"]
 bench = ["dep:rstim", "dep:rand", "dep:serde", "dep:serde_json"]
 
 [dependencies]
-rsinter = { path = "../rsinter", optional = true }
 rstim = { path = "../rstim", optional = true }
 rand = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }

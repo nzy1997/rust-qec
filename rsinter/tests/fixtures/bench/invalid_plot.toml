@@ -1,0 +1,28 @@
+name = "broken"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.002]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Broken"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"

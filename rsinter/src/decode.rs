@@ -2,6 +2,7 @@ use rstim::dem::DetectorErrorModel;
 
 pub use crate::ilpqec_adapter::IlpDemDecoder;
 pub use crate::rbposd_adapter::RbposdDemDecoder;
+pub use crate::rmatching_adapter::RmatchingDemDecoder;
 
 pub trait CompiledDecoder: Send {
     /// Decode bit-packed detection events into bit-packed observable predictions.

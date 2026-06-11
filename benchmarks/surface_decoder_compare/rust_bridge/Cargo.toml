@@ -9,7 +9,6 @@ gurobi = ["rsinter/gurobi", "rilpqec/gurobi"]
 
 [dependencies]
 rbposd = { path = "../../../rbposd" }
-rmatching = { path = "../../../rmatching", features = ["rsinter"] }
 rilpqec = { path = "../../../rilpqec" }
 rsinter = { path = "../../../rsinter" }
 rstim = { path = "../../../rstim" }

@@ -59,6 +59,12 @@ class FailingDriver:
 
 
 class RunCompareTest(unittest.TestCase):
+    def test_new_surface_benchmark_spec_exists(self) -> None:
+        self.assertTrue(Path("benchmarks/surface_decoder/spec.toml").exists())
+
+    def test_python_runner_entrypoint_exists(self) -> None:
+        self.assertTrue(Path("benchmarks/python_runners/surface_decoder/run.py").exists())
+
     def test_cli_filters_parse_and_apply(self) -> None:
         specs = [
             CaseSpec(distance=3, rounds=3, p=0.001),
