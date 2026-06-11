@@ -128,3 +128,79 @@ pub(crate) fn run_decoder_point(
         error: None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use rstim::dem::DetectorErrorModel;
+
+    use super::*;
+    use crate::decode::{CompiledDecoder, Decoder};
+
+    struct EmptyPredictionDecoder;
+
+    struct EmptyPredictionCompiled;
+
+    impl Decoder for EmptyPredictionDecoder {
+        fn compile_for_dem(&self, _dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
+            Box::new(EmptyPredictionCompiled)
+        }
+    }
+
+    impl CompiledDecoder for EmptyPredictionCompiled {
+        fn decode_shots_bit_packed(
+            &self,
+            _dets: &[u8],
+            _num_shots: usize,
+            _num_dets: usize,
+            _num_obs: usize,
+        ) -> Vec<u8> {
+            Vec::new()
+        }
+    }
+
+    #[test]
+    fn run_decoder_point_rejects_prediction_buffers_with_wrong_length() {
+        let point = BenchCasePoint {
+            distance: 3,
+            rounds: 3,
+            p: 0.002,
+            max_shots: 4,
+            max_errors: 2,
+            batch_size: 2,
+        };
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+        };
+
+        let err = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap_err();
+
+        assert!(err.contains("decoder fake produced 0 bytes"));
+    }
+
+    #[test]
+    fn run_decoder_point_reports_zero_rates_when_no_shots_are_requested() {
+        let point = BenchCasePoint {
+            distance: 3,
+            rounds: 3,
+            p: 0.002,
+            max_shots: 0,
+            max_errors: 2,
+            batch_size: 2,
+        };
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+        };
+
+        let row = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap();
+
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert_eq!(row.metrics["logical_error_rate"], 0.0);
+        assert_eq!(row.metrics["decode_us_per_shot"], 0.0);
+    }
+}
