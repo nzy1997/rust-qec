@@ -1,10 +1,10 @@
 use std::sync::Mutex;
 
-use crate::bp::{run_minimum_sum_compiled_in_place, BpWorkspace, CompiledGraph};
+use crate::bp::{BpWorkspace, CompiledGraph, run_minimum_sum_compiled_in_place};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
-use crate::osd::{decode_osd0_with_workspace, OsdWorkspace};
+use crate::osd::{OsdWorkspace, decode_osd_with_workspace};
 use crate::vector::{Correction, Syndrome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,12 +101,13 @@ impl BpOsdDecoder {
 
         let correction = {
             let mut osd_workspace = self.osd_workspace.lock().unwrap();
-            decode_osd0_with_workspace(
+            decode_osd_with_workspace(
                 &self.pcm,
                 syndrome,
                 &bp_workspace.hard_decision_bits,
                 &bp_workspace.reliability,
                 &mut osd_workspace,
+                self.config.osd_order,
             )?
         };
         drop(bp_workspace);

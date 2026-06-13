@@ -1,7 +1,9 @@
 use crate::error::DecodeError;
-use crate::gf2::PreparedLinearSystem;
+use crate::gf2::{DetailedSolution, PreparedLinearSystem};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
+
+const OSD_FREE_COLUMN_FRONTIER: usize = 16;
 
 #[derive(Debug)]
 pub(crate) struct OsdWorkspace {
@@ -33,19 +35,9 @@ impl OsdWorkspace {
         });
         &self.column_order
     }
-
-    fn solve_residual_by_unreliability(
-        &mut self,
-        target_syndrome: &Syndrome,
-        reliability: &[f64],
-    ) -> Result<Correction, DecodeError> {
-        debug_assert_eq!(target_syndrome.len(), self.num_checks);
-        self.sort_unreliable_columns(reliability);
-        self.prepared
-            .solve_with_column_order(target_syndrome, &self.column_order)
-    }
 }
 
+#[allow(dead_code)]
 pub(crate) fn decode_osd0_with_workspace(
     pcm: &ParityCheckMatrix,
     syndrome: &Syndrome,
@@ -53,15 +45,115 @@ pub(crate) fn decode_osd0_with_workspace(
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
 ) -> Result<Correction, DecodeError> {
+    decode_osd_with_workspace(
+        pcm,
+        syndrome,
+        base_correction_bits,
+        reliability,
+        workspace,
+        0,
+    )
+}
+
+pub(crate) fn decode_osd_with_workspace(
+    pcm: &ParityCheckMatrix,
+    syndrome: &Syndrome,
+    base_correction_bits: &[bool],
+    reliability: &[f64],
+    workspace: &mut OsdWorkspace,
+    osd_order: usize,
+) -> Result<Correction, DecodeError> {
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
     debug_assert_eq!(workspace.num_bits, pcm.num_bits());
     debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
     debug_assert_eq!(reliability.len(), pcm.num_bits());
     let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
-    let residual = workspace
-        .solve_residual_by_unreliability(&target_syndrome, reliability)
+    workspace.sort_unreliable_columns(reliability);
+
+    if osd_order == 0 {
+        let residual = workspace
+            .prepared
+            .solve_with_column_order(&target_syndrome, &workspace.column_order)
+            .map_err(|_| DecodeError::NoOsdSolution)?;
+        return Ok(xor_correction_bits(base_correction_bits, &residual));
+    }
+
+    let base = workspace
+        .prepared
+        .solve_with_column_order_detailed(&target_syndrome, &workspace.column_order, &[])
         .map_err(|_| DecodeError::NoOsdSolution)?;
-    Ok(xor_correction_bits(base_correction_bits, &residual))
+    let best = best_osd_candidate(&target_syndrome, reliability, workspace, base, osd_order)?;
+    Ok(xor_correction_bits(base_correction_bits, &best.correction))
+}
+
+fn best_osd_candidate(
+    target_syndrome: &Syndrome,
+    reliability: &[f64],
+    workspace: &mut OsdWorkspace,
+    base: DetailedSolution,
+    osd_order: usize,
+) -> Result<DetailedSolution, DecodeError> {
+    let frontier_len = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
+    let frontier = base.free_columns[..frontier_len].to_vec();
+    let max_order = osd_order.min(frontier.len());
+    let mut best = base;
+    let mut forced = Vec::new();
+    for order in 1..=max_order {
+        visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
+            if let Ok(candidate) = workspace.prepared.solve_with_column_order_detailed(
+                target_syndrome,
+                &workspace.column_order,
+                columns,
+            ) {
+                if is_better_solution(&candidate, &best, reliability) {
+                    best = candidate;
+                }
+            }
+        });
+    }
+    Ok(best)
+}
+
+fn visit_combinations(
+    columns: &[usize],
+    target_len: usize,
+    start: usize,
+    forced: &mut Vec<usize>,
+    visit: &mut impl FnMut(&[usize]),
+) {
+    if forced.len() == target_len {
+        visit(forced);
+        return;
+    }
+    let remaining = target_len - forced.len();
+    for index in start..=columns.len() - remaining {
+        forced.push(columns[index]);
+        visit_combinations(columns, target_len, index + 1, forced, visit);
+        forced.pop();
+    }
+}
+
+fn is_better_solution(
+    candidate: &DetailedSolution,
+    best: &DetailedSolution,
+    reliability: &[f64],
+) -> bool {
+    let candidate_cost = residual_cost(candidate.correction.as_slice(), reliability);
+    let best_cost = residual_cost(best.correction.as_slice(), reliability);
+    if candidate_cost < best_cost - f64::EPSILON {
+        return true;
+    }
+    if (candidate_cost - best_cost).abs() <= f64::EPSILON {
+        return candidate.correction.as_slice() < best.correction.as_slice();
+    }
+    false
+}
+
+fn residual_cost(bits: &[bool], reliability: &[f64]) -> f64 {
+    bits.iter()
+        .zip(reliability.iter())
+        .filter_map(|(&bit, &cost)| bit.then_some(cost))
+        .sum()
 }
 
 fn multiply_bits(pcm: &ParityCheckMatrix, bits: &[bool]) -> Syndrome {
@@ -100,12 +192,11 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{decode_osd0_with_workspace, OsdWorkspace};
+    use super::{OsdWorkspace, decode_osd0_with_workspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0], vec![1, 2]]).unwrap();
         let syndrome = Syndrome::from(vec![false, true]);
         let base = Correction::from(vec![false, false, false]);
         let reliability = vec![1.0, 1.0, 2.0];
@@ -125,8 +216,7 @@ mod tests {
 
     #[test]
     fn osd_workspace_orders_columns_by_unreliability_stably() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
         let mut workspace = OsdWorkspace::new(&pcm);
 
         let order = workspace.sort_unreliable_columns(&[1.0, 1.0, 0.4]);
