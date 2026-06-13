@@ -19,6 +19,7 @@ fn rbposd_runner_handles_zero_shot_benchmark_points() {
         max_shots: 0,
         max_errors: 2,
         batch_size: 4,
+        decoder_params: std::collections::BTreeMap::new(),
     };
     let ctx = BenchRunContext {
         benchmark_name: "surface_decoder".into(),
@@ -52,6 +53,7 @@ fn rilpqec_runner_handles_zero_shot_benchmark_points() {
         max_shots: 0,
         max_errors: 2,
         batch_size: 4,
+        decoder_params: std::collections::BTreeMap::new(),
     };
     let ctx = BenchRunContext {
         benchmark_name: "surface_decoder".into(),

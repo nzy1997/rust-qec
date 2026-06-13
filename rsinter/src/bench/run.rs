@@ -1,7 +1,9 @@
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
-use crate::bench::registry::{expand_runner_points, BenchRunContext, RustRunnerRegistry};
+use crate::bench::registry::{
+    expand_runner_points_for_runner, BenchRunContext, RustRunnerRegistry,
+};
 use crate::bench::result::{write_results_jsonl, RunManifest};
 use crate::bench::spec::BenchmarkSpec;
 
@@ -32,7 +34,7 @@ pub fn run_rust_benchmark(
         let runner_impl = registry
             .get(&runner.impl_key)
             .ok_or_else(|| format!("unknown rust runner: {}", runner.impl_key))?;
-        let points = expand_runner_points(&runner.params)?;
+        let points = expand_runner_points_for_runner(runner_impl.name(), &runner.params)?;
 
         let ctx = BenchRunContext {
             benchmark_name: spec.name.clone(),

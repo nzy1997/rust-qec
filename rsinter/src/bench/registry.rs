@@ -8,6 +8,7 @@ use crate::bench::runners::rbposd::RbposdRunner;
 use crate::bench::runners::rilpqec::RilpqecRunner;
 use crate::bench::runners::rmatching::RmatchingRunner;
 
+#[derive(Debug)]
 pub struct BenchCasePoint {
     pub input_type: String,
     pub code_id: Option<String>,
@@ -22,6 +23,7 @@ pub struct BenchCasePoint {
     pub max_shots: u64,
     pub max_errors: u64,
     pub batch_size: usize,
+    pub decoder_params: BTreeMap<String, Value>,
 }
 
 pub struct BenchRunContext {
@@ -43,6 +45,11 @@ pub trait RustBenchRunner: Send + Sync {
 
 pub type RustRunnerRegistry = BTreeMap<String, Box<dyn RustBenchRunner>>;
 
+struct SplitRunnerParams {
+    generic: BTreeMap<String, Value>,
+    decoder: BTreeMap<String, Value>,
+}
+
 pub fn default_rust_runner_names() -> Vec<String> {
     ["rmatching", "rbposd", "rilpqec"]
         .into_iter()
@@ -60,6 +67,21 @@ pub fn build_default_rust_runner_registry() -> RustRunnerRegistry {
 
 pub fn expand_runner_points(
     params: &BTreeMap<String, Value>,
+) -> Result<Vec<BenchCasePoint>, String> {
+    expand_runner_points_for_runner("generic", params)
+}
+
+pub fn expand_runner_points_for_runner(
+    runner_name: &str,
+    params: &BTreeMap<String, Value>,
+) -> Result<Vec<BenchCasePoint>, String> {
+    let split = split_runner_params(runner_name, params)?;
+    expand_generic_runner_points(&split.generic, split.decoder)
+}
+
+fn expand_generic_runner_points(
+    params: &BTreeMap<String, Value>,
+    decoder_params: BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
     let input_type =
         optional_string(params, "input_type")?.unwrap_or_else(|| "surface_rotated_memory_x".into());
@@ -79,10 +101,24 @@ pub fn expand_runner_points(
     }
 
     match input_type.as_str() {
-        "surface_rotated_memory_x" => {
-            expand_surface_points(params, rounds, ps, max_shots, max_errors, batch_size)
-        }
-        "css" => expand_css_points(params, rounds, ps, max_shots, max_errors, batch_size),
+        "surface_rotated_memory_x" => expand_surface_points(
+            params,
+            rounds,
+            ps,
+            max_shots,
+            max_errors,
+            batch_size,
+            decoder_params,
+        ),
+        "css" => expand_css_points(
+            params,
+            rounds,
+            ps,
+            max_shots,
+            max_errors,
+            batch_size,
+            decoder_params,
+        ),
         other => Err(format!("unknown input_type: {other}")),
     }
 }
@@ -94,6 +130,7 @@ fn expand_surface_points(
     max_shots: u64,
     max_errors: u64,
     batch_size: usize,
+    decoder_params: BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
     let distances = require_array(params, "distance")?;
     if distances.is_empty() {
@@ -126,6 +163,7 @@ fn expand_surface_points(
                     max_shots,
                     max_errors,
                     batch_size,
+                    decoder_params: decoder_params.clone(),
                 });
             }
         }
@@ -140,6 +178,7 @@ fn expand_css_points(
     max_shots: u64,
     max_errors: u64,
     batch_size: usize,
+    decoder_params: BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
     let basis = require_string(params, "basis")?;
     let schedule = optional_string(params, "schedule")?.unwrap_or_else(|| "greedy".to_string());
@@ -169,10 +208,63 @@ fn expand_css_points(
                 max_shots,
                 max_errors,
                 batch_size,
+                decoder_params: decoder_params.clone(),
             });
         }
     }
     Ok(points)
+}
+
+fn split_runner_params(
+    runner_name: &str,
+    params: &BTreeMap<String, Value>,
+) -> Result<SplitRunnerParams, String> {
+    let mut generic = BTreeMap::new();
+    let mut decoder = BTreeMap::new();
+    for (key, value) in params {
+        if is_generic_param_key(key) {
+            generic.insert(key.clone(), value.clone());
+        } else if is_decoder_param_key(runner_name, key) {
+            decoder.insert(key.clone(), value.clone());
+        } else {
+            return Err(format!("unknown {runner_name} runner param: {key}"));
+        }
+    }
+    Ok(SplitRunnerParams { generic, decoder })
+}
+
+fn is_generic_param_key(key: &str) -> bool {
+    matches!(
+        key,
+        "input_type"
+            | "distance"
+            | "rounds"
+            | "p"
+            | "max_shots"
+            | "max_errors"
+            | "batch_size"
+            | "basis"
+            | "schedule"
+            | "hx"
+            | "hz"
+            | "observables"
+            | "code_id"
+    )
+}
+
+fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
+    match runner_name {
+        "rbposd" => matches!(
+            key,
+            "bp_iters" | "max_bp_iterations" | "early_stop" | "osd_order"
+        ),
+        "rilpqec" => matches!(
+            key,
+            "backend" | "time_limit_s" | "mip_gap" | "threads" | "verbose"
+        ),
+        "rmatching" | "generic" => false,
+        _ => false,
+    }
 }
 
 fn optional_string(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<String>, String> {

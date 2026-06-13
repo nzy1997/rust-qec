@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use rsinter::bench::registry::{
     build_default_rust_runner_registry, default_rust_runner_names, expand_runner_points,
+    expand_runner_points_for_runner,
 };
 
 #[test]
@@ -180,6 +181,52 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
     assert_eq!(points[0].input_type, "surface_rotated_memory_x");
     assert_eq!(points[0].distance, Some(3));
     assert_eq!(points[0].basis, None);
+}
+
+#[test]
+fn expand_runner_points_for_runner_carries_decoder_params_without_multiplying_points() {
+    let mut params = valid_runner_params();
+    params.insert("bp_iters".into(), toml::Value::Integer(50));
+    params.insert("osd_order".into(), toml::Value::Integer(10));
+
+    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(
+        points[0]
+            .decoder_params
+            .get("bp_iters")
+            .and_then(toml::Value::as_integer),
+        Some(50)
+    );
+    assert_eq!(
+        points[0]
+            .decoder_params
+            .get("osd_order")
+            .and_then(toml::Value::as_integer),
+        Some(10)
+    );
+    assert_eq!(points[0].distance, Some(3));
+}
+
+#[test]
+fn expand_runner_points_for_runner_rejects_unknown_decoder_param() {
+    let mut params = valid_runner_params();
+    params.insert("bogus".into(), toml::Value::Integer(1));
+
+    let err = expand_runner_points_for_runner("rbposd", &params).unwrap_err();
+
+    assert_eq!(err, "unknown rbposd runner param: bogus");
+}
+
+#[test]
+fn expand_runner_points_for_runner_rejects_decoder_params_for_rmatching() {
+    let mut params = valid_runner_params();
+    params.insert("osd_order".into(), toml::Value::Integer(10));
+
+    let err = expand_runner_points_for_runner("rmatching", &params).unwrap_err();
+
+    assert_eq!(err, "unknown rmatching runner param: osd_order");
 }
 
 fn valid_runner_params() -> BTreeMap<String, toml::Value> {

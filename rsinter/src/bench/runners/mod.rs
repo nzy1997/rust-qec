@@ -173,6 +173,7 @@ mod tests {
             max_shots: 4,
             max_errors: 2,
             batch_size: 2,
+            decoder_params: BTreeMap::new(),
         };
         let ctx = BenchRunContext {
             benchmark_name: "surface_decoder".into(),
@@ -203,6 +204,7 @@ mod tests {
             max_shots: 0,
             max_errors: 2,
             batch_size: 2,
+            decoder_params: BTreeMap::new(),
         };
         let ctx = BenchRunContext {
             benchmark_name: "surface_decoder".into(),
