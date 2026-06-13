@@ -47,6 +47,14 @@ fn stabilizers_lie_in_the_returned_normalizer_span() {
 }
 
 #[test]
+fn k_two_code_normalizer_dimension_matches_two_n_minus_r() {
+    let code = trivial_k_two_code();
+    let basis = code.normalizer_basis().unwrap();
+
+    assert_eq!(basis.len(), 6);
+}
+
+#[test]
 fn empty_stabilizer_code_normalizer_has_full_symplectic_dimension() {
     let code = StabilizerCode::from_stabilizers(2, vec![]).unwrap();
     let basis = code.normalizer_basis().unwrap();

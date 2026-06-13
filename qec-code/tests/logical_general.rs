@@ -60,6 +60,21 @@ fn trivial_k2_code_returns_two_canonical_logical_pairs() {
 }
 
 #[test]
+fn canonical_pairs_commute_off_diagonal_for_k_two_codes() {
+    let stabilizers = vec![pauli(4, &[], &[0]), pauli(4, &[], &[1])];
+    let code = StabilizerCode::from_stabilizers(4, stabilizers).unwrap();
+    let basis = code.canonical_logical_basis().unwrap();
+
+    assert_eq!(basis.k, 2);
+    assert!(basis.logical_x[0].anticommutes_with(&basis.logical_z[0]));
+    assert!(basis.logical_x[1].anticommutes_with(&basis.logical_z[1]));
+    assert!(basis.logical_x[0].commutes_with(&basis.logical_z[1]));
+    assert!(basis.logical_x[1].commutes_with(&basis.logical_z[0]));
+    assert!(basis.logical_x[0].commutes_with(&basis.logical_x[1]));
+    assert!(basis.logical_z[0].commutes_with(&basis.logical_z[1]));
+}
+
+#[test]
 fn non_css_k1_code_returns_commuting_anticommuting_logicals() {
     let stabilizers = vec![pauli(2, &[0], &[0])];
     let code = StabilizerCode::from_stabilizers(2, stabilizers).unwrap();
