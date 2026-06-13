@@ -80,6 +80,27 @@ fn css_memory_rejects_non_orthogonal_checks() {
 }
 
 #[test]
+fn explicit_observables_allow_redundant_orthogonal_checks() {
+    let config = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: vec![vec![0, 1], vec![0, 1]],
+            hz: vec![],
+            num_data_qubits: 2,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+    };
+
+    let circuit = css_memory(config).unwrap();
+
+    assert_eq!(stats::num_observables(&circuit), 1);
+    ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+}
+
+#[test]
 fn css_memory_rejects_out_of_range_observable_support() {
     let mut config = repetition_like_css_config(1, MemoryBasis::X);
     config.observables = CssObservableSource::Explicit(vec![vec![2]]);

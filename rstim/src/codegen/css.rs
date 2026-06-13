@@ -786,9 +786,12 @@ fn validate_supports(
 }
 
 fn validate_css_orthogonality(hx: &[Vec<usize>], hz: &[Vec<usize>]) -> Result<(), CssCodegenError> {
+    let hz_supports: Vec<_> = hz
+        .iter()
+        .map(|row| row.iter().copied().collect::<BTreeSet<_>>())
+        .collect();
     for x_row in hx {
-        for z_row in hz {
-            let z_support: BTreeSet<_> = z_row.iter().copied().collect();
+        for z_support in &hz_supports {
             let parity = x_row
                 .iter()
                 .filter(|&&qubit| z_support.contains(&qubit))
