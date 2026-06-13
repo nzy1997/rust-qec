@@ -384,6 +384,76 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn rust_benchmark_preflights_decoder_param_values_before_writing_results() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching_ok"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 1
+max_errors = 1
+batch_size = 1
+
+[[runner]]
+name = "rilpqec_bad"
+language = "rust"
+impl_key = "rilpqec"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+mip_gap = 1.0
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "mip_gap must be in [0, 1)");
+    assert!(!dir.path().join("rmatching_ok").exists());
+    assert!(!dir.path().join("rilpqec_bad").exists());
+}
+
+#[test]
 fn rilpqec_benchmark_records_normalized_decoder_params() {
     let spec_text = r#"
 name = "surface_decoder"

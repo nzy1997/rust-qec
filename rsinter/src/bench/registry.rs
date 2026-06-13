@@ -36,6 +36,9 @@ pub struct BenchRunContext {
 
 pub trait RustBenchRunner: Send + Sync {
     fn name(&self) -> &'static str;
+    fn preflight_point(&self, _point: &BenchCasePoint) -> Result<(), String> {
+        Ok(())
+    }
     fn run_point(
         &self,
         point: &BenchCasePoint,

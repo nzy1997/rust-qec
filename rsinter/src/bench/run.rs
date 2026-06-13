@@ -112,6 +112,9 @@ fn plan_rust_runs<'a>(
             .get(&runner.impl_key)
             .ok_or_else(|| format!("unknown rust runner: {}", runner.impl_key))?;
         let points = expand_runner_points_for_runner(runner_impl.name(), &runner.params)?;
+        for point in &points {
+            runner_impl.preflight_point(point)?;
+        }
         planned_runs.push(PlannedRustRun {
             runner,
             runner_impl: runner_impl.as_ref(),

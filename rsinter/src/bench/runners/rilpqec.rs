@@ -68,6 +68,10 @@ impl RustBenchRunner for RilpqecRunner {
         "rilpqec"
     }
 
+    fn preflight_point(&self, point: &BenchCasePoint) -> Result<(), String> {
+        RilpqecRunnerParams::parse(&point.decoder_params).map(|_| ())
+    }
+
     fn run_point(
         &self,
         point: &BenchCasePoint,

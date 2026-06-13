@@ -50,6 +50,10 @@ impl RustBenchRunner for RbposdRunner {
         "rbposd"
     }
 
+    fn preflight_point(&self, point: &BenchCasePoint) -> Result<(), String> {
+        RbposdRunnerParams::parse(&point.decoder_params).map(|_| ())
+    }
+
     fn run_point(
         &self,
         point: &BenchCasePoint,
