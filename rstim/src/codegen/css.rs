@@ -283,7 +283,325 @@ pub fn css_memory(config: CssMemoryConfig) -> Result<Vec<StimInstr>, CssCodegenE
     let hz_dense = supports_to_dense(&config.checks.hz, config.checks.num_data_qubits);
     CssCode::from_hx_hz(hx_dense, hz_dense)
         .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
-    Ok(Vec::new())
+    let observables = explicit_observables(&config)?;
+    emit_css_memory_circuit(&config, &observables)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CheckKind {
+    X,
+    Z,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Check {
+    kind: CheckKind,
+    row: usize,
+    ancilla: u32,
+    support: Vec<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CnotInteraction {
+    control: u32,
+    target: u32,
+}
+
+fn explicit_observables(config: &CssMemoryConfig) -> Result<Vec<Vec<usize>>, CssCodegenError> {
+    match &config.observables {
+        CssObservableSource::Explicit(rows) | CssObservableSource::ExplicitOrCanonical(rows) => {
+            validate_observables(rows, config.checks.num_data_qubits)?;
+            Ok(rows.clone())
+        }
+        CssObservableSource::CanonicalFallback => Err(CssCodegenError::MissingObservables),
+    }
+}
+
+fn validate_observables(rows: &[Vec<usize>], width: usize) -> Result<(), CssCodegenError> {
+    if rows.is_empty() {
+        return Err(CssCodegenError::MissingObservables);
+    }
+    for (row_index, row) in rows.iter().enumerate() {
+        let mut seen = BTreeSet::new();
+        for &col in row {
+            if col >= width {
+                return Err(CssCodegenError::InvalidObservable {
+                    row: row_index,
+                    col,
+                    width,
+                });
+            }
+            if !seen.insert(col) {
+                return Err(CssCodegenError::InvalidObservable {
+                    row: row_index,
+                    col,
+                    width,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn emit_css_memory_circuit(
+    config: &CssMemoryConfig,
+    observables: &[Vec<usize>],
+) -> Result<Vec<StimInstr>, CssCodegenError> {
+    let width = config.checks.num_data_qubits;
+    let checks = build_checks(&config.checks);
+    let num_checks = checks.len();
+    let mut instrs = Vec::new();
+
+    for q in 0..width {
+        instrs.push(op(
+            "QUBIT_COORDS",
+            &[q as f64],
+            &[StimTarget::Qubit(q as u32)],
+        ));
+    }
+    for (index, check) in checks.iter().enumerate() {
+        instrs.push(op(
+            "QUBIT_COORDS",
+            &[width as f64, index as f64],
+            &[StimTarget::Qubit(check.ancilla)],
+        ));
+    }
+
+    let reset_data = match config.basis {
+        MemoryBasis::X => "RX",
+        MemoryBasis::Z => "R",
+    };
+    for q in 0..width {
+        instrs.push(op(reset_data, &[], &[StimTarget::Qubit(q as u32)]));
+    }
+    if config.noise.after_reset_flip_probability > 0.0 {
+        for q in 0..width {
+            instrs.push(op(
+                "X_ERROR",
+                &[config.noise.after_reset_flip_probability],
+                &[StimTarget::Qubit(q as u32)],
+            ));
+        }
+    }
+    for check in &checks {
+        instrs.push(op("R", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    if config.noise.after_reset_flip_probability > 0.0 {
+        for check in &checks {
+            instrs.push(op(
+                "X_ERROR",
+                &[config.noise.after_reset_flip_probability],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
+    }
+
+    for round in 0..config.rounds {
+        if round > 0 {
+            instrs.push(op("SHIFT_COORDS", &[0.0, 0.0, 1.0], &[]));
+        }
+        emit_round(&mut instrs, config, &checks);
+        emit_round_detectors(&mut instrs, config, &checks, round, num_checks);
+    }
+
+    instrs.push(op("TICK", &[], &[]));
+    if config.noise.before_measure_flip_probability > 0.0 {
+        for q in 0..width {
+            instrs.push(op(
+                "X_ERROR",
+                &[config.noise.before_measure_flip_probability],
+                &[StimTarget::Qubit(q as u32)],
+            ));
+        }
+    }
+    let measure_data = match config.basis {
+        MemoryBasis::X => "MX",
+        MemoryBasis::Z => "M",
+    };
+    for q in 0..width {
+        instrs.push(op(measure_data, &[], &[StimTarget::Qubit(q as u32)]));
+    }
+    emit_tail_detectors(&mut instrs, config, &checks, width, num_checks);
+    emit_observables(&mut instrs, observables, width);
+
+    Ok(instrs)
+}
+
+fn build_checks(matrices: &CssCheckMatrices) -> Vec<Check> {
+    let x_base = matrices.num_data_qubits as u32;
+    let z_base = x_base + matrices.hx.len() as u32;
+    let mut checks = Vec::with_capacity(matrices.hx.len() + matrices.hz.len());
+    for (row, support) in matrices.hx.iter().enumerate() {
+        checks.push(Check {
+            kind: CheckKind::X,
+            row,
+            ancilla: x_base + row as u32,
+            support: support.clone(),
+        });
+    }
+    for (row, support) in matrices.hz.iter().enumerate() {
+        checks.push(Check {
+            kind: CheckKind::Z,
+            row,
+            ancilla: z_base + row as u32,
+            support: support.clone(),
+        });
+    }
+    checks
+}
+
+fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[Check]) {
+    instrs.push(op("TICK", &[], &[]));
+    if config.noise.before_round_data_depolarization > 0.0 {
+        for q in 0..config.checks.num_data_qubits {
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[config.noise.before_round_data_depolarization],
+                &[StimTarget::Qubit(q as u32)],
+            ));
+        }
+    }
+    for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+        instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    for layer in schedule_layers(config.schedule, checks) {
+        instrs.push(op("TICK", &[], &[]));
+        let targets: Vec<_> = layer
+            .iter()
+            .flat_map(|cnot| {
+                [
+                    StimTarget::Qubit(cnot.control),
+                    StimTarget::Qubit(cnot.target),
+                ]
+            })
+            .collect();
+        if !targets.is_empty() {
+            instrs.push(op("CX", &[], &targets));
+        }
+    }
+    instrs.push(op("TICK", &[], &[]));
+    for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+        instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    instrs.push(op("TICK", &[], &[]));
+    if config.noise.before_measure_flip_probability > 0.0 {
+        for check in checks {
+            instrs.push(op(
+                "X_ERROR",
+                &[config.noise.before_measure_flip_probability],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
+    }
+    for check in checks {
+        instrs.push(op("MR", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    if config.noise.after_reset_flip_probability > 0.0 {
+        for check in checks {
+            instrs.push(op(
+                "X_ERROR",
+                &[config.noise.after_reset_flip_probability],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
+    }
+}
+
+fn schedule_layers(schedule: CssSchedule, checks: &[Check]) -> Vec<Vec<CnotInteraction>> {
+    let interactions = cnot_interactions(checks);
+    match schedule {
+        CssSchedule::Sequential => interactions.into_iter().map(|cnot| vec![cnot]).collect(),
+        CssSchedule::Greedy => interactions.into_iter().map(|cnot| vec![cnot]).collect(),
+    }
+}
+
+fn cnot_interactions(checks: &[Check]) -> Vec<CnotInteraction> {
+    let mut interactions = Vec::new();
+    for check in checks {
+        for &data in &check.support {
+            match check.kind {
+                CheckKind::X => interactions.push(CnotInteraction {
+                    control: check.ancilla,
+                    target: data as u32,
+                }),
+                CheckKind::Z => interactions.push(CnotInteraction {
+                    control: data as u32,
+                    target: check.ancilla,
+                }),
+            }
+        }
+    }
+    interactions
+}
+
+fn emit_round_detectors(
+    instrs: &mut Vec<StimInstr>,
+    config: &CssMemoryConfig,
+    checks: &[Check],
+    round: usize,
+    num_checks: usize,
+) {
+    for (order, check) in checks.iter().enumerate() {
+        if round == 0 && !check_is_deterministic(config.basis, check.kind) {
+            continue;
+        }
+        let current = -((num_checks - order) as i32);
+        let targets = if round == 0 {
+            vec![StimTarget::Rec(current)]
+        } else {
+            vec![
+                StimTarget::Rec(current),
+                StimTarget::Rec(current - num_checks as i32),
+            ]
+        };
+        instrs.push(op("DETECTOR", &[order as f64, 0.0], &targets));
+    }
+}
+
+fn emit_tail_detectors(
+    instrs: &mut Vec<StimInstr>,
+    config: &CssMemoryConfig,
+    checks: &[Check],
+    width: usize,
+    num_checks: usize,
+) {
+    for (order, check) in checks.iter().enumerate() {
+        if !check_is_deterministic(config.basis, check.kind) {
+            continue;
+        }
+        let mut targets: Vec<StimTarget> = check
+            .support
+            .iter()
+            .map(|&data| StimTarget::Rec(-((width - data) as i32)))
+            .collect();
+        targets.push(StimTarget::Rec(-((width + num_checks - order) as i32)));
+        targets.sort_by_key(|target| match target {
+            StimTarget::Rec(offset) => *offset,
+            _ => 0,
+        });
+        instrs.push(op("DETECTOR", &[order as f64, 1.0], &targets));
+    }
+}
+
+fn emit_observables(instrs: &mut Vec<StimInstr>, observables: &[Vec<usize>], width: usize) {
+    for (index, support) in observables.iter().enumerate() {
+        let mut targets: Vec<StimTarget> = support
+            .iter()
+            .map(|&data| StimTarget::Rec(-((width - data) as i32)))
+            .collect();
+        targets.sort_by_key(|target| match target {
+            StimTarget::Rec(offset) => *offset,
+            _ => 0,
+        });
+        instrs.push(op("OBSERVABLE_INCLUDE", &[index as f64], &targets));
+    }
+}
+
+fn check_is_deterministic(basis: MemoryBasis, kind: CheckKind) -> bool {
+    matches!(
+        (basis, kind),
+        (MemoryBasis::X, CheckKind::X) | (MemoryBasis::Z, CheckKind::Z)
+    )
 }
 
 fn validate_supports(
