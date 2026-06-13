@@ -1,8 +1,8 @@
-use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
+use rstim::codegen::NoiseParams;
 
 #[test]
 fn css_memory_rejects_zero_rounds() {
