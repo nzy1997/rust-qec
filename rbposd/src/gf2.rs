@@ -35,6 +35,13 @@ pub(crate) fn solve_with_column_order(
     PreparedLinearSystem::from_pcm(pcm).solve_with_column_order(syndrome, column_order)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DetailedSolution {
+    pub(crate) correction: Correction,
+    pub(crate) pivot_columns: Vec<usize>,
+    pub(crate) free_columns: Vec<usize>,
+}
+
 #[derive(Debug)]
 pub(crate) struct PreparedLinearSystem {
     base_rows: Vec<Vec<bool>>,
@@ -62,6 +69,16 @@ impl PreparedLinearSystem {
         syndrome: &Syndrome,
         column_order: &[usize],
     ) -> Result<Correction, DecodeError> {
+        self.solve_with_column_order_detailed(syndrome, column_order, &[])
+            .map(|solution| solution.correction)
+    }
+
+    pub(crate) fn solve_with_column_order_detailed(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+        forced_true_columns: &[usize],
+    ) -> Result<DetailedSolution, DecodeError> {
         self.scratch_rows.clone_from(&self.base_rows);
         self.scratch_rhs.copy_from_slice(syndrome.as_slice());
         self.pivot_columns.clear();
@@ -79,8 +96,7 @@ impl PreparedLinearSystem {
                 for other in 0..self.scratch_rows.len() {
                     if other != row && self.scratch_rows[other][column] {
                         for &physical in column_order.iter().skip(pivot_position) {
-                            self.scratch_rows[other][physical] ^=
-                                self.scratch_rows[row][physical];
+                            self.scratch_rows[other][physical] ^= self.scratch_rows[row][physical];
                         }
                         self.scratch_rhs[other] ^= self.scratch_rhs[row];
                     }
@@ -94,16 +110,45 @@ impl PreparedLinearSystem {
             return Err(DecodeError::SingularSystem);
         }
 
+        let mut is_pivot = vec![false; self.num_bits];
+        for &column in &self.pivot_columns {
+            is_pivot[column] = true;
+        }
+        let free_columns = column_order
+            .iter()
+            .copied()
+            .filter(|&column| !is_pivot[column])
+            .collect::<Vec<_>>();
+
         let mut solution = vec![false; self.num_bits];
+        for &column in forced_true_columns {
+            if column >= self.num_bits {
+                return Err(DecodeError::InvalidColumnIndex {
+                    column,
+                    num_bits: self.num_bits,
+                });
+            }
+            if is_pivot[column] {
+                return Err(DecodeError::SingularSystem);
+            }
+            solution[column] = true;
+        }
+
         for (pivot_row, &column) in self.pivot_columns.iter().enumerate().rev() {
             let mut value = self.scratch_rhs[pivot_row];
-            for later_column in self.pivot_columns.iter().skip(pivot_row + 1) {
-                value ^= self.scratch_rows[pivot_row][*later_column] && solution[*later_column];
+            for (physical, &coefficient) in self.scratch_rows[pivot_row].iter().enumerate() {
+                if physical != column && coefficient && solution[physical] {
+                    value ^= true;
+                }
             }
             solution[column] = value;
         }
 
-        Ok(Correction::from(solution))
+        Ok(DetailedSolution {
+            correction: Correction::from(solution),
+            pivot_columns: self.pivot_columns.clone(),
+            free_columns,
+        })
     }
 }
 
@@ -113,8 +158,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        solve_with_column_order, sort_columns_by_reliability, sort_columns_by_unreliability,
-        PreparedLinearSystem,
+        PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
+        sort_columns_by_unreliability,
     };
 
     #[test]
@@ -131,8 +176,7 @@ mod tests {
 
     #[test]
     fn solve_with_column_order_returns_a_valid_solution() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
         let syndrome = Syndrome::from(vec![true, false]);
         let order = vec![0, 1, 2];
 
@@ -155,8 +199,7 @@ mod tests {
 
     #[test]
     fn prepared_system_solves_multiple_rhs_without_rebuilding_matrix_storage() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
         let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
 
         let first = prepared
@@ -171,9 +214,31 @@ mod tests {
     }
 
     #[test]
+    fn prepared_system_can_force_free_columns() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+
+        let osd0 = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1, 2], &[])
+            .unwrap();
+        let forced = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1, 2], &[2])
+            .unwrap();
+
+        assert_eq!(osd0.correction, Correction::from(vec![true, true, false]));
+        assert_eq!(osd0.pivot_columns, vec![0, 1]);
+        assert_eq!(osd0.free_columns, vec![2]);
+        assert_eq!(
+            forced.correction,
+            Correction::from(vec![false, false, true])
+        );
+        assert_eq!(pcm.multiply(&forced.correction), syndrome);
+    }
+
+    #[test]
     fn solve_with_column_order_prefers_low_reliability_basis_for_syndrome_decoding() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0], vec![1, 2]]).unwrap();
         let syndrome = Syndrome::from(vec![false, true]);
 
         // For syndrome decoding, the dependent basis columns should come from the
