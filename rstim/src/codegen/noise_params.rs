@@ -1,5 +1,5 @@
 /// Per-channel noise parameters for circuit generation.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NoiseParams {
     pub before_round_data_depolarization: f64,
     pub after_clifford_depolarization: f64,

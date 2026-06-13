@@ -4,6 +4,11 @@ use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
+use crate::codegen::NoiseParams;
+use crate::codegen::css::{
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
+};
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
@@ -90,11 +95,21 @@ pub enum Commands {
         #[arg(long)]
         task: String,
         #[arg(long)]
-        distance: usize,
+        distance: Option<usize>,
         #[arg(long)]
         rounds: usize,
         #[arg(long = "after_clifford_depolarization", default_value = "0")]
         noise: f64,
+        #[arg(long)]
+        hx: Option<String>,
+        #[arg(long)]
+        hz: Option<String>,
+        #[arg(long)]
+        basis: Option<String>,
+        #[arg(long, default_value = "greedy")]
+        schedule: String,
+        #[arg(long)]
+        observables: Option<String>,
         #[arg(long)]
         out: Option<String>,
     },
@@ -345,10 +360,35 @@ pub fn run(cli: Cli) -> Result<(), String> {
             distance,
             rounds,
             noise,
+            hx,
+            hz,
+            basis,
+            schedule,
+            observables,
             out,
         }) => {
-            let mut w = open_output(out.as_deref())?;
-            run_gen(&code, &task, distance, rounds, noise, &mut w)
+            if code == "css" {
+                let mut buffer = Vec::new();
+                run_css_gen(
+                    &task,
+                    hx.as_deref(),
+                    hz.as_deref(),
+                    basis.as_deref(),
+                    rounds,
+                    noise,
+                    &schedule,
+                    observables.as_deref(),
+                    &mut buffer,
+                )?;
+                let mut w = open_output(out.as_deref())?;
+                w.write_all(&buffer)
+                    .map_err(|error| format!("write error: {error}"))
+            } else {
+                let distance = distance
+                    .ok_or_else(|| "distance is required for common generators".to_string())?;
+                let mut w = open_output(out.as_deref())?;
+                run_gen(&code, &task, distance, rounds, noise, &mut w)
+            }
         }
         Some(Commands::Convert {
             in_format,
@@ -481,7 +521,14 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let text = read_input(r#in.as_deref())?;
             let format = parse_json_output_format(&format)?;
             let mut w = open_output(out.as_deref())?;
-            run_export_json(&text, format, highlight_dem_error, sample_shot, seed, &mut w)
+            run_export_json(
+                &text,
+                format,
+                highlight_dem_error,
+                sample_shot,
+                seed,
+                &mut w,
+            )
         }
         Some(Commands::Perf { command }) => match command {
             PerfCommands::Run {
@@ -560,8 +607,9 @@ fn run_perf_ci(
     warmup_rounds: usize,
     measure_rounds: usize,
 ) -> Result<(), PerfCiError> {
-    std::fs::create_dir_all(out_dir)
-        .map_err(|e| PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}")))?;
+    std::fs::create_dir_all(out_dir).map_err(|e| {
+        PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}"))
+    })?;
 
     let raw_path = std::path::Path::new(out_dir).join("raw.jsonl");
     let summary_path = std::path::Path::new(out_dir).join("summary.json");
@@ -569,11 +617,12 @@ fn run_perf_ci(
 
     write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds)?;
 
-    let raw_text = std::fs::read_to_string(&raw_path)
-        .map_err(|e| PerfCiError::Infrastructure(format!(
+    let raw_text = std::fs::read_to_string(&raw_path).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
             "failed to read raw perf artifact {}: {e}",
             raw_path.display()
-        )))?;
+        ))
+    })?;
     finalize_perf_ci_artifacts(
         &raw_text,
         &summary_path,
@@ -614,18 +663,22 @@ fn finalize_perf_ci_artifacts(
     report_path: &std::path::Path,
     config: crate::perf::PerfGateConfig,
 ) -> Result<(), PerfCiError> {
-    let summary = crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
+    let summary =
+        crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
     let verdict = crate::perf::evaluate_summary(&summary, config);
 
     std::fs::write(
         summary_path,
-        serde_json::to_string_pretty(&summary)
-            .map_err(|e| PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}")))?,
+        serde_json::to_string_pretty(&summary).map_err(|e| {
+            PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}"))
+        })?,
     )
-    .map_err(|e| PerfCiError::Infrastructure(format!(
-        "failed to write perf summary {}: {e}",
-        summary_path.display()
-    )))?;
+    .map_err(|e| {
+        PerfCiError::Infrastructure(format!(
+            "failed to write perf summary {}: {e}",
+            summary_path.display()
+        ))
+    })?;
 
     let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
     std::fs::write(report_path, report).map_err(|e| {
@@ -772,6 +825,84 @@ pub fn run_gen(
     let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
     out.write_all(circuit_text.as_bytes())
         .map_err(|e| format!("write error: {e}"))
+}
+
+pub fn run_css_gen(
+    task: &str,
+    hx_path: Option<&str>,
+    hz_path: Option<&str>,
+    basis: Option<&str>,
+    rounds: usize,
+    noise: f64,
+    schedule: &str,
+    observables_path: Option<&str>,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    if task != "memory" {
+        return Err(format!("unknown css task: {task}"));
+    }
+    let hx_path =
+        hx_path.ok_or_else(|| "--hx is required for css memory generation".to_string())?;
+    let hz_path =
+        hz_path.ok_or_else(|| "--hz is required for css memory generation".to_string())?;
+    let hx_text = read_input(Some(hx_path))?;
+    let hz_text = read_input(Some(hz_path))?;
+    let hx = parse_css_matrix_json(&hx_text).map_err(|error| error.to_string())?;
+    let hz = parse_css_matrix_json(&hz_text).map_err(|error| error.to_string())?;
+    if hx.num_cols != hz.num_cols {
+        return Err(format!(
+            "hx and hz widths differ: {} != {}",
+            hx.num_cols, hz.num_cols
+        ));
+    }
+    let observables = if let Some(path) = observables_path {
+        let text = read_input(Some(path))?;
+        let parsed = parse_css_observable_json(&text).map_err(|error| error.to_string())?;
+        if parsed.num_cols != hx.num_cols {
+            return Err(format!(
+                "observable width differs from CSS width: {} != {}",
+                parsed.num_cols, hx.num_cols
+            ));
+        }
+        CssObservableSource::Explicit(parsed.rows)
+    } else {
+        CssObservableSource::CanonicalFallback
+    };
+    let basis = parse_memory_basis(
+        basis.ok_or_else(|| "--basis is required for css memory generation".to_string())?,
+    )?;
+    let schedule = parse_css_schedule(schedule)?;
+    let circuit = css_memory(CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: hx.rows,
+            hz: hz.rows,
+            num_data_qubits: hx.num_cols,
+        },
+        rounds,
+        noise: NoiseParams::uniform(noise),
+        basis,
+        schedule,
+        observables,
+    })
+    .map_err(|error| error.to_string())?;
+    out.write_all(crate::ir::circuit_to_string(&circuit).as_bytes())
+        .map_err(|error| format!("write error: {error}"))
+}
+
+fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
+    match value {
+        "x" | "X" => Ok(MemoryBasis::X),
+        "z" | "Z" => Ok(MemoryBasis::Z),
+        other => Err(format!("unknown CSS memory basis: {other}")),
+    }
+}
+
+fn parse_css_schedule(value: &str) -> Result<CssSchedule, String> {
+    match value {
+        "sequential" => Ok(CssSchedule::Sequential),
+        "greedy" => Ok(CssSchedule::Greedy),
+        other => Err(format!("unknown CSS schedule: {other}")),
+    }
 }
 
 pub(crate) fn generate_common_circuit_text(
@@ -1397,9 +1528,11 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
-            .unwrap()
-            .contains("\"cases\""));
+        assert!(
+            std::fs::read_to_string(gate_out_dir.join("summary.json"))
+                .unwrap()
+                .contains("\"cases\"")
+        );
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -1454,7 +1587,9 @@ mod tests {
 
         match err {
             PerfCiError::Gate(message) => {
-                assert!(message.contains("RegressionFailure") || message.contains("exceeds threshold"));
+                assert!(
+                    message.contains("RegressionFailure") || message.contains("exceeds threshold")
+                );
             }
             PerfCiError::Infrastructure(message) => {
                 panic!("unexpected infrastructure failure: {message}");
@@ -1465,7 +1600,9 @@ mod tests {
         let report_text = std::fs::read_to_string(&report_path).unwrap();
         assert!(summary_text.contains("\"cases\""));
         assert!(report_text.contains("## Gate Verdict"));
-        assert!(report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold"));
+        assert!(
+            report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold")
+        );
     }
 
     #[test]
@@ -1499,13 +1636,266 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                .unwrap()
-                .contains("QUBIT_COORDS"));
+            assert!(
+                generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                    .unwrap()
+                    .contains("QUBIT_COORDS")
+            );
         }
-        assert!(generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
-            .unwrap_err()
-            .contains("unknown code/task"));
+        assert!(
+            generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
+                .unwrap_err()
+                .contains("unknown code/task")
+        );
+    }
+
+    fn write_css_json(dir: &tempfile::TempDir, name: &str, text: &str) -> String {
+        let path = dir.path().join(name);
+        std::fs::write(&path, text).unwrap();
+        path.display().to_string()
+    }
+
+    #[test]
+    fn run_dispatches_css_gen_command_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let hx = write_css_json(
+            &dir,
+            "hx.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#,
+        );
+        let hz = write_css_json(
+            &dir,
+            "hz.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let observables = write_css_json(
+            &dir,
+            "obs.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let out = dir.path().join("memory.stim");
+
+        run(Cli {
+            command: Some(Commands::Gen {
+                code: "css".to_string(),
+                task: "memory".to_string(),
+                distance: None,
+                rounds: 2,
+                noise: 0.0,
+                hx: Some(hx),
+                hz: Some(hz),
+                basis: Some("Z".to_string()),
+                schedule: "sequential".to_string(),
+                observables: Some(observables),
+                out: Some(out.display().to_string()),
+            }),
+        })
+        .unwrap();
+
+        let text = std::fs::read_to_string(out).unwrap();
+        assert!(text.contains("R 0"));
+        assert!(text.contains("M 0"));
+        assert!(text.contains("MR 2"));
+        assert!(text.contains("OBSERVABLE_INCLUDE"));
+    }
+
+    #[test]
+    fn run_css_gen_accepts_canonical_fallback_without_observable_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+        let hx = write_css_json(&dir, "steane_hx.json", h);
+        let hz = write_css_json(&dir, "steane_hz.json", h);
+        let mut out = Vec::new();
+
+        run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut out,
+        )
+        .unwrap();
+
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("OBSERVABLE_INCLUDE"));
+        assert_eq!(parse_memory_basis("X").unwrap(), MemoryBasis::X);
+        assert_eq!(parse_memory_basis("z").unwrap(), MemoryBasis::Z);
+        assert_eq!(parse_css_schedule("greedy").unwrap(), CssSchedule::Greedy);
+        assert_eq!(
+            parse_css_schedule("sequential").unwrap(),
+            CssSchedule::Sequential
+        );
+    }
+
+    #[test]
+    fn run_css_gen_reports_input_errors_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let hx = write_css_json(
+            &dir,
+            "hx.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let hz = write_css_json(
+            &dir,
+            "hz.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#,
+        );
+        let hz_wide = write_css_json(
+            &dir,
+            "hz_wide.json",
+            r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+        );
+        let obs_wide = write_css_json(
+            &dir,
+            "obs_wide.json",
+            r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1,2]]}"#,
+        );
+
+        let err = run_css_gen(
+            "stability",
+            None,
+            None,
+            None,
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown css task"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            None,
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--hx is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            None,
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--hz is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz_wide),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("hx and hz widths differ"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            Some(&obs_wide),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("observable width differs"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            None,
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--basis is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("y"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown CSS memory basis"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "layered",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown CSS schedule"), "error was: {err}");
+    }
+
+    #[test]
+    fn run_common_gen_missing_distance_is_in_process_error_without_touching_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out.stim");
+        std::fs::write(&out, "keep me").unwrap();
+
+        let err = run(Cli {
+            command: Some(Commands::Gen {
+                code: "repetition_code".to_string(),
+                task: "memory".to_string(),
+                distance: None,
+                rounds: 1,
+                noise: 0.0,
+                hx: None,
+                hz: None,
+                basis: None,
+                schedule: "greedy".to_string(),
+                observables: None,
+                out: Some(out.display().to_string()),
+            }),
+        })
+        .unwrap_err();
+
+        assert!(
+            err.contains("distance is required for common generators"),
+            "error was: {err}"
+        );
+        assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
     }
 
     #[test]

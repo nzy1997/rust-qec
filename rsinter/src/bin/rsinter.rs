@@ -74,7 +74,12 @@ fn run() -> Result<(), String> {
                 language,
                 out,
             } => {
-                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+                let spec_path = PathBuf::from(&spec);
+                let spec_dir = spec_path
+                    .parent()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from("."));
+                let text = std::fs::read_to_string(&spec_path).map_err(|e| e.to_string())?;
                 let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
                 bench_spec.validate()?;
                 let registry = build_default_rust_runner_registry();
@@ -83,6 +88,7 @@ fn run() -> Result<(), String> {
                     &language,
                     PathBuf::from(out).as_path(),
                     &registry,
+                    &spec_dir,
                 )?;
             }
             BenchCommands::Merge {

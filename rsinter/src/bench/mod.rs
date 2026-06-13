@@ -1,3 +1,4 @@
+pub mod circuit_source;
 pub mod merge;
 pub mod plot;
 pub mod registry;
