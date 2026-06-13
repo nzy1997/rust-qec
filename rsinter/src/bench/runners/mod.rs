@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;

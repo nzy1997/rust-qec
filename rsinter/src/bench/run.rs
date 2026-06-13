@@ -2,10 +2,10 @@ use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 use crate::bench::registry::{
-    expand_runner_points_for_runner, BenchCasePoint, BenchRunContext, RustBenchRunner,
-    RustRunnerRegistry,
+    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
+    expand_runner_points_for_runner,
 };
-use crate::bench::result::{write_results_jsonl, RunManifest};
+use crate::bench::result::{RunManifest, write_results_jsonl};
 use crate::bench::spec::{BenchmarkSpec, RunnerSpec};
 
 struct PlannedRustRun<'a> {

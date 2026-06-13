@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rbposd::DecoderConfig;
-use rsinter::collect::{collect, CollectOptions};
+use rsinter::collect::{CollectOptions, collect};
 use rsinter::decode::{Decoder, RbposdDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
@@ -153,8 +153,7 @@ fn exact_three_error_logical_error_rate(dem: &DetectorErrorModel, osd_order: usi
                 let det1 = e1 ^ e2;
                 let observed = e2;
                 let det_byte = u8::from(det0) | (u8::from(det1) << 1);
-                let predicted =
-                    compiled.decode_shots_bit_packed(&[det_byte], 1, 2, 1)[0] & 1 != 0;
+                let predicted = compiled.decode_shots_bit_packed(&[det_byte], 1, 2, 1)[0] & 1 != 0;
                 if predicted != observed {
                     ler += probability;
                 }
