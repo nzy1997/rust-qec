@@ -368,7 +368,7 @@ pub fn run(cli: Cli) -> Result<(), String> {
             out,
         }) => {
             if code == "css" {
-                let mut w = open_output(out.as_deref())?;
+                let mut buffer = Vec::new();
                 run_css_gen(
                     &task,
                     hx.as_deref(),
@@ -378,8 +378,11 @@ pub fn run(cli: Cli) -> Result<(), String> {
                     noise,
                     &schedule,
                     observables.as_deref(),
-                    &mut w,
-                )
+                    &mut buffer,
+                )?;
+                let mut w = open_output(out.as_deref())?;
+                w.write_all(&buffer)
+                    .map_err(|error| format!("write error: {error}"))
             } else {
                 let distance = distance
                     .ok_or_else(|| "distance is required for common generators".to_string())?;
@@ -865,7 +868,9 @@ pub fn run_css_gen(
     } else {
         CssObservableSource::CanonicalFallback
     };
-    let basis = parse_memory_basis(basis.unwrap_or("x"))?;
+    let basis = parse_memory_basis(
+        basis.ok_or_else(|| "--basis is required for css memory generation".to_string())?,
+    )?;
     let schedule = parse_css_schedule(schedule)?;
     let circuit = css_memory(CssMemoryConfig {
         checks: CssCheckMatrices {

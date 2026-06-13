@@ -193,6 +193,81 @@ fn gen_css_memory_requires_hx_and_hz() {
 }
 
 #[test]
+fn gen_css_memory_requires_basis() {
+    let dir = tempfile::tempdir().unwrap();
+    let hx = dir.path().join("hx.json");
+    let hz = dir.path().join("hz.json");
+    let obs = dir.path().join("obs.json");
+    std::fs::write(
+        &hx,
+        r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+    )
+    .unwrap();
+    std::fs::write(&hz, r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#).unwrap();
+    std::fs::write(
+        &obs,
+        r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+    )
+    .unwrap();
+
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "css",
+            "--task",
+            "memory",
+            "--hx",
+            hx.to_str().unwrap(),
+            "--hz",
+            hz.to_str().unwrap(),
+            "--rounds",
+            "1",
+            "--observables",
+            obs.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--basis is required"), "stderr: {stderr}");
+}
+
+#[test]
+fn gen_css_memory_validation_error_does_not_touch_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let hz = dir.path().join("hz.json");
+    let out = dir.path().join("out.stim");
+    std::fs::write(&hz, r#"{"format":"sparse_rows","num_cols":1,"rows":[]}"#).unwrap();
+    std::fs::write(&out, "keep me").unwrap();
+
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "css",
+            "--task",
+            "memory",
+            "--hz",
+            hz.to_str().unwrap(),
+            "--basis",
+            "x",
+            "--rounds",
+            "1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--hx is required"), "stderr: {stderr}");
+    assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
+}
+
+#[test]
 fn gen_css_memory_reports_non_orthogonal_checks() {
     let dir = tempfile::tempdir().unwrap();
     let hx = dir.path().join("hx.json");
