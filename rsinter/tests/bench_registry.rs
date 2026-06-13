@@ -126,6 +126,40 @@ fn expand_runner_points_accepts_css_input_type() {
 }
 
 #[test]
+fn expand_runner_points_defaults_optional_css_fields() {
+    let params = BTreeMap::from([
+        ("input_type".into(), toml::Value::String("css".into())),
+        (
+            "hx".into(),
+            toml::Value::String("tests/fixtures/css/steane_hx.json".into()),
+        ),
+        (
+            "hz".into(),
+            toml::Value::String("tests/fixtures/css/steane_hz.json".into()),
+        ),
+        ("basis".into(), toml::Value::String("x".into())),
+        (
+            "rounds".into(),
+            toml::Value::Array(vec![toml::Value::Integer(1)]),
+        ),
+        (
+            "p".into(),
+            toml::Value::Array(vec![toml::Value::Float(0.0)]),
+        ),
+        ("max_shots".into(), toml::Value::Integer(8)),
+        ("max_errors".into(), toml::Value::Integer(4)),
+        ("batch_size".into(), toml::Value::Integer(4)),
+    ]);
+
+    let points = expand_runner_points(&params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(points[0].code_id, None);
+    assert_eq!(points[0].schedule.as_deref(), Some("greedy"));
+    assert_eq!(points[0].observables_path, None);
+}
+
+#[test]
 fn expand_runner_points_defaults_to_legacy_surface_input() {
     let points = expand_runner_points(&valid_runner_params()).unwrap();
 

@@ -139,12 +139,12 @@ fn expand_css_points(
     max_errors: u64,
     batch_size: usize,
 ) -> Result<Vec<BenchCasePoint>, String> {
-    let code_id = require_string(params, "code_id")?;
     let basis = require_string(params, "basis")?;
-    let schedule = require_string(params, "schedule")?;
+    let schedule = optional_string(params, "schedule").unwrap_or_else(|| "greedy".to_string());
     let hx_path = require_string(params, "hx")?;
     let hz_path = require_string(params, "hz")?;
-    let observables_path = require_string(params, "observables")?;
+    let observables_path = optional_string(params, "observables");
+    let code_id = optional_string(params, "code_id");
 
     let mut points = Vec::new();
     for round in rounds {
@@ -155,7 +155,7 @@ fn expand_css_points(
             }
             points.push(BenchCasePoint {
                 input_type: "css".into(),
-                code_id: Some(code_id.clone()),
+                code_id: code_id.clone(),
                 distance: None,
                 rounds,
                 p: value_as_f64(p, "p entry")?,
@@ -163,7 +163,7 @@ fn expand_css_points(
                 schedule: Some(schedule.clone()),
                 hx_path: Some(hx_path.clone()),
                 hz_path: Some(hz_path.clone()),
-                observables_path: Some(observables_path.clone()),
+                observables_path: observables_path.clone(),
                 max_shots,
                 max_errors,
                 batch_size,
