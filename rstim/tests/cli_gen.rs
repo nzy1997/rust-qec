@@ -76,6 +76,36 @@ fn gen_unknown_code_fails() {
 }
 
 #[test]
+fn gen_common_without_distance_does_not_touch_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out.stim");
+    std::fs::write(&out, "keep me").unwrap();
+
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--rounds",
+            "1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("distance is required for common generators"),
+        "stderr: {stderr}"
+    );
+    assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
+}
+
+#[test]
 fn gen_css_memory_from_sparse_json_files() {
     let dir = tempfile::tempdir().unwrap();
     let hx = dir.path().join("hx.json");
@@ -124,6 +154,42 @@ fn gen_css_memory_from_sparse_json_files() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("DETECTOR"));
     assert!(stdout.contains("OBSERVABLE_INCLUDE"));
+}
+
+#[test]
+fn gen_css_memory_requires_hx_and_hz() {
+    let dir = tempfile::tempdir().unwrap();
+    let hx = dir.path().join("hx.json");
+    let hz = dir.path().join("hz.json");
+    std::fs::write(&hx, r#"{"format":"sparse_rows","num_cols":1,"rows":[]}"#).unwrap();
+    std::fs::write(&hz, r#"{"format":"sparse_rows","num_cols":1,"rows":[]}"#).unwrap();
+
+    for (omitted_arg, provided_arg, provided_path, expected) in [
+        ("--hx", "--hz", hz.as_path(), "--hx is required"),
+        ("--hz", "--hx", hx.as_path(), "--hz is required"),
+    ] {
+        let output = rstim_cmd()
+            .args([
+                "gen",
+                "--code",
+                "css",
+                "--task",
+                "memory",
+                provided_arg,
+                provided_path.to_str().unwrap(),
+                "--rounds",
+                "1",
+            ])
+            .output()
+            .unwrap();
+
+        assert!(
+            !output.status.success(),
+            "omitting {omitted_arg} unexpectedly succeeded"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(expected), "stderr: {stderr}");
+    }
 }
 
 #[test]
