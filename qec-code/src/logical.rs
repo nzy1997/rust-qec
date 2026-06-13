@@ -1,7 +1,8 @@
 use crate::Pauli;
-use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
+use crate::gf2::BinaryRow;
+use crate::{gf2, symplectic};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogicalBasis {
@@ -11,104 +12,81 @@ pub struct LogicalBasis {
 }
 
 pub fn extract_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
+    code.logical_basis()
+}
+
+pub fn compute_normalizer_basis(code: &StabilizerCode) -> Result<Vec<Pauli>> {
+    normalizer_basis_rows(code)?
+        .into_iter()
+        .map(Pauli::from_symplectic_row)
+        .collect()
+}
+
+pub fn compute_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
+    compute_canonical_logical_basis(code)
+}
+
+pub fn compute_canonical_logical_basis(code: &StabilizerCode) -> Result<LogicalBasis> {
     let k = code.num_logical_qubits();
-    if k == 0 {
-        return Ok(LogicalBasis {
-            k,
-            logical_x: Vec::new(),
-            logical_z: Vec::new(),
-        });
-    }
-    if k > 1 {
-        return Err(QecError::UnsupportedLogicalBasis { k });
+    let logical_rows = logical_quotient_rows(code)?;
+    let pairs = symplectic::symplectic_gram_schmidt(&logical_rows)?;
+
+    if pairs.len() != k {
+        return Err(QecError::LogicalBasisNotFound);
     }
 
-    let stabilizer_rows = code.stabilizer_rows();
-    let mut logicals = Vec::new();
-
-    for candidate in all_paulis(code.n())? {
-        if code
-            .stabilizers()
-            .iter()
-            .all(|stabilizer| candidate.commutes_with(stabilizer))
-            && !try_in_row_span(&stabilizer_rows, &candidate.to_symplectic_row())?
-        {
-            logicals.push(candidate);
-        }
+    let mut logical_x = Vec::with_capacity(k);
+    let mut logical_z = Vec::with_capacity(k);
+    for (x_like, z_like) in pairs {
+        logical_x.push(Pauli::from_symplectic_row(x_like)?);
+        logical_z.push(Pauli::from_symplectic_row(z_like)?);
     }
 
-    let (logical_x, logical_z) = select_anticommuting_pair(&logicals)?;
     Ok(LogicalBasis {
         k,
-        logical_x: vec![logical_x],
-        logical_z: vec![logical_z],
+        logical_x,
+        logical_z,
     })
 }
 
-fn all_paulis(n: usize) -> Result<Vec<Pauli>> {
-    let symplectic_bits = n
+fn logical_quotient_rows(code: &StabilizerCode) -> Result<Vec<BinaryRow>> {
+    let width = symplectic_width(code)?;
+    let target_count = code
+        .num_logical_qubits()
         .checked_mul(2)
-        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
-    let total = 1usize
-        .checked_shl(symplectic_bits as u32)
-        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })?;
-    let mut paulis = Vec::with_capacity(total.saturating_sub(1));
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n: code.n() })?;
+    let mut span_rows = code.stabilizer_rows();
+    gf2::validate_rows_with_width(&span_rows, width)?;
 
-    for mask in 1..total {
-        let mut x = vec![0; n];
-        let mut z = vec![0; n];
-
-        for qubit in 0..n {
-            x[qubit] = ((mask >> qubit) & 1) as u8;
-            z[qubit] = ((mask >> (n + qubit)) & 1) as u8;
+    let mut logical_rows = Vec::with_capacity(target_count);
+    for row in normalizer_basis_rows(code)? {
+        if gf2::try_in_row_span_with_width(&span_rows, width, &row)? {
+            continue;
         }
 
-        paulis.push(
-            Pauli::from_xz_bits(x, z).expect("generated Pauli supports must be valid binary rows"),
-        );
-    }
-
-    Ok(paulis)
-}
-
-fn select_anticommuting_pair(logicals: &[Pauli]) -> Result<(Pauli, Pauli)> {
-    for i in 0..logicals.len() {
-        for j in (i + 1)..logicals.len() {
-            if logicals[i].try_anticommutes_with(&logicals[j])? {
-                return Ok((logicals[i].clone(), logicals[j].clone()));
-            }
+        span_rows.push(row.clone());
+        logical_rows.push(row);
+        if logical_rows.len() == target_count {
+            return Ok(logical_rows);
         }
     }
 
-    Err(QecError::LogicalBasisNotFound)
+    if logical_rows.len() == target_count {
+        Ok(logical_rows)
+    } else {
+        Err(QecError::LogicalBasisNotFound)
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::select_anticommuting_pair;
-    use crate::{Pauli, QecError};
+fn normalizer_basis_rows(code: &StabilizerCode) -> Result<Vec<BinaryRow>> {
+    let width = symplectic_width(code)?;
+    let stabilizer_rows = code.stabilizer_rows();
+    let constraints = symplectic::commutation_constraints_with_width(&stabilizer_rows, width)?;
+    gf2::try_nullspace_basis_with_width(&constraints, width)
+}
 
-    #[test]
-    fn select_anticommuting_pair_returns_the_first_found_pair() {
-        let logical_x = Pauli::from_xz_bits(vec![1, 1], vec![0, 0]).unwrap();
-        let logical_z = Pauli::from_xz_bits(vec![0, 0], vec![1, 0]).unwrap();
-        let commuting = Pauli::from_xz_bits(vec![0, 0], vec![0, 1]).unwrap();
-
-        let (x, z) = select_anticommuting_pair(&[logical_x.clone(), logical_z.clone(), commuting])
-            .unwrap();
-
-        assert_eq!(x, logical_x);
-        assert_eq!(z, logical_z);
-    }
-
-    #[test]
-    fn select_anticommuting_pair_reports_when_no_pair_exists() {
-        let x0 = Pauli::from_xz_bits(vec![1, 0], vec![0, 0]).unwrap();
-        let x1 = Pauli::from_xz_bits(vec![0, 1], vec![0, 0]).unwrap();
-
-        assert_eq!(
-            select_anticommuting_pair(&[x0, x1]),
-            Err(QecError::LogicalBasisNotFound)
-        );
-    }
+fn symplectic_width(code: &StabilizerCode) -> Result<usize> {
+    let n = code.n();
+    n.checked_mul(2)
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })
 }

@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 use crate::QecError;
 use crate::codes::steane::Steane;
 use crate::distance::compute_distance;
-use crate::logical::extract_logical_basis;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -69,7 +68,7 @@ fn run_steane(command: SteaneCommands) -> Result<String, QecError> {
             Ok(lines.join("\n"))
         }
         SteaneCommands::Logicals => {
-            let basis = extract_logical_basis(code)?;
+            let basis = code.logical_basis()?;
             Ok(format!(
                 "k: {}\nlogical_x:\n{}\nlogical_z:\n{}",
                 basis.k,

@@ -5,8 +5,10 @@ pub mod codes;
 pub mod css;
 pub mod distance;
 pub mod error;
+mod gf2;
 pub mod logical;
 pub mod pauli;
+mod symplectic;
 
 pub use code::StabilizerCode;
 pub use error::QecError;

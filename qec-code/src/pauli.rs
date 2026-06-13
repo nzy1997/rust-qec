@@ -1,4 +1,5 @@
 use crate::error::{QecError, Result};
+use crate::symplectic;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pauli {
@@ -17,6 +18,16 @@ impl Pauli {
         validate_pauli_bits("X", &x)?;
         validate_pauli_bits("Z", &z)?;
         Ok(Self { x, z })
+    }
+
+    pub fn from_symplectic_row(row: Vec<u8>) -> Result<Self> {
+        if row.len() % 2 != 0 {
+            return Err(QecError::InvalidSymplecticRowWidth { width: row.len() });
+        }
+
+        let qubits = row.len() / 2;
+        let (x, z) = row.split_at(qubits);
+        Self::from_xz_bits(x.to_vec(), z.to_vec())
     }
 
     pub fn n(&self) -> usize {
@@ -39,14 +50,7 @@ impl Pauli {
             });
         }
 
-        Ok(self
-            .x
-            .iter()
-            .zip(&self.z)
-            .zip(other.x.iter().zip(&other.z))
-            .fold(0, |parity, ((x1, z1), (x2, z2))| {
-                parity ^ ((*x1 & *z2) ^ (*z1 & *x2))
-            }))
+        symplectic::symplectic_product(&self.to_symplectic_row(), &other.to_symplectic_row())
     }
 
     pub fn symplectic_product(&self, other: &Self) -> u8 {
@@ -63,7 +67,14 @@ impl Pauli {
     }
 
     pub fn try_commutes_with(&self, other: &Self) -> Result<bool> {
-        Ok(self.try_symplectic_product(other)? == 0)
+        if self.n() != other.n() {
+            return Err(QecError::InvalidPauliWidth {
+                x_width: self.n(),
+                z_width: other.n(),
+            });
+        }
+
+        symplectic::commutes(&self.to_symplectic_row(), &other.to_symplectic_row())
     }
 
     pub fn commutes_with(&self, other: &Self) -> bool {
@@ -72,7 +83,7 @@ impl Pauli {
     }
 
     pub fn try_anticommutes_with(&self, other: &Self) -> Result<bool> {
-        Ok(self.try_symplectic_product(other)? == 1)
+        Ok(!self.try_commutes_with(other)?)
     }
 
     pub fn anticommutes_with(&self, other: &Self) -> bool {
