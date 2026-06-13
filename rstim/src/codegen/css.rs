@@ -464,6 +464,15 @@ fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[C
     for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
         instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
     }
+    if config.noise.after_clifford_depolarization > 0.0 {
+        for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[config.noise.after_clifford_depolarization],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
+    }
     for layer in schedule_layers(config.schedule, checks) {
         instrs.push(op("TICK", &[], &[]));
         let targets: Vec<_> = layer
@@ -478,10 +487,26 @@ fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[C
         if !targets.is_empty() {
             instrs.push(op("CX", &[], &targets));
         }
+        if config.noise.after_clifford_depolarization > 0.0 && !targets.is_empty() {
+            instrs.push(op(
+                "DEPOLARIZE2",
+                &[config.noise.after_clifford_depolarization],
+                &targets,
+            ));
+        }
     }
     instrs.push(op("TICK", &[], &[]));
     for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
         instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    if config.noise.after_clifford_depolarization > 0.0 {
+        for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[config.noise.after_clifford_depolarization],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
     }
     instrs.push(op("TICK", &[], &[]));
     if config.noise.before_measure_flip_probability > 0.0 {
@@ -511,8 +536,30 @@ fn schedule_layers(schedule: CssSchedule, checks: &[Check]) -> Vec<Vec<CnotInter
     let interactions = cnot_interactions(checks);
     match schedule {
         CssSchedule::Sequential => interactions.into_iter().map(|cnot| vec![cnot]).collect(),
-        CssSchedule::Greedy => interactions.into_iter().map(|cnot| vec![cnot]).collect(),
+        CssSchedule::Greedy => {
+            let mut layers: Vec<Vec<CnotInteraction>> = Vec::new();
+            for cnot in interactions {
+                if let Some(layer) = layers
+                    .iter_mut()
+                    .find(|layer| cnot_fits_layer(&cnot, layer))
+                {
+                    layer.push(cnot);
+                } else {
+                    layers.push(vec![cnot]);
+                }
+            }
+            layers
+        }
     }
+}
+
+fn cnot_fits_layer(cnot: &CnotInteraction, layer: &[CnotInteraction]) -> bool {
+    layer.iter().all(|existing| {
+        existing.control != cnot.control
+            && existing.target != cnot.control
+            && existing.control != cnot.target
+            && existing.target != cnot.target
+    })
 }
 
 fn cnot_interactions(checks: &[Check]) -> Vec<CnotInteraction> {

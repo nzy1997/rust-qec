@@ -129,3 +129,39 @@ fn observable_json_uses_sparse_support_rows() {
     assert_eq!(parsed.num_cols, 4);
     assert_eq!(parsed.rows, vec![vec![0, 2], vec![1, 3]]);
 }
+
+#[test]
+fn greedy_schedule_packs_disjoint_cnots() {
+    let sequential = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: vec![vec![0], vec![1]],
+            hz: vec![],
+            num_data_qubits: 2,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Sequential,
+        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+    };
+    let mut greedy = sequential.clone();
+    greedy.schedule = CssSchedule::Greedy;
+
+    let sequential_text = circuit_to_string(&css_memory(sequential).unwrap());
+    let greedy_text = circuit_to_string(&css_memory(greedy).unwrap());
+
+    assert!(sequential_text.contains("CX 2 0\nTICK\nCX 3 1"));
+    assert!(greedy_text.contains("CX 2 0 3 1"));
+}
+
+#[test]
+fn css_memory_places_requested_noise_channels() {
+    let mut config = repetition_like_css_config(1, MemoryBasis::X);
+    config.noise = NoiseParams::uniform(0.125);
+
+    let text = circuit_to_string(&css_memory(config).unwrap());
+
+    assert!(text.contains("DEPOLARIZE1(0.125) 0"));
+    assert!(text.contains("DEPOLARIZE2(0.125) 2 0"));
+    assert!(text.contains("X_ERROR(0.125) 2"));
+}
