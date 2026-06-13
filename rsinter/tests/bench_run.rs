@@ -258,6 +258,133 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn rilpqec_benchmark_records_normalized_decoder_params() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rilpqec_tuned"
+language = "rust"
+impl_key = "rilpqec"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+backend = "highs"
+time_limit_s = 5.0
+mip_gap = 0.01
+threads = 1
+verbose = true
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rilpqec_tuned")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].params["backend"], serde_json::json!("highs"));
+    assert_eq!(rows[0].params["time_limit_s"], serde_json::json!(5.0));
+    assert_eq!(rows[0].params["mip_gap"], serde_json::json!(0.01));
+    assert_eq!(rows[0].params["threads"], serde_json::json!(1));
+    assert_eq!(rows[0].params["verbose"], serde_json::json!(true));
+}
+
+#[test]
+fn rilpqec_benchmark_rejects_invalid_mip_gap() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rilpqec_bad"
+language = "rust"
+impl_key = "rilpqec"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+mip_gap = 1.0
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "mip_gap must be in [0, 1)");
+}
+
+#[test]
 fn rust_benchmark_run_rejects_invalid_distance_before_codegen_panic() {
     let spec_text = r#"
 name = "surface_decoder"
