@@ -65,4 +65,16 @@ impl StabilizerCode {
     pub fn num_logical_qubits(&self) -> usize {
         self.n - self.stabilizer_rank
     }
+
+    pub fn normalizer_basis(&self) -> Result<Vec<Pauli>> {
+        crate::logical::compute_normalizer_basis(self)
+    }
+
+    pub fn logical_basis(&self) -> Result<crate::logical::LogicalBasis> {
+        crate::logical::compute_logical_basis(self)
+    }
+
+    pub fn canonical_logical_basis(&self) -> Result<crate::logical::LogicalBasis> {
+        crate::logical::compute_canonical_logical_basis(self)
+    }
 }
