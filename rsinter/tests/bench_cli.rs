@@ -40,6 +40,30 @@ fn rsinter_bench_run_writes_artifacts_from_fixture_spec() {
 }
 
 #[test]
+fn rsinter_bench_run_writes_artifacts_from_css_fixture_spec() {
+    let dir = tempfile::tempdir().unwrap();
+    let spec = "tests/fixtures/bench/minimal_css_decoder.toml";
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "run",
+            "--spec",
+            spec,
+            "--language",
+            "rust",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let entries: Vec<_> = fs::read_dir(dir.path()).unwrap().collect();
+    assert!(!entries.is_empty());
+}
+
+#[test]
 fn rsinter_bench_merge_writes_combined_jsonl() {
     let dir = tempfile::tempdir().unwrap();
     let first = dir.path().join("first.jsonl");

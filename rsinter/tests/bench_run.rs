@@ -317,7 +317,7 @@ label = "Logical Error Rate"
 fn rust_benchmark_run_supports_css_input_type() {
     let spec_path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/minimal_css_decoder.toml");
-    let text = fs::read_to_string(spec_path).unwrap();
+    let text = fs::read_to_string(&spec_path).unwrap();
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
@@ -327,7 +327,7 @@ fn rust_benchmark_run_supports_css_input_type() {
         "rust",
         dir.path(),
         &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
+        spec_path.parent().unwrap(),
     )
     .unwrap();
     let data = fs::read(
