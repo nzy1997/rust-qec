@@ -210,6 +210,23 @@ Current generator controls:
 - `--rounds`
 - `--after_clifford_depolarization`
 
+CSS memory circuits can be generated from explicit matrix wrappers:
+
+```sh
+rstim gen \
+  --code css \
+  --task memory \
+  --hx hx.json \
+  --hz hz.json \
+  --basis x \
+  --rounds 3 \
+  --schedule greedy \
+  --observables logicals_x.json
+```
+
+`hx.json`, `hz.json`, and observable files use the explicit JSON wrappers
+accepted by `rstim::codegen::css`.
+
 This command is a convenient front door to the circuit generation APIs in
 `rstim::codegen`.
 
