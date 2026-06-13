@@ -11,6 +11,11 @@ pub(crate) struct ReducedRows {
 
 pub(crate) fn validate_rows(matrix: &[BinaryRow]) -> Result<usize> {
     let width = matrix.first().map_or(0, Vec::len);
+    validate_rows_with_width(matrix, width)?;
+    Ok(width)
+}
+
+pub(crate) fn validate_rows_with_width(matrix: &[BinaryRow], width: usize) -> Result<()> {
     for (row_index, row) in matrix.iter().enumerate() {
         if row.len() != width {
             return Err(QecError::RowWidthMismatch {
@@ -28,7 +33,7 @@ pub(crate) fn validate_rows(matrix: &[BinaryRow]) -> Result<usize> {
             }
         }
     }
-    Ok(width)
+    Ok(())
 }
 
 pub(crate) fn validate_target(target: &[u8]) -> Result<()> {
@@ -74,6 +79,11 @@ pub(crate) fn try_row_echelon(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
 
 pub(crate) fn try_rref(matrix: &[BinaryRow]) -> Result<ReducedRows> {
     let width = validate_rows(matrix)?;
+    try_rref_with_width(matrix, width)
+}
+
+pub(crate) fn try_rref_with_width(matrix: &[BinaryRow], width: usize) -> Result<ReducedRows> {
+    validate_rows_with_width(matrix, width)?;
     let mut rows = matrix.to_vec();
     let mut pivot_cols = Vec::new();
     let mut pivot_row = 0;
@@ -118,6 +128,17 @@ pub(crate) fn try_in_row_span(matrix: &[BinaryRow], target: &[u8]) -> Result<boo
         return Ok(!target.iter().any(|bit| *bit != 0));
     }
 
+    try_in_row_span_with_width(matrix, width, target)
+}
+
+pub(crate) fn try_in_row_span_with_width(
+    matrix: &[BinaryRow],
+    width: usize,
+    target: &[u8],
+) -> Result<bool> {
+    validate_rows_with_width(matrix, width)?;
+    validate_target(target)?;
+
     if target.len() != width {
         return Err(QecError::RowWidthMismatch {
             expected: width,
@@ -125,18 +146,22 @@ pub(crate) fn try_in_row_span(matrix: &[BinaryRow], target: &[u8]) -> Result<boo
         });
     }
 
-    let rank = try_rank(matrix)?;
+    if matrix.is_empty() {
+        return Ok(!target.iter().any(|bit| *bit != 0));
+    }
+
+    let rank = try_rref_with_width(matrix, width)?.pivot_cols.len();
     let mut augmented = matrix.to_vec();
     augmented.push(target.to_vec());
-    Ok(try_rank(&augmented)? == rank)
+    Ok(try_rref_with_width(&augmented, width)?.pivot_cols.len() == rank)
 }
 
 pub(crate) fn try_select_independent_rows(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
-    validate_rows(matrix)?;
+    let width = validate_rows(matrix)?;
     let mut basis = Vec::new();
 
     for row in matrix {
-        if !try_in_row_span(&basis, row)? {
+        if !try_in_row_span_with_width(&basis, width, row)? {
             basis.push(row.clone());
         }
     }
@@ -145,7 +170,15 @@ pub(crate) fn try_select_independent_rows(matrix: &[BinaryRow]) -> Result<Vec<Bi
 }
 
 pub(crate) fn try_nullspace_basis(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
-    let reduced = try_rref(matrix)?;
+    let width = validate_rows(matrix)?;
+    try_nullspace_basis_with_width(matrix, width)
+}
+
+pub(crate) fn try_nullspace_basis_with_width(
+    matrix: &[BinaryRow],
+    width: usize,
+) -> Result<Vec<BinaryRow>> {
+    let reduced = try_rref_with_width(matrix, width)?;
     let width = reduced.width;
     let pivot_cols = reduced.pivot_cols;
     let free_cols = (0..width)
@@ -171,7 +204,12 @@ pub(crate) fn try_nullspace_basis(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>
 
 #[cfg(test)]
 mod tests {
-    use super::{try_nullspace_basis, try_select_independent_rows};
+    use crate::error::QecError;
+
+    use super::{
+        try_in_row_span_with_width, try_nullspace_basis_with_width, try_nullspace_basis,
+        try_select_independent_rows,
+    };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
         lhs.iter()
@@ -200,6 +238,26 @@ mod tests {
         assert_eq!(
             try_select_independent_rows(&rows).unwrap(),
             vec![vec![1, 0, 1], vec![0, 1, 1]]
+        );
+    }
+
+    #[test]
+    fn width_aware_nullspace_basis_for_empty_constraints_spans_full_space() {
+        let basis = try_nullspace_basis_with_width(&[], 3).unwrap();
+
+        assert_eq!(basis, vec![vec![1, 0, 0], vec![0, 1, 0], vec![0, 0, 1]]);
+    }
+
+    #[test]
+    fn width_aware_row_span_path_checks_known_empty_constraint_width() {
+        assert_eq!(try_in_row_span_with_width(&[], 3, &[0, 0, 0]), Ok(true));
+        assert_eq!(try_in_row_span_with_width(&[], 3, &[1, 0, 0]), Ok(false));
+        assert_eq!(
+            try_in_row_span_with_width(&[], 3, &[0, 0]),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            })
         );
     }
 }
