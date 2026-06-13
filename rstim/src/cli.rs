@@ -1649,6 +1649,255 @@ mod tests {
         );
     }
 
+    fn write_css_json(dir: &tempfile::TempDir, name: &str, text: &str) -> String {
+        let path = dir.path().join(name);
+        std::fs::write(&path, text).unwrap();
+        path.display().to_string()
+    }
+
+    #[test]
+    fn run_dispatches_css_gen_command_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let hx = write_css_json(
+            &dir,
+            "hx.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#,
+        );
+        let hz = write_css_json(
+            &dir,
+            "hz.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let observables = write_css_json(
+            &dir,
+            "obs.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let out = dir.path().join("memory.stim");
+
+        run(Cli {
+            command: Some(Commands::Gen {
+                code: "css".to_string(),
+                task: "memory".to_string(),
+                distance: None,
+                rounds: 2,
+                noise: 0.0,
+                hx: Some(hx),
+                hz: Some(hz),
+                basis: Some("Z".to_string()),
+                schedule: "sequential".to_string(),
+                observables: Some(observables),
+                out: Some(out.display().to_string()),
+            }),
+        })
+        .unwrap();
+
+        let text = std::fs::read_to_string(out).unwrap();
+        assert!(text.contains("R 0"));
+        assert!(text.contains("M 0"));
+        assert!(text.contains("MR 2"));
+        assert!(text.contains("OBSERVABLE_INCLUDE"));
+    }
+
+    #[test]
+    fn run_css_gen_accepts_canonical_fallback_without_observable_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+        let hx = write_css_json(&dir, "steane_hx.json", h);
+        let hz = write_css_json(&dir, "steane_hz.json", h);
+        let mut out = Vec::new();
+
+        run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut out,
+        )
+        .unwrap();
+
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("OBSERVABLE_INCLUDE"));
+        assert_eq!(parse_memory_basis("X").unwrap(), MemoryBasis::X);
+        assert_eq!(parse_memory_basis("z").unwrap(), MemoryBasis::Z);
+        assert_eq!(parse_css_schedule("greedy").unwrap(), CssSchedule::Greedy);
+        assert_eq!(
+            parse_css_schedule("sequential").unwrap(),
+            CssSchedule::Sequential
+        );
+    }
+
+    #[test]
+    fn run_css_gen_reports_input_errors_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let hx = write_css_json(
+            &dir,
+            "hx.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        );
+        let hz = write_css_json(
+            &dir,
+            "hz.json",
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#,
+        );
+        let hz_wide = write_css_json(
+            &dir,
+            "hz_wide.json",
+            r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+        );
+        let obs_wide = write_css_json(
+            &dir,
+            "obs_wide.json",
+            r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1,2]]}"#,
+        );
+
+        let err = run_css_gen(
+            "stability",
+            None,
+            None,
+            None,
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown css task"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            None,
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--hx is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            None,
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--hz is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz_wide),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("hx and hz widths differ"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "greedy",
+            Some(&obs_wide),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("observable width differs"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            None,
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("--basis is required"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("y"),
+            1,
+            0.0,
+            "greedy",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown CSS memory basis"), "error was: {err}");
+
+        let err = run_css_gen(
+            "memory",
+            Some(&hx),
+            Some(&hz),
+            Some("x"),
+            1,
+            0.0,
+            "layered",
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown CSS schedule"), "error was: {err}");
+    }
+
+    #[test]
+    fn run_common_gen_missing_distance_is_in_process_error_without_touching_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out.stim");
+        std::fs::write(&out, "keep me").unwrap();
+
+        let err = run(Cli {
+            command: Some(Commands::Gen {
+                code: "repetition_code".to_string(),
+                task: "memory".to_string(),
+                distance: None,
+                rounds: 1,
+                noise: 0.0,
+                hx: None,
+                hz: None,
+                basis: None,
+                schedule: "greedy".to_string(),
+                observables: None,
+                out: Some(out.display().to_string()),
+            }),
+        })
+        .unwrap_err();
+
+        assert!(
+            err.contains("distance is required for common generators"),
+            "error was: {err}"
+        );
+        assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
+    }
+
     #[test]
     fn run_dispatches_perf_summarize_gate_and_report_commands_in_process() {
         let dir = tempfile::tempdir().unwrap();
