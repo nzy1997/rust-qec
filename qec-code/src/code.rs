@@ -66,6 +66,7 @@ impl StabilizerCode {
         self.n - self.stabilizer_rank
     }
 
+    /// Returns a basis for the full stabilizer normalizer, including stabilizer generators.
     pub fn normalizer_basis(&self) -> Result<Vec<Pauli>> {
         crate::logical::compute_normalizer_basis(self)
     }

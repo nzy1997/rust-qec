@@ -1,6 +1,6 @@
 use crate::Pauli;
 use crate::code::StabilizerCode;
-use crate::error::Result;
+use crate::error::{QecError, Result};
 use crate::{gf2, symplectic};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,8 +34,14 @@ pub fn compute_canonical_logical_basis(code: &StabilizerCode) -> Result<LogicalB
 }
 
 fn normalizer_basis_rows(code: &StabilizerCode) -> Result<Vec<Vec<u8>>> {
-    let width = 2 * code.n();
+    let width = symplectic_width(code)?;
     let stabilizer_rows = code.stabilizer_rows();
     let constraints = symplectic::commutation_constraints_with_width(&stabilizer_rows, width)?;
     gf2::try_nullspace_basis_with_width(&constraints, width)
+}
+
+fn symplectic_width(code: &StabilizerCode) -> Result<usize> {
+    let n = code.n();
+    n.checked_mul(2)
+        .ok_or(QecError::UnsupportedExhaustiveEnumeration { n })
 }

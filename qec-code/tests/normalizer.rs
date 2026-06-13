@@ -1,6 +1,6 @@
-use qec_code::binary::in_row_span;
+use qec_code::binary::{in_row_span, try_binary_rank};
 use qec_code::codes::steane::Steane;
-use qec_code::{Pauli, StabilizerCode};
+use qec_code::{Pauli, QecError, StabilizerCode};
 
 fn trivial_k_two_code() -> StabilizerCode {
     StabilizerCode::from_stabilizers(
@@ -17,8 +17,13 @@ fn trivial_k_two_code() -> StabilizerCode {
 fn steane_normalizer_basis_has_expected_dimension() {
     let steane = Steane::new().unwrap();
     let basis = steane.code().normalizer_basis().unwrap();
+    let basis_rows = basis
+        .iter()
+        .map(Pauli::to_symplectic_row)
+        .collect::<Vec<_>>();
 
     assert_eq!(basis.len(), 8);
+    assert_eq!(try_binary_rank(&basis_rows).unwrap(), basis.len());
     for operator in &basis {
         for stabilizer in steane.code().stabilizers() {
             assert!(operator.commutes_with(stabilizer));
@@ -45,7 +50,23 @@ fn stabilizers_lie_in_the_returned_normalizer_span() {
 fn empty_stabilizer_code_normalizer_has_full_symplectic_dimension() {
     let code = StabilizerCode::from_stabilizers(2, vec![]).unwrap();
     let basis = code.normalizer_basis().unwrap();
+    let basis_rows = basis
+        .iter()
+        .map(Pauli::to_symplectic_row)
+        .collect::<Vec<_>>();
 
     assert_eq!(basis.len(), 4);
+    assert_eq!(try_binary_rank(&basis_rows).unwrap(), basis.len());
     assert!(basis.iter().all(|operator| operator.n() == 2));
+}
+
+#[test]
+fn normalizer_basis_rejects_qubit_counts_that_overflow_symplectic_width() {
+    let n = usize::MAX / 2 + 1;
+    let code = StabilizerCode::from_stabilizers(n, vec![]).unwrap();
+
+    assert_eq!(
+        code.normalizer_basis(),
+        Err(QecError::UnsupportedExhaustiveEnumeration { n })
+    );
 }
