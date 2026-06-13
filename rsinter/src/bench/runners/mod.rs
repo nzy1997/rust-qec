@@ -22,7 +22,16 @@ pub(crate) fn run_decoder_point(
     point: &BenchCasePoint,
     ctx: &BenchRunContext,
 ) -> Result<BenchmarkResultRow, String> {
-    let circuit = rotated_memory_x(point.distance, point.rounds, point.p);
+    if point.input_type != "surface_rotated_memory_x" {
+        return Err(format!(
+            "runner {runner_name} does not yet support input_type {}",
+            point.input_type
+        ));
+    }
+    let distance = point
+        .distance
+        .ok_or_else(|| "surface_rotated_memory_x point is missing distance".to_string())?;
+    let circuit = rotated_memory_x(distance, point.rounds, point.p);
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?;
 
     let compile_started = Instant::now();
@@ -90,7 +99,7 @@ pub(crate) fn run_decoder_point(
         language: ctx.language.clone(),
         status: "ok".into(),
         params: ParamMap::from_pairs([
-            ("distance", serde_json::json!(point.distance)),
+            ("distance", serde_json::json!(distance)),
             ("rounds", serde_json::json!(point.rounds)),
             ("p", serde_json::json!(point.p)),
             ("max_shots", serde_json::json!(point.max_shots)),
@@ -161,9 +170,16 @@ mod tests {
     #[test]
     fn run_decoder_point_rejects_prediction_buffers_with_wrong_length() {
         let point = BenchCasePoint {
-            distance: 3,
+            input_type: "surface_rotated_memory_x".into(),
+            code_id: None,
+            distance: Some(3),
             rounds: 3,
             p: 0.002,
+            basis: None,
+            schedule: None,
+            hx_path: None,
+            hz_path: None,
+            observables_path: None,
             max_shots: 4,
             max_errors: 2,
             batch_size: 2,
@@ -183,9 +199,16 @@ mod tests {
     #[test]
     fn run_decoder_point_reports_zero_rates_when_no_shots_are_requested() {
         let point = BenchCasePoint {
-            distance: 3,
+            input_type: "surface_rotated_memory_x".into(),
+            code_id: None,
+            distance: Some(3),
             rounds: 3,
             p: 0.002,
+            basis: None,
+            schedule: None,
+            hx_path: None,
+            hz_path: None,
+            observables_path: None,
             max_shots: 0,
             max_errors: 2,
             batch_size: 2,

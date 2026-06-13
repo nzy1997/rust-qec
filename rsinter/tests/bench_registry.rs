@@ -83,6 +83,57 @@ fn expand_points_err_panics_when_points_expand_successfully() {
     let _ = expand_points_err(&params);
 }
 
+#[test]
+fn expand_runner_points_accepts_css_input_type() {
+    let params = BTreeMap::from([
+        ("input_type".into(), toml::Value::String("css".into())),
+        ("code_id".into(), toml::Value::String("steane".into())),
+        (
+            "hx".into(),
+            toml::Value::String("tests/fixtures/css/steane_hx.json".into()),
+        ),
+        (
+            "hz".into(),
+            toml::Value::String("tests/fixtures/css/steane_hz.json".into()),
+        ),
+        ("basis".into(), toml::Value::String("x".into())),
+        ("schedule".into(), toml::Value::String("greedy".into())),
+        (
+            "observables".into(),
+            toml::Value::String("tests/fixtures/css/steane_logicals_x.json".into()),
+        ),
+        (
+            "rounds".into(),
+            toml::Value::Array(vec![toml::Value::Integer(1)]),
+        ),
+        (
+            "p".into(),
+            toml::Value::Array(vec![toml::Value::Float(0.0)]),
+        ),
+        ("max_shots".into(), toml::Value::Integer(8)),
+        ("max_errors".into(), toml::Value::Integer(4)),
+        ("batch_size".into(), toml::Value::Integer(4)),
+    ]);
+
+    let points = expand_runner_points(&params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(points[0].rounds, 1);
+    assert_eq!(points[0].p, 0.0);
+    assert_eq!(points[0].input_type, "css");
+    assert_eq!(points[0].basis.as_deref(), Some("x"));
+    assert_eq!(points[0].code_id.as_deref(), Some("steane"));
+}
+
+#[test]
+fn expand_runner_points_defaults_to_legacy_surface_input() {
+    let points = expand_runner_points(&valid_runner_params()).unwrap();
+
+    assert_eq!(points[0].input_type, "surface_rotated_memory_x");
+    assert_eq!(points[0].distance, Some(3));
+    assert_eq!(points[0].basis, None);
+}
+
 fn valid_runner_params() -> BTreeMap<String, toml::Value> {
     BTreeMap::from([
         (
