@@ -3,6 +3,18 @@ use qec_code::distance::compute_distance;
 use qec_code::logical::extract_logical_basis;
 use qec_code::{Pauli, QecError, StabilizerCode};
 
+fn pauli(n: usize, x_support: &[usize], z_support: &[usize]) -> Pauli {
+    let mut x = vec![0; n];
+    let mut z = vec![0; n];
+    for &qubit in x_support {
+        x[qubit] = 1;
+    }
+    for &qubit in z_support {
+        z[qubit] = 1;
+    }
+    Pauli::from_xz_bits(x, z).unwrap()
+}
+
 #[test]
 fn steane_logical_basis_contains_one_anticommuting_pair() {
     let steane = Steane::new().unwrap();
@@ -37,21 +49,30 @@ fn steane_distance_is_three_with_a_commuting_weight_three_witness() {
 }
 
 #[test]
-fn logical_basis_rejects_multi_logical_codes_until_supported() {
-    let code = StabilizerCode::from_stabilizers(2, vec![]).unwrap();
+fn logical_basis_supports_multi_logical_codes() {
+    let code = StabilizerCode::from_stabilizers(4, vec![pauli(4, &[], &[0]), pauli(4, &[], &[1])])
+        .unwrap();
 
-    assert_eq!(
-        extract_logical_basis(&code),
-        Err(QecError::UnsupportedLogicalBasis { k: 2 })
-    );
+    let basis = extract_logical_basis(&code).unwrap();
+
+    assert_eq!(basis.k, 2);
+    assert_eq!(basis.logical_x.len(), 2);
+    assert_eq!(basis.logical_z.len(), 2);
+    for index in 0..basis.k {
+        assert!(basis.logical_x[index].anticommutes_with(&basis.logical_z[index]));
+    }
+    for stabilizer in code.stabilizers() {
+        for logical in basis.logical_x.iter().chain(&basis.logical_z) {
+            assert!(logical.commutes_with(stabilizer));
+        }
+    }
 }
 
 #[test]
 fn logical_basis_for_zero_logical_qubits_is_empty() {
-    let code = StabilizerCode::from_stabilizers(1, vec![
-        Pauli::from_xz_bits(vec![1], vec![0]).unwrap(),
-    ])
-    .unwrap();
+    let code =
+        StabilizerCode::from_stabilizers(1, vec![Pauli::from_xz_bits(vec![1], vec![0]).unwrap()])
+            .unwrap();
 
     let basis = extract_logical_basis(&code).unwrap();
 
@@ -71,11 +92,14 @@ fn distance_returns_no_witness_for_zero_logical_qubit_code() {
     )
     .unwrap();
 
-    assert_eq!(compute_distance(&code), Err(QecError::DistanceWitnessNotFound));
+    assert_eq!(
+        compute_distance(&code),
+        Err(QecError::DistanceWitnessNotFound)
+    );
 }
 
 #[test]
-fn exhaustive_logical_and_distance_search_reject_large_codes_instead_of_panicking() {
+fn large_code_logical_basis_avoids_exhaustive_enumeration() {
     let stabilizers = (0..31)
         .map(|qubit| {
             let mut z = vec![0; 32];
@@ -85,10 +109,16 @@ fn exhaustive_logical_and_distance_search_reject_large_codes_instead_of_panickin
         .collect();
     let code = StabilizerCode::from_stabilizers(32, stabilizers).unwrap();
 
-    assert_eq!(
-        extract_logical_basis(&code),
-        Err(QecError::UnsupportedExhaustiveEnumeration { n: 32 })
-    );
+    let basis = extract_logical_basis(&code).unwrap();
+
+    assert_eq!(basis.k, 1);
+    assert_eq!(basis.logical_x.len(), 1);
+    assert_eq!(basis.logical_z.len(), 1);
+    assert!(basis.logical_x[0].anticommutes_with(&basis.logical_z[0]));
+    for stabilizer in code.stabilizers() {
+        assert!(basis.logical_x[0].commutes_with(stabilizer));
+        assert!(basis.logical_z[0].commutes_with(stabilizer));
+    }
     assert_eq!(
         compute_distance(&code),
         Err(QecError::UnsupportedExhaustiveEnumeration { n: 32 })
