@@ -119,6 +119,10 @@ impl PreparedLinearSystem {
             .copied()
             .filter(|&column| !is_pivot[column])
             .collect::<Vec<_>>();
+        let mut is_free = vec![false; self.num_bits];
+        for &column in &free_columns {
+            is_free[column] = true;
+        }
 
         let mut solution = vec![false; self.num_bits];
         for &column in forced_true_columns {
@@ -128,7 +132,7 @@ impl PreparedLinearSystem {
                     num_bits: self.num_bits,
                 });
             }
-            if is_pivot[column] {
+            if !is_free[column] {
                 return Err(DecodeError::SingularSystem);
             }
             solution[column] = true;
@@ -154,6 +158,7 @@ impl PreparedLinearSystem {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::DecodeError;
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
@@ -234,6 +239,51 @@ mod tests {
             Correction::from(vec![false, false, true])
         );
         assert_eq!(pcm.multiply(&forced.correction), syndrome);
+    }
+
+    #[test]
+    fn prepared_system_rejects_forced_pivot_columns() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+
+        let error = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1, 2], &[0])
+            .unwrap_err();
+
+        assert_eq!(error, DecodeError::SingularSystem);
+    }
+
+    #[test]
+    fn prepared_system_rejects_forced_columns_outside_column_order() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+
+        let error = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1], &[2])
+            .unwrap_err();
+
+        assert_eq!(error, DecodeError::SingularSystem);
+    }
+
+    #[test]
+    fn detailed_solving_without_forced_columns_matches_basic_solving() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![false, true]);
+        let order = vec![2, 0, 1];
+        let mut detailed_prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut basic_prepared = PreparedLinearSystem::from_pcm(&pcm);
+
+        let detailed = detailed_prepared
+            .solve_with_column_order_detailed(&syndrome, &order, &[])
+            .unwrap();
+        let basic = basic_prepared
+            .solve_with_column_order(&syndrome, &order)
+            .unwrap();
+
+        assert_eq!(detailed.correction, basic);
     }
 
     #[test]
