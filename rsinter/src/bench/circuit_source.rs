@@ -74,9 +74,6 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     let basis = parse_memory_basis(basis_text)?;
     let schedule = parse_css_schedule(schedule_text)?;
     let num_data_qubits = hx.num_cols;
-    let num_x_checks = hx.rows.len();
-    let num_z_checks = hz.rows.len();
-    let mut case_summary = CaseSummary::new();
     let observables = if let Some(path) = point.observables_path.as_deref() {
         let text = std::fs::read_to_string(resolve_spec_path(spec_dir, path))
             .map_err(|error| error.to_string())?;
@@ -87,25 +84,8 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
                 parsed.num_cols, num_data_qubits
             ));
         }
-        let checks = match basis {
-            MemoryBasis::X => &hz.rows,
-            MemoryBasis::Z => &hx.rows,
-        };
-        if observables_commute_with_checks(&parsed.rows, checks) {
-            case_summary.insert("observables_source".into(), serde_json::json!("explicit"));
-            CssObservableSource::Explicit(parsed.rows)
-        } else {
-            case_summary.insert(
-                "observables_source".into(),
-                serde_json::json!("canonical_fallback"),
-            );
-            CssObservableSource::CanonicalFallback
-        }
+        CssObservableSource::Explicit(parsed.rows)
     } else {
-        case_summary.insert(
-            "observables_source".into(),
-            serde_json::json!("canonical_fallback"),
-        );
         CssObservableSource::CanonicalFallback
     };
     let circuit = css_memory(CssMemoryConfig {
@@ -139,25 +119,7 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
             ("max_errors", serde_json::json!(point.max_errors)),
             ("batch_size", serde_json::json!(point.batch_size)),
         ]),
-        case_summary: {
-            case_summary.insert("num_data_qubits".into(), serde_json::json!(num_data_qubits));
-            case_summary.insert("num_x_checks".into(), serde_json::json!(num_x_checks));
-            case_summary.insert("num_z_checks".into(), serde_json::json!(num_z_checks));
-            case_summary
-        },
-    })
-}
-
-fn observables_commute_with_checks(observables: &[Vec<usize>], checks: &[Vec<usize>]) -> bool {
-    observables.iter().all(|observable| {
-        checks.iter().all(|check| {
-            observable
-                .iter()
-                .filter(|&&qubit| check.binary_search(&qubit).is_ok())
-                .count()
-                % 2
-                == 0
-        })
+        case_summary: CaseSummary::new(),
     })
 }
 
