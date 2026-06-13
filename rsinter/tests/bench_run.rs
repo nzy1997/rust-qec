@@ -343,5 +343,64 @@ fn rust_benchmark_run_supports_css_input_type() {
     assert_eq!(rows[0].params["input_type"], serde_json::json!("css"));
     assert_eq!(rows[0].params["code_id"], serde_json::json!("steane"));
     assert_eq!(rows[0].params["basis"], serde_json::json!("x"));
+    assert_eq!(
+        rows[0].params["observables"],
+        serde_json::json!("../css/steane_logicals_x.json")
+    );
     assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(1));
+}
+
+#[test]
+fn rust_benchmark_run_reports_css_file_path_context() {
+    let spec_text = r#"
+name = "css_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "missing_hx.json"
+hz = "../css/steane_hz.json"
+basis = "x"
+rounds = [1]
+p = [0.0]
+schedule = "greedy"
+observables = "../css/steane_logicals_x.json"
+max_shots = 8
+max_errors = 4
+batch_size = 4
+
+[plot]
+title = "CSS Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench");
+
+    let err = run_rust_benchmark(&spec, "rust", dir.path(), &registry, &spec_dir).unwrap_err();
+
+    assert!(err.contains("hx"), "error was: {err}");
+    assert!(err.contains("missing_hx.json"), "error was: {err}");
 }

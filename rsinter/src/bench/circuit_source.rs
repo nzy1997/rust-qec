@@ -57,10 +57,8 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
         .hz_path
         .as_deref()
         .ok_or_else(|| "css point is missing hz".to_string())?;
-    let hx_text = std::fs::read_to_string(resolve_spec_path(spec_dir, hx_path))
-        .map_err(|error| error.to_string())?;
-    let hz_text = std::fs::read_to_string(resolve_spec_path(spec_dir, hz_path))
-        .map_err(|error| error.to_string())?;
+    let hx_text = read_spec_text(spec_dir, "hx", hx_path)?;
+    let hz_text = read_spec_text(spec_dir, "hz", hz_path)?;
     let hx = parse_css_matrix_json(&hx_text).map_err(|error| error.to_string())?;
     let hz = parse_css_matrix_json(&hz_text).map_err(|error| error.to_string())?;
     if hx.num_cols != hz.num_cols {
@@ -75,8 +73,7 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     let schedule = parse_css_schedule(schedule_text)?;
     let num_data_qubits = hx.num_cols;
     let observables = if let Some(path) = point.observables_path.as_deref() {
-        let text = std::fs::read_to_string(resolve_spec_path(spec_dir, path))
-            .map_err(|error| error.to_string())?;
+        let text = read_spec_text(spec_dir, "observables", path)?;
         let parsed = parse_css_observable_json(&text).map_err(|error| error.to_string())?;
         if parsed.num_cols != num_data_qubits {
             return Err(format!(
@@ -101,25 +98,43 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
         observables,
     })
     .map_err(|error| error.to_string())?;
+    let mut params = ParamMap::from_pairs([
+        ("input_type", serde_json::json!("css")),
+        (
+            "code_id",
+            serde_json::json!(point.code_id.as_deref().unwrap_or("css")),
+        ),
+        ("basis", serde_json::json!(basis_text)),
+        ("schedule", serde_json::json!(schedule_text)),
+        ("rounds", serde_json::json!(point.rounds)),
+        ("p", serde_json::json!(point.p)),
+        ("hx", serde_json::json!(hx_path)),
+        ("hz", serde_json::json!(hz_path)),
+        ("max_shots", serde_json::json!(point.max_shots)),
+        ("max_errors", serde_json::json!(point.max_errors)),
+        ("batch_size", serde_json::json!(point.batch_size)),
+    ]);
+    params.insert(
+        "observables".into(),
+        serde_json::json!(point
+            .observables_path
+            .as_deref()
+            .unwrap_or("canonical_fallback")),
+    );
     Ok(BuiltCircuit {
         circuit,
-        params: ParamMap::from_pairs([
-            ("input_type", serde_json::json!("css")),
-            (
-                "code_id",
-                serde_json::json!(point.code_id.as_deref().unwrap_or("css")),
-            ),
-            ("basis", serde_json::json!(basis_text)),
-            ("schedule", serde_json::json!(schedule_text)),
-            ("rounds", serde_json::json!(point.rounds)),
-            ("p", serde_json::json!(point.p)),
-            ("hx", serde_json::json!(hx_path)),
-            ("hz", serde_json::json!(hz_path)),
-            ("max_shots", serde_json::json!(point.max_shots)),
-            ("max_errors", serde_json::json!(point.max_errors)),
-            ("batch_size", serde_json::json!(point.batch_size)),
-        ]),
+        params,
         case_summary: CaseSummary::new(),
+    })
+}
+
+fn read_spec_text(spec_dir: &Path, field: &str, value: &str) -> Result<String, String> {
+    let path = resolve_spec_path(spec_dir, value);
+    std::fs::read_to_string(&path).map_err(|error| {
+        format!(
+            "failed to read CSS {field} file {}: {error}",
+            path.display()
+        )
     })
 }
 
