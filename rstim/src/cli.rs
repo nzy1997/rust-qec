@@ -1,19 +1,24 @@
 use std::io::{self, Read, Write};
 
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
+use crate::codegen::css::{
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
+};
+use crate::codegen::NoiseParams;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8,
+    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
+    write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
-use crate::sampler::{SampleOptions, sample_batch, sample_batch_with_options};
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -90,11 +95,21 @@ pub enum Commands {
         #[arg(long)]
         task: String,
         #[arg(long)]
-        distance: usize,
+        distance: Option<usize>,
         #[arg(long)]
         rounds: usize,
         #[arg(long = "after_clifford_depolarization", default_value = "0")]
         noise: f64,
+        #[arg(long)]
+        hx: Option<String>,
+        #[arg(long)]
+        hz: Option<String>,
+        #[arg(long)]
+        basis: Option<String>,
+        #[arg(long, default_value = "greedy")]
+        schedule: String,
+        #[arg(long)]
+        observables: Option<String>,
         #[arg(long)]
         out: Option<String>,
     },
@@ -345,10 +360,31 @@ pub fn run(cli: Cli) -> Result<(), String> {
             distance,
             rounds,
             noise,
+            hx,
+            hz,
+            basis,
+            schedule,
+            observables,
             out,
         }) => {
             let mut w = open_output(out.as_deref())?;
-            run_gen(&code, &task, distance, rounds, noise, &mut w)
+            if code == "css" {
+                run_css_gen(
+                    &task,
+                    hx.as_deref(),
+                    hz.as_deref(),
+                    basis.as_deref(),
+                    rounds,
+                    noise,
+                    &schedule,
+                    observables.as_deref(),
+                    &mut w,
+                )
+            } else {
+                let distance = distance
+                    .ok_or_else(|| "distance is required for common generators".to_string())?;
+                run_gen(&code, &task, distance, rounds, noise, &mut w)
+            }
         }
         Some(Commands::Convert {
             in_format,
@@ -481,7 +517,14 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let text = read_input(r#in.as_deref())?;
             let format = parse_json_output_format(&format)?;
             let mut w = open_output(out.as_deref())?;
-            run_export_json(&text, format, highlight_dem_error, sample_shot, seed, &mut w)
+            run_export_json(
+                &text,
+                format,
+                highlight_dem_error,
+                sample_shot,
+                seed,
+                &mut w,
+            )
         }
         Some(Commands::Perf { command }) => match command {
             PerfCommands::Run {
@@ -560,8 +603,9 @@ fn run_perf_ci(
     warmup_rounds: usize,
     measure_rounds: usize,
 ) -> Result<(), PerfCiError> {
-    std::fs::create_dir_all(out_dir)
-        .map_err(|e| PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}")))?;
+    std::fs::create_dir_all(out_dir).map_err(|e| {
+        PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}"))
+    })?;
 
     let raw_path = std::path::Path::new(out_dir).join("raw.jsonl");
     let summary_path = std::path::Path::new(out_dir).join("summary.json");
@@ -569,11 +613,12 @@ fn run_perf_ci(
 
     write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds)?;
 
-    let raw_text = std::fs::read_to_string(&raw_path)
-        .map_err(|e| PerfCiError::Infrastructure(format!(
+    let raw_text = std::fs::read_to_string(&raw_path).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
             "failed to read raw perf artifact {}: {e}",
             raw_path.display()
-        )))?;
+        ))
+    })?;
     finalize_perf_ci_artifacts(
         &raw_text,
         &summary_path,
@@ -614,18 +659,22 @@ fn finalize_perf_ci_artifacts(
     report_path: &std::path::Path,
     config: crate::perf::PerfGateConfig,
 ) -> Result<(), PerfCiError> {
-    let summary = crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
+    let summary =
+        crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
     let verdict = crate::perf::evaluate_summary(&summary, config);
 
     std::fs::write(
         summary_path,
-        serde_json::to_string_pretty(&summary)
-            .map_err(|e| PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}")))?,
+        serde_json::to_string_pretty(&summary).map_err(|e| {
+            PerfCiError::Infrastructure(format!("failed to serialize perf summary: {e}"))
+        })?,
     )
-    .map_err(|e| PerfCiError::Infrastructure(format!(
-        "failed to write perf summary {}: {e}",
-        summary_path.display()
-    )))?;
+    .map_err(|e| {
+        PerfCiError::Infrastructure(format!(
+            "failed to write perf summary {}: {e}",
+            summary_path.display()
+        ))
+    })?;
 
     let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
     std::fs::write(report_path, report).map_err(|e| {
@@ -772,6 +821,78 @@ pub fn run_gen(
     let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
     out.write_all(circuit_text.as_bytes())
         .map_err(|e| format!("write error: {e}"))
+}
+
+pub fn run_css_gen(
+    task: &str,
+    hx_path: Option<&str>,
+    hz_path: Option<&str>,
+    basis: Option<&str>,
+    rounds: usize,
+    noise: f64,
+    schedule: &str,
+    observables_path: Option<&str>,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    if task != "memory" {
+        return Err(format!("unknown css task: {task}"));
+    }
+    let hx_text = read_input(hx_path)?;
+    let hz_text = read_input(hz_path)?;
+    let hx = parse_css_matrix_json(&hx_text).map_err(|error| error.to_string())?;
+    let hz = parse_css_matrix_json(&hz_text).map_err(|error| error.to_string())?;
+    if hx.num_cols != hz.num_cols {
+        return Err(format!(
+            "hx and hz widths differ: {} != {}",
+            hx.num_cols, hz.num_cols
+        ));
+    }
+    let observables = if let Some(path) = observables_path {
+        let text = read_input(Some(path))?;
+        let parsed = parse_css_observable_json(&text).map_err(|error| error.to_string())?;
+        if parsed.num_cols != hx.num_cols {
+            return Err(format!(
+                "observable width differs from CSS width: {} != {}",
+                parsed.num_cols, hx.num_cols
+            ));
+        }
+        CssObservableSource::Explicit(parsed.rows)
+    } else {
+        CssObservableSource::CanonicalFallback
+    };
+    let basis = parse_memory_basis(basis.unwrap_or("x"))?;
+    let schedule = parse_css_schedule(schedule)?;
+    let circuit = css_memory(CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: hx.rows,
+            hz: hz.rows,
+            num_data_qubits: hx.num_cols,
+        },
+        rounds,
+        noise: NoiseParams::uniform(noise),
+        basis,
+        schedule,
+        observables,
+    })
+    .map_err(|error| error.to_string())?;
+    out.write_all(crate::ir::circuit_to_string(&circuit).as_bytes())
+        .map_err(|error| format!("write error: {error}"))
+}
+
+fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
+    match value {
+        "x" | "X" => Ok(MemoryBasis::X),
+        "z" | "Z" => Ok(MemoryBasis::Z),
+        other => Err(format!("unknown CSS memory basis: {other}")),
+    }
+}
+
+fn parse_css_schedule(value: &str) -> Result<CssSchedule, String> {
+    match value {
+        "sequential" => Ok(CssSchedule::Sequential),
+        "greedy" => Ok(CssSchedule::Greedy),
+        other => Err(format!("unknown CSS schedule: {other}")),
+    }
 }
 
 pub(crate) fn generate_common_circuit_text(
@@ -1454,7 +1575,9 @@ mod tests {
 
         match err {
             PerfCiError::Gate(message) => {
-                assert!(message.contains("RegressionFailure") || message.contains("exceeds threshold"));
+                assert!(
+                    message.contains("RegressionFailure") || message.contains("exceeds threshold")
+                );
             }
             PerfCiError::Infrastructure(message) => {
                 panic!("unexpected infrastructure failure: {message}");
@@ -1465,7 +1588,9 @@ mod tests {
         let report_text = std::fs::read_to_string(&report_path).unwrap();
         assert!(summary_text.contains("\"cases\""));
         assert!(report_text.contains("## Gate Verdict"));
-        assert!(report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold"));
+        assert!(
+            report_text.contains("RegressionFailure") || report_text.contains("exceeds threshold")
+        );
     }
 
     #[test]
@@ -1503,9 +1628,11 @@ mod tests {
                 .unwrap()
                 .contains("QUBIT_COORDS"));
         }
-        assert!(generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
-            .unwrap_err()
-            .contains("unknown code/task"));
+        assert!(
+            generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
+                .unwrap_err()
+                .contains("unknown code/task")
+        );
     }
 
     #[test]
