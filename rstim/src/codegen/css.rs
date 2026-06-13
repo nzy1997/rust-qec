@@ -279,11 +279,8 @@ pub fn css_memory(config: CssMemoryConfig) -> Result<Vec<StimInstr>, CssCodegenE
     }
     validate_supports("hx", &config.checks.hx, config.checks.num_data_qubits)?;
     validate_supports("hz", &config.checks.hz, config.checks.num_data_qubits)?;
-    let hx_dense = supports_to_dense(&config.checks.hx, config.checks.num_data_qubits);
-    let hz_dense = supports_to_dense(&config.checks.hz, config.checks.num_data_qubits);
-    let css_code = CssCode::from_hx_hz(hx_dense, hz_dense)
-        .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
-    let observables = resolve_observables(&config, &css_code)?;
+    validate_css_orthogonality(&config.checks.hx, &config.checks.hz)?;
+    let observables = resolve_observables(&config)?;
     emit_css_memory_circuit(&config, &observables)
 }
 
@@ -307,10 +304,7 @@ struct CnotInteraction {
     target: u32,
 }
 
-fn resolve_observables(
-    config: &CssMemoryConfig,
-    css_code: &CssCode,
-) -> Result<Vec<Vec<usize>>, CssCodegenError> {
+fn resolve_observables(config: &CssMemoryConfig) -> Result<Vec<Vec<usize>>, CssCodegenError> {
     match &config.observables {
         CssObservableSource::Explicit(rows) | CssObservableSource::ExplicitOrCanonical(rows)
             if !rows.is_empty() =>
@@ -319,7 +313,11 @@ fn resolve_observables(
             Ok(rows.clone())
         }
         CssObservableSource::ExplicitOrCanonical(_) | CssObservableSource::CanonicalFallback => {
-            canonical_observables(config, css_code)
+            let hx_dense = supports_to_dense(&config.checks.hx, config.checks.num_data_qubits);
+            let hz_dense = supports_to_dense(&config.checks.hz, config.checks.num_data_qubits);
+            let css_code = CssCode::from_hx_hz(hx_dense, hz_dense)
+                .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
+            canonical_observables(config, &css_code)
         }
         CssObservableSource::Explicit(rows) => {
             validate_observables(rows, config.checks.num_data_qubits)?;
@@ -781,6 +779,25 @@ fn validate_supports(
                     row: row_index,
                     col,
                 });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_css_orthogonality(hx: &[Vec<usize>], hz: &[Vec<usize>]) -> Result<(), CssCodegenError> {
+    for x_row in hx {
+        for z_row in hz {
+            let z_support: BTreeSet<_> = z_row.iter().copied().collect();
+            let parity = x_row
+                .iter()
+                .filter(|&&qubit| z_support.contains(&qubit))
+                .count()
+                % 2;
+            if parity != 0 {
+                return Err(CssCodegenError::InvalidCss(
+                    "CSS X/Z checks are not orthogonal".into(),
+                ));
             }
         }
     }
