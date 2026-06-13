@@ -25,6 +25,7 @@ fn rbposd_runner_handles_zero_shot_benchmark_points() {
         runner_name: "rbposd_alias".into(),
         language: "rust".into(),
         seed: 12_345,
+        spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
     };
 
     let row = runner.run_point(&point, &ctx).unwrap();
@@ -57,6 +58,7 @@ fn rilpqec_runner_handles_zero_shot_benchmark_points() {
         runner_name: "rilpqec_alias".into(),
         language: "rust".into(),
         seed: 12_345,
+        spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
     };
 
     let row = runner.run_point(&point, &ctx).unwrap();

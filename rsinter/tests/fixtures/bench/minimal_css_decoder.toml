@@ -1,0 +1,39 @@
+name = "css_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "tests/fixtures/css/steane_hx.json"
+hz = "tests/fixtures/css/steane_hz.json"
+basis = "x"
+rounds = [1]
+p = [0.0]
+schedule = "greedy"
+observables = "tests/fixtures/css/steane_logicals_x.json"
+max_shots = 8
+max_errors = 4
+batch_size = 4
+
+[plot]
+title = "CSS Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"

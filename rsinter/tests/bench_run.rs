@@ -3,6 +3,7 @@ use rsinter::bench::result::read_results_jsonl;
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::BenchmarkSpec;
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn rust_benchmark_run_writes_manifest_and_results_jsonl() {
@@ -46,7 +47,14 @@ label = "Logical Error Rate"
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let artifact_root = run_rust_benchmark(&spec, "rust", dir.path(), &registry).unwrap();
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
 
     let artifact_dir = artifact_root.join("rmatching").join("test-run");
     assert!(artifact_dir.join("run_manifest.json").exists());
@@ -101,7 +109,14 @@ label = "Logical Error Rate"
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let artifact_root = run_rust_benchmark(&spec, "rust", dir.path(), &registry).unwrap();
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
     let data = fs::read(
         artifact_root
             .join("mwpm_alias")
@@ -157,7 +172,14 @@ label = "Logical Error Rate"
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let err = run_rust_benchmark(&spec, "rust", dir.path(), &registry).unwrap_err();
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
     assert!(err.contains("distance"));
 }
 
@@ -205,14 +227,28 @@ label = "Logical Error Rate"
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let artifact_root = run_rust_benchmark(&good_spec, "rust", dir.path(), &registry).unwrap();
+    let artifact_root = run_rust_benchmark(
+        &good_spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
     let results_path = artifact_root
         .join("mwpm_alias")
         .join("test-run")
         .join("results.jsonl");
     assert!(results_path.exists());
 
-    let err = run_rust_benchmark(&bad_spec, "rust", dir.path(), &registry).unwrap_err();
+    let err = run_rust_benchmark(
+        &bad_spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
     assert!(err.contains("distance"));
     assert!(!results_path.exists());
 }
@@ -262,10 +298,50 @@ label = "Logical Error Rate"
     fs::write(staging_dir.join("stale.txt"), "stale").unwrap();
 
     let registry = build_default_rust_runner_registry();
-    let artifact_root = run_rust_benchmark(&spec, "rust", dir.path(), &registry).unwrap();
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
     let artifact_dir = artifact_root.join("rmatching").join("test-run");
 
     assert!(artifact_dir.join("run_manifest.json").exists());
     assert!(artifact_dir.join("results.jsonl").exists());
     assert!(!staging_dir.exists());
+}
+
+#[test]
+fn rust_benchmark_run_supports_css_input_type() {
+    let spec_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/minimal_css_decoder.toml");
+    let text = fs::read_to_string(spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rmatching")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("css"));
+    assert_eq!(rows[0].params["code_id"], serde_json::json!("steane"));
+    assert_eq!(rows[0].params["basis"], serde_json::json!("x"));
+    assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(1));
 }

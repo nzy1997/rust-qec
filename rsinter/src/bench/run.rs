@@ -10,6 +10,7 @@ pub fn run_rust_benchmark(
     language: &str,
     out_root: &Path,
     registry: &RustRunnerRegistry,
+    spec_dir: &Path,
 ) -> Result<PathBuf, String> {
     spec.validate()?;
     fs::create_dir_all(out_root).map_err(|e| e.to_string())?;
@@ -38,6 +39,7 @@ pub fn run_rust_benchmark(
             runner_name: runner.name.clone(),
             language: language.to_string(),
             seed: 12_345,
+            spec_dir: spec_dir.to_path_buf(),
         };
         let mut rows = Vec::new();
         for point in &points {

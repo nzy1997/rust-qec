@@ -3,13 +3,13 @@ use std::time::Instant;
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use rstim::codegen::surface_code::rotated_memory_x;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
+use crate::bench::circuit_source::build_circuit_for_point;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
-use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
+use crate::bench::result::{BenchmarkResultRow, MetricMap, PairMapExt};
 use crate::decode::Decoder;
 
 pub mod rbposd;
@@ -22,16 +22,8 @@ pub(crate) fn run_decoder_point(
     point: &BenchCasePoint,
     ctx: &BenchRunContext,
 ) -> Result<BenchmarkResultRow, String> {
-    if point.input_type != "surface_rotated_memory_x" {
-        return Err(format!(
-            "runner {runner_name} does not yet support input_type {}",
-            point.input_type
-        ));
-    }
-    let distance = point
-        .distance
-        .ok_or_else(|| "surface_rotated_memory_x point is missing distance".to_string())?;
-    let circuit = rotated_memory_x(distance, point.rounds, point.p);
+    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
+    let circuit = built.circuit;
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?;
 
     let compile_started = Instant::now();
@@ -98,19 +90,17 @@ pub(crate) fn run_decoder_point(
         runner: ctx.runner_name.clone(),
         language: ctx.language.clone(),
         status: "ok".into(),
-        params: ParamMap::from_pairs([
-            ("distance", serde_json::json!(distance)),
-            ("rounds", serde_json::json!(point.rounds)),
-            ("p", serde_json::json!(point.p)),
-            ("max_shots", serde_json::json!(point.max_shots)),
-            ("max_errors", serde_json::json!(point.max_errors)),
-            ("batch_size", serde_json::json!(point.batch_size)),
-        ]),
-        case_summary: CaseSummary::from_pairs([
-            ("num_dets", serde_json::json!(num_dets)),
-            ("num_obs", serde_json::json!(num_obs)),
-            ("num_shots_generated", serde_json::json!(generated_shots)),
-        ]),
+        params: built.params,
+        case_summary: {
+            let mut summary = built.case_summary;
+            summary.insert("num_dets".into(), serde_json::json!(num_dets));
+            summary.insert("num_obs".into(), serde_json::json!(num_obs));
+            summary.insert(
+                "num_shots_generated".into(),
+                serde_json::json!(generated_shots),
+            );
+            summary
+        },
         metrics: MetricMap::from_pairs([
             ("shots_used", shots_used as f64),
             ("logical_errors", logical_errors as f64),
@@ -189,6 +179,7 @@ mod tests {
             runner_name: "fake".into(),
             language: "rust".into(),
             seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
         };
 
         let err = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap_err();
@@ -218,6 +209,7 @@ mod tests {
             runner_name: "fake".into(),
             language: "rust".into(),
             seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
         };
 
         let row = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap();

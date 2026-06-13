@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use toml::Value;
 
@@ -28,6 +29,7 @@ pub struct BenchRunContext {
     pub runner_name: String,
     pub language: String,
     pub seed: u64,
+    pub spec_dir: PathBuf,
 }
 
 pub trait RustBenchRunner: Send + Sync {
