@@ -310,7 +310,7 @@ label = "Logical Error Rate"
     .unwrap_err();
 
     assert_eq!(err, "unknown rbposd runner param: bogus");
-    assert!(!dir.path().join("rbposd_bad").join("test-run").exists());
+    assert!(!dir.path().join("rbposd_bad").exists());
 }
 
 #[test]
