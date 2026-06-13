@@ -57,6 +57,40 @@ fn pauli_from_xz_bits_rejects_non_binary_values() {
 }
 
 #[test]
+fn pauli_symplectic_rows_round_trip_through_constructor() {
+    let row = vec![1, 0, 1, 0, 1, 1];
+    let pauli = Pauli::from_symplectic_row(row.clone()).unwrap();
+
+    assert_eq!(pauli.x_bits(), &[1, 0, 1]);
+    assert_eq!(pauli.z_bits(), &[0, 1, 1]);
+    assert_eq!(pauli.to_symplectic_row(), row);
+}
+
+#[test]
+fn pauli_from_symplectic_row_rejects_invalid_rows() {
+    assert_eq!(
+        Pauli::from_symplectic_row(vec![1, 0, 1]),
+        Err(QecError::InvalidSymplecticRowWidth { width: 3 })
+    );
+    assert_eq!(
+        Pauli::from_symplectic_row(vec![1, 2, 0, 1]),
+        Err(QecError::InvalidPauliBit {
+            which: "X",
+            index: 1,
+            value: 2,
+        })
+    );
+    assert_eq!(
+        Pauli::from_symplectic_row(vec![1, 0, 0, 3]),
+        Err(QecError::InvalidPauliBit {
+            which: "Z",
+            index: 1,
+            value: 3,
+        })
+    );
+}
+
+#[test]
 fn checked_binary_helpers_report_invalid_input_without_panicking() {
     assert_eq!(
         try_binary_rank(&[vec![1, 0], vec![1]]),

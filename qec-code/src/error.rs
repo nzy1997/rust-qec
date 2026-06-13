@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum QecError {
     #[error("row width mismatch: expected {expected}, got {actual}")]
     RowWidthMismatch { expected: usize, actual: usize },
+    #[error("invalid symplectic row width: expected even width, got {width}")]
+    InvalidSymplecticRowWidth { width: usize },
     #[error("non-binary matrix entry {value} at row {row}, column {col}")]
     InvalidBinaryEntry { row: usize, col: usize, value: u8 },
     #[error("invalid Pauli width: x has {x_width} bits, z has {z_width}")]
