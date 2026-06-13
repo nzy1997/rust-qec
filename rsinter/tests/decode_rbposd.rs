@@ -109,3 +109,57 @@ fn rbposd_dem_decoder_handles_zero_syndrome_map_cases() {
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
+
+#[test]
+fn rbposd_osd_order_changes_ler() {
+    let dem = DetectorErrorModel::parse(concat!(
+        "error(0.2689414213699951) D0\n",
+        "error(0.2689414213699951) D1\n",
+        "error(0.18242552380635635) D0 D1 L0\n",
+    ))
+    .unwrap();
+
+    let order0_ler = exact_three_error_logical_error_rate(&dem, 0);
+    let order10_ler = exact_three_error_logical_error_rate(&dem, 10);
+
+    assert!(
+        order10_ler < order0_ler,
+        "expected osd_order=10 to improve LER: order0={order0_ler}, order10={order10_ler}"
+    );
+}
+
+fn exact_three_error_logical_error_rate(dem: &DetectorErrorModel, osd_order: usize) -> f64 {
+    let mut config = DecoderConfig::default();
+    config.max_bp_iterations = 0;
+    config.osd_order = osd_order;
+    let decoder = RbposdDemDecoder::new(config);
+    let compiled = decoder.compile_for_dem(dem);
+    let probabilities = [
+        0.268_941_421_369_995_1,
+        0.268_941_421_369_995_1,
+        0.182_425_523_806_356_35,
+    ];
+    let mut ler = 0.0;
+    for e0 in [false, true] {
+        for e1 in [false, true] {
+            for e2 in [false, true] {
+                let event = [e0, e1, e2];
+                let probability = event
+                    .iter()
+                    .zip(probabilities.iter())
+                    .map(|(&fired, &p)| if fired { p } else { 1.0 - p })
+                    .product::<f64>();
+                let det0 = e0 ^ e2;
+                let det1 = e1 ^ e2;
+                let observed = e2;
+                let det_byte = u8::from(det0) | (u8::from(det1) << 1);
+                let predicted =
+                    compiled.decode_shots_bit_packed(&[det_byte], 1, 2, 1)[0] & 1 != 0;
+                if predicted != observed {
+                    ler += probability;
+                }
+            }
+        }
+    }
+    ler
+}
