@@ -16,6 +16,7 @@ impl RustBenchRunner for RmatchingRunner {
         ctx: &BenchRunContext,
     ) -> Result<BenchmarkResultRow, String> {
         let decoder = RmatchingDemDecoder;
-        run_decoder_point(self.name(), &decoder, point, ctx)
+        let decoder_params = crate::bench::result::ParamMap::new();
+        run_decoder_point(self.name(), &decoder, point, ctx, &decoder_params)
     }
 }

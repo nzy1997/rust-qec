@@ -21,14 +21,17 @@ pub struct SuccessDiagnostics {
 
 impl SuccessDiagnostics {
     fn matches_actual(&self, actual: &Self) -> bool {
-        self.converged.map_or(true, |value| actual.converged == Some(value))
+        self.converged
+            .map_or(true, |value| actual.converged == Some(value))
             && self
                 .bp_iterations
                 .map_or(true, |value| actual.bp_iterations == Some(value))
-            && self.used_osd.map_or(true, |value| actual.used_osd == Some(value))
-            && self.residual_syndrome_weight.map_or(true, |value| {
-                actual.residual_syndrome_weight == Some(value)
-            })
+            && self
+                .used_osd
+                .map_or(true, |value| actual.used_osd == Some(value))
+            && self
+                .residual_syndrome_weight
+                .map_or(true, |value| actual.residual_syndrome_weight == Some(value))
     }
 }
 
@@ -172,6 +175,7 @@ impl ConfigSpec {
             osd_variant: match self.osd_variant {
                 OsdVariantSpec::Osd0 => OsdVariant::Osd0,
             },
+            osd_order: 0,
         }
     }
 }
@@ -191,7 +195,11 @@ pub struct ParityCase {
 
 impl ParityCase {
     pub fn build_decoder(&self) -> Result<BpOsdDecoder, DecodeError> {
-        BpOsdDecoder::new(self.matrix.build()?, self.channel.build(), self.config.build())
+        BpOsdDecoder::new(
+            self.matrix.build()?,
+            self.channel.build(),
+            self.config.build(),
+        )
     }
 
     pub fn syndrome(&self) -> Syndrome {

@@ -12,6 +12,7 @@ use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, MetricMap, PairMapExt};
 use crate::decode::Decoder;
 
+pub(crate) mod params;
 pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
@@ -21,6 +22,7 @@ pub(crate) fn run_decoder_point(
     decoder: &dyn Decoder,
     point: &BenchCasePoint,
     ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
     let built = build_circuit_for_point(point, &ctx.spec_dir)?;
     let circuit = built.circuit;
@@ -85,12 +87,17 @@ pub(crate) fn run_decoder_point(
         }
     }
 
+    let mut result_params = built.params;
+    for (key, value) in decoder_params {
+        result_params.insert(key.clone(), value.clone());
+    }
+
     Ok(BenchmarkResultRow {
         benchmark: ctx.benchmark_name.clone(),
         runner: ctx.runner_name.clone(),
         language: ctx.language.clone(),
         status: "ok".into(),
-        params: built.params,
+        params: result_params,
         case_summary: {
             let mut summary = built.case_summary;
             summary.insert("num_dets".into(), serde_json::json!(num_dets));
@@ -183,7 +190,15 @@ mod tests {
             spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
         };
 
-        let err = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap_err();
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let err = run_decoder_point(
+            "fake",
+            &EmptyPredictionDecoder,
+            &point,
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap_err();
 
         assert!(err.contains("decoder fake produced 0 bytes"));
     }
@@ -214,7 +229,15 @@ mod tests {
             spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
         };
 
-        let row = run_decoder_point("fake", &EmptyPredictionDecoder, &point, &ctx).unwrap();
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let row = run_decoder_point(
+            "fake",
+            &EmptyPredictionDecoder,
+            &point,
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
 
         assert_eq!(row.metrics["shots_used"], 0.0);
         assert_eq!(row.metrics["logical_error_rate"], 0.0);

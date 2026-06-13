@@ -16,6 +16,7 @@ impl RustBenchRunner for RilpqecRunner {
         ctx: &BenchRunContext,
     ) -> Result<BenchmarkResultRow, String> {
         let decoder = IlpDemDecoder::default();
-        run_decoder_point(self.name(), &decoder, point, ctx)
+        let decoder_params = crate::bench::result::ParamMap::new();
+        run_decoder_point(self.name(), &decoder, point, ctx, &decoder_params)
     }
 }

@@ -1,4 +1,6 @@
-use rbposd::{BpVariant, ChannelModel, Correction, DecodeError, DecoderConfig, OsdVariant, Schedule};
+use rbposd::{
+    BpVariant, ChannelModel, Correction, DecodeError, DecoderConfig, OsdVariant, Schedule,
+};
 
 #[test]
 fn decoder_config_default_contract() {
@@ -9,6 +11,7 @@ fn decoder_config_default_contract() {
     assert_eq!(cfg.bp_variant, BpVariant::MinimumSum);
     assert_eq!(cfg.schedule, Schedule::Parallel);
     assert_eq!(cfg.osd_variant, OsdVariant::Osd0);
+    assert_eq!(cfg.osd_order, 0);
 }
 
 #[test]
@@ -17,7 +20,10 @@ fn channel_model_contract() {
     assert_eq!(bsc, ChannelModel::Bsc { error_rate: 0.05 });
 
     let bit_flips = ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]);
-    assert_eq!(bit_flips, ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]));
+    assert_eq!(
+        bit_flips,
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3])
+    );
 }
 
 #[test]
@@ -26,10 +32,7 @@ fn decode_error_contract() {
         column: 7,
         num_bits: 5,
     };
-    assert_eq!(
-        e.to_string(),
-        "column index 7 is out of bounds for 5 bits"
-    );
+    assert_eq!(e.to_string(), "column index 7 is out of bounds for 5 bits");
 
     fn takes_std_error(_: &dyn std::error::Error) {}
     takes_std_error(&e);

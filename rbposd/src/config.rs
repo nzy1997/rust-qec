@@ -26,6 +26,7 @@ pub struct DecoderConfig {
     pub bp_variant: BpVariant,
     pub schedule: Schedule,
     pub osd_variant: OsdVariant,
+    pub osd_order: usize,
 }
 
 impl Default for DecoderConfig {
@@ -36,6 +37,7 @@ impl Default for DecoderConfig {
             bp_variant: BpVariant::MinimumSum,
             schedule: Schedule::Parallel,
             osd_variant: OsdVariant::Osd0,
+            osd_order: 0,
         }
     }
 }
