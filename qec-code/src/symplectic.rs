@@ -49,7 +49,16 @@ pub(crate) fn commutes(lhs: &[u8], rhs: &[u8]) -> Result<bool> {
 #[allow(dead_code)]
 pub(crate) fn commutation_constraints(rows: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
     let width = gf2::validate_rows(rows)?;
+    commutation_constraints_with_width(rows, width)
+}
+
+#[allow(dead_code)]
+pub(crate) fn commutation_constraints_with_width(
+    rows: &[BinaryRow],
+    width: usize,
+) -> Result<Vec<BinaryRow>> {
     validate_symplectic_width(width)?;
+    gf2::validate_rows_with_width(rows, width)?;
     rows.iter().map(|row| dual_row(row)).collect()
 }
 
@@ -57,7 +66,10 @@ pub(crate) fn commutation_constraints(rows: &[BinaryRow]) -> Result<Vec<BinaryRo
 mod tests {
     use crate::error::QecError;
 
-    use super::{commutation_constraints, commutes, dual_row, symplectic_product};
+    use super::{
+        commutation_constraints, commutation_constraints_with_width, commutes, dual_row,
+        symplectic_product,
+    };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
         lhs.iter()
@@ -120,6 +132,30 @@ mod tests {
         assert_eq!(
             commutation_constraints(&[vec![1, 0, 1]]),
             Err(QecError::InvalidSymplecticRowWidth { width: 3 })
+        );
+    }
+
+    #[test]
+    fn commutation_constraints_with_width_accept_empty_rows_at_known_even_width() {
+        assert_eq!(commutation_constraints_with_width(&[], 4), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn commutation_constraints_with_width_reject_odd_width() {
+        assert_eq!(
+            commutation_constraints_with_width(&[], 3),
+            Err(QecError::InvalidSymplecticRowWidth { width: 3 })
+        );
+    }
+
+    #[test]
+    fn commutation_constraints_with_width_reject_row_width_mismatch() {
+        assert_eq!(
+            commutation_constraints_with_width(&[vec![1, 0]], 4),
+            Err(QecError::RowWidthMismatch {
+                expected: 4,
+                actual: 2,
+            })
         );
     }
 }
