@@ -60,7 +60,7 @@ pub fn expand_runner_points(
     params: &BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
     let input_type =
-        optional_string(params, "input_type").unwrap_or_else(|| "surface_rotated_memory_x".into());
+        optional_string(params, "input_type")?.unwrap_or_else(|| "surface_rotated_memory_x".into());
     let rounds = require_array(params, "rounds")?;
     let ps = require_array(params, "p")?;
     let max_shots = require_u64(params, "max_shots")?;
@@ -140,11 +140,11 @@ fn expand_css_points(
     batch_size: usize,
 ) -> Result<Vec<BenchCasePoint>, String> {
     let basis = require_string(params, "basis")?;
-    let schedule = optional_string(params, "schedule").unwrap_or_else(|| "greedy".to_string());
+    let schedule = optional_string(params, "schedule")?.unwrap_or_else(|| "greedy".to_string());
     let hx_path = require_string(params, "hx")?;
     let hz_path = require_string(params, "hz")?;
-    let observables_path = optional_string(params, "observables");
-    let code_id = optional_string(params, "code_id");
+    let observables_path = optional_string(params, "observables")?;
+    let code_id = optional_string(params, "code_id")?;
 
     let mut points = Vec::new();
     for round in rounds {
@@ -173,8 +173,15 @@ fn expand_css_points(
     Ok(points)
 }
 
-fn optional_string(params: &BTreeMap<String, Value>, key: &str) -> Option<String> {
-    params.get(key).and_then(Value::as_str).map(str::to_string)
+fn optional_string(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<String>, String> {
+    match params.get(key) {
+        None => Ok(None),
+        Some(value) => value
+            .as_str()
+            .map(str::to_string)
+            .map(Some)
+            .ok_or_else(|| format!("{key} must be a string")),
+    }
 }
 
 fn require_string(params: &BTreeMap<String, Value>, key: &str) -> Result<String, String> {

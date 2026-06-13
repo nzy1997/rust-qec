@@ -77,6 +77,20 @@ fn expand_runner_points_rejects_invalid_entries_and_accepts_integer_p() {
 }
 
 #[test]
+fn expand_runner_points_rejects_non_string_optional_fields() {
+    let mut params = valid_runner_params();
+    params.insert(
+        "input_type".into(),
+        toml::Value::Array(vec![toml::Value::String("css".into())]),
+    );
+    assert_eq!(expand_points_err(&params), "input_type must be a string");
+
+    let mut params = valid_css_runner_params();
+    params.insert("schedule".into(), toml::Value::Integer(3));
+    assert_eq!(expand_points_err(&params), "schedule must be a string");
+}
+
+#[test]
 #[should_panic(expected = "expected expand_runner_points to fail")]
 fn expand_points_err_panics_when_points_expand_successfully() {
     let params = valid_runner_params();
@@ -184,6 +198,33 @@ fn valid_runner_params() -> BTreeMap<String, toml::Value> {
         ),
         ("max_shots".into(), toml::Value::Integer(20)),
         ("max_errors".into(), toml::Value::Integer(5)),
+        ("batch_size".into(), toml::Value::Integer(4)),
+    ])
+}
+
+fn valid_css_runner_params() -> BTreeMap<String, toml::Value> {
+    BTreeMap::from([
+        ("input_type".into(), toml::Value::String("css".into())),
+        (
+            "hx".into(),
+            toml::Value::String("tests/fixtures/css/steane_hx.json".into()),
+        ),
+        (
+            "hz".into(),
+            toml::Value::String("tests/fixtures/css/steane_hz.json".into()),
+        ),
+        ("basis".into(), toml::Value::String("x".into())),
+        ("schedule".into(), toml::Value::String("greedy".into())),
+        (
+            "rounds".into(),
+            toml::Value::Array(vec![toml::Value::Integer(1)]),
+        ),
+        (
+            "p".into(),
+            toml::Value::Array(vec![toml::Value::Float(0.0)]),
+        ),
+        ("max_shots".into(), toml::Value::Integer(8)),
+        ("max_errors".into(), toml::Value::Integer(4)),
         ("batch_size".into(), toml::Value::Integer(4)),
     ])
 }
