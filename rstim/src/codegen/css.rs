@@ -281,9 +281,9 @@ pub fn css_memory(config: CssMemoryConfig) -> Result<Vec<StimInstr>, CssCodegenE
     validate_supports("hz", &config.checks.hz, config.checks.num_data_qubits)?;
     let hx_dense = supports_to_dense(&config.checks.hx, config.checks.num_data_qubits);
     let hz_dense = supports_to_dense(&config.checks.hz, config.checks.num_data_qubits);
-    CssCode::from_hx_hz(hx_dense, hz_dense)
+    let css_code = CssCode::from_hx_hz(hx_dense, hz_dense)
         .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
-    let observables = explicit_observables(&config)?;
+    let observables = resolve_observables(&config, &css_code)?;
     emit_css_memory_circuit(&config, &observables)
 }
 
@@ -307,14 +307,75 @@ struct CnotInteraction {
     target: u32,
 }
 
-fn explicit_observables(config: &CssMemoryConfig) -> Result<Vec<Vec<usize>>, CssCodegenError> {
+fn resolve_observables(
+    config: &CssMemoryConfig,
+    css_code: &CssCode,
+) -> Result<Vec<Vec<usize>>, CssCodegenError> {
     match &config.observables {
-        CssObservableSource::Explicit(rows) | CssObservableSource::ExplicitOrCanonical(rows) => {
+        CssObservableSource::Explicit(rows) | CssObservableSource::ExplicitOrCanonical(rows)
+            if !rows.is_empty() =>
+        {
             validate_observables(rows, config.checks.num_data_qubits)?;
             Ok(rows.clone())
         }
-        CssObservableSource::CanonicalFallback => Err(CssCodegenError::MissingObservables),
+        CssObservableSource::ExplicitOrCanonical(_) | CssObservableSource::CanonicalFallback => {
+            canonical_observables(config, css_code)
+        }
+        CssObservableSource::Explicit(rows) => {
+            validate_observables(rows, config.checks.num_data_qubits)?;
+            Ok(rows.clone())
+        }
     }
+}
+
+fn canonical_observables(
+    config: &CssMemoryConfig,
+    css_code: &CssCode,
+) -> Result<Vec<Vec<usize>>, CssCodegenError> {
+    let basis = css_code
+        .code()
+        .canonical_logical_basis()
+        .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
+    let logicals = match config.basis {
+        MemoryBasis::X => basis.logical_x,
+        MemoryBasis::Z => basis.logical_z,
+    };
+    let mut observables = Vec::with_capacity(logicals.len());
+    for (index, logical) in logicals.iter().enumerate() {
+        let support = match config.basis {
+            MemoryBasis::X => {
+                if logical.z_bits().iter().any(|&bit| bit != 0) {
+                    return Err(CssCodegenError::MixedCanonicalLogical {
+                        index,
+                        basis: config.basis,
+                    });
+                }
+                logical
+                    .x_bits()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(qubit, &bit)| (bit == 1).then_some(qubit))
+                    .collect()
+            }
+            MemoryBasis::Z => {
+                if logical.x_bits().iter().any(|&bit| bit != 0) {
+                    return Err(CssCodegenError::MixedCanonicalLogical {
+                        index,
+                        basis: config.basis,
+                    });
+                }
+                logical
+                    .z_bits()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(qubit, &bit)| (bit == 1).then_some(qubit))
+                    .collect()
+            }
+        };
+        observables.push(support);
+    }
+    validate_observables(&observables, config.checks.num_data_qubits)?;
+    Ok(observables)
 }
 
 fn validate_observables(rows: &[Vec<usize>], width: usize) -> Result<(), CssCodegenError> {
@@ -461,11 +522,34 @@ fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[C
             ));
         }
     }
-    for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+    let x_checks: Vec<_> = checks
+        .iter()
+        .filter(|check| check.kind == CheckKind::X)
+        .cloned()
+        .collect();
+    let z_checks: Vec<_> = checks
+        .iter()
+        .filter(|check| check.kind == CheckKind::Z)
+        .cloned()
+        .collect();
+    if !x_checks.is_empty() {
+        emit_x_check_measurements(instrs, config, &x_checks);
+    }
+    if !z_checks.is_empty() {
+        emit_z_check_measurements(instrs, config, &z_checks);
+    }
+}
+
+fn emit_x_check_measurements(
+    instrs: &mut Vec<StimInstr>,
+    config: &CssMemoryConfig,
+    checks: &[Check],
+) {
+    for check in checks {
         instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
     }
     if config.noise.after_clifford_depolarization > 0.0 {
-        for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
+        for check in checks {
             instrs.push(op(
                 "DEPOLARIZE1",
                 &[config.noise.after_clifford_depolarization],
@@ -473,6 +557,33 @@ fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[C
             ));
         }
     }
+    emit_cnot_layers(instrs, config, checks);
+    instrs.push(op("TICK", &[], &[]));
+    for check in checks {
+        instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
+    }
+    if config.noise.after_clifford_depolarization > 0.0 {
+        for check in checks {
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[config.noise.after_clifford_depolarization],
+                &[StimTarget::Qubit(check.ancilla)],
+            ));
+        }
+    }
+    emit_check_measurements(instrs, config, checks);
+}
+
+fn emit_z_check_measurements(
+    instrs: &mut Vec<StimInstr>,
+    config: &CssMemoryConfig,
+    checks: &[Check],
+) {
+    emit_cnot_layers(instrs, config, checks);
+    emit_check_measurements(instrs, config, checks);
+}
+
+fn emit_cnot_layers(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[Check]) {
     for layer in schedule_layers(config.schedule, checks) {
         instrs.push(op("TICK", &[], &[]));
         let targets: Vec<_> = layer
@@ -495,19 +606,13 @@ fn emit_round(instrs: &mut Vec<StimInstr>, config: &CssMemoryConfig, checks: &[C
             ));
         }
     }
-    instrs.push(op("TICK", &[], &[]));
-    for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
-        instrs.push(op("H", &[], &[StimTarget::Qubit(check.ancilla)]));
-    }
-    if config.noise.after_clifford_depolarization > 0.0 {
-        for check in checks.iter().filter(|check| check.kind == CheckKind::X) {
-            instrs.push(op(
-                "DEPOLARIZE1",
-                &[config.noise.after_clifford_depolarization],
-                &[StimTarget::Qubit(check.ancilla)],
-            ));
-        }
-    }
+}
+
+fn emit_check_measurements(
+    instrs: &mut Vec<StimInstr>,
+    config: &CssMemoryConfig,
+    checks: &[Check],
+) {
     instrs.push(op("TICK", &[], &[]));
     if config.noise.before_measure_flip_probability > 0.0 {
         for check in checks {

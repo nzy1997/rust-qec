@@ -165,3 +165,50 @@ fn css_memory_places_requested_noise_channels() {
     assert!(text.contains("DEPOLARIZE2(0.125) 2 0"));
     assert!(text.contains("X_ERROR(0.125) 2"));
 }
+
+fn steane_h() -> Vec<Vec<usize>> {
+    vec![vec![0, 3, 5, 6], vec![1, 3, 4, 6], vec![2, 4, 5, 6]]
+}
+
+#[test]
+fn canonical_fallback_adds_steane_observable() {
+    let h = steane_h();
+    let config = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: h.clone(),
+            hz: h,
+            num_data_qubits: 7,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::CanonicalFallback,
+    };
+
+    let circuit = css_memory(config).unwrap();
+
+    assert_eq!(stats::num_observables(&circuit), 1);
+    ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+}
+
+#[test]
+fn explicit_or_canonical_prefers_explicit_observables() {
+    let h = steane_h();
+    let config = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: h.clone(),
+            hz: h,
+            num_data_qubits: 7,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::ExplicitOrCanonical(vec![vec![0, 1, 2]]),
+    };
+
+    let text = circuit_to_string(&css_memory(config).unwrap());
+
+    assert!(text.contains("OBSERVABLE_INCLUDE(0) rec[-7] rec[-6] rec[-5]"));
+}
