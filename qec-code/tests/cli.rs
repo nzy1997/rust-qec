@@ -66,4 +66,6 @@ fn steane_logicals_reports_logical_sections() {
 
     assert!(stdout.contains("logical_x:"), "stdout was: {stdout}");
     assert!(stdout.contains("logical_z:"), "stdout was: {stdout}");
+    assert!(stdout.contains("  1:"), "stdout was: {stdout}");
+    assert!(stdout.contains("weight="), "stdout was: {stdout}");
 }

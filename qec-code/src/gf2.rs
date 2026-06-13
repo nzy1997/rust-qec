@@ -169,11 +169,6 @@ pub(crate) fn try_select_independent_rows(matrix: &[BinaryRow]) -> Result<Vec<Bi
     Ok(basis)
 }
 
-pub(crate) fn try_nullspace_basis(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
-    let width = validate_rows(matrix)?;
-    try_nullspace_basis_with_width(matrix, width)
-}
-
 pub(crate) fn try_nullspace_basis_with_width(
     matrix: &[BinaryRow],
     width: usize,
@@ -207,8 +202,7 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_row_span_with_width, try_nullspace_basis_with_width, try_nullspace_basis,
-        try_select_independent_rows,
+        try_in_row_span_with_width, try_nullspace_basis_with_width, try_select_independent_rows,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -220,7 +214,7 @@ mod tests {
     #[test]
     fn nullspace_basis_annihilates_every_constraint_row() {
         let matrix = vec![vec![1, 0, 1, 0], vec![0, 1, 1, 0]];
-        let basis = try_nullspace_basis(&matrix).unwrap();
+        let basis = try_nullspace_basis_with_width(&matrix, 4).unwrap();
 
         assert_eq!(basis.len(), 2);
         assert!(basis.iter().all(|row| row.len() == 4));
