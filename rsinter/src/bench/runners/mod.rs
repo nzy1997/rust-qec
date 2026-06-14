@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
 use crate::bench::circuit_source::build_circuit_for_point;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
-use crate::bench::result::{BenchmarkResultRow, MetricMap, PairMapExt};
+use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::classify_completed;
+use crate::failure::{FailureKind, classify_completed, classify_error};
 
 pub(crate) mod params;
 pub mod rbposd;
@@ -25,6 +25,82 @@ fn under_wall_budget(total_seconds: f64, max_wall_seconds: Option<f64>) -> bool 
     }
 }
 
+fn benchmark_result_row(
+    ctx: &BenchRunContext,
+    failure_kind: FailureKind,
+    params: ParamMap,
+    case_summary: CaseSummary,
+    metrics: MetricMap,
+    error: Option<String>,
+) -> BenchmarkResultRow {
+    BenchmarkResultRow {
+        benchmark: ctx.benchmark_name.clone(),
+        runner: ctx.runner_name.clone(),
+        language: ctx.language.clone(),
+        status: failure_kind.status().into(),
+        failure_kind,
+        params,
+        case_summary,
+        metrics,
+        artifacts: BTreeMap::new(),
+        error,
+    }
+}
+
+fn merge_decoder_params(mut params: ParamMap, decoder_params: &ParamMap) -> ParamMap {
+    for (key, value) in decoder_params {
+        params.insert(key.clone(), value.clone());
+    }
+    params
+}
+
+fn case_summary_with_progress(
+    mut summary: CaseSummary,
+    num_dets: usize,
+    num_obs: usize,
+    generated_shots: usize,
+) -> CaseSummary {
+    summary.insert("num_dets".into(), serde_json::json!(num_dets));
+    summary.insert("num_obs".into(), serde_json::json!(num_obs));
+    summary.insert(
+        "num_shots_generated".into(),
+        serde_json::json!(generated_shots),
+    );
+    summary
+}
+
+fn benchmark_metrics(
+    shots_used: usize,
+    logical_errors: usize,
+    compile_us: f64,
+    total_decode_us: f64,
+    wall_seconds: f64,
+) -> MetricMap {
+    MetricMap::from_pairs([
+        ("shots_used", shots_used as f64),
+        ("logical_errors", logical_errors as f64),
+        (
+            "logical_error_rate",
+            if shots_used == 0 {
+                0.0
+            } else {
+                logical_errors as f64 / shots_used as f64
+            },
+        ),
+        ("compile_us", compile_us),
+        ("total_decode_us", total_decode_us),
+        ("wall_seconds", wall_seconds),
+        (
+            "decode_us_per_shot",
+            if shots_used == 0 {
+                0.0
+            } else {
+                total_decode_us / shots_used as f64
+            },
+        ),
+    ])
+}
+
 pub(crate) fn run_decoder_point(
     runner_name: &'static str,
     decoder: &dyn Decoder,
@@ -34,18 +110,33 @@ pub(crate) fn run_decoder_point(
 ) -> Result<BenchmarkResultRow, String> {
     let built = build_circuit_for_point(point, &ctx.spec_dir)?;
     let circuit = built.circuit;
+    let result_params = merge_decoder_params(built.params, decoder_params);
+    let base_case_summary = built.case_summary;
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?;
+    let num_dets = dem.effective_num_detectors();
+    let num_obs = dem.num_observables();
 
     let compile_started = Instant::now();
-    let compiled = decoder.compile_for_dem(&dem)?;
+    let compiled = match decoder.compile_for_dem(&dem) {
+        Ok(compiled) => compiled,
+        Err(error) => {
+            let failure_kind = classify_error(&error, FailureKind::SolverFailure);
+            return Ok(benchmark_result_row(
+                ctx,
+                failure_kind,
+                result_params,
+                case_summary_with_progress(base_case_summary, num_dets, num_obs, 0),
+                benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                Some(error),
+            ));
+        }
+    };
     let compile_us = compile_started.elapsed().as_secs_f64() * 1e6;
 
     let max_shots = usize::try_from(point.max_shots)
         .map_err(|_| "max_shots exceeds supported usize range".to_string())?;
     let max_errors = usize::try_from(point.max_errors)
         .map_err(|_| "max_errors exceeds supported usize range".to_string())?;
-    let num_dets = dem.effective_num_detectors();
-    let num_obs = dem.num_observables();
     let obs_bytes = num_obs.div_ceil(8);
 
     let mut rng = StdRng::seed_from_u64(ctx.seed);
@@ -71,20 +162,76 @@ pub(crate) fn run_decoder_point(
 
         let decode_started = Instant::now();
         let predictions =
-            compiled.decode_shots_bit_packed(&dets, batch_shots, num_dets, num_obs)?;
+            match compiled.decode_shots_bit_packed(&dets, batch_shots, num_dets, num_obs) {
+                Ok(predictions) => predictions,
+                Err(error) => {
+                    total_decode_us += decode_started.elapsed().as_secs_f64() * 1e6;
+                    let wall_seconds = wall_seconds + batch_started.elapsed().as_secs_f64();
+                    let failure_kind = classify_error(&error, FailureKind::SolverFailure);
+                    return Ok(benchmark_result_row(
+                        ctx,
+                        failure_kind,
+                        result_params,
+                        case_summary_with_progress(
+                            base_case_summary,
+                            num_dets,
+                            num_obs,
+                            generated_shots,
+                        ),
+                        benchmark_metrics(
+                            shots_used,
+                            logical_errors,
+                            compile_us,
+                            total_decode_us,
+                            wall_seconds,
+                        ),
+                        Some(error),
+                    ));
+                }
+            };
         total_decode_us += decode_started.elapsed().as_secs_f64() * 1e6;
 
         let expected_len = batch_shots * obs_bytes;
         if predictions.len() != expected_len {
-            return Err(format!(
+            let error = format!(
                 "decoder {runner_name} produced {} bytes, expected {expected_len}",
                 predictions.len()
+            );
+            let wall_seconds = wall_seconds + batch_started.elapsed().as_secs_f64();
+            return Ok(benchmark_result_row(
+                ctx,
+                FailureKind::SolverFailure,
+                result_params,
+                case_summary_with_progress(base_case_summary, num_dets, num_obs, generated_shots),
+                benchmark_metrics(
+                    shots_used,
+                    logical_errors,
+                    compile_us,
+                    total_decode_us,
+                    wall_seconds,
+                ),
+                Some(error),
             ));
         }
         if obs.len() != expected_len {
-            return Err(format!(
+            let error = format!(
                 "sampler produced {} observable bytes, expected {expected_len}",
                 obs.len()
+            );
+            let wall_seconds = wall_seconds + batch_started.elapsed().as_secs_f64();
+            return Ok(benchmark_result_row(
+                ctx,
+                FailureKind::SamplerError,
+                result_params,
+                case_summary_with_progress(base_case_summary, num_dets, num_obs, generated_shots),
+                benchmark_metrics(
+                    shots_used,
+                    logical_errors,
+                    compile_us,
+                    total_decode_us,
+                    wall_seconds,
+                ),
+                Some(error),
             ));
         }
 
@@ -102,57 +249,25 @@ pub(crate) fn run_decoder_point(
         wall_seconds += batch_started.elapsed().as_secs_f64();
     }
 
-    let mut result_params = built.params;
-    for (key, value) in decoder_params {
-        result_params.insert(key.clone(), value.clone());
-    }
     let timed_out = matches!(point.max_wall_seconds, Some(max_seconds) if wall_seconds >= max_seconds)
         && shots_used < max_shots
         && logical_errors < max_errors;
+    let failure_kind = classify_completed(logical_errors as u64, timed_out);
 
-    Ok(BenchmarkResultRow {
-        benchmark: ctx.benchmark_name.clone(),
-        runner: ctx.runner_name.clone(),
-        language: ctx.language.clone(),
-        status: "ok".into(),
-        failure_kind: classify_completed(logical_errors as u64, timed_out),
-        params: result_params,
-        case_summary: {
-            let mut summary = built.case_summary;
-            summary.insert("num_dets".into(), serde_json::json!(num_dets));
-            summary.insert("num_obs".into(), serde_json::json!(num_obs));
-            summary.insert(
-                "num_shots_generated".into(),
-                serde_json::json!(generated_shots),
-            );
-            summary
-        },
-        metrics: MetricMap::from_pairs([
-            ("shots_used", shots_used as f64),
-            ("logical_errors", logical_errors as f64),
-            (
-                "logical_error_rate",
-                if shots_used == 0 {
-                    0.0
-                } else {
-                    logical_errors as f64 / shots_used as f64
-                },
-            ),
-            ("compile_us", compile_us),
-            ("total_decode_us", total_decode_us),
-            ("wall_seconds", wall_seconds),
-            (
-                "decode_us_per_shot",
-                if shots_used == 0 {
-                    0.0
-                } else {
-                    total_decode_us / shots_used as f64
-                },
-            ),
-        ]),
-        artifacts: BTreeMap::new(),
-        error: None,
-    })
+    Ok(benchmark_result_row(
+        ctx,
+        failure_kind,
+        result_params,
+        case_summary_with_progress(base_case_summary, num_dets, num_obs, generated_shots),
+        benchmark_metrics(
+            shots_used,
+            logical_errors,
+            compile_us,
+            total_decode_us,
+            wall_seconds,
+        ),
+        None,
+    ))
 }
 
 #[cfg(test)]
@@ -221,6 +336,198 @@ mod tests {
         }
     }
 
+    struct OnePredictionDecoder;
+
+    struct OnePredictionCompiled;
+
+    impl Decoder for OnePredictionDecoder {
+        fn compile_for_dem(
+            &self,
+            _dem: &DetectorErrorModel,
+        ) -> Result<Box<dyn CompiledDecoder>, String> {
+            Ok(Box::new(OnePredictionCompiled))
+        }
+    }
+
+    impl CompiledDecoder for OnePredictionCompiled {
+        fn decode_shots_bit_packed(
+            &self,
+            _dets: &[u8],
+            num_shots: usize,
+            _num_dets: usize,
+            num_obs: usize,
+        ) -> Result<Vec<u8>, String> {
+            let obs_bytes = num_obs.div_ceil(8);
+            Ok(vec![0xffu8; num_shots * obs_bytes])
+        }
+    }
+
+    struct CompileErrorDecoder {
+        message: &'static str,
+    }
+
+    impl Decoder for CompileErrorDecoder {
+        fn compile_for_dem(
+            &self,
+            _dem: &DetectorErrorModel,
+        ) -> Result<Box<dyn CompiledDecoder>, String> {
+            Err(self.message.to_string())
+        }
+    }
+
+    struct DecodeErrorDecoder {
+        message: &'static str,
+    }
+
+    struct DecodeErrorCompiled {
+        message: &'static str,
+    }
+
+    impl Decoder for DecodeErrorDecoder {
+        fn compile_for_dem(
+            &self,
+            _dem: &DetectorErrorModel,
+        ) -> Result<Box<dyn CompiledDecoder>, String> {
+            Ok(Box::new(DecodeErrorCompiled {
+                message: self.message,
+            }))
+        }
+    }
+
+    impl CompiledDecoder for DecodeErrorCompiled {
+        fn decode_shots_bit_packed(
+            &self,
+            _dets: &[u8],
+            _num_shots: usize,
+            _num_dets: usize,
+            _num_obs: usize,
+        ) -> Result<Vec<u8>, String> {
+            Err(self.message.to_string())
+        }
+    }
+
+    fn surface_point(p: f64, max_shots: u64, max_errors: u64) -> BenchCasePoint {
+        BenchCasePoint {
+            input_type: "surface_rotated_memory_x".into(),
+            code_id: None,
+            distance: Some(3),
+            rounds: 3,
+            p,
+            basis: None,
+            schedule: None,
+            hx_path: None,
+            hz_path: None,
+            observables_path: None,
+            max_shots,
+            max_errors,
+            max_wall_seconds: None,
+            batch_size: 1,
+            decoder_params: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn failure_kind_is_structured_for_completed_benchmark_rows() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+
+        let ok_row = run_decoder_point(
+            "fake",
+            &SlowPredictionDecoder {
+                sleep: Duration::from_millis(0),
+            },
+            &surface_point(0.0, 2, 10),
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+        assert_eq!(ok_row.failure_kind, FailureKind::Ok);
+
+        let logical_row = run_decoder_point(
+            "fake",
+            &OnePredictionDecoder,
+            &surface_point(0.0, 2, 10),
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+        assert_eq!(logical_row.failure_kind, FailureKind::LogicalFailure);
+
+        let mut timeout_point = surface_point(0.0, 20, 20);
+        timeout_point.max_wall_seconds = Some(0.09);
+        let timeout_row = run_decoder_point(
+            "fake",
+            &SlowPredictionDecoder {
+                sleep: Duration::from_millis(35),
+            },
+            &timeout_point,
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+        assert_eq!(timeout_row.failure_kind, FailureKind::Timeout);
+    }
+
+    #[test]
+    fn benchmark_runner_records_compile_failure_as_structured_row() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+
+        let row = run_decoder_point(
+            "fake",
+            &CompileErrorDecoder {
+                message: "no ILP backend is available for kind Gurobi",
+            },
+            &surface_point(0.002, 1, 1),
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::Unsupported);
+        assert!(row.error.unwrap().contains("no ILP backend is available"));
+    }
+
+    #[test]
+    fn benchmark_runner_records_decode_failure_as_structured_row() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+
+        let row = run_decoder_point(
+            "fake",
+            &DecodeErrorDecoder {
+                message: "HiGHS backend error: solve failed",
+            },
+            &surface_point(0.002, 1, 1),
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::SolverFailure);
+        assert!(row.error.unwrap().contains("HiGHS backend error"));
+    }
+
     #[test]
     fn run_decoder_point_rejects_prediction_buffers_with_wrong_length() {
         let point = BenchCasePoint {
@@ -249,16 +556,18 @@ mod tests {
         };
 
         let decoder_params = crate::bench::result::ParamMap::new();
-        let err = run_decoder_point(
+        let row = run_decoder_point(
             "fake",
             &EmptyPredictionDecoder,
             &point,
             &ctx,
             &decoder_params,
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(err.contains("decoder fake produced 0 bytes"));
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::SolverFailure);
+        assert!(row.error.unwrap().contains("decoder fake produced 0 bytes"));
     }
 
     #[test]

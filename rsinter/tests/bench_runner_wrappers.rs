@@ -34,6 +34,7 @@ fn rbposd_runner_handles_zero_shot_benchmark_points() {
 
     assert_eq!(runner.name(), "rbposd");
     assert_eq!(row.runner, "rbposd_alias");
+    assert_eq!(row.failure_kind, rsinter::failure::FailureKind::Ok);
     assert_eq!(row.metrics["shots_used"], 0.0);
 }
 
@@ -69,5 +70,6 @@ fn rilpqec_runner_handles_zero_shot_benchmark_points() {
 
     assert_eq!(runner.name(), "rilpqec");
     assert_eq!(row.runner, "rilpqec_alias");
+    assert_eq!(row.failure_kind, rsinter::failure::FailureKind::Ok);
     assert_eq!(row.metrics["shots_used"], 0.0);
 }
