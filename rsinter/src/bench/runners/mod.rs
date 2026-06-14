@@ -4,10 +4,11 @@ use std::time::Instant;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::ir::StimInstr;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
-use crate::bench::circuit_source::build_circuit_for_point;
+use crate::bench::circuit_source::{build_circuit_for_point, BuiltCircuit};
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
@@ -109,10 +110,72 @@ pub(crate) fn run_decoder_point(
     decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
     let built = build_circuit_for_point(point, &ctx.spec_dir)?;
+    run_built_decoder_point(runner_name, decoder, built, point, ctx, decoder_params)
+}
+
+fn run_built_decoder_point(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    built: BuiltCircuit,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+) -> Result<BenchmarkResultRow, String> {
+    run_built_decoder_point_with_batcher(
+        runner_name,
+        decoder,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        sample_and_pack_batch,
+    )
+}
+
+fn sample_and_pack_batch(
+    circuit: &[StimInstr],
+    batch_shots: usize,
+    rng: &mut StdRng,
+) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let batch = sample_batch(circuit, batch_shots, rng)?;
+
+    let mut dets = Vec::new();
+    write_shots_b8(&batch.detections, &mut dets).map_err(|error| error.to_string())?;
+    let mut obs = Vec::new();
+    write_shots_b8(&batch.observable_flips, &mut obs).map_err(|error| error.to_string())?;
+
+    Ok((dets, obs))
+}
+
+fn run_built_decoder_point_with_batcher<F>(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    built: BuiltCircuit,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    mut sample_and_pack: F,
+) -> Result<BenchmarkResultRow, String>
+where
+    F: FnMut(&[StimInstr], usize, &mut StdRng) -> Result<(Vec<u8>, Vec<u8>), String>,
+{
     let circuit = built.circuit;
     let result_params = merge_decoder_params(built.params, decoder_params);
     let base_case_summary = built.case_summary;
-    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?;
+    let dem = match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
+        Ok(dem) => dem,
+        Err(error) => {
+            let failure_kind = classify_error(&error, FailureKind::SolverFailure);
+            return Ok(benchmark_result_row(
+                ctx,
+                failure_kind,
+                result_params,
+                base_case_summary,
+                benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                Some(error),
+            ));
+        }
+    };
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
 
@@ -153,13 +216,32 @@ pub(crate) fn run_decoder_point(
     {
         let batch_started = Instant::now();
         let batch_shots = point.batch_size.min(max_shots - shots_used);
-        let batch = sample_batch(&circuit, batch_shots, &mut rng)?;
+        let (dets, obs) = match sample_and_pack(&circuit, batch_shots, &mut rng) {
+            Ok(packed) => packed,
+            Err(error) => {
+                let wall_seconds = wall_seconds + batch_started.elapsed().as_secs_f64();
+                return Ok(benchmark_result_row(
+                    ctx,
+                    FailureKind::SamplerError,
+                    result_params,
+                    case_summary_with_progress(
+                        base_case_summary,
+                        num_dets,
+                        num_obs,
+                        generated_shots,
+                    ),
+                    benchmark_metrics(
+                        shots_used,
+                        logical_errors,
+                        compile_us,
+                        total_decode_us,
+                        wall_seconds,
+                    ),
+                    Some(error),
+                ));
+            }
+        };
         generated_shots += batch_shots;
-
-        let mut dets = Vec::new();
-        write_shots_b8(&batch.detections, &mut dets).map_err(|e| e.to_string())?;
-        let mut obs = Vec::new();
-        write_shots_b8(&batch.observable_flips, &mut obs).map_err(|e| e.to_string())?;
 
         let decode_started = Instant::now();
         let predictions =
@@ -274,10 +356,12 @@ pub(crate) fn run_decoder_point(
 #[cfg(test)]
 mod tests {
     use rstim::dem::DetectorErrorModel;
+    use rstim::parser::parse_lines;
     use std::thread;
     use std::time::Duration;
 
     use super::*;
+    use crate::bench::circuit_source::BuiltCircuit;
     use crate::decode::{CompiledDecoder, Decoder};
     use crate::failure::FailureKind;
 
@@ -572,6 +656,71 @@ mod tests {
         assert_eq!(row.status, "error");
         assert_eq!(row.failure_kind, FailureKind::SolverFailure);
         assert!(row.error.unwrap().contains("decoder fake produced 0 bytes"));
+    }
+
+    #[test]
+    fn run_decoder_point_records_dem_analysis_failures_as_structured_rows() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let built = BuiltCircuit {
+            circuit: parse_lines("ML 0\nDETECTOR rec[-2]\n").unwrap(),
+            params: ParamMap::from_pairs([("input_type", serde_json::json!("custom"))]),
+            case_summary: CaseSummary::new(),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+
+        let row = run_built_decoder_point(
+            "fake",
+            &EmptyPredictionDecoder,
+            built,
+            &surface_point(0.002, 1, 1),
+            &ctx,
+            &decoder_params,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::Unsupported);
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert!(row.error.unwrap().contains("unsupported instruction ML"));
+    }
+
+    #[test]
+    fn run_decoder_point_records_sampler_failures_as_structured_rows() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let point = surface_point(0.002, 1, 1);
+        let built = build_circuit_for_point(&point, &ctx.spec_dir).unwrap();
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let mut failing_batcher = |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+            Err("sampler exploded".to_string())
+        };
+
+        let row = run_built_decoder_point_with_batcher(
+            "fake",
+            &EmptyPredictionDecoder,
+            built,
+            &point,
+            &ctx,
+            &decoder_params,
+            &mut failing_batcher,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::SamplerError);
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert_eq!(row.error.as_deref(), Some("sampler exploded"));
     }
 
     #[test]
