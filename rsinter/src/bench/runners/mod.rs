@@ -11,6 +11,7 @@ use crate::bench::circuit_source::build_circuit_for_point;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, MetricMap, PairMapExt};
 use crate::decode::Decoder;
+use crate::failure::classify_completed;
 
 pub(crate) mod params;
 pub mod rbposd;
@@ -104,12 +105,17 @@ pub(crate) fn run_decoder_point(
     for (key, value) in decoder_params {
         result_params.insert(key.clone(), value.clone());
     }
+    let timed_out =
+        matches!(point.max_wall_seconds, Some(max_seconds) if wall_seconds >= max_seconds)
+            && shots_used < max_shots
+            && logical_errors < max_errors;
 
     Ok(BenchmarkResultRow {
         benchmark: ctx.benchmark_name.clone(),
         runner: ctx.runner_name.clone(),
         language: ctx.language.clone(),
         status: "ok".into(),
+        failure_kind: classify_completed(logical_errors as u64, timed_out),
         params: result_params,
         case_summary: {
             let mut summary = built.case_summary;

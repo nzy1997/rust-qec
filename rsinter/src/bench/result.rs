@@ -4,6 +4,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::failure::{FailureKind, classify_error};
+
 pub type ArtifactMap = BTreeMap<String, String>;
 pub type CaseSummary = BTreeMap<String, Value>;
 pub type ParamMap = BTreeMap<String, Value>;
@@ -52,17 +54,78 @@ impl RunManifest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct BenchmarkResultRow {
     pub benchmark: String,
     pub runner: String,
     pub language: String,
     pub status: String,
+    pub failure_kind: FailureKind,
     pub params: ParamMap,
     pub case_summary: CaseSummary,
     pub metrics: MetricMap,
     pub artifacts: ArtifactMap,
     pub error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawBenchmarkResultRow {
+    benchmark: String,
+    runner: String,
+    language: String,
+    status: String,
+    #[serde(default)]
+    failure_kind: Option<FailureKind>,
+    params: ParamMap,
+    case_summary: CaseSummary,
+    metrics: MetricMap,
+    artifacts: ArtifactMap,
+    error: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for BenchmarkResultRow {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = RawBenchmarkResultRow::deserialize(deserializer)?;
+        let failure_kind = raw.failure_kind.unwrap_or_else(|| {
+            infer_legacy_failure_kind(
+                &raw.status,
+                raw.error.as_deref(),
+                raw.metrics.get("logical_errors").copied(),
+            )
+        });
+        Ok(Self {
+            benchmark: raw.benchmark,
+            runner: raw.runner,
+            language: raw.language,
+            status: raw.status,
+            failure_kind,
+            params: raw.params,
+            case_summary: raw.case_summary,
+            metrics: raw.metrics,
+            artifacts: raw.artifacts,
+            error: raw.error,
+        })
+    }
+}
+
+fn infer_legacy_failure_kind(
+    status: &str,
+    error: Option<&str>,
+    logical_errors: Option<f64>,
+) -> FailureKind {
+    if status == "error" {
+        return error
+            .map(|message| classify_error(message, FailureKind::SolverFailure))
+            .unwrap_or(FailureKind::SolverFailure);
+    }
+    if logical_errors.unwrap_or(0.0) > 0.0 {
+        FailureKind::LogicalFailure
+    } else {
+        FailureKind::Ok
+    }
 }
 
 pub fn write_results_jsonl(rows: &[BenchmarkResultRow], out: &mut dyn Write) -> Result<(), String> {
