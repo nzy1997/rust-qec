@@ -131,9 +131,28 @@ fn legacy_timed_out(params: &ParamMap, metrics: &MetricMap) -> bool {
     let Some(max_wall_seconds) = params.get("max_wall_seconds").and_then(Value::as_f64) else {
         return false;
     };
-    metrics
-        .get("wall_seconds")
-        .is_some_and(|wall_seconds| wall_seconds.is_finite() && *wall_seconds >= max_wall_seconds)
+    let Some(wall_seconds) = metrics.get("wall_seconds") else {
+        return false;
+    };
+    wall_seconds.is_finite()
+        && *wall_seconds >= max_wall_seconds
+        && !legacy_reached_cap(params, metrics, "max_shots", "shots_used")
+        && !legacy_reached_cap(params, metrics, "max_errors", "logical_errors")
+}
+
+fn legacy_reached_cap(
+    params: &ParamMap,
+    metrics: &MetricMap,
+    param_key: &str,
+    metric_key: &str,
+) -> bool {
+    match (
+        params.get(param_key).and_then(Value::as_f64),
+        metrics.get(metric_key).copied(),
+    ) {
+        (Some(cap), Some(value)) => value.is_finite() && value >= cap,
+        _ => false,
+    }
 }
 
 pub fn write_results_jsonl(rows: &[BenchmarkResultRow], out: &mut dyn Write) -> Result<(), String> {
