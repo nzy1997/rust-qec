@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::failure::{FailureKind, classify_error};
+use crate::failure::{classify_error, FailureKind};
 
 pub type ArtifactMap = BTreeMap<String, String>;
 pub type CaseSummary = BTreeMap<String, Value>;

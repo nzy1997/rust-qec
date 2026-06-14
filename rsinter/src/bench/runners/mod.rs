@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
@@ -11,7 +11,7 @@ use crate::bench::circuit_source::build_circuit_for_point;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::{FailureKind, classify_completed, classify_error};
+use crate::failure::{classify_completed, classify_error, FailureKind};
 
 pub(crate) mod params;
 pub mod rbposd;

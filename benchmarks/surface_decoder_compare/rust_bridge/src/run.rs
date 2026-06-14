@@ -2,8 +2,10 @@ use std::fs;
 use std::time::Instant;
 
 use rbposd::DecoderConfig;
-use rilpqec::backend::{BatchBackend, build_batch_backend};
-use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem, lower_dem_to_problem};
+use rilpqec::backend::{build_batch_backend, BatchBackend};
+use rilpqec::{
+    lower_dem_to_problem, BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem,
+};
 use rsinter::decode::{CompiledDecoder, Decoder, RbposdDemDecoder, RmatchingDemDecoder};
 use rstim::dem::DetectorErrorModel;
 
@@ -242,12 +244,7 @@ fn decode_rilpqec_batches(
     })
 }
 
-fn count_logical_errors(
-    predictions: &[u8],
-    obs: &[u8],
-    num_shots: usize,
-    num_obs: usize,
-) -> usize {
+fn count_logical_errors(predictions: &[u8], obs: &[u8], num_shots: usize, num_obs: usize) -> usize {
     let obs_bytes = bytes_per_shot(num_obs);
     let mut logical_errors = 0usize;
 

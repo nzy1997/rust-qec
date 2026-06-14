@@ -1,6 +1,6 @@
 use rsinter::bench::result::{
-    BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap, RunManifest,
-    read_results_jsonl, write_results_jsonl,
+    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, CaseSummary, MetricMap,
+    PairMapExt, ParamMap, RunManifest,
 };
 use rsinter::failure::FailureKind;
 

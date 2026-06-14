@@ -1,4 +1,4 @@
-use crate::failure::{FailureKind, classify_completed};
+use crate::failure::{classify_completed, FailureKind};
 use crate::task_stats::TaskStats;
 use std::io::Write;
 
