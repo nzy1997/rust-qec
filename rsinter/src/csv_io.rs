@@ -35,6 +35,10 @@ pub fn write_csv(stats: &[TaskStats], out: &mut dyn Write) -> Result<(), String>
 }
 
 pub fn read_csv(data: &[u8]) -> Result<Vec<TaskStats>, String> {
+    if data.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let mut rdr = csv::Reader::from_reader(data);
     let headers = rdr.headers().map_err(|e| e.to_string())?.clone();
     let required_index = |name: &str| {

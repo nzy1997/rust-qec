@@ -45,6 +45,30 @@ fn csv_reads_legacy_rows_without_failure_kind() {
 }
 
 #[test]
+fn csv_reads_empty_input_as_empty_stats() {
+    let recovered = read_csv(b"").unwrap();
+
+    assert!(recovered.is_empty());
+}
+
+#[test]
+fn csv_reads_columns_by_header_name() {
+    let input = concat!(
+        "strong_id,failure_kind,custom_counts,decoder,seconds,json_metadata,errors,discards,shots\n",
+        "sid-7,timeout,\"{}\",mwpm,2.5000,\"{\"\"d\"\":5}\",3,1,42\n"
+    );
+
+    let recovered = read_csv(input.as_bytes()).unwrap();
+
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0].shots, 42);
+    assert_eq!(recovered[0].errors, 3);
+    assert_eq!(recovered[0].decoder, "mwpm");
+    assert_eq!(recovered[0].strong_id, "sid-7");
+    assert_eq!(recovered[0].failure_kind, FailureKind::Timeout);
+}
+
+#[test]
 fn task_stats_addition() {
     let a = sample_stats();
     let b = TaskStats {
