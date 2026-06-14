@@ -90,6 +90,14 @@ struct FailingDecoder {
     message: &'static str,
 }
 
+struct DecodeErrorDecoder;
+
+struct DecodeErrorCompiledDecoder;
+
+struct WrongPredictionLengthDecoder;
+
+struct WrongPredictionLengthCompiledDecoder;
+
 impl Decoder for FailingDecoder {
     fn compile_for_dem(
         &self,
@@ -99,12 +107,79 @@ impl Decoder for FailingDecoder {
     }
 }
 
+impl Decoder for DecodeErrorDecoder {
+    fn compile_for_dem(
+        &self,
+        _dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        Ok(Box::new(DecodeErrorCompiledDecoder))
+    }
+}
+
+impl CompiledDecoder for DecodeErrorCompiledDecoder {
+    fn decode_shots_bit_packed(
+        &self,
+        _dets: &[u8],
+        _num_shots: usize,
+        _num_dets: usize,
+        _num_obs: usize,
+    ) -> Result<Vec<u8>, String> {
+        Err("decode failed".into())
+    }
+}
+
+impl Decoder for WrongPredictionLengthDecoder {
+    fn compile_for_dem(
+        &self,
+        _dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        Ok(Box::new(WrongPredictionLengthCompiledDecoder))
+    }
+}
+
+impl CompiledDecoder for WrongPredictionLengthCompiledDecoder {
+    fn decode_shots_bit_packed(
+        &self,
+        _dets: &[u8],
+        _num_shots: usize,
+        _num_dets: usize,
+        _num_obs: usize,
+    ) -> Result<Vec<u8>, String> {
+        Ok(Vec::new())
+    }
+}
+
 fn make_failing_decoders(
     message: &'static str,
 ) -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
     let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
     decoders.insert("vacuous".into(), Box::new(FailingDecoder { message }));
     decoders
+}
+
+fn make_decode_error_decoders() -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
+    let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
+    decoders.insert("vacuous".into(), Box::new(DecodeErrorDecoder));
+    decoders
+}
+
+fn make_wrong_prediction_length_decoders() -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
+    let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
+    decoders.insert("vacuous".into(), Box::new(WrongPredictionLengthDecoder));
+    decoders
+}
+
+fn collect_branch_options() -> CollectOptions {
+    CollectOptions {
+        num_workers: 1,
+        max_shots: Some(1),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(1),
+        start_batch_size: 1,
+        save_resume_filepath: None,
+        print_progress: false,
+    }
 }
 
 #[test]
@@ -314,4 +389,55 @@ fn collect_records_decoder_failure_as_task_stats() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].shots, 0);
     assert_eq!(results[0].failure_kind, FailureKind::SolverFailure);
+}
+
+#[test]
+fn collect_missing_decoder_remains_caller_error() {
+    let mut task = make_clean_task();
+    task.decoder = "missing".into();
+
+    let err = collect(vec![task], make_decoders(), &collect_branch_options()).unwrap_err();
+
+    assert_eq!(err, "decoder not found: missing");
+}
+
+#[test]
+fn collect_records_decode_error_as_solver_failure_task_stats() {
+    let results = collect(
+        vec![make_clean_task()],
+        make_decode_error_decoders(),
+        &collect_branch_options(),
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SolverFailure);
+}
+
+#[test]
+fn collect_records_wrong_prediction_length_as_solver_failure_task_stats() {
+    let results = collect(
+        vec![make_clean_task()],
+        make_wrong_prediction_length_decoders(),
+        &collect_branch_options(),
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SolverFailure);
+}
+
+#[test]
+fn collect_records_detector_buffer_mismatch_as_sampler_error_task_stats() {
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = Some(1);
+    task.dem.set_min_counts(9, 1);
+
+    let results = collect(vec![task], make_decoders(), &collect_branch_options()).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SamplerError);
 }

@@ -114,6 +114,7 @@ fn collect_one_task(
 
     let num_dets = task.dem.effective_num_detectors();
     let num_obs = task.dem.num_observables();
+    let det_bytes_per_shot = num_dets.div_ceil(8);
     let obs_bytes_per_shot = (num_obs + 7) / 8;
 
     let max_shots = task
@@ -165,6 +166,16 @@ fn collect_one_task(
 
         let mut det_buf = Vec::new();
         if write_shots_b8(&batch.detections, &mut det_buf).is_err() {
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds + batch_started.elapsed().as_secs_f64(),
+                FailureKind::SamplerError,
+            ));
+        }
+        if det_buf.len() != n * det_bytes_per_shot {
             return Ok(make_task_stats(
                 task,
                 strong_id,
