@@ -103,3 +103,58 @@ fn failure_priority(kind: FailureKind) -> u8 {
         FailureKind::Unsupported => 5,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn failure_kind_status_groups_completed_and_error_kinds() {
+        assert_eq!(FailureKind::Ok.status(), "ok");
+        assert_eq!(FailureKind::LogicalFailure.status(), "ok");
+        assert_eq!(FailureKind::Timeout.status(), "ok");
+        assert_eq!(FailureKind::SolverFailure.status(), "error");
+        assert_eq!(FailureKind::Unsupported.status(), "error");
+        assert_eq!(FailureKind::SamplerError.status(), "error");
+    }
+
+    #[test]
+    fn failure_kind_parses_snake_case_values() {
+        assert_eq!(FailureKind::from_str("ok").unwrap(), FailureKind::Ok);
+        assert_eq!(
+            FailureKind::from_str("logical_failure").unwrap(),
+            FailureKind::LogicalFailure
+        );
+        assert_eq!(
+            FailureKind::from_str("solver_failure").unwrap(),
+            FailureKind::SolverFailure
+        );
+        assert!(FailureKind::from_str("logical-failure").is_err());
+    }
+
+    #[test]
+    fn classify_completed_prioritizes_timeout_then_logical_failure() {
+        assert_eq!(classify_completed(0, false), FailureKind::Ok);
+        assert_eq!(classify_completed(1, false), FailureKind::LogicalFailure);
+        assert_eq!(classify_completed(0, true), FailureKind::Timeout);
+        assert_eq!(classify_completed(1, true), FailureKind::Timeout);
+    }
+
+    #[test]
+    fn combine_failure_kind_uses_failure_priority_order() {
+        assert_eq!(
+            combine_failure_kind(FailureKind::Ok, FailureKind::LogicalFailure),
+            FailureKind::LogicalFailure
+        );
+        assert_eq!(
+            combine_failure_kind(FailureKind::Timeout, FailureKind::SamplerError),
+            FailureKind::SamplerError
+        );
+        assert_eq!(
+            combine_failure_kind(FailureKind::SolverFailure, FailureKind::Unsupported),
+            FailureKind::Unsupported
+        );
+    }
+}

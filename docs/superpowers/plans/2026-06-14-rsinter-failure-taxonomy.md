@@ -107,7 +107,7 @@ fn results_jsonl_infers_missing_failure_kind_from_legacy_rows() {
 Run:
 
 ```bash
-cargo test -p rsinter bench_result
+cargo test -p rsinter --test bench_result
 ```
 
 Expected: FAIL to compile because `rsinter::failure::FailureKind` and `BenchmarkResultRow.failure_kind` do not exist.
@@ -361,9 +361,9 @@ failure_kind: FailureKind::SolverFailure,
 Run:
 
 ```bash
-cargo test -p rsinter bench_result
-cargo test -p rsinter bench_merge
-cargo test -p rsinter bench_plot
+cargo test -p rsinter --test bench_result
+cargo test -p rsinter --test bench_merge
+cargo test -p rsinter --test bench_plot
 ```
 
 Expected: PASS.
@@ -452,7 +452,7 @@ fn task_stats_addition_keeps_strongest_failure_kind() {
 Run:
 
 ```bash
-cargo test -p rsinter csv_io
+cargo test -p rsinter --test csv_io
 ```
 
 Expected: FAIL to compile because `TaskStats.failure_kind` is missing.
@@ -641,7 +641,7 @@ use rsinter::failure::FailureKind;
 Run:
 
 ```bash
-cargo test -p rsinter csv_io
+cargo test -p rsinter --test csv_io
 cargo test -p rsinter collect_single_task_vacuous
 ```
 
@@ -961,10 +961,10 @@ to:
 Run:
 
 ```bash
-cargo test -p rsinter decode
-cargo test -p rsinter decode_ilp
-cargo test -p rsinter decode_rbposd
-cargo test -p rsinter decode_rmatching
+cargo test -p rsinter --test decode
+cargo test -p rsinter --test decode_ilp
+cargo test -p rsinter --test decode_rbposd
+cargo test -p rsinter --test decode_rmatching
 ```
 
 Expected: PASS.
@@ -1362,7 +1362,7 @@ Run:
 cargo test -p rsinter failure_kind_is_structured
 cargo test -p rsinter benchmark_runner_records_compile_failure_as_structured_row
 cargo test -p rsinter benchmark_runner_records_decode_failure_as_structured_row
-cargo test -p rsinter bench_runner_wrappers
+cargo test -p rsinter --test bench_runner_wrappers
 ```
 
 Expected: PASS.
@@ -1764,7 +1764,7 @@ fn make_task_stats(
 Run:
 
 ```bash
-cargo test -p rsinter collect
+cargo test -p rsinter --test collect
 ```
 
 Expected: PASS.
@@ -1888,9 +1888,9 @@ Run:
 
 ```bash
 cargo test -p rsinter failure_kind_is_structured
-cargo test -p rsinter bench_result
-cargo test -p rsinter csv_io
-cargo test -p rsinter collect
+cargo test -p rsinter --test bench_result
+cargo test -p rsinter --test csv_io
+cargo test -p rsinter --test collect
 cargo test -p rsinter rilpqec_gurobi_without_feature_records_unsupported_failure_kind
 ```
 

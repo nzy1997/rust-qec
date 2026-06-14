@@ -150,3 +150,17 @@ fn results_jsonl_infers_missing_failure_kind_from_legacy_rows() {
     assert_eq!(rows[2].failure_kind, FailureKind::SolverFailure);
     assert_eq!(rows[3].failure_kind, FailureKind::Unsupported);
 }
+
+#[test]
+fn results_jsonl_infers_missing_failure_kind_from_legacy_timeout_row() {
+    let input = concat!(
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"timeout\",\"language\":\"rust\",\"status\":\"ok\",",
+        "\"params\":{\"max_wall_seconds\":0.25},\"case_summary\":{},",
+        "\"metrics\":{\"wall_seconds\":0.25,\"logical_errors\":0.0},",
+        "\"artifacts\":{},\"error\":null}\n"
+    );
+
+    let rows = read_results_jsonl(input.as_bytes()).unwrap();
+
+    assert_eq!(rows[0].failure_kind, FailureKind::Timeout);
+}

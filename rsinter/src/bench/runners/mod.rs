@@ -163,6 +163,7 @@ mod tests {
 
     use super::*;
     use crate::decode::{CompiledDecoder, Decoder};
+    use crate::failure::FailureKind;
 
     struct EmptyPredictionDecoder;
 
@@ -338,6 +339,7 @@ mod tests {
 
         assert!(shots_used > 0.0, "shots_used={shots_used}");
         assert!(shots_used < 20.0, "shots_used={shots_used}");
+        assert_eq!(row.failure_kind, FailureKind::Timeout);
         assert!(wall_seconds >= 0.09, "wall_seconds={wall_seconds}");
         assert!(wall_seconds.is_finite(), "wall_seconds={wall_seconds}");
     }

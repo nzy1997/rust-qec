@@ -90,11 +90,7 @@ impl<'de> Deserialize<'de> for BenchmarkResultRow {
     {
         let raw = RawBenchmarkResultRow::deserialize(deserializer)?;
         let failure_kind = raw.failure_kind.unwrap_or_else(|| {
-            infer_legacy_failure_kind(
-                &raw.status,
-                raw.error.as_deref(),
-                raw.metrics.get("logical_errors").copied(),
-            )
+            infer_legacy_failure_kind(&raw.status, raw.error.as_deref(), &raw.params, &raw.metrics)
         });
         Ok(Self {
             benchmark: raw.benchmark,
@@ -114,18 +110,30 @@ impl<'de> Deserialize<'de> for BenchmarkResultRow {
 fn infer_legacy_failure_kind(
     status: &str,
     error: Option<&str>,
-    logical_errors: Option<f64>,
+    params: &ParamMap,
+    metrics: &MetricMap,
 ) -> FailureKind {
     if status == "error" {
         return error
             .map(|message| classify_error(message, FailureKind::SolverFailure))
             .unwrap_or(FailureKind::SolverFailure);
     }
-    if logical_errors.unwrap_or(0.0) > 0.0 {
+    if legacy_timed_out(params, metrics) {
+        FailureKind::Timeout
+    } else if metrics.get("logical_errors").copied().unwrap_or(0.0) > 0.0 {
         FailureKind::LogicalFailure
     } else {
         FailureKind::Ok
     }
+}
+
+fn legacy_timed_out(params: &ParamMap, metrics: &MetricMap) -> bool {
+    let Some(max_wall_seconds) = params.get("max_wall_seconds").and_then(Value::as_f64) else {
+        return false;
+    };
+    metrics
+        .get("wall_seconds")
+        .is_some_and(|wall_seconds| wall_seconds.is_finite() && *wall_seconds >= max_wall_seconds)
 }
 
 pub fn write_results_jsonl(rows: &[BenchmarkResultRow], out: &mut dyn Write) -> Result<(), String> {
