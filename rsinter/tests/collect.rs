@@ -1,5 +1,6 @@
 use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{CompiledDecoder, Decoder, VacuousDecoder};
+use rsinter::failure::FailureKind;
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
 use rstim::error_analyzer::ErrorAnalyzer;
@@ -57,6 +58,22 @@ fn make_task() -> Task {
     }
 }
 
+fn make_clean_task() -> Task {
+    let circuit = parse_lines("M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]").unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem(&circuit).unwrap();
+    Task {
+        circuit,
+        decoder: "vacuous".into(),
+        dem,
+        metadata: serde_json::json!({"d": 3, "clean": true}),
+        collection_options: CollectionOptions {
+            max_shots: Some(16),
+            max_errors: None,
+            max_wall_seconds: None,
+        },
+    }
+}
+
 fn make_decoders() -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
     let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
     decoders.insert("vacuous".into(), Box::new(VacuousDecoder));
@@ -66,6 +83,27 @@ fn make_decoders() -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
 fn make_slow_decoders(sleep: Duration) -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
     let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
     decoders.insert("vacuous".into(), Box::new(SlowDecoder { sleep }));
+    decoders
+}
+
+struct FailingDecoder {
+    message: &'static str,
+}
+
+impl Decoder for FailingDecoder {
+    fn compile_for_dem(
+        &self,
+        _dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        Err(self.message.to_string())
+    }
+}
+
+fn make_failing_decoders(
+    message: &'static str,
+) -> HashMap<String, Box<dyn rsinter::decode::Decoder>> {
+    let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
+    decoders.insert("vacuous".into(), Box::new(FailingDecoder { message }));
     decoders
 }
 
@@ -188,4 +226,92 @@ fn collect_rejects_non_positive_wall_clock() {
     let err = collect(vec![make_task()], make_decoders(), &options).unwrap_err();
 
     assert!(err.contains("max_wall_seconds must be positive"), "{err}");
+}
+
+#[test]
+fn collect_reports_ok_failure_kind_for_clean_runs() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(16),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(16),
+        start_batch_size: 16,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let results = collect(vec![make_clean_task()], make_decoders(), &options).unwrap();
+
+    assert_eq!(results[0].failure_kind, FailureKind::Ok);
+}
+
+#[test]
+fn collect_reports_logical_failure_kind_for_logical_errors() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(1000),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(256),
+        start_batch_size: 64,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let results = collect(vec![make_task()], make_decoders(), &options).unwrap();
+
+    assert!(results[0].errors > 0);
+    assert_eq!(results[0].failure_kind, FailureKind::LogicalFailure);
+}
+
+#[test]
+fn collect_reports_timeout_failure_kind_for_wall_clock_stop() {
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = None;
+
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(20),
+        max_errors: None,
+        max_wall_seconds: Some(0.09),
+        max_batch_size: Some(1),
+        start_batch_size: 1,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let results = collect(
+        vec![task],
+        make_slow_decoders(Duration::from_millis(35)),
+        &options,
+    )
+    .unwrap();
+
+    assert_eq!(results[0].failure_kind, FailureKind::Timeout);
+}
+
+#[test]
+fn collect_records_decoder_failure_as_task_stats() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(20),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(1),
+        start_batch_size: 1,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let results = collect(
+        vec![make_clean_task()],
+        make_failing_decoders("HiGHS backend error: compile failed"),
+        &options,
+    )
+    .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SolverFailure);
 }

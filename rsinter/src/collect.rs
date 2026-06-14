@@ -11,7 +11,7 @@ use rstim::sampler::sample_batch;
 
 use crate::csv_io;
 use crate::decode::Decoder;
-use crate::failure::FailureKind;
+use crate::failure::{classify_completed, classify_error, FailureKind};
 use crate::task::Task;
 use crate::task_stats::TaskStats;
 
@@ -55,6 +55,215 @@ fn should_continue_collecting(
         && under_wall_budget(total_seconds, max_wall_seconds)
 }
 
+fn make_task_stats(
+    task: &Task,
+    strong_id: String,
+    shots: u64,
+    errors: u64,
+    seconds: f64,
+    failure_kind: FailureKind,
+) -> TaskStats {
+    TaskStats {
+        strong_id,
+        decoder: task.decoder.clone(),
+        metadata: task.metadata.clone(),
+        shots,
+        errors,
+        discards: 0,
+        seconds,
+        failure_kind,
+        custom_counts: HashMap::new(),
+    }
+}
+
+fn collect_one_task(
+    task: &Task,
+    decoders: &HashMap<String, Box<dyn Decoder>>,
+    existing: &HashMap<String, TaskStats>,
+    options: &CollectOptions,
+) -> Result<TaskStats, String> {
+    let strong_id = task.strong_id();
+
+    let mut total_shots: u64 = 0;
+    let mut total_errors: u64 = 0;
+    let mut total_seconds: f64 = 0.0;
+
+    if let Some(prev) = existing.get(&strong_id) {
+        total_shots = prev.shots;
+        total_errors = prev.errors;
+        total_seconds = prev.seconds;
+    }
+
+    let decoder = decoders
+        .get(&task.decoder)
+        .ok_or_else(|| format!("decoder not found: {}", task.decoder))?;
+    let compiled = match decoder.compile_for_dem(&task.dem) {
+        Ok(compiled) => compiled,
+        Err(error) => {
+            let failure_kind = classify_error(&error, FailureKind::SolverFailure);
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds,
+                failure_kind,
+            ));
+        }
+    };
+
+    let num_dets = task.dem.effective_num_detectors();
+    let num_obs = task.dem.num_observables();
+    let obs_bytes_per_shot = (num_obs + 7) / 8;
+
+    let max_shots = task
+        .collection_options
+        .max_shots
+        .or(options.max_shots)
+        .unwrap_or(u64::MAX);
+    let max_errors = task
+        .collection_options
+        .max_errors
+        .or(options.max_errors)
+        .unwrap_or(u64::MAX);
+    let max_wall_seconds = task
+        .collection_options
+        .max_wall_seconds
+        .or(options.max_wall_seconds);
+
+    let mut batch_size = options.start_batch_size;
+    let mut rng = StdRng::from_entropy();
+
+    while should_continue_collecting(
+        total_shots,
+        total_errors,
+        total_seconds,
+        max_shots,
+        max_errors,
+        max_wall_seconds,
+    ) {
+        let remaining = (max_shots - total_shots) as usize;
+        let n = batch_size.min(remaining);
+        if n == 0 {
+            break;
+        }
+
+        let batch_started = Instant::now();
+        let batch = match sample_batch(&task.circuit, n, &mut rng) {
+            Ok(batch) => batch,
+            Err(_) => {
+                return Ok(make_task_stats(
+                    task,
+                    strong_id,
+                    total_shots,
+                    total_errors,
+                    total_seconds + batch_started.elapsed().as_secs_f64(),
+                    FailureKind::SamplerError,
+                ));
+            }
+        };
+
+        let mut det_buf = Vec::new();
+        if write_shots_b8(&batch.detections, &mut det_buf).is_err() {
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds + batch_started.elapsed().as_secs_f64(),
+                FailureKind::SamplerError,
+            ));
+        }
+        let mut obs_buf = Vec::new();
+        if write_shots_b8(&batch.observable_flips, &mut obs_buf).is_err() {
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds + batch_started.elapsed().as_secs_f64(),
+                FailureKind::SamplerError,
+            ));
+        }
+
+        let predictions = match compiled.decode_shots_bit_packed(&det_buf, n, num_dets, num_obs) {
+            Ok(predictions) => predictions,
+            Err(error) => {
+                let failure_kind = classify_error(&error, FailureKind::SolverFailure);
+                return Ok(make_task_stats(
+                    task,
+                    strong_id,
+                    total_shots,
+                    total_errors,
+                    total_seconds + batch_started.elapsed().as_secs_f64(),
+                    failure_kind,
+                ));
+            }
+        };
+
+        let expected_len = n * obs_bytes_per_shot;
+        if predictions.len() != expected_len {
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds + batch_started.elapsed().as_secs_f64(),
+                FailureKind::SolverFailure,
+            ));
+        }
+        if obs_buf.len() != expected_len {
+            return Ok(make_task_stats(
+                task,
+                strong_id,
+                total_shots,
+                total_errors,
+                total_seconds + batch_started.elapsed().as_secs_f64(),
+                FailureKind::SamplerError,
+            ));
+        }
+
+        let mut batch_errors = 0u64;
+        for shot in 0..n {
+            let offset = shot * obs_bytes_per_shot;
+            let mut mismatch = false;
+            for byte in 0..obs_bytes_per_shot {
+                if predictions[offset + byte] != obs_buf[offset + byte] {
+                    mismatch = true;
+                    break;
+                }
+            }
+            if mismatch {
+                batch_errors += 1;
+            }
+        }
+
+        total_shots += n as u64;
+        total_errors += batch_errors;
+        total_seconds += batch_started.elapsed().as_secs_f64();
+
+        if let Some(max) = options.max_batch_size {
+            batch_size = (batch_size * 2).min(max);
+        } else {
+            batch_size *= 2;
+        }
+    }
+
+    let timed_out = max_wall_seconds.is_some_and(|max_seconds| {
+        total_seconds >= max_seconds && total_shots < max_shots && total_errors < max_errors
+    });
+    let failure_kind = classify_completed(total_errors, timed_out);
+
+    Ok(make_task_stats(
+        task,
+        strong_id,
+        total_shots,
+        total_errors,
+        total_seconds,
+        failure_kind,
+    ))
+}
+
 pub fn collect(
     tasks: Vec<Task>,
     decoders: HashMap<String, Box<dyn Decoder>>,
@@ -90,108 +299,7 @@ pub fn collect(
     let results: Result<Vec<TaskStats>, String> = pool.install(|| {
         tasks
             .par_iter()
-            .map(|task| -> Result<TaskStats, String> {
-                let strong_id = task.strong_id();
-                let compiled = decoders
-                    .get(&task.decoder)
-                    .expect("decoder not found")
-                    .compile_for_dem(&task.dem)?;
-
-                let num_dets = task.dem.effective_num_detectors();
-                let num_obs = task.dem.num_observables();
-                let obs_bytes_per_shot = (num_obs + 7) / 8;
-
-                let mut total_shots: u64 = 0;
-                let mut total_errors: u64 = 0;
-                let mut total_seconds: f64 = 0.0;
-
-                if let Some(prev) = existing.get(&strong_id) {
-                    total_shots = prev.shots;
-                    total_errors = prev.errors;
-                    total_seconds = prev.seconds;
-                }
-
-                let max_shots = task
-                    .collection_options
-                    .max_shots
-                    .or(options.max_shots)
-                    .unwrap_or(u64::MAX);
-                let max_errors = task
-                    .collection_options
-                    .max_errors
-                    .or(options.max_errors)
-                    .unwrap_or(u64::MAX);
-                let max_wall_seconds = task
-                    .collection_options
-                    .max_wall_seconds
-                    .or(options.max_wall_seconds);
-
-                let mut batch_size = options.start_batch_size;
-                let mut rng = StdRng::from_entropy();
-
-                while should_continue_collecting(
-                    total_shots,
-                    total_errors,
-                    total_seconds,
-                    max_shots,
-                    max_errors,
-                    max_wall_seconds,
-                ) {
-                    let remaining = (max_shots - total_shots) as usize;
-                    let n = batch_size.min(remaining);
-                    if n == 0 {
-                        break;
-                    }
-
-                    let batch_started = Instant::now();
-                    let batch = sample_batch(&task.circuit, n, &mut rng).unwrap();
-
-                    let mut det_buf = Vec::new();
-                    write_shots_b8(&batch.detections, &mut det_buf).unwrap();
-                    let mut obs_buf = Vec::new();
-                    write_shots_b8(&batch.observable_flips, &mut obs_buf).unwrap();
-
-                    let predictions =
-                        compiled.decode_shots_bit_packed(&det_buf, n, num_dets, num_obs)?;
-
-                    let mut batch_errors = 0u64;
-                    for shot in 0..n {
-                        let offset = shot * obs_bytes_per_shot;
-                        let mut mismatch = false;
-                        for byte in 0..obs_bytes_per_shot {
-                            if predictions[offset + byte] != obs_buf[offset + byte] {
-                                mismatch = true;
-                                break;
-                            }
-                        }
-                        if mismatch {
-                            batch_errors += 1;
-                        }
-                    }
-
-                    total_shots += n as u64;
-                    total_errors += batch_errors;
-                    total_seconds += batch_started.elapsed().as_secs_f64();
-
-                    if let Some(max) = options.max_batch_size {
-                        batch_size = (batch_size * 2).min(max);
-                    } else {
-                        batch_size *= 2;
-                    }
-                }
-
-                Ok(TaskStats {
-                    strong_id,
-                    decoder: task.decoder.clone(),
-                    metadata: task.metadata.clone(),
-                    shots: total_shots,
-                    errors: total_errors,
-                    discards: 0,
-                    seconds: total_seconds,
-                    failure_kind: FailureKind::Ok,
-                    custom_counts: HashMap::new(),
-                })
-            })
+            .map(|task| collect_one_task(task, &decoders, &existing, options))
             .collect()
     });
     let results = results?;
