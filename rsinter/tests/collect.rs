@@ -511,3 +511,26 @@ fn collect_grows_batch_size_without_an_explicit_cap() {
     assert_eq!(results[0].shots, 2);
     assert_eq!(results[0].failure_kind, FailureKind::Ok);
 }
+
+#[test]
+fn collect_prefers_task_specific_shot_limit_over_global_limit() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(20),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(8),
+        start_batch_size: 8,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = Some(3);
+    let results = collect(vec![task], make_decoders(), &options).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 3);
+    assert_eq!(results[0].errors, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::Ok);
+}

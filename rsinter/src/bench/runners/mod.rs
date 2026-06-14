@@ -852,4 +852,91 @@ mod tests {
         assert!(wall_seconds >= 0.09, "wall_seconds={wall_seconds}");
         assert!(wall_seconds.is_finite(), "wall_seconds={wall_seconds}");
     }
+
+    #[test]
+    fn run_decoder_point_reports_sampler_failure_after_partial_progress() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let mut point = surface_point(0.0, 2, 2);
+        point.batch_size = 1;
+        let built = build_circuit_for_point(&point, &ctx.spec_dir).unwrap();
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let mut calls = 0usize;
+        let mut flaky_batcher =
+            |_circuit: &[rstim::ir::StimInstr], shots: usize, _rng: &mut StdRng| {
+                calls += 1;
+                if calls == 1 {
+                    Ok((Vec::new(), vec![0u8; shots]))
+                } else {
+                    Err("sampler stopped after warmup".to_string())
+                }
+            };
+
+        let row = run_built_decoder_point_with_batcher(
+            "fake",
+            &SlowPredictionDecoder {
+                sleep: Duration::from_millis(0),
+            },
+            built,
+            &point,
+            &ctx,
+            &decoder_params,
+            &mut flaky_batcher,
+        )
+        .unwrap();
+
+        assert_eq!(calls, 2);
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::SamplerError);
+        assert_eq!(row.metrics["shots_used"], 1.0);
+        assert_eq!(row.metrics["logical_errors"], 0.0);
+        assert_eq!(
+            row.case_summary["num_shots_generated"],
+            serde_json::json!(1)
+        );
+        assert_eq!(row.error.as_deref(), Some("sampler stopped after warmup"));
+    }
+
+    #[test]
+    fn run_decoder_point_stops_mid_batch_when_logical_error_cap_is_hit() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let mut point = surface_point(0.0, 4, 1);
+        point.batch_size = 4;
+        let decoder_params = crate::bench::result::ParamMap::new();
+
+        let row = run_decoder_point("fake", &OnePredictionDecoder, &point, &ctx, &decoder_params)
+            .unwrap();
+
+        assert_eq!(row.status, "ok");
+        assert_eq!(row.failure_kind, FailureKind::LogicalFailure);
+        assert_eq!(row.metrics["shots_used"], 1.0);
+        assert_eq!(row.metrics["logical_errors"], 1.0);
+        assert_eq!(
+            row.case_summary["num_shots_generated"],
+            serde_json::json!(4)
+        );
+    }
+
+    #[test]
+    fn sample_and_pack_batch_writes_clean_detector_and_observable_bytes() {
+        let circuit =
+            parse_lines("M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+        let mut rng = StdRng::seed_from_u64(7);
+
+        let (dets, obs) = sample_and_pack_batch(&circuit, 3, &mut rng).unwrap();
+
+        assert_eq!(dets, vec![0u8; 3]);
+        assert_eq!(obs, vec![0u8; 3]);
+    }
 }

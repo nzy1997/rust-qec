@@ -180,6 +180,29 @@ fn results_jsonl_does_not_infer_timeout_without_wall_seconds_metric() {
 }
 
 #[test]
+fn results_jsonl_keeps_more_legacy_timeout_edges_as_non_timeouts() {
+    let input = concat!(
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"no_limit\",\"language\":\"rust\",\"status\":\"ok\",",
+        "\"params\":{},\"case_summary\":{},",
+        "\"metrics\":{\"wall_seconds\":99.0,\"logical_errors\":0.0},",
+        "\"artifacts\":{},\"error\":null}\n",
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"under_limit\",\"language\":\"rust\",\"status\":\"ok\",",
+        "\"params\":{\"max_wall_seconds\":0.25},\"case_summary\":{},",
+        "\"metrics\":{\"wall_seconds\":0.24,\"logical_errors\":0.0},",
+        "\"artifacts\":{},\"error\":null}\n",
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"error_without_message\",\"language\":\"rust\",",
+        "\"status\":\"error\",\"params\":{},\"case_summary\":{},\"metrics\":{},",
+        "\"artifacts\":{},\"error\":null}\n"
+    );
+
+    let rows = read_results_jsonl(input.as_bytes()).unwrap();
+
+    assert_eq!(rows[0].failure_kind, FailureKind::Ok);
+    assert_eq!(rows[1].failure_kind, FailureKind::Ok);
+    assert_eq!(rows[2].failure_kind, FailureKind::SolverFailure);
+}
+
+#[test]
 fn results_jsonl_does_not_infer_timeout_when_legacy_rows_hit_caps() {
     let input = concat!(
         "{\"benchmark\":\"surface_decoder\",\"runner\":\"shot_cap\",\"language\":\"rust\",\"status\":\"ok\",",
