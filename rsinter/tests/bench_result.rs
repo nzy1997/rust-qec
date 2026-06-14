@@ -152,6 +152,29 @@ fn results_jsonl_infers_missing_failure_kind_from_legacy_rows() {
 }
 
 #[test]
+fn results_jsonl_preserves_explicit_failure_kind_over_legacy_inference() {
+    let input = concat!(
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"explicit_timeout\",\"language\":\"rust\",",
+        "\"status\":\"ok\",\"failure_kind\":\"timeout\",",
+        "\"params\":{},\"case_summary\":{},\"metrics\":{\"logical_errors\":0.0},",
+        "\"artifacts\":{},\"error\":null}\n",
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"explicit_sampler\",\"language\":\"rust\",",
+        "\"status\":\"error\",\"failure_kind\":\"sampler_error\",",
+        "\"params\":{},\"case_summary\":{},\"metrics\":{},",
+        "\"artifacts\":{},\"error\":\"sample failed\"}\n"
+    );
+
+    let rows = read_results_jsonl(input.as_bytes()).unwrap();
+
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].failure_kind, FailureKind::Timeout);
+    assert_eq!(rows[1].status, "error");
+    assert_eq!(rows[1].failure_kind, FailureKind::SamplerError);
+    assert_eq!(rows[1].error.as_deref(), Some("sample failed"));
+}
+
+#[test]
 fn results_jsonl_infers_missing_failure_kind_from_legacy_timeout_row() {
     let input = concat!(
         "{\"benchmark\":\"surface_decoder\",\"runner\":\"timeout\",\"language\":\"rust\",\"status\":\"ok\",",

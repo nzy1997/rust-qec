@@ -304,6 +304,26 @@ fn collect_rejects_non_positive_wall_clock() {
 }
 
 #[test]
+fn collect_rejects_task_specific_non_positive_wall_clock() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(20),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: Some(1),
+        start_batch_size: 1,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+    let mut task = make_task();
+    task.collection_options.max_wall_seconds = Some(-0.5);
+
+    let err = collect(vec![task], make_decoders(), &options).unwrap_err();
+
+    assert!(err.contains("max_wall_seconds must be positive"), "{err}");
+}
+
+#[test]
 fn collect_reports_ok_failure_kind_for_clean_runs() {
     let options = CollectOptions {
         num_workers: 1,
