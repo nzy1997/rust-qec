@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-#[cfg(feature = "gurobi")]
 use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig};
-use rsinter::collect::{CollectOptions, collect};
+use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{Decoder, IlpDemDecoder as RsinterIlpDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
@@ -13,9 +12,11 @@ use rstim::parser::parse_lines;
 fn ilp_dem_decoder_predicts_a_single_observable_flip() {
     let dem = DetectorErrorModel::parse("error(0.125) D0 L0\nerror(0.25) D1\n").unwrap();
     let decoder = RsinterIlpDemDecoder::default();
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -24,9 +25,9 @@ fn ilp_dem_decoder_predicts_a_single_observable_flip() {
 fn ilp_dem_decoder_handles_observable_only_terms() {
     let dem = DetectorErrorModel::parse("error(0.75) L0\n").unwrap();
     let decoder = RsinterIlpDemDecoder::default();
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[], 1, 0, 1);
+    let predictions = compiled.decode_shots_bit_packed(&[], 1, 0, 1).unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -86,9 +87,36 @@ fn ilp_dem_decoder_can_explicitly_use_gurobi_through_rsinter() {
             verbose: false,
         },
     });
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
+}
+
+#[cfg(not(feature = "gurobi"))]
+#[test]
+fn ilp_dem_decoder_reports_unavailable_gurobi_backend() {
+    let dem = DetectorErrorModel::parse("error(0.125) D0 L0\n").unwrap();
+    let decoder = RsinterIlpDemDecoder::new(IlpDecoderConfig {
+        backend: BackendConfig {
+            kind: BackendKind::Gurobi,
+            time_limit_seconds: None,
+            mip_gap: None,
+            threads: Some(1),
+            verbose: false,
+        },
+    });
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
+
+    let err = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 1, 1)
+        .unwrap_err();
+
+    assert!(
+        err.contains("no ILP backend is available"),
+        "error was: {err}"
+    );
 }

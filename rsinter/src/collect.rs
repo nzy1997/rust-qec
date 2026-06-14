@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rayon::prelude::*;
 
 use rstim::output::write_shots_b8;
@@ -87,15 +87,15 @@ pub fn collect(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let results: Vec<TaskStats> = pool.install(|| {
+    let results: Result<Vec<TaskStats>, String> = pool.install(|| {
         tasks
             .par_iter()
-            .map(|task| {
+            .map(|task| -> Result<TaskStats, String> {
                 let strong_id = task.strong_id();
                 let compiled = decoders
                     .get(&task.decoder)
                     .expect("decoder not found")
-                    .compile_for_dem(&task.dem);
+                    .compile_for_dem(&task.dem)?;
 
                 let num_dets = task.dem.effective_num_detectors();
                 let num_obs = task.dem.num_observables();
@@ -152,7 +152,7 @@ pub fn collect(
                     write_shots_b8(&batch.observable_flips, &mut obs_buf).unwrap();
 
                     let predictions =
-                        compiled.decode_shots_bit_packed(&det_buf, n, num_dets, num_obs);
+                        compiled.decode_shots_bit_packed(&det_buf, n, num_dets, num_obs)?;
 
                     let mut batch_errors = 0u64;
                     for shot in 0..n {
@@ -180,7 +180,7 @@ pub fn collect(
                     }
                 }
 
-                TaskStats {
+                Ok(TaskStats {
                     strong_id,
                     decoder: task.decoder.clone(),
                     metadata: task.metadata.clone(),
@@ -190,10 +190,11 @@ pub fn collect(
                     seconds: total_seconds,
                     failure_kind: FailureKind::Ok,
                     custom_counts: HashMap::new(),
-                }
+                })
             })
             .collect()
     });
+    let results = results?;
 
     // Save to CSV if path specified
     if let Some(ref path) = options.save_resume_filepath {

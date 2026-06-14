@@ -1,4 +1,4 @@
-use rsinter::collect::{CollectOptions, collect};
+use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{CompiledDecoder, Decoder, VacuousDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
@@ -17,8 +17,11 @@ struct SlowCompiledDecoder {
 }
 
 impl Decoder for SlowDecoder {
-    fn compile_for_dem(&self, _dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-        Box::new(SlowCompiledDecoder { sleep: self.sleep })
+    fn compile_for_dem(
+        &self,
+        _dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        Ok(Box::new(SlowCompiledDecoder { sleep: self.sleep }))
     }
 }
 
@@ -29,10 +32,10 @@ impl CompiledDecoder for SlowCompiledDecoder {
         num_shots: usize,
         _num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, String> {
         thread::sleep(self.sleep);
         let obs_bytes = num_obs.div_ceil(8);
-        vec![0u8; num_shots * obs_bytes]
+        Ok(vec![0u8; num_shots * obs_bytes])
     }
 }
 

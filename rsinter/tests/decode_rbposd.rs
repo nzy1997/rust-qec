@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rbposd::DecoderConfig;
-use rsinter::collect::{CollectOptions, collect};
+use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{Decoder, RbposdDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
@@ -12,9 +12,11 @@ use rstim::parser::parse_lines;
 fn rbposd_dem_decoder_predicts_a_single_observable_flip() {
     let dem = DetectorErrorModel::parse("error(0.125) D0 L0\nerror(0.25) D1\n").unwrap();
     let decoder = RbposdDemDecoder::new(DecoderConfig::default());
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -23,11 +25,17 @@ fn rbposd_dem_decoder_predicts_a_single_observable_flip() {
 fn rbposd_dem_decoder_reuses_one_compiled_instance_across_multiple_batch_calls() {
     let dem = DetectorErrorModel::parse("error(0.125) D0 L0\nerror(0.25) D1\n").unwrap();
     let decoder = RbposdDemDecoder::new(DecoderConfig::default());
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let first = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
-    let second = compiled.decode_shots_bit_packed(&[0b0000_0000], 1, 2, 1);
-    let third = compiled.decode_shots_bit_packed(&[0b0000_0001, 0b0000_0000], 2, 2, 1);
+    let first = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
+    let second = compiled
+        .decode_shots_bit_packed(&[0b0000_0000], 1, 2, 1)
+        .unwrap();
+    let third = compiled
+        .decode_shots_bit_packed(&[0b0000_0001, 0b0000_0000], 2, 2, 1)
+        .unwrap();
 
     assert_eq!(first, vec![0b0000_0001]);
     assert_eq!(second, vec![0b0000_0000]);
@@ -83,9 +91,9 @@ fn collect_runs_with_the_rbposd_adapter() {
 fn rbposd_dem_decoder_handles_observable_only_terms() {
     let dem = DetectorErrorModel::parse("error(0.75) L0\n").unwrap();
     let decoder = RbposdDemDecoder::new(DecoderConfig::default());
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[], 1, 0, 1);
+    let predictions = compiled.decode_shots_bit_packed(&[], 1, 0, 1).unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -94,9 +102,11 @@ fn rbposd_dem_decoder_handles_observable_only_terms() {
 fn rbposd_dem_decoder_handles_exact_probability_terms() {
     let dem = DetectorErrorModel::parse("error(1) D0 L0\nerror(0) D1\n").unwrap();
     let decoder = RbposdDemDecoder::new(DecoderConfig::default());
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1);
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -105,9 +115,11 @@ fn rbposd_dem_decoder_handles_exact_probability_terms() {
 fn rbposd_dem_decoder_handles_zero_syndrome_map_cases() {
     let dem = DetectorErrorModel::parse("error(0.9) D0 L0\nerror(0.2) D0\n").unwrap();
     let decoder = RbposdDemDecoder::new(DecoderConfig::default());
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
 
-    let predictions = compiled.decode_shots_bit_packed(&[0b0000_0000], 1, 1, 1);
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0000], 1, 1, 1)
+        .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
 }
@@ -135,7 +147,7 @@ fn exact_three_error_logical_error_rate(dem: &DetectorErrorModel, osd_order: usi
     config.max_bp_iterations = 0;
     config.osd_order = osd_order;
     let decoder = RbposdDemDecoder::new(config);
-    let compiled = decoder.compile_for_dem(dem);
+    let compiled = decoder.compile_for_dem(dem).unwrap();
     let probabilities = [
         0.268_941_421_369_995_1,
         0.268_941_421_369_995_1,
@@ -155,7 +167,11 @@ fn exact_three_error_logical_error_rate(dem: &DetectorErrorModel, osd_order: usi
                 let det1 = e1 ^ e2;
                 let observed = e2;
                 let det_byte = u8::from(det0) | (u8::from(det1) << 1);
-                let predicted = compiled.decode_shots_bit_packed(&[det_byte], 1, 2, 1)[0] & 1 != 0;
+                let predicted = compiled
+                    .decode_shots_bit_packed(&[det_byte], 1, 2, 1)
+                    .unwrap()[0]
+                    & 1
+                    != 0;
                 if predicted != observed {
                     ler += probability;
                 }

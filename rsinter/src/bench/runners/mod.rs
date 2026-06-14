@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
@@ -37,7 +37,7 @@ pub(crate) fn run_decoder_point(
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?;
 
     let compile_started = Instant::now();
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem)?;
     let compile_us = compile_started.elapsed().as_secs_f64() * 1e6;
 
     let max_shots = usize::try_from(point.max_shots)
@@ -70,7 +70,8 @@ pub(crate) fn run_decoder_point(
         write_shots_b8(&batch.observable_flips, &mut obs).map_err(|e| e.to_string())?;
 
         let decode_started = Instant::now();
-        let predictions = compiled.decode_shots_bit_packed(&dets, batch_shots, num_dets, num_obs);
+        let predictions =
+            compiled.decode_shots_bit_packed(&dets, batch_shots, num_dets, num_obs)?;
         total_decode_us += decode_started.elapsed().as_secs_f64() * 1e6;
 
         let expected_len = batch_shots * obs_bytes;
@@ -105,10 +106,9 @@ pub(crate) fn run_decoder_point(
     for (key, value) in decoder_params {
         result_params.insert(key.clone(), value.clone());
     }
-    let timed_out =
-        matches!(point.max_wall_seconds, Some(max_seconds) if wall_seconds >= max_seconds)
-            && shots_used < max_shots
-            && logical_errors < max_errors;
+    let timed_out = matches!(point.max_wall_seconds, Some(max_seconds) if wall_seconds >= max_seconds)
+        && shots_used < max_shots
+        && logical_errors < max_errors;
 
     Ok(BenchmarkResultRow {
         benchmark: ctx.benchmark_name.clone(),
@@ -170,8 +170,11 @@ mod tests {
     struct EmptyPredictionCompiled;
 
     impl Decoder for EmptyPredictionDecoder {
-        fn compile_for_dem(&self, _dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-            Box::new(EmptyPredictionCompiled)
+        fn compile_for_dem(
+            &self,
+            _dem: &DetectorErrorModel,
+        ) -> Result<Box<dyn CompiledDecoder>, String> {
+            Ok(Box::new(EmptyPredictionCompiled))
         }
     }
 
@@ -182,8 +185,8 @@ mod tests {
             _num_shots: usize,
             _num_dets: usize,
             _num_obs: usize,
-        ) -> Vec<u8> {
-            Vec::new()
+        ) -> Result<Vec<u8>, String> {
+            Ok(Vec::new())
         }
     }
 
@@ -196,8 +199,11 @@ mod tests {
     }
 
     impl Decoder for SlowPredictionDecoder {
-        fn compile_for_dem(&self, _dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-            Box::new(SlowPredictionCompiled { sleep: self.sleep })
+        fn compile_for_dem(
+            &self,
+            _dem: &DetectorErrorModel,
+        ) -> Result<Box<dyn CompiledDecoder>, String> {
+            Ok(Box::new(SlowPredictionCompiled { sleep: self.sleep }))
         }
     }
 
@@ -208,10 +214,10 @@ mod tests {
             num_shots: usize,
             _num_dets: usize,
             num_obs: usize,
-        ) -> Vec<u8> {
+        ) -> Result<Vec<u8>, String> {
             thread::sleep(self.sleep);
             let obs_bytes = num_obs.div_ceil(8);
-            vec![0u8; num_shots * obs_bytes]
+            Ok(vec![0u8; num_shots * obs_bytes])
         }
     }
 
