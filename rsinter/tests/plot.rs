@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rsinter::failure::FailureKind;
 use rsinter::plot::{plot_error_rate, plot_error_rate_per_piece};
 use rsinter::task_stats::TaskStats;
 use tempfile::tempdir;
@@ -13,6 +14,7 @@ fn make_stat(p: f64, d: u64, r: u64, shots: u64, errors: u64) -> TaskStats {
         errors,
         discards: 0,
         seconds: 0.0,
+        failure_kind: FailureKind::Ok,
         custom_counts: HashMap::new(),
     }
 }

@@ -11,6 +11,7 @@ use rstim::sampler::sample_batch;
 
 use crate::csv_io;
 use crate::decode::Decoder;
+use crate::failure::FailureKind;
 use crate::task::Task;
 use crate::task_stats::TaskStats;
 
@@ -187,6 +188,7 @@ pub fn collect(
                     errors: total_errors,
                     discards: 0,
                     seconds: total_seconds,
+                    failure_kind: FailureKind::Ok,
                     custom_counts: HashMap::new(),
                 }
             })

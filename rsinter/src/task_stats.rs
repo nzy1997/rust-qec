@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Add;
-use serde::{Serialize, Deserialize};
+
+use crate::failure::{FailureKind, combine_failure_kind};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskStats {
@@ -11,6 +13,8 @@ pub struct TaskStats {
     pub errors: u64,
     pub discards: u64,
     pub seconds: f64,
+    #[serde(default)]
+    pub failure_kind: FailureKind,
     pub custom_counts: HashMap<String, u64>,
 }
 
@@ -29,6 +33,7 @@ impl Add for TaskStats {
             errors: self.errors + rhs.errors,
             discards: self.discards + rhs.discards,
             seconds: self.seconds + rhs.seconds,
+            failure_kind: combine_failure_kind(self.failure_kind, rhs.failure_kind),
             custom_counts: counts,
         }
     }
