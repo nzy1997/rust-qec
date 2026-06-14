@@ -120,13 +120,14 @@ pub(crate) fn run_decoder_point(
     let compiled = match decoder.compile_for_dem(&dem) {
         Ok(compiled) => compiled,
         Err(error) => {
+            let compile_us = compile_started.elapsed().as_secs_f64() * 1e6;
             let failure_kind = classify_error(&error, FailureKind::SolverFailure);
             return Ok(benchmark_result_row(
                 ctx,
                 failure_kind,
                 result_params,
                 case_summary_with_progress(base_case_summary, num_dets, num_obs, 0),
-                benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                benchmark_metrics(0, 0, compile_us, 0.0, 0.0),
                 Some(error),
             ));
         }
@@ -371,6 +372,7 @@ mod tests {
             &self,
             _dem: &DetectorErrorModel,
         ) -> Result<Box<dyn CompiledDecoder>, String> {
+            thread::sleep(Duration::from_millis(1));
             Err(self.message.to_string())
         }
     }
@@ -498,6 +500,8 @@ mod tests {
 
         assert_eq!(row.status, "error");
         assert_eq!(row.failure_kind, FailureKind::Unsupported);
+        assert!(row.metrics["compile_us"].is_finite());
+        assert!(row.metrics["compile_us"] > 0.0);
         assert!(row.error.unwrap().contains("no ILP backend is available"));
     }
 
