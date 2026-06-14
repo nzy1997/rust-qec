@@ -166,6 +166,20 @@ fn results_jsonl_infers_missing_failure_kind_from_legacy_timeout_row() {
 }
 
 #[test]
+fn results_jsonl_does_not_infer_timeout_without_wall_seconds_metric() {
+    let input = concat!(
+        "{\"benchmark\":\"surface_decoder\",\"runner\":\"missing_wall\",\"language\":\"rust\",\"status\":\"ok\",",
+        "\"params\":{\"max_wall_seconds\":0.25},\"case_summary\":{},",
+        "\"metrics\":{\"logical_errors\":0.0},",
+        "\"artifacts\":{},\"error\":null}\n"
+    );
+
+    let rows = read_results_jsonl(input.as_bytes()).unwrap();
+
+    assert_eq!(rows[0].failure_kind, FailureKind::Ok);
+}
+
+#[test]
 fn results_jsonl_does_not_infer_timeout_when_legacy_rows_hit_caps() {
     let input = concat!(
         "{\"benchmark\":\"surface_decoder\",\"runner\":\"shot_cap\",\"language\":\"rust\",\"status\":\"ok\",",

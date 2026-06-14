@@ -441,3 +441,73 @@ fn collect_records_detector_buffer_mismatch_as_sampler_error_task_stats() {
     assert_eq!(results[0].shots, 0);
     assert_eq!(results[0].failure_kind, FailureKind::SamplerError);
 }
+
+#[test]
+fn collect_records_sampler_failure_as_sampler_error_task_stats() {
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = Some(1);
+    task.circuit = parse_lines("ML 0\n").unwrap();
+
+    let results = collect(vec![task], make_decoders(), &collect_branch_options()).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SamplerError);
+}
+
+#[test]
+fn collect_records_observable_buffer_mismatch_as_sampler_error_task_stats() {
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = Some(1);
+    task.dem.set_min_counts(1, 9);
+
+    let results = collect(vec![task], make_decoders(), &collect_branch_options()).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::SamplerError);
+}
+
+#[test]
+fn collect_zero_start_batch_size_finishes_without_collecting() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(1),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: None,
+        start_batch_size: 0,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = None;
+    let results = collect(vec![task], make_decoders(), &options).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 0);
+    assert_eq!(results[0].failure_kind, FailureKind::Ok);
+}
+
+#[test]
+fn collect_grows_batch_size_without_an_explicit_cap() {
+    let options = CollectOptions {
+        num_workers: 1,
+        max_shots: Some(2),
+        max_errors: None,
+        max_wall_seconds: None,
+        max_batch_size: None,
+        start_batch_size: 1,
+        save_resume_filepath: None,
+        print_progress: false,
+    };
+
+    let mut task = make_clean_task();
+    task.collection_options.max_shots = None;
+    let results = collect(vec![task], make_decoders(), &options).unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].shots, 2);
+    assert_eq!(results[0].failure_kind, FailureKind::Ok);
+}

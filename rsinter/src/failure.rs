@@ -121,6 +121,17 @@ mod tests {
     }
 
     #[test]
+    fn failure_kind_default_and_display_cover_all_variants() {
+        assert_eq!(FailureKind::default(), FailureKind::Ok);
+        assert_eq!(FailureKind::Ok.to_string(), "ok");
+        assert_eq!(FailureKind::LogicalFailure.to_string(), "logical_failure");
+        assert_eq!(FailureKind::Timeout.to_string(), "timeout");
+        assert_eq!(FailureKind::SolverFailure.to_string(), "solver_failure");
+        assert_eq!(FailureKind::Unsupported.to_string(), "unsupported");
+        assert_eq!(FailureKind::SamplerError.to_string(), "sampler_error");
+    }
+
+    #[test]
     fn failure_kind_parses_snake_case_values() {
         assert_eq!(FailureKind::from_str("ok").unwrap(), FailureKind::Ok);
         assert_eq!(

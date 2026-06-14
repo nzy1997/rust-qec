@@ -724,6 +724,47 @@ mod tests {
     }
 
     #[test]
+    fn run_decoder_point_records_observable_buffer_mismatch_as_sampler_error() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let point = surface_point(0.002, 1, 1);
+        let built = build_circuit_for_point(&point, &ctx.spec_dir).unwrap();
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let mut short_observables =
+            |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+                Ok((Vec::new(), Vec::new()))
+            };
+
+        let row = run_built_decoder_point_with_batcher(
+            "fake",
+            &SlowPredictionDecoder {
+                sleep: Duration::from_millis(0),
+            },
+            built,
+            &point,
+            &ctx,
+            &decoder_params,
+            &mut short_observables,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::SamplerError);
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert!(
+            row.error
+                .as_deref()
+                .unwrap()
+                .contains("sampler produced 0 observable bytes")
+        );
+    }
+
+    #[test]
     fn run_decoder_point_reports_zero_rates_when_no_shots_are_requested() {
         let point = BenchCasePoint {
             input_type: "surface_rotated_memory_x".into(),
