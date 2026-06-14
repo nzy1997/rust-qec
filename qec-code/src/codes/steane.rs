@@ -1,4 +1,5 @@
 use crate::code::StabilizerCode;
+use crate::codes::built_in_css::built_in_css_checks;
 use crate::css::CssCode;
 use crate::error::Result;
 
@@ -9,12 +10,10 @@ pub struct Steane {
 
 impl Steane {
     pub fn new() -> Result<Self> {
-        let h = vec![
-            vec![1, 0, 0, 1, 0, 1, 1],
-            vec![0, 1, 0, 1, 1, 0, 1],
-            vec![0, 0, 1, 0, 1, 1, 1],
-        ];
-        let css = CssCode::from_hx_hz(h.clone(), h)?;
+        let checks = built_in_css_checks("steane")?;
+        let hx = row_supports_to_dense(checks.num_cols, &checks.hx);
+        let hz = row_supports_to_dense(checks.num_cols, &checks.hz);
+        let css = CssCode::from_hx_hz(hx, hz)?;
 
         Ok(Self {
             code: css.code().clone(),
@@ -24,4 +23,16 @@ impl Steane {
     pub fn code(&self) -> &StabilizerCode {
         &self.code
     }
+}
+
+fn row_supports_to_dense(num_cols: usize, rows: &[Vec<usize>]) -> Vec<Vec<u8>> {
+    let mut matrix = vec![vec![0; num_cols]; rows.len()];
+
+    for (row_idx, row) in rows.iter().enumerate() {
+        for &col in row {
+            matrix[row_idx][col] = 1;
+        }
+    }
+
+    matrix
 }

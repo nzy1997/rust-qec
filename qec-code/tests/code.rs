@@ -1,6 +1,16 @@
+use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::codes::steane::Steane;
 use qec_code::css::CssCode;
 use qec_code::{Pauli, QecError, StabilizerCode};
+
+fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
+    for row in rows {
+        assert!(
+            row.windows(2).all(|pair| pair[0] < pair[1]),
+            "row is not canonical: {row:?}"
+        );
+    }
+}
 
 #[test]
 fn stabilizer_code_rejects_noncommuting_generators() {
@@ -94,4 +104,33 @@ fn steane_exposes_expected_invariants() {
     assert_eq!(code.stabilizers().len(), 6);
     assert_eq!(code.stabilizer_rows().len(), 6);
     assert_eq!(code.stabilizer_rows()[0].len(), 14);
+}
+
+#[test]
+fn built_in_css_registry_exposes_steane_checks() {
+    let checks = built_in_css_checks("steane").unwrap();
+
+    assert_eq!(checks.code_id, "steane");
+    assert_eq!(checks.num_cols, 7);
+    assert_eq!(
+        checks.hx,
+        vec![
+            vec![0, 3, 5, 6],
+            vec![1, 3, 4, 6],
+            vec![2, 4, 5, 6],
+        ]
+    );
+    assert_eq!(checks.hz, checks.hx);
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn built_in_css_registry_rejects_unknown_code_id() {
+    assert_eq!(
+        built_in_css_checks("unknown"),
+        Err(QecError::UnknownBuiltInCssCode {
+            code_id: "unknown".to_owned(),
+        })
+    );
 }
