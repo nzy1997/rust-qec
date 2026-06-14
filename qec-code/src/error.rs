@@ -30,6 +30,8 @@ pub enum QecError {
     LogicalBasisNotFound,
     #[error("distance witness not found")]
     DistanceWitnessNotFound,
+    #[error("unknown built-in CSS code: {code_id}")]
+    UnknownBuiltInCssCode { code_id: String },
 }
 
 pub type Result<T> = core::result::Result<T, QecError>;
