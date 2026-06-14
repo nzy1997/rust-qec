@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
 };
 use rstim::codegen::surface_code::rotated_memory_x;
-use rstim::codegen::NoiseParams;
 use rstim::ir::StimInstr;
 
 use crate::bench::registry::BenchCasePoint;
@@ -33,19 +33,27 @@ fn build_surface(point: &BenchCasePoint) -> Result<BuiltCircuit, String> {
         .distance
         .ok_or_else(|| "surface point is missing distance".to_string())?;
     let circuit = rotated_memory_x(distance, point.rounds, point.p);
+    let mut params = ParamMap::from_pairs([
+        ("input_type", serde_json::json!("surface_rotated_memory_x")),
+        ("distance", serde_json::json!(distance)),
+        ("rounds", serde_json::json!(point.rounds)),
+        ("p", serde_json::json!(point.p)),
+        ("max_shots", serde_json::json!(point.max_shots)),
+        ("max_errors", serde_json::json!(point.max_errors)),
+        ("batch_size", serde_json::json!(point.batch_size)),
+    ]);
+    insert_max_wall_seconds(&mut params, point.max_wall_seconds);
     Ok(BuiltCircuit {
         circuit,
-        params: ParamMap::from_pairs([
-            ("input_type", serde_json::json!("surface_rotated_memory_x")),
-            ("distance", serde_json::json!(distance)),
-            ("rounds", serde_json::json!(point.rounds)),
-            ("p", serde_json::json!(point.p)),
-            ("max_shots", serde_json::json!(point.max_shots)),
-            ("max_errors", serde_json::json!(point.max_errors)),
-            ("batch_size", serde_json::json!(point.batch_size)),
-        ]),
+        params,
         case_summary: CaseSummary::new(),
     })
+}
+
+fn insert_max_wall_seconds(params: &mut ParamMap, max_wall_seconds: Option<f64>) {
+    if let Some(seconds) = max_wall_seconds {
+        params.insert("max_wall_seconds".into(), serde_json::json!(seconds));
+    }
 }
 
 fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, String> {
@@ -116,11 +124,14 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     ]);
     params.insert(
         "observables".into(),
-        serde_json::json!(point
-            .observables_path
-            .as_deref()
-            .unwrap_or("canonical_fallback")),
+        serde_json::json!(
+            point
+                .observables_path
+                .as_deref()
+                .unwrap_or("canonical_fallback")
+        ),
     );
+    insert_max_wall_seconds(&mut params, point.max_wall_seconds);
     Ok(BuiltCircuit {
         circuit,
         params,

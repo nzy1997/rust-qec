@@ -1,5 +1,5 @@
 //! End-to-end: generate circuit -> collect -> fit_binomial
-use rsinter::collect::{collect, CollectOptions};
+use rsinter::collect::{CollectOptions, collect};
 use rsinter::decode::VacuousDecoder;
 use rsinter::stats::fit_binomial;
 use rsinter::task::{CollectionOptions, Task};
@@ -19,15 +19,16 @@ fn end_to_end_rep_code() {
         collection_options: CollectionOptions {
             max_shots: Some(10_000),
             max_errors: None,
+            max_wall_seconds: None,
         },
     };
-    let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> =
-        HashMap::new();
+    let mut decoders: HashMap<String, Box<dyn rsinter::decode::Decoder>> = HashMap::new();
     decoders.insert("vacuous".into(), Box::new(VacuousDecoder));
     let options = CollectOptions {
         num_workers: 2,
         max_shots: Some(10_000),
         max_errors: None,
+        max_wall_seconds: None,
         max_batch_size: Some(1024),
         start_batch_size: 64,
         save_resume_filepath: None,

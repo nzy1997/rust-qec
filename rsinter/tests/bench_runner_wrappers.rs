@@ -18,6 +18,7 @@ fn rbposd_runner_handles_zero_shot_benchmark_points() {
         observables_path: None,
         max_shots: 0,
         max_errors: 2,
+        max_wall_seconds: None,
         batch_size: 4,
         decoder_params: std::collections::BTreeMap::new(),
     };
@@ -52,6 +53,7 @@ fn rilpqec_runner_handles_zero_shot_benchmark_points() {
         observables_path: None,
         max_shots: 0,
         max_errors: 2,
+        max_wall_seconds: None,
         batch_size: 4,
         decoder_params: std::collections::BTreeMap::new(),
     };

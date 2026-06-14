@@ -1,11 +1,12 @@
-use rstim::ir::{StimInstr, circuit_to_string};
 use rstim::dem::DetectorErrorModel;
-use sha2::{Sha256, Digest};
+use rstim::ir::{StimInstr, circuit_to_string};
+use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, Default)]
 pub struct CollectionOptions {
     pub max_shots: Option<u64>,
     pub max_errors: Option<u64>,
+    pub max_wall_seconds: Option<f64>,
 }
 
 #[derive(Clone, Debug)]

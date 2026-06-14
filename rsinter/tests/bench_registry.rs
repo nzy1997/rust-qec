@@ -92,6 +92,23 @@ fn expand_runner_points_rejects_non_string_optional_fields() {
 }
 
 #[test]
+fn expand_runner_points_rejects_non_positive_max_wall_seconds() {
+    let mut params = valid_runner_params();
+    params.insert("max_wall_seconds".into(), toml::Value::Float(0.0));
+    assert_eq!(
+        expand_points_err(&params),
+        "max_wall_seconds must be positive"
+    );
+
+    let mut params = valid_runner_params();
+    params.insert("max_wall_seconds".into(), toml::Value::Float(-1.0));
+    assert_eq!(
+        expand_points_err(&params),
+        "max_wall_seconds must be positive"
+    );
+}
+
+#[test]
 #[should_panic(expected = "expected expand_runner_points to fail")]
 fn expand_points_err_panics_when_points_expand_successfully() {
     let params = valid_runner_params();
@@ -181,6 +198,29 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
     assert_eq!(points[0].input_type, "surface_rotated_memory_x");
     assert_eq!(points[0].distance, Some(3));
     assert_eq!(points[0].basis, None);
+}
+
+#[test]
+fn expand_runner_points_accepts_optional_max_wall_seconds() {
+    let mut params = valid_runner_params();
+    params.insert("max_wall_seconds".into(), toml::Value::Float(2.5));
+
+    let points = expand_runner_points(&params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(points[0].max_wall_seconds, Some(2.5));
+}
+
+#[test]
+fn expand_runner_points_still_requires_max_shots_with_wall_clock_budget() {
+    let mut params = valid_runner_params();
+    params.remove("max_shots");
+    params.insert("max_wall_seconds".into(), toml::Value::Float(2.5));
+
+    assert_eq!(
+        expand_points_err(&params),
+        "missing runner param: max_shots"
+    );
 }
 
 #[test]

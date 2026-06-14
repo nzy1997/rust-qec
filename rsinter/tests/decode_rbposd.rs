@@ -49,6 +49,7 @@ fn collect_runs_with_the_rbposd_adapter() {
         collection_options: CollectionOptions {
             max_shots: Some(32),
             max_errors: Some(32),
+            max_wall_seconds: None,
         },
     };
 
@@ -65,6 +66,7 @@ fn collect_runs_with_the_rbposd_adapter() {
             num_workers: 1,
             max_shots: None,
             max_errors: None,
+            max_wall_seconds: None,
             max_batch_size: Some(32),
             start_batch_size: 8,
             save_resume_filepath: None,

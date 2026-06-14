@@ -22,6 +22,7 @@ pub struct BenchCasePoint {
     pub observables_path: Option<String>,
     pub max_shots: u64,
     pub max_errors: u64,
+    pub max_wall_seconds: Option<f64>,
     pub batch_size: usize,
     pub decoder_params: BTreeMap<String, Value>,
 }
@@ -92,6 +93,8 @@ fn expand_generic_runner_points(
     let ps = require_array(params, "p")?;
     let max_shots = require_u64(params, "max_shots")?;
     let max_errors = require_u64(params, "max_errors")?;
+    let max_wall_seconds = optional_f64(params, "max_wall_seconds")?;
+    validate_max_wall_seconds(max_wall_seconds)?;
     let batch_size = require_usize(params, "batch_size")?;
     if rounds.is_empty() {
         return Err("rounds must not be empty".into());
@@ -110,6 +113,7 @@ fn expand_generic_runner_points(
             ps,
             max_shots,
             max_errors,
+            max_wall_seconds,
             batch_size,
             decoder_params,
         ),
@@ -119,6 +123,7 @@ fn expand_generic_runner_points(
             ps,
             max_shots,
             max_errors,
+            max_wall_seconds,
             batch_size,
             decoder_params,
         ),
@@ -132,6 +137,7 @@ fn expand_surface_points(
     ps: &[Value],
     max_shots: u64,
     max_errors: u64,
+    max_wall_seconds: Option<f64>,
     batch_size: usize,
     decoder_params: BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
@@ -165,6 +171,7 @@ fn expand_surface_points(
                     observables_path: None,
                     max_shots,
                     max_errors,
+                    max_wall_seconds,
                     batch_size,
                     decoder_params: decoder_params.clone(),
                 });
@@ -180,6 +187,7 @@ fn expand_css_points(
     ps: &[Value],
     max_shots: u64,
     max_errors: u64,
+    max_wall_seconds: Option<f64>,
     batch_size: usize,
     decoder_params: BTreeMap<String, Value>,
 ) -> Result<Vec<BenchCasePoint>, String> {
@@ -210,6 +218,7 @@ fn expand_css_points(
                 observables_path: observables_path.clone(),
                 max_shots,
                 max_errors,
+                max_wall_seconds,
                 batch_size,
                 decoder_params: decoder_params.clone(),
             });
@@ -245,6 +254,7 @@ fn is_generic_param_key(key: &str) -> bool {
             | "p"
             | "max_shots"
             | "max_errors"
+            | "max_wall_seconds"
             | "batch_size"
             | "basis"
             | "schedule"
@@ -302,6 +312,22 @@ fn require_u64(params: &BTreeMap<String, Value>, key: &str) -> Result<u64, Strin
         .as_integer()
         .ok_or_else(|| format!("{key} must be an integer"))?;
     u64::try_from(value).map_err(|_| format!("{key} must be non-negative"))
+}
+
+fn optional_f64(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<f64>, String> {
+    match params.get(key) {
+        None => Ok(None),
+        Some(value) => value_as_f64(value, key).map(Some),
+    }
+}
+
+fn validate_max_wall_seconds(max_wall_seconds: Option<f64>) -> Result<(), String> {
+    if let Some(seconds) = max_wall_seconds {
+        if !seconds.is_finite() || seconds <= 0.0 {
+            return Err("max_wall_seconds must be positive".into());
+        }
+    }
+    Ok(())
 }
 
 fn require_usize(params: &BTreeMap<String, Value>, key: &str) -> Result<usize, String> {

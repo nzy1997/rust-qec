@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rayon::prelude::*;
 
 use rstim::output::write_shots_b8;
@@ -18,10 +18,40 @@ pub struct CollectOptions {
     pub num_workers: usize,
     pub max_shots: Option<u64>,
     pub max_errors: Option<u64>,
+    pub max_wall_seconds: Option<f64>,
     pub max_batch_size: Option<usize>,
     pub start_batch_size: usize,
     pub save_resume_filepath: Option<PathBuf>,
     pub print_progress: bool,
+}
+
+fn validate_max_wall_seconds(max_wall_seconds: Option<f64>) -> Result<(), String> {
+    if let Some(seconds) = max_wall_seconds {
+        if !seconds.is_finite() || seconds <= 0.0 {
+            return Err("max_wall_seconds must be positive".into());
+        }
+    }
+    Ok(())
+}
+
+fn under_wall_budget(total_seconds: f64, max_wall_seconds: Option<f64>) -> bool {
+    match max_wall_seconds {
+        Some(max_seconds) => total_seconds < max_seconds,
+        None => true,
+    }
+}
+
+fn should_continue_collecting(
+    total_shots: u64,
+    total_errors: u64,
+    total_seconds: f64,
+    max_shots: u64,
+    max_errors: u64,
+    max_wall_seconds: Option<f64>,
+) -> bool {
+    total_shots < max_shots
+        && total_errors < max_errors
+        && under_wall_budget(total_seconds, max_wall_seconds)
 }
 
 pub fn collect(
@@ -29,6 +59,11 @@ pub fn collect(
     decoders: HashMap<String, Box<dyn Decoder>>,
     options: &CollectOptions,
 ) -> Result<Vec<TaskStats>, String> {
+    validate_max_wall_seconds(options.max_wall_seconds)?;
+    for task in &tasks {
+        validate_max_wall_seconds(task.collection_options.max_wall_seconds)?;
+    }
+
     // Load existing data if resume path exists
     let mut existing: HashMap<String, TaskStats> = HashMap::new();
     if let Some(ref path) = options.save_resume_filepath {
@@ -85,20 +120,30 @@ pub fn collect(
                     .max_errors
                     .or(options.max_errors)
                     .unwrap_or(u64::MAX);
+                let max_wall_seconds = task
+                    .collection_options
+                    .max_wall_seconds
+                    .or(options.max_wall_seconds);
 
                 let mut batch_size = options.start_batch_size;
                 let mut rng = StdRng::from_entropy();
 
-                while total_shots < max_shots && total_errors < max_errors {
+                while should_continue_collecting(
+                    total_shots,
+                    total_errors,
+                    total_seconds,
+                    max_shots,
+                    max_errors,
+                    max_wall_seconds,
+                ) {
                     let remaining = (max_shots - total_shots) as usize;
                     let n = batch_size.min(remaining);
                     if n == 0 {
                         break;
                     }
 
-                    let start = Instant::now();
+                    let batch_started = Instant::now();
                     let batch = sample_batch(&task.circuit, n, &mut rng).unwrap();
-                    let elapsed = start.elapsed().as_secs_f64();
 
                     let mut det_buf = Vec::new();
                     write_shots_b8(&batch.detections, &mut det_buf).unwrap();
@@ -125,7 +170,7 @@ pub fn collect(
 
                     total_shots += n as u64;
                     total_errors += batch_errors;
-                    total_seconds += elapsed;
+                    total_seconds += batch_started.elapsed().as_secs_f64();
 
                     if let Some(max) = options.max_batch_size {
                         batch_size = (batch_size * 2).min(max);
