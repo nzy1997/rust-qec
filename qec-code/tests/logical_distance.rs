@@ -119,8 +119,64 @@ fn large_code_logical_basis_avoids_exhaustive_enumeration() {
         assert!(basis.logical_x[0].commutes_with(stabilizer));
         assert!(basis.logical_z[0].commutes_with(stabilizer));
     }
+    #[cfg(not(feature = "distance-ilp-highs"))]
     assert_eq!(
         compute_distance(&code),
-        Err(QecError::UnsupportedExhaustiveEnumeration { n: 32 })
+        Err(QecError::DistanceComputationUnsupported {
+            n: 32,
+            reason: "enable a distance ILP feature or use a smaller code".into(),
+        })
+    );
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn steane_distance_matches_ilp_path() {
+    let steane = Steane::new().unwrap();
+
+    let distance = compute_distance(steane.code()).unwrap();
+
+    assert_eq!(distance.distance, 3);
+    assert_eq!(distance.witness.weight(), 3);
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn multi_logical_code_returns_a_nontrivial_minimum_witness() {
+    let code = StabilizerCode::from_stabilizers(4, vec![pauli(4, &[], &[0]), pauli(4, &[], &[1])])
+        .unwrap();
+
+    let distance = compute_distance(&code).unwrap();
+
+    assert_eq!(distance.distance, 1);
+    assert_eq!(distance.witness.weight(), 1);
+    assert!(!distance
+        .witness
+        .x_bits()
+        .iter()
+        .chain(distance.witness.z_bits())
+        .all(|&bit| bit == 0));
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+#[test]
+fn large_code_without_ilp_reports_configuration_specific_unsupported_error() {
+    let stabilizers = (0..31)
+        .map(|qubit| {
+            let mut z = vec![0; 32];
+            z[qubit] = 1;
+            Pauli::from_xz_bits(vec![0; 32], z).unwrap()
+        })
+        .collect();
+    let code = StabilizerCode::from_stabilizers(32, stabilizers).unwrap();
+
+    let err = compute_distance(&code).unwrap_err();
+
+    assert_eq!(
+        err,
+        QecError::DistanceComputationUnsupported {
+            n: 32,
+            reason: "enable a distance ILP feature or use a smaller code".into(),
+        }
     );
 }

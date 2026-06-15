@@ -1,3 +1,5 @@
+#![cfg(feature = "distance-ilp-highs")]
+
 use qec_code::codes::steane::Steane;
 use qec_code::distance_ilp::lower_distance_problem;
 use qec_code::{Pauli, StabilizerCode};
@@ -27,11 +29,8 @@ fn steane_distance_problem_has_expected_variable_shape() {
 
 #[test]
 fn multi_logical_code_gets_one_nonzero_logical_constraint() {
-    let code = StabilizerCode::from_stabilizers(
-        4,
-        vec![pauli(4, &[], &[0]), pauli(4, &[], &[1])],
-    )
-    .unwrap();
+    let code = StabilizerCode::from_stabilizers(4, vec![pauli(4, &[], &[0]), pauli(4, &[], &[1])])
+        .unwrap();
 
     let lowered = lower_distance_problem(&code).unwrap();
     let logical_constraint = lowered
