@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "qec-ilp-core",
     "qec-code",
     "rstim",
     "rsinter",

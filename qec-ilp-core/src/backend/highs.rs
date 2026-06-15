@@ -1,0 +1,217 @@
+use std::num::NonZeroU32;
+use std::os::raw::c_int;
+
+use highs::{ColProblem, HighsModelStatus, HighsSolutionStatus, Model};
+
+use crate::backend::BinaryBackend;
+use crate::config::BinaryIlpConfig;
+use crate::error::BinaryIlpError;
+use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution};
+
+#[derive(Debug)]
+pub struct HighsBinaryBackend {
+    model: Option<Model>,
+    row_senses: Vec<ConstraintSense>,
+    row_structural_bounds: Vec<(f64, f64)>,
+    solution_binary_prefix_len: usize,
+}
+
+impl HighsBinaryBackend {
+    pub fn new(problem: &BinaryIlpModel, config: &BinaryIlpConfig) -> Result<Self, BinaryIlpError> {
+        let mut col_problem = ColProblem::new();
+        let mut rows = Vec::with_capacity(problem.constraints.len());
+        let mut row_senses = Vec::with_capacity(problem.constraints.len());
+        let mut row_structural_bounds = Vec::with_capacity(problem.constraints.len());
+
+        for constraint in &problem.constraints {
+            let (lower, upper) = row_bounds(constraint.sense, constraint.rhs);
+            let row = match constraint.sense {
+                ConstraintSense::Eq => col_problem.add_row(constraint.rhs..=constraint.rhs),
+                ConstraintSense::Le => col_problem.add_row(..=constraint.rhs),
+                ConstraintSense::Ge => col_problem.add_row(constraint.rhs..),
+            };
+            rows.push(row);
+            row_senses.push(constraint.sense);
+            row_structural_bounds.push((lower, upper));
+        }
+
+        for (column_index, var) in problem.binary_vars.iter().enumerate() {
+            let mut entries = Vec::new();
+            for (row_index, row) in problem.constraints.iter().enumerate() {
+                for &(index, coeff) in &row.binary_terms {
+                    if index == column_index {
+                        entries.push((rows[row_index], coeff));
+                    }
+                }
+            }
+            col_problem.add_integer_column(var.objective, var.lower..=var.upper, entries);
+        }
+
+        for (column_index, var) in problem.integer_vars.iter().enumerate() {
+            let mut entries = Vec::new();
+            for (row_index, row) in problem.constraints.iter().enumerate() {
+                for &(index, coeff) in &row.integer_terms {
+                    if index == column_index {
+                        entries.push((rows[row_index], coeff));
+                    }
+                }
+            }
+            col_problem.add_integer_column(var.objective, var.lower..=var.upper, entries);
+        }
+
+        let mut model = Model::try_new(col_problem)
+            .map_err(|err| BinaryIlpError::Highs(format!("failed to create model: {err:?}")))?;
+        if !config.backend.verbose {
+            model.make_quiet();
+        }
+        if let Some(threads) = config.backend.threads.and_then(NonZeroU32::new) {
+            model.set_threads(threads);
+        }
+        if let Some(limit) = config.backend.time_limit_seconds {
+            model.try_set_option("time_limit", limit).map_err(|err| {
+                BinaryIlpError::Highs(format!("failed to set time_limit option: {err:?}"))
+            })?;
+        }
+        if let Some(gap) = config.backend.mip_gap {
+            model.try_set_option("mip_rel_gap", gap).map_err(|err| {
+                BinaryIlpError::Highs(format!("failed to set mip_rel_gap option: {err:?}"))
+            })?;
+        }
+
+        Ok(Self {
+            model: Some(model),
+            row_senses,
+            row_structural_bounds,
+            solution_binary_prefix_len: problem.solution_binary_prefix_len,
+        })
+    }
+}
+
+impl BinaryBackend for HighsBinaryBackend {
+    fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError> {
+        let model = self
+            .model
+            .take()
+            .ok_or_else(|| BinaryIlpError::Highs("model already in use".to_string()))?;
+
+        let solved = model
+            .try_solve()
+            .map_err(|err| BinaryIlpError::Highs(format!("solve failed: {err:?}")))?;
+        let model_status = solved.status();
+        let primal_status = solved.primal_solution_status();
+        if !accept_solved_model_status(model_status, primal_status) {
+            self.model = Some(solved.into());
+            return Err(BinaryIlpError::Highs(format!(
+                "unexpected HiGHS solve status: model={model_status:?}, primal={primal_status:?}"
+            )));
+        }
+
+        let columns = solved.get_solution().columns().to_vec();
+        self.model = Some(solved.into());
+
+        if columns.len() < self.solution_binary_prefix_len {
+            return Err(BinaryIlpError::Highs(format!(
+                "solution width mismatch: expected at least {}, got {}",
+                self.solution_binary_prefix_len,
+                columns.len()
+            )));
+        }
+
+        Ok(ModelSolution {
+            binary_values: columns[..self.solution_binary_prefix_len]
+                .iter()
+                .map(|&value| value > 0.5)
+                .collect(),
+        })
+    }
+
+    fn set_rhs(&mut self, row: usize, rhs: f64) -> Result<(), BinaryIlpError> {
+        let sense = *self
+            .row_senses
+            .get(row)
+            .ok_or(BinaryIlpError::UnknownConstraintRow(row))?;
+        let (structural_lower, structural_upper) = self
+            .row_structural_bounds
+            .get(row)
+            .copied()
+            .ok_or(BinaryIlpError::UnknownConstraintRow(row))?;
+        let (lower, upper) = match sense {
+            ConstraintSense::Eq => (rhs, rhs),
+            ConstraintSense::Le => (structural_lower, rhs),
+            ConstraintSense::Ge => (rhs, structural_upper),
+        };
+
+        let model = self
+            .model
+            .as_mut()
+            .ok_or_else(|| BinaryIlpError::Highs("model already in use".to_string()))?;
+        let status = unsafe {
+            highs_sys::Highs_changeRowBounds(model.as_mut_ptr(), row as c_int, lower, upper)
+        };
+        if status != highs_sys::STATUS_OK {
+            return Err(BinaryIlpError::Highs(format!(
+                "failed to set row bounds for row {row}: status {status}"
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+fn row_bounds(sense: ConstraintSense, rhs: f64) -> (f64, f64) {
+    match sense {
+        ConstraintSense::Eq => (rhs, rhs),
+        ConstraintSense::Le => (f64::NEG_INFINITY, rhs),
+        ConstraintSense::Ge => (rhs, f64::INFINITY),
+    }
+}
+
+fn accept_solved_model_status(
+    model_status: HighsModelStatus,
+    primal_status: HighsSolutionStatus,
+) -> bool {
+    match model_status {
+        HighsModelStatus::Optimal => true,
+        HighsModelStatus::ReachedTimeLimit => primal_status == HighsSolutionStatus::Feasible,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use highs::{HighsModelStatus, HighsSolutionStatus};
+
+    use super::accept_solved_model_status;
+
+    #[test]
+    fn accepts_optimal_solution() {
+        assert!(accept_solved_model_status(
+            HighsModelStatus::Optimal,
+            HighsSolutionStatus::Feasible,
+        ));
+    }
+
+    #[test]
+    fn accepts_time_limited_feasible_solution() {
+        assert!(accept_solved_model_status(
+            HighsModelStatus::ReachedTimeLimit,
+            HighsSolutionStatus::Feasible,
+        ));
+    }
+
+    #[test]
+    fn rejects_time_limited_run_without_feasible_solution() {
+        assert!(!accept_solved_model_status(
+            HighsModelStatus::ReachedTimeLimit,
+            HighsSolutionStatus::None,
+        ));
+    }
+
+    #[test]
+    fn rejects_other_non_optimal_statuses_even_with_feasible_solution() {
+        assert!(!accept_solved_model_status(
+            HighsModelStatus::ReachedInterrupt,
+            HighsSolutionStatus::Feasible,
+        ));
+    }
+}
