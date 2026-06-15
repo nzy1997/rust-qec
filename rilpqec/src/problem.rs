@@ -39,18 +39,25 @@ impl LoweredDemProblem {
             })
             .collect::<Vec<_>>();
 
+        let mut row_binary_terms = vec![Vec::new(); self.num_detectors];
+        for (index, column) in self.columns.iter().enumerate() {
+            for &row in &column.detectors {
+                let terms =
+                    row_binary_terms
+                        .get_mut(row)
+                        .ok_or(IlpDecodeError::DetectorWidthMismatch {
+                            expected: self.num_detectors,
+                            actual: row + 1,
+                        })?;
+                terms.push((index, 1.0));
+            }
+        }
+
         let constraints = (0..self.num_detectors)
             .map(|row| qec_ilp_core::LinearConstraint {
                 name: format!("det_{row}"),
                 sense: qec_ilp_core::ConstraintSense::Eq,
-                binary_terms: self
-                    .columns
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, column)| {
-                        column.detectors.contains(&row).then_some((index, 1.0))
-                    })
-                    .collect(),
+                binary_terms: row_binary_terms[row].clone(),
                 integer_terms: vec![(row, -2.0)],
                 rhs: 0.0,
             })

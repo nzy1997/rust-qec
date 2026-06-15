@@ -1,8 +1,9 @@
 use std::fs;
 use std::time::Instant;
 
+use qec_ilp_core::backend::{build_binary_backend, BinaryBackend};
+use qec_ilp_core::BinaryIlpConfig;
 use rbposd::DecoderConfig;
-use rilpqec::backend::{build_batch_backend, BatchBackend};
 use rilpqec::{
     lower_dem_to_problem, BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem,
 };
@@ -176,7 +177,7 @@ fn decode_rilpqec_batches(
     dets: &[u8],
     obs: &[u8],
     problem: &LoweredDemProblem,
-    backend: &mut dyn BatchBackend,
+    backend: &mut dyn BinaryBackend,
 ) -> Result<DecodeSummary, String> {
     if request.num_dets != problem.num_detectors {
         return Err(format!(
@@ -211,9 +212,17 @@ fn decode_rilpqec_batches(
                 &dets[absolute_shot * det_bytes..(absolute_shot + 1) * det_bytes],
                 request.num_dets,
             );
+            for (row, (&bit, &forced)) in syndrome.iter().zip(&problem.forced_syndrome).enumerate()
+            {
+                let rhs = if bit ^ forced { 1.0 } else { 0.0 };
+                backend
+                    .set_rhs(row, rhs)
+                    .map_err(|error| format!("rilpqec set_rhs failed: {error}"))?;
+            }
             let correction = backend
-                .solve(&syndrome)
-                .map_err(|error| format!("rilpqec decode failed: {error}"))?;
+                .solve()
+                .map_err(|error| format!("rilpqec decode failed: {error}"))?
+                .binary_values;
             let observables = problem
                 .observables_from_correction(&correction)
                 .map_err(|error| format!("rilpqec observable projection failed: {error}"))?;
@@ -296,17 +305,27 @@ fn build_success_response(
 
 fn compile_rilpqec_backend(
     problem: &LoweredDemProblem,
-) -> Result<(Box<dyn BatchBackend>, String), String> {
+) -> Result<(Box<dyn BinaryBackend>, String), String> {
+    let base_model = problem
+        .to_binary_ilp_model()
+        .map_err(|error| format!("failed to build rilpqec ILP model: {error}"))?;
     let preferred_config = ilp_config(BackendKind::Gurobi);
-    match build_batch_backend(problem, &preferred_config) {
+    let preferred_binary_config = BinaryIlpConfig {
+        backend: preferred_config.backend.clone(),
+    };
+    match build_binary_backend(&base_model, &preferred_binary_config) {
         Ok(backend) => Ok((backend, "gurobi".to_string())),
         Err(gurobi_error) => {
             let fallback_config = ilp_config(BackendKind::Highs);
-            let backend = build_batch_backend(problem, &fallback_config).map_err(|highs_error| {
-                format!(
-                    "failed to compile rilpqec with gurobi ({gurobi_error}) and highs ({highs_error})"
-                )
-            })?;
+            let fallback_binary_config = BinaryIlpConfig {
+                backend: fallback_config.backend.clone(),
+            };
+            let backend =
+                build_binary_backend(&base_model, &fallback_binary_config).map_err(|highs_error| {
+                    format!(
+                        "failed to compile rilpqec with gurobi ({gurobi_error}) and highs ({highs_error})"
+                    )
+                })?;
             Ok((backend, "highs".to_string()))
         }
     }

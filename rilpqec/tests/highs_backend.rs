@@ -1,6 +1,6 @@
-use qec_ilp_core::BinaryIlpModel;
 use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::BinaryIlpConfig;
+use qec_ilp_core::BinaryIlpModel;
 use rilpqec::{
     lower_dem_to_problem, BackendConfig, BackendKind, IlpDecodeError, IlpDecoderConfig,
     IlpDemDecoder,
@@ -62,6 +62,30 @@ fn highs_reuses_one_batch_backend_for_multiple_shots() {
 
     let predictions = decoder
         .decode_batch_bit_packed(&[0b0000_0001, 0b0000_0000], 2, 2, 1)
+        .unwrap();
+
+    assert_eq!(predictions, vec![0b0000_0001, 0b0000_0000]);
+}
+
+#[test]
+fn highs_decodes_forced_syndrome_after_probability_normalization() {
+    let dem = DetectorErrorModel::parse("error(0.75) D0 L0\n").unwrap();
+    let decoder = IlpDemDecoder::from_dem(
+        &dem,
+        IlpDecoderConfig {
+            backend: BackendConfig {
+                kind: BackendKind::Highs,
+                time_limit_seconds: None,
+                mip_gap: None,
+                threads: Some(1),
+                verbose: false,
+            },
+        },
+    )
+    .unwrap();
+
+    let predictions = decoder
+        .decode_batch_bit_packed(&[0b0000_0001, 0b0000_0000], 2, 1, 1)
         .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001, 0b0000_0000]);
@@ -233,7 +257,7 @@ fn direct_highs_backend_supports_optional_solver_settings() {
 }
 
 #[test]
-fn direct_highs_backend_rejects_detector_width_mismatch() {
+fn observables_from_correction_rejects_width_mismatch_after_backend_build() {
     let dem = DetectorErrorModel::parse("error(0.1) D0 L0\n").unwrap();
     let problem = lower_dem_to_problem(&dem).unwrap();
     let model = problem.to_binary_ilp_model().unwrap();
@@ -252,7 +276,9 @@ fn direct_highs_backend_rejects_detector_width_mismatch() {
     )
     .unwrap();
 
-    let err = problem.observables_from_correction(&[true, false]).unwrap_err();
+    let err = problem
+        .observables_from_correction(&[true, false])
+        .unwrap_err();
 
     assert_eq!(
         err,
