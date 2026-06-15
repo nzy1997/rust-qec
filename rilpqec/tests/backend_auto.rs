@@ -4,6 +4,13 @@ use rilpqec::IlpDecodeError;
 use rstim::dem::DetectorErrorModel;
 
 #[test]
+fn default_decoder_config_reexports_shared_auto_backend_kind() {
+    let config = IlpDecoderConfig::default();
+
+    assert_eq!(config.backend.kind, qec_ilp_core::BackendKind::Auto);
+}
+
+#[test]
 fn auto_backend_falls_back_to_highs() {
     let dem = DetectorErrorModel::parse("error(0.1) D0 L0\nerror(0.2) D1\n").unwrap();
     let decoder = IlpDemDecoder::from_dem(&dem, IlpDecoderConfig::default()).unwrap();
@@ -39,9 +46,9 @@ fn explicit_gurobi_selection_reports_unavailable_without_feature() {
 
     assert_eq!(
         err,
-        IlpDecodeError::BackendUnavailable {
+        IlpDecodeError::Backend(qec_ilp_core::BinaryIlpError::BackendUnavailable {
             requested: BackendKind::Gurobi,
-        }
+        })
     );
 }
 

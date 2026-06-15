@@ -1,6 +1,7 @@
 use rstim::dem::DetectorErrorModel;
+use qec_ilp_core::BinaryIlpConfig;
+use qec_ilp_core::backend::build_binary_backend;
 
-use crate::backend::build_batch_backend;
 use crate::config::IlpDecoderConfig;
 use crate::error::IlpDecodeError;
 use crate::lowering::lower_dem_to_problem;
@@ -63,7 +64,13 @@ impl IlpDemDecoder {
             }
             return Ok(out);
         }
-        let mut backend = build_batch_backend(&self.problem, &self.config)?;
+        let base_model = self.problem.to_binary_ilp_model()?;
+        let mut backend = build_binary_backend(
+            &base_model,
+            &BinaryIlpConfig {
+                backend: self.config.backend.clone(),
+            },
+        )?;
 
         for shot in 0..num_shots {
             let mut syndrome = vec![false; num_dets];
@@ -72,7 +79,12 @@ impl IlpDemDecoder {
                 syndrome[det] = ((byte >> (det % 8)) & 1) != 0;
             }
 
-            let correction = backend.solve(&syndrome)?;
+            for (row, (&bit, &forced)) in syndrome.iter().zip(&self.problem.forced_syndrome).enumerate() {
+                let rhs = if bit ^ forced { 1.0 } else { 0.0 };
+                backend.set_rhs(row, rhs)?;
+            }
+
+            let correction = backend.solve()?.binary_values;
             let observables = self.problem.observables_from_correction(&correction)?;
             for obs in 0..num_obs {
                 if observables[obs] {

@@ -17,6 +17,53 @@ pub struct LoweredDemProblem {
 }
 
 impl LoweredDemProblem {
+    pub fn to_binary_ilp_model(&self) -> Result<qec_ilp_core::BinaryIlpModel, IlpDecodeError> {
+        let binary_vars = self
+            .columns
+            .iter()
+            .enumerate()
+            .map(|(index, column)| qec_ilp_core::ModelVar {
+                name: format!("e_{index}"),
+                objective: column.weight,
+                lower: 0.0,
+                upper: 1.0,
+            })
+            .collect::<Vec<_>>();
+
+        let integer_vars = (0..self.num_detectors)
+            .map(|row| qec_ilp_core::ModelVar {
+                name: format!("a_{row}"),
+                objective: 0.0,
+                lower: 0.0,
+                upper: f64::INFINITY,
+            })
+            .collect::<Vec<_>>();
+
+        let constraints = (0..self.num_detectors)
+            .map(|row| qec_ilp_core::LinearConstraint {
+                name: format!("det_{row}"),
+                sense: qec_ilp_core::ConstraintSense::Eq,
+                binary_terms: self
+                    .columns
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, column)| {
+                        column.detectors.contains(&row).then_some((index, 1.0))
+                    })
+                    .collect(),
+                integer_terms: vec![(row, -2.0)],
+                rhs: 0.0,
+            })
+            .collect::<Vec<_>>();
+
+        Ok(qec_ilp_core::BinaryIlpModel {
+            binary_vars,
+            integer_vars,
+            constraints,
+            solution_binary_prefix_len: self.columns.len(),
+        })
+    }
+
     pub fn observables_from_correction(
         &self,
         correction: &[bool],
