@@ -47,3 +47,15 @@ fn sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports() {
         })
     );
 }
+
+#[test]
+fn sparse_rows_matrix_preserves_row_order_without_normalizing() {
+    let text = SparseRowsMatrix::new(5, vec![vec![3, 1], vec![4, 0]])
+        .unwrap()
+        .to_json_string();
+
+    assert_eq!(
+        text,
+        "{\"format\":\"sparse_rows\",\"num_cols\":5,\"rows\":[[3,1],[4,0]]}\n"
+    );
+}
