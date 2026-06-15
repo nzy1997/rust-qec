@@ -235,7 +235,7 @@ Run:
 cargo test -p qec-code --test css_export
 ```
 
-Expected: both `steane_sparse_rows_json_matches_workspace_fixtures` and `sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports` pass.
+Expected: both `steane_sparse_rows_json_matches_workspace_fixtures` and `sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports` pass. Because the fixture files on disk end with `\n`, `to_json_string()` is expected to return fixture-matching text including that trailing newline.
 
 - [ ] **Step 4: Commit the sparse-row wrapper implementation**
 
@@ -266,7 +266,7 @@ fn sparse_rows_matrix_serializes_steane_supports() {
 
     assert_eq!(
         text,
-        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#
+        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}\n"
     );
 }
 ```

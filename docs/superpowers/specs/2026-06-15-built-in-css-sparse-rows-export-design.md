@@ -185,8 +185,9 @@ API notes:
 - `new(...)` owns validation and is the only fallible step.
 - `to_json_string()` is infallible because a constructed value is already
   validated.
-- the JSON output must be canonical and compact, matching the fixture layout
-  without extra whitespace.
+- the JSON output must be canonical and compact, matching the fixture document
+  bytes used by the workspace tests. For the current Steane fixtures, that
+  includes the trailing newline present on disk.
 - the wrapper is intentionally narrow and does not yet expose file I/O helpers.
 
 ## Validation Rules
@@ -241,11 +242,14 @@ The positive path for built-in export should be:
 1. `built_in_css_checks("steane")` returns canonical row supports.
 2. The caller selects exactly one matrix: `hx` or `hz`.
 3. `SparseRowsMatrix::new(checks.num_cols, selected_rows)` validates the data.
-4. `to_json_string()` emits:
+4. `to_json_string()` emits the fixture-matching document text:
 
 ```json
 {"format":"sparse_rows","num_cols":N,"rows":[...]}
 ```
+
+The current workspace fixtures store that JSON document with a trailing newline,
+so byte-for-byte fixture parity includes that newline.
 
 This keeps the issue aligned with the required input/output contract:
 
