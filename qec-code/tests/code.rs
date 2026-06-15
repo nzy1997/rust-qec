@@ -1,6 +1,6 @@
 use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::codes::steane::Steane;
-use qec_code::css::CssCode;
+use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -123,6 +123,19 @@ fn built_in_css_registry_exposes_steane_checks() {
     assert_eq!(checks.hz, checks.hx);
     assert_strictly_increasing_rows(&checks.hx);
     assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn sparse_rows_matrix_serializes_steane_supports() {
+    let checks = built_in_css_checks("steane").unwrap();
+    let text = SparseRowsMatrix::new(checks.num_cols, checks.hx.clone())
+        .unwrap()
+        .to_json_string();
+
+    assert_eq!(
+        text,
+        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}\n"
+    );
 }
 
 #[test]
