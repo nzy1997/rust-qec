@@ -29,7 +29,7 @@ impl SparseRowsMatrix {
             rows: &self.rows,
         })
         .expect("validated sparse rows matrix should always serialize");
-        format!("{json}\n")
+        json
     }
 }
 
@@ -65,6 +65,10 @@ impl CssCode {
 }
 
 fn validate_sparse_rows(num_cols: usize, rows: &[Vec<usize>]) -> Result<()> {
+    if num_cols == 0 {
+        return Err(QecError::InvalidSparseRowsWidth { num_cols });
+    }
+
     for (row_index, row) in rows.iter().enumerate() {
         let mut seen = std::collections::BTreeSet::new();
         for &support in row {

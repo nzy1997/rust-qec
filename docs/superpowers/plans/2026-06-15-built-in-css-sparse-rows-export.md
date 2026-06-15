@@ -47,8 +47,8 @@ fn steane_sparse_rows_json_matches_workspace_fixtures() {
     let expected_hx = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
     let expected_hz = read_fixture("rsinter/tests/fixtures/css/steane_hz.json");
 
-    assert_eq!(hx, expected_hx);
-    assert_eq!(hz, expected_hz);
+    assert_eq!(format!("{hx}\n"), expected_hx);
+    assert_eq!(format!("{hz}\n"), expected_hz);
 }
 
 #[test]
@@ -65,6 +65,14 @@ fn sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports() {
             support: 3,
             num_cols: 3,
         })
+    );
+}
+
+#[test]
+fn sparse_rows_matrix_rejects_zero_width() {
+    assert_eq!(
+        SparseRowsMatrix::new(0, vec![]),
+        Err(QecError::InvalidSparseRowsWidth { num_cols: 0 })
     );
 }
 ```
@@ -104,6 +112,8 @@ pub enum QecError {
     InvalidSymplecticRowWidth { width: usize },
     #[error("non-binary matrix entry {value} at row {row}, column {col}")]
     InvalidBinaryEntry { row: usize, col: usize, value: u8 },
+    #[error("invalid sparse-rows width: {num_cols}")]
+    InvalidSparseRowsWidth { num_cols: usize },
     #[error("duplicate sparse-row support {support} in row {row}")]
     DuplicateSparseRowSupport { row: usize, support: usize },
     #[error(
@@ -205,6 +215,10 @@ impl SparseRowsMatrix {
 
 ```rust
 fn validate_sparse_rows(num_cols: usize, rows: &[Vec<usize>]) -> Result<()> {
+    if num_cols == 0 {
+        return Err(QecError::InvalidSparseRowsWidth { num_cols });
+    }
+
     for (row_index, row) in rows.iter().enumerate() {
         let mut seen = std::collections::BTreeSet::new();
         for &support in row {
@@ -235,7 +249,7 @@ Run:
 cargo test -p qec-code --test css_export
 ```
 
-Expected: both `steane_sparse_rows_json_matches_workspace_fixtures` and `sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports` pass. Because the fixture files on disk end with `\n`, `to_json_string()` is expected to return fixture-matching text including that trailing newline.
+Expected: both `steane_sparse_rows_json_matches_workspace_fixtures` and `sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports` pass. Because the fixture files on disk end with `\n`, the fixture-parity test appends that newline at the assertion boundary; `to_json_string()` itself returns compact JSON without a line terminator.
 
 - [ ] **Step 4: Commit the sparse-row wrapper implementation**
 
@@ -266,7 +280,7 @@ fn sparse_rows_matrix_serializes_steane_supports() {
 
     assert_eq!(
         text,
-        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}\n"
+        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"
     );
 }
 ```

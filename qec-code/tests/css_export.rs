@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
+use qec_code::QecError;
 use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::SparseRowsMatrix;
-use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -27,8 +27,8 @@ fn steane_sparse_rows_json_matches_workspace_fixtures() {
     let expected_hx = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
     let expected_hz = read_fixture("rsinter/tests/fixtures/css/steane_hz.json");
 
-    assert_eq!(hx, expected_hx);
-    assert_eq!(hz, expected_hz);
+    assert_eq!(format!("{hx}\n"), expected_hx);
+    assert_eq!(format!("{hz}\n"), expected_hz);
 }
 
 #[test]
@@ -49,6 +49,14 @@ fn sparse_rows_matrix_rejects_duplicate_or_out_of_range_supports() {
 }
 
 #[test]
+fn sparse_rows_matrix_rejects_zero_width() {
+    assert_eq!(
+        SparseRowsMatrix::new(0, vec![]),
+        Err(QecError::InvalidSparseRowsWidth { num_cols: 0 })
+    );
+}
+
+#[test]
 fn sparse_rows_matrix_preserves_row_order_without_normalizing() {
     let text = SparseRowsMatrix::new(5, vec![vec![3, 1], vec![4, 0]])
         .unwrap()
@@ -56,6 +64,6 @@ fn sparse_rows_matrix_preserves_row_order_without_normalizing() {
 
     assert_eq!(
         text,
-        "{\"format\":\"sparse_rows\",\"num_cols\":5,\"rows\":[[3,1],[4,0]]}\n"
+        "{\"format\":\"sparse_rows\",\"num_cols\":5,\"rows\":[[3,1],[4,0]]}"
     );
 }

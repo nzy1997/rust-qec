@@ -134,7 +134,7 @@ fn sparse_rows_matrix_serializes_steane_supports() {
 
     assert_eq!(
         text,
-        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}\n"
+        "{\"format\":\"sparse_rows\",\"num_cols\":7,\"rows\":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"
     );
 }
 

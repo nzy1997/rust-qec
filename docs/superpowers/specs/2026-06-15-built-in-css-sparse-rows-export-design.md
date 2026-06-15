@@ -185,9 +185,8 @@ API notes:
 - `new(...)` owns validation and is the only fallible step.
 - `to_json_string()` is infallible because a constructed value is already
   validated.
-- the JSON output must be canonical and compact, matching the fixture document
-  bytes used by the workspace tests. For the current Steane fixtures, that
-  includes the trailing newline present on disk.
+- the JSON output must be canonical and compact, without a trailing newline.
+  Writers that need line-oriented output should append their own newline.
 - the wrapper is intentionally narrow and does not yet expose file I/O helpers.
 
 ## Validation Rules
@@ -195,9 +194,10 @@ API notes:
 `SparseRowsMatrix::new(...)` should enforce only the invariants required by the
 workspace `sparse_rows` contract for this issue:
 
-1. Every support entry in every row must be `< num_cols`.
-2. No support entry may appear more than once within a row.
-3. Row order must be preserved exactly as provided; the wrapper must not sort,
+1. `num_cols` must be positive.
+2. Every support entry in every row must be `< num_cols`.
+3. No support entry may appear more than once within a row.
+4. Row order must be preserved exactly as provided; the wrapper must not sort,
    normalize, or otherwise repair input rows.
 
 Chosen non-rules:
@@ -213,10 +213,11 @@ quietly normalize bad inputs.
 
 ## Error Handling
 
-Sparse-row validation should stay in the existing `QecError` enum. Add two new
+Sparse-row validation should stay in the existing `QecError` enum. Add three new
 variants with enough detail for precise tests and debugging:
 
 ```rust
+QecError::InvalidSparseRowsWidth { num_cols: usize }
 QecError::DuplicateSparseRowSupport { row: usize, support: usize }
 QecError::SparseRowSupportOutOfRange {
     row: usize,
@@ -230,6 +231,7 @@ Behavioral expectations:
 - duplicate detection should report the row index and offending support
 - out-of-range detection should report the row index, offending support, and
   declared width
+- zero-width matrices should be rejected before checking rows
 - the constructor should fail fast on the first invalid row entry
 
 These errors are for user-provided or caller-provided row supports. They are
@@ -242,14 +244,15 @@ The positive path for built-in export should be:
 1. `built_in_css_checks("steane")` returns canonical row supports.
 2. The caller selects exactly one matrix: `hx` or `hz`.
 3. `SparseRowsMatrix::new(checks.num_cols, selected_rows)` validates the data.
-4. `to_json_string()` emits the fixture-matching document text:
+4. `to_json_string()` emits the compact document text:
 
 ```json
 {"format":"sparse_rows","num_cols":N,"rows":[...]}
 ```
 
-The current workspace fixtures store that JSON document with a trailing newline,
-so byte-for-byte fixture parity includes that newline.
+The current workspace fixtures store that JSON document with a trailing newline.
+Byte-for-byte fixture parity should append that newline at the test or writer
+boundary, not bake it into `to_json_string()`.
 
 This keeps the issue aligned with the required input/output contract:
 
