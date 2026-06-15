@@ -192,12 +192,12 @@ API notes:
 ## Validation Rules
 
 `SparseRowsMatrix::new(...)` should enforce only the invariants required by the
-workspace `sparse_rows` contract:
+workspace `sparse_rows` contract for this issue:
 
 1. Every support entry in every row must be `< num_cols`.
-2. Every row must be strictly increasing.
-3. Strictly increasing rows imply duplicate-free rows, so no separate runtime
-   deduplication step should occur.
+2. No support entry may appear more than once within a row.
+3. Row order must be preserved exactly as provided; the wrapper must not sort,
+   normalize, or otherwise repair input rows.
 
 Chosen non-rules:
 
@@ -205,6 +205,7 @@ Chosen non-rules:
 - no CSS orthogonality checks
 - no logical-basis checks
 - no runtime sorting or repair of malformed rows
+- no extra row-order canonicalization rule beyond preserving the caller's input
 
 If input rows are malformed, construction should fail. The type should not
 quietly normalize bad inputs.
