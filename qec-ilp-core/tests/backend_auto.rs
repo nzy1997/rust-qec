@@ -64,3 +64,20 @@ fn explicit_gurobi_selection_reports_unavailable_without_feature() {
         }
     );
 }
+
+#[test]
+fn invalid_binary_variable_bounds_are_rejected_before_backend_build() {
+    let mut model = simple_model();
+    model.binary_vars[0].upper = 2.0;
+
+    let err = build_binary_backend(&model, &BinaryIlpConfig::default()).unwrap_err();
+
+    assert_eq!(
+        err,
+        BinaryIlpError::InvalidBinaryVarBounds {
+            index: 0,
+            lower: 0.0,
+            upper: 2.0,
+        }
+    );
+}

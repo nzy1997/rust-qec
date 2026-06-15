@@ -8,6 +8,12 @@ pub enum BinaryIlpError {
     UnknownBinaryVar(usize),
     #[error("model row references an unknown integer variable index {0}")]
     UnknownIntegerVar(usize),
+    #[error("binary variable {index} must have integral bounds within [0, 1], got [{lower}, {upper}]")]
+    InvalidBinaryVarBounds {
+        index: usize,
+        lower: f64,
+        upper: f64,
+    },
     #[error("model references an unknown constraint row index {0}")]
     UnknownConstraintRow(usize),
     #[error("no ILP backend is available for kind {requested:?}")]

@@ -1,7 +1,8 @@
+use std::ffi::CString;
 use std::num::NonZeroU32;
 use std::os::raw::c_int;
 
-use highs::{ColProblem, HighsModelStatus, HighsSolutionStatus, Model};
+use highs::{ColProblem, HighsModelStatus, HighsSolutionStatus, HighsStatus, Model};
 
 use crate::backend::BinaryBackend;
 use crate::config::BinaryIlpConfig;
@@ -91,23 +92,19 @@ impl BinaryBackend for HighsBinaryBackend {
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError> {
         let model = self
             .model
-            .take()
+            .as_mut()
             .ok_or_else(|| BinaryIlpError::Highs("model already in use".to_string()))?;
-
-        let solved = model
-            .try_solve()
-            .map_err(|err| BinaryIlpError::Highs(format!("solve failed: {err:?}")))?;
-        let model_status = solved.status();
-        let primal_status = solved.primal_solution_status();
+        let status = unsafe { highs_sys::Highs_run(model.as_mut_ptr()) };
+        accept_call_status(status, "solve failed")?;
+        let model_status = read_model_status(model)?;
+        let primal_status = read_primal_solution_status(model)?;
         if !accept_solved_model_status(model_status, primal_status) {
-            self.model = Some(solved.into());
             return Err(BinaryIlpError::Highs(format!(
                 "unexpected HiGHS solve status: model={model_status:?}, primal={primal_status:?}"
             )));
         }
 
-        let columns = solved.get_solution().columns().to_vec();
-        self.model = Some(solved.into());
+        let columns = read_solution_columns(model)?;
 
         if columns.len() < self.solution_binary_prefix_len {
             return Err(BinaryIlpError::Highs(format!(
@@ -164,6 +161,57 @@ fn row_bounds(sense: ConstraintSense, rhs: f64) -> (f64, f64) {
         ConstraintSense::Le => (f64::NEG_INFINITY, rhs),
         ConstraintSense::Ge => (rhs, f64::INFINITY),
     }
+}
+
+fn accept_call_status(status: c_int, context: &str) -> Result<(), BinaryIlpError> {
+    match HighsStatus::try_from(status) {
+        Ok(HighsStatus::OK | HighsStatus::Warning) => Ok(()),
+        Ok(other) => Err(BinaryIlpError::Highs(format!("{context}: {other:?}"))),
+        Err(_) => Err(BinaryIlpError::Highs(format!(
+            "{context}: unexpected raw status {status}"
+        ))),
+    }
+}
+
+fn read_model_status(model: &mut Model) -> Result<HighsModelStatus, BinaryIlpError> {
+    let status = unsafe { highs_sys::Highs_getModelStatus(model.as_mut_ptr()) };
+    HighsModelStatus::try_from(status).map_err(|_| {
+        BinaryIlpError::Highs(format!("unexpected HiGHS model status value {status}"))
+    })
+}
+
+fn read_primal_solution_status(model: &mut Model) -> Result<HighsSolutionStatus, BinaryIlpError> {
+    let name = CString::new("primal_solution_status")
+        .map_err(|_| BinaryIlpError::Highs("invalid HiGHS info key".to_string()))?;
+    let mut solution_status = -1;
+    let status = unsafe {
+        highs_sys::Highs_getIntInfoValue(model.as_mut_ptr(), name.as_ptr(), &mut solution_status)
+    };
+    accept_call_status(status, "failed to read primal solution status")?;
+    HighsSolutionStatus::try_from(solution_status).map_err(|_| {
+        BinaryIlpError::Highs(format!(
+            "unexpected HiGHS primal solution status value {solution_status}"
+        ))
+    })
+}
+
+fn read_solution_columns(model: &mut Model) -> Result<Vec<f64>, BinaryIlpError> {
+    let cols = model.num_cols();
+    let rows = model.num_rows();
+    let mut colvalue = vec![0.0; cols];
+    let mut coldual = vec![0.0; cols];
+    let mut rowvalue = vec![0.0; rows];
+    let mut rowdual = vec![0.0; rows];
+    unsafe {
+        highs_sys::Highs_getSolution(
+            model.as_mut_ptr(),
+            colvalue.as_mut_ptr(),
+            coldual.as_mut_ptr(),
+            rowvalue.as_mut_ptr(),
+            rowdual.as_mut_ptr(),
+        );
+    }
+    Ok(colvalue)
 }
 
 fn accept_solved_model_status(
