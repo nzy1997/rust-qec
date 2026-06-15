@@ -12,12 +12,14 @@ struct CompiledRmatchingDemDecoder {
 }
 
 impl Decoder for RmatchingDemDecoder {
-    fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-        let matching =
-            Matching::from_dem(&dem.to_string()).expect("failed to compile rmatching decoder");
-        Box::new(CompiledRmatchingDemDecoder {
+    fn compile_for_dem(
+        &self,
+        dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        let matching = Matching::from_dem(&dem.to_string()).map_err(|error| error.to_string())?;
+        Ok(Box::new(CompiledRmatchingDemDecoder {
             matching: Mutex::new(matching),
-        })
+        }))
     }
 }
 
@@ -28,10 +30,11 @@ impl CompiledDecoder for CompiledRmatchingDemDecoder {
         num_shots: usize,
         num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8> {
-        self.matching
+    ) -> Result<Vec<u8>, String> {
+        Ok(self
+            .matching
             .lock()
-            .unwrap()
-            .decode_shots_bit_packed(dets, num_shots, num_dets, num_obs)
+            .map_err(|error| error.to_string())?
+            .decode_shots_bit_packed(dets, num_shots, num_dets, num_obs))
     }
 }

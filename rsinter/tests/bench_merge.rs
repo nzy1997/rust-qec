@@ -1,5 +1,6 @@
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
+use rsinter::failure::FailureKind;
 
 #[test]
 fn merge_result_rows_concatenates_and_sorts_by_runner_then_distance_then_p() {
@@ -9,6 +10,7 @@ fn merge_result_rows_concatenates_and_sorts_by_runner_then_distance_then_p() {
             runner: "pymatching".into(),
             language: "python".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::Ok,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(5)),
                 ("p", serde_json::json!(0.005)),
@@ -23,6 +25,7 @@ fn merge_result_rows_concatenates_and_sorts_by_runner_then_distance_then_p() {
             runner: "rmatching".into(),
             language: "rust".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::Ok,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(3)),
                 ("p", serde_json::json!(0.002)),

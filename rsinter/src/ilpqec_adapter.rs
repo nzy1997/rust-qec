@@ -26,10 +26,13 @@ struct CompiledIlpDemDecoder {
 }
 
 impl Decoder for IlpDemDecoder {
-    fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
+    fn compile_for_dem(
+        &self,
+        dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
         let decoder = rilpqec::IlpDemDecoder::from_dem(dem, self.config.clone())
-            .expect("failed to compile ILP DEM decoder");
-        Box::new(CompiledIlpDemDecoder { decoder })
+            .map_err(|error| error.to_string())?;
+        Ok(Box::new(CompiledIlpDemDecoder { decoder }))
     }
 }
 
@@ -40,9 +43,9 @@ impl CompiledDecoder for CompiledIlpDemDecoder {
         num_shots: usize,
         num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, String> {
         self.decoder
             .decode_batch_bit_packed(dets, num_shots, num_dets, num_obs)
-            .expect("ILP DEM decode failed")
+            .map_err(|error| error.to_string())
     }
 }

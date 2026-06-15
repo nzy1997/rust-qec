@@ -25,7 +25,10 @@ struct CompiledRbposdDemDecoder {
 }
 
 impl Decoder for RbposdDemDecoder {
-    fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
+    fn compile_for_dem(
+        &self,
+        dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
         let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
             dem_to_matrix_problem(dem);
 
@@ -70,7 +73,7 @@ impl Decoder for RbposdDemDecoder {
                 filtered_detector_columns.len(),
                 filtered_detector_columns,
             )
-            .expect("generated DEM matrix should be valid");
+            .map_err(|error| format!("invalid rbposd parity matrix: {error}"))?;
 
             Some(
                 BpOsdDecoder::new(
@@ -78,18 +81,18 @@ impl Decoder for RbposdDemDecoder {
                     ChannelModel::BitFlipProbabilities(filtered_probabilities),
                     self.config.clone(),
                 )
-                .expect("DEM lowering produced an invalid rbposd problem"),
+                .map_err(|error| format!("failed to compile rbposd decoder: {error}"))?,
             )
         };
 
-        Box::new(CompiledRbposdDemDecoder {
+        Ok(Box::new(CompiledRbposdDemDecoder {
             decoder,
             num_dets,
             num_obs,
             observable_columns: filtered_observable_columns,
             forced_syndrome,
             baseline_observables,
-        })
+        }))
     }
 }
 
@@ -100,7 +103,7 @@ impl CompiledDecoder for CompiledRbposdDemDecoder {
         num_shots: usize,
         num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, String> {
         let det_bytes = num_dets.div_ceil(8);
         let obs_bytes = num_obs.div_ceil(8);
         let mut out = vec![0u8; num_shots * obs_bytes];
@@ -119,7 +122,7 @@ impl CompiledDecoder for CompiledRbposdDemDecoder {
             if let Some(decoder) = &self.decoder {
                 let result = decoder
                     .decode(&Syndrome::from(syndrome_bits))
-                    .expect("rbposd decode failed");
+                    .map_err(|error| format!("rbposd decode failed: {error}"))?;
                 let decoded_observables = correction_to_observables(
                     &result.correction,
                     &self.observable_columns,
@@ -135,7 +138,7 @@ impl CompiledDecoder for CompiledRbposdDemDecoder {
             }
         }
 
-        out
+        Ok(out)
     }
 }
 
@@ -298,6 +301,9 @@ mod tests {
         assert_eq!(num_obs, 1);
         assert_eq!(detector_columns, vec![vec![1, 2], vec![4, 5]]);
         assert_eq!(probabilities, vec![0.25, 0.25]);
-        assert_eq!(observable_columns, vec![Vec::<usize>::new(), Vec::<usize>::new()]);
+        assert_eq!(
+            observable_columns,
+            vec![Vec::<usize>::new(), Vec::<usize>::new()]
+        );
     }
 }

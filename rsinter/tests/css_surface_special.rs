@@ -67,7 +67,7 @@ fn bb72_css_smoke_builds_dem_with_twelve_observables() {
 fn logical_error_rate(circuit: &[rstim::ir::StimInstr], shots: usize, seed: u64) -> f64 {
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(circuit).unwrap();
     let decoder = RmatchingDemDecoder;
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
     let obs_bytes = num_obs.div_ceil(8);
@@ -77,7 +77,9 @@ fn logical_error_rate(circuit: &[rstim::ir::StimInstr], shots: usize, seed: u64)
     write_shots_b8(&batch.detections, &mut dets).unwrap();
     let mut obs = Vec::new();
     write_shots_b8(&batch.observable_flips, &mut obs).unwrap();
-    let predictions = compiled.decode_shots_bit_packed(&dets, shots, num_dets, num_obs);
+    let predictions = compiled
+        .decode_shots_bit_packed(&dets, shots, num_dets, num_obs)
+        .unwrap();
     let mut errors = 0usize;
     for shot in 0..shots {
         let start = shot * obs_bytes;

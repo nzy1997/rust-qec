@@ -240,6 +240,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::failure::FailureKind;
     use crate::stats::shot_error_rate_to_piece_error_rate;
     use std::collections::HashMap;
     use tempfile::tempdir;
@@ -253,6 +254,7 @@ mod tests {
             errors,
             discards: 0,
             seconds: 0.0,
+            failure_kind: FailureKind::Ok,
             custom_counts: HashMap::new(),
         }
     }

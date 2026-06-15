@@ -2,6 +2,7 @@ use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::read_results_jsonl;
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::BenchmarkSpec;
+use rsinter::failure::FailureKind;
 use std::fs;
 use std::path::Path;
 
@@ -523,6 +524,81 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["mip_gap"], serde_json::json!(0.01));
     assert_eq!(rows[0].params["threads"], serde_json::json!(1));
     assert_eq!(rows[0].params["verbose"], serde_json::json!(true));
+}
+
+#[cfg(not(feature = "gurobi"))]
+#[test]
+fn rilpqec_gurobi_without_feature_records_unsupported_failure_kind() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rilpqec_gurobi"
+language = "rust"
+impl_key = "rilpqec"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 1
+max_errors = 1
+batch_size = 1
+backend = "gurobi"
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rilpqec_gurobi")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "error");
+    assert_eq!(rows[0].failure_kind, FailureKind::Unsupported);
+    assert!(
+        rows[0]
+            .error
+            .as_deref()
+            .unwrap_or("")
+            .contains("no ILP backend is available"),
+        "row error was: {:?}",
+        rows[0].error
+    );
 }
 
 #[test]

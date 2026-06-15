@@ -2,8 +2,10 @@ use std::fs;
 use std::time::Instant;
 
 use rbposd::DecoderConfig;
-use rilpqec::backend::{BatchBackend, build_batch_backend};
-use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem, lower_dem_to_problem};
+use rilpqec::backend::{build_batch_backend, BatchBackend};
+use rilpqec::{
+    lower_dem_to_problem, BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem,
+};
 use rsinter::decode::{CompiledDecoder, Decoder, RbposdDemDecoder, RmatchingDemDecoder};
 use rstim::dem::DetectorErrorModel;
 
@@ -76,9 +78,9 @@ fn run_native_decoder(
     decoder: &dyn Decoder,
 ) -> Result<BridgeResponse, String> {
     let compile_started = Instant::now();
-    let compiled = decoder.compile_for_dem(&dem);
+    let compiled = decoder.compile_for_dem(&dem)?;
     let compile_us = elapsed_us(compile_started);
-    let summary = decode_batches(&request, &dets, &obs, compiled.as_ref());
+    let summary = decode_batches(&request, &dets, &obs, compiled.as_ref())?;
 
     Ok(build_success_response(
         request.decoder,
@@ -126,7 +128,7 @@ fn decode_batches(
     dets: &[u8],
     obs: &[u8],
     decoder: &dyn CompiledDecoder,
-) -> DecodeSummary {
+) -> Result<DecodeSummary, String> {
     let det_bytes = bytes_per_shot(request.num_dets);
     let obs_bytes = bytes_per_shot(request.num_obs);
     let batch_size = request.batch_size.max(1);
@@ -149,7 +151,7 @@ fn decode_batches(
             shots_in_batch,
             request.num_dets,
             request.num_obs,
-        );
+        )?;
         total_decode_us += elapsed_us(decode_started);
 
         let batch_logical_errors = count_logical_errors(
@@ -162,11 +164,11 @@ fn decode_batches(
         shots_used += shots_in_batch;
     }
 
-    DecodeSummary {
+    Ok(DecodeSummary {
         shots_used,
         logical_errors,
         total_decode_us,
-    }
+    })
 }
 
 fn decode_rilpqec_batches(
@@ -242,12 +244,7 @@ fn decode_rilpqec_batches(
     })
 }
 
-fn count_logical_errors(
-    predictions: &[u8],
-    obs: &[u8],
-    num_shots: usize,
-    num_obs: usize,
-) -> usize {
+fn count_logical_errors(predictions: &[u8], obs: &[u8], num_shots: usize, num_obs: usize) -> usize {
     let obs_bytes = bytes_per_shot(num_obs);
     let mut logical_errors = 0usize;
 

@@ -14,11 +14,12 @@ pub trait CompiledDecoder: Send {
         num_shots: usize,
         num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8>;
+    ) -> Result<Vec<u8>, String>;
 }
 
 pub trait Decoder: Send + Sync {
-    fn compile_for_dem(&self, dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder>;
+    fn compile_for_dem(&self, dem: &DetectorErrorModel)
+        -> Result<Box<dyn CompiledDecoder>, String>;
 }
 
 /// Always predicts no observable flips. Useful for testing the pipeline.
@@ -33,14 +34,17 @@ impl CompiledDecoder for VacuousCompiled {
         num_shots: usize,
         _num_dets: usize,
         num_obs: usize,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, String> {
         let obs_bytes = (num_obs + 7) / 8;
-        vec![0u8; num_shots * obs_bytes]
+        Ok(vec![0u8; num_shots * obs_bytes])
     }
 }
 
 impl Decoder for VacuousDecoder {
-    fn compile_for_dem(&self, _dem: &DetectorErrorModel) -> Box<dyn CompiledDecoder> {
-        Box::new(VacuousCompiled)
+    fn compile_for_dem(
+        &self,
+        _dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        Ok(Box::new(VacuousCompiled))
     }
 }

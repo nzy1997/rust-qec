@@ -1,6 +1,7 @@
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use rsinter::bench::spec::BenchmarkSpec;
+use rsinter::failure::FailureKind;
 
 #[test]
 fn render_benchmark_plot_writes_svg_for_ok_rows() {
@@ -49,6 +50,7 @@ label = "Logical Error Rate"
             runner: "rmatching".into(),
             language: "rust".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::LogicalFailure,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(3)),
                 ("p", serde_json::json!(0.002)),
@@ -67,6 +69,7 @@ label = "Logical Error Rate"
             runner: "rmatching".into(),
             language: "rust".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::LogicalFailure,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(3)),
                 ("p", serde_json::json!(0.005)),
@@ -139,6 +142,7 @@ label = "Decode Time Per Shot"
         runner: "rmatching".into(),
         language: "rust".into(),
         status: "ok".into(),
+        failure_kind: FailureKind::LogicalFailure,
         params: ParamMap::from_pairs([
             ("distance", serde_json::json!(3)),
             ("p", serde_json::json!(0.002)),
@@ -207,6 +211,7 @@ label = "Logical Error Rate"
         runner: "rmatching".into(),
         language: "rust".into(),
         status: "error".into(),
+        failure_kind: FailureKind::SolverFailure,
         params: ParamMap::from_pairs([
             ("distance", serde_json::json!(3)),
             ("p", serde_json::json!(0.002)),
@@ -270,6 +275,7 @@ label = "Logical Error Rate"
         runner: "rmatching".into(),
         language: "rust".into(),
         status: "ok".into(),
+        failure_kind: FailureKind::Ok,
         params: ParamMap::from_pairs([
             ("distance", serde_json::json!(3)),
             ("p", serde_json::json!(0.002)),
@@ -338,6 +344,7 @@ label = "Decode Time Per Shot"
             runner: "rmatching".into(),
             language: "rust".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::LogicalFailure,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(3)),
                 ("p", serde_json::json!(0.002)),
@@ -357,6 +364,7 @@ label = "Decode Time Per Shot"
             runner: "rmatching".into(),
             language: "rust".into(),
             status: "ok".into(),
+            failure_kind: FailureKind::LogicalFailure,
             params: ParamMap::from_pairs([
                 ("distance", serde_json::json!(3)),
                 ("p", serde_json::json!(0.005)),
@@ -814,6 +822,11 @@ fn ok_row(
         runner: runner.into(),
         language: "rust".into(),
         status: "ok".into(),
+        failure_kind: if logical_errors > 0.0 {
+            FailureKind::LogicalFailure
+        } else {
+            FailureKind::Ok
+        },
         params: ParamMap::from_pairs([
             ("distance", serde_json::json!(distance)),
             ("p", serde_json::json!(p)),
