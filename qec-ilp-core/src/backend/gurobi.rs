@@ -5,7 +5,6 @@ use crate::config::BinaryIlpConfig;
 use crate::error::BinaryIlpError;
 use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution};
 
-#[derive(Debug)]
 pub struct GurobiBinaryBackend {
     _env: Env,
     model: Model,

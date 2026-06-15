@@ -2,15 +2,19 @@
 mod gurobi;
 mod highs;
 
-use std::fmt::Debug;
-
 use crate::config::{BackendKind, BinaryIlpConfig};
 use crate::error::BinaryIlpError;
 use crate::model::{BinaryIlpModel, ModelSolution};
 
-pub trait BinaryBackend: Debug {
+pub trait BinaryBackend {
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError>;
     fn set_rhs(&mut self, row: usize, rhs: f64) -> Result<(), BinaryIlpError>;
+}
+
+impl std::fmt::Debug for dyn BinaryBackend + '_ {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("BinaryBackend(..)")
+    }
 }
 
 pub fn build_binary_backend(
