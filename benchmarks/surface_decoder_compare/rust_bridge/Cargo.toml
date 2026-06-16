@@ -9,6 +9,7 @@ gurobi = ["rsinter/gurobi", "rilpqec/gurobi"]
 
 [dependencies]
 rbposd = { path = "../../../rbposd" }
+qec-ilp-core = { path = "../../../qec-ilp-core" }
 rilpqec = { path = "../../../rilpqec" }
 rsinter = { path = "../../../rsinter" }
 rstim = { path = "../../../rstim" }

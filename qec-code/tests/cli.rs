@@ -177,3 +177,15 @@ fn run_code_css_unknown_id_returns_registry_error() {
         })
     );
 }
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+#[test]
+fn large_distance_errors_render_configuration_message() {
+    let stderr = qec_code::QecError::DistanceComputationUnsupported {
+        n: 32,
+        reason: "enable a distance ILP feature or use a smaller code".into(),
+    }
+    .to_string();
+
+    assert!(stderr.contains("distance computation is unsupported"));
+}

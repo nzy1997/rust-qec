@@ -12,13 +12,6 @@ pub enum IlpDecodeError {
     CorrectionWidthMismatch { expected: usize, actual: usize },
     #[error("observable width mismatch: expected {expected}, got {actual}")]
     ObservableWidthMismatch { expected: usize, actual: usize },
-    #[error("no ILP backend is available for kind {requested:?}")]
-    BackendUnavailable {
-        requested: crate::config::BackendKind,
-    },
-    #[error("HiGHS backend error: {0}")]
-    Highs(String),
-    #[cfg(feature = "gurobi")]
-    #[error("Gurobi backend error: {0}")]
-    Gurobi(String),
+    #[error(transparent)]
+    Backend(#[from] qec_ilp_core::BinaryIlpError),
 }

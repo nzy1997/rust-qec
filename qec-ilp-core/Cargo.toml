@@ -1,0 +1,14 @@
+[package]
+name = "qec-ilp-core"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+gurobi = ["dep:gurobi"]
+
+[dependencies]
+thiserror = "2"
+highs = "2.1.0"
+highs-sys = "1.14.2"
+gurobi = { version = "0.3.4", optional = true }
