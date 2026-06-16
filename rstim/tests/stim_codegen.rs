@@ -53,6 +53,17 @@ fn op_qubit_target_count(instr: &StimInstr) -> usize {
     }
 }
 
+fn qubit_targets_in(instrs: &[StimInstr]) -> Vec<u32> {
+    let mut qubits = Vec::new();
+    for instr in instrs {
+        if let StimInstr::Op { targets, .. } = instr {
+            qubits.extend(targets.iter().filter_map(StimTarget::qubit_index));
+        }
+    }
+    qubits.sort_unstable();
+    qubits
+}
+
 fn assert_each_x_error_run_is_immediately_before_measurement(instrs: &[StimInstr]) {
     let mut i = 0;
     let mut runs = 0;
@@ -66,7 +77,9 @@ fn assert_each_x_error_run_is_immediately_before_measurement(instrs: &[StimInstr
         while i < instrs.len() && op_name(&instrs[i]) == Some("X_ERROR") {
             i += 1;
         }
+        let error_end = i;
         let error_targets: usize = instrs[start..i].iter().map(op_qubit_target_count).sum();
+        let error_qubits = qubit_targets_in(&instrs[start..error_end]);
 
         let Some(measure_name @ ("MR" | "M")) = instrs.get(i).and_then(op_name) else {
             panic!("X_ERROR run should be immediately followed by MR or M");
@@ -79,9 +92,14 @@ fn assert_each_x_error_run_is_immediately_before_measurement(instrs: &[StimInstr
             .iter()
             .map(op_qubit_target_count)
             .sum();
+        let measure_qubits = qubit_targets_in(&instrs[measure_start..i]);
 
         assert_eq!(
             error_targets, measure_targets,
+            "X_ERROR run before {measure_name} should cover the same qubits"
+        );
+        assert_eq!(
+            error_qubits, measure_qubits,
             "X_ERROR run before {measure_name} should cover the same qubits"
         );
         runs += 1;
@@ -122,9 +140,15 @@ fn assert_each_x_error_run_is_immediately_after_reset(instrs: &[StimInstr]) {
             .iter()
             .map(op_qubit_target_count)
             .sum();
+        let error_qubits = qubit_targets_in(&instrs[start..i]);
+        let reset_qubits = qubit_targets_in(&instrs[reset_start..start]);
 
         assert_eq!(
             error_targets, reset_targets,
+            "X_ERROR run after {reset_name} should cover the same qubits"
+        );
+        assert_eq!(
+            error_qubits, reset_qubits,
             "X_ERROR run after {reset_name} should cover the same qubits"
         );
         runs += 1;
