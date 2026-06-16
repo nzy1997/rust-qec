@@ -32,33 +32,101 @@ pub struct BuiltInCssParams {
 
 pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     if let Some((family_name, params_text)) = input.split_once(':') {
-        let family = match family_name {
-            "repetition_x" => BuiltInCssFamily::RepetitionX,
-            "repetition_z" => BuiltInCssFamily::RepetitionZ,
-            _ => {
-                return Err(QecError::UnknownBuiltInCssCode {
-                    code_id: family_name.to_owned(),
-                });
-            }
-        };
-
-        let distance = params_text
-            .strip_prefix("d=")
-            .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(0);
-
-        return Ok(BuiltInCssCodeSpec::Family {
-            family,
-            params: BuiltInCssParams { distance },
-        });
+        return parse_built_in_css_family_spec(family_name, params_text);
     }
 
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
+        "repetition_x" | "repetition_z" => Err(QecError::MissingBuiltInCssParameter {
+            family: input.to_owned(),
+            parameter: "d".to_owned(),
+        }),
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: input.to_owned(),
         }),
     }
+}
+
+fn parse_built_in_css_family_spec(
+    family_name: &str,
+    params_text: &str,
+) -> Result<BuiltInCssCodeSpec> {
+    let family = match family_name {
+        "repetition_x" => BuiltInCssFamily::RepetitionX,
+        "repetition_z" => BuiltInCssFamily::RepetitionZ,
+        _ => {
+            return Err(QecError::UnknownBuiltInCssFamily {
+                family: family_name.to_owned(),
+            });
+        }
+    };
+
+    let distance = parse_repetition_distance(family_name, params_text)?;
+
+    Ok(BuiltInCssCodeSpec::Family {
+        family,
+        params: BuiltInCssParams { distance },
+    })
+}
+
+fn parse_repetition_distance(family_name: &str, params_text: &str) -> Result<usize> {
+    if params_text.is_empty() {
+        return Err(QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "d".to_owned(),
+        });
+    }
+
+    let mut distance = None;
+
+    for pair in params_text.split(',') {
+        let Some((key, value)) = pair.split_once('=') else {
+            return Err(QecError::UnexpectedBuiltInCssParameter {
+                family: family_name.to_owned(),
+                parameter: pair.to_owned(),
+            });
+        };
+
+        match key {
+            "d" => {
+                if distance.is_some() {
+                    return Err(QecError::DuplicateBuiltInCssParameter {
+                        family: family_name.to_owned(),
+                        parameter: "d".to_owned(),
+                    });
+                }
+
+                let parsed = value.parse::<usize>().map_err(|_| {
+                    QecError::InvalidBuiltInCssIntegerParameter {
+                        family: family_name.to_owned(),
+                        parameter: "d".to_owned(),
+                        value: value.to_owned(),
+                    }
+                })?;
+
+                if parsed == 0 {
+                    return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+                        family: family_name.to_owned(),
+                        parameter: "d".to_owned(),
+                        value: parsed,
+                    });
+                }
+
+                distance = Some(parsed);
+            }
+            _ => {
+                return Err(QecError::UnexpectedBuiltInCssParameter {
+                    family: family_name.to_owned(),
+                    parameter: key.to_owned(),
+                });
+            }
+        }
+    }
+
+    distance.ok_or_else(|| QecError::MissingBuiltInCssParameter {
+        family: family_name.to_owned(),
+        parameter: "d".to_owned(),
+    })
 }
 
 const STEANE_ROW_SUPPORTS: &[&[usize]] = &[

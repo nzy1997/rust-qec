@@ -151,6 +151,53 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
 }
 
 #[test]
+fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_integers() {
+    assert_eq!(
+        parse_built_in_css_code_spec("unknown:d=5"),
+        Err(QecError::UnknownBuiltInCssFamily {
+            family: "unknown".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=nope"),
+        Err(QecError::InvalidBuiltInCssIntegerParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+            value: "nope".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=5,d=7"),
+        Err(QecError::DuplicateBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=0"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+            value: 0,
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=5,foo=1"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "foo".to_owned(),
+        })
+    );
+}
+
+#[test]
 fn sparse_rows_matrix_serializes_steane_supports() {
     let checks = built_in_css_checks("steane").unwrap();
     let text = SparseRowsMatrix::new(checks.num_cols, checks.hx.clone())
