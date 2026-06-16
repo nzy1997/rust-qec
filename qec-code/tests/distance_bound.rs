@@ -288,6 +288,44 @@ fn validator_rejects_logical_class_that_disagrees_with_witness_support() {
 }
 
 #[test]
+fn validator_accepts_z_like_and_mixed_witness_classes() {
+    let code = trivial_one_qubit_code();
+    let mut z_like = valid_result();
+    z_like.logical_class = LogicalClass::ZLike;
+    z_like.witness = DistanceBoundWitness {
+        x: vec![0],
+        z: vec![1],
+        weight: 1,
+    };
+
+    validate_randomized_upper_bound_result(
+        &z_like,
+        BoundValidationContext {
+            code: &code,
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
+
+    let mut mixed = valid_result();
+    mixed.logical_class = LogicalClass::Mixed;
+    mixed.witness = DistanceBoundWitness {
+        x: vec![1],
+        z: vec![1],
+        weight: 1,
+    };
+
+    validate_randomized_upper_bound_result(
+        &mixed,
+        BoundValidationContext {
+            code: &code,
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
 fn validator_rejects_zero_completed_upper_bound() {
     let code = trivial_one_qubit_code();
     let mut result = valid_result();
@@ -442,6 +480,25 @@ fn randomized_upper_bound_finds_repetition_css_distance_under_pinned_options() {
 
     assert_eq!(result.upper_bound, 1);
     assert_eq!(result.logical_class, LogicalClass::XLike);
+}
+
+#[test]
+fn randomized_upper_bound_returns_best_witness_after_exhausting_iterations() {
+    let css = css_from_sparse_rows(3, vec![vec![0, 1], vec![1, 2]], vec![]);
+
+    let result = randomized_css_upper_bound(
+        &css,
+        RandomizedUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 11,
+            target_weight: None,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 1);
+    assert_eq!(result.options.target_weight, None);
 }
 
 #[test]

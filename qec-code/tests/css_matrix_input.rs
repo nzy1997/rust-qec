@@ -9,6 +9,7 @@ fn sparse_rows_json_parses_and_converts_to_dense_rows() {
     .unwrap();
 
     assert_eq!(matrix.num_cols(), 5);
+    assert_eq!(matrix.rows(), &[vec![0, 3], vec![1, 4], vec![]]);
     assert_eq!(
         matrix.to_dense_rows(),
         vec![

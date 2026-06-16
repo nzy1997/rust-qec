@@ -373,3 +373,21 @@ fn validate_witness_against_code(code: &StabilizerCode, witness: &Pauli) -> Resu
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn witness_validation_rejects_identity_witness() {
+        let code = StabilizerCode::from_stabilizers(1, vec![]).unwrap();
+        let witness = Pauli::from_xz_bits(vec![0], vec![0]).unwrap();
+
+        assert_eq!(
+            validate_witness_against_code(&code, &witness),
+            Err(QecError::DistanceBoundValidationFailed(
+                "witness must be non-identity".to_owned(),
+            ))
+        );
+    }
+}

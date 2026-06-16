@@ -1,8 +1,10 @@
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use qec_code::QecError;
 use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
+use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
@@ -21,6 +23,12 @@ fn run_qec_code(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("qec-code binary should run")
+}
+
+fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
+    let path = dir.join(name);
+    fs::write(&path, contents).expect("matrix fixture should be writable");
+    path
 }
 
 #[test]
@@ -307,6 +315,110 @@ fn css_distance_randomized_upper_bound_rejects_code_id_and_file_input_together()
         stderr.contains("use either --code-id or --hx/--hz, not both"),
         "stderr was: {stderr}"
     );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_missing_matrix_pair() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("--hx and --hz must be provided together"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_missing_input_source() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("provide --code-id or both --hx and --hz"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_mismatched_file_widths() {
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":4,"rows":[[2,3]]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("hx width 3 does not match hz width 4"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_reports_matrix_read_failures() {
+    let dir = tempdir().unwrap();
+    let hx = dir.path().join("missing-hx.json");
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("failed to read CSS matrix"),
+        "stderr was: {stderr}"
+    );
+    assert!(stderr.contains("missing-hx.json"), "stderr was: {stderr}");
 }
 
 #[test]
