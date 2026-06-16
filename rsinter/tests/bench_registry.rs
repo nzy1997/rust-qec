@@ -207,10 +207,6 @@ fn expand_runner_points_accepts_rotated_memory_z_input_type() {
         "input_type".into(),
         toml::Value::String("surface_rotated_memory_z".into()),
     );
-    params.insert(
-        "rounds".into(),
-        toml::Value::Array(vec![toml::Value::Integer(1)]),
-    );
 
     let points = expand_runner_points(&params).unwrap();
 
@@ -299,7 +295,7 @@ fn valid_runner_params() -> BTreeMap<String, toml::Value> {
         ),
         (
             "rounds".into(),
-            toml::Value::Array(vec![toml::Value::Integer(3)]),
+            toml::Value::Array(vec![toml::Value::Integer(1)]),
         ),
         (
             "p".into(),
