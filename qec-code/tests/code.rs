@@ -174,6 +174,26 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         })
     );
     assert_eq!(
+        parse_built_in_css_code_spec("unknown"),
+        Err(QecError::UnknownBuiltInCssCode {
+            code_id: "unknown".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
         parse_built_in_css_code_spec("repetition_x:d=5,d=7"),
         Err(QecError::DuplicateBuiltInCssParameter {
             family: "repetition_x".to_owned(),
