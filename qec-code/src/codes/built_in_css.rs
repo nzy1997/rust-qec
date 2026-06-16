@@ -8,6 +8,12 @@ pub struct BuiltInCssChecks {
     pub hz: Vec<Vec<usize>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BuiltInCssCatalogEntry {
+    pub spec: &'static str,
+    pub description: &'static str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltInCssCodeSpec {
     Fixed {
@@ -29,6 +35,33 @@ pub enum BuiltInCssFamily {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuiltInCssParams {
     pub distance: usize,
+}
+
+const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
+    BuiltInCssCatalogEntry {
+        spec: "steane",
+        description: "fixed [[7,1,3]] CSS code",
+    },
+    BuiltInCssCatalogEntry {
+        spec: "bb72",
+        description: "fixed [[72,12,6]] bivariate-bicycle CSS code",
+    },
+    BuiltInCssCatalogEntry {
+        spec: "repetition_x:d=<distance>",
+        description: "X-check chain, distance >= 2",
+    },
+    BuiltInCssCatalogEntry {
+        spec: "repetition_z:d=<distance>",
+        description: "Z-check chain, distance >= 2",
+    },
+    BuiltInCssCatalogEntry {
+        spec: "surface_rotated:d=<distance>",
+        description: "rotated surface CSS code, distance >= 2",
+    },
+];
+
+pub fn built_in_css_catalog() -> &'static [BuiltInCssCatalogEntry] {
+    BUILT_IN_CSS_CATALOG
 }
 
 pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {

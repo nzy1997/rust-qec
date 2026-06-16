@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::QecError;
-use crate::codes::built_in_css::built_in_css_checks;
+use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::steane::Steane;
 use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::compute_distance;
@@ -32,13 +32,58 @@ pub enum CodeCommands {
         #[command(subcommand)]
         command: SteaneCommands,
     },
-    Css {
-        code_id: String,
-        matrix: CssMatrixKind,
-    },
+    Css(CssArgs),
     CssDistance {
         #[command(subcommand)]
         command: CssDistanceCommands,
+    },
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+#[command(subcommand_negates_reqs = true)]
+#[command(arg_required_else_help = true)]
+pub struct CssArgs {
+    #[command(subcommand)]
+    command: Option<CssCommands>,
+    #[arg(value_name = "CODE_ID", required = true)]
+    code_id: Option<String>,
+    #[arg(value_name = "MATRIX", required = true)]
+    matrix: Option<CssMatrixKind>,
+}
+
+impl CssArgs {
+    pub fn list() -> Self {
+        Self {
+            command: Some(CssCommands::List),
+            code_id: None,
+            matrix: None,
+        }
+    }
+
+    pub fn export(code_id: String, matrix: CssMatrixKind) -> Self {
+        Self {
+            command: None,
+            code_id: Some(code_id),
+            matrix: Some(matrix),
+        }
+    }
+
+    pub fn export_subcommand(code_id: String, matrix: CssMatrixKind) -> Self {
+        Self {
+            command: Some(CssCommands::Export { code_id, matrix }),
+            code_id: None,
+            matrix: None,
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CssCommands {
+    List,
+    Export {
+        code_id: String,
+        matrix: CssMatrixKind,
     },
 }
 
@@ -90,9 +135,48 @@ pub fn run(cli: Cli) -> Result<String, QecError> {
 fn run_code(command: CodeCommands) -> Result<String, QecError> {
     match command {
         CodeCommands::Steane { command } => run_steane(command),
-        CodeCommands::Css { code_id, matrix } => run_css(&code_id, matrix),
+        CodeCommands::Css(args) => run_css_args(args),
         CodeCommands::CssDistance { command } => run_css_distance(command),
     }
+}
+
+fn run_css_args(args: CssArgs) -> Result<String, QecError> {
+    match args.command {
+        Some(CssCommands::List) => Ok(run_css_list()),
+        Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
+        None => {
+            let code_id = args
+                .code_id
+                .expect("clap requires CODE_ID when no css subcommand is used");
+            let matrix = args
+                .matrix
+                .expect("clap requires MATRIX when no css subcommand is used");
+
+            run_css(&code_id, matrix)
+        }
+    }
+}
+
+fn run_css_list() -> String {
+    let catalog = built_in_css_catalog();
+    let width = catalog
+        .iter()
+        .map(|entry| entry.spec.len())
+        .max()
+        .unwrap_or(0);
+    let mut lines = Vec::with_capacity(catalog.len() + 1);
+
+    lines.push("Built-in CSS codes:".to_owned());
+    lines.extend(catalog.iter().map(|entry| {
+        format!(
+            "  {:width$}  {}",
+            entry.spec,
+            entry.description,
+            width = width
+        )
+    }));
+
+    lines.join("\n")
 }
 
 fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
