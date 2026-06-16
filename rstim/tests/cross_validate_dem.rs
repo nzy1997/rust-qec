@@ -1,7 +1,9 @@
 #![allow(unexpected_cfgs)]
 
 use rstim::codegen::{
-    color_code::memory_xyz, repetition_code_memory, surface_code::rotated_memory_x,
+    color_code::memory_xyz,
+    repetition_code_memory,
+    surface_code::{rotated_memory_x, rotated_memory_z},
 };
 use rstim::dem::DetectorErrorModel;
 use rstim::error_analyzer::ErrorAnalyzer;
@@ -58,6 +60,53 @@ fn stim_python_generated_surface_code_circuit_text() -> String {
         "python3 stim generation failed: {stderr}"
     );
     String::from_utf8(output.stdout).unwrap()
+}
+
+fn stim_python_generated_memory_z_counts(
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+) -> (usize, usize) {
+    let script = format!(
+        r#"
+import stim
+
+circuit = stim.Circuit.generated(
+    'surface_code:rotated_memory_z',
+    rounds={rounds},
+    distance={distance},
+    after_clifford_depolarization={noise},
+    after_reset_flip_probability={noise},
+    before_measure_flip_probability={noise},
+    before_round_data_depolarization={noise},
+)
+print(circuit.num_detectors)
+print(circuit.num_observables)
+"#
+    );
+    let output = Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .output()
+        .expect("failed to run python3");
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    assert!(
+        output.status.success(),
+        "python3 stim count generation failed: {stderr}"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let mut lines = stdout.lines();
+    let num_detectors = lines
+        .next()
+        .expect("missing detector count")
+        .parse::<usize>()
+        .expect("detector count should be numeric");
+    let num_observables = lines
+        .next()
+        .expect("missing observable count")
+        .parse::<usize>()
+        .expect("observable count should be numeric");
+    (num_detectors, num_observables)
 }
 
 fn stim_analyze_errors_flags(circuit_text: &str, flags: &[&str]) -> String {
@@ -682,6 +731,35 @@ if det_diff > det_tol or obs_diff > obs_tol or pair_diff > pair_tol:
         output.status.success(),
         "python3 sampling parity check failed:\nstdout:\n{stdout}\nstderr:\n{stderr}"
     );
+}
+
+#[test]
+fn issue_memory_z_counts_match_python_stim() {
+    let _guard = lock_stim_env();
+    let circuit = rotated_memory_z(3, 9, 0.008);
+    let (stim_num_detectors, stim_num_observables) =
+        stim_python_generated_memory_z_counts(3, 9, 0.008);
+
+    assert_eq!(rstim::stats::num_detectors(&circuit), stim_num_detectors);
+    assert_eq!(
+        rstim::stats::num_observables(&circuit),
+        stim_num_observables
+    );
+}
+
+#[test]
+fn cross_validate_decomposed_memory_z_issue_dem() {
+    let _guard = lock_stim_env();
+    let circuit = rotated_memory_z(3, 9, 0.008);
+    let circuit_text = circuit_to_string(&circuit);
+    let stim_dem_text = stim_analyze_errors_flags(&circuit_text, &["--decompose_errors"]);
+    let rstim_dem_text = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)
+        .unwrap()
+        .to_string();
+
+    assert_all_graphlike_dem_text(&stim_dem_text);
+    assert_all_graphlike_dem_text(&rstim_dem_text);
+    assert_semantic_dem_parity(&stim_dem_text, &rstim_dem_text);
 }
 
 #[test]
