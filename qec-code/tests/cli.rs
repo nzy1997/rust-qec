@@ -297,10 +297,7 @@ fn code_css_surface_rotated_missing_or_bad_distance_fails() {
             !output.status.success(),
             "case {case:?} unexpectedly succeeded"
         );
-        assert_eq!(
-            output.stdout, b"",
-            "case {case:?} should not print stdout"
-        );
+        assert_eq!(output.stdout, b"", "case {case:?} should not print stdout");
 
         let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
         assert!(
