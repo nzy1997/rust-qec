@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -82,19 +82,6 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         fixture: "bb72_hz.json",
     },
 ];
-
-fn read_qec_code_css_fixture(file_name: &str) -> String {
-    let path = workspace_root()
-        .join("qec-code/tests/fixtures/css")
-        .join(file_name);
-
-    std::fs::read_to_string(&path).unwrap_or_else(|err| {
-        panic!(
-            "failed to read qec-code CSS fixture {}: {err}",
-            path.display()
-        )
-    })
-}
 
 #[test]
 fn steane_summary_reports_basic_code_parameters() {
@@ -232,21 +219,12 @@ fn built_in_css_fixture_manifest_exports_match_pinned_json() {
     for case in BUILT_IN_CSS_FIXTURE_CASES {
         let output = run_qec_code(&["code", "css", case.code_id, case.matrix]);
 
-        assert!(
-            output.status.success(),
-            "case {case:?} failed with status {}\nstderr: {}\nstdout: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        );
-        assert!(
-            output.stderr.is_empty(),
-            "case {case:?} wrote stderr: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
 
         let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-        let expected = read_qec_code_css_fixture(case.fixture);
+        let fixture_path = format!("qec-code/tests/fixtures/css/{}", case.fixture);
+        let expected = read_fixture(&fixture_path);
 
         assert_eq!(
             stdout, expected,
