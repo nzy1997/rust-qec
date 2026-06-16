@@ -132,6 +132,30 @@ fn code_css_unknown_id_fails() {
 }
 
 #[test]
+fn code_css_bb72_hx_prints_sparse_rows_json() {
+    let output = run_qec_code(&["code", "css", "bb72", "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
+    let rows = json["rows"]
+        .as_array()
+        .expect("sparse-row JSON should contain rows");
+
+    assert_eq!(json["format"], "sparse_rows");
+    assert_eq!(json["num_cols"], 72);
+    assert_eq!(rows.len(), 36);
+    assert!(
+        rows.iter()
+            .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
+        "all bb72 hx rows should have weight 6: {rows:?}"
+    );
+}
+
+#[test]
 fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
     let hx = run(Cli {
         command: Commands::Code {
