@@ -36,12 +36,23 @@ pub enum QecError {
     UnsupportedLogicalBasis { k: usize },
     #[error("exhaustive Pauli enumeration is unsupported for {n} qubits on this target")]
     UnsupportedExhaustiveEnumeration { n: usize },
-    #[error("distance computation is unsupported for {n} qubits in the current configuration: {reason}")]
+    #[error(
+        "distance computation is unsupported for {n} qubits in the current configuration: {reason}"
+    )]
     DistanceComputationUnsupported { n: usize, reason: String },
     #[error("logical basis not found")]
     LogicalBasisNotFound,
     #[error("distance witness not found")]
     DistanceWitnessNotFound,
+    #[error("invalid distance bound option {option}: {reason}")]
+    InvalidDistanceBoundOption {
+        option: &'static str,
+        reason: String,
+    },
+    #[error("randomized upper-bound witness not found")]
+    RandomizedUpperBoundWitnessNotFound,
+    #[error("distance bound validation failed: {0}")]
+    DistanceBoundValidationFailed(String),
     #[error("ILP backend is unavailable: {0}")]
     IlpBackendUnavailable(String),
     #[error("ILP solve failed: {0}")]
