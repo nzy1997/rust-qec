@@ -83,8 +83,7 @@ fn css_code_rejects_non_orthogonal_checks() {
 
 #[test]
 fn css_code_accepts_redundant_orthogonal_checks() {
-    let code = CssCode::from_hx_hz(vec![vec![1, 0], vec![0, 1], vec![1, 1]], vec![])
-        .unwrap();
+    let code = CssCode::from_hx_hz(vec![vec![1, 0], vec![0, 1], vec![1, 1]], vec![]).unwrap();
 
     assert_eq!(code.code().n(), 2);
     assert_eq!(code.code().stabilizer_rank(), 2);
@@ -151,11 +150,7 @@ fn built_in_css_registry_exposes_steane_checks() {
     assert_eq!(checks.num_cols, 7);
     assert_eq!(
         checks.hx,
-        vec![
-            vec![0, 3, 5, 6],
-            vec![1, 3, 4, 6],
-            vec![2, 4, 5, 6],
-        ]
+        vec![vec![0, 3, 5, 6], vec![1, 3, 4, 6], vec![2, 4, 5, 6],]
     );
     assert_eq!(checks.hz, checks.hx);
     assert_strictly_increasing_rows(&checks.hx);

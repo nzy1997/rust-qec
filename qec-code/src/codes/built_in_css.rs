@@ -130,11 +130,7 @@ fn parse_repetition_distance(family_name: &str, params_text: &str) -> Result<usi
     })
 }
 
-const STEANE_ROW_SUPPORTS: &[&[usize]] = &[
-    &[0, 3, 5, 6],
-    &[1, 3, 4, 6],
-    &[2, 4, 5, 6],
-];
+const STEANE_ROW_SUPPORTS: &[&[usize]] = &[&[0, 3, 5, 6], &[1, 3, 4, 6], &[2, 4, 5, 6]];
 
 const BB72_LX: usize = 6;
 const BB72_LY: usize = 6;
@@ -223,10 +219,7 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
     }
 }
 
-fn repetition_css_checks(
-    family: BuiltInCssFamily,
-    distance: usize,
-) -> Result<BuiltInCssChecks> {
+fn repetition_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltInCssChecks> {
     match family {
         BuiltInCssFamily::RepetitionX => {
             let hx = chain_supports("repetition_x", distance)?;
