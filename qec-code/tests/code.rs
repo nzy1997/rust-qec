@@ -253,6 +253,18 @@ fn surface_rotated_d5_has_expected_check_counts_and_weights() {
 }
 
 #[test]
+fn surface_rotated_rejects_distance_below_two() {
+    assert_eq!(
+        built_in_css_checks("surface_rotated:d=1"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "surface_rotated".to_owned(),
+            parameter: "d".to_owned(),
+            value: 1,
+        })
+    );
+}
+
+#[test]
 fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
     assert_eq!(
         parse_built_in_css_code_spec("steane"),
