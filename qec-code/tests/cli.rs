@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssCommands, CssMatrixKind, run};
 
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
@@ -13,8 +13,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn read_fixture(rel_path: &str) -> String {
-    std::fs::read_to_string(workspace_root().join(rel_path))
-        .expect("fixture should be readable")
+    std::fs::read_to_string(workspace_root().join(rel_path)).expect("fixture should be readable")
 }
 
 fn run_qec_code(args: &[&str]) -> Output {
@@ -104,6 +103,19 @@ fn code_css_steane_hx_prints_workspace_fixture() {
 }
 
 #[test]
+fn code_css_export_subcommand_steane_hx_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", "export", "steane", "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
 fn code_css_steane_hz_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "steane", "hz"]);
 
@@ -156,22 +168,65 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
 }
 
 #[test]
+fn code_css_list_includes_supported_built_ins() {
+    let output = run_qec_code(&["code", "css", "list"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+
+    assert!(
+        stdout.contains("Built-in CSS codes:"),
+        "stdout was: {stdout}"
+    );
+    assert!(stdout.contains("steane"), "stdout was: {stdout}");
+    assert!(stdout.contains("bb72"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("repetition_x:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(
+        stdout.contains("repetition_z:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
+}
+
+#[test]
+fn code_css_list_rejects_unexpected_extra_arguments() {
+    let output = run_qec_code(&["code", "css", "list", "extra"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+
+    assert!(
+        stderr.contains("extra") || stderr.contains("Usage:"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
 fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
     let hx = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css {
-                code_id: "steane".to_owned(),
-                matrix: CssMatrixKind::Hx,
-            },
+            command: CodeCommands::Css(CssArgs {
+                command: None,
+                code_id: Some("steane".to_owned()),
+                matrix: Some(CssMatrixKind::Hx),
+            }),
         },
     })
     .unwrap();
     let hz = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css {
-                code_id: "steane".to_owned(),
-                matrix: CssMatrixKind::Hz,
-            },
+            command: CodeCommands::Css(CssArgs {
+                command: None,
+                code_id: Some("steane".to_owned()),
+                matrix: Some(CssMatrixKind::Hz),
+            }),
         },
     })
     .unwrap();
@@ -184,13 +239,35 @@ fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
 }
 
 #[test]
+fn run_code_css_list_returns_catalog_without_newline() {
+    let output = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs {
+                command: Some(CssCommands::List),
+                code_id: None,
+                matrix: None,
+            }),
+        },
+    })
+    .unwrap();
+
+    assert!(output.starts_with("Built-in CSS codes:\n"));
+    assert!(!output.ends_with('\n'));
+    assert!(output.contains("steane"));
+    assert!(output.contains("bb72"));
+    assert!(output.contains("repetition_x:d=<distance>"));
+    assert!(output.contains("repetition_z:d=<distance>"));
+}
+
+#[test]
 fn run_code_css_unknown_id_returns_registry_error() {
     let result = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css {
-                code_id: "unknown".to_owned(),
-                matrix: CssMatrixKind::Hx,
-            },
+            command: CodeCommands::Css(CssArgs {
+                command: None,
+                code_id: Some("unknown".to_owned()),
+                matrix: Some(CssMatrixKind::Hx),
+            }),
         },
     });
 

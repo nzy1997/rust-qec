@@ -1,7 +1,7 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::QecError;
-use crate::codes::built_in_css::built_in_css_checks;
+use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::steane::Steane;
 use crate::css::SparseRowsMatrix;
 use crate::distance::compute_distance;
@@ -27,7 +27,26 @@ pub enum CodeCommands {
         #[command(subcommand)]
         command: SteaneCommands,
     },
-    Css {
+    Css(CssArgs),
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+#[command(subcommand_negates_reqs = true)]
+#[command(arg_required_else_help = true)]
+pub struct CssArgs {
+    #[command(subcommand)]
+    pub command: Option<CssCommands>,
+    #[arg(value_name = "CODE_ID", required = true)]
+    pub code_id: Option<String>,
+    #[arg(value_name = "MATRIX", required = true)]
+    pub matrix: Option<CssMatrixKind>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CssCommands {
+    List,
+    Export {
         code_id: String,
         matrix: CssMatrixKind,
     },
@@ -56,8 +75,47 @@ pub fn run(cli: Cli) -> Result<String, QecError> {
 fn run_code(command: CodeCommands) -> Result<String, QecError> {
     match command {
         CodeCommands::Steane { command } => run_steane(command),
-        CodeCommands::Css { code_id, matrix } => run_css(&code_id, matrix),
+        CodeCommands::Css(args) => run_css_args(args),
     }
+}
+
+fn run_css_args(args: CssArgs) -> Result<String, QecError> {
+    match args.command {
+        Some(CssCommands::List) => Ok(run_css_list()),
+        Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
+        None => {
+            let code_id = args
+                .code_id
+                .expect("clap requires CODE_ID when no css subcommand is used");
+            let matrix = args
+                .matrix
+                .expect("clap requires MATRIX when no css subcommand is used");
+
+            run_css(&code_id, matrix)
+        }
+    }
+}
+
+fn run_css_list() -> String {
+    let catalog = built_in_css_catalog();
+    let width = catalog
+        .iter()
+        .map(|entry| entry.spec.len())
+        .max()
+        .unwrap_or(0);
+    let mut lines = Vec::with_capacity(catalog.len() + 1);
+
+    lines.push("Built-in CSS codes:".to_owned());
+    lines.extend(catalog.iter().map(|entry| {
+        format!(
+            "  {:width$}  {}",
+            entry.spec,
+            entry.description,
+            width = width
+        )
+    }));
+
+    lines.join("\n")
 }
 
 fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
