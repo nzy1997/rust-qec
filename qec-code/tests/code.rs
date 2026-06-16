@@ -15,6 +15,29 @@ fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
     }
 }
 
+fn assert_rows_in_range(rows: &[Vec<usize>], num_cols: usize) {
+    for row in rows {
+        for &col in row {
+            assert!(
+                col < num_cols,
+                "row contains out-of-range column {col} for width {num_cols}: {row:?}"
+            );
+        }
+    }
+}
+
+fn dense_rows(rows: &[Vec<usize>], width: usize) -> Vec<Vec<u8>> {
+    rows.iter().map(|row| dense_row(row, width)).collect()
+}
+
+fn dense_row(row: &[usize], width: usize) -> Vec<u8> {
+    let mut dense = vec![0; width];
+    for &col in row {
+        dense[col] = 1;
+    }
+    dense
+}
+
 #[test]
 fn stabilizer_code_rejects_noncommuting_generators() {
     let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
@@ -129,6 +152,31 @@ fn built_in_css_registry_exposes_steane_checks() {
 }
 
 #[test]
+fn bb72_has_expected_shape_and_css_orthogonality() {
+    let checks = built_in_css_checks("bb72").unwrap();
+
+    assert_eq!(checks.code_id, "bb72");
+    assert_eq!(checks.num_cols, 72);
+    assert_eq!(checks.hx.len(), 36);
+    assert_eq!(checks.hz.len(), 36);
+
+    for row in checks.hx.iter().chain(checks.hz.iter()) {
+        assert_eq!(row.len(), 6, "row has wrong weight: {row:?}");
+    }
+
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
+}
+
+#[test]
 fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
     assert_eq!(
         parse_built_in_css_code_spec("steane"),
@@ -146,6 +194,20 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
         Ok(BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::RepetitionZ,
             params: BuiltInCssParams { distance: 5 },
+        })
+    );
+}
+
+#[test]
+fn bb72_code_spec_rejects_unexpected_parameters() {
+    assert_eq!(
+        parse_built_in_css_code_spec("bb72"),
+        Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("bb72:d=3"),
+        Err(QecError::UnknownBuiltInCssFamily {
+            family: "bb72".to_owned(),
         })
     );
 }
