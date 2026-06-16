@@ -74,6 +74,24 @@ def fit_binomial(shots: int, hits: int) -> tuple[float, float, float]:
     return low / (ACC * shots), best, high / (ACC * shots)
 
 
+def shot_error_rate_to_piece_error_rate(shot_error_rate: float, pieces: int | float) -> float:
+    if not 0.0 <= shot_error_rate <= 1.0:
+        raise ValueError(f"shot error rate must be in [0, 1], got {shot_error_rate}")
+    if pieces <= 0:
+        raise ValueError(f"pieces must be positive, got {pieces}")
+    if pieces == 1:
+        return shot_error_rate
+    if shot_error_rate > 0.5:
+        return 1.0 - shot_error_rate_to_piece_error_rate(1.0 - shot_error_rate, pieces)
+
+    randomize_rate = 2.0 * shot_error_rate
+    piece_randomize_rate = 1.0 - (1.0 - randomize_rate) ** (1.0 / pieces)
+    piece_error_rate = piece_randomize_rate / 2.0
+    if piece_error_rate == 0.0:
+        return shot_error_rate / pieces
+    return piece_error_rate
+
+
 def make_circuit(distance: int, rounds: int, noise: float):
     import stim
 
@@ -197,26 +215,43 @@ def load_rust_rows(paths: list[Path]) -> list[dict[str, object]]:
     return rows
 
 
-def add_series(axis, label: str, rows: list[dict[str, object]], distance: int, color: str, marker: str) -> None:
+def add_series(
+    axis,
+    label: str,
+    rows: list[dict[str, object]],
+    distance: int,
+    color: str,
+    marker: str,
+    linestyle: str = "-",
+) -> None:
     selected = sorted(
         [row for row in rows if int(row["distance"]) == distance],
         key=lambda row: float(row["p"]),
     )
+    if not selected:
+        return
     xs = [float(row["p"]) for row in selected]
-    ys = [float(row["logical_error_rate"]) for row in selected]
+    per_round_ys = []
     low_err = []
     high_err = []
-    for row, y in zip(selected, ys):
+    for row in selected:
+        y = float(row["logical_error_rate"])
         low, _best, high = fit_binomial(int(row["shots"]), int(row["logical_errors"]))
-        low_err.append(max(0.0, y - low))
-        high_err.append(max(0.0, high - y))
+        rounds = int(row["rounds"])
+        per_round_y = shot_error_rate_to_piece_error_rate(y, rounds)
+        per_round_low = shot_error_rate_to_piece_error_rate(low, rounds)
+        per_round_high = shot_error_rate_to_piece_error_rate(high, rounds)
+        per_round_ys.append(per_round_y)
+        low_err.append(max(0.0, per_round_y - per_round_low))
+        high_err.append(max(0.0, per_round_high - per_round_y))
     axis.errorbar(
         xs,
-        ys,
+        per_round_ys,
         yerr=[low_err, high_err],
         marker=marker,
         label=label,
         color=color,
+        linestyle=linestyle,
         linewidth=1.4,
         capsize=3,
     )
@@ -230,18 +265,28 @@ def plot_compare(stim_fixture: Path, rust_results: list[Path], out: Path) -> Non
 
     stim_rows = json.loads(stim_fixture.read_text())["rows"]
     rust_rows = load_rust_rows(rust_results)
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=True)
+    fig, axis = plt.subplots(1, 1, figsize=(7, 5), sharey=False)
 
-    for axis, distance in zip(axes, DISTANCES):
-        add_series(axis, "Stim/PyMatching", stim_rows, distance, "tab:blue", "o")
-        add_series(axis, "RStim/rmatching", rust_rows, distance, "tab:orange", "s")
-        axis.set_title(f"d={distance}, r={distance * 3}")
-        axis.set_xlabel("p")
-        axis.set_yscale("log")
-        axis.grid(True, alpha=0.3)
+    colors = {3: "tab:blue", 5: "tab:green", 7: "tab:red"}
+    for distance in DISTANCES:
+        color = colors[distance]
+        add_series(axis, f"Stim/PyMatching d={distance}", stim_rows, distance, color, "o", "-")
+        add_series(
+            axis,
+            f"RStim/rmatching d={distance}",
+            rust_rows,
+            distance,
+            color,
+            "s",
+            "--",
+        )
+    axis.set_title("d=3,5,7; rounds=3d")
+    axis.set_xlabel("p")
+    axis.set_yscale("log")
+    axis.grid(True, alpha=0.3)
 
-    axes[0].set_ylabel("logical error rate")
-    axes[0].legend()
+    axis.set_ylabel("logical error rate per round")
+    axis.legend(ncol=2)
     fig.suptitle("Issue 65 rotated memory-Z sweep")
     fig.tight_layout()
     out.parent.mkdir(parents=True, exist_ok=True)
