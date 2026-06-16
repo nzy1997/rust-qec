@@ -1,9 +1,11 @@
+use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
-use crate::Pauli;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum LogicalClass {
     XLike,
     ZLike,
@@ -163,7 +165,7 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_logical, LogicalClass};
+    use super::{LogicalClass, classify_logical};
     use crate::Pauli;
     #[cfg(feature = "distance-ilp-highs")]
     use crate::{QecError, StabilizerCode};

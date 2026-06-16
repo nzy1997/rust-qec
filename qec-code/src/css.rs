@@ -2,7 +2,7 @@ use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
 use crate::gf2;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SparseRowsMatrix {
@@ -14,6 +14,27 @@ impl SparseRowsMatrix {
     pub fn new(num_cols: usize, rows: Vec<Vec<usize>>) -> Result<Self> {
         validate_sparse_rows(num_cols, &rows)?;
         Ok(Self { num_cols, rows })
+    }
+
+    pub fn num_cols(&self) -> usize {
+        self.num_cols
+    }
+
+    pub fn rows(&self) -> &[Vec<usize>] {
+        &self.rows
+    }
+
+    pub fn to_dense_rows(&self) -> Vec<Vec<u8>> {
+        self.rows
+            .iter()
+            .map(|row| {
+                let mut dense = vec![0; self.num_cols];
+                for &support in row {
+                    dense[support] = 1;
+                }
+                dense
+            })
+            .collect()
     }
 
     pub fn to_json_string(&self) -> String {
@@ -32,6 +53,39 @@ impl SparseRowsMatrix {
         .expect("validated sparse rows matrix should always serialize");
         json
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct SparseRowsMatrixJson {
+    format: String,
+    num_cols: usize,
+    rows: Vec<Vec<usize>>,
+}
+
+pub fn sparse_rows_matrix_from_json_str(input: &str) -> Result<SparseRowsMatrix> {
+    let value: serde_json::Value = serde_json::from_str(input)
+        .map_err(|err| QecError::InvalidCssMatrixJson(err.to_string()))?;
+
+    let format = value
+        .get("format")
+        .and_then(serde_json::Value::as_str)
+        .ok_or(QecError::MissingCssMatrixFormat)?;
+
+    if format != "sparse_rows" {
+        return Err(QecError::UnsupportedCssMatrixFormat {
+            format: format.to_owned(),
+        });
+    }
+
+    let parsed: SparseRowsMatrixJson = serde_json::from_value(value)
+        .map_err(|err| QecError::InvalidCssMatrixJson(err.to_string()))?;
+    let SparseRowsMatrixJson {
+        format: _format,
+        num_cols,
+        rows,
+    } = parsed;
+
+    SparseRowsMatrix::new(num_cols, rows)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

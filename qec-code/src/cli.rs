@@ -1,10 +1,15 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use std::fs;
+use std::path::PathBuf;
+
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::QecError;
 use crate::codes::built_in_css::built_in_css_checks;
 use crate::codes::steane::Steane;
-use crate::css::SparseRowsMatrix;
+use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::compute_distance;
+use crate::distance_bound::{RandomizedUpperBoundOptions, randomized_css_upper_bound};
+use crate::error::CssMatrixReadSource;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -31,12 +36,41 @@ pub enum CodeCommands {
         code_id: String,
         matrix: CssMatrixKind,
     },
+    CssDistance {
+        #[command(subcommand)]
+        command: CssDistanceCommands,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum CssMatrixKind {
     Hx,
     Hz,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CssDistanceCommands {
+    RandomizedUpperBound(RandomizedUpperBoundCli),
+}
+
+#[derive(Debug, Args)]
+pub struct RandomizedUpperBoundCli {
+    #[arg(long)]
+    code_id: Option<String>,
+    #[arg(long)]
+    hx: Option<PathBuf>,
+    #[arg(long)]
+    hz: Option<PathBuf>,
+    #[arg(long)]
+    iterations: usize,
+    #[arg(long, default_value_t = 1)]
+    restarts: usize,
+    #[arg(long)]
+    seed: u64,
+    #[arg(long)]
+    target_weight: Option<usize>,
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -57,6 +91,7 @@ fn run_code(command: CodeCommands) -> Result<String, QecError> {
     match command {
         CodeCommands::Steane { command } => run_steane(command),
         CodeCommands::Css { code_id, matrix } => run_css(&code_id, matrix),
+        CodeCommands::CssDistance { command } => run_css_distance(command),
     }
 }
 
@@ -70,6 +105,82 @@ fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
 
     let matrix = SparseRowsMatrix::new(num_cols, rows)?;
     Ok(matrix.to_json_string())
+}
+
+fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {
+    match command {
+        CssDistanceCommands::RandomizedUpperBound(options) => {
+            run_css_randomized_upper_bound(options)
+        }
+    }
+}
+
+fn run_css_randomized_upper_bound(cli: RandomizedUpperBoundCli) -> Result<String, QecError> {
+    const COMMAND: &str = "code css-distance randomized-upper-bound";
+
+    if !cli.json {
+        return Err(QecError::JsonOutputRequired { command: COMMAND });
+    }
+
+    let css = css_code_from_randomized_upper_bound_cli(&cli)?;
+    let options = RandomizedUpperBoundOptions {
+        iterations: cli.iterations,
+        restarts: cli.restarts,
+        seed: cli.seed,
+        target_weight: cli.target_weight,
+    };
+    let result = randomized_css_upper_bound(&css, options)?;
+
+    serde_json::to_string(&result).map_err(|err| QecError::InvalidCssDistanceInput(err.to_string()))
+}
+
+fn css_code_from_randomized_upper_bound_cli(
+    cli: &RandomizedUpperBoundCli,
+) -> Result<CssCode, QecError> {
+    match (&cli.code_id, &cli.hx, &cli.hz) {
+        (Some(code_id), None, None) => css_code_from_built_in(code_id),
+        (None, Some(hx), Some(hz)) => css_code_from_files(hx, hz),
+        (Some(_), Some(_), _) | (Some(_), _, Some(_)) => Err(QecError::InvalidCssDistanceInput(
+            "use either --code-id or --hx/--hz, not both".to_owned(),
+        )),
+        (None, Some(_), None) | (None, None, Some(_)) => Err(QecError::InvalidCssDistanceInput(
+            "--hx and --hz must be provided together".to_owned(),
+        )),
+        (None, None, None) => Err(QecError::InvalidCssDistanceInput(
+            "provide --code-id or both --hx and --hz".to_owned(),
+        )),
+    }
+}
+
+fn css_code_from_built_in(code_id: &str) -> Result<CssCode, QecError> {
+    let checks = built_in_css_checks(code_id)?;
+    let hx = SparseRowsMatrix::new(checks.num_cols, checks.hx)?.to_dense_rows();
+    let hz = SparseRowsMatrix::new(checks.num_cols, checks.hz)?.to_dense_rows();
+    CssCode::from_hx_hz(hx, hz)
+}
+
+fn css_code_from_files(hx_path: &PathBuf, hz_path: &PathBuf) -> Result<CssCode, QecError> {
+    let hx = read_css_sparse_rows_matrix(hx_path)?;
+    let hz = read_css_sparse_rows_matrix(hz_path)?;
+
+    if hx.num_cols() != hz.num_cols() {
+        return Err(QecError::InvalidCssDistanceInput(format!(
+            "hx width {} does not match hz width {}",
+            hx.num_cols(),
+            hz.num_cols()
+        )));
+    }
+
+    CssCode::from_hx_hz(hx.to_dense_rows(), hz.to_dense_rows())
+}
+
+fn read_css_sparse_rows_matrix(path: &PathBuf) -> Result<SparseRowsMatrix, QecError> {
+    let input = fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
+        path: path.display().to_string(),
+        source: CssMatrixReadSource(err.to_string()),
+    })?;
+
+    sparse_rows_matrix_from_json_str(&input)
 }
 
 fn run_steane(command: SteaneCommands) -> Result<String, QecError> {

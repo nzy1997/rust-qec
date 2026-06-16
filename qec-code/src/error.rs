@@ -1,5 +1,9 @@
 use thiserror::Error;
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{0}")]
+pub struct CssMatrixReadSource(pub String);
+
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum QecError {
     #[error("row width mismatch: expected {expected}, got {actual}")]
@@ -17,6 +21,21 @@ pub enum QecError {
         row: usize,
         support: usize,
         num_cols: usize,
+    },
+    #[error("missing CSS matrix format")]
+    MissingCssMatrixFormat,
+    #[error("unsupported CSS matrix format: {format}")]
+    UnsupportedCssMatrixFormat { format: String },
+    #[error("invalid CSS matrix JSON: {0}")]
+    InvalidCssMatrixJson(String),
+    #[error("JSON output is required for {command}")]
+    JsonOutputRequired { command: &'static str },
+    #[error("invalid CSS distance input: {0}")]
+    InvalidCssDistanceInput(String),
+    #[error("failed to read CSS matrix {path}: {source}")]
+    CssMatrixReadFailed {
+        path: String,
+        source: CssMatrixReadSource,
     },
     #[error("invalid Pauli width: x has {x_width} bits, z has {z_width}")]
     InvalidPauliWidth { x_width: usize, z_width: usize },
@@ -36,12 +55,23 @@ pub enum QecError {
     UnsupportedLogicalBasis { k: usize },
     #[error("exhaustive Pauli enumeration is unsupported for {n} qubits on this target")]
     UnsupportedExhaustiveEnumeration { n: usize },
-    #[error("distance computation is unsupported for {n} qubits in the current configuration: {reason}")]
+    #[error(
+        "distance computation is unsupported for {n} qubits in the current configuration: {reason}"
+    )]
     DistanceComputationUnsupported { n: usize, reason: String },
     #[error("logical basis not found")]
     LogicalBasisNotFound,
     #[error("distance witness not found")]
     DistanceWitnessNotFound,
+    #[error("invalid distance bound option {option}: {reason}")]
+    InvalidDistanceBoundOption {
+        option: &'static str,
+        reason: String,
+    },
+    #[error("randomized upper-bound witness not found")]
+    RandomizedUpperBoundWitnessNotFound,
+    #[error("distance bound validation failed: {0}")]
+    DistanceBoundValidationFailed(String),
     #[error("ILP backend is unavailable: {0}")]
     IlpBackendUnavailable(String),
     #[error("ILP solve failed: {0}")]
