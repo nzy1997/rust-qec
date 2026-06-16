@@ -1,5 +1,9 @@
 use thiserror::Error;
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{0}")]
+pub struct CssMatrixReadSource(pub String);
+
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum QecError {
     #[error("row width mismatch: expected {expected}, got {actual}")]
@@ -24,6 +28,15 @@ pub enum QecError {
     UnsupportedCssMatrixFormat { format: String },
     #[error("invalid CSS matrix JSON: {0}")]
     InvalidCssMatrixJson(String),
+    #[error("JSON output is required for {command}")]
+    JsonOutputRequired { command: &'static str },
+    #[error("invalid CSS distance input: {0}")]
+    InvalidCssDistanceInput(String),
+    #[error("failed to read CSS matrix {path}: {source}")]
+    CssMatrixReadFailed {
+        path: String,
+        source: CssMatrixReadSource,
+    },
     #[error("invalid Pauli width: x has {x_width} bits, z has {z_width}")]
     InvalidPauliWidth { x_width: usize, z_width: usize },
     #[error("non-binary Pauli bit {value} in {which} support at index {index}")]
@@ -81,9 +94,7 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error(
-        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
-    )]
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

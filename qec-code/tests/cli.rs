@@ -13,8 +13,7 @@ fn workspace_root() -> PathBuf {
 }
 
 fn read_fixture(rel_path: &str) -> String {
-    std::fs::read_to_string(workspace_root().join(rel_path))
-        .expect("fixture should be readable")
+    std::fs::read_to_string(workspace_root().join(rel_path)).expect("fixture should be readable")
 }
 
 fn run_qec_code(args: &[&str]) -> Output {
@@ -188,4 +187,119 @@ fn large_distance_errors_render_configuration_message() {
     .to_string();
 
     assert!(stderr.contains("distance computation is unsupported"));
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_code_id_outputs_json() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "500",
+        "--restarts",
+        "4",
+        "--seed",
+        "7",
+        "--target-weight",
+        "3",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+    assert_eq!(json["options"]["seed"], 7);
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_hx_hz_files_output_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args([
+            "--iterations",
+            "500",
+            "--restarts",
+            "4",
+            "--seed",
+            "7",
+            "--target-weight",
+            "3",
+            "--json",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_requires_json_flag() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("JSON output is required for code css-distance randomized-upper-bound"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "0",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("invalid distance bound option iterations"),
+        "stderr was: {stderr}"
+    );
 }
