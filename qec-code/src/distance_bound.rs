@@ -137,6 +137,8 @@ pub fn validate_randomized_upper_bound_result(
     result: &DistanceBoundResult,
     context: BoundValidationContext<'_>,
 ) -> Result<()> {
+    result.options.validate()?;
+
     if result.method != DistanceBoundMethod::RandomizedUpperBound {
         return Err(QecError::DistanceBoundValidationFailed(
             "distance bound method must be randomized-upper-bound".to_owned(),
@@ -159,6 +161,26 @@ pub fn validate_randomized_upper_bound_result(
     }
 
     let witness = result.witness.to_pauli()?;
+    if witness.n() != context.code.n() {
+        return Err(QecError::DistanceBoundValidationFailed(
+            "witness width must match code length".to_owned(),
+        ));
+    }
+    if witness.weight() == 0 {
+        return Err(QecError::DistanceBoundValidationFailed(
+            "witness must be non-identity".to_owned(),
+        ));
+    }
+    if result.witness.weight != witness.weight() {
+        return Err(QecError::DistanceBoundValidationFailed(
+            "witness weight field must equal Pauli weight".to_owned(),
+        ));
+    }
+    if result.logical_class != classify_witness_support(&witness) {
+        return Err(QecError::DistanceBoundValidationFailed(
+            "logical_class must match witness support".to_owned(),
+        ));
+    }
     validate_witness_against_code(context.code, &witness)?;
 
     if let Some(known_exact_distance) = context.known_exact_distance {
@@ -171,6 +193,18 @@ pub fn validate_randomized_upper_bound_result(
     }
 
     Ok(())
+}
+
+fn classify_witness_support(witness: &Pauli) -> LogicalClass {
+    let has_x = witness.x_bits().contains(&1);
+    let has_z = witness.z_bits().contains(&1);
+
+    match (has_x, has_z) {
+        (true, false) => LogicalClass::XLike,
+        (false, true) => LogicalClass::ZLike,
+        (true, true) => LogicalClass::Mixed,
+        (false, false) => unreachable!("witness support classification requires non-identity"),
+    }
 }
 
 fn validate_witness_against_code(code: &StabilizerCode, witness: &Pauli) -> Result<()> {

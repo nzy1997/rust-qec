@@ -191,6 +191,95 @@ fn validator_rejects_witness_weight_mismatch() {
 }
 
 #[test]
+fn validator_rejects_serialized_witness_weight_that_disagrees_with_pauli_weight() {
+    let code = StabilizerCode::from_stabilizers(2, vec![]).unwrap();
+    let mut result = valid_result();
+    result.witness = DistanceBoundWitness {
+        x: vec![1, 1],
+        z: vec![0, 0],
+        weight: 1,
+    };
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "witness weight field must equal Pauli weight".to_owned(),
+        ))
+    );
+}
+
+#[test]
+fn validator_rejects_witness_width_that_differs_from_code_length() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.witness = DistanceBoundWitness {
+        x: vec![1, 0],
+        z: vec![0, 0],
+        weight: 1,
+    };
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "witness width must match code length".to_owned(),
+        ))
+    );
+}
+
+#[test]
+fn validator_rejects_invalid_result_options() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.options.iterations = 0;
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::InvalidDistanceBoundOption {
+            option: "iterations",
+            reason: "must be greater than zero".to_owned(),
+        })
+    );
+}
+
+#[test]
+fn validator_rejects_logical_class_that_disagrees_with_witness_support() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.logical_class = LogicalClass::ZLike;
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "logical_class must match witness support".to_owned(),
+        ))
+    );
+}
+
+#[test]
 fn validator_rejects_zero_completed_upper_bound() {
     let code = trivial_one_qubit_code();
     let mut result = valid_result();
