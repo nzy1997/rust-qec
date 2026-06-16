@@ -207,6 +207,13 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
             params: BuiltInCssParams { distance: 5 },
         })
     );
+    assert_eq!(
+        parse_built_in_css_code_spec("surface_rotated:d=3"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::SurfaceRotated,
+            params: BuiltInCssParams { distance: 3 },
+        })
+    );
 }
 
 #[test]
