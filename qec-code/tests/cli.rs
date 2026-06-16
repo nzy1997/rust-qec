@@ -1,7 +1,9 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use clap::Parser;
 use qec_code::QecError;
 use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
 use tempfile::tempdir;
@@ -23,6 +25,16 @@ fn run_qec_code(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("qec-code binary should run")
+}
+
+fn run_qec_code_in_process(args: &[&str]) -> Result<String, QecError> {
+    run_qec_code_in_process_os(args.iter().map(OsString::from).collect())
+}
+
+fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
+    let mut argv = vec![OsString::from("qec-code")];
+    argv.extend(args);
+    run(Cli::parse_from(argv))
 }
 
 fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
@@ -139,6 +151,30 @@ fn code_css_unknown_id_fails() {
 }
 
 #[test]
+fn code_css_bb72_hx_prints_sparse_rows_json() {
+    let output = run_qec_code(&["code", "css", "bb72", "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
+    let rows = json["rows"]
+        .as_array()
+        .expect("sparse-row JSON should contain rows");
+
+    assert_eq!(json["format"], "sparse_rows");
+    assert_eq!(json["num_cols"], 72);
+    assert_eq!(rows.len(), 36);
+    assert!(
+        rows.iter()
+            .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
+        "all bb72 hx rows should have weight 6: {rows:?}"
+    );
+}
+
+#[test]
 fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
     let hx = run(Cli {
         command: Commands::Code {
@@ -183,6 +219,200 @@ fn run_code_css_unknown_id_returns_registry_error() {
             code_id: "unknown".to_owned(),
         })
     );
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_code_id_returns_json() {
+    let stdout = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "500",
+        "--restarts",
+        "4",
+        "--seed",
+        "7",
+        "--target-weight",
+        "3",
+        "--json",
+    ])
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_files_return_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let stdout = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("500"),
+        OsString::from("--restarts"),
+        OsString::from("4"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--target-weight"),
+        OsString::from("3"),
+        OsString::from("--json"),
+    ])
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let conflicting_inputs = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--code-id"),
+        OsString::from("steane"),
+        OsString::from("--hx"),
+        hx.clone().into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        conflicting_inputs,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("use either --code-id or --hx/--hz")
+    ));
+
+    let missing_pair = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        missing_pair,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("--hx and --hz must be provided together")
+    ));
+
+    let missing_source = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+    assert!(matches!(
+        missing_source,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("provide --code-id or both --hx and --hz")
+    ));
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_rejects_output_and_file_errors() {
+    assert_eq!(
+        run_qec_code_in_process(&[
+            "code",
+            "css-distance",
+            "randomized-upper-bound",
+            "--code-id",
+            "steane",
+            "--iterations",
+            "10",
+            "--seed",
+            "7",
+        ]),
+        Err(QecError::JsonOutputRequired {
+            command: "code css-distance randomized-upper-bound",
+        })
+    );
+
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":4,"rows":[[2,3]]}"#,
+    );
+    let mismatched_widths = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        mismatched_widths,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("hx width 3 does not match hz width 4")
+    ));
+
+    let missing_hx = dir.path().join("missing-hx.json");
+    let readable_hz = write_matrix_file(
+        dir.path(),
+        "readable-hz.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+    let read_failure = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        missing_hx.into_os_string(),
+        OsString::from("--hz"),
+        readable_hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        read_failure,
+        Err(QecError::CssMatrixReadFailed { .. })
+    ));
 }
 
 #[cfg(not(feature = "distance-ilp-highs"))]
