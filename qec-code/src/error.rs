@@ -18,6 +18,12 @@ pub enum QecError {
         support: usize,
         num_cols: usize,
     },
+    #[error("missing CSS matrix format")]
+    MissingCssMatrixFormat,
+    #[error("unsupported CSS matrix format: {format}")]
+    UnsupportedCssMatrixFormat { format: String },
+    #[error("invalid CSS matrix JSON: {0}")]
+    InvalidCssMatrixJson(String),
     #[error("invalid Pauli width: x has {x_width} bits, z has {z_width}")]
     InvalidPauliWidth { x_width: usize, z_width: usize },
     #[error("non-binary Pauli bit {value} in {which} support at index {index}")]
@@ -75,7 +81,9 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    #[error(
+        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
+    )]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,
