@@ -172,6 +172,80 @@ fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measu
     assert_eq!(tail_dep1_targets, 0, "{tail_context}");
 }
 
+#[test]
+fn surface_code_before_measure_flip_covers_ancilla_and_final_data_measurements() {
+    let rounds = 3;
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.001,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, rounds, params);
+
+    let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
+    let ancilla_measure_targets = count_qubit_targets_named(&circuit, "MR");
+    let final_data_measure_targets =
+        count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+
+    assert_eq!(
+        x_error_targets,
+        ancilla_measure_targets + final_data_measure_targets,
+        "before_measure_flip_probability should apply before every ancilla MR and before final data M"
+    );
+}
+
+#[test]
+fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
+    let rounds = 3;
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.001,
+    };
+    let circuit = rotated_memory_z_with_params(3, rounds, params);
+
+    let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
+    let ancilla_mr_targets = count_qubit_targets_named(&circuit, "MR");
+    let final_data_measure_targets =
+        count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+    let ancilla_count = ancilla_mr_targets / rounds;
+
+    assert_eq!(
+        x_error_targets,
+        final_data_measure_targets + ancilla_count + ancilla_mr_targets,
+        "after_reset_flip_probability should apply after initial data reset, initial ancilla reset, and each ancilla MR reset"
+    );
+}
+
+#[test]
+fn issue_memory_z_uniform_noise_contains_all_four_noise_channels() {
+    let circuit = rotated_memory_z_with_params(3, 9, NoiseParams::uniform(0.008));
+    let text = circuit_to_string(&circuit);
+
+    assert!(
+        text.contains("DEPOLARIZE1(0.008)"),
+        "missing before-round or after-H depolarization: {text}"
+    );
+    assert!(
+        text.contains("DEPOLARIZE2(0.008)"),
+        "missing after-CX depolarization: {text}"
+    );
+    assert!(
+        text.contains("X_ERROR(0.008)"),
+        "missing reset or measurement flip channel: {text}"
+    );
+    assert!(
+        text.contains("MR"),
+        "missing ancilla measurement/reset operations: {text}"
+    );
+    assert!(
+        text.contains("OBSERVABLE_INCLUDE(0)"),
+        "missing logical observable: {text}"
+    );
+}
+
 // --- surface code no noise ---
 #[test]
 fn surface_code_no_noise_clean() {
