@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+use qec_code::QecError;
+use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
+
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
 }
@@ -11,7 +14,7 @@ fn workspace_root() -> PathBuf {
 
 fn read_fixture(rel_path: &str) -> String {
     std::fs::read_to_string(workspace_root().join(rel_path))
-        .unwrap_or_else(|err| panic!("failed to read fixture {rel_path}: {err}"))
+        .expect("fixture should be readable")
 }
 
 fn run_qec_code(args: &[&str]) -> Output {
@@ -137,5 +140,52 @@ fn code_css_unknown_id_fails() {
     assert!(
         stderr.contains("unknown built-in CSS code: unknown"),
         "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
+    let hx = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css {
+                code_id: "steane".to_owned(),
+                matrix: CssMatrixKind::Hx,
+            },
+        },
+    })
+    .unwrap();
+    let hz = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css {
+                code_id: "steane".to_owned(),
+                matrix: CssMatrixKind::Hz,
+            },
+        },
+    })
+    .unwrap();
+
+    let expected_hx = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
+    let expected_hz = read_fixture("rsinter/tests/fixtures/css/steane_hz.json");
+
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+    assert_eq!(hz, expected_hz.trim_end_matches('\n'));
+}
+
+#[test]
+fn run_code_css_unknown_id_returns_registry_error() {
+    let result = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css {
+                code_id: "unknown".to_owned(),
+                matrix: CssMatrixKind::Hx,
+            },
+        },
+    });
+
+    assert_eq!(
+        result,
+        Err(QecError::UnknownBuiltInCssCode {
+            code_id: "unknown".to_owned(),
+        })
     );
 }
