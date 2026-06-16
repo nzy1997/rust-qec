@@ -244,6 +244,12 @@ fn surface_rotated_d5_has_expected_check_counts_and_weights() {
     assert_strictly_increasing_rows(&checks.hz);
     assert_rows_in_range(&checks.hx, checks.num_cols);
     assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
 }
 
 #[test]
