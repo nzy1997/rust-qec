@@ -1,7 +1,9 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::QecError;
+use crate::codes::built_in_css::built_in_css_checks;
 use crate::codes::steane::Steane;
+use crate::css::SparseRowsMatrix;
 use crate::distance::compute_distance;
 
 #[derive(Debug, Parser)]
@@ -25,6 +27,16 @@ pub enum CodeCommands {
         #[command(subcommand)]
         command: SteaneCommands,
     },
+    Css {
+        code_id: String,
+        matrix: CssMatrixKind,
+    },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum CssMatrixKind {
+    Hx,
+    Hz,
 }
 
 #[derive(Debug, Subcommand)]
@@ -44,7 +56,20 @@ pub fn run(cli: Cli) -> Result<String, QecError> {
 fn run_code(command: CodeCommands) -> Result<String, QecError> {
     match command {
         CodeCommands::Steane { command } => run_steane(command),
+        CodeCommands::Css { code_id, matrix } => run_css(&code_id, matrix),
     }
+}
+
+fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
+    let checks = built_in_css_checks(code_id)?;
+    let num_cols = checks.num_cols;
+    let rows = match matrix {
+        CssMatrixKind::Hx => checks.hx,
+        CssMatrixKind::Hz => checks.hz,
+    };
+
+    let matrix = SparseRowsMatrix::new(num_cols, rows)?;
+    Ok(matrix.to_json_string())
 }
 
 fn run_steane(command: SteaneCommands) -> Result<String, QecError> {

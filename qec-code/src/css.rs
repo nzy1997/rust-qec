@@ -1,6 +1,37 @@
 use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SparseRowsMatrix {
+    num_cols: usize,
+    rows: Vec<Vec<usize>>,
+}
+
+impl SparseRowsMatrix {
+    pub fn new(num_cols: usize, rows: Vec<Vec<usize>>) -> Result<Self> {
+        validate_sparse_rows(num_cols, &rows)?;
+        Ok(Self { num_cols, rows })
+    }
+
+    pub fn to_json_string(&self) -> String {
+        #[derive(Serialize)]
+        struct SparseRowsMatrixJson<'a> {
+            format: &'static str,
+            num_cols: usize,
+            rows: &'a [Vec<usize>],
+        }
+
+        let json = serde_json::to_string(&SparseRowsMatrixJson {
+            format: "sparse_rows",
+            num_cols: self.num_cols,
+            rows: &self.rows,
+        })
+        .expect("validated sparse rows matrix should always serialize");
+        json
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CssCode {
@@ -31,6 +62,32 @@ impl CssCode {
     pub fn code(&self) -> &StabilizerCode {
         &self.code
     }
+}
+
+fn validate_sparse_rows(num_cols: usize, rows: &[Vec<usize>]) -> Result<()> {
+    if num_cols == 0 {
+        return Err(QecError::InvalidSparseRowsWidth { num_cols });
+    }
+
+    for (row_index, row) in rows.iter().enumerate() {
+        let mut seen = std::collections::BTreeSet::new();
+        for &support in row {
+            if support >= num_cols {
+                return Err(QecError::SparseRowSupportOutOfRange {
+                    row: row_index,
+                    support,
+                    num_cols,
+                });
+            }
+            if !seen.insert(support) {
+                return Err(QecError::DuplicateSparseRowSupport {
+                    row: row_index,
+                    support,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn shared_width(hx: &[Vec<u8>], hz: &[Vec<u8>]) -> Result<usize> {
