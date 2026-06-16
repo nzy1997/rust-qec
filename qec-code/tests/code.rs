@@ -218,6 +218,54 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
 }
 
 #[test]
+fn repetition_x_d5_matches_chain_checks() {
+    let checks = built_in_css_checks("repetition_x:d=5").unwrap();
+
+    assert_eq!(checks.code_id, "repetition_x");
+    assert_eq!(checks.num_cols, 5);
+    assert_eq!(
+        checks.hx,
+        vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]]
+    );
+    assert_eq!(checks.hz, Vec::<Vec<usize>>::new());
+    assert_strictly_increasing_rows(&checks.hx);
+}
+
+#[test]
+fn repetition_z_d5_matches_chain_checks() {
+    let checks = built_in_css_checks("repetition_z:d=5").unwrap();
+
+    assert_eq!(checks.code_id, "repetition_z");
+    assert_eq!(checks.num_cols, 5);
+    assert_eq!(checks.hx, Vec::<Vec<usize>>::new());
+    assert_eq!(
+        checks.hz,
+        vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]]
+    );
+    assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn repetition_family_rejects_distance_below_two() {
+    assert_eq!(
+        built_in_css_checks("repetition_x:d=1"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+            value: 1,
+        })
+    );
+    assert_eq!(
+        built_in_css_checks("repetition_z:d=1"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "repetition_z".to_owned(),
+            parameter: "d".to_owned(),
+            value: 1,
+        })
+    );
+}
+
+#[test]
 fn sparse_rows_matrix_serializes_steane_supports() {
     let checks = built_in_css_checks("steane").unwrap();
     let text = SparseRowsMatrix::new(checks.num_cols, checks.hx.clone())

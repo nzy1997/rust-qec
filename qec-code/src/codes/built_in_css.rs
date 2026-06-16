@@ -136,6 +136,15 @@ const STEANE_ROW_SUPPORTS: &[&[usize]] = &[
 ];
 
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
+    match parse_built_in_css_code_spec(code_id)? {
+        BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
+        BuiltInCssCodeSpec::Family { family, params } => {
+            repetition_css_checks(family, params.distance)
+        }
+    }
+}
+
+fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> {
     match code_id {
         "steane" => {
             let hx = STEANE_ROW_SUPPORTS
@@ -154,4 +163,42 @@ pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
             code_id: code_id.to_owned(),
         }),
     }
+}
+
+fn repetition_css_checks(
+    family: BuiltInCssFamily,
+    distance: usize,
+) -> Result<BuiltInCssChecks> {
+    match family {
+        BuiltInCssFamily::RepetitionX => {
+            let hx = chain_supports("repetition_x", distance)?;
+            Ok(BuiltInCssChecks {
+                code_id: "repetition_x",
+                num_cols: distance,
+                hx,
+                hz: vec![],
+            })
+        }
+        BuiltInCssFamily::RepetitionZ => {
+            let hz = chain_supports("repetition_z", distance)?;
+            Ok(BuiltInCssChecks {
+                code_id: "repetition_z",
+                num_cols: distance,
+                hx: vec![],
+                hz,
+            })
+        }
+    }
+}
+
+fn chain_supports(family: &'static str, distance: usize) -> Result<Vec<Vec<usize>>> {
+    if distance < 2 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: family.to_owned(),
+            parameter: "d".to_owned(),
+            value: distance,
+        });
+    }
+
+    Ok((0..distance - 1).map(|col| vec![col, col + 1]).collect())
 }
