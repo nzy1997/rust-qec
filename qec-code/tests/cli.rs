@@ -254,6 +254,10 @@ fn code_css_list_includes_supported_built_ins() {
         stdout.contains("surface_rotated:d=<distance>"),
         "stdout was: {stdout}"
     );
+    assert!(
+        stdout.contains("toric:d=<distance>"),
+        "stdout was: {stdout}"
+    );
     assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
 }
 
@@ -323,7 +327,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
     })
     .unwrap();
 
-    let expected = "Built-in CSS codes:\n  steane                        fixed [[7,1,3]] CSS code\n  bb72                          fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>     X-check chain, distance >= 2\n  repetition_z:d=<distance>     Z-check chain, distance >= 2\n  surface_rotated:d=<distance>  rotated surface CSS code, distance >= 2";
+    let expected = "Built-in CSS codes:\n  steane                        fixed [[7,1,3]] CSS code\n  bb72                          fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>     X-check chain, distance >= 2\n  repetition_z:d=<distance>     Z-check chain, distance >= 2\n  surface_rotated:d=<distance>  rotated surface CSS code, distance >= 2\n  toric:d=<distance>            periodic square-lattice toric CSS code, distance >= 2";
     assert_eq!(output, expected);
 }
 

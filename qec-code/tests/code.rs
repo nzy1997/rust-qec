@@ -188,6 +188,7 @@ fn built_in_css_catalog_lists_supported_specs() {
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
             "surface_rotated:d=<distance>",
+            "toric:d=<distance>",
         ]
     );
     assert_eq!(unique_specs.len(), specs.len());
@@ -215,6 +216,13 @@ fn built_in_css_catalog_lists_supported_specs() {
             .any(|entry| entry.spec == "surface_rotated:d=<distance>"
                 && entry.description.contains("distance >= 2")),
         "surface_rotated entry should describe the distance constraint: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "toric:d=<distance>"
+                && entry.description.contains("distance >= 2")),
+        "toric entry should describe the distance constraint: {catalog:?}"
     );
 }
 
@@ -296,6 +304,89 @@ fn surface_rotated_rejects_distance_below_two() {
 }
 
 #[test]
+fn toric_d3_matches_expected_checks() {
+    let checks = built_in_css_checks("toric:d=3").unwrap();
+
+    assert_eq!(checks.code_id, "toric");
+    assert_eq!(checks.num_cols, 18);
+    assert_eq!(
+        checks.hx,
+        vec![
+            vec![0, 2, 9, 15],
+            vec![0, 1, 10, 16],
+            vec![1, 2, 11, 17],
+            vec![3, 5, 9, 12],
+            vec![3, 4, 10, 13],
+            vec![4, 5, 11, 14],
+            vec![6, 8, 12, 15],
+            vec![6, 7, 13, 16],
+            vec![7, 8, 14, 17],
+        ]
+    );
+    assert_eq!(
+        checks.hz,
+        vec![
+            vec![0, 3, 9, 10],
+            vec![1, 4, 10, 11],
+            vec![2, 5, 9, 11],
+            vec![3, 6, 12, 13],
+            vec![4, 7, 13, 14],
+            vec![5, 8, 12, 14],
+            vec![0, 6, 15, 16],
+            vec![1, 7, 16, 17],
+            vec![2, 8, 15, 17],
+        ]
+    );
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
+}
+
+#[test]
+fn toric_d4_has_expected_counts_and_weight_four_rows() {
+    let checks = built_in_css_checks("toric:d=4").unwrap();
+
+    assert_eq!(checks.code_id, "toric");
+    assert_eq!(checks.num_cols, 32);
+    assert_eq!(checks.hx.len(), 16);
+    assert_eq!(checks.hz.len(), 16);
+
+    for row in checks.hx.iter().chain(checks.hz.iter()) {
+        assert_eq!(row.len(), 4, "row has wrong weight: {row:?}");
+    }
+
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
+}
+
+#[test]
+fn toric_family_rejects_distance_below_two() {
+    assert_eq!(
+        built_in_css_checks("toric:d=1"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "toric".to_owned(),
+            parameter: "d".to_owned(),
+            value: 1,
+        })
+    );
+}
+
+#[test]
 fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
     assert_eq!(
         parse_built_in_css_code_spec("steane"),
@@ -319,6 +410,13 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
         parse_built_in_css_code_spec("surface_rotated:d=3"),
         Ok(BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::SurfaceRotated,
+            params: BuiltInCssParams { distance: 3 },
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("toric:d=3"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::Toric,
             params: BuiltInCssParams { distance: 3 },
         })
     );
@@ -357,6 +455,13 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         parse_built_in_css_code_spec("surface_rotated"),
         Err(QecError::MissingBuiltInCssParameter {
             family: "surface_rotated".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("toric"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "toric".to_owned(),
             parameter: "d".to_owned(),
         })
     );

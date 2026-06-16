@@ -30,6 +30,7 @@ pub enum BuiltInCssFamily {
     RepetitionX,
     RepetitionZ,
     SurfaceRotated,
+    Toric,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +59,10 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
         spec: "surface_rotated:d=<distance>",
         description: "rotated surface CSS code, distance >= 2",
     },
+    BuiltInCssCatalogEntry {
+        spec: "toric:d=<distance>",
+        description: "periodic square-lattice toric CSS code, distance >= 2",
+    },
 ];
 
 pub fn built_in_css_catalog() -> &'static [BuiltInCssCatalogEntry] {
@@ -72,7 +77,7 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
         "bb72" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" }),
-        "repetition_x" | "repetition_z" | "surface_rotated" => {
+        "repetition_x" | "repetition_z" | "surface_rotated" | "toric" => {
             Err(QecError::MissingBuiltInCssParameter {
                 family: input.to_owned(),
                 parameter: "d".to_owned(),
@@ -92,6 +97,7 @@ fn parse_built_in_css_family_spec(
         "repetition_x" => BuiltInCssFamily::RepetitionX,
         "repetition_z" => BuiltInCssFamily::RepetitionZ,
         "surface_rotated" => BuiltInCssFamily::SurfaceRotated,
+        "toric" => BuiltInCssFamily::Toric,
         _ => {
             return Err(QecError::UnknownBuiltInCssFamily {
                 family: family_name.to_owned(),
@@ -275,6 +281,7 @@ fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltI
             })
         }
         BuiltInCssFamily::SurfaceRotated => surface_rotated_css_checks(distance),
+        BuiltInCssFamily::Toric => toric_css_checks(distance),
     }
 }
 
@@ -371,4 +378,76 @@ fn rotated_surface_measure_support(distance: usize, ax: usize, ay: usize) -> Vec
 
 fn rotated_surface_data_index(distance: usize, x: usize, y: usize) -> usize {
     x * distance + y
+}
+
+fn toric_css_checks(distance: usize) -> Result<BuiltInCssChecks> {
+    if distance < 2 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "toric".to_owned(),
+            parameter: "d".to_owned(),
+            value: distance,
+        });
+    }
+
+    let (hx, hz) = toric_supports(distance);
+
+    Ok(BuiltInCssChecks {
+        code_id: "toric",
+        num_cols: 2 * distance * distance,
+        hx,
+        hz,
+    })
+}
+
+fn toric_supports(distance: usize) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    let mut hx = Vec::with_capacity(distance * distance);
+    let mut hz = Vec::with_capacity(distance * distance);
+
+    for x in 0..distance {
+        for y in 0..distance {
+            hx.push(toric_x_check_support(distance, x, y));
+            hz.push(toric_z_check_support(distance, x, y));
+        }
+    }
+
+    (hx, hz)
+}
+
+fn toric_x_check_support(distance: usize, x: usize, y: usize) -> Vec<usize> {
+    sorted_toric_row([
+        toric_horizontal_index(distance, x, y),
+        toric_horizontal_index(distance, x, wrap_prev(y, distance)),
+        toric_vertical_index(distance, x, y),
+        toric_vertical_index(distance, wrap_prev(x, distance), y),
+    ])
+}
+
+fn toric_z_check_support(distance: usize, x: usize, y: usize) -> Vec<usize> {
+    sorted_toric_row([
+        toric_horizontal_index(distance, x, y),
+        toric_horizontal_index(distance, wrap_next(x, distance), y),
+        toric_vertical_index(distance, x, y),
+        toric_vertical_index(distance, x, wrap_next(y, distance)),
+    ])
+}
+
+fn sorted_toric_row(mut row: [usize; 4]) -> Vec<usize> {
+    row.sort_unstable();
+    row.to_vec()
+}
+
+fn toric_horizontal_index(distance: usize, x: usize, y: usize) -> usize {
+    x * distance + y
+}
+
+fn toric_vertical_index(distance: usize, x: usize, y: usize) -> usize {
+    distance * distance + x * distance + y
+}
+
+fn wrap_prev(value: usize, distance: usize) -> usize {
+    (value + distance - 1) % distance
+}
+
+fn wrap_next(value: usize, distance: usize) -> usize {
+    (value + 1) % distance
 }
