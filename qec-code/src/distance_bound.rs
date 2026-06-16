@@ -1,6 +1,7 @@
 use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
+use crate::css::CssCode;
 use crate::distance::LogicalClass;
 use crate::error::{QecError, Result};
 use serde::{Deserialize, Serialize};
@@ -124,6 +125,151 @@ impl DistanceBoundResult {
             options,
             provenance: DistanceBoundProvenance::current(),
         }
+    }
+}
+
+pub fn randomized_css_upper_bound(
+    css: &CssCode,
+    options: RandomizedUpperBoundOptions,
+) -> Result<DistanceBoundResult> {
+    options.validate()?;
+
+    let code = css.code();
+    if code.num_logical_qubits() == 0 {
+        return Err(QecError::DistanceWitnessNotFound);
+    }
+
+    let basis = code.canonical_logical_basis()?;
+    let logical_rows = basis
+        .logical_x
+        .iter()
+        .chain(&basis.logical_z)
+        .map(Pauli::to_symplectic_row)
+        .collect::<Vec<_>>();
+    let stabilizer_rows = code.stabilizer_rows();
+    let mut rng = SplitMix64::new(options.seed);
+    let mut best_witness: Option<Pauli> = None;
+
+    for _restart in 0..options.restarts {
+        for _iteration in 0..options.iterations {
+            let candidate_row =
+                sampled_logical_plus_stabilizer_row(&logical_rows, &stabilizer_rows, &mut rng);
+            let candidate = Pauli::from_symplectic_row(candidate_row)?;
+
+            if validate_witness_against_code(code, &candidate).is_err() {
+                continue;
+            }
+
+            let replace = match &best_witness {
+                Some(current) => candidate.weight() < current.weight(),
+                None => true,
+            };
+            if replace {
+                best_witness = Some(candidate);
+            }
+
+            if best_witness.as_ref().is_some_and(|witness| {
+                options
+                    .target_weight
+                    .is_some_and(|target| witness.weight() <= target)
+            }) {
+                return completed_randomized_upper_bound_result(
+                    code,
+                    best_witness.unwrap(),
+                    options,
+                );
+            }
+        }
+    }
+
+    let witness = best_witness.ok_or(QecError::RandomizedUpperBoundWitnessNotFound)?;
+    completed_randomized_upper_bound_result(code, witness, options)
+}
+
+fn completed_randomized_upper_bound_result(
+    code: &StabilizerCode,
+    witness: Pauli,
+    options: RandomizedUpperBoundOptions,
+) -> Result<DistanceBoundResult> {
+    let result = DistanceBoundResult::completed(
+        witness.weight(),
+        classify_witness_support(&witness),
+        DistanceBoundWitness::from_pauli(&witness),
+        options,
+    );
+    validate_randomized_upper_bound_result(
+        &result,
+        BoundValidationContext {
+            code,
+            known_exact_distance: None,
+        },
+    )?;
+    Ok(result)
+}
+
+fn sampled_logical_plus_stabilizer_row(
+    logical_rows: &[Vec<u8>],
+    stabilizer_rows: &[Vec<u8>],
+    rng: &mut SplitMix64,
+) -> Vec<u8> {
+    let width = logical_rows
+        .first()
+        .or_else(|| stabilizer_rows.first())
+        .map(Vec::len)
+        .unwrap_or(0);
+    let mut row = vec![0; width];
+    let mut selected_logical = false;
+
+    for logical in logical_rows {
+        if rng.next_bool() {
+            xor_assign(&mut row, logical);
+            selected_logical = true;
+        }
+    }
+    if !selected_logical {
+        let index = rng.next_usize(logical_rows.len());
+        xor_assign(&mut row, &logical_rows[index]);
+    }
+
+    for stabilizer in stabilizer_rows {
+        if rng.next_bool() {
+            xor_assign(&mut row, stabilizer);
+        }
+    }
+
+    row
+}
+
+fn xor_assign(target: &mut [u8], source: &[u8]) {
+    for (target_bit, source_bit) in target.iter_mut().zip(source) {
+        *target_bit ^= *source_bit;
+    }
+}
+
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D049BB133111EB);
+        value ^ (value >> 31)
+    }
+
+    fn next_bool(&mut self) -> bool {
+        self.next_u64() & 1 == 1
+    }
+
+    fn next_usize(&mut self, upper_bound: usize) -> usize {
+        debug_assert!(upper_bound > 0);
+        (self.next_u64() as usize) % upper_bound
     }
 }
 

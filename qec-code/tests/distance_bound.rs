@@ -1,10 +1,18 @@
+use qec_code::codes::built_in_css::built_in_css_checks;
+use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
     BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
     DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, RandomizedUpperBoundOptions,
-    validate_randomized_upper_bound_result,
+    randomized_css_upper_bound, validate_randomized_upper_bound_result,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
+
+fn css_from_sparse_rows(num_cols: usize, hx: Vec<Vec<usize>>, hz: Vec<Vec<usize>>) -> CssCode {
+    let hx = SparseRowsMatrix::new(num_cols, hx).unwrap().to_dense_rows();
+    let hz = SparseRowsMatrix::new(num_cols, hz).unwrap().to_dense_rows();
+    CssCode::from_hx_hz(hx, hz).unwrap()
+}
 
 fn trivial_one_qubit_code() -> StabilizerCode {
     StabilizerCode::from_stabilizers(1, vec![]).unwrap()
@@ -377,5 +385,100 @@ fn completed_status_is_serialized_as_completed() {
     assert_eq!(
         serde_json::to_value(DistanceBoundStatus::Completed).unwrap(),
         "completed"
+    );
+}
+
+#[test]
+fn randomized_upper_bound_reproducible_for_same_seed() {
+    let checks = built_in_css_checks("steane").unwrap();
+    let css = css_from_sparse_rows(checks.num_cols, checks.hx, checks.hz);
+    let options = RandomizedUpperBoundOptions {
+        iterations: 500,
+        restarts: 4,
+        seed: 7,
+        target_weight: Some(3),
+    };
+
+    let first = randomized_css_upper_bound(&css, options.clone()).unwrap();
+    let second = randomized_css_upper_bound(&css, options).unwrap();
+
+    assert_eq!(first, second);
+}
+
+#[test]
+fn randomized_upper_bound_finds_steane_distance_under_pinned_options() {
+    let checks = built_in_css_checks("steane").unwrap();
+    let css = css_from_sparse_rows(checks.num_cols, checks.hx, checks.hz);
+
+    let result = randomized_css_upper_bound(
+        &css,
+        RandomizedUpperBoundOptions {
+            iterations: 500,
+            restarts: 4,
+            seed: 7,
+            target_weight: Some(3),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 3);
+    assert_eq!(result.witness.weight, 3);
+}
+
+#[test]
+fn randomized_upper_bound_finds_repetition_css_distance_under_pinned_options() {
+    let css = css_from_sparse_rows(3, vec![vec![0, 1], vec![1, 2]], vec![]);
+
+    let result = randomized_css_upper_bound(
+        &css,
+        RandomizedUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 11,
+            target_weight: Some(1),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 1);
+    assert_eq!(result.logical_class, LogicalClass::XLike);
+}
+
+#[test]
+fn randomized_upper_bound_rejects_invalid_options_before_search() {
+    let css = css_from_sparse_rows(1, vec![vec![0]], vec![]);
+
+    assert_eq!(
+        randomized_css_upper_bound(
+            &css,
+            RandomizedUpperBoundOptions {
+                iterations: 0,
+                restarts: 1,
+                seed: 7,
+                target_weight: None,
+            },
+        ),
+        Err(QecError::InvalidDistanceBoundOption {
+            option: "iterations",
+            reason: "must be greater than zero".to_owned(),
+        })
+    );
+}
+
+#[test]
+fn randomized_upper_bound_rejects_zero_logical_qubit_code() {
+    let css = css_from_sparse_rows(1, vec![vec![0]], vec![]);
+
+    assert_eq!(
+        randomized_css_upper_bound(
+            &css,
+            RandomizedUpperBoundOptions {
+                iterations: 10,
+                restarts: 1,
+                seed: 7,
+                target_weight: None,
+            },
+        ),
+        Err(QecError::DistanceWitnessNotFound)
     );
 }
