@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use qec_code::codes::built_in_css::{
-    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_checks,
-    parse_built_in_css_code_spec,
+    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_catalog,
+    built_in_css_checks, parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
@@ -160,6 +162,42 @@ fn built_in_css_registry_exposes_steane_checks() {
     assert_eq!(checks.hz, checks.hx);
     assert_strictly_increasing_rows(&checks.hx);
     assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn built_in_css_catalog_lists_supported_specs() {
+    let catalog = built_in_css_catalog();
+    let specs = catalog.iter().map(|entry| entry.spec).collect::<Vec<_>>();
+    let unique_specs = specs.iter().copied().collect::<HashSet<_>>();
+
+    assert_eq!(
+        specs,
+        vec![
+            "steane",
+            "bb72",
+            "repetition_x:d=<distance>",
+            "repetition_z:d=<distance>",
+        ]
+    );
+    assert_eq!(unique_specs.len(), specs.len());
+    assert!(
+        catalog.iter().all(|entry| !entry.description.is_empty()),
+        "all catalog entries need descriptions: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "repetition_x:d=<distance>"
+                && entry.description.contains("distance >= 2")),
+        "repetition_x entry should describe the distance constraint: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "repetition_z:d=<distance>"
+                && entry.description.contains("distance >= 2")),
+        "repetition_z entry should describe the distance constraint: {catalog:?}"
+    );
 }
 
 #[test]
