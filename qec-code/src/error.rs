@@ -8,6 +8,16 @@ pub enum QecError {
     InvalidSymplecticRowWidth { width: usize },
     #[error("non-binary matrix entry {value} at row {row}, column {col}")]
     InvalidBinaryEntry { row: usize, col: usize, value: u8 },
+    #[error("invalid sparse-rows width: {num_cols}")]
+    InvalidSparseRowsWidth { num_cols: usize },
+    #[error("duplicate sparse-row support {support} in row {row}")]
+    DuplicateSparseRowSupport { row: usize, support: usize },
+    #[error("out-of-range sparse-row support {support} in row {row} for width {num_cols}")]
+    SparseRowSupportOutOfRange {
+        row: usize,
+        support: usize,
+        num_cols: usize,
+    },
     #[error("invalid Pauli width: x has {x_width} bits, z has {z_width}")]
     InvalidPauliWidth { x_width: usize, z_width: usize },
     #[error("non-binary Pauli bit {value} in {which} support at index {index}")]
