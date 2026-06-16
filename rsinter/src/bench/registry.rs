@@ -107,7 +107,8 @@ fn expand_generic_runner_points(
     }
 
     match input_type.as_str() {
-        "surface_rotated_memory_x" => expand_surface_points(
+        "surface_rotated_memory_x" | "surface_rotated_memory_z" => expand_surface_points(
+            &input_type,
             params,
             rounds,
             ps,
@@ -132,6 +133,7 @@ fn expand_generic_runner_points(
 }
 
 fn expand_surface_points(
+    input_type: &str,
     params: &BTreeMap<String, Value>,
     rounds: &[Value],
     ps: &[Value],
@@ -159,7 +161,7 @@ fn expand_surface_points(
                     return Err("round entry must be >= 1".into());
                 }
                 points.push(BenchCasePoint {
-                    input_type: "surface_rotated_memory_x".into(),
+                    input_type: input_type.to_string(),
                     code_id: None,
                     distance: Some(distance),
                     rounds,
