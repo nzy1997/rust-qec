@@ -43,6 +43,46 @@ fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     path
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BuiltInCssFixtureCase {
+    code_id: &'static str,
+    matrix: &'static str,
+    fixture: &'static str,
+}
+
+const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hx",
+        fixture: "steane_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hz",
+        fixture: "steane_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_x:d=5",
+        matrix: "hx",
+        fixture: "repetition_x_d5_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_z:d=5",
+        matrix: "hz",
+        fixture: "repetition_z_d5_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hx",
+        fixture: "bb72_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hz",
+        fixture: "bb72_hz.json",
+    },
+];
+
 #[test]
 fn steane_summary_reports_basic_code_parameters() {
     let output = Command::new(qec_code_bin())
@@ -230,6 +270,26 @@ fn code_css_list_rejects_unexpected_extra_arguments() {
         stderr.contains("extra") || stderr.contains("Usage:"),
         "stderr was: {stderr}"
     );
+}
+
+#[test]
+fn built_in_css_fixture_manifest_exports_match_pinned_json() {
+    for case in BUILT_IN_CSS_FIXTURE_CASES {
+        let output = run_qec_code(&["code", "css", case.code_id, case.matrix]);
+
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
+
+        let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+        let fixture_path = format!("qec-code/tests/fixtures/css/{}", case.fixture);
+        let expected = read_fixture(&fixture_path);
+
+        assert_eq!(
+            stdout, expected,
+            "case {case:?} stdout differed from fixture {}",
+            case.fixture
+        );
+    }
 }
 
 #[test]
