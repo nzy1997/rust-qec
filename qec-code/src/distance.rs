@@ -2,8 +2,10 @@ use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum LogicalClass {
     XLike,
     ZLike,

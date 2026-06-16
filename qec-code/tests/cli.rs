@@ -1,8 +1,12 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use clap::Parser;
 use qec_code::QecError;
 use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
+use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
@@ -21,6 +25,22 @@ fn run_qec_code(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("qec-code binary should run")
+}
+
+fn run_qec_code_in_process(args: &[&str]) -> Result<String, QecError> {
+    run_qec_code_in_process_os(args.iter().map(OsString::from).collect())
+}
+
+fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
+    let mut argv = vec![OsString::from("qec-code")];
+    argv.extend(args);
+    run(Cli::parse_from(argv))
+}
+
+fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
+    let path = dir.join(name);
+    fs::write(&path, contents).expect("matrix fixture should be writable");
+    path
 }
 
 #[test]
@@ -190,6 +210,10 @@ fn code_css_list_includes_supported_built_ins() {
         stdout.contains("repetition_z:d=<distance>"),
         "stdout was: {stdout}"
     );
+    assert!(
+        stdout.contains("surface_rotated:d=<distance>"),
+        "stdout was: {stdout}"
+    );
     assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
 }
 
@@ -239,8 +263,24 @@ fn run_code_css_list_returns_catalog_without_newline() {
     })
     .unwrap();
 
-    let expected = "Built-in CSS codes:\n  steane                     fixed [[7,1,3]] CSS code\n  bb72                       fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>  X-check chain, distance >= 2\n  repetition_z:d=<distance>  Z-check chain, distance >= 2";
+    let expected = "Built-in CSS codes:\n  steane                        fixed [[7,1,3]] CSS code\n  bb72                          fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>     X-check chain, distance >= 2\n  repetition_z:d=<distance>     Z-check chain, distance >= 2\n  surface_rotated:d=<distance>  rotated surface CSS code, distance >= 2";
     assert_eq!(output, expected);
+}
+
+#[test]
+fn run_code_css_export_subcommand_returns_fixture_json_without_newline() {
+    let output = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export_subcommand(
+                "steane".to_owned(),
+                CssMatrixKind::Hx,
+            )),
+        },
+    })
+    .unwrap();
+
+    let expected = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
+    assert_eq!(output, expected.trim_end_matches('\n'));
 }
 
 #[test]
@@ -259,6 +299,200 @@ fn run_code_css_unknown_id_returns_registry_error() {
     );
 }
 
+#[test]
+fn run_code_css_distance_randomized_upper_bound_code_id_returns_json() {
+    let stdout = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "500",
+        "--restarts",
+        "4",
+        "--seed",
+        "7",
+        "--target-weight",
+        "3",
+        "--json",
+    ])
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_files_return_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let stdout = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("500"),
+        OsString::from("--restarts"),
+        OsString::from("4"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--target-weight"),
+        OsString::from("3"),
+        OsString::from("--json"),
+    ])
+    .unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let conflicting_inputs = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--code-id"),
+        OsString::from("steane"),
+        OsString::from("--hx"),
+        hx.clone().into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        conflicting_inputs,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("use either --code-id or --hx/--hz")
+    ));
+
+    let missing_pair = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        missing_pair,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("--hx and --hz must be provided together")
+    ));
+
+    let missing_source = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+    assert!(matches!(
+        missing_source,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("provide --code-id or both --hx and --hz")
+    ));
+}
+
+#[test]
+fn run_code_css_distance_randomized_upper_bound_rejects_output_and_file_errors() {
+    assert_eq!(
+        run_qec_code_in_process(&[
+            "code",
+            "css-distance",
+            "randomized-upper-bound",
+            "--code-id",
+            "steane",
+            "--iterations",
+            "10",
+            "--seed",
+            "7",
+        ]),
+        Err(QecError::JsonOutputRequired {
+            command: "code css-distance randomized-upper-bound",
+        })
+    );
+
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":4,"rows":[[2,3]]}"#,
+    );
+    let mismatched_widths = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        mismatched_widths,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("hx width 3 does not match hz width 4")
+    ));
+
+    let missing_hx = dir.path().join("missing-hx.json");
+    let readable_hz = write_matrix_file(
+        dir.path(),
+        "readable-hz.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+    let read_failure = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("randomized-upper-bound"),
+        OsString::from("--hx"),
+        missing_hx.into_os_string(),
+        OsString::from("--hz"),
+        readable_hz.into_os_string(),
+        OsString::from("--iterations"),
+        OsString::from("10"),
+        OsString::from("--seed"),
+        OsString::from("7"),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        read_failure,
+        Err(QecError::CssMatrixReadFailed { .. })
+    ));
+}
+
 #[cfg(not(feature = "distance-ilp-highs"))]
 #[test]
 fn large_distance_errors_render_configuration_message() {
@@ -269,4 +503,253 @@ fn large_distance_errors_render_configuration_message() {
     .to_string();
 
     assert!(stderr.contains("distance computation is unsupported"));
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_code_id_outputs_json() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "500",
+        "--restarts",
+        "4",
+        "--seed",
+        "7",
+        "--target-weight",
+        "3",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+    assert_eq!(json["options"]["seed"], 7);
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_hx_hz_files_output_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args([
+            "--iterations",
+            "500",
+            "--restarts",
+            "4",
+            "--seed",
+            "7",
+            "--target-weight",
+            "3",
+            "--json",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_requires_json_flag() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("JSON output is required for code css-distance randomized-upper-bound"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_code_id_and_file_input_together() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args([
+            "code",
+            "css-distance",
+            "randomized-upper-bound",
+            "--code-id",
+            "steane",
+            "--hx",
+        ])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("use either --code-id or --hx/--hz, not both"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_missing_matrix_pair() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("--hx and --hz must be provided together"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_missing_input_source() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("provide --code-id or both --hx and --hz"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_mismatched_file_widths() {
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":4,"rows":[[2,3]]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("hx width 3 does not match hz width 4"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_reports_matrix_read_failures() {
+    let dir = tempdir().unwrap();
+    let hx = dir.path().join("missing-hx.json");
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "randomized-upper-bound", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("failed to read CSS matrix"),
+        "stderr was: {stderr}"
+    );
+    assert!(stderr.contains("missing-hx.json"), "stderr was: {stderr}");
+}
+
+#[test]
+fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "randomized-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "0",
+        "--seed",
+        "7",
+        "--json",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("invalid distance bound option iterations"),
+        "stderr was: {stderr}"
+    );
 }
