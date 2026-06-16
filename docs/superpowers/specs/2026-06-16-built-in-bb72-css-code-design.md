@@ -81,6 +81,15 @@ The helper stays private because issue #59 asks for one stable benchmark code,
 not a public parameter surface. Future bicycle families can reuse or reshape
 the helper later if a separate issue asks for that API.
 
+Because `bb72` is a raw parity-check matrix for a `[[72,12,6]]` code, its 72
+rows are redundant: the X-check rank is 30 and the Z-check rank is 30. If
+`CssCode::from_hx_hz(...)` still rejects dependent CSS checks by passing every
+row directly into `StabilizerCode::from_stabilizers(...)`, this issue should
+also teach `CssCode::from_hx_hz(...)` to select an independent stabilizer basis
+after orthogonality validation. `StabilizerCode` can keep rejecting dependent
+explicit stabilizer lists; the relaxation belongs at the CSS parity-check
+layer.
+
 ## Public Behavior
 
 `built_in_css_checks("bb72")` returns:
@@ -156,6 +165,8 @@ Add focused tests in `qec-code/tests/code.rs`:
    - asserts rows are canonical and in range
    - converts sparse supports to dense binary rows
    - validates with `CssCode::from_hx_hz(...)`
+   - this requires `CssCode::from_hx_hz(...)` to accept redundant CSS
+     parity-check rows by selecting an independent stabilizer basis internally
 
 2. `bb72_code_spec_rejects_unexpected_parameters`
    - asserts `parse_built_in_css_code_spec("bb72")` returns a fixed selector
