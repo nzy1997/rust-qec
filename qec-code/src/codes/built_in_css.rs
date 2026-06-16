@@ -129,11 +129,7 @@ fn parse_repetition_distance(family_name: &str, params_text: &str) -> Result<usi
     })
 }
 
-const STEANE_ROW_SUPPORTS: &[&[usize]] = &[
-    &[0, 3, 5, 6],
-    &[1, 3, 4, 6],
-    &[2, 4, 5, 6],
-];
+const STEANE_ROW_SUPPORTS: &[&[usize]] = &[&[0, 3, 5, 6], &[1, 3, 4, 6], &[2, 4, 5, 6]];
 
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match code_id {

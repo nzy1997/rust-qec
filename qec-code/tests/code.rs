@@ -117,11 +117,7 @@ fn built_in_css_registry_exposes_steane_checks() {
     assert_eq!(checks.num_cols, 7);
     assert_eq!(
         checks.hx,
-        vec![
-            vec![0, 3, 5, 6],
-            vec![1, 3, 4, 6],
-            vec![2, 4, 5, 6],
-        ]
+        vec![vec![0, 3, 5, 6], vec![1, 3, 4, 6], vec![2, 4, 5, 6],]
     );
     assert_eq!(checks.hz, checks.hx);
     assert_strictly_increasing_rows(&checks.hx);

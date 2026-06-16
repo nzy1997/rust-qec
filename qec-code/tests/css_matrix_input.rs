@@ -1,5 +1,5 @@
-use qec_code::css::{sparse_rows_matrix_from_json_str, SparseRowsMatrix};
 use qec_code::QecError;
+use qec_code::css::{SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 
 #[test]
 fn sparse_rows_json_parses_and_converts_to_dense_rows() {

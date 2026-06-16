@@ -1,6 +1,6 @@
 use clap::Parser;
-use qec_code::cli::{Cli, run};
 use qec_code::QecError;
+use qec_code::cli::{Cli, run};
 use std::io::{self, Write};
 
 fn main() {
@@ -39,8 +39,8 @@ fn write_error(stderr: &mut impl Write, error: &qec_code::QecError) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::{run_and_write, write_result};
-    use qec_code::cli::{Cli, CodeCommands, Commands, SteaneCommands};
     use qec_code::QecError;
+    use qec_code::cli::{Cli, CodeCommands, Commands, SteaneCommands};
 
     #[test]
     fn run_and_write_writes_stdout_on_success() {
