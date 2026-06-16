@@ -191,6 +191,70 @@ fn validator_rejects_witness_weight_mismatch() {
 }
 
 #[test]
+fn validator_rejects_zero_completed_upper_bound() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.upper_bound = 0;
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "completed upper_bound must be positive".to_owned(),
+        ))
+    );
+}
+
+#[test]
+fn validator_rejects_identity_witness_even_with_positive_declared_weight() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.witness = DistanceBoundWitness {
+        x: vec![0],
+        z: vec![0],
+        weight: 1,
+    };
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "witness must be non-identity".to_owned(),
+        ))
+    );
+}
+
+#[test]
+fn validator_rejects_noncommuting_witness() {
+    let z0 = Pauli::from_xz_bits(vec![0], vec![1]).unwrap();
+    let code = StabilizerCode::from_stabilizers(1, vec![z0]).unwrap();
+    let result = valid_result();
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: None,
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "witness does not commute with stabilizers".to_owned(),
+        ))
+    );
+}
+
+#[test]
 fn validator_rejects_stabilizer_span_witness() {
     let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
     let code = StabilizerCode::from_stabilizers(1, vec![x0]).unwrap();
