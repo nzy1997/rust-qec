@@ -5,7 +5,7 @@ use rstim::codegen::css::{
     CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
     parse_css_matrix_json, parse_css_observable_json,
 };
-use rstim::codegen::surface_code::rotated_memory_x;
+use rstim::codegen::surface_code::{rotated_memory_x, rotated_memory_z};
 use rstim::ir::StimInstr;
 
 use crate::bench::registry::BenchCasePoint;
@@ -22,7 +22,7 @@ pub fn build_circuit_for_point(
     spec_dir: &Path,
 ) -> Result<BuiltCircuit, String> {
     match point.input_type.as_str() {
-        "surface_rotated_memory_x" => build_surface(point),
+        "surface_rotated_memory_x" | "surface_rotated_memory_z" => build_surface(point),
         "css" => build_css(point, spec_dir),
         other => Err(format!("unknown input_type: {other}")),
     }
@@ -32,9 +32,13 @@ fn build_surface(point: &BenchCasePoint) -> Result<BuiltCircuit, String> {
     let distance = point
         .distance
         .ok_or_else(|| "surface point is missing distance".to_string())?;
-    let circuit = rotated_memory_x(distance, point.rounds, point.p);
+    let circuit = match point.input_type.as_str() {
+        "surface_rotated_memory_x" => rotated_memory_x(distance, point.rounds, point.p),
+        "surface_rotated_memory_z" => rotated_memory_z(distance, point.rounds, point.p),
+        other => return Err(format!("unknown input_type: {other}")),
+    };
     let mut params = ParamMap::from_pairs([
-        ("input_type", serde_json::json!("surface_rotated_memory_x")),
+        ("input_type", serde_json::json!(point.input_type.as_str())),
         ("distance", serde_json::json!(distance)),
         ("rounds", serde_json::json!(point.rounds)),
         ("p", serde_json::json!(point.p)),
