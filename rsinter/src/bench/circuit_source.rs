@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
 use rstim::codegen::surface_code::{rotated_memory_x, rotated_memory_z};
+use rstim::codegen::NoiseParams;
 use rstim::ir::StimInstr;
 
 use crate::bench::registry::BenchCasePoint;
@@ -34,14 +34,13 @@ fn build_surface(point: &BenchCasePoint) -> Result<BuiltCircuit, String> {
     let distance = point
         .distance
         .ok_or_else(|| "surface point is missing distance".to_string())?;
-    let circuit = match point.input_type.as_str() {
-        "surface_rotated_memory_x" | "memory-x" => {
-            rotated_memory_x(distance, point.rounds, point.p)
-        }
-        "surface_rotated_memory_z" | "memory-z" => {
-            rotated_memory_z(distance, point.rounds, point.p)
-        }
-        other => return Err(format!("unknown input_type: {other}")),
+    let circuit = if matches!(
+        point.input_type.as_str(),
+        "surface_rotated_memory_z" | "memory-z"
+    ) {
+        rotated_memory_z(distance, point.rounds, point.p)
+    } else {
+        rotated_memory_x(distance, point.rounds, point.p)
     };
     let mut params = ParamMap::from_pairs([
         ("input_type", serde_json::json!(point.input_type.as_str())),
@@ -134,12 +133,10 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     ]);
     params.insert(
         "observables".into(),
-        serde_json::json!(
-            point
-                .observables_path
-                .as_deref()
-                .unwrap_or("canonical_fallback")
-        ),
+        serde_json::json!(point
+            .observables_path
+            .as_deref()
+            .unwrap_or("canonical_fallback")),
     );
     insert_max_wall_seconds(&mut params, point.max_wall_seconds);
     Ok(BuiltCircuit {

@@ -2,10 +2,10 @@
 // Tests: noise parameter application in code generation.
 // Avoids overlap with existing codegen_noise.rs tests.
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::codegen::*;
-use rstim::ir::{StimInstr, StimTarget, circuit_to_string};
+use rstim::ir::{circuit_to_string, StimInstr, StimTarget};
 use rstim::sampler::sample_batch;
 
 fn rng() -> StdRng {
@@ -51,6 +51,21 @@ fn op_qubit_target_count(instr: &StimInstr) -> usize {
             .count(),
         StimInstr::Repeat { .. } => 0,
     }
+}
+
+#[test]
+fn surface_noise_helpers_ignore_repeat_blocks_for_inline_counts() {
+    let repeat = StimInstr::Repeat {
+        count: 2,
+        body: vec![StimInstr::new(
+            "X_ERROR",
+            vec![0.125],
+            vec![StimTarget::Qubit(7)],
+        )],
+    };
+
+    assert_eq!(op_name(&repeat), None);
+    assert_eq!(op_qubit_target_count(&repeat), 0);
 }
 
 fn qubit_targets_in(instrs: &[StimInstr]) -> Vec<u32> {
@@ -305,8 +320,7 @@ fn surface_code_before_measure_flip_covers_ancilla_and_final_data_measurements()
 
     let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
     let ancilla_measure_targets = count_qubit_targets_named(&circuit, "MR");
-    let final_data_measure_targets =
-        count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+    let final_data_measure_targets = count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
 
     assert_eq!(
         x_error_targets,
@@ -329,8 +343,7 @@ fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
 
     let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
     let ancilla_mr_targets = count_qubit_targets_named(&circuit, "MR");
-    let final_data_measure_targets =
-        count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+    let final_data_measure_targets = count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
     assert_eq!(ancilla_mr_targets % rounds, 0);
     let ancilla_count = ancilla_mr_targets / rounds;
 
@@ -343,30 +356,31 @@ fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
 }
 
 #[test]
+#[should_panic(expected = "X_ERROR run should be immediately followed by MR or M")]
+fn before_measure_helper_rejects_error_run_not_followed_by_measurement() {
+    let instrs = vec![StimInstr::new(
+        "X_ERROR",
+        vec![0.125],
+        vec![StimTarget::Qubit(7)],
+    )];
+
+    assert_each_x_error_run_is_immediately_before_measurement(&instrs);
+}
+
+#[test]
 fn issue_memory_z_uniform_noise_contains_all_four_noise_channels() {
     let circuit = rotated_memory_z_with_params(3, 9, NoiseParams::uniform(0.008));
     let text = circuit_to_string(&circuit);
 
-    assert!(
-        text.contains("DEPOLARIZE1(0.008)"),
-        "missing before-round or after-H depolarization: {text}"
-    );
-    assert!(
-        text.contains("DEPOLARIZE2(0.008)"),
-        "missing after-CX depolarization: {text}"
-    );
-    assert!(
-        text.contains("X_ERROR(0.008)"),
-        "missing reset or measurement flip channel: {text}"
-    );
-    assert!(
-        text.contains("MR"),
-        "missing ancilla measurement/reset operations: {text}"
-    );
-    assert!(
-        text.contains("OBSERVABLE_INCLUDE(0)"),
-        "missing logical observable: {text}"
-    );
+    for needle in [
+        "DEPOLARIZE1(0.008)",
+        "DEPOLARIZE2(0.008)",
+        "X_ERROR(0.008)",
+        "MR",
+        "OBSERVABLE_INCLUDE(0)",
+    ] {
+        assert!(text.contains(needle), "missing {needle}: {text}");
+    }
 }
 
 // --- surface code no noise ---

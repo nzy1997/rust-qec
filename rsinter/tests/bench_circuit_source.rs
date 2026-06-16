@@ -60,3 +60,14 @@ fn build_circuit_for_point_dispatches_rotated_memory_z() {
     assert!(has_op(&memory_z.circuit, "M"));
     assert!(!has_op(&memory_z.circuit, "MX"));
 }
+
+#[test]
+fn build_circuit_for_point_rejects_unknown_surface_input_type() {
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let error = match build_circuit_for_point(&surface_point("memory-y"), spec_dir) {
+        Ok(_) => panic!("unknown memory-y input type should fail"),
+        Err(error) => error,
+    };
+
+    assert_eq!(error, "unknown input_type: memory-y");
+}
