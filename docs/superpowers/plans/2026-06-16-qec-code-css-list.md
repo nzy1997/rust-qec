@@ -25,73 +25,7 @@
   - Owns built-in CSS registry tests.
   - Add a focused catalog metadata test to prevent drift and duplicate specs.
 
-## Task 1: Add Failing CLI List Tests
-
-**Files:**
-- Modify: `qec-code/tests/cli.rs`
-
-- [ ] **Step 1: Add binary list tests**
-
-In `qec-code/tests/cli.rs`, insert these tests after `code_css_bb72_hx_prints_sparse_rows_json`:
-
-```rust
-#[test]
-fn code_css_list_includes_supported_built_ins() {
-    let output = run_qec_code(&["code", "css", "list"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-
-    assert!(
-        stdout.contains("Built-in CSS codes:"),
-        "stdout was: {stdout}"
-    );
-    assert!(stdout.contains("steane"), "stdout was: {stdout}");
-    assert!(stdout.contains("bb72"), "stdout was: {stdout}");
-    assert!(
-        stdout.contains("repetition_x:d=<distance>"),
-        "stdout was: {stdout}"
-    );
-    assert!(
-        stdout.contains("repetition_z:d=<distance>"),
-        "stdout was: {stdout}"
-    );
-    assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
-}
-
-#[test]
-fn code_css_list_rejects_unexpected_extra_arguments() {
-    let output = run_qec_code(&["code", "css", "list", "extra"]);
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-
-    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
-
-    assert!(
-        stderr.contains("extra") || stderr.contains("Usage:"),
-        "stderr was: {stderr}"
-    );
-}
-```
-
-- [ ] **Step 2: Run the focused tests and verify they fail**
-
-Run:
-
-```bash
-cargo test -p qec-code --test cli code_css_list_
-```
-
-Expected:
-
-- The command exits non-zero.
-- `code_css_list_includes_supported_built_ins` fails because `qec-code code css list` is still parsed as an incomplete matrix export.
-- `code_css_list_rejects_unexpected_extra_arguments` may already pass through clap validation; the filtered command still fails because the success-path list test fails.
-
-## Task 2: Add Built-In CSS Catalog Metadata
+## Task 1: Add Built-In CSS Catalog Metadata
 
 **Files:**
 - Modify: `qec-code/src/codes/built_in_css.rs`
@@ -228,13 +162,74 @@ git add qec-code/src/codes/built_in_css.rs qec-code/tests/code.rs
 git commit -m "feat: add built-in css catalog metadata"
 ```
 
-## Task 3: Add CSS List CLI Dispatch
+## Task 2: Add CSS List CLI Dispatch
 
 **Files:**
 - Modify: `qec-code/src/cli.rs`
 - Modify: `qec-code/tests/cli.rs`
 
-- [ ] **Step 1: Refactor the CSS command type**
+- [ ] **Step 1: Add binary list tests**
+
+In `qec-code/tests/cli.rs`, insert these tests after `code_css_bb72_hx_prints_sparse_rows_json`:
+
+```rust
+#[test]
+fn code_css_list_includes_supported_built_ins() {
+    let output = run_qec_code(&["code", "css", "list"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+
+    assert!(
+        stdout.contains("Built-in CSS codes:"),
+        "stdout was: {stdout}"
+    );
+    assert!(stdout.contains("steane"), "stdout was: {stdout}");
+    assert!(stdout.contains("bb72"), "stdout was: {stdout}");
+    assert!(
+        stdout.contains("repetition_x:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(
+        stdout.contains("repetition_z:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
+}
+
+#[test]
+fn code_css_list_rejects_unexpected_extra_arguments() {
+    let output = run_qec_code(&["code", "css", "list", "extra"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+
+    assert!(
+        stderr.contains("extra") || stderr.contains("Usage:"),
+        "stderr was: {stderr}"
+    );
+}
+```
+
+- [ ] **Step 2: Run the list tests and verify the success-path test fails**
+
+Run:
+
+```bash
+cargo test -p qec-code --test cli code_css_list_
+```
+
+Expected:
+
+- The command exits non-zero.
+- `code_css_list_includes_supported_built_ins` fails because `qec-code code css list` is still parsed as an incomplete matrix export.
+- `code_css_list_rejects_unexpected_extra_arguments` may already pass through clap validation.
+
+- [ ] **Step 3: Refactor the CSS command type**
 
 In `qec-code/src/cli.rs`, change the clap import and built-in CSS import:
 
@@ -326,7 +321,7 @@ fn run_css_list() -> String {
 }
 ```
 
-- [ ] **Step 2: Update direct `run(...)` tests for the new enum shape**
+- [ ] **Step 4: Update direct `run(...)` tests for the new enum shape**
 
 In `qec-code/tests/cli.rs`, update the import:
 
@@ -366,7 +361,7 @@ command: CodeCommands::Css(CssArgs {
 }),
 ```
 
-- [ ] **Step 3: Add direct list and explicit export tests**
+- [ ] **Step 5: Add direct list and explicit export tests**
 
 In `qec-code/tests/cli.rs`, insert this binary export regression after `code_css_steane_hx_prints_workspace_fixture`:
 
@@ -410,7 +405,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
 }
 ```
 
-- [ ] **Step 4: Run the issue list tests and verify they pass**
+- [ ] **Step 6: Run the issue list tests and verify they pass**
 
 Run:
 
@@ -423,7 +418,7 @@ Expected:
 - The command exits zero.
 - Both `code_css_list_includes_supported_built_ins` and `code_css_list_rejects_unexpected_extra_arguments` pass.
 
-- [ ] **Step 5: Run the nearby CSS CLI tests and verify they pass**
+- [ ] **Step 7: Run the nearby CSS CLI tests and verify they pass**
 
 Run:
 
@@ -438,7 +433,7 @@ Expected:
 - `code_css_export_subcommand_steane_hx_prints_workspace_fixture` passes.
 - Unknown-code behavior still returns `unknown built-in CSS code: unknown`.
 
-- [ ] **Step 6: Commit the CLI list command**
+- [ ] **Step 8: Commit the CLI list command**
 
 Run:
 
@@ -447,7 +442,7 @@ git add qec-code/src/cli.rs qec-code/tests/cli.rs
 git commit -m "feat: add qec-code css list command"
 ```
 
-## Task 4: Final Verification
+## Task 3: Final Verification
 
 **Files:**
 - Verify: `qec-code/src/codes/built_in_css.rs`
@@ -531,4 +526,4 @@ git status --short --branch
 Expected:
 
 - Only intentional issue #60 files are modified or committed.
-- The pre-existing untracked `docs/superpowers/plans/2026-06-16-randomized-css-distance-upper-bound.md` remains unrelated and unstaged.
+- The pre-existing untracked `docs/superpowers/plans/2026-06-16-randomized-css-distance-upper-bound.md` in the original checkout remains unrelated and unstaged.
