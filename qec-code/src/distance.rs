@@ -148,14 +148,14 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
         ));
     }
 
+    if witness.weight() == 0 {
+        return Err(QecError::IlpInfeasible);
+    }
+
     if try_in_row_span(&code.stabilizer_rows(), &witness.to_symplectic_row())? {
         return Err(QecError::IlpSolveFailed(
             "returned witness lies in stabilizer span".into(),
         ));
-    }
-
-    if witness.weight() == 0 {
-        return Err(QecError::IlpInfeasible);
     }
 
     Ok(())
@@ -165,6 +165,14 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 mod tests {
     use super::{classify_logical, LogicalClass};
     use crate::Pauli;
+    #[cfg(feature = "distance-ilp-highs")]
+    use crate::{QecError, StabilizerCode};
+
+    #[cfg(feature = "distance-ilp-highs")]
+    fn single_qubit_z_stabilizer_code() -> StabilizerCode {
+        StabilizerCode::from_stabilizers(1, vec![Pauli::from_xz_bits(vec![0], vec![1]).unwrap()])
+            .unwrap()
+    }
 
     #[test]
     fn classify_logical_distinguishes_x_z_and_mixed_supports() {
@@ -175,5 +183,45 @@ mod tests {
         assert_eq!(classify_logical(&x_like), LogicalClass::XLike);
         assert_eq!(classify_logical(&z_like), LogicalClass::ZLike);
         assert_eq!(classify_logical(&mixed), LogicalClass::Mixed);
+    }
+
+    #[cfg(feature = "distance-ilp-highs")]
+    #[test]
+    fn post_validate_distance_witness_rejects_non_commuting_witnesses() {
+        let code = single_qubit_z_stabilizer_code();
+        let witness = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
+
+        assert_eq!(
+            super::post_validate_distance_witness(&code, &witness),
+            Err(QecError::IlpSolveFailed(
+                "returned witness does not commute with stabilizers".into(),
+            ))
+        );
+    }
+
+    #[cfg(feature = "distance-ilp-highs")]
+    #[test]
+    fn post_validate_distance_witness_rejects_stabilizer_span_elements() {
+        let code = single_qubit_z_stabilizer_code();
+        let witness = Pauli::from_xz_bits(vec![0], vec![1]).unwrap();
+
+        assert_eq!(
+            super::post_validate_distance_witness(&code, &witness),
+            Err(QecError::IlpSolveFailed(
+                "returned witness lies in stabilizer span".into(),
+            ))
+        );
+    }
+
+    #[cfg(feature = "distance-ilp-highs")]
+    #[test]
+    fn post_validate_distance_witness_rejects_zero_weight_witnesses() {
+        let code = StabilizerCode::from_stabilizers(1, vec![]).unwrap();
+        let witness = Pauli::from_xz_bits(vec![0], vec![0]).unwrap();
+
+        assert_eq!(
+            super::post_validate_distance_witness(&code, &witness),
+            Err(QecError::IlpInfeasible)
+        );
     }
 }
