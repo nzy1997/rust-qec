@@ -1,10 +1,10 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::steane::Steane;
 use crate::css::SparseRowsMatrix;
 use crate::distance::compute_distance;
+use crate::QecError;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -36,11 +36,37 @@ pub enum CodeCommands {
 #[command(arg_required_else_help = true)]
 pub struct CssArgs {
     #[command(subcommand)]
-    pub command: Option<CssCommands>,
+    command: Option<CssCommands>,
     #[arg(value_name = "CODE_ID", required = true)]
-    pub code_id: Option<String>,
+    code_id: Option<String>,
     #[arg(value_name = "MATRIX", required = true)]
-    pub matrix: Option<CssMatrixKind>,
+    matrix: Option<CssMatrixKind>,
+}
+
+impl CssArgs {
+    pub fn list() -> Self {
+        Self {
+            command: Some(CssCommands::List),
+            code_id: None,
+            matrix: None,
+        }
+    }
+
+    pub fn export(code_id: String, matrix: CssMatrixKind) -> Self {
+        Self {
+            command: None,
+            code_id: Some(code_id),
+            matrix: Some(matrix),
+        }
+    }
+
+    pub fn export_subcommand(code_id: String, matrix: CssMatrixKind) -> Self {
+        Self {
+            command: Some(CssCommands::Export { code_id, matrix }),
+            code_id: None,
+            matrix: None,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]

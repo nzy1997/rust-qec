@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssCommands, CssMatrixKind, run};
 
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
@@ -212,21 +212,13 @@ fn code_css_list_rejects_unexpected_extra_arguments() {
 fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
     let hx = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: None,
-                code_id: Some("steane".to_owned()),
-                matrix: Some(CssMatrixKind::Hx),
-            }),
+            command: CodeCommands::Css(CssArgs::export("steane".to_owned(), CssMatrixKind::Hx)),
         },
     })
     .unwrap();
     let hz = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: None,
-                code_id: Some("steane".to_owned()),
-                matrix: Some(CssMatrixKind::Hz),
-            }),
+            command: CodeCommands::Css(CssArgs::export("steane".to_owned(), CssMatrixKind::Hz)),
         },
     })
     .unwrap();
@@ -242,32 +234,20 @@ fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
 fn run_code_css_list_returns_catalog_without_newline() {
     let output = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: Some(CssCommands::List),
-                code_id: None,
-                matrix: None,
-            }),
+            command: CodeCommands::Css(CssArgs::list()),
         },
     })
     .unwrap();
 
-    assert!(output.starts_with("Built-in CSS codes:\n"));
-    assert!(!output.ends_with('\n'));
-    assert!(output.contains("steane"));
-    assert!(output.contains("bb72"));
-    assert!(output.contains("repetition_x:d=<distance>"));
-    assert!(output.contains("repetition_z:d=<distance>"));
+    let expected = "Built-in CSS codes:\n  steane                     fixed [[7,1,3]] CSS code\n  bb72                       fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>  X-check chain, distance >= 2\n  repetition_z:d=<distance>  Z-check chain, distance >= 2";
+    assert_eq!(output, expected);
 }
 
 #[test]
 fn run_code_css_unknown_id_returns_registry_error() {
     let result = run(Cli {
         command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: None,
-                code_id: Some("unknown".to_owned()),
-                matrix: Some(CssMatrixKind::Hx),
-            }),
+            command: CodeCommands::Css(CssArgs::export("unknown".to_owned(), CssMatrixKind::Hx)),
         },
     });
 
