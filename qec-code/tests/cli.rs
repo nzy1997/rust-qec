@@ -81,6 +81,16 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         matrix: "hz",
         fixture: "bb72_hz.json",
     },
+    BuiltInCssFixtureCase {
+        code_id: "surface_rotated:d=3",
+        matrix: "hx",
+        fixture: "surface_rotated_d3_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "surface_rotated:d=3",
+        matrix: "hz",
+        fixture: "surface_rotated_d3_hz.json",
+    },
 ];
 
 #[test]
@@ -225,6 +235,32 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
             .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
         "all bb72 hx rows should have weight 6: {rows:?}"
     );
+}
+
+#[test]
+fn code_css_surface_rotated_d3_hx_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_surface_rotated_d3_hz_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hz"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(stdout, expected);
 }
 
 #[test]
