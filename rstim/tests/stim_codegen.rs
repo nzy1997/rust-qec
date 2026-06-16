@@ -2,10 +2,10 @@
 // Tests: noise parameter application in code generation.
 // Avoids overlap with existing codegen_noise.rs tests.
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::codegen::*;
-use rstim::ir::{StimInstr, StimTarget, circuit_to_string};
+use rstim::ir::{circuit_to_string, StimInstr, StimTarget};
 use rstim::sampler::sample_batch;
 
 fn rng() -> StdRng {
@@ -34,6 +34,141 @@ fn tail_after_last_tick(instrs: &[StimInstr]) -> &[StimInstr] {
         .rposition(|instr| matches!(instr, StimInstr::Op { name, .. } if name == "TICK"))
         .expect("surface-code circuit should contain TICK instructions");
     &instrs[last_tick + 1..]
+}
+
+fn op_name(instr: &StimInstr) -> Option<&str> {
+    match instr {
+        StimInstr::Op { name, .. } => Some(name.as_str()),
+        StimInstr::Repeat { .. } => None,
+    }
+}
+
+fn op_qubit_target_count(instr: &StimInstr) -> usize {
+    match instr {
+        StimInstr::Op { targets, .. } => targets
+            .iter()
+            .filter(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+            .count(),
+        StimInstr::Repeat { .. } => 0,
+    }
+}
+
+#[test]
+fn surface_noise_helpers_ignore_repeat_blocks_for_inline_counts() {
+    let repeat = StimInstr::Repeat {
+        count: 2,
+        body: vec![StimInstr::new(
+            "X_ERROR",
+            vec![0.125],
+            vec![StimTarget::Qubit(7)],
+        )],
+    };
+
+    assert_eq!(op_name(&repeat), None);
+    assert_eq!(op_qubit_target_count(&repeat), 0);
+}
+
+fn qubit_targets_in(instrs: &[StimInstr]) -> Vec<u32> {
+    let mut qubits = Vec::new();
+    for instr in instrs {
+        if let StimInstr::Op { targets, .. } = instr {
+            qubits.extend(targets.iter().filter_map(StimTarget::qubit_index));
+        }
+    }
+    qubits.sort_unstable();
+    qubits
+}
+
+fn assert_each_x_error_run_is_immediately_before_measurement(instrs: &[StimInstr]) {
+    let mut i = 0;
+    let mut runs = 0;
+    while i < instrs.len() {
+        if op_name(&instrs[i]) != Some("X_ERROR") {
+            i += 1;
+            continue;
+        }
+
+        let start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some("X_ERROR") {
+            i += 1;
+        }
+        let error_end = i;
+        let error_targets: usize = instrs[start..i].iter().map(op_qubit_target_count).sum();
+        let error_qubits = qubit_targets_in(&instrs[start..error_end]);
+
+        let Some(measure_name @ ("MR" | "M")) = instrs.get(i).and_then(op_name) else {
+            panic!("X_ERROR run should be immediately followed by MR or M");
+        };
+        let measure_start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some(measure_name) {
+            i += 1;
+        }
+        let measure_targets: usize = instrs[measure_start..i]
+            .iter()
+            .map(op_qubit_target_count)
+            .sum();
+        let measure_qubits = qubit_targets_in(&instrs[measure_start..i]);
+
+        assert_eq!(
+            error_targets, measure_targets,
+            "X_ERROR run before {measure_name} should cover the same qubits"
+        );
+        assert_eq!(
+            error_qubits, measure_qubits,
+            "X_ERROR run before {measure_name} should cover the same qubits"
+        );
+        runs += 1;
+    }
+    assert!(runs > 0, "expected at least one before-measure X_ERROR run");
+}
+
+fn assert_each_x_error_run_is_immediately_after_reset(instrs: &[StimInstr]) {
+    let mut i = 0;
+    let mut runs = 0;
+    while i < instrs.len() {
+        if op_name(&instrs[i]) != Some("X_ERROR") {
+            i += 1;
+            continue;
+        }
+
+        let start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some("X_ERROR") {
+            i += 1;
+        }
+        let error_targets: usize = instrs[start..i].iter().map(op_qubit_target_count).sum();
+
+        let mut reset_start = start;
+        while reset_start > 0 {
+            let previous = reset_start - 1;
+            if !matches!(op_name(&instrs[previous]), Some("R" | "MR")) {
+                break;
+            }
+            reset_start = previous;
+        }
+        assert!(
+            reset_start < start,
+            "X_ERROR run should be immediately after R or MR"
+        );
+        let reset_name = op_name(&instrs[reset_start]).unwrap();
+        assert!(matches!(reset_name, "R" | "MR"));
+        let reset_targets: usize = instrs[reset_start..start]
+            .iter()
+            .map(op_qubit_target_count)
+            .sum();
+        let error_qubits = qubit_targets_in(&instrs[start..i]);
+        let reset_qubits = qubit_targets_in(&instrs[reset_start..start]);
+
+        assert_eq!(
+            error_targets, reset_targets,
+            "X_ERROR run after {reset_name} should cover the same qubits"
+        );
+        assert_eq!(
+            error_qubits, reset_qubits,
+            "X_ERROR run after {reset_name} should cover the same qubits"
+        );
+        runs += 1;
+    }
+    assert!(runs > 0, "expected at least one after-reset X_ERROR run");
 }
 
 #[test]
@@ -170,6 +305,82 @@ fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measu
     let tail_context =
         "the tail data-measurement step should not inject an extra DEPOLARIZE1 layer";
     assert_eq!(tail_dep1_targets, 0, "{tail_context}");
+}
+
+#[test]
+fn surface_code_before_measure_flip_covers_ancilla_and_final_data_measurements() {
+    let rounds = 3;
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.001,
+        after_reset_flip_probability: 0.0,
+    };
+    let circuit = rotated_memory_z_with_params(3, rounds, params);
+
+    let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
+    let ancilla_measure_targets = count_qubit_targets_named(&circuit, "MR");
+    let final_data_measure_targets = count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+
+    assert_eq!(
+        x_error_targets,
+        ancilla_measure_targets + final_data_measure_targets,
+        "before_measure_flip_probability should apply before every ancilla MR and before final data M"
+    );
+    assert_each_x_error_run_is_immediately_before_measurement(&circuit);
+}
+
+#[test]
+fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
+    let rounds = 3;
+    let params = NoiseParams {
+        before_round_data_depolarization: 0.0,
+        after_clifford_depolarization: 0.0,
+        before_measure_flip_probability: 0.0,
+        after_reset_flip_probability: 0.001,
+    };
+    let circuit = rotated_memory_z_with_params(3, rounds, params);
+
+    let x_error_targets = count_qubit_targets_named(&circuit, "X_ERROR");
+    let ancilla_mr_targets = count_qubit_targets_named(&circuit, "MR");
+    let final_data_measure_targets = count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+    assert_eq!(ancilla_mr_targets % rounds, 0);
+    let ancilla_count = ancilla_mr_targets / rounds;
+
+    assert_eq!(
+        x_error_targets,
+        final_data_measure_targets + ancilla_count + ancilla_mr_targets,
+        "after_reset_flip_probability should apply after initial data reset, initial ancilla reset, and each ancilla MR reset"
+    );
+    assert_each_x_error_run_is_immediately_after_reset(&circuit);
+}
+
+#[test]
+#[should_panic(expected = "X_ERROR run should be immediately followed by MR or M")]
+fn before_measure_helper_rejects_error_run_not_followed_by_measurement() {
+    let instrs = vec![StimInstr::new(
+        "X_ERROR",
+        vec![0.125],
+        vec![StimTarget::Qubit(7)],
+    )];
+
+    assert_each_x_error_run_is_immediately_before_measurement(&instrs);
+}
+
+#[test]
+fn issue_memory_z_uniform_noise_contains_all_four_noise_channels() {
+    let circuit = rotated_memory_z_with_params(3, 9, NoiseParams::uniform(0.008));
+    let text = circuit_to_string(&circuit);
+
+    for needle in [
+        "DEPOLARIZE1(0.008)",
+        "DEPOLARIZE2(0.008)",
+        "X_ERROR(0.008)",
+        "MR",
+        "OBSERVABLE_INCLUDE(0)",
+    ] {
+        assert!(text.contains(needle), "missing {needle}: {text}");
+    }
 }
 
 // --- surface code no noise ---

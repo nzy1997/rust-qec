@@ -69,6 +69,79 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn rust_benchmark_run_supports_memory_z_input_type() {
+    let spec_text = r#"
+name = "surface_decoder_memory_z"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching_memory_z"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "memory-z"
+distance = [3]
+rounds = [9]
+p = [0.008]
+max_shots = 8
+max_errors = 8
+batch_size = 4
+
+[plot]
+title = "Surface Decoder Memory-Z"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rmatching_memory_z")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("memory-z"));
+    assert_eq!(rows[0].params["distance"], serde_json::json!(3));
+    assert_eq!(rows[0].params["rounds"], serde_json::json!(9));
+    assert_eq!(rows[0].params["p"], serde_json::json!(0.008));
+    assert_eq!(rows[0].case_summary["num_dets"], serde_json::json!(72));
+    assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(1));
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+    assert_ne!(rows[0].failure_kind, FailureKind::SolverFailure);
+    assert_ne!(rows[0].failure_kind, FailureKind::SamplerError);
+}
+
+#[test]
 fn rust_benchmark_results_use_runner_name_not_impl_key() {
     let spec_text = r#"
 name = "surface_decoder"

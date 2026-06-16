@@ -1,0 +1,62 @@
+name = "issue65-memory-z-sweep"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching-memory-z-d3"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "memory-z"
+distance = [3]
+rounds = [9]
+p = [0.008, 0.009, 0.010, 0.011, 0.012]
+max_shots = 1000000
+max_errors = 5000
+batch_size = 256
+
+[[runner]]
+name = "rmatching-memory-z-d5"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "memory-z"
+distance = [5]
+rounds = [15]
+p = [0.008, 0.009, 0.010, 0.011, 0.012]
+max_shots = 1000000
+max_errors = 5000
+batch_size = 256
+
+[[runner]]
+name = "rmatching-memory-z-d7"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "memory-z"
+distance = [7]
+rounds = [21]
+p = [0.008, 0.009, 0.010, 0.011, 0.012]
+max_shots = 1000000
+max_errors = 5000
+batch_size = 256
+
+[plot]
+title = "Issue 65 Memory-Z Sweep"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["language", "runner", "params.distance"]
+label_template = "{language} {runner} d={params.distance}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"

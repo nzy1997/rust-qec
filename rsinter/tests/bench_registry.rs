@@ -201,6 +201,26 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
 }
 
 #[test]
+fn expand_runner_points_accepts_memory_z_input_types() {
+    for input_type in ["surface_rotated_memory_z", "memory-z"] {
+        let mut params = valid_runner_params();
+        params.insert(
+            "input_type".into(),
+            toml::Value::String(input_type.into()),
+        );
+
+        let points = expand_runner_points(&params).unwrap();
+
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].input_type, input_type);
+        assert_eq!(points[0].distance, Some(3));
+        assert_eq!(points[0].rounds, 1);
+        assert_eq!(points[0].p, 0.002);
+        assert_eq!(points[0].basis, None);
+    }
+}
+
+#[test]
 fn expand_runner_points_accepts_optional_max_wall_seconds() {
     let mut params = valid_runner_params();
     params.insert("max_wall_seconds".into(), toml::Value::Float(2.5));
@@ -277,7 +297,7 @@ fn valid_runner_params() -> BTreeMap<String, toml::Value> {
         ),
         (
             "rounds".into(),
-            toml::Value::Array(vec![toml::Value::Integer(3)]),
+            toml::Value::Array(vec![toml::Value::Integer(1)]),
         ),
         (
             "p".into(),
