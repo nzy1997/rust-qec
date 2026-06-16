@@ -1,10 +1,10 @@
-#[cfg(not(feature = "gurobi"))]
 use qec_ilp_core::BinaryIlpError;
 use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::{
-    BackendConfig, BackendKind, BinaryIlpConfig, BinaryIlpModel, ConstraintSense, LinearConstraint,
-    ModelVar,
+    BackendKind, BinaryIlpConfig, BinaryIlpModel, ConstraintSense, LinearConstraint, ModelVar,
 };
+#[cfg(not(feature = "gurobi"))]
+use qec_ilp_core::BackendConfig;
 
 fn simple_model() -> BinaryIlpModel {
     BinaryIlpModel {
