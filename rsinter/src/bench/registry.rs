@@ -107,17 +107,19 @@ fn expand_generic_runner_points(
     }
 
     match input_type.as_str() {
-        "surface_rotated_memory_x" | "surface_rotated_memory_z" => expand_surface_points(
-            &input_type,
-            params,
-            rounds,
-            ps,
-            max_shots,
-            max_errors,
-            max_wall_seconds,
-            batch_size,
-            decoder_params,
-        ),
+        "surface_rotated_memory_x" | "surface_rotated_memory_z" | "memory-x" | "memory-z" => {
+            expand_surface_points(
+                &input_type,
+                params,
+                rounds,
+                ps,
+                max_shots,
+                max_errors,
+                max_wall_seconds,
+                batch_size,
+                decoder_params,
+            )
+        }
         "css" => expand_css_points(
             params,
             rounds,

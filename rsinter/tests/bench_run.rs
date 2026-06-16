@@ -69,7 +69,7 @@ label = "Logical Error Rate"
 }
 
 #[test]
-fn rust_benchmark_run_supports_surface_rotated_memory_z() {
+fn rust_benchmark_run_supports_memory_z_input_type() {
     let spec_text = r#"
 name = "surface_decoder_memory_z"
 version = 1
@@ -81,7 +81,7 @@ language = "rust"
 impl_key = "rmatching"
 
 [runner.params]
-input_type = "surface_rotated_memory_z"
+input_type = "memory-z"
 distance = [3]
 rounds = [9]
 p = [0.008]
@@ -129,10 +129,7 @@ label = "Logical Error Rate"
     let rows = read_results_jsonl(&data[..]).unwrap();
 
     assert_eq!(rows.len(), 1);
-    assert_eq!(
-        rows[0].params["input_type"],
-        serde_json::json!("surface_rotated_memory_z")
-    );
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("memory-z"));
     assert_eq!(rows[0].params["distance"], serde_json::json!(3));
     assert_eq!(rows[0].params["rounds"], serde_json::json!(9));
     assert_eq!(rows[0].params["p"], serde_json::json!(0.008));

@@ -201,21 +201,23 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
 }
 
 #[test]
-fn expand_runner_points_accepts_rotated_memory_z_input_type() {
-    let mut params = valid_runner_params();
-    params.insert(
-        "input_type".into(),
-        toml::Value::String("surface_rotated_memory_z".into()),
-    );
+fn expand_runner_points_accepts_memory_z_input_types() {
+    for input_type in ["surface_rotated_memory_z", "memory-z"] {
+        let mut params = valid_runner_params();
+        params.insert(
+            "input_type".into(),
+            toml::Value::String(input_type.into()),
+        );
 
-    let points = expand_runner_points(&params).unwrap();
+        let points = expand_runner_points(&params).unwrap();
 
-    assert_eq!(points.len(), 1);
-    assert_eq!(points[0].input_type, "surface_rotated_memory_z");
-    assert_eq!(points[0].distance, Some(3));
-    assert_eq!(points[0].rounds, 1);
-    assert_eq!(points[0].p, 0.002);
-    assert_eq!(points[0].basis, None);
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].input_type, input_type);
+        assert_eq!(points[0].distance, Some(3));
+        assert_eq!(points[0].rounds, 1);
+        assert_eq!(points[0].p, 0.002);
+        assert_eq!(points[0].basis, None);
+    }
 }
 
 #[test]

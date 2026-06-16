@@ -22,7 +22,9 @@ pub fn build_circuit_for_point(
     spec_dir: &Path,
 ) -> Result<BuiltCircuit, String> {
     match point.input_type.as_str() {
-        "surface_rotated_memory_x" | "surface_rotated_memory_z" => build_surface(point),
+        "surface_rotated_memory_x" | "surface_rotated_memory_z" | "memory-x" | "memory-z" => {
+            build_surface(point)
+        }
         "css" => build_css(point, spec_dir),
         other => Err(format!("unknown input_type: {other}")),
     }
@@ -33,8 +35,12 @@ fn build_surface(point: &BenchCasePoint) -> Result<BuiltCircuit, String> {
         .distance
         .ok_or_else(|| "surface point is missing distance".to_string())?;
     let circuit = match point.input_type.as_str() {
-        "surface_rotated_memory_x" => rotated_memory_x(distance, point.rounds, point.p),
-        "surface_rotated_memory_z" => rotated_memory_z(distance, point.rounds, point.p),
+        "surface_rotated_memory_x" | "memory-x" => {
+            rotated_memory_x(distance, point.rounds, point.p)
+        }
+        "surface_rotated_memory_z" | "memory-z" => {
+            rotated_memory_z(distance, point.rounds, point.p)
+        }
         other => return Err(format!("unknown input_type: {other}")),
     };
     let mut params = ParamMap::from_pairs([
