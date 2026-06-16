@@ -95,11 +95,7 @@ fn code_css_steane_hx_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "steane", "hx"]);
 
     assert!(output.status.success());
-    assert!(
-        output.stderr.is_empty(),
-        "stderr was: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert_eq!(output.stderr, b"");
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
     let expected = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
@@ -112,11 +108,7 @@ fn code_css_steane_hz_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "steane", "hz"]);
 
     assert!(output.status.success());
-    assert!(
-        output.stderr.is_empty(),
-        "stderr was: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    assert_eq!(output.stderr, b"");
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
     let expected = read_fixture("rsinter/tests/fixtures/css/steane_hz.json");
@@ -129,11 +121,7 @@ fn code_css_unknown_id_fails() {
     let output = run_qec_code(&["code", "css", "unknown", "hx"]);
 
     assert!(!output.status.success());
-    assert!(
-        output.stdout.is_empty(),
-        "stdout was: {}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+    assert_eq!(output.stdout, b"");
 
     let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
 
