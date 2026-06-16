@@ -23,6 +23,7 @@ pub enum BuiltInCssCodeSpec {
 pub enum BuiltInCssFamily {
     RepetitionX,
     RepetitionZ,
+    SurfaceRotated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,10 +39,12 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
         "bb72" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" }),
-        "repetition_x" | "repetition_z" => Err(QecError::MissingBuiltInCssParameter {
-            family: input.to_owned(),
-            parameter: "d".to_owned(),
-        }),
+        "repetition_x" | "repetition_z" | "surface_rotated" => {
+            Err(QecError::MissingBuiltInCssParameter {
+                family: input.to_owned(),
+                parameter: "d".to_owned(),
+            })
+        }
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: input.to_owned(),
         }),
@@ -55,6 +58,7 @@ fn parse_built_in_css_family_spec(
     let family = match family_name {
         "repetition_x" => BuiltInCssFamily::RepetitionX,
         "repetition_z" => BuiltInCssFamily::RepetitionZ,
+        "surface_rotated" => BuiltInCssFamily::SurfaceRotated,
         _ => {
             return Err(QecError::UnknownBuiltInCssFamily {
                 family: family_name.to_owned(),
@@ -246,6 +250,9 @@ fn repetition_css_checks(
                 hz,
             })
         }
+        BuiltInCssFamily::SurfaceRotated => Err(QecError::UnknownBuiltInCssCode {
+            code_id: "surface_rotated".to_owned(),
+        }),
     }
 }
 
