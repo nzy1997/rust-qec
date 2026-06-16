@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
-use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")

@@ -36,7 +36,9 @@ pub enum QecError {
     UnsupportedLogicalBasis { k: usize },
     #[error("exhaustive Pauli enumeration is unsupported for {n} qubits on this target")]
     UnsupportedExhaustiveEnumeration { n: usize },
-    #[error("distance computation is unsupported for {n} qubits in the current configuration: {reason}")]
+    #[error(
+        "distance computation is unsupported for {n} qubits in the current configuration: {reason}"
+    )]
     DistanceComputationUnsupported { n: usize, reason: String },
     #[error("logical basis not found")]
     LogicalBasisNotFound,

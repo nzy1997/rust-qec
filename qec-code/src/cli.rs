@@ -1,10 +1,10 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
+use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::steane::Steane;
 use crate::css::SparseRowsMatrix;
 use crate::distance::compute_distance;
-use crate::QecError;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]

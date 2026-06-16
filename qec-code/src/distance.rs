@@ -1,7 +1,7 @@
+use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
-use crate::Pauli;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogicalClass {
@@ -163,7 +163,7 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_logical, LogicalClass};
+    use super::{LogicalClass, classify_logical};
     use crate::Pauli;
     #[cfg(feature = "distance-ilp-highs")]
     use crate::{QecError, StabilizerCode};

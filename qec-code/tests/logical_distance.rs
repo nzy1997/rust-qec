@@ -150,12 +150,14 @@ fn multi_logical_code_returns_a_nontrivial_minimum_witness() {
 
     assert_eq!(distance.distance, 1);
     assert_eq!(distance.witness.weight(), 1);
-    assert!(!distance
-        .witness
-        .x_bits()
-        .iter()
-        .chain(distance.witness.z_bits())
-        .all(|&bit| bit == 0));
+    assert!(
+        !distance
+            .witness
+            .x_bits()
+            .iter()
+            .chain(distance.witness.z_bits())
+            .all(|&bit| bit == 0)
+    );
 }
 
 #[cfg(not(feature = "distance-ilp-highs"))]
