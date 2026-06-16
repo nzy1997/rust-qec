@@ -40,6 +40,16 @@ fn auto_backend_falls_back_to_highs() {
     assert_eq!(solution.binary_values, vec![true]);
 }
 
+#[test]
+fn binary_backend_trait_objects_have_a_stable_debug_name() {
+    let mut config = BinaryIlpConfig::default();
+    config.backend.kind = BackendKind::Highs;
+
+    let backend = build_binary_backend(&simple_model(), &config).unwrap();
+
+    assert_eq!(format!("{backend:?}"), "BinaryBackend(..)");
+}
+
 #[cfg(not(feature = "gurobi"))]
 #[test]
 fn explicit_gurobi_selection_reports_unavailable_without_feature() {
@@ -63,6 +73,36 @@ fn explicit_gurobi_selection_reports_unavailable_without_feature() {
             requested: BackendKind::Gurobi,
         }
     );
+}
+
+#[test]
+fn unknown_binary_variable_references_are_rejected_before_backend_build() {
+    let mut model = simple_model();
+    model.constraints[0].binary_terms[0].0 = 1;
+
+    let err = build_binary_backend(&model, &BinaryIlpConfig::default()).unwrap_err();
+
+    assert_eq!(err, BinaryIlpError::UnknownBinaryVar(1));
+}
+
+#[test]
+fn unknown_integer_variable_references_are_rejected_before_backend_build() {
+    let mut model = simple_model();
+    model.constraints[0].integer_terms[0].0 = 1;
+
+    let err = build_binary_backend(&model, &BinaryIlpConfig::default()).unwrap_err();
+
+    assert_eq!(err, BinaryIlpError::UnknownIntegerVar(1));
+}
+
+#[test]
+fn oversized_solution_prefix_is_rejected_before_backend_build() {
+    let mut model = simple_model();
+    model.solution_binary_prefix_len = 2;
+
+    let err = build_binary_backend(&model, &BinaryIlpConfig::default()).unwrap_err();
+
+    assert_eq!(err, BinaryIlpError::UnknownBinaryVar(2));
 }
 
 #[test]
