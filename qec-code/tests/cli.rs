@@ -395,6 +395,34 @@ fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
 }
 
 #[test]
+fn run_code_css_surface_rotated_d3_matrices_return_fixture_json_without_newline() {
+    let hx = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hx,
+            )),
+        },
+    })
+    .unwrap();
+    let hz = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hz,
+            )),
+        },
+    })
+    .unwrap();
+
+    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+    let expected_hz = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+    assert_eq!(hz, expected_hz.trim_end_matches('\n'));
+}
+
+#[test]
 fn run_code_css_list_returns_catalog_without_newline() {
     let output = run(Cli {
         command: Commands::Code {
@@ -421,6 +449,34 @@ fn run_code_css_export_subcommand_returns_fixture_json_without_newline() {
 
     let expected = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
     assert_eq!(output, expected.trim_end_matches('\n'));
+}
+
+#[test]
+fn run_code_css_surface_rotated_export_subcommand_returns_fixture_json_without_newline() {
+    let hx = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export_subcommand(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hx,
+            )),
+        },
+    })
+    .unwrap();
+    let hz = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export_subcommand(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hz,
+            )),
+        },
+    })
+    .unwrap();
+
+    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+    let expected_hz = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+    assert_eq!(hz, expected_hz.trim_end_matches('\n'));
 }
 
 #[test]
