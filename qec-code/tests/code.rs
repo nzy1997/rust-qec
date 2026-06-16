@@ -38,6 +38,21 @@ fn dense_row(row: &[usize], width: usize) -> Vec<u8> {
     dense
 }
 
+fn row_weight_counts(rows: &[Vec<usize>]) -> std::collections::BTreeMap<usize, usize> {
+    let mut counts = std::collections::BTreeMap::new();
+    for row in rows {
+        *counts.entry(row.len()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn assert_surface_rotated_d5_weights(rows: &[Vec<usize>]) {
+    let counts = row_weight_counts(rows);
+    assert_eq!(counts.get(&2), Some(&4));
+    assert_eq!(counts.get(&4), Some(&8));
+    assert_eq!(counts.values().sum::<usize>(), 12);
+}
+
 #[test]
 fn stabilizer_code_rejects_noncommuting_generators() {
     let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
@@ -183,6 +198,58 @@ fn bb72_has_expected_shape_and_css_orthogonality() {
 }
 
 #[test]
+fn surface_rotated_d3_matches_expected_checks() {
+    let checks = built_in_css_checks("surface_rotated:d=3").unwrap();
+
+    assert_eq!(checks.code_id, "surface_rotated");
+    assert_eq!(checks.num_cols, 9);
+    assert_eq!(
+        checks.hx,
+        vec![vec![0, 3], vec![1, 2, 4, 5], vec![3, 4, 6, 7], vec![5, 8],]
+    );
+    assert_eq!(
+        checks.hz,
+        vec![vec![1, 2], vec![0, 1, 3, 4], vec![4, 5, 7, 8], vec![6, 7],]
+    );
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn surface_rotated_d5_has_expected_check_counts_and_weights() {
+    let checks = built_in_css_checks("surface_rotated:d=5").unwrap();
+
+    assert_eq!(checks.code_id, "surface_rotated");
+    assert_eq!(checks.num_cols, 25);
+    assert_eq!(checks.hx.len(), 12);
+    assert_eq!(checks.hz.len(), 12);
+    assert_surface_rotated_d5_weights(&checks.hx);
+    assert_surface_rotated_d5_weights(&checks.hz);
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
+}
+
+#[test]
+fn surface_rotated_rejects_distance_below_two() {
+    assert_eq!(
+        built_in_css_checks("surface_rotated:d=1"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "surface_rotated".to_owned(),
+            parameter: "d".to_owned(),
+            value: 1,
+        })
+    );
+}
+
+#[test]
 fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
     assert_eq!(
         parse_built_in_css_code_spec("steane"),
@@ -200,6 +267,13 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
         Ok(BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::RepetitionZ,
             params: BuiltInCssParams { distance: 5 },
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("surface_rotated:d=3"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::SurfaceRotated,
+            params: BuiltInCssParams { distance: 3 },
         })
     );
 }
@@ -230,6 +304,13 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         parse_built_in_css_code_spec("repetition_x"),
         Err(QecError::MissingBuiltInCssParameter {
             family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("surface_rotated"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "surface_rotated".to_owned(),
             parameter: "d".to_owned(),
         })
     );

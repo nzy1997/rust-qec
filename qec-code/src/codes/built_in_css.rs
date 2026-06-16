@@ -23,6 +23,7 @@ pub enum BuiltInCssCodeSpec {
 pub enum BuiltInCssFamily {
     RepetitionX,
     RepetitionZ,
+    SurfaceRotated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,10 +39,12 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
         "bb72" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" }),
-        "repetition_x" | "repetition_z" => Err(QecError::MissingBuiltInCssParameter {
-            family: input.to_owned(),
-            parameter: "d".to_owned(),
-        }),
+        "repetition_x" | "repetition_z" | "surface_rotated" => {
+            Err(QecError::MissingBuiltInCssParameter {
+                family: input.to_owned(),
+                parameter: "d".to_owned(),
+            })
+        }
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: input.to_owned(),
         }),
@@ -55,6 +58,7 @@ fn parse_built_in_css_family_spec(
     let family = match family_name {
         "repetition_x" => BuiltInCssFamily::RepetitionX,
         "repetition_z" => BuiltInCssFamily::RepetitionZ,
+        "surface_rotated" => BuiltInCssFamily::SurfaceRotated,
         _ => {
             return Err(QecError::UnknownBuiltInCssFamily {
                 family: family_name.to_owned(),
@@ -182,9 +186,7 @@ fn bivariate_bicycle_checks(
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match parse_built_in_css_code_spec(code_id)? {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
-        BuiltInCssCodeSpec::Family { family, params } => {
-            repetition_css_checks(family, params.distance)
-        }
+        BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params.distance),
     }
 }
 
@@ -219,7 +221,7 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
     }
 }
 
-fn repetition_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltInCssChecks> {
+fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltInCssChecks> {
     match family {
         BuiltInCssFamily::RepetitionX => {
             let hx = chain_supports("repetition_x", distance)?;
@@ -239,6 +241,7 @@ fn repetition_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<Bu
                 hz,
             })
         }
+        BuiltInCssFamily::SurfaceRotated => surface_rotated_css_checks(distance),
     }
 }
 
@@ -252,4 +255,87 @@ fn chain_supports(family: &'static str, distance: usize) -> Result<Vec<Vec<usize
     }
 
     Ok((0..distance - 1).map(|col| vec![col, col + 1]).collect())
+}
+
+fn surface_rotated_css_checks(distance: usize) -> Result<BuiltInCssChecks> {
+    if distance < 2 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "surface_rotated".to_owned(),
+            parameter: "d".to_owned(),
+            value: distance,
+        });
+    }
+
+    let (hx, hz) = rotated_surface_supports(distance);
+
+    Ok(BuiltInCssChecks {
+        code_id: "surface_rotated",
+        num_cols: distance * distance,
+        hx,
+        hz,
+    })
+}
+
+fn rotated_surface_supports(distance: usize) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    let mut hx = Vec::new();
+    let mut hz = Vec::new();
+
+    for ax in 0..=distance {
+        for ay in 0..=distance {
+            let on_boundary_1 = ax == 0 || ax == distance;
+            let on_boundary_2 = ay == 0 || ay == distance;
+            let parity = (ax % 2) != (ay % 2);
+            if on_boundary_1 && parity {
+                continue;
+            }
+            if on_boundary_2 && !parity {
+                continue;
+            }
+
+            let support = rotated_surface_measure_support(distance, ax, ay);
+            if support.is_empty() {
+                continue;
+            }
+
+            if parity {
+                hx.push(support);
+            } else {
+                hz.push(support);
+            }
+        }
+    }
+
+    (hx, hz)
+}
+
+fn rotated_surface_measure_support(distance: usize, ax: usize, ay: usize) -> Vec<usize> {
+    let mut support = Vec::new();
+    let mx = (2 * ax) as isize;
+    let my = (2 * ay) as isize;
+
+    for (dx, dy) in [(1isize, 1isize), (1, -1), (-1, 1), (-1, -1)] {
+        let x = mx + dx;
+        let y = my + dy;
+        if x >= 1
+            && x <= (2 * distance - 1) as isize
+            && y >= 1
+            && y <= (2 * distance - 1) as isize
+            && x % 2 == 1
+            && y % 2 == 1
+        {
+            let qx = ((x - 1) / 2) as usize;
+            let qy = ((y - 1) / 2) as usize;
+            if qx < distance && qy < distance {
+                support.push(rotated_surface_data_index(distance, qx, qy));
+            }
+        }
+    }
+
+    support.sort_unstable();
+    support.dedup();
+    support
+}
+
+fn rotated_surface_data_index(distance: usize, x: usize, y: usize) -> usize {
+    x * distance + y
 }
