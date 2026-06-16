@@ -36,6 +36,102 @@ fn tail_after_last_tick(instrs: &[StimInstr]) -> &[StimInstr] {
     &instrs[last_tick + 1..]
 }
 
+fn op_name(instr: &StimInstr) -> Option<&str> {
+    match instr {
+        StimInstr::Op { name, .. } => Some(name.as_str()),
+        StimInstr::Repeat { .. } => None,
+    }
+}
+
+fn op_qubit_target_count(instr: &StimInstr) -> usize {
+    match instr {
+        StimInstr::Op { targets, .. } => targets
+            .iter()
+            .filter(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+            .count(),
+        StimInstr::Repeat { .. } => 0,
+    }
+}
+
+fn assert_each_x_error_run_is_immediately_before_measurement(instrs: &[StimInstr]) {
+    let mut i = 0;
+    let mut runs = 0;
+    while i < instrs.len() {
+        if op_name(&instrs[i]) != Some("X_ERROR") {
+            i += 1;
+            continue;
+        }
+
+        let start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some("X_ERROR") {
+            i += 1;
+        }
+        let error_targets: usize = instrs[start..i].iter().map(op_qubit_target_count).sum();
+
+        let Some(measure_name @ ("MR" | "M")) = instrs.get(i).and_then(op_name) else {
+            panic!("X_ERROR run should be immediately followed by MR or M");
+        };
+        let measure_start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some(measure_name) {
+            i += 1;
+        }
+        let measure_targets: usize = instrs[measure_start..i]
+            .iter()
+            .map(op_qubit_target_count)
+            .sum();
+
+        assert_eq!(
+            error_targets, measure_targets,
+            "X_ERROR run before {measure_name} should cover the same qubits"
+        );
+        runs += 1;
+    }
+    assert!(runs > 0, "expected at least one before-measure X_ERROR run");
+}
+
+fn assert_each_x_error_run_is_immediately_after_reset(instrs: &[StimInstr]) {
+    let mut i = 0;
+    let mut runs = 0;
+    while i < instrs.len() {
+        if op_name(&instrs[i]) != Some("X_ERROR") {
+            i += 1;
+            continue;
+        }
+
+        let start = i;
+        while i < instrs.len() && op_name(&instrs[i]) == Some("X_ERROR") {
+            i += 1;
+        }
+        let error_targets: usize = instrs[start..i].iter().map(op_qubit_target_count).sum();
+
+        let mut reset_start = start;
+        while reset_start > 0 {
+            let previous = reset_start - 1;
+            if !matches!(op_name(&instrs[previous]), Some("R" | "MR")) {
+                break;
+            }
+            reset_start = previous;
+        }
+        assert!(
+            reset_start < start,
+            "X_ERROR run should be immediately after R or MR"
+        );
+        let reset_name = op_name(&instrs[reset_start]).unwrap();
+        assert!(matches!(reset_name, "R" | "MR"));
+        let reset_targets: usize = instrs[reset_start..start]
+            .iter()
+            .map(op_qubit_target_count)
+            .sum();
+
+        assert_eq!(
+            error_targets, reset_targets,
+            "X_ERROR run after {reset_name} should cover the same qubits"
+        );
+        runs += 1;
+    }
+    assert!(runs > 0, "expected at least one after-reset X_ERROR run");
+}
+
 #[test]
 fn count_qubit_targets_named_counts_repeat_blocks_recursively() {
     let instrs = vec![
@@ -193,6 +289,7 @@ fn surface_code_before_measure_flip_covers_ancilla_and_final_data_measurements()
         ancilla_measure_targets + final_data_measure_targets,
         "before_measure_flip_probability should apply before every ancilla MR and before final data M"
     );
+    assert_each_x_error_run_is_immediately_before_measurement(&circuit);
 }
 
 #[test]
@@ -210,6 +307,7 @@ fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
     let ancilla_mr_targets = count_qubit_targets_named(&circuit, "MR");
     let final_data_measure_targets =
         count_qubit_targets_named(tail_after_last_tick(&circuit), "M");
+    assert_eq!(ancilla_mr_targets % rounds, 0);
     let ancilla_count = ancilla_mr_targets / rounds;
 
     assert_eq!(
@@ -217,6 +315,7 @@ fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
         final_data_measure_targets + ancilla_count + ancilla_mr_targets,
         "after_reset_flip_probability should apply after initial data reset, initial ancilla reset, and each ancilla MR reset"
     );
+    assert_each_x_error_run_is_immediately_after_reset(&circuit);
 }
 
 #[test]
