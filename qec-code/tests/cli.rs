@@ -264,6 +264,53 @@ fn code_css_surface_rotated_d3_hz_prints_workspace_fixture() {
 }
 
 #[test]
+fn code_css_surface_rotated_missing_or_bad_distance_fails() {
+    #[derive(Debug)]
+    struct FailureCase {
+        args: &'static [&'static str],
+        stderr_fragment: &'static str,
+    }
+
+    const CASES: &[FailureCase] = &[
+        FailureCase {
+            args: &["code", "css", "surface_rotated", "hx"],
+            stderr_fragment: "missing built-in CSS parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=nope", "hx"],
+            stderr_fragment: "invalid built-in CSS integer parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=1", "hx"],
+            stderr_fragment: "out-of-range built-in CSS integer parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=3", "foo"],
+            stderr_fragment: "invalid value 'foo'",
+        },
+    ];
+
+    for case in CASES {
+        let output = run_qec_code(case.args);
+
+        assert!(
+            !output.status.success(),
+            "case {case:?} unexpectedly succeeded"
+        );
+        assert_eq!(
+            output.stdout, b"",
+            "case {case:?} should not print stdout"
+        );
+
+        let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+        assert!(
+            stderr.contains(case.stderr_fragment),
+            "case {case:?} stderr was: {stderr}"
+        );
+    }
+}
+
+#[test]
 fn code_css_list_includes_supported_built_ins() {
     let output = run_qec_code(&["code", "css", "list"]);
 
