@@ -280,6 +280,36 @@ fn css_distance_randomized_upper_bound_requires_json_flag() {
 }
 
 #[test]
+fn css_distance_randomized_upper_bound_rejects_code_id_and_file_input_together() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args([
+            "code",
+            "css-distance",
+            "randomized-upper-bound",
+            "--code-id",
+            "steane",
+            "--hx",
+        ])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .args(["--iterations", "10", "--seed", "7", "--json"])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("use either --code-id or --hx/--hz, not both"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
 fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() {
     let output = run_qec_code(&[
         "code",
