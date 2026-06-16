@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -42,6 +42,46 @@ fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     fs::write(&path, contents).expect("matrix fixture should be writable");
     path
 }
+
+#[derive(Debug, Clone, Copy)]
+struct BuiltInCssFixtureCase {
+    code_id: &'static str,
+    matrix: &'static str,
+    fixture: &'static str,
+}
+
+const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hx",
+        fixture: "steane_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hz",
+        fixture: "steane_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_x:d=5",
+        matrix: "hx",
+        fixture: "repetition_x_d5_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_z:d=5",
+        matrix: "hz",
+        fixture: "repetition_z_d5_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hx",
+        fixture: "bb72_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hz",
+        fixture: "bb72_hz.json",
+    },
+];
 
 #[test]
 fn steane_summary_reports_basic_code_parameters() {
@@ -172,6 +212,26 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
             .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
         "all bb72 hx rows should have weight 6: {rows:?}"
     );
+}
+
+#[test]
+fn built_in_css_fixture_manifest_exports_match_pinned_json() {
+    for case in BUILT_IN_CSS_FIXTURE_CASES {
+        let output = run_qec_code(&["code", "css", case.code_id, case.matrix]);
+
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
+
+        let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+        let fixture_path = format!("qec-code/tests/fixtures/css/{}", case.fixture);
+        let expected = read_fixture(&fixture_path);
+
+        assert_eq!(
+            stdout, expected,
+            "case {case:?} stdout differed from fixture {}",
+            case.fixture
+        );
+    }
 }
 
 #[test]
