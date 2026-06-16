@@ -1,6 +1,7 @@
 use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
+use crate::gf2;
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,13 +47,22 @@ impl CssCode {
             return Err(QecError::InvalidCssOrthogonality);
         }
 
-        let mut stabilizers = Vec::with_capacity(hx.len() + hz.len());
+        let mut stabilizer_rows = Vec::with_capacity(hx.len() + hz.len());
         for row in hx {
-            stabilizers.push(Pauli::from_xz_bits(row, vec![0; n])?);
+            let mut symplectic_row = row;
+            symplectic_row.extend(vec![0; n]);
+            stabilizer_rows.push(symplectic_row);
         }
         for row in hz {
-            stabilizers.push(Pauli::from_xz_bits(vec![0; n], row)?);
+            let mut symplectic_row = vec![0; n];
+            symplectic_row.extend(row);
+            stabilizer_rows.push(symplectic_row);
         }
+
+        let stabilizers = gf2::try_select_independent_rows(&stabilizer_rows)?
+            .into_iter()
+            .map(Pauli::from_symplectic_row)
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             code: StabilizerCode::from_stabilizers(n, stabilizers)?,

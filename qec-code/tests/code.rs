@@ -82,6 +82,17 @@ fn css_code_rejects_non_orthogonal_checks() {
 }
 
 #[test]
+fn css_code_accepts_redundant_orthogonal_checks() {
+    let code = CssCode::from_hx_hz(vec![vec![1, 0], vec![0, 1], vec![1, 1]], vec![])
+        .unwrap();
+
+    assert_eq!(code.code().n(), 2);
+    assert_eq!(code.code().stabilizer_rank(), 2);
+    assert_eq!(code.code().stabilizers().len(), 2);
+    assert_eq!(code.code().num_logical_qubits(), 0);
+}
+
+#[test]
 fn css_code_rejects_ragged_row_widths() {
     assert_eq!(
         CssCode::from_hx_hz(vec![vec![1, 0], vec![1]], vec![]),
