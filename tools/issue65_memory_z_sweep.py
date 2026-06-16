@@ -8,19 +8,11 @@ import sys
 import time
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import pymatching
-import stim
-
 DISTANCES = (3, 5, 7)
 NOISES = (0.008, 0.009, 0.010, 0.011, 0.012)
 MAX_SHOTS = 1_000_000
 MAX_ERRORS = 5_000
-MAX_LIKELIHOOD_FACTOR = 9.0
+MAX_LIKELIHOOD_FACTOR = 10_000.0
 ACC = 100
 
 
@@ -82,7 +74,9 @@ def fit_binomial(shots: int, hits: int) -> tuple[float, float, float]:
     return low / (ACC * shots), best, high / (ACC * shots)
 
 
-def make_circuit(distance: int, rounds: int, noise: float) -> stim.Circuit:
+def make_circuit(distance: int, rounds: int, noise: float):
+    import stim
+
     return stim.Circuit.generated(
         "surface_code:rotated_memory_z",
         rounds=rounds,
@@ -102,7 +96,9 @@ def import_sinter_version() -> str | None:
     return getattr(sinter, "__version__", "unknown")
 
 
-def count_mismatched_rows(pred: np.ndarray, obs: np.ndarray) -> int:
+def count_mismatched_rows(pred, obs) -> int:
+    import numpy as np
+
     if pred.shape != obs.shape:
         raise ValueError(f"prediction shape {pred.shape} does not match observable shape {obs.shape}")
     if pred.ndim == 1:
@@ -111,6 +107,9 @@ def count_mismatched_rows(pred: np.ndarray, obs: np.ndarray) -> int:
 
 
 def collect_stim_reference(out: Path) -> None:
+    import pymatching
+    import stim
+
     rows = []
     for distance in DISTANCES:
         rounds = distance * 3
@@ -224,6 +223,11 @@ def add_series(axis, label: str, rows: list[dict[str, object]], distance: int, c
 
 
 def plot_compare(stim_fixture: Path, rust_results: list[Path], out: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     stim_rows = json.loads(stim_fixture.read_text())["rows"]
     rust_rows = load_rust_rows(rust_results)
     fig, axes = plt.subplots(1, 3, figsize=(13, 4), sharey=True)

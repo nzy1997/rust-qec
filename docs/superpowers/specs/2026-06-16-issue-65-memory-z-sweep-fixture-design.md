@@ -49,7 +49,7 @@ It uses `input_type = "memory-z"` and expands to the same fifteen cases.
 
 Use the existing rsinter binomial interval implementation:
 
-`fit_binomial(shots, logical_errors, 9.0)`
+`fit_binomial(shots, logical_errors, 10_000.0)`
 
 For each case:
 
@@ -59,10 +59,12 @@ For each case:
 4. require interval overlap and require the Stim best estimate to be inside the
    Rust interval.
 
-This intentionally does not require an exact logical error rate match. Neither
-side needs a newly introduced seed control. With `max_errors = 5_000`, the
-intervals should be tight enough that a real mismatch is visible, while normal
-sampling noise should still pass.
+This intentionally does not require an exact logical error rate match. The
+higher likelihood factor is used because the requested assertion compares the
+Stim point estimate against the Rust interval, even though both estimates are
+sampled. Neither side needs a newly introduced seed control. With
+`max_errors = 5_000`, the intervals should still be tight enough that a real
+mismatch is visible, while normal sampling noise should pass.
 
 ## Comparison Figure
 

@@ -6,7 +6,7 @@
 
 **Architecture:** Use one shared TOML spec for the Rust sweep and one checked-in JSON fixture for the Stim reference sweep. A small Python tool generates the Stim fixture and renders a plot from the fixed Stim rows plus a Rust `results.jsonl`; the Rust integration test reads the fixture, runs the Rust sweep, computes binomial confidence intervals with `rsinter::stats::fit_binomial`, and checks agreement.
 
-**Tech Stack:** Rust integration tests, rsinter benchmark runner, Python 3, Stim/PyMatching/Sinter when available, Matplotlib, existing `fit_binomial(..., 9.0)` confidence intervals.
+**Tech Stack:** Rust integration tests, rsinter benchmark runner, Python 3, Stim/PyMatching/Sinter when available, Matplotlib, high-confidence `fit_binomial(..., 10_000.0)` intervals for the issue #65 comparison.
 
 ---
 
@@ -123,7 +123,7 @@ DISTANCES = (3, 5, 7)
 NOISES = (0.008, 0.009, 0.010, 0.011, 0.012)
 MAX_SHOTS = 1_000_000
 MAX_ERRORS = 5_000
-MAX_LIKELIHOOD_FACTOR = 9.0
+MAX_LIKELIHOOD_FACTOR = 10_000.0
 
 
 def fit_binomial(shots: int, errors: int) -> tuple[float, float, float]:
@@ -379,7 +379,7 @@ use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::stats::fit_binomial;
 use serde::Deserialize;
 
-const FIT_FACTOR: f64 = 9.0;
+const FIT_FACTOR: f64 = 10_000.0;
 
 #[derive(Debug, Deserialize)]
 struct StimFixture {

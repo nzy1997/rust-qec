@@ -9,7 +9,7 @@ use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::stats::fit_binomial;
 use serde::Deserialize;
 
-const FIT_FACTOR: f64 = 9.0;
+const FIT_FACTOR: f64 = 10_000.0;
 const EXPECTED_DISTANCES: [usize; 3] = [3, 5, 7];
 const EXPECTED_PS: [f64; 5] = [0.008, 0.009, 0.010, 0.011, 0.012];
 
@@ -71,8 +71,8 @@ fn issue65_memory_z_stim_fixture_is_well_formed() {
         );
 
         let fit = fit_binomial(row.shots, row.logical_errors, FIT_FACTOR);
-        assert_eq!(row.ci_low, fit.low.unwrap());
-        assert_eq!(row.ci_high, fit.high.unwrap());
+        assert_close(row.ci_low, fit.low.unwrap(), "ci_low");
+        assert_close(row.ci_high, fit.high.unwrap(), "ci_high");
     }
 }
 

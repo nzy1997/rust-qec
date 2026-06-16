@@ -1,10 +1,10 @@
 {
   "metadata": {
     "case_count": 15,
-    "created_at_unix": 1781594572,
+    "created_at_unix": 1781595414,
     "generator": "tools/issue65_memory_z_sweep.py collect-stim",
     "max_errors": 5000,
-    "max_likelihood_factor": 9.0,
+    "max_likelihood_factor": 10000.0,
     "max_shots": 1000000,
     "pymatching_version": "2.3.1",
     "sinter_version": null,
@@ -12,11 +12,11 @@
   },
   "rows": [
     {
-      "ci_high": 0.10883657094594594,
-      "ci_low": 0.10290983952702702,
+      "ci_high": 0.11186655405405406,
+      "ci_low": 0.09973986486486487,
       "distance": 3,
-      "logical_error_rate": 0.10584881756756757,
-      "logical_errors": 5013,
+      "logical_error_rate": 0.10570101351351352,
+      "logical_errors": 5006,
       "num_detectors": 72,
       "num_observables": 1,
       "p": 0.008,
@@ -24,35 +24,35 @@
       "shots": 47360
     },
     {
-      "ci_high": 0.13064960430194805,
-      "ci_low": 0.12361632508116883,
+      "ci_high": 0.13597554125816994,
+      "ci_low": 0.12145705678104575,
       "distance": 3,
-      "logical_error_rate": 0.12710531655844157,
-      "logical_errors": 5011,
+      "logical_error_rate": 0.1285998774509804,
+      "logical_errors": 5037,
       "num_detectors": 72,
       "num_observables": 1,
       "p": 0.009,
       "rounds": 9,
-      "shots": 39424
+      "shots": 39168
     },
     {
-      "ci_high": 0.15016266324626865,
-      "ci_low": 0.1421668027052239,
+      "ci_high": 0.1601544331395349,
+      "ci_low": 0.14321765988372093,
       "distance": 3,
-      "logical_error_rate": 0.14613456156716417,
-      "logical_errors": 5013,
+      "logical_error_rate": 0.15155644379844962,
+      "logical_errors": 5005,
       "num_detectors": 72,
       "num_observables": 1,
       "p": 0.01,
       "rounds": 9,
-      "shots": 34304
+      "shots": 33024
     },
     {
-      "ci_high": 0.17975132533482144,
-      "ci_low": 0.1703431919642857,
+      "ci_high": 0.18489013671875,
+      "ci_low": 0.16562534877232143,
       "distance": 3,
-      "logical_error_rate": 0.17501395089285715,
-      "logical_errors": 5018,
+      "logical_error_rate": 0.17511858258928573,
+      "logical_errors": 5021,
       "num_detectors": 72,
       "num_observables": 1,
       "p": 0.011,
@@ -60,59 +60,59 @@
       "shots": 28672
     },
     {
-      "ci_high": 0.20619021045918368,
-      "ci_low": 0.1955855389030612,
+      "ci_high": 0.20186931128640775,
+      "ci_low": 0.1810789593446602,
       "distance": 3,
-      "logical_error_rate": 0.20085299744897958,
-      "logical_errors": 5039,
+      "logical_error_rate": 0.1913304004854369,
+      "logical_errors": 5045,
       "num_detectors": 72,
       "num_observables": 1,
       "p": 0.012,
       "rounds": 9,
-      "shots": 25088
+      "shots": 26368
     },
     {
-      "ci_high": 0.14688212819343066,
-      "ci_low": 0.13904653284671534,
+      "ci_high": 0.1484575892857143,
+      "ci_low": 0.13270396205357143,
       "distance": 5,
-      "logical_error_rate": 0.14293453467153286,
-      "logical_errors": 5013,
+      "logical_error_rate": 0.14045758928571428,
+      "logical_errors": 5034,
       "num_detectors": 360,
       "num_observables": 1,
       "p": 0.008,
       "rounds": 15,
-      "shots": 35072
+      "shots": 35840
     },
     {
-      "ci_high": 0.1882359813084112,
-      "ci_low": 0.1784349445093458,
+      "ci_high": 0.18976490825688072,
+      "ci_low": 0.17003547878440367,
       "distance": 5,
-      "logical_error_rate": 0.18330169392523366,
-      "logical_errors": 5021,
+      "logical_error_rate": 0.17975917431192662,
+      "logical_errors": 5016,
       "num_detectors": 360,
       "num_observables": 1,
       "p": 0.009,
       "rounds": 15,
-      "shots": 27392
+      "shots": 27904
     },
     {
-      "ci_high": 0.22554599719101123,
-      "ci_low": 0.2140449438202247,
+      "ci_high": 0.23406871448863636,
+      "ci_low": 0.2103036221590909,
       "distance": 5,
-      "logical_error_rate": 0.21975948033707865,
-      "logical_errors": 5007,
+      "logical_error_rate": 0.22203480113636365,
+      "logical_errors": 5002,
       "num_detectors": 360,
       "num_observables": 1,
       "p": 0.01,
       "rounds": 15,
-      "shots": 22784
+      "shots": 22528
     },
     {
-      "ci_high": 0.26623612253289475,
-      "ci_low": 0.2530592105263158,
+      "ci_high": 0.2712654194078947,
+      "ci_low": 0.24435701069078947,
       "distance": 5,
-      "logical_error_rate": 0.25961143092105265,
-      "logical_errors": 5051,
+      "logical_error_rate": 0.25765830592105265,
+      "logical_errors": 5013,
       "num_detectors": 360,
       "num_observables": 1,
       "p": 0.011,
@@ -120,11 +120,11 @@
       "shots": 19456
     },
     {
-      "ci_high": 0.3030480410447761,
-      "ci_low": 0.28843983208955226,
+      "ci_high": 0.3082649253731343,
+      "ci_low": 0.27843516791044776,
       "distance": 5,
-      "logical_error_rate": 0.2957089552238806,
-      "logical_errors": 5072,
+      "logical_error_rate": 0.2932019589552239,
+      "logical_errors": 5029,
       "num_detectors": 360,
       "num_observables": 1,
       "p": 0.012,
@@ -132,11 +132,11 @@
       "shots": 17152
     },
     {
-      "ci_high": 0.16088375,
-      "ci_low": 0.1523665625,
+      "ci_high": 0.1657634375,
+      "ci_low": 0.1483121875,
       "distance": 7,
-      "logical_error_rate": 0.15659375,
-      "logical_errors": 5011,
+      "logical_error_rate": 0.15690625,
+      "logical_errors": 5021,
       "num_detectors": 1008,
       "num_observables": 1,
       "p": 0.008,
@@ -144,35 +144,35 @@
       "shots": 32000
     },
     {
-      "ci_high": 0.21834621263586956,
-      "ci_low": 0.20716669497282608,
+      "ci_high": 0.22264700940860216,
+      "ci_low": 0.19994581653225807,
       "distance": 7,
-      "logical_error_rate": 0.21272078804347827,
-      "logical_errors": 5010,
+      "logical_error_rate": 0.21114751344086022,
+      "logical_errors": 5027,
       "num_detectors": 1008,
       "num_observables": 1,
       "p": 0.009,
       "rounds": 21,
-      "shots": 23552
+      "shots": 23808
     },
     {
-      "ci_high": 0.2688776041666667,
-      "ci_low": 0.2555703125,
+      "ci_high": 0.2785810810810811,
+      "ci_low": 0.2510736908783784,
       "distance": 7,
-      "logical_error_rate": 0.2621875,
-      "logical_errors": 5034,
+      "logical_error_rate": 0.2646748310810811,
+      "logical_errors": 5014,
       "num_detectors": 1008,
       "num_observables": 1,
       "p": 0.01,
       "rounds": 21,
-      "shots": 19200
+      "shots": 18944
     },
     {
-      "ci_high": 0.333585425204918,
-      "ci_low": 0.31786372950819675,
+      "ci_high": 0.3395863217213115,
+      "ci_low": 0.3074641393442623,
       "distance": 7,
-      "logical_error_rate": 0.32569159836065575,
-      "logical_errors": 5086,
+      "logical_error_rate": 0.3233862704918033,
+      "logical_errors": 5050,
       "num_detectors": 1008,
       "num_observables": 1,
       "p": 0.011,
@@ -180,16 +180,16 @@
       "shots": 15616
     },
     {
-      "ci_high": 0.3766818576388889,
-      "ci_low": 0.35948567708333334,
+      "ci_high": 0.3886328125,
+      "ci_low": 0.3530512971698113,
       "distance": 7,
-      "logical_error_rate": 0.3680555555555556,
-      "logical_errors": 5088,
+      "logical_error_rate": 0.3707252358490566,
+      "logical_errors": 5030,
       "num_detectors": 1008,
       "num_observables": 1,
       "p": 0.012,
       "rounds": 21,
-      "shots": 13824
+      "shots": 13568
     }
   ]
 }
