@@ -19,6 +19,9 @@
   - Parse `bb72` as a fixed built-in id.
   - Add private fixed-term bivariate-bicycle helpers.
   - Dispatch `built_in_css_checks("bb72")`.
+- Modify: `qec-code/src/css.rs`
+  - Let `CssCode::from_hx_hz(...)` accept redundant CSS parity-check rows by
+    selecting an independent stabilizer basis after orthogonality validation.
 - Modify: `qec-code/tests/cli.rs`
   - Add a low-cost CLI smoke test proving the existing `qec-code code css bb72 hx` path emits sparse-row JSON.
 
@@ -123,9 +126,102 @@ Expected: FAIL. At least `bb72_has_expected_shape_and_css_orthogonality` should 
 
 **Files:**
 - Modify: `qec-code/src/codes/built_in_css.rs:33-157`
+- Modify: `qec-code/src/css.rs:1-60`
 - Test: `qec-code/tests/code.rs`
 
-- [ ] **Step 1: Add `bb72` as an accepted fixed id**
+- [ ] **Step 1: Add a regression test for redundant CSS parity checks**
+
+Insert this test after `css_code_rejects_non_orthogonal_checks` in `qec-code/tests/code.rs`:
+
+```rust
+#[test]
+fn css_code_accepts_redundant_orthogonal_checks() {
+    let code = CssCode::from_hx_hz(vec![vec![1, 0], vec![0, 1], vec![1, 1]], vec![])
+        .unwrap();
+
+    assert_eq!(code.code().n(), 2);
+    assert_eq!(code.code().stabilizer_rank(), 2);
+    assert_eq!(code.code().stabilizers().len(), 2);
+    assert_eq!(code.code().num_logical_qubits(), 0);
+}
+```
+
+- [ ] **Step 2: Run the redundant-check regression test and confirm it fails**
+
+Run:
+
+```bash
+cargo test -p qec-code --test code css_code_accepts_redundant_orthogonal_checks
+```
+
+Expected: FAIL with `DependentStabilizers`. This confirms the existing CSS
+constructor overconstrains redundant parity-check matrices.
+
+- [ ] **Step 3: Teach `CssCode::from_hx_hz` to select independent stabilizer rows**
+
+In `qec-code/src/css.rs`, add the private GF(2) import near the top:
+
+```rust
+use crate::gf2;
+```
+
+Then replace the stabilizer construction inside `CssCode::from_hx_hz(...)`.
+Change this block:
+
+```rust
+        let mut stabilizers = Vec::with_capacity(hx.len() + hz.len());
+        for row in hx {
+            stabilizers.push(Pauli::from_xz_bits(row, vec![0; n])?);
+        }
+        for row in hz {
+            stabilizers.push(Pauli::from_xz_bits(vec![0; n], row)?);
+        }
+
+        Ok(Self {
+            code: StabilizerCode::from_stabilizers(n, stabilizers)?,
+        })
+```
+
+to:
+
+```rust
+        let mut stabilizer_rows = Vec::with_capacity(hx.len() + hz.len());
+        for row in hx {
+            let mut symplectic_row = row;
+            symplectic_row.extend(vec![0; n]);
+            stabilizer_rows.push(symplectic_row);
+        }
+        for row in hz {
+            let mut symplectic_row = vec![0; n];
+            symplectic_row.extend(row);
+            stabilizer_rows.push(symplectic_row);
+        }
+
+        let stabilizers = gf2::try_select_independent_rows(&stabilizer_rows)?
+            .into_iter()
+            .map(Pauli::from_symplectic_row)
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Self {
+            code: StabilizerCode::from_stabilizers(n, stabilizers)?,
+        })
+```
+
+This keeps `StabilizerCode::from_stabilizers(...)` strict for explicit
+stabilizer lists while allowing `CssCode` to accept raw redundant parity-check
+matrices.
+
+- [ ] **Step 4: Run the redundant-check regression test and confirm it passes**
+
+Run:
+
+```bash
+cargo test -p qec-code --test code css_code_accepts_redundant_orthogonal_checks
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Add `bb72` as an accepted fixed id**
 
 Change the bare-id match in `parse_built_in_css_code_spec` from:
 
@@ -158,7 +254,7 @@ to:
     }
 ```
 
-- [ ] **Step 2: Add fixed `bb72` constants and private helpers**
+- [ ] **Step 6: Add fixed `bb72` constants and private helpers**
 
 Insert this block after `STEANE_ROW_SUPPORTS` and before `built_in_css_checks`:
 
@@ -211,7 +307,7 @@ fn bivariate_bicycle_checks(
 }
 ```
 
-- [ ] **Step 3: Dispatch `built_in_css_checks("bb72")`**
+- [ ] **Step 7: Dispatch `built_in_css_checks("bb72")`**
 
 Add this match branch after the existing `"steane"` branch and before the `_` error branch:
 
@@ -228,7 +324,7 @@ Add this match branch after the existing `"steane"` branch and before the `_` er
         }
 ```
 
-- [ ] **Step 4: Run the focused library tests and confirm they pass**
+- [ ] **Step 8: Run the focused library tests and confirm they pass**
 
 Run:
 
@@ -238,12 +334,12 @@ cargo test -p qec-code --test code bb72
 
 Expected: PASS. The output should include both `bb72_has_expected_shape_and_css_orthogonality` and `bb72_code_spec_rejects_unexpected_parameters` as passing tests.
 
-- [ ] **Step 5: Commit the library implementation**
+- [ ] **Step 9: Commit the library implementation**
 
 Run:
 
 ```bash
-git add qec-code/tests/code.rs qec-code/src/codes/built_in_css.rs
+git add qec-code/tests/code.rs qec-code/src/css.rs qec-code/src/codes/built_in_css.rs
 git commit -m "feat: add built-in bb72 css checks"
 ```
 
