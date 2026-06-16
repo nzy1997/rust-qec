@@ -323,6 +323,13 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         })
     );
     assert_eq!(
+        parse_built_in_css_code_spec("surface_rotated"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "surface_rotated".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
         parse_built_in_css_code_spec("repetition_x:d=nope"),
         Err(QecError::InvalidBuiltInCssIntegerParameter {
             family: "repetition_x".to_owned(),
