@@ -43,6 +43,59 @@ fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     path
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BuiltInCssFixtureCase {
+    code_id: &'static str,
+    matrix: &'static str,
+    fixture: &'static str,
+}
+
+const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hx",
+        fixture: "steane_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "steane",
+        matrix: "hz",
+        fixture: "steane_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_x:d=5",
+        matrix: "hx",
+        fixture: "repetition_x_d5_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "repetition_z:d=5",
+        matrix: "hz",
+        fixture: "repetition_z_d5_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hx",
+        fixture: "bb72_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "bb72",
+        matrix: "hz",
+        fixture: "bb72_hz.json",
+    },
+];
+
+fn read_qec_code_css_fixture(file_name: &str) -> String {
+    let path = workspace_root()
+        .join("qec-code/tests/fixtures/css")
+        .join(file_name);
+
+    std::fs::read_to_string(&path).unwrap_or_else(|err| {
+        panic!(
+            "failed to read qec-code CSS fixture {}: {err}",
+            path.display()
+        )
+    })
+}
+
 #[test]
 fn steane_summary_reports_basic_code_parameters() {
     let output = Command::new(qec_code_bin())
@@ -172,6 +225,35 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
             .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
         "all bb72 hx rows should have weight 6: {rows:?}"
     );
+}
+
+#[test]
+fn built_in_css_fixture_manifest_exports_match_pinned_json() {
+    for case in BUILT_IN_CSS_FIXTURE_CASES {
+        let output = run_qec_code(&["code", "css", case.code_id, case.matrix]);
+
+        assert!(
+            output.status.success(),
+            "case {case:?} failed with status {}\nstderr: {}\nstdout: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "case {case:?} wrote stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+        let expected = read_qec_code_css_fixture(case.fixture);
+
+        assert_eq!(
+            stdout, expected,
+            "case {case:?} stdout differed from fixture {}",
+            case.fixture
+        );
+    }
 }
 
 #[test]
