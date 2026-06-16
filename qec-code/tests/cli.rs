@@ -81,6 +81,16 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         matrix: "hz",
         fixture: "bb72_hz.json",
     },
+    BuiltInCssFixtureCase {
+        code_id: "surface_rotated:d=3",
+        matrix: "hx",
+        fixture: "surface_rotated_d3_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: "surface_rotated:d=3",
+        matrix: "hz",
+        fixture: "surface_rotated_d3_hz.json",
+    },
 ];
 
 #[test]
@@ -228,6 +238,76 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
 }
 
 #[test]
+fn code_css_surface_rotated_d3_hx_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_surface_rotated_d3_hz_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hz"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_surface_rotated_missing_or_bad_distance_fails() {
+    #[derive(Debug)]
+    struct FailureCase {
+        args: &'static [&'static str],
+        stderr_fragment: &'static str,
+    }
+
+    const CASES: &[FailureCase] = &[
+        FailureCase {
+            args: &["code", "css", "surface_rotated", "hx"],
+            stderr_fragment: "missing built-in CSS parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=nope", "hx"],
+            stderr_fragment: "invalid built-in CSS integer parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=1", "hx"],
+            stderr_fragment: "out-of-range built-in CSS integer parameter d",
+        },
+        FailureCase {
+            args: &["code", "css", "surface_rotated:d=3", "foo"],
+            stderr_fragment: "invalid value 'foo'",
+        },
+    ];
+
+    for case in CASES {
+        let output = run_qec_code(case.args);
+
+        assert!(
+            !output.status.success(),
+            "case {case:?} unexpectedly succeeded"
+        );
+        assert_eq!(output.stdout, b"", "case {case:?} should not print stdout");
+
+        let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+        assert!(
+            stderr.contains(case.stderr_fragment),
+            "case {case:?} stderr was: {stderr}"
+        );
+    }
+}
+
+#[test]
 fn code_css_list_includes_supported_built_ins() {
     let output = run_qec_code(&["code", "css", "list"]);
 
@@ -319,6 +399,34 @@ fn run_code_css_steane_matrices_return_fixture_json_without_newline() {
 }
 
 #[test]
+fn run_code_css_surface_rotated_d3_matrices_return_fixture_json_without_newline() {
+    let hx = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hx,
+            )),
+        },
+    })
+    .unwrap();
+    let hz = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hz,
+            )),
+        },
+    })
+    .unwrap();
+
+    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+    let expected_hz = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+    assert_eq!(hz, expected_hz.trim_end_matches('\n'));
+}
+
+#[test]
 fn run_code_css_list_returns_catalog_without_newline() {
     let output = run(Cli {
         command: Commands::Code {
@@ -345,6 +453,34 @@ fn run_code_css_export_subcommand_returns_fixture_json_without_newline() {
 
     let expected = read_fixture("rsinter/tests/fixtures/css/steane_hx.json");
     assert_eq!(output, expected.trim_end_matches('\n'));
+}
+
+#[test]
+fn run_code_css_surface_rotated_export_subcommand_returns_fixture_json_without_newline() {
+    let hx = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export_subcommand(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hx,
+            )),
+        },
+    })
+    .unwrap();
+    let hz = run(Cli {
+        command: Commands::Code {
+            command: CodeCommands::Css(CssArgs::export_subcommand(
+                "surface_rotated:d=3".to_owned(),
+                CssMatrixKind::Hz,
+            )),
+        },
+    })
+    .unwrap();
+
+    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+    let expected_hz = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hz.json");
+
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+    assert_eq!(hz, expected_hz.trim_end_matches('\n'));
 }
 
 #[test]
