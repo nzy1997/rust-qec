@@ -1,4 +1,7 @@
-use qec_code::codes::built_in_css::built_in_css_checks;
+use qec_code::codes::built_in_css::{
+    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_checks,
+    parse_built_in_css_code_spec,
+};
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
@@ -123,6 +126,95 @@ fn built_in_css_registry_exposes_steane_checks() {
     assert_eq!(checks.hz, checks.hx);
     assert_strictly_increasing_rows(&checks.hx);
     assert_strictly_increasing_rows(&checks.hz);
+}
+
+#[test]
+fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
+    assert_eq!(
+        parse_built_in_css_code_spec("steane"),
+        Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=5"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::RepetitionX,
+            params: BuiltInCssParams { distance: 5 },
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_z:d=5"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::RepetitionZ,
+            params: BuiltInCssParams { distance: 5 },
+        })
+    );
+}
+
+#[test]
+fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_integers() {
+    assert_eq!(
+        parse_built_in_css_code_spec("unknown:d=5"),
+        Err(QecError::UnknownBuiltInCssFamily {
+            family: "unknown".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=nope"),
+        Err(QecError::InvalidBuiltInCssIntegerParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+            value: "nope".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("unknown"),
+        Err(QecError::UnknownBuiltInCssCode {
+            code_id: "unknown".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=5,d=7"),
+        Err(QecError::DuplicateBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=0"),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "d".to_owned(),
+            value: 0,
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("repetition_x:d=5,foo=1"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "repetition_x".to_owned(),
+            parameter: "foo".to_owned(),
+        })
+    );
 }
 
 #[test]

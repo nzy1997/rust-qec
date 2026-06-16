@@ -50,6 +50,26 @@ pub enum QecError {
     IlpInfeasible,
     #[error("unknown built-in CSS code: {code_id}")]
     UnknownBuiltInCssCode { code_id: String },
+    #[error("unknown built-in CSS family: {family}")]
+    UnknownBuiltInCssFamily { family: String },
+    #[error("missing built-in CSS parameter {parameter} for family {family}")]
+    MissingBuiltInCssParameter { family: String, parameter: String },
+    #[error("duplicate built-in CSS parameter {parameter} for family {family}")]
+    DuplicateBuiltInCssParameter { family: String, parameter: String },
+    #[error("invalid built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    InvalidBuiltInCssIntegerParameter {
+        family: String,
+        parameter: String,
+        value: String,
+    },
+    #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
+    UnexpectedBuiltInCssParameter { family: String, parameter: String },
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    OutOfRangeBuiltInCssIntegerParameter {
+        family: String,
+        parameter: String,
+        value: usize,
+    },
 }
 
 pub type Result<T> = core::result::Result<T, QecError>;
