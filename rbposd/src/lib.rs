@@ -28,6 +28,7 @@ mod css;
 mod decoder;
 mod decoder_core;
 mod gf2;
+mod lsd_decoder;
 mod osd;
 
 pub use config::{
@@ -36,5 +37,6 @@ pub use config::{
 pub use css::CssDecoders;
 pub use decoder::{BpOsdDecoder, DecodeResult};
 pub use error::DecodeError;
+pub use lsd_decoder::BpLsdDecoder;
 pub use matrix::ParityCheckMatrix;
 pub use vector::{Correction, Syndrome};
