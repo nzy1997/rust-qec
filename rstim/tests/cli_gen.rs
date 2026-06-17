@@ -119,7 +119,7 @@ fn gen_css_memory_from_sparse_json_files() {
     std::fs::write(&hz, r#"{"format":"sparse_rows","num_cols":2,"rows":[]}"#).unwrap();
     std::fs::write(
         &obs,
-        r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+        r#"{"format":"sparse_rows","num_cols":2,"rows":[[0]]}"#,
     )
     .unwrap();
 
@@ -300,4 +300,49 @@ fn gen_css_memory_reports_non_orthogonal_checks() {
         stderr.contains("CSS X/Z checks are not orthogonal"),
         "stderr: {stderr}"
     );
+}
+
+#[test]
+fn gen_css_memory_rejects_non_logical_observable_and_preserves_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let hx = dir.path().join("hx.json");
+    let hz = dir.path().join("hz.json");
+    let obs = dir.path().join("obs.json");
+    let out = dir.path().join("out.stim");
+    let steane_h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+    std::fs::write(&hx, steane_h).unwrap();
+    std::fs::write(&hz, steane_h).unwrap();
+    std::fs::write(&obs, r#"{"format":"sparse_rows","num_cols":7,"rows":[[0]]}"#).unwrap();
+    std::fs::write(&out, "keep me").unwrap();
+
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "css",
+            "--task",
+            "memory",
+            "--hx",
+            hx.to_str().unwrap(),
+            "--hz",
+            hz.to_str().unwrap(),
+            "--basis",
+            "x",
+            "--rounds",
+            "1",
+            "--observables",
+            obs.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("observable 0 is not an X logical"),
+        "stderr: {stderr}"
+    );
+    assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
 }
