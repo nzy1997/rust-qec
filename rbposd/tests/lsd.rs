@@ -21,6 +21,47 @@ fn bplsddecoder_public_api_matches_reference_contract() {
 }
 
 #[test]
+fn bplsddecoder_clone_preserves_decoding_behavior_with_fresh_workspaces() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![1, 2], vec![0]]).unwrap();
+    let decoder = BpLsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::Bsc { error_rate: 0.05 },
+        LsdConfig::default(),
+    )
+    .unwrap();
+
+    let cloned = decoder.clone();
+    let syndrome = Syndrome::from(vec![true, false]);
+    let first = decoder.decode(&syndrome).unwrap();
+    let second = cloned.decode(&syndrome).unwrap();
+
+    assert_eq!(second, first);
+    assert_eq!(pcm.multiply(&second.correction), syndrome);
+}
+
+#[test]
+fn bplsddecoder_rejects_syndrome_length_mismatch() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+    let decoder = BpLsdDecoder::new(
+        pcm,
+        ChannelModel::Bsc { error_rate: 0.05 },
+        LsdConfig::default(),
+    )
+    .unwrap();
+
+    let err = decoder.decode(&Syndrome::from(vec![true])).unwrap_err();
+
+    assert_eq!(
+        err,
+        DecodeError::DimensionMismatch {
+            what: "syndrome",
+            expected: 2,
+            actual: 1,
+        }
+    );
+}
+
+#[test]
 fn bplsddecoder_zero_syndrome_uses_prior_fast_path() {
     let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
     let decoder = BpLsdDecoder::new(

@@ -91,6 +91,25 @@ fn minimum_sum_decoder_reuses_one_instance_for_multiple_syndromes() {
 }
 
 #[test]
+fn minimum_sum_decoder_clone_preserves_decoding_behavior_with_fresh_workspaces() {
+    let pcm = repetition_pcm();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::Bsc { error_rate: 0.05 },
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let cloned = decoder.clone();
+    let syndrome = Syndrome::from(vec![false, true, false, false]);
+    let first = decoder.decode(&syndrome).unwrap();
+    let second = cloned.decode(&syndrome).unwrap();
+
+    assert_eq!(second, first);
+    assert_eq!(pcm.multiply(&second.correction), syndrome);
+}
+
+#[test]
 fn zero_syndrome_can_return_a_prior_favored_nullspace_correction() {
     let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
     let decoder = BpOsdDecoder::new(
