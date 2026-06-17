@@ -721,6 +721,29 @@ fn code_css_distance_exact_code_id_returns_exact_json() {
 }
 
 #[test]
+fn run_code_css_distance_exact_code_id_returns_exact_json() {
+    let output = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--json",
+    ])
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 3);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 3);
+    assert_eq!(json["options"]["input"], "code_id");
+    assert_eq!(json["options"]["code_id"], "steane");
+    assert_eq!(json["provenance"]["tool"], "qec-code");
+}
+
+#[test]
 fn code_css_distance_exact_hx_hz_files_return_exact_json() {
     let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
     let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
@@ -750,6 +773,33 @@ fn code_css_distance_exact_hx_hz_files_return_exact_json() {
 }
 
 #[test]
+fn run_code_css_distance_exact_files_return_exact_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("exact"),
+        OsString::from("--hx"),
+        hx.clone().into_os_string(),
+        OsString::from("--hz"),
+        hz.clone().into_os_string(),
+        OsString::from("--json"),
+    ])
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 3);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 3);
+    assert_eq!(json["options"]["input"], "files");
+    assert_eq!(json["options"]["hx"], hx.display().to_string());
+    assert_eq!(json["options"]["hz"], hz.display().to_string());
+}
+
+#[test]
 fn code_css_distance_exact_requires_json_flag() {
     let output = run_qec_code(&["code", "css-distance", "exact", "--code-id", "steane"]);
 
@@ -761,6 +811,68 @@ fn code_css_distance_exact_requires_json_flag() {
         stderr.contains("JSON output is required for code css-distance exact"),
         "stderr was: {stderr}"
     );
+}
+
+#[test]
+fn run_code_css_distance_exact_rejects_input_errors() {
+    let missing_json =
+        run_qec_code_in_process(&["code", "css-distance", "exact", "--code-id", "steane"]);
+    assert!(matches!(
+        missing_json,
+        Err(QecError::JsonOutputRequired { command })
+            if command == "code css-distance exact"
+    ));
+
+    let missing_source = run_qec_code_in_process(&["code", "css-distance", "exact", "--json"]);
+    assert!(matches!(
+        missing_source,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("provide --code-id or both --hx and --hz")
+    ));
+
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[]}"#,
+    );
+
+    let mixed_input = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("exact"),
+        OsString::from("--code-id"),
+        OsString::from("steane"),
+        OsString::from("--hx"),
+        hx.clone().into_os_string(),
+        OsString::from("--hz"),
+        hz.into_os_string(),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        mixed_input,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("use either --code-id or --hx/--hz, not both")
+    ));
+
+    let missing_pair = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css-distance"),
+        OsString::from("exact"),
+        OsString::from("--hx"),
+        hx.into_os_string(),
+        OsString::from("--json"),
+    ]);
+    assert!(matches!(
+        missing_pair,
+        Err(QecError::InvalidCssDistanceInput(message))
+            if message.contains("--hx and --hz must be provided together")
+    ));
 }
 
 #[test]
