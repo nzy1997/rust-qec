@@ -225,7 +225,11 @@ rstim gen \
 ```
 
 `hx.json`, `hz.json`, and observable files use the explicit JSON wrappers
-accepted by `rstim::codegen::css`.
+accepted by `rstim::codegen::css`. For CSS memory generation, `--basis x`
+interprets `--observables` rows as X-like logical supports, while `--basis z`
+interprets them as Z-like logical supports. Explicit observable rows must define
+exactly `k` independent logical classes modulo the selected-basis stabilizer
+span; invalid rows fail before a circuit is written.
 
 This command is a convenient front door to the circuit generation APIs in
 `rstim::codegen`.
