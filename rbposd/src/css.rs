@@ -1,9 +1,9 @@
+use crate::DecoderConfig;
 use crate::config::ChannelModel;
 use crate::decoder::{BpOsdDecoder, DecodeResult};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::Syndrome;
-use crate::DecoderConfig;
 
 #[derive(Debug, Clone)]
 pub struct CssDecoders {

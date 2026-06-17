@@ -175,8 +175,7 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
     let wrong_error = parity_schema::ParityOutcome::Error {
         error: "BpDidNotConverge".to_string(),
     };
-    let actual_error =
-        parity_schema::ParityOutcome::from_decode_error(DecodeError::NoOsdSolution);
+    let actual_error = parity_schema::ParityOutcome::from_decode_error(DecodeError::NoOsdSolution);
     assert!(!wrong_error.matches_actual(&actual_error));
     assert!(!expected_partial.matches_actual(&actual_error));
 }

@@ -2,8 +2,14 @@
 pub enum DecodeError {
     EmptyMatrix,
     InvalidProbability,
-    InvalidColumnIndex { column: usize, num_bits: usize },
-    InvalidRowIndex { row: usize, num_checks: usize },
+    InvalidColumnIndex {
+        column: usize,
+        num_bits: usize,
+    },
+    InvalidRowIndex {
+        row: usize,
+        num_checks: usize,
+    },
     DimensionMismatch {
         what: &'static str,
         expected: usize,
@@ -12,7 +18,9 @@ pub enum DecodeError {
     SingularSystem,
     BpDidNotConverge,
     NoOsdSolution,
-    UnsupportedLsdOrder { order: usize },
+    UnsupportedLsdOrder {
+        order: usize,
+    },
 }
 
 impl core::fmt::Display for DecodeError {
@@ -40,14 +48,14 @@ impl core::fmt::Display for DecodeError {
                 f,
                 "dimension mismatch for {what}: expected {expected}, got {actual}"
             ),
-            Self::SingularSystem => write!(
-                f,
-                "singular system cannot satisfy the target syndrome"
-            ),
+            Self::SingularSystem => write!(f, "singular system cannot satisfy the target syndrome"),
             Self::BpDidNotConverge => write!(f, "belief propagation did not converge"),
             Self::NoOsdSolution => write!(f, "no OSD solution found"),
             Self::UnsupportedLsdOrder { order } => {
-                write!(f, "unsupported LSD order {order}; only order 0 is supported")
+                write!(
+                    f,
+                    "unsupported LSD order {order}; only order 0 is supported"
+                )
             }
         }
     }

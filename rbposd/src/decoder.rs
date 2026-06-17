@@ -5,7 +5,7 @@ use crate::config::{ChannelModel, DecoderConfig};
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
-use crate::osd::{decode_osd_with_workspace, OsdWorkspace};
+use crate::osd::{OsdWorkspace, decode_osd_with_workspace};
 use crate::vector::{Correction, Syndrome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

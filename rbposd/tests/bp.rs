@@ -1,6 +1,5 @@
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix,
-    Syndrome,
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
 };
 
 fn repetition_pcm() -> ParityCheckMatrix {
@@ -34,14 +33,13 @@ fn minimum_sum_decodes_a_single_flip_without_osd() {
 
 #[test]
 fn minimum_sum_keeps_a_converged_solution_when_early_stop_is_disabled() {
-    let pcm =
-        ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![0, 1, 2]]).unwrap();
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![0, 1, 2]]).unwrap();
     let config = DecoderConfig {
         early_stop: false,
         ..DecoderConfig::default()
     };
-    let decoder = BpOsdDecoder::new(pcm.clone(), ChannelModel::Bsc { error_rate: 0.05 }, config)
-        .unwrap();
+    let decoder =
+        BpOsdDecoder::new(pcm.clone(), ChannelModel::Bsc { error_rate: 0.05 }, config).unwrap();
 
     let syndrome = Syndrome::from(vec![false, true]);
     let result = decoder.decode(&syndrome).unwrap();
@@ -50,7 +48,10 @@ fn minimum_sum_keeps_a_converged_solution_when_early_stop_is_disabled() {
     assert!(!result.used_osd);
     assert_eq!(result.residual_syndrome_weight, 0);
     assert_eq!(pcm.multiply(&result.correction), syndrome);
-    assert_eq!(result.correction, Correction::from(vec![false, false, true]));
+    assert_eq!(
+        result.correction,
+        Correction::from(vec![false, false, true])
+    );
 }
 
 #[test]
@@ -140,7 +141,9 @@ fn decoder_rejects_syndrome_and_channel_dimension_mismatches() {
     )
     .unwrap();
 
-    let err = decoder.decode(&Syndrome::from(vec![true, false])).unwrap_err();
+    let err = decoder
+        .decode(&Syndrome::from(vec![true, false]))
+        .unwrap_err();
     assert_eq!(
         err,
         DecodeError::DimensionMismatch {

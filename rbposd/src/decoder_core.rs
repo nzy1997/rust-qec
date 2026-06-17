@@ -1,4 +1,4 @@
-use crate::bp::{run_minimum_sum_compiled_in_place, BpRunInfo, BpWorkspace, CompiledGraph};
+use crate::bp::{BpRunInfo, BpWorkspace, CompiledGraph, run_minimum_sum_compiled_in_place};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
@@ -94,7 +94,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::Correction;
 
-    use super::{compute_prior_llrs, prior_hard_decision, BpCore};
+    use super::{BpCore, compute_prior_llrs, prior_hard_decision};
 
     #[test]
     fn computes_uniform_prior_llrs_from_bsc() {
