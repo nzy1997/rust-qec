@@ -13,6 +13,7 @@ fn default_rust_runner_registry_contains_workspace_decoders() {
     assert!(registry.contains_key("rmatching"));
     assert!(registry.contains_key("rbposd"));
     assert!(registry.contains_key("rilpqec"));
+    assert!(registry.contains_key("predict-zero"));
 }
 
 #[test]
@@ -22,6 +23,7 @@ fn default_rust_runner_registry_exposes_runner_names() {
     assert_eq!(registry.get("rmatching").unwrap().name(), "rmatching");
     assert_eq!(registry.get("rbposd").unwrap().name(), "rbposd");
     assert_eq!(registry.get("rilpqec").unwrap().name(), "rilpqec");
+    assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
 }
 
 #[test]
@@ -30,6 +32,7 @@ fn default_rust_runner_names_include_workspace_decoders() {
     assert!(names.contains(&"rmatching".to_string()));
     assert!(names.contains(&"rbposd".to_string()));
     assert!(names.contains(&"rilpqec".to_string()));
+    assert!(names.contains(&"predict-zero".to_string()));
 }
 
 #[test]
@@ -204,10 +207,7 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
 fn expand_runner_points_accepts_memory_z_input_types() {
     for input_type in ["surface_rotated_memory_z", "memory-z"] {
         let mut params = valid_runner_params();
-        params.insert(
-            "input_type".into(),
-            toml::Value::String(input_type.into()),
-        );
+        params.insert("input_type".into(), toml::Value::String(input_type.into()));
 
         let points = expand_runner_points(&params).unwrap();
 

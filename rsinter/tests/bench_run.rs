@@ -202,7 +202,10 @@ label = "Logical Error Rate"
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].runner, "mwpm_alias");
-    assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rmatching"));
+    assert_eq!(
+        rows[0].params["decoder_impl"],
+        serde_json::json!("rmatching")
+    );
     assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
 }
 
@@ -1024,8 +1027,8 @@ label = "Logical Error Rate"
 
 #[test]
 fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
-    let spec_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/minimal_bb72_css_decoder.toml");
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/minimal_bb72_css_decoder.toml");
     let text = fs::read_to_string(&spec_path).unwrap();
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
     let dir = tempfile::tempdir().unwrap();
@@ -1073,10 +1076,94 @@ fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
 }
 
 #[test]
+fn predict_zero_benchmark_runs_bb72_css_negative_control() {
+    let spec_text = r#"
+name = "bb72_predict_zero"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "predict-zero-v1"
+language = "rust"
+impl_key = "predict-zero"
+
+[runner.params]
+input_type = "css"
+code_id = "bivariate-bicycle-code-m6-n6"
+hx = "../css/bb72_hx.json"
+hz = "../css/bb72_hz.json"
+observables = "../css/bb72_logicals_x.json"
+basis = "x"
+schedule = "greedy"
+rounds = [3]
+p = [0.001]
+seed = 12345
+max_shots = 64
+max_errors = 64
+batch_size = 64
+
+[plot]
+title = "BB72 Predict Zero"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench");
+
+    let artifact_root =
+        run_rust_benchmark(&spec, "rust", dir.path(), &registry, &spec_dir).unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("predict-zero-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].runner, "predict-zero-v1");
+    assert_eq!(
+        rows[0].params["decoder_impl"],
+        serde_json::json!("predict-zero")
+    );
+    assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("css"));
+    assert_eq!(
+        rows[0].params["code_id"],
+        serde_json::json!("bivariate-bicycle-code-m6-n6")
+    );
+    assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(12));
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+
+    let logical_error_rate = rows[0].metrics["logical_error_rate"];
+    assert!(
+        (0.35..=0.65).contains(&logical_error_rate),
+        "predict-zero control LER was {logical_error_rate}"
+    );
+}
+
+#[test]
 fn rust_benchmark_run_rejects_invalid_css_observables_before_results() {
     let spec_dir = tempfile::tempdir().unwrap();
     let out_dir = tempfile::tempdir().unwrap();
-    let steane_h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+    let steane_h =
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
     fs::write(spec_dir.path().join("hx.json"), steane_h).unwrap();
     fs::write(spec_dir.path().join("hz.json"), steane_h).unwrap();
     fs::write(
@@ -1128,8 +1215,8 @@ label = "Logical Error Rate"
     let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let err = run_rust_benchmark(&spec, "rust", out_dir.path(), &registry, spec_dir.path())
-        .unwrap_err();
+    let err =
+        run_rust_benchmark(&spec, "rust", out_dir.path(), &registry, spec_dir.path()).unwrap_err();
 
     assert!(
         err.contains("observable 0 is not an X logical"),

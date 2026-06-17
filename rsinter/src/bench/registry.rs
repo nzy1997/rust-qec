@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use toml::Value;
 
 use crate::bench::result::BenchmarkResultRow;
+use crate::bench::runners::predict_zero::PredictZeroRunner;
 use crate::bench::runners::rbposd::RbposdRunner;
 use crate::bench::runners::rilpqec::RilpqecRunner;
 use crate::bench::runners::rmatching::RmatchingRunner;
@@ -58,7 +59,7 @@ struct SplitRunnerParams {
 }
 
 pub fn default_rust_runner_names() -> Vec<String> {
-    ["rmatching", "rbposd", "rilpqec"]
+    ["rmatching", "rbposd", "rilpqec", "predict-zero"]
         .into_iter()
         .map(|name| name.to_string())
         .collect()
@@ -69,6 +70,7 @@ pub fn build_default_rust_runner_registry() -> RustRunnerRegistry {
     registry.insert("rmatching".into(), Box::new(RmatchingRunner));
     registry.insert("rbposd".into(), Box::new(RbposdRunner));
     registry.insert("rilpqec".into(), Box::new(RilpqecRunner));
+    registry.insert("predict-zero".into(), Box::new(PredictZeroRunner));
     registry
 }
 

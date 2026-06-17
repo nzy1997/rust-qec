@@ -1,20 +1,21 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::StimInstr;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
-use crate::bench::circuit_source::{build_circuit_for_point, BuiltCircuit};
+use crate::bench::circuit_source::{BuiltCircuit, build_circuit_for_point};
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::{classify_completed, classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_completed, classify_error};
 
 pub(crate) mod params;
+pub mod predict_zero;
 pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
@@ -170,16 +171,19 @@ where
     let base_case_summary = built.case_summary;
     let dem = match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
         Ok(dem) => dem,
-        Err(error) => {
-            let failure_kind = classify_error(&error, FailureKind::SolverFailure);
-            return Ok(benchmark_result_row(
-                ctx,
-                failure_kind,
-                result_params,
-                base_case_summary,
-                benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
-                Some(error),
-            ));
+        Err(decomposition_error) => {
+            if runner_name != "predict-zero" {
+                let failure_kind = classify_error(&decomposition_error, FailureKind::SolverFailure);
+                return Ok(benchmark_result_row(
+                    ctx,
+                    failure_kind,
+                    result_params,
+                    base_case_summary,
+                    benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                    Some(decomposition_error),
+                ));
+            }
+            ErrorAnalyzer::circuit_to_dem(&circuit).map_err(|error| error)?
         }
     };
     let num_dets = dem.effective_num_detectors();
