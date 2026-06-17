@@ -26,6 +26,7 @@ pub mod vector;
 mod bp;
 mod css;
 mod decoder;
+mod decoder_core;
 mod gf2;
 mod osd;
 
