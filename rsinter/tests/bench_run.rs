@@ -1054,6 +1054,10 @@ fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
         serde_json::json!("explicit")
     );
     assert_eq!(
+        rows[0].params["logical_observable_basis"],
+        serde_json::json!("x")
+    );
+    assert_eq!(
         rows[0].params["logical_failure_aggregation"],
         serde_json::json!("any_logical")
     );
