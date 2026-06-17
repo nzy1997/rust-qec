@@ -60,14 +60,47 @@ fn task_6_documentation_surfaces_exist() {
     let profile_example = crate_root.join("examples/profile_repetition.rs");
     let lib_rs = crate_root.join("src/lib.rs");
 
-    assert!(basic_example.exists(), "missing {}", basic_example.display());
-    assert!(profile_example.exists(), "missing {}", profile_example.display());
+    assert!(
+        basic_example.exists(),
+        "missing {}",
+        basic_example.display()
+    );
+    assert!(
+        profile_example.exists(),
+        "missing {}",
+        profile_example.display()
+    );
 
     let lib_contents = fs::read_to_string(&lib_rs).unwrap();
     let lib_rs_display = lib_rs.display().to_string();
     assert!(
-        lib_contents.contains("use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};"),
+        lib_contents.contains(
+            "use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};"
+        ),
         "missing crate-level usage example in {}",
         lib_rs_display
     );
+    assert!(
+        lib_contents.contains(
+            "use rbposd::{BpLsdDecoder, ChannelModel, LsdConfig, ParityCheckMatrix, Syndrome};"
+        ),
+        "missing BpLsdDecoder crate-level usage example in {}",
+        lib_rs_display
+    );
+
+    let reference_doc = crate_root.join("doc/ldpc_mvp_reference.md");
+    let reference_contents = fs::read_to_string(&reference_doc).unwrap();
+    let reference_doc_display = reference_doc.display().to_string();
+    for required in [
+        "BpLsdDecoder",
+        "LsdConfig",
+        "LsdMethod",
+        "UnsupportedLsdOrder",
+    ] {
+        assert!(
+            reference_contents.contains(required),
+            "missing {required} in {}",
+            reference_doc_display
+        );
+    }
 }

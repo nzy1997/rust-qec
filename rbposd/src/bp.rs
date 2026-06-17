@@ -167,7 +167,11 @@ fn update_check_to_variable_messages(
     for check in 0..graph.num_checks {
         let start = graph.check_edge_offsets[check];
         let end = graph.check_edge_offsets[check + 1];
-        let syndrome_sign = if syndrome.as_slice()[check] { -1.0 } else { 1.0 };
+        let syndrome_sign = if syndrome.as_slice()[check] {
+            -1.0
+        } else {
+            1.0
+        };
 
         if end - start == 1 {
             workspace.c_to_v[start] = syndrome_sign * CERTAINTY_LLR;
@@ -284,7 +288,9 @@ pub(crate) fn run_minimum_sum_compiled_in_place(
             workspace
                 .best_hard_decision_bits
                 .copy_from_slice(&workspace.hard_decision_bits);
-            workspace.best_reliability.copy_from_slice(&workspace.reliability);
+            workspace
+                .best_reliability
+                .copy_from_slice(&workspace.reliability);
             best_info = Some(info);
         }
 
@@ -302,7 +308,9 @@ pub(crate) fn run_minimum_sum_compiled_in_place(
         workspace
             .hard_decision_bits
             .copy_from_slice(&workspace.best_hard_decision_bits);
-        workspace.reliability.copy_from_slice(&workspace.best_reliability);
+        workspace
+            .reliability
+            .copy_from_slice(&workspace.best_reliability);
         workspace.residual_weight = 0;
         return info;
     }
@@ -321,15 +329,14 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        recompute_residual_from_hard_decision, run_minimum_sum_compiled,
-        run_minimum_sum_compiled_in_place, BpWorkspace, CompiledGraph,
+        BpWorkspace, CompiledGraph, recompute_residual_from_hard_decision,
+        run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
         update_check_to_variable_messages,
     };
 
     #[test]
     fn compiled_graph_flattens_sparse_rows_into_stable_edge_ranges() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
 
         let graph = CompiledGraph::from_pcm(&pcm);
 
@@ -344,8 +351,7 @@ mod tests {
 
     #[test]
     fn bp_workspace_reset_clears_messages_and_decision_state() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
         let graph = CompiledGraph::from_pcm(&pcm);
         let mut workspace = BpWorkspace::new(&graph);
 
@@ -375,8 +381,7 @@ mod tests {
     fn bp_workspace_reset_rejects_workspace_from_different_graph() {
         let first_pcm =
             ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
-        let second_pcm =
-            ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+        let second_pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
         let first_graph = CompiledGraph::from_pcm(&first_pcm);
         let second_graph = CompiledGraph::from_pcm(&second_pcm);
         let mut workspace = BpWorkspace::new(&first_graph);
@@ -386,8 +391,7 @@ mod tests {
 
     #[test]
     fn residual_tracker_matches_pcm_multiply_for_manual_hard_decision() {
-        let pcm =
-            ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
         let graph = CompiledGraph::from_pcm(&pcm);
         let syndrome = Syndrome::from(vec![false, false]);
         let mut workspace = BpWorkspace::new(&graph);
@@ -477,8 +481,7 @@ mod tests {
 
     #[test]
     fn compiled_minimum_sum_zero_iterations_preserves_prior_snapshot() {
-        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]])
-            .unwrap();
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
         let graph = CompiledGraph::from_pcm(&pcm);
         let mut workspace = BpWorkspace::new(&graph);
         let config = DecoderConfig {
@@ -495,7 +498,10 @@ mod tests {
             &mut workspace,
         );
 
-        assert_eq!(snapshot.hard_decision, Correction::from(vec![false, false, true]));
+        assert_eq!(
+            snapshot.hard_decision,
+            Correction::from(vec![false, false, true])
+        );
         assert_eq!(snapshot.reliability, vec![2.0, 1.0, 3.0]);
         assert_eq!(snapshot.iterations, 0);
         assert!(!snapshot.converged);

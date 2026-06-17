@@ -1,11 +1,11 @@
 use std::fs;
 use std::process::ExitCode;
 
+#[path = "../dev/parity_runner.rs"]
+mod parity_runner;
 #[allow(dead_code)]
 #[path = "../dev/parity_schema.rs"]
 mod parity_schema;
-#[path = "../dev/parity_runner.rs"]
-mod parity_runner;
 
 fn main() -> ExitCode {
     let mut args = std::env::args();
