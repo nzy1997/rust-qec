@@ -113,7 +113,7 @@ fn rotated_surface_css_memory_x(
 }
 
 fn rotated_surface_css_checks(distance: usize) -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<usize>) {
-    let data_index = |x: usize, y: usize| -> usize { y * distance + x };
+    let data_index = |x: usize, y: usize| -> usize { x * distance + y };
     let mut hx = Vec::new();
     let mut hz = Vec::new();
     for ax in 0..=distance {
@@ -128,9 +128,11 @@ fn rotated_surface_css_checks(distance: usize) -> (Vec<Vec<usize>>, Vec<Vec<usiz
                 continue;
             }
             let mut support = Vec::new();
+            let mx = (2 * ax) as isize;
+            let my = (2 * ay) as isize;
             for (dx, dy) in [(1isize, 1isize), (1, -1), (-1, 1), (-1, -1)] {
-                let x = ax as isize + dx;
-                let y = ay as isize + dy;
+                let x = mx + dx;
+                let y = my + dy;
                 if x >= 1
                     && x <= (2 * distance - 1) as isize
                     && y >= 1
@@ -146,6 +148,10 @@ fn rotated_surface_css_checks(distance: usize) -> (Vec<Vec<usize>>, Vec<Vec<usiz
                 }
             }
             support.sort_unstable();
+            support.dedup();
+            if support.is_empty() {
+                continue;
+            }
             if parity {
                 hx.push(support);
             } else {
