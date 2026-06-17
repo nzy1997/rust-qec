@@ -12,12 +12,24 @@ fn parity_harness_tooling_surfaces_exist() {
     let parity_requirements = crate_root.join("scripts/requirements-parity.txt");
     let parity_requirements_display = parity_requirements.display().to_string();
 
-    assert!(parity_driver.exists(), "missing {}", parity_driver.display());
-    assert!(parity_harness.exists(), "missing {}", parity_harness.display());
+    assert!(
+        parity_driver.exists(),
+        "missing {}",
+        parity_driver.display()
+    );
+    assert!(
+        parity_harness.exists(),
+        "missing {}",
+        parity_harness.display()
+    );
     assert!(
         parity_requirements.exists(),
         "missing {}",
         parity_requirements_display
     );
-    assert!(workflow_path.exists(), "missing {}", workflow_path.display());
+    assert!(
+        workflow_path.exists(),
+        "missing {}",
+        workflow_path.display()
+    );
 }

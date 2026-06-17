@@ -90,8 +90,16 @@ fn parity_driver_fails_with_usage_when_case_path_missing() {
         stdout,
         stderr
     );
-    assert!(stdout.trim().is_empty(), "expected empty stdout, got:\n{}", stdout);
-    assert!(stderr.contains("usage:"), "stderr missing usage:\n{}", stderr);
+    assert!(
+        stdout.trim().is_empty(),
+        "expected empty stdout, got:\n{}",
+        stdout
+    );
+    assert!(
+        stderr.contains("usage:"),
+        "stderr missing usage:\n{}",
+        stderr
+    );
     assert!(
         stderr.contains("<parity-case.json>"),
         "stderr missing arg hint:\n{}",
@@ -121,7 +129,11 @@ fn parity_driver_fails_cleanly_on_invalid_json_case() {
         stdout,
         stderr
     );
-    assert!(stdout.trim().is_empty(), "expected empty stdout, got:\n{}", stdout);
+    assert!(
+        stdout.trim().is_empty(),
+        "expected empty stdout, got:\n{}",
+        stdout
+    );
     assert!(
         stderr.contains("failed to parse"),
         "stderr should explain parse failure:\n{}",

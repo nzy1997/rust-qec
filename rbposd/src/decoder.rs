@@ -1,7 +1,8 @@
 use std::sync::Mutex;
 
-use crate::bp::{BpWorkspace, CompiledGraph, run_minimum_sum_compiled_in_place};
+use crate::bp::BpWorkspace;
 use crate::config::{ChannelModel, DecoderConfig};
+use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{OsdWorkspace, decode_osd_with_workspace};
@@ -19,9 +20,8 @@ pub struct DecodeResult {
 #[derive(Debug)]
 pub struct BpOsdDecoder {
     pcm: ParityCheckMatrix,
-    graph: CompiledGraph,
+    core: BpCore,
     config: DecoderConfig,
-    prior_llrs: Vec<f64>,
     bp_workspace: Mutex<BpWorkspace>,
     osd_workspace: Mutex<OsdWorkspace>,
 }
@@ -30,10 +30,9 @@ impl Clone for BpOsdDecoder {
     fn clone(&self) -> Self {
         Self {
             pcm: self.pcm.clone(),
-            graph: self.graph.clone(),
-            config: self.config.clone(),
-            prior_llrs: self.prior_llrs.clone(),
-            bp_workspace: Mutex::new(BpWorkspace::new(&self.graph)),
+            core: self.core.clone(),
+            config: self.config,
+            bp_workspace: Mutex::new(self.core.workspace()),
             osd_workspace: Mutex::new(OsdWorkspace::new(&self.pcm)),
         }
     }
@@ -45,15 +44,13 @@ impl BpOsdDecoder {
         channel: ChannelModel,
         config: DecoderConfig,
     ) -> Result<Self, DecodeError> {
-        let prior_llrs = compute_prior_llrs(&pcm, &channel)?;
-        let graph = CompiledGraph::from_pcm(&pcm);
-        let bp_workspace = Mutex::new(BpWorkspace::new(&graph));
+        let core = BpCore::new(&pcm, &channel)?;
+        let bp_workspace = Mutex::new(core.workspace());
         let osd_workspace = Mutex::new(OsdWorkspace::new(&pcm));
         Ok(Self {
             pcm,
-            graph,
+            core,
             config,
-            prior_llrs,
             bp_workspace,
             osd_workspace,
         })
@@ -69,7 +66,7 @@ impl BpOsdDecoder {
         }
 
         if syndrome.weight() == 0 {
-            let prior_correction = prior_hard_decision(&self.prior_llrs);
+            let prior_correction = self.core.hard_decision_from_prior();
             if self.pcm.multiply(&prior_correction) == *syndrome {
                 return Ok(DecodeResult {
                     correction: prior_correction,
@@ -82,13 +79,9 @@ impl BpOsdDecoder {
         }
 
         let mut bp_workspace = self.bp_workspace.lock().unwrap();
-        let bp_info = run_minimum_sum_compiled_in_place(
-            &self.graph,
-            syndrome,
-            &self.prior_llrs,
-            &self.config,
-            &mut bp_workspace,
-        );
+        let bp_info = self
+            .core
+            .run_minimum_sum_in_place(syndrome, &self.config, &mut bp_workspace);
         if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {
                 correction: Correction::from(bp_workspace.hard_decision_bits.clone()),
@@ -120,46 +113,4 @@ impl BpOsdDecoder {
             residual_syndrome_weight: 0,
         })
     }
-}
-
-fn compute_prior_llrs(
-    pcm: &ParityCheckMatrix,
-    channel: &ChannelModel,
-) -> Result<Vec<f64>, DecodeError> {
-    match channel {
-        ChannelModel::Bsc { error_rate } => {
-            let probability = validate_probability(*error_rate)?;
-            let llr = probability_to_llr(probability);
-            Ok(vec![llr; pcm.num_bits()])
-        }
-        ChannelModel::BitFlipProbabilities(probabilities) => {
-            if probabilities.len() != pcm.num_bits() {
-                return Err(DecodeError::DimensionMismatch {
-                    what: "channel probabilities",
-                    expected: pcm.num_bits(),
-                    actual: probabilities.len(),
-                });
-            }
-
-            probabilities
-                .iter()
-                .map(|&probability| validate_probability(probability).map(probability_to_llr))
-                .collect()
-        }
-    }
-}
-
-fn validate_probability(probability: f64) -> Result<f64, DecodeError> {
-    if !probability.is_finite() || probability <= 0.0 || probability >= 1.0 {
-        return Err(DecodeError::InvalidProbability);
-    }
-    Ok(probability)
-}
-
-fn probability_to_llr(probability: f64) -> f64 {
-    ((1.0 - probability) / probability).ln()
-}
-
-fn prior_hard_decision(prior_llrs: &[f64]) -> Correction {
-    Correction::from(prior_llrs.iter().map(|&llr| llr < 0.0).collect::<Vec<_>>())
 }

@@ -10,19 +10,25 @@ Included:
 - `DecoderConfig` and its default contract:
   `max_bp_iterations=30`, `early_stop=true`, `bp_variant=MinimumSum`,
   `schedule=Parallel`, `osd_variant=Osd0`
+- `LsdConfig` and its default contract:
+  `method=LocalizedStatistics`, `lsd_order=0`
+- `LsdMethod` with the first supported variant:
+  `LocalizedStatistics`
 - `ChannelModel` with:
   `Bsc { error_rate: f64 }` and `BitFlipProbabilities(Vec<f64>)`
 - `DecodeError` variants:
   `EmptyMatrix`, `InvalidProbability`,
   `InvalidColumnIndex { column: usize, num_bits: usize }`,
   `DimensionMismatch { what: &'static str, expected: usize, actual: usize }`,
-  `BpDidNotConverge`, `NoOsdSolution`
+  `BpDidNotConverge`, `NoOsdSolution`,
+  `UnsupportedLsdOrder { order: usize }`
 - Error ergonomics for `DecodeError`:
   `Display` implementation and `impl std::error::Error`
 - Crate exports:
   `pub mod config; pub mod error;`
   and top-level re-exports for
-  `BpVariant, ChannelModel, DecoderConfig, OsdVariant, Schedule, DecodeError`
+  `BpVariant, ChannelModel, DecoderConfig, LsdConfig, LsdMethod,
+  OsdVariant, Schedule, DecodeError`
 
 Excluded:
 - Any decoding algorithm implementation (BP, OSD, or hybrid solver logic)
@@ -63,3 +69,26 @@ decode paths or corrections. These are reported as
 `zero_iter_semantics_mismatch` and do not fail parity, because Rust treats
 `max_bp_iterations=0` as "disable BP and run OSD" while Python `ldpc` does not
 share that contract.
+
+## LSD Public API Contract
+
+Issue #88 adds `BpLsdDecoder` as a first-class public decoder family parallel
+to `BpOsdDecoder`.
+
+The supported construction path is:
+
+```rust
+let decoder = BpLsdDecoder::new(pcm, channel, LsdConfig::default())?;
+let result = decoder.decode(&syndrome)?;
+```
+
+The issue #88 behavior is intentionally narrow:
+
+- `LsdMethod::LocalizedStatistics` is the only public LSD method variant.
+- `lsd_order=0` is the only supported order.
+- `lsd_order>0` returns `DecodeError::UnsupportedLsdOrder`.
+- successful decodes return `DecodeResult` and keep `used_osd=false`.
+- the order-0 fallback is an API validity bridge, not the full LSD algorithm.
+
+Full LSD post-BP search, nonzero-order behavior, borrowed LSD fixtures, and
+Python `ldpc` differential harness coverage are owned by follow-on issues.
