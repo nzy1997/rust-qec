@@ -1,5 +1,6 @@
 use rbposd::{
-    BpVariant, ChannelModel, Correction, DecodeError, DecoderConfig, OsdVariant, Schedule,
+    BpVariant, ChannelModel, Correction, DecodeError, DecoderConfig, LsdConfig, LsdMethod,
+    OsdVariant, Schedule,
 };
 
 #[test]
@@ -12,6 +13,17 @@ fn decoder_config_default_contract() {
     assert_eq!(cfg.schedule, Schedule::Parallel);
     assert_eq!(cfg.osd_variant, OsdVariant::Osd0);
     assert_eq!(cfg.osd_order, 0);
+}
+
+#[test]
+fn lsd_config_default_contract() {
+    let cfg = LsdConfig::default();
+
+    assert_eq!(cfg.method, LsdMethod::LocalizedStatistics);
+    assert_eq!(cfg.lsd_order, 0);
+
+    let method = LsdMethod::LocalizedStatistics;
+    assert_eq!(method, cfg.method);
 }
 
 #[test]
@@ -72,5 +84,9 @@ fn correction_helpers_and_error_display_cover_remaining_contracts() {
     assert_eq!(
         DecodeError::NoOsdSolution.to_string(),
         "no OSD solution found"
+    );
+    assert_eq!(
+        DecodeError::UnsupportedLsdOrder { order: 1 }.to_string(),
+        "unsupported LSD order 1; only order 0 is supported"
     );
 }

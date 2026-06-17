@@ -12,6 +12,7 @@ pub enum DecodeError {
     SingularSystem,
     BpDidNotConverge,
     NoOsdSolution,
+    UnsupportedLsdOrder { order: usize },
 }
 
 impl core::fmt::Display for DecodeError {
@@ -45,6 +46,9 @@ impl core::fmt::Display for DecodeError {
             ),
             Self::BpDidNotConverge => write!(f, "belief propagation did not converge"),
             Self::NoOsdSolution => write!(f, "no OSD solution found"),
+            Self::UnsupportedLsdOrder { order } => {
+                write!(f, "unsupported LSD order {order}; only order 0 is supported")
+            }
         }
     }
 }
