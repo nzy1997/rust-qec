@@ -238,7 +238,20 @@ where
                 ));
             }
         },
-        DemBuildMode::Raw => ErrorAnalyzer::circuit_to_dem(&circuit).map_err(|error| error)?,
+        DemBuildMode::Raw => match ErrorAnalyzer::circuit_to_dem(&circuit) {
+            Ok(dem) => dem,
+            Err(dem_error) => {
+                let failure_kind = classify_error(&dem_error, FailureKind::SolverFailure);
+                return Ok(benchmark_result_row(
+                    ctx,
+                    failure_kind,
+                    result_params,
+                    base_case_summary,
+                    benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                    Some(dem_error),
+                ));
+            }
+        },
     };
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
@@ -747,6 +760,44 @@ mod tests {
             &surface_point(0.002, 1, 1),
             &ctx,
             &decoder_params,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::Unsupported);
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert!(row.error.unwrap().contains("unsupported instruction ML"));
+    }
+
+    #[test]
+    fn run_decoder_point_records_raw_dem_analysis_failures_as_structured_rows() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let built = BuiltCircuit {
+            circuit: parse_lines("ML 0\nDETECTOR rec[-2]\n").unwrap(),
+            params: ParamMap::from_pairs([("input_type", serde_json::json!("custom"))]),
+            case_summary: CaseSummary::new(),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let mut unused_batcher =
+            |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+                panic!("raw DEM analysis should fail before sampling")
+            };
+
+        let row = run_built_decoder_point_with_batcher(
+            "fake",
+            &EmptyPredictionDecoder,
+            built,
+            &surface_point(0.002, 1, 1),
+            &ctx,
+            &decoder_params,
+            DemBuildMode::Raw,
+            &mut unused_batcher,
         )
         .unwrap();
 
