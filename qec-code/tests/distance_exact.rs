@@ -1,9 +1,9 @@
+use qec_code::Pauli;
 use qec_code::distance::{DistanceResult, LogicalClass};
 use qec_code::distance_exact::{
     ExactCssDistanceInput, ExactCssDistanceOptions, ExactCssDistanceProvenance,
     ExactCssDistanceResult,
 };
-use qec_code::Pauli;
 
 fn sample_distance_result() -> DistanceResult {
     let witness = Pauli::from_xz_bits(vec![1, 0, 1], vec![0, 0, 0]).unwrap();
@@ -38,7 +38,10 @@ fn exact_css_distance_result_serializes_completed_contract() {
     assert_eq!(json["options"]["input"], "code_id");
     assert_eq!(json["options"]["code_id"], "surface_rotated:d=3");
     assert_eq!(json["provenance"]["tool"], "qec-code");
-    assert_eq!(json["provenance"]["tool_version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(
+        json["provenance"]["tool_version"],
+        env!("CARGO_PKG_VERSION")
+    );
     assert_eq!(json["provenance"]["method_revision"], 1);
 }
 

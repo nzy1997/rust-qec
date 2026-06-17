@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {

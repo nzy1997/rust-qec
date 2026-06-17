@@ -3,16 +3,16 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
+use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::steane::Steane;
-use crate::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
+use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::compute_distance;
-use crate::distance_bound::{randomized_css_upper_bound, RandomizedUpperBoundOptions};
+use crate::distance_bound::{RandomizedUpperBoundOptions, randomized_css_upper_bound};
 use crate::distance_exact::{
     ExactCssDistanceInput, ExactCssDistanceOptions, ExactCssDistanceResult,
 };
 use crate::error::CssMatrixReadSource;
-use crate::QecError;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
