@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use qec_code::binary::{try_binary_rank, try_in_row_span};
 use qec_code::css::CssCode;
 use serde::Deserialize;
 
@@ -134,6 +135,26 @@ pub enum CssCodegenError {
         col: usize,
         width: usize,
     },
+    LogicalObservableNotInNormalizer {
+        row: usize,
+        basis: MemoryBasis,
+        check_matrix: &'static str,
+        check_row: usize,
+    },
+    LogicalObservableIsStabilizer {
+        row: usize,
+        basis: MemoryBasis,
+    },
+    LogicalObservableCountMismatch {
+        basis: MemoryBasis,
+        count: usize,
+        expected: usize,
+    },
+    LogicalObservableRankMismatch {
+        basis: MemoryBasis,
+        rank: usize,
+        expected: usize,
+    },
     MixedCanonicalLogical {
         index: usize,
         basis: MemoryBasis,
@@ -164,6 +185,41 @@ impl fmt::Display for CssCodegenError {
             Self::InvalidObservable { row, col, width } => write!(
                 f,
                 "observable {row} references data qubit {col}, but width is {width}"
+            ),
+            Self::LogicalObservableNotInNormalizer {
+                row,
+                basis,
+                check_matrix,
+                check_row,
+            } => write!(
+                f,
+                "observable {row} is not {} {} logical: anticommutes with {check_matrix} row {check_row}",
+                basis_article(*basis),
+                basis_label(*basis)
+            ),
+            Self::LogicalObservableIsStabilizer { row, basis } => write!(
+                f,
+                "observable {row} is {} {} stabilizer, not a logical",
+                basis_article(*basis),
+                basis_label(*basis)
+            ),
+            Self::LogicalObservableCountMismatch {
+                basis,
+                count,
+                expected,
+            } => write!(
+                f,
+                "explicit {} observables define {count} rows, expected k = {expected}",
+                basis_label(*basis)
+            ),
+            Self::LogicalObservableRankMismatch {
+                basis,
+                rank,
+                expected,
+            } => write!(
+                f,
+                "explicit {} observables define rank {rank}, expected k = {expected}",
+                basis_label(*basis)
             ),
             Self::MixedCanonicalLogical { index, basis } => {
                 write!(
@@ -280,8 +336,16 @@ pub fn css_memory(config: CssMemoryConfig) -> Result<Vec<StimInstr>, CssCodegenE
     validate_supports("hx", &config.checks.hx, config.checks.num_data_qubits)?;
     validate_supports("hz", &config.checks.hz, config.checks.num_data_qubits)?;
     validate_css_orthogonality(&config.checks.hx, &config.checks.hz)?;
-    let observables = resolve_observables(&config)?;
+    let css_code = css_code_from_checks(&config.checks)?;
+    let observables = resolve_observables(&config, &css_code)?;
     emit_css_memory_circuit(&config, &observables)
+}
+
+fn css_code_from_checks(checks: &CssCheckMatrices) -> Result<CssCode, CssCodegenError> {
+    let hx_dense = supports_to_dense(&checks.hx, checks.num_data_qubits);
+    let hz_dense = supports_to_dense(&checks.hz, checks.num_data_qubits);
+    CssCode::from_hx_hz(hx_dense, hz_dense)
+        .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -304,20 +368,24 @@ struct CnotInteraction {
     target: u32,
 }
 
-fn resolve_observables(config: &CssMemoryConfig) -> Result<Vec<Vec<usize>>, CssCodegenError> {
+fn resolve_observables(
+    config: &CssMemoryConfig,
+    css_code: &CssCode,
+) -> Result<Vec<Vec<usize>>, CssCodegenError> {
     match &config.observables {
         CssObservableSource::Explicit(rows) | CssObservableSource::ExplicitOrCanonical(rows)
             if !rows.is_empty() =>
         {
             validate_observables(rows, config.checks.num_data_qubits)?;
+            validate_explicit_logical_observables(
+                rows,
+                config,
+                css_code.code().num_logical_qubits(),
+            )?;
             Ok(rows.clone())
         }
         CssObservableSource::ExplicitOrCanonical(_) | CssObservableSource::CanonicalFallback => {
-            let hx_dense = supports_to_dense(&config.checks.hx, config.checks.num_data_qubits);
-            let hz_dense = supports_to_dense(&config.checks.hz, config.checks.num_data_qubits);
-            let css_code = CssCode::from_hx_hz(hx_dense, hz_dense)
-                .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
-            canonical_observables(config, &css_code)
+            canonical_observables(config, css_code)
         }
         CssObservableSource::Explicit(rows) => {
             validate_observables(rows, config.checks.num_data_qubits)?;
@@ -374,6 +442,78 @@ fn canonical_observables(
     }
     validate_observables(&observables, config.checks.num_data_qubits)?;
     Ok(observables)
+}
+
+fn validate_explicit_logical_observables(
+    rows: &[Vec<usize>],
+    config: &CssMemoryConfig,
+    logical_count: usize,
+) -> Result<(), CssCodegenError> {
+    if rows.len() != logical_count {
+        return Err(CssCodegenError::LogicalObservableCountMismatch {
+            basis: config.basis,
+            count: rows.len(),
+            expected: logical_count,
+        });
+    }
+
+    let width = config.checks.num_data_qubits;
+    let (stabilizer_rows, opposite_rows, opposite_name) = match config.basis {
+        MemoryBasis::X => (&config.checks.hx, &config.checks.hz, "hz"),
+        MemoryBasis::Z => (&config.checks.hz, &config.checks.hx, "hx"),
+    };
+    let stabilizer_dense = supports_to_dense(stabilizer_rows, width);
+    let stabilizer_rank = try_binary_rank(&stabilizer_dense)
+        .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?;
+    let mut augmented = stabilizer_dense.clone();
+
+    for (row_index, row) in rows.iter().enumerate() {
+        let dense = support_to_dense(row, width);
+        for (check_row, check) in opposite_rows.iter().enumerate() {
+            if support_dot(&dense, check) != 0 {
+                return Err(CssCodegenError::LogicalObservableNotInNormalizer {
+                    row: row_index,
+                    basis: config.basis,
+                    check_matrix: opposite_name,
+                    check_row,
+                });
+            }
+        }
+        if try_in_row_span(&stabilizer_dense, &dense)
+            .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?
+        {
+            return Err(CssCodegenError::LogicalObservableIsStabilizer {
+                row: row_index,
+                basis: config.basis,
+            });
+        }
+        augmented.push(dense);
+    }
+
+    let quotient_rank = try_binary_rank(&augmented)
+        .map_err(|error| CssCodegenError::InvalidCss(error.to_string()))?
+        .saturating_sub(stabilizer_rank);
+    if quotient_rank != logical_count {
+        return Err(CssCodegenError::LogicalObservableRankMismatch {
+            basis: config.basis,
+            rank: quotient_rank,
+            expected: logical_count,
+        });
+    }
+
+    Ok(())
+}
+
+fn support_to_dense(row: &[usize], width: usize) -> Vec<u8> {
+    let mut dense = vec![0; width];
+    for &col in row {
+        dense[col] = 1;
+    }
+    dense
+}
+
+fn support_dot(dense: &[u8], support: &[usize]) -> u8 {
+    support.iter().fold(0, |parity, &col| parity ^ dense[col])
 }
 
 fn validate_observables(rows: &[Vec<usize>], width: usize) -> Result<(), CssCodegenError> {
@@ -807,15 +947,23 @@ fn validate_css_orthogonality(hx: &[Vec<usize>], hz: &[Vec<usize>]) -> Result<()
     Ok(())
 }
 
+fn basis_label(basis: MemoryBasis) -> &'static str {
+    match basis {
+        MemoryBasis::X => "X",
+        MemoryBasis::Z => "Z",
+    }
+}
+
+fn basis_article(basis: MemoryBasis) -> &'static str {
+    match basis {
+        MemoryBasis::X => "an",
+        MemoryBasis::Z => "a",
+    }
+}
+
 fn supports_to_dense(rows: &[Vec<usize>], width: usize) -> Vec<Vec<u8>> {
     rows.iter()
-        .map(|row| {
-            let mut dense = vec![0; width];
-            for &col in row {
-                dense[col] = 1;
-            }
-            dense
-        })
+        .map(|row| support_to_dense(row, width))
         .collect()
 }
 

@@ -946,7 +946,23 @@ fn rust_benchmark_run_supports_css_input_type() {
         rows[0].params["observables"],
         serde_json::json!("../css/steane_logicals_x.json")
     );
+    assert_eq!(
+        rows[0].params["logical_observable_source"],
+        serde_json::json!("explicit")
+    );
+    assert_eq!(
+        rows[0].params["logical_observable_basis"],
+        serde_json::json!("x")
+    );
+    assert_eq!(
+        rows[0].params["logical_failure_aggregation"],
+        serde_json::json!("any_logical")
+    );
     assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(1));
+    assert_eq!(
+        rows[0].case_summary["logical_observable_count"],
+        serde_json::json!(1)
+    );
 }
 
 #[test]
@@ -1002,4 +1018,123 @@ label = "Logical Error Rate"
 
     assert!(err.contains("hx"), "error was: {err}");
     assert!(err.contains("missing_hx.json"), "error was: {err}");
+}
+
+#[test]
+fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
+    let spec_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/minimal_bb72_css_decoder.toml");
+    let text = fs::read_to_string(&spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        spec_path.parent().unwrap(),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rmatching")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("css"));
+    assert_eq!(rows[0].params["code_id"], serde_json::json!("bb72"));
+    assert_eq!(
+        rows[0].params["logical_observable_source"],
+        serde_json::json!("explicit")
+    );
+    assert_eq!(
+        rows[0].params["logical_observable_basis"],
+        serde_json::json!("x")
+    );
+    assert_eq!(
+        rows[0].params["logical_failure_aggregation"],
+        serde_json::json!("any_logical")
+    );
+    assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(12));
+    assert_eq!(
+        rows[0].case_summary["logical_observable_count"],
+        serde_json::json!(12)
+    );
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+}
+
+#[test]
+fn rust_benchmark_run_rejects_invalid_css_observables_before_results() {
+    let spec_dir = tempfile::tempdir().unwrap();
+    let out_dir = tempfile::tempdir().unwrap();
+    let steane_h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+    fs::write(spec_dir.path().join("hx.json"), steane_h).unwrap();
+    fs::write(spec_dir.path().join("hz.json"), steane_h).unwrap();
+    fs::write(
+        spec_dir.path().join("bad_obs.json"),
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0]]}"#,
+    )
+    .unwrap();
+    let spec_text = r#"
+name = "bad_css_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "hx.json"
+hz = "hz.json"
+basis = "x"
+rounds = [1]
+p = [0.0]
+schedule = "greedy"
+observables = "bad_obs.json"
+max_shots = 4
+max_errors = 4
+batch_size = 4
+
+[plot]
+title = "Bad CSS Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "linear"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"
+"#;
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(&spec, "rust", out_dir.path(), &registry, spec_dir.path())
+        .unwrap_err();
+
+    assert!(
+        err.contains("observable 0 is not an X logical"),
+        "error was: {err}"
+    );
+    assert!(
+        !out_dir.path().join("rmatching").join("test-run").exists(),
+        "invalid observable run must not produce a completed result directory"
+    );
 }

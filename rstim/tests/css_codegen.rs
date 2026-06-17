@@ -1,8 +1,8 @@
-use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
+use rstim::codegen::NoiseParams;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::circuit_to_string;
 use rstim::stats;
@@ -18,7 +18,7 @@ fn repetition_like_css_config(rounds: usize, basis: MemoryBasis) -> CssMemoryCon
         noise: NoiseParams::none(),
         basis,
         schedule: CssSchedule::Sequential,
-        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+        observables: CssObservableSource::Explicit(vec![vec![0]]),
     }
 }
 
@@ -69,7 +69,7 @@ fn sequential_css_memory_z_emits_detectors_observable_and_dem() {
         noise: NoiseParams::none(),
         basis: MemoryBasis::Z,
         schedule: CssSchedule::Sequential,
-        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+        observables: CssObservableSource::Explicit(vec![vec![0]]),
     };
 
     let circuit = css_memory(config).unwrap();
@@ -118,7 +118,7 @@ fn explicit_observables_allow_redundant_orthogonal_checks() {
         noise: NoiseParams::none(),
         basis: MemoryBasis::X,
         schedule: CssSchedule::Greedy,
-        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+        observables: CssObservableSource::Explicit(vec![vec![0]]),
     };
 
     let circuit = css_memory(config).unwrap();
@@ -252,13 +252,13 @@ fn greedy_schedule_packs_disjoint_cnots() {
         checks: CssCheckMatrices {
             hx: vec![vec![0], vec![1]],
             hz: vec![],
-            num_data_qubits: 2,
+            num_data_qubits: 3,
         },
         rounds: 1,
         noise: NoiseParams::none(),
         basis: MemoryBasis::X,
         schedule: CssSchedule::Sequential,
-        observables: CssObservableSource::Explicit(vec![vec![0, 1]]),
+        observables: CssObservableSource::Explicit(vec![vec![2]]),
     };
     let mut greedy = sequential.clone();
     greedy.schedule = CssSchedule::Greedy;
@@ -266,8 +266,8 @@ fn greedy_schedule_packs_disjoint_cnots() {
     let sequential_text = circuit_to_string(&css_memory(sequential).unwrap());
     let greedy_text = circuit_to_string(&css_memory(greedy).unwrap());
 
-    assert!(sequential_text.contains("CX 2 0\nTICK\nCX 3 1"));
-    assert!(greedy_text.contains("CX 2 0 3 1"));
+    assert!(sequential_text.contains("CX 3 0\nTICK\nCX 4 1"));
+    assert!(greedy_text.contains("CX 3 0 4 1"));
 }
 
 #[test]
@@ -284,6 +284,22 @@ fn css_memory_places_requested_noise_channels() {
 
 fn steane_h() -> Vec<Vec<usize>> {
     vec![vec![0, 3, 5, 6], vec![1, 3, 4, 6], vec![2, 4, 5, 6]]
+}
+
+fn steane_css_config(basis: MemoryBasis, observables: Vec<Vec<usize>>) -> CssMemoryConfig {
+    let h = steane_h();
+    CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: h.clone(),
+            hz: h,
+            num_data_qubits: 7,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::Explicit(observables),
+    }
 }
 
 #[test]
@@ -309,6 +325,171 @@ fn canonical_fallback_adds_steane_observable() {
 }
 
 #[test]
+fn explicit_x_logical_observables_are_validated() {
+    let circuit = css_memory(steane_css_config(MemoryBasis::X, vec![vec![0, 1, 3]])).unwrap();
+
+    assert_eq!(stats::num_observables(&circuit), 1);
+    ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+}
+
+#[test]
+fn explicit_z_logical_observables_are_validated() {
+    let circuit = css_memory(steane_css_config(MemoryBasis::Z, vec![vec![0, 1, 3]])).unwrap();
+
+    assert_eq!(stats::num_observables(&circuit), 1);
+    ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+}
+
+#[test]
+fn explicit_x_observable_must_commute_with_z_checks() {
+    let err = css_memory(steane_css_config(MemoryBasis::X, vec![vec![0]]))
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        err.contains("observable 0 is not an X logical: anticommutes with hz row 0"),
+        "error was: {err}"
+    );
+}
+
+#[test]
+fn explicit_x_observable_must_not_be_x_stabilizer() {
+    let err = css_memory(steane_css_config(MemoryBasis::X, vec![vec![0, 3, 5, 6]]))
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        err.contains("observable 0 is an X stabilizer, not a logical"),
+        "error was: {err}"
+    );
+}
+
+#[test]
+fn explicit_observable_count_must_match_k() {
+    let config = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: vec![vec![0, 1]],
+            hz: vec![],
+            num_data_qubits: 3,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::Explicit(vec![vec![0]]),
+    };
+
+    let err = css_memory(config).unwrap_err().to_string();
+
+    assert!(
+        err.contains("explicit X observables define 1 rows, expected k = 2"),
+        "error was: {err}"
+    );
+}
+
+#[test]
+fn explicit_observable_rank_must_match_k() {
+    let config = CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx: vec![vec![0, 1]],
+            hz: vec![],
+            num_data_qubits: 3,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::Explicit(vec![vec![0], vec![0]]),
+    };
+
+    let err = css_memory(config).unwrap_err().to_string();
+
+    assert!(
+        err.contains("explicit X observables define rank 1, expected k = 2"),
+        "error was: {err}"
+    );
+}
+
+fn bb72_logicals_x() -> Vec<Vec<usize>> {
+    vec![
+        vec![3, 6, 12, 15, 18, 24],
+        vec![4, 7, 13, 16, 19, 25],
+        vec![5, 8, 14, 17, 20, 26],
+        vec![0, 9, 12, 15, 21, 27],
+        vec![3, 6, 9, 15, 21, 30],
+        vec![4, 7, 10, 16, 22, 31],
+        vec![0, 1, 3, 4, 6, 7, 9, 10, 36, 37, 39, 40],
+        vec![0, 2, 3, 5, 6, 8, 9, 11, 36, 38, 39, 41],
+        vec![0, 1, 2, 5, 6, 7, 8, 9, 12, 14, 37, 39, 42, 44],
+        vec![2, 4, 6, 8, 13, 15, 36, 37, 38, 39, 43, 45],
+        vec![2, 4, 7, 8, 9, 10, 12, 16, 36, 37, 38, 39, 42, 46],
+        vec![0, 1, 4, 5, 6, 7, 8, 11, 13, 17, 36, 38, 43, 47],
+    ]
+}
+
+fn bb72_checks() -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    bivariate_bicycle_checks(6, 6, &[(3, 0), (0, 1), (0, 2)], &[(0, 3), (1, 0), (2, 0)])
+}
+
+fn bivariate_bicycle_checks(
+    lx: usize,
+    ly: usize,
+    a_terms: &[(usize, usize)],
+    b_terms: &[(usize, usize)],
+) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    let block = lx * ly;
+    let index = |x: usize, y: usize| -> usize { (x % lx) * ly + (y % ly) };
+    let mut hx = Vec::with_capacity(block);
+    let mut hz = Vec::with_capacity(block);
+    for x in 0..lx {
+        for y in 0..ly {
+            let mut x_row = Vec::new();
+            for &(dx, dy) in a_terms {
+                x_row.push(index(x + dx, y + dy));
+            }
+            for &(dx, dy) in b_terms {
+                x_row.push(block + index(x + dx, y + dy));
+            }
+            x_row.sort_unstable();
+            hx.push(x_row);
+
+            let mut z_row = Vec::new();
+            for &(dx, dy) in b_terms {
+                z_row.push(index((x + lx - dx % lx) % lx, (y + ly - dy % ly) % ly));
+            }
+            for &(dx, dy) in a_terms {
+                z_row.push(block + index((x + lx - dx % lx) % lx, (y + ly - dy % ly) % ly));
+            }
+            z_row.sort_unstable();
+            hz.push(z_row);
+        }
+    }
+    (hx, hz)
+}
+
+#[test]
+fn bb72_explicit_x_logicals_build_dem_with_twelve_observables() {
+    let (hx, hz) = bb72_checks();
+    let circuit = css_memory(CssMemoryConfig {
+        checks: CssCheckMatrices {
+            hx,
+            hz,
+            num_data_qubits: 72,
+        },
+        rounds: 1,
+        noise: NoiseParams::none(),
+        basis: MemoryBasis::X,
+        schedule: CssSchedule::Greedy,
+        observables: CssObservableSource::Explicit(bb72_logicals_x()),
+    })
+    .unwrap();
+    let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+
+    assert_eq!(stats::num_observables(&circuit), 12);
+    assert_eq!(dem.num_observables(), 12);
+}
+
+#[test]
 fn explicit_or_canonical_prefers_explicit_observables() {
     let h = steane_h();
     let config = CssMemoryConfig {
@@ -321,10 +502,10 @@ fn explicit_or_canonical_prefers_explicit_observables() {
         noise: NoiseParams::none(),
         basis: MemoryBasis::X,
         schedule: CssSchedule::Greedy,
-        observables: CssObservableSource::ExplicitOrCanonical(vec![vec![0, 1, 2]]),
+        observables: CssObservableSource::ExplicitOrCanonical(vec![vec![0, 1, 3]]),
     };
 
     let text = circuit_to_string(&css_memory(config).unwrap());
 
-    assert!(text.contains("OBSERVABLE_INCLUDE(0) rec[-7] rec[-6] rec[-5]"));
+    assert!(text.contains("OBSERVABLE_INCLUDE(0) rec[-7] rec[-6] rec[-4]"));
 }

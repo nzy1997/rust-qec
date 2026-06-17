@@ -1671,7 +1671,7 @@ mod tests {
         let observables = write_css_json(
             &dir,
             "obs.json",
-            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0,1]]}"#,
+            r#"{"format":"sparse_rows","num_cols":2,"rows":[[0]]}"#,
         );
         let out = dir.path().join("memory.stim");
 
