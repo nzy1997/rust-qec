@@ -9,6 +9,9 @@ use crate::codes::steane::Steane;
 use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::compute_distance;
 use crate::distance_bound::{RandomizedUpperBoundOptions, randomized_css_upper_bound};
+use crate::distance_exact::{
+    ExactCssDistanceInput, ExactCssDistanceOptions, ExactCssDistanceResult,
+};
 use crate::error::CssMatrixReadSource;
 
 #[derive(Debug, Parser)]
@@ -95,7 +98,20 @@ pub enum CssMatrixKind {
 
 #[derive(Debug, Subcommand)]
 pub enum CssDistanceCommands {
+    Exact(ExactCssDistanceCli),
     RandomizedUpperBound(RandomizedUpperBoundCli),
+}
+
+#[derive(Debug, Args)]
+pub struct ExactCssDistanceCli {
+    #[arg(long)]
+    code_id: Option<String>,
+    #[arg(long)]
+    hx: Option<PathBuf>,
+    #[arg(long)]
+    hz: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -193,9 +209,57 @@ fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
 
 fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {
     match command {
+        CssDistanceCommands::Exact(options) => run_css_exact_distance(options),
         CssDistanceCommands::RandomizedUpperBound(options) => {
             run_css_randomized_upper_bound(options)
         }
+    }
+}
+
+fn run_css_exact_distance(cli: ExactCssDistanceCli) -> Result<String, QecError> {
+    const COMMAND: &str = "code css-distance exact";
+
+    if !cli.json {
+        return Err(QecError::JsonOutputRequired { command: COMMAND });
+    }
+
+    let (css, options) = css_code_and_exact_options_from_cli(&cli)?;
+    let distance = compute_distance(css.code())?;
+    let result = ExactCssDistanceResult::completed(distance, options);
+
+    serde_json::to_string(&result).map_err(|err| QecError::InvalidCssDistanceInput(err.to_string()))
+}
+
+fn css_code_and_exact_options_from_cli(
+    cli: &ExactCssDistanceCli,
+) -> Result<(CssCode, ExactCssDistanceOptions), QecError> {
+    match (&cli.code_id, &cli.hx, &cli.hz) {
+        (Some(code_id), None, None) => Ok((
+            css_code_from_built_in(code_id)?,
+            ExactCssDistanceOptions {
+                input: ExactCssDistanceInput::CodeId {
+                    code_id: code_id.clone(),
+                },
+            },
+        )),
+        (None, Some(hx), Some(hz)) => Ok((
+            css_code_from_files(hx, hz)?,
+            ExactCssDistanceOptions {
+                input: ExactCssDistanceInput::Files {
+                    hx: hx.display().to_string(),
+                    hz: hz.display().to_string(),
+                },
+            },
+        )),
+        (Some(_), Some(_), _) | (Some(_), _, Some(_)) => Err(QecError::InvalidCssDistanceInput(
+            "use either --code-id or --hx/--hz, not both".to_owned(),
+        )),
+        (None, Some(_), None) | (None, None, Some(_)) => Err(QecError::InvalidCssDistanceInput(
+            "--hx and --hz must be provided together".to_owned(),
+        )),
+        (None, None, None) => Err(QecError::InvalidCssDistanceInput(
+            "provide --code-id or both --hx and --hz".to_owned(),
+        )),
     }
 }
 
