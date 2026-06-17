@@ -20,6 +20,11 @@ pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
 
+pub(crate) enum DemBuildMode {
+    Decomposed,
+    Raw,
+}
+
 fn under_wall_budget(total_seconds: f64, max_wall_seconds: Option<f64>) -> bool {
     match max_wall_seconds {
         Some(max_seconds) => total_seconds < max_seconds,
@@ -114,10 +119,37 @@ pub(crate) fn run_decoder_point(
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
-    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
-    run_built_decoder_point(runner_name, decoder, built, point, ctx, decoder_params)
+    run_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        point,
+        ctx,
+        decoder_params,
+        DemBuildMode::Decomposed,
+    )
 }
 
+pub(crate) fn run_decoder_point_with_dem_mode(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<BenchmarkResultRow, String> {
+    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
+    run_built_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        dem_mode,
+    )
+}
+
+#[cfg(test)]
 fn run_built_decoder_point(
     runner_name: &'static str,
     decoder: &dyn Decoder,
@@ -126,6 +158,26 @@ fn run_built_decoder_point(
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
+    run_built_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        DemBuildMode::Decomposed,
+    )
+}
+
+fn run_built_decoder_point_with_dem_mode(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    built: BuiltCircuit,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<BenchmarkResultRow, String> {
     run_built_decoder_point_with_batcher(
         runner_name,
         decoder,
@@ -133,6 +185,7 @@ fn run_built_decoder_point(
         point,
         ctx,
         decoder_params,
+        dem_mode,
         sample_and_pack_batch,
     )
 }
@@ -159,6 +212,7 @@ fn run_built_decoder_point_with_batcher<F>(
     point: &BenchCasePoint,
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
     mut sample_and_pack: F,
 ) -> Result<BenchmarkResultRow, String>
 where
@@ -169,10 +223,10 @@ where
     result_params.insert("decoder_impl".into(), serde_json::json!(runner_name));
     result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
-    let dem = match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
-        Ok(dem) => dem,
-        Err(decomposition_error) => {
-            if runner_name != "predict-zero" {
+    let dem = match dem_mode {
+        DemBuildMode::Decomposed => match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
+            Ok(dem) => dem,
+            Err(decomposition_error) => {
                 let failure_kind = classify_error(&decomposition_error, FailureKind::SolverFailure);
                 return Ok(benchmark_result_row(
                     ctx,
@@ -183,8 +237,8 @@ where
                     Some(decomposition_error),
                 ));
             }
-            ErrorAnalyzer::circuit_to_dem(&circuit).map_err(|error| error)?
-        }
+        },
+        DemBuildMode::Raw => ErrorAnalyzer::circuit_to_dem(&circuit).map_err(|error| error)?,
     };
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
@@ -725,6 +779,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut failing_batcher,
         )
         .unwrap();
@@ -761,6 +816,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut short_observables,
         )
         .unwrap();
@@ -900,6 +956,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut flaky_batcher,
         )
         .unwrap();
