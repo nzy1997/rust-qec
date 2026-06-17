@@ -25,6 +25,26 @@ fn surface_point(input_type: &str) -> BenchCasePoint {
     }
 }
 
+fn css_point(observables_path: Option<&str>) -> BenchCasePoint {
+    BenchCasePoint {
+        input_type: "css".into(),
+        code_id: Some("steane".into()),
+        distance: None,
+        rounds: 1,
+        p: 0.0,
+        basis: Some("x".into()),
+        schedule: Some("greedy".into()),
+        hx_path: Some("../css/steane_hx.json".into()),
+        hz_path: Some("../css/steane_hz.json".into()),
+        observables_path: observables_path.map(str::to_string),
+        max_shots: 0,
+        max_errors: 2,
+        max_wall_seconds: None,
+        batch_size: 4,
+        decoder_params: BTreeMap::new(),
+    }
+}
+
 fn has_op(circuit: &[StimInstr], op_name: &str) -> bool {
     circuit
         .iter()
@@ -70,4 +90,23 @@ fn build_circuit_for_point_rejects_unknown_surface_input_type() {
     };
 
     assert_eq!(error, "unknown input_type: memory-y");
+}
+
+#[test]
+fn build_circuit_for_css_point_records_canonical_fallback_observable_metadata() {
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench");
+    let built = build_circuit_for_point(&css_point(None), &spec_dir).unwrap();
+
+    assert_eq!(
+        built.params["logical_observable_source"],
+        serde_json::json!("canonical_fallback")
+    );
+    assert_eq!(
+        built.params["logical_observable_basis"],
+        serde_json::json!("x")
+    );
+    assert_eq!(
+        built.params["logical_failure_aggregation"],
+        serde_json::json!("any_logical")
+    );
 }

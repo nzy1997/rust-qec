@@ -946,7 +946,23 @@ fn rust_benchmark_run_supports_css_input_type() {
         rows[0].params["observables"],
         serde_json::json!("../css/steane_logicals_x.json")
     );
+    assert_eq!(
+        rows[0].params["logical_observable_source"],
+        serde_json::json!("explicit")
+    );
+    assert_eq!(
+        rows[0].params["logical_observable_basis"],
+        serde_json::json!("x")
+    );
+    assert_eq!(
+        rows[0].params["logical_failure_aggregation"],
+        serde_json::json!("any_logical")
+    );
     assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(1));
+    assert_eq!(
+        rows[0].case_summary["logical_observable_count"],
+        serde_json::json!(1)
+    );
 }
 
 #[test]

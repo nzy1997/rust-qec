@@ -65,6 +65,13 @@ fn insert_max_wall_seconds(params: &mut ParamMap, max_wall_seconds: Option<f64>)
     }
 }
 
+fn memory_basis_label(basis: MemoryBasis) -> &'static str {
+    match basis {
+        MemoryBasis::X => "x",
+        MemoryBasis::Z => "z",
+    }
+}
+
 fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, String> {
     let hx_path = point
         .hx_path
@@ -88,6 +95,12 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     let schedule_text = point.schedule.as_deref().unwrap_or("greedy");
     let basis = parse_memory_basis(basis_text)?;
     let schedule = parse_css_schedule(schedule_text)?;
+    let basis_label = memory_basis_label(basis);
+    let observable_source = if point.observables_path.is_some() {
+        "explicit"
+    } else {
+        "canonical_fallback"
+    };
     let num_data_qubits = hx.num_cols;
     let observables = if let Some(path) = point.observables_path.as_deref() {
         let text = read_spec_text(spec_dir, "observables", path)?;
@@ -122,6 +135,18 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
             serde_json::json!(point.code_id.as_deref().unwrap_or("css")),
         ),
         ("basis", serde_json::json!(basis_text)),
+        (
+            "logical_observable_source",
+            serde_json::json!(observable_source),
+        ),
+        (
+            "logical_observable_basis",
+            serde_json::json!(basis_label),
+        ),
+        (
+            "logical_failure_aggregation",
+            serde_json::json!("any_logical"),
+        ),
         ("schedule", serde_json::json!(schedule_text)),
         ("rounds", serde_json::json!(point.rounds)),
         ("p", serde_json::json!(point.p)),

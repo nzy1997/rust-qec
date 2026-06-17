@@ -64,6 +64,10 @@ fn case_summary_with_progress(
     summary.insert("num_dets".into(), serde_json::json!(num_dets));
     summary.insert("num_obs".into(), serde_json::json!(num_obs));
     summary.insert(
+        "logical_observable_count".into(),
+        serde_json::json!(num_obs),
+    );
+    summary.insert(
         "num_shots_generated".into(),
         serde_json::json!(generated_shots),
     );
