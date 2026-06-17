@@ -164,7 +164,9 @@ where
     F: FnMut(&[StimInstr], usize, &mut StdRng) -> Result<(Vec<u8>, Vec<u8>), String>,
 {
     let circuit = built.circuit;
-    let result_params = merge_decoder_params(built.params, decoder_params);
+    let mut result_params = merge_decoder_params(built.params, decoder_params);
+    result_params.insert("decoder_impl".into(), serde_json::json!(runner_name));
+    result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
     let dem = match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
         Ok(dem) => dem,
@@ -207,7 +209,7 @@ where
         .map_err(|_| "max_errors exceeds supported usize range".to_string())?;
     let obs_bytes = num_obs.div_ceil(8);
 
-    let mut rng = StdRng::seed_from_u64(ctx.seed);
+    let mut rng = StdRng::seed_from_u64(point.seed);
     let mut shots_used = 0usize;
     let mut logical_errors = 0usize;
     let mut generated_shots = 0usize;
@@ -503,6 +505,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -628,6 +631,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.002,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -776,6 +780,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.002,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -818,6 +823,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.0,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,

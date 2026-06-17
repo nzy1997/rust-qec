@@ -202,6 +202,8 @@ label = "Logical Error Rate"
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].runner, "mwpm_alias");
+    assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rmatching"));
+    assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
 }
 
 #[test]

@@ -232,6 +232,31 @@ fn expand_runner_points_accepts_optional_max_wall_seconds() {
 }
 
 #[test]
+fn expand_runner_points_accepts_and_defaults_seed() {
+    let default_points = expand_runner_points(&valid_runner_params()).unwrap();
+    assert_eq!(default_points.len(), 1);
+    assert_eq!(default_points[0].seed, 12_345);
+
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Integer(99));
+
+    let explicit_points = expand_runner_points(&params).unwrap();
+    assert_eq!(explicit_points.len(), 1);
+    assert_eq!(explicit_points[0].seed, 99);
+}
+
+#[test]
+fn expand_runner_points_rejects_invalid_seed() {
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Float(1.0));
+    assert_eq!(expand_points_err(&params), "seed must be an integer");
+
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Integer(-1));
+    assert_eq!(expand_points_err(&params), "seed must be non-negative");
+}
+
+#[test]
 fn expand_runner_points_still_requires_max_shots_with_wall_clock_budget() {
     let mut params = valid_runner_params();
     params.remove("max_shots");
