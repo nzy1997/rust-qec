@@ -5,6 +5,7 @@ pub mod codes;
 pub mod css;
 pub mod distance;
 pub mod distance_bound;
+pub mod distance_exact;
 #[cfg(feature = "distance-ilp-highs")]
 pub mod distance_ilp;
 pub mod error;
