@@ -1282,6 +1282,67 @@ label = "Logical Error Rate"
 }
 
 #[test]
+#[ignore = "manual BB72 BP+OSD reference run; intentionally heavier than CI"]
+fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/bb72_css_bposd_reference.toml");
+    let text = fs::read_to_string(&spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        spec_path.parent().unwrap(),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd-osd10-reference")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+    assert_eq!(rows.len(), 2);
+
+    let mut seen_p003 = false;
+    let mut seen_p01 = false;
+    for row in rows {
+        assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
+        assert_eq!(row.params["seed"], serde_json::json!(12_345));
+        assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+        assert_eq!(row.params["bp_iters"], serde_json::json!(10_000));
+        assert_eq!(
+            row.params["osd_method"],
+            serde_json::json!("combination_sweep")
+        );
+        assert_eq!(row.params["osd_order"], serde_json::json!(10));
+        assert_eq!(
+            row.params["logical_observable_source"],
+            serde_json::json!("explicit")
+        );
+        assert_eq!(row.case_summary["num_obs"], serde_json::json!(12));
+        assert_eq!(row.status, "ok");
+        assert_eq!(row.error, None);
+
+        let p = row.params["p"].as_f64().unwrap();
+        if (p - 0.003).abs() < f64::EPSILON {
+            seen_p003 = true;
+        }
+        if (p - 0.01).abs() < f64::EPSILON {
+            seen_p01 = true;
+        }
+    }
+
+    assert!(seen_p003);
+    assert!(seen_p01);
+}
+
+#[test]
 fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/bench/bb72_css_bposd_decoder.toml");
