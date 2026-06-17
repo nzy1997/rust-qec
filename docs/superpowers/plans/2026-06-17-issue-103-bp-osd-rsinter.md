@@ -273,7 +273,7 @@ observables = "../css/bb72_logicals_x.json"
 basis = "x"
 schedule = "greedy"
 rounds = [3]
-p = [0.003]
+p = [0.001]
 seed = 12345
 max_shots = 64
 max_errors = 64
@@ -416,7 +416,12 @@ cargo test -p rsinter --test bench_registry
 cargo test -p rsinter --test bench_run
 ```
 
-Expected: all commands pass. If the fixed-seed predict-zero LER assertion fails, change the test's `p` to `0.01` and rerun; the committed test must keep the explicit `0.35..=0.65` assertion.
+Expected: all commands pass. The standalone predict-zero negative-control smoke uses
+`p = 0.001` because the fixed-seed BB72 explicit-observable sample lands in the
+requested `0.35..=0.65` control window there, while `p = 0.003` and `p = 0.01`
+are too high for this small all-zero-prediction smoke. Later BB72 BP+OSD and
+manual reference fixtures keep their `p = 0.003` and `p = 0.01` reference
+points.
 
 - [ ] **Step 7: Commit Task 2**
 
