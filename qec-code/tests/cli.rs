@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -691,6 +691,258 @@ fn run_code_css_distance_randomized_upper_bound_rejects_output_and_file_errors()
         read_failure,
         Err(QecError::CssMatrixReadFailed { .. })
     ));
+}
+
+#[test]
+fn code_css_distance_exact_code_id_returns_exact_json() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 3);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 3);
+    assert_eq!(json["options"]["input"], "code_id");
+    assert_eq!(json["options"]["code_id"], "steane");
+    assert_eq!(json["provenance"]["tool"], "qec-code");
+}
+
+#[test]
+fn code_css_distance_exact_hx_hz_files_return_exact_json() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--hx"])
+        .arg(&hx)
+        .arg("--hz")
+        .arg(&hz)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 3);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 3);
+    assert_eq!(json["options"]["input"], "files");
+    assert_eq!(json["options"]["hx"], hx.display().to_string());
+    assert_eq!(json["options"]["hz"], hz.display().to_string());
+}
+
+#[test]
+fn code_css_distance_exact_requires_json_flag() {
+    let output = run_qec_code(&["code", "css-distance", "exact", "--code-id", "steane"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("JSON output is required for code css-distance exact"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn code_css_distance_exact_rejects_code_id_and_file_input_together() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let output = Command::new(qec_code_bin())
+        .args([
+            "code",
+            "css-distance",
+            "exact",
+            "--code-id",
+            "steane",
+            "--hx",
+        ])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("use either --code-id or --hx/--hz, not both"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn code_css_distance_exact_rejects_missing_matrix_pair() {
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--hx"])
+        .arg(hx)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("--hx and --hz must be provided together"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn code_css_distance_exact_rejects_missing_input_source() {
+    let output = run_qec_code(&["code", "css-distance", "exact", "--json"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("provide --code-id or both --hx and --hz"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn code_css_distance_exact_rejects_mismatched_file_widths() {
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":3,"rows":[[0,1]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":4,"rows":[[2,3]]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("hx width 3 does not match hz width 4"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn code_css_distance_exact_rejects_non_commuting_css_before_solving() {
+    let dir = tempdir().unwrap();
+    let hx = write_matrix_file(
+        dir.path(),
+        "hx.json",
+        r#"{"format":"sparse_rows","num_cols":1,"rows":[[0]]}"#,
+    );
+    let hz = write_matrix_file(
+        dir.path(),
+        "hz.json",
+        r#"{"format":"sparse_rows","num_cols":1,"rows":[[0]]}"#,
+    );
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--hx"])
+        .arg(hx)
+        .arg("--hz")
+        .arg(hz)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("CSS X/Z checks are not orthogonal"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn code_css_distance_exact_surface_rotated_known_distances_with_ilp() {
+    for (code_id, expected_distance) in [
+        ("surface_rotated:d=3", 3),
+        ("surface_rotated:d=5", 5),
+        ("surface_rotated:d=7", 7),
+    ] {
+        let output = run_qec_code(&[
+            "code",
+            "css-distance",
+            "exact",
+            "--code-id",
+            code_id,
+            "--json",
+        ]);
+
+        assert!(output.status.success(), "case {code_id} failed");
+        assert_eq!(output.stderr, b"", "case {code_id} printed stderr");
+
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+        assert_eq!(json["distance"], expected_distance);
+        assert_eq!(json["bound_type"], "exact");
+        assert_eq!(json["method"], "rstim-ilp-exact");
+        assert_eq!(json["witness"]["weight"], expected_distance);
+    }
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn code_css_distance_exact_bb72_known_distance_with_ilp() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "bb72",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["distance"], 6);
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["witness"]["weight"], 6);
 }
 
 #[cfg(not(feature = "distance-ilp-highs"))]
