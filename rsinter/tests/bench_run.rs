@@ -275,6 +275,14 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["bp_iters"], serde_json::json!(50));
     assert_eq!(rows[0].params["early_stop"], serde_json::json!(false));
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
+    assert_eq!(
+        rows[0].params["bp_algorithm"],
+        serde_json::json!("min_sum")
+    );
+    assert_eq!(
+        rows[0].params["osd_method"],
+        serde_json::json!("combination_sweep")
+    );
 }
 
 #[test]
@@ -334,6 +342,124 @@ label = "Logical Error Rate"
         err,
         "rbposd params must not set both bp_iters and max_bp_iterations"
     );
+}
+
+#[test]
+fn rbposd_benchmark_rejects_unsupported_bp_algorithm() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_bad"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+bp_algorithm = "sum_product"
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd bp_algorithm must be \"min_sum\", got \"sum_product\""
+    );
+    assert!(!dir.path().join("rbposd_bad").exists());
+}
+
+#[test]
+fn rbposd_benchmark_rejects_unsupported_osd_method() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_bad"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+osd_method = "unknown_method"
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd osd_method must be \"combination_sweep\", got \"unknown_method\""
+    );
+    assert!(!dir.path().join("rbposd_bad").exists());
 }
 
 #[test]

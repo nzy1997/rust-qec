@@ -286,7 +286,12 @@ fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
     match runner_name {
         "rbposd" => matches!(
             key,
-            "bp_iters" | "max_bp_iterations" | "early_stop" | "osd_order"
+            "bp_algorithm"
+                | "bp_iters"
+                | "max_bp_iterations"
+                | "early_stop"
+                | "osd_method"
+                | "osd_order"
         ),
         "rilpqec" => matches!(
             key,

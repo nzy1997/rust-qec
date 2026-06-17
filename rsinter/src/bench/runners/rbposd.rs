@@ -5,7 +5,7 @@ use toml::Value;
 
 use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
 use crate::bench::result::{BenchmarkResultRow, PairMapExt, ParamMap};
-use crate::bench::runners::params::{optional_bool, optional_usize};
+use crate::bench::runners::params::{optional_bool, optional_string, optional_usize};
 use crate::bench::runners::run_decoder_point;
 use crate::decode::RbposdDemDecoder;
 
@@ -19,6 +19,20 @@ struct RbposdRunnerParams {
 impl RbposdRunnerParams {
     fn parse(params: &BTreeMap<String, Value>) -> Result<Self, String> {
         let mut config = DecoderConfig::default();
+        let bp_algorithm = optional_string(params, "bp_algorithm")?
+            .unwrap_or_else(|| "min_sum".to_string());
+        if bp_algorithm != "min_sum" {
+            return Err(format!(
+                "rbposd bp_algorithm must be \"min_sum\", got \"{bp_algorithm}\""
+            ));
+        }
+        let osd_method = optional_string(params, "osd_method")?
+            .unwrap_or_else(|| "combination_sweep".to_string());
+        if osd_method != "combination_sweep" {
+            return Err(format!(
+                "rbposd osd_method must be \"combination_sweep\", got \"{osd_method}\""
+            ));
+        }
         let bp_iters = optional_usize(params, "bp_iters")?;
         let max_bp_iterations = optional_usize(params, "max_bp_iterations")?;
         let bp_iters = match (bp_iters, max_bp_iterations) {
@@ -37,8 +51,10 @@ impl RbposdRunnerParams {
         Ok(Self {
             config,
             normalized: ParamMap::from_pairs([
+                ("bp_algorithm", serde_json::json!(bp_algorithm)),
                 ("bp_iters", serde_json::json!(config.max_bp_iterations)),
                 ("early_stop", serde_json::json!(config.early_stop)),
+                ("osd_method", serde_json::json!(osd_method)),
                 ("osd_order", serde_json::json!(config.osd_order)),
             ]),
         })
