@@ -839,7 +839,7 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     assert_eq!(predict_zero_row.error, None);
     let logical_error_rate = predict_zero_row.metrics["logical_error_rate"];
     assert!(
-        (0.35..=0.65).contains(&logical_error_rate),
+        (0.70..=0.80).contains(&logical_error_rate),
         "predict-zero fixture LER was {logical_error_rate}"
     );
 }
@@ -854,7 +854,7 @@ cargo test -p rsinter --test bench_run rust_benchmark_run_supports_bb72_css_bpos
 cargo test -p rsinter --test bench_run
 ```
 
-Expected: all commands pass. If the OSD10 row makes the test too slow, change only the `rbposd-osd10-v1` fixture budget to `max_shots = 0`, keep all rbposd provenance assertions, and keep the predict-zero runner at `max_shots = 64`.
+Expected: all commands pass. If the OSD10 row makes the test too slow, change only the `rbposd-osd10-v1` fixture budget to `max_shots = 0`, keep all rbposd provenance assertions, and keep the predict-zero runner at `max_shots = 64`. The fixture keeps `p = 0.003` as the BB72 reference point, so its fixed-seed predict-zero row is a high-error negative control; the near-0.5 predict-zero smoke remains the standalone `p = 0.001` test from Task 2.
 
 - [ ] **Step 4: Commit Task 4**
 

@@ -275,10 +275,7 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["bp_iters"], serde_json::json!(50));
     assert_eq!(rows[0].params["early_stop"], serde_json::json!(false));
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
-    assert_eq!(
-        rows[0].params["bp_algorithm"],
-        serde_json::json!("min_sum")
-    );
+    assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
     assert_eq!(
         rows[0].params["osd_method"],
         serde_json::json!("combination_sweep")
@@ -1281,6 +1278,90 @@ label = "Logical Error Rate"
     assert!(
         (0.35..=0.65).contains(&logical_error_rate),
         "predict-zero control LER was {logical_error_rate}"
+    );
+}
+
+#[test]
+fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/bb72_css_bposd_decoder.toml");
+    let text = fs::read_to_string(&spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        spec_path.parent().unwrap(),
+    )
+    .unwrap();
+
+    let rbposd_data = fs::read(
+        artifact_root
+            .join("rbposd-osd10-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rbposd_rows = read_results_jsonl(&rbposd_data[..]).unwrap();
+    assert_eq!(rbposd_rows.len(), 1);
+    let rbposd_row = &rbposd_rows[0];
+    assert_eq!(rbposd_row.params["input_type"], serde_json::json!("css"));
+    assert_eq!(
+        rbposd_row.params["code_id"],
+        serde_json::json!("bivariate-bicycle-code-m6-n6")
+    );
+    assert_eq!(
+        rbposd_row.params["logical_observable_source"],
+        serde_json::json!("explicit")
+    );
+    assert_eq!(
+        rbposd_row.params["decoder_impl"],
+        serde_json::json!("rbposd")
+    );
+    assert_eq!(rbposd_row.params["seed"], serde_json::json!(12_345));
+    assert_eq!(
+        rbposd_row.params["bp_algorithm"],
+        serde_json::json!("min_sum")
+    );
+    assert_eq!(rbposd_row.params["bp_iters"], serde_json::json!(50));
+    assert_eq!(
+        rbposd_row.params["osd_method"],
+        serde_json::json!("combination_sweep")
+    );
+    assert_eq!(rbposd_row.params["osd_order"], serde_json::json!(10));
+    assert_eq!(rbposd_row.case_summary["num_obs"], serde_json::json!(12));
+    assert_eq!(rbposd_row.status, "ok");
+    assert_eq!(rbposd_row.error, None);
+
+    let predict_zero_data = fs::read(
+        artifact_root
+            .join("predict-zero-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let predict_zero_rows = read_results_jsonl(&predict_zero_data[..]).unwrap();
+    assert_eq!(predict_zero_rows.len(), 1);
+    let predict_zero_row = &predict_zero_rows[0];
+    assert_eq!(
+        predict_zero_row.params["decoder_impl"],
+        serde_json::json!("predict-zero")
+    );
+    assert_eq!(predict_zero_row.params["seed"], serde_json::json!(12_345));
+    assert_eq!(
+        predict_zero_row.case_summary["num_obs"],
+        serde_json::json!(12)
+    );
+    assert_eq!(predict_zero_row.status, "ok");
+    assert_eq!(predict_zero_row.error, None);
+    let logical_error_rate = predict_zero_row.metrics["logical_error_rate"];
+    assert!(
+        (0.70..=0.80).contains(&logical_error_rate),
+        "predict-zero fixture LER was {logical_error_rate}"
     );
 }
 

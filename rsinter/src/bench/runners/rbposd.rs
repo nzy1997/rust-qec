@@ -6,7 +6,7 @@ use toml::Value;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
 use crate::bench::result::{BenchmarkResultRow, PairMapExt, ParamMap};
 use crate::bench::runners::params::{optional_bool, optional_string, optional_usize};
-use crate::bench::runners::run_decoder_point;
+use crate::bench::runners::{DemBuildMode, run_decoder_point_with_dem_mode};
 use crate::decode::RbposdDemDecoder;
 
 pub struct RbposdRunner;
@@ -19,8 +19,8 @@ struct RbposdRunnerParams {
 impl RbposdRunnerParams {
     fn parse(params: &BTreeMap<String, Value>) -> Result<Self, String> {
         let mut config = DecoderConfig::default();
-        let bp_algorithm = optional_string(params, "bp_algorithm")?
-            .unwrap_or_else(|| "min_sum".to_string());
+        let bp_algorithm =
+            optional_string(params, "bp_algorithm")?.unwrap_or_else(|| "min_sum".to_string());
         if bp_algorithm != "min_sum" {
             return Err(format!(
                 "rbposd bp_algorithm must be \"min_sum\", got \"{bp_algorithm}\""
@@ -77,6 +77,13 @@ impl RustBenchRunner for RbposdRunner {
     ) -> Result<BenchmarkResultRow, String> {
         let params = RbposdRunnerParams::parse(&point.decoder_params)?;
         let decoder = RbposdDemDecoder::new(params.config);
-        run_decoder_point(self.name(), &decoder, point, ctx, &params.normalized)
+        run_decoder_point_with_dem_mode(
+            self.name(),
+            &decoder,
+            point,
+            ctx,
+            &params.normalized,
+            DemBuildMode::Raw,
+        )
     }
 }
