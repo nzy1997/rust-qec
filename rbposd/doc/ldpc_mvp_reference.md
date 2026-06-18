@@ -99,3 +99,46 @@ Issue #89 checks in a minimal Rust-side fixture set under
 
 Fixture manifests, Python `ldpc` differential harness coverage, and broader
 fixture catalog validation are owned by #90/#98.
+
+## LSD Fixture Manifest
+
+Issue #90 adds an LSD-only fixture manifest at
+`rbposd/tests/fixtures/lsd/manifest.json`.
+
+The manifest covers the current checked-in LSD fixtures:
+
+- `lsd_small_sparse_code.json`
+- `lsd_order_one_improves_over_baseline.json`
+- `lsd_unsatisfiable_case.json`
+
+Each manifest entry records:
+
+- fixture id
+- fixture path
+- provenance
+- verifier command
+- pass condition
+- consuming issue ids
+
+Rust tests validate that each checked-in LSD fixture has exactly one manifest
+entry and that malformed metadata is rejected instead of silently skipped.
+
+The Python parity harness can opt into these LSD fixtures with:
+
+```bash
+python3 rbposd/scripts/parity_harness.py --include-lsd --skip-generated
+```
+
+The harness path converts manifest-listed LSD fixtures into the existing parity
+report shape and compares supported `BpLsdDecoder` cases against upstream
+`ldpc`. Unsupported LSD mappings are reported as structured errors and are not
+coerced into OSD decoding.
+
+Harness unit coverage for the LSD manifest path can be run with:
+
+```bash
+python3 -m pytest rbposd/scripts/test_parity_harness.py -k lsd
+```
+
+Existing OSD/BP parity fixtures remain outside the #90 manifest. The broader
+shared LSD and BP-option fixture catalog remains owned by #98.

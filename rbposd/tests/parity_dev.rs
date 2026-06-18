@@ -63,6 +63,13 @@ fn osd_config() -> parity_schema::ConfigSpec {
     }
 }
 
+fn lsd_config(order: usize) -> parity_schema::LsdConfigSpec {
+    parity_schema::LsdConfigSpec {
+        method: parity_schema::LsdMethodSpec::LocalizedStatistics,
+        lsd_order: order,
+    }
+}
+
 #[test]
 fn panic_message_handles_all_supported_payload_shapes() {
     assert_eq!(panic_message(Box::new("borrowed panic")), "borrowed panic");
@@ -182,9 +189,80 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
 }
 
 #[test]
+fn parity_case_defaults_to_bposd_decoder_for_existing_json_shape() {
+    let json = r#"{
+      "name": "default_decoder_case",
+      "matrix": {
+        "num_checks": 1,
+        "num_bits": 1,
+        "rows": [[0]]
+      },
+      "channel": {
+        "kind": "bsc",
+        "error_rate": 0.2
+      },
+      "syndrome": [true],
+      "config": {
+        "max_bp_iterations": 0,
+        "early_stop": true,
+        "bp_variant": "minimum_sum",
+        "schedule": "parallel",
+        "osd_variant": "osd0"
+      }
+    }"#;
+
+    let case: parity_schema::ParityCase = serde_json::from_str(json).unwrap();
+
+    assert_eq!(case.decoder, parity_schema::DecoderSpec::BpOsd);
+    assert!(case.lsd_config.is_none());
+}
+
+#[test]
+fn parity_runner_decodes_bplsd_cases_when_decoder_field_is_set() {
+    let case = parity_schema::ParityCase {
+        name: "lsd_parity_case".to_string(),
+        decoder: parity_schema::DecoderSpec::BpLsd,
+        matrix: parity_schema::MatrixSpec {
+            num_checks: 2,
+            num_bits: 3,
+            rows: vec![vec![1, 2], vec![0]],
+        },
+        channel: parity_schema::ChannelSpec::Bsc { error_rate: 0.05 },
+        syndrome: vec![true, false],
+        config: osd_config(),
+        lsd_config: Some(lsd_config(1)),
+        expected: None,
+        tags: vec!["lsd".to_string()],
+    };
+
+    let report = parity_runner::run_case(&case);
+
+    assert_eq!(report.name, "lsd_parity_case");
+    assert_eq!(report.tags, vec!["lsd"]);
+    assert_eq!(report.matches_expected, None);
+    match report.actual {
+        parity_schema::ParityOutcome::Success {
+            correction,
+            diagnostics,
+        } => {
+            let pcm = rbposd::ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![1, 2], vec![0]])
+                .unwrap();
+            let syndrome = rbposd::Syndrome::from(vec![true, false]);
+            assert_eq!(pcm.multiply(&rbposd::Correction::from(correction)), syndrome);
+            assert_eq!(diagnostics.used_osd, Some(false));
+            assert_eq!(diagnostics.residual_syndrome_weight, Some(0));
+        }
+        parity_schema::ParityOutcome::Error { error } => {
+            panic!("expected LSD success report, got error {error}");
+        }
+    }
+}
+
+#[test]
 fn run_case_reports_success_build_failures_and_decode_failures() {
     let success_case = parity_schema::ParityCase {
         name: "success_without_expected".to_string(),
+        decoder: parity_schema::DecoderSpec::BpOsd,
         matrix: parity_schema::MatrixSpec {
             num_checks: 1,
             num_bits: 1,
@@ -193,6 +271,7 @@ fn run_case_reports_success_build_failures_and_decode_failures() {
         channel: parity_schema::ChannelSpec::Bsc { error_rate: 0.2 },
         syndrome: vec![true],
         config: osd_config(),
+        lsd_config: None,
         expected: None,
         tags: vec!["success".to_string()],
     };
@@ -215,6 +294,7 @@ fn run_case_reports_success_build_failures_and_decode_failures() {
 
     let build_error_case = parity_schema::ParityCase {
         name: "invalid_probability".to_string(),
+        decoder: parity_schema::DecoderSpec::BpOsd,
         matrix: parity_schema::MatrixSpec {
             num_checks: 1,
             num_bits: 1,
@@ -223,6 +303,7 @@ fn run_case_reports_success_build_failures_and_decode_failures() {
         channel: parity_schema::ChannelSpec::Bsc { error_rate: 1.0 },
         syndrome: vec![true],
         config: osd_config(),
+        lsd_config: None,
         expected: Some(parity_schema::ParityOutcome::Error {
             error: "InvalidProbability".to_string(),
         }),
@@ -239,6 +320,7 @@ fn run_case_reports_success_build_failures_and_decode_failures() {
 
     let decode_error_case = parity_schema::ParityCase {
         name: "dimension_mismatch".to_string(),
+        decoder: parity_schema::DecoderSpec::BpOsd,
         matrix: parity_schema::MatrixSpec {
             num_checks: 2,
             num_bits: 3,
@@ -249,6 +331,7 @@ fn run_case_reports_success_build_failures_and_decode_failures() {
         },
         syndrome: vec![true],
         config: osd_config(),
+        lsd_config: None,
         expected: Some(parity_schema::ParityOutcome::Error {
             error: "DimensionMismatch".to_string(),
         }),

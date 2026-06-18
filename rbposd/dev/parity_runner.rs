@@ -12,12 +12,8 @@ pub struct ParityReport {
 }
 
 pub fn run_case(case: &ParityCase) -> ParityReport {
-    let syndrome = case.syndrome();
-    let actual = match case.build_decoder() {
-        Ok(decoder) => match decoder.decode(&syndrome) {
-            Ok(result) => ParityOutcome::from_decode_result(result),
-            Err(error) => ParityOutcome::from_decode_error(error),
-        },
+    let actual = match case.decode() {
+        Ok(result) => ParityOutcome::from_decode_result(result),
         Err(error) => ParityOutcome::from_decode_error(error),
     };
 

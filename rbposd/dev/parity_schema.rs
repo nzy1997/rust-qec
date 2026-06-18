@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rbposd::{
-    BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult, DecoderConfig, OsdVariant,
-    ParityCheckMatrix, Schedule, Syndrome,
+    BpLsdDecoder, BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult,
+    DecoderConfig, LsdConfig, LsdMethod, OsdVariant, ParityCheckMatrix, Schedule, Syndrome,
 };
 use serde::{Deserialize, Serialize};
 
@@ -154,6 +154,42 @@ pub enum OsdVariantSpec {
     Osd0,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DecoderSpec {
+    BpOsd,
+    BpLsd,
+}
+
+impl Default for DecoderSpec {
+    fn default() -> Self {
+        Self::BpOsd
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LsdMethodSpec {
+    LocalizedStatistics,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LsdConfigSpec {
+    pub method: LsdMethodSpec,
+    pub lsd_order: usize,
+}
+
+impl LsdConfigSpec {
+    fn build(self) -> LsdConfig {
+        LsdConfig {
+            method: match self.method {
+                LsdMethodSpec::LocalizedStatistics => LsdMethod::LocalizedStatistics,
+            },
+            lsd_order: self.lsd_order,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConfigSpec {
     pub max_bp_iterations: usize,
@@ -185,10 +221,14 @@ impl ConfigSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParityCase {
     pub name: String,
+    #[serde(default)]
+    pub decoder: DecoderSpec,
     pub matrix: MatrixSpec,
     pub channel: ChannelSpec,
     pub syndrome: Vec<bool>,
     pub config: ConfigSpec,
+    #[serde(default)]
+    pub lsd_config: Option<LsdConfigSpec>,
     #[serde(default)]
     pub expected: Option<ParityOutcome>,
     #[serde(default)]
@@ -202,6 +242,22 @@ impl ParityCase {
             self.channel.build(),
             self.config.build(),
         )
+    }
+
+    fn build_lsd_decoder(&self) -> Result<BpLsdDecoder, DecodeError> {
+        let lsd_config = self
+            .lsd_config
+            .map(LsdConfigSpec::build)
+            .unwrap_or_default();
+        BpLsdDecoder::new(self.matrix.build()?, self.channel.build(), lsd_config)
+    }
+
+    pub fn decode(&self) -> Result<DecodeResult, DecodeError> {
+        let syndrome = self.syndrome();
+        match self.decoder {
+            DecoderSpec::BpOsd => self.build_decoder()?.decode(&syndrome),
+            DecoderSpec::BpLsd => self.build_lsd_decoder()?.decode(&syndrome),
+        }
     }
 
     pub fn syndrome(&self) -> Syndrome {

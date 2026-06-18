@@ -13,6 +13,14 @@ REAL_MISMATCH_CLASSES = {
     "payload_mismatch",
 }
 
+DEFAULT_BP_CONFIG = {
+    "max_bp_iterations": 30,
+    "early_stop": True,
+    "bp_variant": "minimum_sum",
+    "schedule": "parallel",
+    "osd_variant": "osd0",
+}
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -29,6 +37,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path("rbposd/tests/fixtures/parity"),
         help="Directory containing checked-in parity fixture JSON files.",
+    )
+    parser.add_argument(
+        "--include-lsd",
+        action="store_true",
+        help="Also run checked-in LSD fixtures from the LSD fixture manifest.",
+    )
+    parser.add_argument(
+        "--lsd-fixtures-dir",
+        type=Path,
+        default=Path("rbposd/tests/fixtures/lsd"),
+        help="Directory containing checked-in LSD fixture JSON files and manifest.json.",
     )
     parser.add_argument(
         "--skip-generated",
@@ -67,6 +86,62 @@ def load_case(case_path: Path) -> dict[str, Any]:
 
 def fixture_case_paths(fixtures_dir: Path) -> list[Path]:
     return sorted(fixtures_dir.glob("*.json"))
+
+
+def load_lsd_manifest(lsd_fixtures_dir: Path) -> dict[str, Any]:
+    manifest_path = lsd_fixtures_dir / "manifest.json"
+    with manifest_path.open("r", encoding="utf-8") as infile:
+        manifest = json.load(infile)
+    if not isinstance(manifest.get("fixtures"), list) or not manifest["fixtures"]:
+        raise ValueError(f"LSD manifest {manifest_path} must contain a non-empty fixtures list")
+    return manifest
+
+
+def iter_lsd_fixture_cases(lsd_fixtures_dir: Path) -> list[dict[str, Any]]:
+    manifest = load_lsd_manifest(lsd_fixtures_dir)
+    cases: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for entry in manifest["fixtures"]:
+        fixture_id = str(entry.get("id", ""))
+        fixture_path_name = str(entry.get("path", ""))
+        if not fixture_id:
+            raise ValueError("LSD manifest entry id must not be empty")
+        if fixture_id in seen_ids:
+            raise ValueError(f"Duplicate LSD manifest id: {fixture_id}")
+        seen_ids.add(fixture_id)
+        if not fixture_path_name:
+            raise ValueError(f"LSD manifest entry {fixture_id} path must not be empty")
+        for metadata_field in ("provenance", "verifier", "pass_condition"):
+            if not str(entry.get(metadata_field, "")).strip():
+                raise ValueError(
+                    f"LSD manifest entry {fixture_id} {metadata_field} must not be empty"
+                )
+        if "#90" not in entry.get("consumes", []):
+            raise ValueError(f"LSD manifest entry {fixture_id} must consume #90")
+
+        fixture_path = lsd_fixtures_dir / fixture_path_name
+        fixture = load_case(fixture_path)
+        if fixture.get("id") != fixture_id:
+            raise ValueError(
+                f"LSD manifest id {fixture_id} does not match fixture id {fixture.get('id')}"
+            )
+
+        cases.append(
+            {
+                "name": fixture["id"],
+                "decoder": "bp_lsd",
+                "matrix": fixture["matrix"],
+                "channel": fixture["channel"],
+                "syndrome": fixture["syndrome"],
+                "config": dict(DEFAULT_BP_CONFIG),
+                "lsd_config": {
+                    "method": "localized_statistics",
+                    "lsd_order": int(fixture["lsd_order"]),
+                },
+                "tags": ["fixture", "lsd", "#90"],
+            }
+        )
+    return cases
 
 
 def iter_generated_cases(_repo_root: Path) -> list[dict[str, Any]]:
@@ -167,41 +242,54 @@ def map_config_to_ldpc_kwargs(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
-    import numpy as np
-    from ldpc import BpOsdDecoder
+def map_lsd_case_to_ldpc_kwargs(case: dict[str, Any]) -> dict[str, Any]:
+    config = case.get("config", {})
+    bp_variant = config.get("bp_variant")
+    if bp_variant != "minimum_sum":
+        raise ValueError(f"Unsupported bp_variant for LSD: {bp_variant}")
 
-    matrix = np.array(matrix_to_dense(case["matrix"]), dtype=np.uint8)
-    syndrome = np.array(case["syndrome"], dtype=np.uint8)
-    config = case["config"]
-    channel = case["channel"]
+    schedule = config.get("schedule")
+    if schedule != "parallel":
+        raise ValueError(f"Unsupported schedule for LSD: {schedule}")
 
-    try:
-        decoder_kwargs = map_config_to_ldpc_kwargs(config)
-    except ValueError as error:
-        return {"status": "error", "error": str(error)}
+    early_stop = config.get("early_stop")
+    if early_stop is not True:
+        raise ValueError(
+            f"Unsupported early_stop value for LSD: {early_stop}. "
+            "Python ldpc parity harness currently requires early_stop=true."
+        )
 
+    lsd_config = case.get("lsd_config", {})
+    lsd_method = lsd_config.get("method")
+    if lsd_method != "localized_statistics":
+        raise ValueError(f"Unsupported lsd_method: {lsd_method}")
+
+    lsd_order = int(lsd_config.get("lsd_order", -1))
+    if lsd_order not in (0, 1):
+        raise ValueError(f"Unsupported lsd_order: {lsd_order}")
+
+    return {
+        "max_iter": int(config["max_bp_iterations"]),
+        "bp_method": "minimum_sum",
+        "schedule": "parallel",
+        "lsd_method": "localized_statistics",
+        "lsd_order": lsd_order,
+        "input_vector_type": "syndrome",
+    }
+
+
+def add_channel_kwargs(decoder_kwargs: dict[str, Any], channel: dict[str, Any]) -> dict[str, Any]:
     if channel["kind"] == "bsc":
         decoder_kwargs["error_rate"] = float(channel["error_rate"])
     elif channel["kind"] == "bit_flip_probabilities":
         decoder_kwargs["error_channel"] = list(channel["probabilities"])
     else:
-        return {
-            "status": "error",
-            "error": f"UnsupportedChannel(kind={channel.get('kind')})",
-        }
+        raise ValueError(f"UnsupportedChannel(kind={channel.get('kind')})")
+    return decoder_kwargs
 
-    try:
-        decoder = BpOsdDecoder(matrix, **decoder_kwargs)
-        correction_arr = decoder.decode(syndrome)
-    except Exception as error:  # pragma: no cover - exercised by full harness runs
-        return {
-            "status": "error",
-            "error": f"{type(error).__name__}: {error}",
-        }
 
-    correction = [bool(int(value)) for value in correction_arr.tolist()]
-    syndrome_bool = [bool(bit) for bit in syndrome.tolist()]
+def residual_weight_for_correction(case: dict[str, Any], correction: list[bool]) -> int:
+    syndrome_bool = [bool(bit) for bit in case["syndrome"]]
     residual = [False for _ in range(len(syndrome_bool))]
     for row_index, row in enumerate(matrix_to_dense(case["matrix"])):
         parity = False
@@ -209,22 +297,81 @@ def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
             if include:
                 parity ^= correction[bit_index]
         residual[row_index] = parity ^ syndrome_bool[row_index]
+    return sum(1 for bit in residual if bit)
 
+
+def run_python_bposd(case: dict[str, Any]) -> dict[str, Any]:
+    import numpy as np
+    from ldpc import BpOsdDecoder
+
+    matrix = np.array(matrix_to_dense(case["matrix"]), dtype=np.uint8)
+    syndrome = np.array(case["syndrome"], dtype=np.uint8)
+    try:
+        decoder_kwargs = add_channel_kwargs(
+            map_config_to_ldpc_kwargs(case["config"]),
+            case["channel"],
+        )
+        decoder = BpOsdDecoder(matrix, **decoder_kwargs)
+        correction_arr = decoder.decode(syndrome)
+    except ValueError as error:
+        return {"status": "error", "error": str(error)}
+    except Exception as error:  # pragma: no cover - exercised by full harness runs
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"}
+
+    correction = [bool(int(value)) for value in correction_arr.tolist()]
+    residual_weight = residual_weight_for_correction(case, correction)
     converged = bool(decoder.converge)
-    bp_iterations = int(decoder.iter)
-    used_osd = not converged
-    residual_weight = sum(1 for bit in residual if bit)
-
     return {
         "status": "success",
         "correction": correction,
         "diagnostics": {
             "converged": converged,
-            "bp_iterations": bp_iterations,
-            "used_osd": used_osd,
+            "bp_iterations": int(decoder.iter),
+            "used_osd": not converged,
             "residual_syndrome_weight": residual_weight,
         },
     }
+
+
+def run_python_bplsd(case: dict[str, Any]) -> dict[str, Any]:
+    import numpy as np
+    from ldpc import BpLsdDecoder
+
+    matrix = np.array(matrix_to_dense(case["matrix"]), dtype=np.uint8)
+    syndrome = np.array(case["syndrome"], dtype=np.uint8)
+    try:
+        decoder_kwargs = add_channel_kwargs(
+            map_lsd_case_to_ldpc_kwargs(case),
+            case["channel"],
+        )
+        decoder = BpLsdDecoder(matrix, **decoder_kwargs)
+        correction_arr = decoder.decode(syndrome)
+    except ValueError as error:
+        return {"status": "error", "error": str(error)}
+    except Exception as error:  # pragma: no cover - exercised by full harness runs
+        return {"status": "error", "error": f"{type(error).__name__}: {error}"}
+
+    correction = [bool(int(value)) for value in correction_arr.tolist()]
+    residual_weight = residual_weight_for_correction(case, correction)
+    return {
+        "status": "success",
+        "correction": correction,
+        "diagnostics": {
+            "converged": bool(getattr(decoder, "converge", False)),
+            "bp_iterations": int(getattr(decoder, "iter", case["config"]["max_bp_iterations"])),
+            "used_osd": False,
+            "residual_syndrome_weight": residual_weight,
+        },
+    }
+
+
+def run_python_ldpc(case: dict[str, Any]) -> dict[str, Any]:
+    decoder = case.get("decoder", "bp_osd")
+    if decoder in ("bp_osd", "bposd"):
+        return run_python_bposd(case)
+    if decoder in ("bp_lsd", "bplsd"):
+        return run_python_bplsd(case)
+    return {"status": "error", "error": f"Unsupported decoder: {decoder}"}
 
 
 def classify_mismatch(
@@ -270,6 +417,8 @@ def build_entries(
     fixtures_dir: Path,
     skip_generated: bool,
     case_limit: int | None,
+    include_lsd: bool = False,
+    lsd_fixtures_dir: Path = Path("rbposd/tests/fixtures/lsd"),
 ) -> list[dict[str, Any]]:
     case_items: list[dict[str, Any]] = []
 
@@ -289,6 +438,16 @@ def build_entries(
                     "source": "generated",
                     "case_path": None,
                     "case": generated_case,
+                }
+            )
+
+    if include_lsd:
+        for lsd_case in iter_lsd_fixture_cases(lsd_fixtures_dir):
+            case_items.append(
+                {
+                    "source": "lsd_fixture",
+                    "case_path": None,
+                    "case": lsd_case,
                 }
             )
 
@@ -337,6 +496,8 @@ def main(argv: list[str] | None = None) -> int:
         fixtures_dir=args.fixtures_dir,
         skip_generated=args.skip_generated,
         case_limit=args.case_limit,
+        include_lsd=args.include_lsd,
+        lsd_fixtures_dir=args.lsd_fixtures_dir,
     )
     mismatch_count = sum(1 for entry in entries if entry["is_mismatch"])
     total_count = len(entries)
