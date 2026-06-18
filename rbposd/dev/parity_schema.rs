@@ -98,6 +98,7 @@ fn error_code(error: &DecodeError) -> &'static str {
         DecodeError::SingularSystem => "SingularSystem",
         DecodeError::BpDidNotConverge => "BpDidNotConverge",
         DecodeError::NoOsdSolution => "NoOsdSolution",
+        DecodeError::NoLsdSolution => "NoLsdSolution",
         DecodeError::UnsupportedLsdOrder { .. } => "UnsupportedLsdOrder",
     }
 }

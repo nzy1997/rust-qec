@@ -86,7 +86,11 @@ fn correction_helpers_and_error_display_cover_remaining_contracts() {
         "no OSD solution found"
     );
     assert_eq!(
-        DecodeError::UnsupportedLsdOrder { order: 1 }.to_string(),
-        "unsupported LSD order 1; only order 0 is supported"
+        DecodeError::NoLsdSolution.to_string(),
+        "no LSD solution found"
+    );
+    assert_eq!(
+        DecodeError::UnsupportedLsdOrder { order: 2 }.to_string(),
+        "unsupported LSD order 2; only orders 0 and 1 are supported"
     );
 }

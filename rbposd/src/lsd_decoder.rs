@@ -5,7 +5,7 @@ use crate::config::{ChannelModel, DecoderConfig, LsdConfig, LsdMethod};
 use crate::decoder::DecodeResult;
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
-use crate::gf2::PreparedLinearSystem;
+use crate::lsd::{LsdWorkspace, decode_lsd_with_workspace};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
@@ -16,7 +16,7 @@ pub struct BpLsdDecoder {
     config: LsdConfig,
     bp_config: DecoderConfig,
     bp_workspace: Mutex<BpWorkspace>,
-    fallback_workspace: Mutex<LsdFallbackWorkspace>,
+    lsd_workspace: Mutex<LsdWorkspace>,
 }
 
 impl Clone for BpLsdDecoder {
@@ -27,7 +27,7 @@ impl Clone for BpLsdDecoder {
             config: self.config,
             bp_config: self.bp_config,
             bp_workspace: Mutex::new(self.core.workspace()),
-            fallback_workspace: Mutex::new(LsdFallbackWorkspace::new(&self.pcm)),
+            lsd_workspace: Mutex::new(LsdWorkspace::new(&self.pcm)),
         }
     }
 }
@@ -41,7 +41,7 @@ impl BpLsdDecoder {
         match config.method {
             LsdMethod::LocalizedStatistics => {}
         }
-        if config.lsd_order != 0 {
+        if config.lsd_order > 1 {
             return Err(DecodeError::UnsupportedLsdOrder {
                 order: config.lsd_order,
             });
@@ -49,7 +49,7 @@ impl BpLsdDecoder {
 
         let core = BpCore::new(&pcm, &channel)?;
         let bp_workspace = Mutex::new(core.workspace());
-        let fallback_workspace = Mutex::new(LsdFallbackWorkspace::new(&pcm));
+        let lsd_workspace = Mutex::new(LsdWorkspace::new(&pcm));
 
         Ok(Self {
             pcm,
@@ -57,7 +57,7 @@ impl BpLsdDecoder {
             config,
             bp_config: DecoderConfig::default(),
             bp_workspace,
-            fallback_workspace,
+            lsd_workspace,
         })
     }
 
@@ -98,13 +98,21 @@ impl BpLsdDecoder {
         }
 
         let correction = {
-            let mut fallback_workspace = self.fallback_workspace.lock().unwrap();
-            fallback_workspace.solve_order_zero(
-                &self.pcm,
+            let target_syndrome = xor_syndromes(
+                &multiply_bits(&self.pcm, &bp_workspace.hard_decision_bits),
                 syndrome,
-                &bp_workspace.hard_decision_bits,
-                &bp_workspace.reliability,
-            )?
+            );
+            let residual = {
+                let mut lsd_workspace = self.lsd_workspace.lock().unwrap();
+                decode_lsd_with_workspace(
+                    &self.pcm,
+                    &target_syndrome,
+                    &bp_workspace.reliability,
+                    self.config.lsd_order,
+                    &mut lsd_workspace,
+                )?
+            };
+            xor_correction_bits(&bp_workspace.hard_decision_bits, &residual)
         };
         drop(bp_workspace);
 
@@ -115,47 +123,6 @@ impl BpLsdDecoder {
             used_osd: false,
             residual_syndrome_weight: 0,
         })
-    }
-}
-
-#[derive(Debug)]
-struct LsdFallbackWorkspace {
-    prepared: PreparedLinearSystem,
-    column_order: Vec<usize>,
-}
-
-impl LsdFallbackWorkspace {
-    fn new(pcm: &ParityCheckMatrix) -> Self {
-        Self {
-            prepared: PreparedLinearSystem::from_pcm(pcm),
-            column_order: (0..pcm.num_bits()).collect(),
-        }
-    }
-
-    fn solve_order_zero(
-        &mut self,
-        pcm: &ParityCheckMatrix,
-        syndrome: &Syndrome,
-        base_correction_bits: &[bool],
-        reliability: &[f64],
-    ) -> Result<Correction, DecodeError> {
-        let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
-        self.sort_unreliable_columns(reliability);
-        let residual = self
-            .prepared
-            .solve_with_column_order(&target_syndrome, &self.column_order)?;
-        Ok(xor_correction_bits(base_correction_bits, &residual))
-    }
-
-    fn sort_unreliable_columns(&mut self, reliability: &[f64]) {
-        self.column_order.clear();
-        self.column_order.extend(0..reliability.len());
-        self.column_order.sort_by(|&a, &b| {
-            reliability[a]
-                .partial_cmp(&reliability[b])
-                .unwrap()
-                .then_with(|| a.cmp(&b))
-        });
     }
 }
 

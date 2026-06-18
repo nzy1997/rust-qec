@@ -20,7 +20,7 @@ Included:
   `EmptyMatrix`, `InvalidProbability`,
   `InvalidColumnIndex { column: usize, num_bits: usize }`,
   `DimensionMismatch { what: &'static str, expected: usize, actual: usize }`,
-  `BpDidNotConverge`, `NoOsdSolution`,
+  `BpDidNotConverge`, `NoOsdSolution`, `NoLsdSolution`,
   `UnsupportedLsdOrder { order: usize }`
 - Error ergonomics for `DecodeError`:
   `Display` implementation and `impl std::error::Error`
@@ -72,8 +72,8 @@ share that contract.
 
 ## LSD Public API Contract
 
-Issue #88 adds `BpLsdDecoder` as a first-class public decoder family parallel
-to `BpOsdDecoder`.
+Issue #89 extends the first-class `BpLsdDecoder` path parallel to
+`BpOsdDecoder`.
 
 The supported construction path is:
 
@@ -82,13 +82,20 @@ let decoder = BpLsdDecoder::new(pcm, channel, LsdConfig::default())?;
 let result = decoder.decode(&syndrome)?;
 ```
 
-The issue #88 behavior is intentionally narrow:
+The issue #89 behavior remains narrow but now includes the first real supported
+LSD solve path:
 
 - `LsdMethod::LocalizedStatistics` is the only public LSD method variant.
-- `lsd_order=0` is the only supported order.
-- `lsd_order>0` returns `DecodeError::UnsupportedLsdOrder`.
+- `lsd_order=0` is the order-0 residual solve baseline.
+- `lsd_order=1` runs the first deterministic localized LSD solve path.
+- `lsd_order>1` returns `DecodeError::UnsupportedLsdOrder`.
+- LSD failures return `DecodeError::NoLsdSolution`.
 - successful decodes return `DecodeResult` and keep `used_osd=false`.
-- the order-0 fallback is an API validity bridge, not the full LSD algorithm.
 
-Full LSD post-BP search, nonzero-order behavior, borrowed LSD fixtures, and
-Python `ldpc` differential harness coverage are owned by follow-on issues.
+Issue #89 checks in a minimal Rust-side fixture set under
+`rbposd/tests/fixtures/lsd/`, including `lsd_small_sparse_code.json`,
+`lsd_order_one_improves_over_baseline.json`, and
+`lsd_unsatisfiable_case.json`.
+
+Fixture manifests, Python `ldpc` differential harness coverage, and broader
+fixture catalog validation are owned by #90/#98.

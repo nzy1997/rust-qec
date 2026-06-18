@@ -1,0 +1,17 @@
+{
+  "id": "lsd_small_sparse_code",
+  "matrix": {
+    "num_checks": 2,
+    "num_bits": 3,
+    "rows": [[1, 2], [0]]
+  },
+  "channel": {
+    "kind": "bsc",
+    "error_rate": 0.05
+  },
+  "syndrome": [true, false],
+  "lsd_order": 1,
+  "expected": {
+    "status": "success"
+  }
+}

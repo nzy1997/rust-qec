@@ -96,6 +96,10 @@ fn task_6_documentation_surfaces_exist() {
         "LsdConfig",
         "LsdMethod",
         "UnsupportedLsdOrder",
+        "NoLsdSolution",
+        "lsd_order=1",
+        "lsd_small_sparse_code.json",
+        "#90/#98",
     ] {
         assert!(
             reference_contents.contains(required),

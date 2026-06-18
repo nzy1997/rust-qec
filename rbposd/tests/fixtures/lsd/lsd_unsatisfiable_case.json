@@ -1,0 +1,18 @@
+{
+  "id": "lsd_unsatisfiable_case",
+  "matrix": {
+    "num_checks": 2,
+    "num_bits": 1,
+    "rows": [[0], [0]]
+  },
+  "channel": {
+    "kind": "bsc",
+    "error_rate": 0.05
+  },
+  "syndrome": [true, false],
+  "lsd_order": 1,
+  "expected": {
+    "status": "error",
+    "error": "NoLsdSolution"
+  }
+}

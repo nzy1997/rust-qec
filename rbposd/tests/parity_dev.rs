@@ -158,6 +158,7 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
         (DecodeError::SingularSystem, "SingularSystem"),
         (DecodeError::BpDidNotConverge, "BpDidNotConverge"),
         (DecodeError::NoOsdSolution, "NoOsdSolution"),
+        (DecodeError::NoLsdSolution, "NoLsdSolution"),
         (
             DecodeError::UnsupportedLsdOrder { order: 1 },
             "UnsupportedLsdOrder",

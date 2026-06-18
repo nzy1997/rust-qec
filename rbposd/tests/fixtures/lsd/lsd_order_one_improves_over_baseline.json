@@ -1,0 +1,19 @@
+{
+  "id": "lsd_order_one_improves_over_baseline",
+  "matrix": {
+    "num_checks": 2,
+    "num_bits": 3,
+    "rows": [[0], [1, 2]]
+  },
+  "channel": {
+    "kind": "bsc",
+    "error_rate": 0.3775406687981454
+  },
+  "syndrome": [false, true],
+  "lsd_order": 1,
+  "expected": {
+    "status": "success",
+    "order_0_correction": [false, true, false],
+    "order_1_correction": [false, false, true]
+  }
+}
