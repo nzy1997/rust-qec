@@ -6,6 +6,47 @@ use rsinter::failure::FailureKind;
 use std::fs;
 use std::path::Path;
 
+fn issue91_surface_spec(extra_params: &str) -> String {
+    format!(
+        r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_lsd"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+{extra_params}
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{{runner}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#
+    )
+}
+
 #[test]
 fn rust_benchmark_run_writes_manifest_and_results_jsonl() {
     let spec_text = r#"
@@ -513,6 +554,79 @@ label = "Logical Error Rate"
 
     assert_eq!(err, "unknown rbposd runner param: bogus");
     assert!(!dir.path().join("rbposd_bad").exists());
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_lsd_param_without_artifacts() {
+    let spec_text = issue91_surface_spec("bogus_lsd = 1");
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "unknown rbposd runner param: bogus_lsd");
+    assert!(!dir.path().join("rbposd_lsd").exists());
+}
+
+#[test]
+fn rbposd_runner_rejects_mixed_osd_and_lsd_params_without_artifacts() {
+    let spec_text = issue91_surface_spec(
+        r#"
+osd_order = 10
+lsd_order = 1
+"#,
+    );
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "rbposd params must not mix OSD and LSD decoder params");
+    assert!(!dir.path().join("rbposd_lsd").exists());
+}
+
+#[test]
+fn rbposd_lsd_run_fails_without_silent_osd_fallback_or_artifacts() {
+    let spec_text = issue91_surface_spec(
+        r#"
+lsd_method = "localized_statistics"
+lsd_order = 1
+"#,
+    );
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd LSD DEM decoding is not implemented yet; see issue #92"
+    );
+    assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
 #[test]

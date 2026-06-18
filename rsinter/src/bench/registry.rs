@@ -292,6 +292,8 @@ fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
                 | "early_stop"
                 | "osd_method"
                 | "osd_order"
+                | "lsd_method"
+                | "lsd_order"
         ),
         "rilpqec" => matches!(
             key,
