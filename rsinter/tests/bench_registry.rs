@@ -13,6 +13,7 @@ fn default_rust_runner_registry_contains_workspace_decoders() {
     assert!(registry.contains_key("rmatching"));
     assert!(registry.contains_key("rbposd"));
     assert!(registry.contains_key("rilpqec"));
+    assert!(registry.contains_key("predict-zero"));
 }
 
 #[test]
@@ -22,6 +23,7 @@ fn default_rust_runner_registry_exposes_runner_names() {
     assert_eq!(registry.get("rmatching").unwrap().name(), "rmatching");
     assert_eq!(registry.get("rbposd").unwrap().name(), "rbposd");
     assert_eq!(registry.get("rilpqec").unwrap().name(), "rilpqec");
+    assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
 }
 
 #[test]
@@ -30,6 +32,7 @@ fn default_rust_runner_names_include_workspace_decoders() {
     assert!(names.contains(&"rmatching".to_string()));
     assert!(names.contains(&"rbposd".to_string()));
     assert!(names.contains(&"rilpqec".to_string()));
+    assert!(names.contains(&"predict-zero".to_string()));
 }
 
 #[test]
@@ -204,10 +207,7 @@ fn expand_runner_points_defaults_to_legacy_surface_input() {
 fn expand_runner_points_accepts_memory_z_input_types() {
     for input_type in ["surface_rotated_memory_z", "memory-z"] {
         let mut params = valid_runner_params();
-        params.insert(
-            "input_type".into(),
-            toml::Value::String(input_type.into()),
-        );
+        params.insert("input_type".into(), toml::Value::String(input_type.into()));
 
         let points = expand_runner_points(&params).unwrap();
 
@@ -229,6 +229,31 @@ fn expand_runner_points_accepts_optional_max_wall_seconds() {
 
     assert_eq!(points.len(), 1);
     assert_eq!(points[0].max_wall_seconds, Some(2.5));
+}
+
+#[test]
+fn expand_runner_points_accepts_and_defaults_seed() {
+    let default_points = expand_runner_points(&valid_runner_params()).unwrap();
+    assert_eq!(default_points.len(), 1);
+    assert_eq!(default_points[0].seed, 12_345);
+
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Integer(99));
+
+    let explicit_points = expand_runner_points(&params).unwrap();
+    assert_eq!(explicit_points.len(), 1);
+    assert_eq!(explicit_points[0].seed, 99);
+}
+
+#[test]
+fn expand_runner_points_rejects_invalid_seed() {
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Float(1.0));
+    assert_eq!(expand_points_err(&params), "seed must be an integer");
+
+    let mut params = valid_runner_params();
+    params.insert("seed".into(), toml::Value::Integer(-1));
+    assert_eq!(expand_points_err(&params), "seed must be non-negative");
 }
 
 #[test]

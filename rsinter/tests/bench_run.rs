@@ -202,6 +202,11 @@ label = "Logical Error Rate"
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].runner, "mwpm_alias");
+    assert_eq!(
+        rows[0].params["decoder_impl"],
+        serde_json::json!("rmatching")
+    );
+    assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
 }
 
 #[test]
@@ -270,6 +275,11 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["bp_iters"], serde_json::json!(50));
     assert_eq!(rows[0].params["early_stop"], serde_json::json!(false));
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
+    assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(
+        rows[0].params["osd_method"],
+        serde_json::json!("combination_sweep")
+    );
 }
 
 #[test]
@@ -329,6 +339,124 @@ label = "Logical Error Rate"
         err,
         "rbposd params must not set both bp_iters and max_bp_iterations"
     );
+}
+
+#[test]
+fn rbposd_benchmark_rejects_unsupported_bp_algorithm() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_bad"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+bp_algorithm = "sum_product"
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd bp_algorithm must be \"min_sum\", got \"sum_product\""
+    );
+    assert!(!dir.path().join("rbposd_bad").exists());
+}
+
+#[test]
+fn rbposd_benchmark_rejects_unsupported_osd_method() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_bad"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+osd_method = "unknown_method"
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd osd_method must be \"combination_sweep\", got \"unknown_method\""
+    );
+    assert!(!dir.path().join("rbposd_bad").exists());
 }
 
 #[test]
@@ -1022,8 +1150,8 @@ label = "Logical Error Rate"
 
 #[test]
 fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
-    let spec_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench/minimal_bb72_css_decoder.toml");
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/minimal_bb72_css_decoder.toml");
     let text = fs::read_to_string(&spec_path).unwrap();
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
     let dir = tempfile::tempdir().unwrap();
@@ -1071,10 +1199,239 @@ fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
 }
 
 #[test]
+fn predict_zero_benchmark_runs_bb72_css_negative_control() {
+    let spec_text = r#"
+name = "bb72_predict_zero"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "predict-zero-v1"
+language = "rust"
+impl_key = "predict-zero"
+
+[runner.params]
+input_type = "css"
+code_id = "bivariate-bicycle-code-m6-n6"
+hx = "../css/bb72_hx.json"
+hz = "../css/bb72_hz.json"
+observables = "../css/bb72_logicals_x.json"
+basis = "x"
+schedule = "greedy"
+rounds = [3]
+p = [0.001]
+seed = 12345
+max_shots = 64
+max_errors = 64
+batch_size = 64
+
+[plot]
+title = "BB72 Predict Zero"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+    let spec_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bench");
+
+    let artifact_root =
+        run_rust_benchmark(&spec, "rust", dir.path(), &registry, &spec_dir).unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("predict-zero-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].runner, "predict-zero-v1");
+    assert_eq!(
+        rows[0].params["decoder_impl"],
+        serde_json::json!("predict-zero")
+    );
+    assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
+    assert_eq!(rows[0].params["input_type"], serde_json::json!("css"));
+    assert_eq!(
+        rows[0].params["code_id"],
+        serde_json::json!("bivariate-bicycle-code-m6-n6")
+    );
+    assert_eq!(rows[0].case_summary["num_obs"], serde_json::json!(12));
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+
+    let logical_error_rate = rows[0].metrics["logical_error_rate"];
+    assert!(
+        (0.35..=0.65).contains(&logical_error_rate),
+        "predict-zero control LER was {logical_error_rate}"
+    );
+}
+
+#[test]
+#[ignore = "manual BB72 BP+OSD reference run; intentionally heavier than CI"]
+fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/bb72_css_bposd_reference.toml");
+    let text = fs::read_to_string(&spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        spec_path.parent().unwrap(),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd-osd10-reference")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+    assert_eq!(rows.len(), 2);
+
+    let mut seen_p003 = false;
+    let mut seen_p01 = false;
+    for row in rows {
+        assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
+        assert_eq!(row.params["seed"], serde_json::json!(12_345));
+        assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+        assert_eq!(row.params["bp_iters"], serde_json::json!(10_000));
+        assert_eq!(
+            row.params["osd_method"],
+            serde_json::json!("combination_sweep")
+        );
+        assert_eq!(row.params["osd_order"], serde_json::json!(10));
+        assert_eq!(
+            row.params["logical_observable_source"],
+            serde_json::json!("explicit")
+        );
+        assert_eq!(row.case_summary["num_obs"], serde_json::json!(12));
+        assert_eq!(row.status, "ok");
+        assert_eq!(row.error, None);
+
+        let p = row.params["p"].as_f64().unwrap();
+        if (p - 0.003).abs() < f64::EPSILON {
+            seen_p003 = true;
+        }
+        if (p - 0.01).abs() < f64::EPSILON {
+            seen_p01 = true;
+        }
+    }
+
+    assert!(seen_p003);
+    assert!(seen_p01);
+}
+
+#[test]
+fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
+    let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/bench/bb72_css_bposd_decoder.toml");
+    let text = fs::read_to_string(&spec_path).unwrap();
+    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        spec_path.parent().unwrap(),
+    )
+    .unwrap();
+
+    let rbposd_data = fs::read(
+        artifact_root
+            .join("rbposd-osd10-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rbposd_rows = read_results_jsonl(&rbposd_data[..]).unwrap();
+    assert_eq!(rbposd_rows.len(), 1);
+    let rbposd_row = &rbposd_rows[0];
+    assert_eq!(rbposd_row.params["input_type"], serde_json::json!("css"));
+    assert_eq!(
+        rbposd_row.params["code_id"],
+        serde_json::json!("bivariate-bicycle-code-m6-n6")
+    );
+    assert_eq!(
+        rbposd_row.params["logical_observable_source"],
+        serde_json::json!("explicit")
+    );
+    assert_eq!(
+        rbposd_row.params["decoder_impl"],
+        serde_json::json!("rbposd")
+    );
+    assert_eq!(rbposd_row.params["seed"], serde_json::json!(12_345));
+    assert_eq!(
+        rbposd_row.params["bp_algorithm"],
+        serde_json::json!("min_sum")
+    );
+    assert_eq!(rbposd_row.params["bp_iters"], serde_json::json!(50));
+    assert_eq!(
+        rbposd_row.params["osd_method"],
+        serde_json::json!("combination_sweep")
+    );
+    assert_eq!(rbposd_row.params["osd_order"], serde_json::json!(10));
+    assert_eq!(rbposd_row.case_summary["num_obs"], serde_json::json!(12));
+    assert_eq!(rbposd_row.status, "ok");
+    assert_eq!(rbposd_row.error, None);
+
+    let predict_zero_data = fs::read(
+        artifact_root
+            .join("predict-zero-v1")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let predict_zero_rows = read_results_jsonl(&predict_zero_data[..]).unwrap();
+    assert_eq!(predict_zero_rows.len(), 1);
+    let predict_zero_row = &predict_zero_rows[0];
+    assert_eq!(
+        predict_zero_row.params["decoder_impl"],
+        serde_json::json!("predict-zero")
+    );
+    assert_eq!(predict_zero_row.params["seed"], serde_json::json!(12_345));
+    assert_eq!(
+        predict_zero_row.case_summary["num_obs"],
+        serde_json::json!(12)
+    );
+    assert_eq!(predict_zero_row.status, "ok");
+    assert_eq!(predict_zero_row.error, None);
+    let logical_error_rate = predict_zero_row.metrics["logical_error_rate"];
+    assert!(
+        (0.70..=0.80).contains(&logical_error_rate),
+        "predict-zero fixture LER was {logical_error_rate}"
+    );
+}
+
+#[test]
 fn rust_benchmark_run_rejects_invalid_css_observables_before_results() {
     let spec_dir = tempfile::tempdir().unwrap();
     let out_dir = tempfile::tempdir().unwrap();
-    let steane_h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+    let steane_h =
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
     fs::write(spec_dir.path().join("hx.json"), steane_h).unwrap();
     fs::write(spec_dir.path().join("hz.json"), steane_h).unwrap();
     fs::write(
@@ -1126,8 +1483,8 @@ label = "Logical Error Rate"
     let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let err = run_rust_benchmark(&spec, "rust", out_dir.path(), &registry, spec_dir.path())
-        .unwrap_err();
+    let err =
+        run_rust_benchmark(&spec, "rust", out_dir.path(), &registry, spec_dir.path()).unwrap_err();
 
     assert!(
         err.contains("observable 0 is not an X logical"),

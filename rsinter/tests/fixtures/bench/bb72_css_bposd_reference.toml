@@ -1,0 +1,58 @@
+# Manual BB72 BP+OSD reference fixture for issue #103.
+# Paper settings: MIN-SUM BP, 10000 BP iterations, combination-sweep OSD,
+# OSD order 10.
+# Table 6 formula:
+#   p_L(p) = p^(d_circ / 2) * exp(c0 + c1*p + c2*p^2)
+# BB72 reference constants:
+#   d_circ = 6
+#   c0 = 11.09
+#   c1 = 365.6
+#   c2 = -16088
+# Useful reference points:
+#   p = 0.003 -> p_L ~= 0.00458
+#   p = 0.01  -> p_L ~= 0.507
+name = "bb72_css_bposd_reference"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd-osd10-reference"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+input_type = "css"
+code_id = "bivariate-bicycle-code-m6-n6"
+hx = "../css/bb72_hx.json"
+hz = "../css/bb72_hz.json"
+observables = "../css/bb72_logicals_x.json"
+basis = "x"
+schedule = "greedy"
+rounds = [3]
+p = [0.003, 0.01]
+seed = 12345
+max_shots = 2000
+max_errors = 200
+batch_size = 64
+bp_algorithm = "min_sum"
+bp_iters = 10000
+early_stop = true
+osd_method = "combination_sweep"
+osd_order = 10
+
+[plot]
+title = "BB72 CSS BP+OSD Reference"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"

@@ -1,23 +1,29 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::StimInstr;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
-use crate::bench::circuit_source::{build_circuit_for_point, BuiltCircuit};
+use crate::bench::circuit_source::{BuiltCircuit, build_circuit_for_point};
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::{classify_completed, classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_completed, classify_error};
 
 pub(crate) mod params;
+pub mod predict_zero;
 pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
+
+pub(crate) enum DemBuildMode {
+    Decomposed,
+    Raw,
+}
 
 fn under_wall_budget(total_seconds: f64, max_wall_seconds: Option<f64>) -> bool {
     match max_wall_seconds {
@@ -113,10 +119,37 @@ pub(crate) fn run_decoder_point(
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
-    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
-    run_built_decoder_point(runner_name, decoder, built, point, ctx, decoder_params)
+    run_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        point,
+        ctx,
+        decoder_params,
+        DemBuildMode::Decomposed,
+    )
 }
 
+pub(crate) fn run_decoder_point_with_dem_mode(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<BenchmarkResultRow, String> {
+    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
+    run_built_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        dem_mode,
+    )
+}
+
+#[cfg(test)]
 fn run_built_decoder_point(
     runner_name: &'static str,
     decoder: &dyn Decoder,
@@ -125,6 +158,26 @@ fn run_built_decoder_point(
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
 ) -> Result<BenchmarkResultRow, String> {
+    run_built_decoder_point_with_dem_mode(
+        runner_name,
+        decoder,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        DemBuildMode::Decomposed,
+    )
+}
+
+fn run_built_decoder_point_with_dem_mode(
+    runner_name: &'static str,
+    decoder: &dyn Decoder,
+    built: BuiltCircuit,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<BenchmarkResultRow, String> {
     run_built_decoder_point_with_batcher(
         runner_name,
         decoder,
@@ -132,6 +185,7 @@ fn run_built_decoder_point(
         point,
         ctx,
         decoder_params,
+        dem_mode,
         sample_and_pack_batch,
     )
 }
@@ -158,27 +212,46 @@ fn run_built_decoder_point_with_batcher<F>(
     point: &BenchCasePoint,
     ctx: &BenchRunContext,
     decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
     mut sample_and_pack: F,
 ) -> Result<BenchmarkResultRow, String>
 where
     F: FnMut(&[StimInstr], usize, &mut StdRng) -> Result<(Vec<u8>, Vec<u8>), String>,
 {
     let circuit = built.circuit;
-    let result_params = merge_decoder_params(built.params, decoder_params);
+    let mut result_params = merge_decoder_params(built.params, decoder_params);
+    result_params.insert("decoder_impl".into(), serde_json::json!(runner_name));
+    result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
-    let dem = match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
-        Ok(dem) => dem,
-        Err(error) => {
-            let failure_kind = classify_error(&error, FailureKind::SolverFailure);
-            return Ok(benchmark_result_row(
-                ctx,
-                failure_kind,
-                result_params,
-                base_case_summary,
-                benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
-                Some(error),
-            ));
-        }
+    let dem = match dem_mode {
+        DemBuildMode::Decomposed => match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
+            Ok(dem) => dem,
+            Err(decomposition_error) => {
+                let failure_kind = classify_error(&decomposition_error, FailureKind::SolverFailure);
+                return Ok(benchmark_result_row(
+                    ctx,
+                    failure_kind,
+                    result_params,
+                    base_case_summary,
+                    benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                    Some(decomposition_error),
+                ));
+            }
+        },
+        DemBuildMode::Raw => match ErrorAnalyzer::circuit_to_dem(&circuit) {
+            Ok(dem) => dem,
+            Err(dem_error) => {
+                let failure_kind = classify_error(&dem_error, FailureKind::SolverFailure);
+                return Ok(benchmark_result_row(
+                    ctx,
+                    failure_kind,
+                    result_params,
+                    base_case_summary,
+                    benchmark_metrics(0, 0, 0.0, 0.0, 0.0),
+                    Some(dem_error),
+                ));
+            }
+        },
     };
     let num_dets = dem.effective_num_detectors();
     let num_obs = dem.num_observables();
@@ -207,7 +280,7 @@ where
         .map_err(|_| "max_errors exceeds supported usize range".to_string())?;
     let obs_bytes = num_obs.div_ceil(8);
 
-    let mut rng = StdRng::seed_from_u64(ctx.seed);
+    let mut rng = StdRng::seed_from_u64(point.seed);
     let mut shots_used = 0usize;
     let mut logical_errors = 0usize;
     let mut generated_shots = 0usize;
@@ -503,6 +576,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -628,6 +702,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.002,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -695,6 +770,44 @@ mod tests {
     }
 
     #[test]
+    fn run_decoder_point_records_raw_dem_analysis_failures_as_structured_rows() {
+        let ctx = BenchRunContext {
+            benchmark_name: "surface_decoder".into(),
+            runner_name: "fake".into(),
+            language: "rust".into(),
+            seed: 12_345,
+            spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        };
+        let built = BuiltCircuit {
+            circuit: parse_lines("ML 0\nDETECTOR rec[-2]\n").unwrap(),
+            params: ParamMap::from_pairs([("input_type", serde_json::json!("custom"))]),
+            case_summary: CaseSummary::new(),
+        };
+        let decoder_params = crate::bench::result::ParamMap::new();
+        let mut unused_batcher =
+            |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+                panic!("raw DEM analysis should fail before sampling")
+            };
+
+        let row = run_built_decoder_point_with_batcher(
+            "fake",
+            &EmptyPredictionDecoder,
+            built,
+            &surface_point(0.002, 1, 1),
+            &ctx,
+            &decoder_params,
+            DemBuildMode::Raw,
+            &mut unused_batcher,
+        )
+        .unwrap();
+
+        assert_eq!(row.status, "error");
+        assert_eq!(row.failure_kind, FailureKind::Unsupported);
+        assert_eq!(row.metrics["shots_used"], 0.0);
+        assert!(row.error.unwrap().contains("unsupported instruction ML"));
+    }
+
+    #[test]
     fn run_decoder_point_records_sampler_failures_as_structured_rows() {
         let ctx = BenchRunContext {
             benchmark_name: "surface_decoder".into(),
@@ -717,6 +830,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut failing_batcher,
         )
         .unwrap();
@@ -753,6 +867,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut short_observables,
         )
         .unwrap();
@@ -776,6 +891,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.002,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -818,6 +934,7 @@ mod tests {
             distance: Some(3),
             rounds: 3,
             p: 0.0,
+            seed: 12_345,
             basis: None,
             schedule: None,
             hx_path: None,
@@ -890,6 +1007,7 @@ mod tests {
             &point,
             &ctx,
             &decoder_params,
+            DemBuildMode::Decomposed,
             &mut flaky_batcher,
         )
         .unwrap();

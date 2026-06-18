@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use toml::Value;
 
 use crate::bench::result::BenchmarkResultRow;
+use crate::bench::runners::predict_zero::PredictZeroRunner;
 use crate::bench::runners::rbposd::RbposdRunner;
 use crate::bench::runners::rilpqec::RilpqecRunner;
 use crate::bench::runners::rmatching::RmatchingRunner;
@@ -15,6 +16,7 @@ pub struct BenchCasePoint {
     pub distance: Option<usize>,
     pub rounds: usize,
     pub p: f64,
+    pub seed: u64,
     pub basis: Option<String>,
     pub schedule: Option<String>,
     pub hx_path: Option<String>,
@@ -26,6 +28,8 @@ pub struct BenchCasePoint {
     pub batch_size: usize,
     pub decoder_params: BTreeMap<String, Value>,
 }
+
+const DEFAULT_BENCH_SEED: u64 = 12_345;
 
 pub struct BenchRunContext {
     pub benchmark_name: String,
@@ -55,7 +59,7 @@ struct SplitRunnerParams {
 }
 
 pub fn default_rust_runner_names() -> Vec<String> {
-    ["rmatching", "rbposd", "rilpqec"]
+    ["rmatching", "rbposd", "rilpqec", "predict-zero"]
         .into_iter()
         .map(|name| name.to_string())
         .collect()
@@ -66,6 +70,7 @@ pub fn build_default_rust_runner_registry() -> RustRunnerRegistry {
     registry.insert("rmatching".into(), Box::new(RmatchingRunner));
     registry.insert("rbposd".into(), Box::new(RbposdRunner));
     registry.insert("rilpqec".into(), Box::new(RilpqecRunner));
+    registry.insert("predict-zero".into(), Box::new(PredictZeroRunner));
     registry
 }
 
@@ -91,6 +96,7 @@ fn expand_generic_runner_points(
         optional_string(params, "input_type")?.unwrap_or_else(|| "surface_rotated_memory_x".into());
     let rounds = require_array(params, "rounds")?;
     let ps = require_array(params, "p")?;
+    let seed = optional_u64(params, "seed")?.unwrap_or(DEFAULT_BENCH_SEED);
     let max_shots = require_u64(params, "max_shots")?;
     let max_errors = require_u64(params, "max_errors")?;
     let max_wall_seconds = optional_f64(params, "max_wall_seconds")?;
@@ -113,6 +119,7 @@ fn expand_generic_runner_points(
                 params,
                 rounds,
                 ps,
+                seed,
                 max_shots,
                 max_errors,
                 max_wall_seconds,
@@ -124,6 +131,7 @@ fn expand_generic_runner_points(
             params,
             rounds,
             ps,
+            seed,
             max_shots,
             max_errors,
             max_wall_seconds,
@@ -139,6 +147,7 @@ fn expand_surface_points(
     params: &BTreeMap<String, Value>,
     rounds: &[Value],
     ps: &[Value],
+    seed: u64,
     max_shots: u64,
     max_errors: u64,
     max_wall_seconds: Option<f64>,
@@ -168,6 +177,7 @@ fn expand_surface_points(
                     distance: Some(distance),
                     rounds,
                     p: value_as_f64(p, "p entry")?,
+                    seed,
                     basis: None,
                     schedule: None,
                     hx_path: None,
@@ -189,6 +199,7 @@ fn expand_css_points(
     params: &BTreeMap<String, Value>,
     rounds: &[Value],
     ps: &[Value],
+    seed: u64,
     max_shots: u64,
     max_errors: u64,
     max_wall_seconds: Option<f64>,
@@ -215,6 +226,7 @@ fn expand_css_points(
                 distance: None,
                 rounds,
                 p: value_as_f64(p, "p entry")?,
+                seed,
                 basis: Some(basis.clone()),
                 schedule: Some(schedule.clone()),
                 hx_path: Some(hx_path.clone()),
@@ -256,6 +268,7 @@ fn is_generic_param_key(key: &str) -> bool {
             | "distance"
             | "rounds"
             | "p"
+            | "seed"
             | "max_shots"
             | "max_errors"
             | "max_wall_seconds"
@@ -273,7 +286,12 @@ fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
     match runner_name {
         "rbposd" => matches!(
             key,
-            "bp_iters" | "max_bp_iterations" | "early_stop" | "osd_order"
+            "bp_algorithm"
+                | "bp_iters"
+                | "max_bp_iterations"
+                | "early_stop"
+                | "osd_method"
+                | "osd_order"
         ),
         "rilpqec" => matches!(
             key,
@@ -316,6 +334,20 @@ fn require_u64(params: &BTreeMap<String, Value>, key: &str) -> Result<u64, Strin
         .as_integer()
         .ok_or_else(|| format!("{key} must be an integer"))?;
     u64::try_from(value).map_err(|_| format!("{key} must be non-negative"))
+}
+
+fn optional_u64(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<u64>, String> {
+    match params.get(key) {
+        None => Ok(None),
+        Some(value) => {
+            let integer = value
+                .as_integer()
+                .ok_or_else(|| format!("{key} must be an integer"))?;
+            u64::try_from(integer)
+                .map(Some)
+                .map_err(|_| format!("{key} must be non-negative"))
+        }
+    }
 }
 
 fn optional_f64(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<f64>, String> {
