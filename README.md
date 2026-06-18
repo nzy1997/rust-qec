@@ -1,34 +1,123 @@
-# rstim
+# rstim Workspace
 
 [![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
 
-A Rust implementation of Stim-like stabilizer circuit simulation.
+This repository is a Rust quantum error correction workspace centered on
+Stim-like circuit simulation, detector error models, decoding, and benchmarking.
 
-## Current Features
-- Clifford/stabilizer simulator with basic gates and measurements
-- Atom-loss-aware simulation with `LOSS`, loss-visible measurement gates, and loss-caused measurement outcomes
-- Detector/observable semantics with `rec[]`
-- `REPEAT` blocks and case-insensitive parsing
-- Coordinate annotations: `QUBIT_COORDS`, `SHIFT_COORDS`, `TICK`
-- Pauli noise channels: `X_ERROR`, `Z_ERROR`, `DEPOLARIZE1/2`
-- QP101 export for both raw circuits and single-shot sample overlays
+The main entrypoints are:
 
-## CLI Workflow
+- `rstim`: stabilizer circuit simulation, circuit generation, DEM extraction,
+  and QP101 export
+- `rsinter`: benchmark and sampling harness for decoder experiments
+- `rmatching`: Rust MWPM decoder for DEM-based workflows
 
-`rstim` already includes a CLI for inspecting, sampling, analyzing, generating,
-and exporting circuits.
+## Workspace Map
 
-## Atom Loss Workflow
+| Path | Role |
+| --- | --- |
+| `rstim/` | Stim-like simulator crate and `rstim` CLI |
+| `rsinter/` | Parallel collection and benchmark harness, plus `rsinter` CLI |
+| `rmatching/` | Sparse Blossom MWPM decoder |
+| `rbposd/` | BP+OSD decoder components |
+| `rilpqec/` | ILP-based decoding path |
+| `qec-code/` | CSS/code construction helpers and `qec-code` CLI |
+| `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness |
+| `qp101-viz/` | Typst renderer for QP101 circuit JSON |
 
-Atom loss is a first-class workflow in `rstim`, not an afterthought bolted onto
-generic Pauli noise. The simulator can model explicit `LOSS` events, carry that
-state through later gates, and distinguish between an ordinary `1` measurement
-and a `1` that happened because the atom was lost.
+## Quick Start
 
-For example, this circuit injects a Pauli error on `q0`, loses atoms on `q1`
-and `q2`, then records both a normal measurement and a loss-visible
-measurement:
+Build the workspace:
+
+```sh
+cargo build --workspace
+```
+
+Run a minimal `rstim` CLI check:
+
+```sh
+printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
+```
+
+Run the Rust test suite:
+
+```sh
+cargo test --workspace
+```
+
+If you only want the simulator, start with
+[`rstim/doc/getting_started.md`](rstim/doc/getting_started.md) and
+[`rstim/doc/cli.md`](rstim/doc/cli.md).
+
+## Common Workflows
+
+### Inspect And Sample A Circuit
+
+Use `rstim stats` before heavier workflows:
+
+```sh
+printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | \
+  cargo run -p rstim --bin rstim -- stats
+```
+
+Then move on to:
+
+- `sample` for measurements
+- `detect` for detection events and observable flips
+- `analyze_errors` for DEM extraction
+- `export_json` for QP101 export
+
+The full command reference is in
+[`rstim/doc/cli.md`](rstim/doc/cli.md).
+
+### Generate Standard QEC Circuits
+
+`rstim gen` can generate common benchmark circuits:
+
+```sh
+cargo run -p rstim --bin rstim -- gen \
+  --code repetition_code \
+  --task memory \
+  --distance 5 \
+  --rounds 5
+```
+
+For code-construction-oriented workflows, see `qec-code`:
+
+```sh
+cargo run -p qec-code -- --help
+```
+
+### Run Decoder Benchmarks
+
+The workspace includes two benchmark layers:
+
+- `rsinter` benchmark flow under `benchmarks/surface_decoder/`
+- comparison harness under `benchmarks/surface_decoder_compare/`
+
+Smoke benchmark through `rsinter`:
+
+```sh
+make bench-surface-smoke
+```
+
+Cross-decoder comparison harness:
+
+```sh
+make surface-decoder-compare-smoke
+```
+
+Benchmark setup details are in
+[`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md).
+
+## Atom Loss And QP101 Export
+
+Atom loss is a first-class workflow in `rstim`. The simulator can model
+explicit `LOSS` events, propagate loss through later operations, and annotate
+loss-caused measurement outcomes in exported sample traces.
+
+Example circuit:
 
 ```stim
 DEPOLARIZE1(1) 0
@@ -39,124 +128,53 @@ MRL 2
 DETECTOR rec[-3]
 ```
 
-You can export one seeded sample shot as QP101 JSON with inline annotations:
+Export one seeded sample shot as QP101 JSON:
 
 ```sh
-cargo run -p rstim --bin rstim -- export_json --sample_shot --seed 7 < qp101-viz/examples/atom-loss-sample.stim
+cargo run -p rstim --bin rstim -- export_json --sample_shot --seed 7 \
+  < qp101-viz/examples/atom-loss-sample.stim
 ```
 
-That shot marks the fired depolarizing branch, the two loss events, the `1[L]`
-measurement caused by loss, the `MRL` pair `L=1 | M=1[L]`, and the flipped
-detector. The matching `qp101-viz` demo lives at
-[`qp101-viz/examples/atom-loss-sample.typ`](qp101-viz/examples/atom-loss-sample.typ)
-with its exported sample result in
-[`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json).
-
-For a larger example, see
-[`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.typ),
-which shows both the source circuit and one seeded sample shot for a rotated
-surface-code memory-X experiment with `d=3`, `r=3`, sparse `LOSS`,
-`X_ERROR`, `Z_ERROR`, `DEPOLARIZE1`, and `DEPOLARIZE2` insertions, and fixed
-sample seed `7`. This example uses the default measurement path, so
-loss-caused outcomes appear as `1[L]` on the ordinary measurement gates
-instead of a separate loss-flag/value pair.
-
-To regenerate the source `.stim`, base QP101 JSON, and seeded sample QP101
-JSON for that showcase, run:
+Regenerate the larger mixed-noise showcase:
 
 ```sh
 cargo run -p rstim --example mixed_noise_showcase
 ```
 
-That command rewrites:
+Related files:
 
-- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim`
-- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.qp101.json`
-- `qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss-sample.qp101.json`
-- `rstim/tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise.json`
-- `rstim/tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json`
+- [`qp101-viz/examples/atom-loss-sample.typ`](qp101-viz/examples/atom-loss-sample.typ)
+- [`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json)
+- [`qp101-viz/README.md`](qp101-viz/README.md)
 
-Use `rstim stats` to inspect a circuit before running heavier workflows:
+## Stim Parity And Performance Evidence
 
-```sh
-printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | rstim stats
-```
+This repository keeps parity and benchmark evidence for generated circuits and
+detector error models against Stim-oriented workflows.
 
-Example output:
-
-```text
-instruction_count: 5
-repeat_blocks: 1
-max_repeat_depth: 1
-num_qubits: 1
-num_measurements: 2
-num_detectors: 2
-num_observables: 0
-num_ticks: 2
-num_sweep_bits: 0
-```
-
-For machine-readable output:
-
-```sh
-printf 'M 0\nDETECTOR rec[-1]\n' | rstim stats --json
-```
-
-For the full CLI reference, including `sample`, `detect`, `analyze_errors`,
-`convert`, `m2d`, `gen`, `sample_dem`, `explain_errors`, and `export_json`, see
-[`rstim/doc/cli.md`](rstim/doc/cli.md) and
-[`rstim/doc/getting_started.md`](rstim/doc/getting_started.md).
-
-## Stim Parity Showcase
-
-On six representative `repetition_code` and rotated `surface_code` cases (`d=5`
-and `d=13`), `rstim` matches `stim` on:
-
-- noiseless generated-circuit structure (`Gen = normalized`)
-- noisy `analyze_errors` detector error model semantics (`DEM = match`)
-
-For `Gen`, `normalized` means the generated circuits are structurally equivalent
-after stripping Stim's comment preamble and comparing normalized instruction
-summaries instead of raw text. For `DEM`, both tools analyze the same noisy
-circuit produced by:
-
-```sh
-stim gen ... --after_clifford_depolarization 0.001
-```
-
-The timing numbers below are median wall-clock times over 5 local runs on one
-development machine, so they should be treated as illustrative instead of a
-portable benchmark.
-
-The repository also includes a reusable `rsinter` benchmark framework. The
-current migrated example is the surface decoder benchmark:
-
-```sh
-make bench-surface-smoke
-```
-
-| Case | Gen | DEM | Max Rel Error | Stim Gen ms | rstim Gen ms | Stim DEM ms | rstim DEM ms | Gen Ratio | DEM Ratio |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| repetition_code/memory d=5 r=5 | normalized | match | 2.032e-16 | 18.794 | 1.852 | 19.482 | 2.449 | 0.10x | 0.13x |
-| repetition_code/memory d=13 r=13 | normalized | match | 2.032e-16 | 19.161 | 2.085 | 20.546 | 7.318 | 0.11x | 0.36x |
-| surface_code/rotated_memory_x d=5 r=5 | normalized | match | 4.068e-16 | 19.085 | 2.026 | 21.966 | 12.535 | 0.11x | 0.57x |
-| surface_code/rotated_memory_x d=13 r=13 | normalized | match | 4.068e-16 | 20.292 | 7.518 | 100.010 | 271.136 | 0.37x | 2.71x |
-| surface_code/rotated_memory_z d=5 r=5 | normalized | match | 4.076e-16 | 18.894 | 1.956 | 21.725 | 12.455 | 0.10x | 0.57x |
-| surface_code/rotated_memory_z d=13 r=13 | normalized | match | 4.076e-16 | 20.485 | 7.518 | 99.428 | 268.938 | 0.37x | 2.70x |
-
-To reproduce the table locally:
+To rerun the current parity showcase:
 
 ```sh
 cargo build -p rstim --bin rstim
 cargo run -p rstim --example stim_parity_showcase
 ```
 
-## Releasing
+Supporting notes live in:
 
-This repository now follows the same tag-driven release entrypoint as
-`problem-reductions`.
+- [`rstim/doc/performance_parity.md`](rstim/doc/performance_parity.md)
+- [`docs/plans/2026-05-25-performance-parity-foundation-design.md`](docs/plans/2026-05-25-performance-parity-foundation-design.md)
 
-To cut a new version:
+## Further Reading
+
+- [`rstim/doc/getting_started.md`](rstim/doc/getting_started.md)
+- [`rstim/doc/cli.md`](rstim/doc/cli.md)
+- [`rmatching/README.md`](rmatching/README.md)
+- [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
+- [`qp101-viz/README.md`](qp101-viz/README.md)
+
+## Maintainer Release Flow
+
+Cut a new tagged release with:
 
 ```sh
 make release V=0.1.1
@@ -164,7 +182,7 @@ make release V=0.1.1
 
 That target:
 
-- bumps the version in all workspace crates
+- bumps selected workspace crate versions
 - runs `cargo check --workspace`
 - creates a release commit
 - creates an annotated tag `vX.Y.Z`
@@ -174,8 +192,7 @@ Pushing a tag that matches `v*.*.*` triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which creates
 a GitHub Release with generated notes.
 
-The default branch is currently `master`. If that changes later, override it
-when running the release target:
+The default branch is currently `master`. If that changes later, override it:
 
 ```sh
 make release V=0.1.1 DEFAULT_BRANCH=main
