@@ -284,10 +284,14 @@ fn update_check_to_variable_messages_for_check(
 ) {
     match rule {
         CheckUpdateRule::MinimumSum => {
-            update_minimum_sum_check_to_variable_messages_for_check(graph, syndrome, workspace, check);
+            update_minimum_sum_check_to_variable_messages_for_check(
+                graph, syndrome, workspace, check,
+            );
         }
         CheckUpdateRule::ProductSum => {
-            update_product_sum_check_to_variable_messages_for_check(graph, syndrome, workspace, check);
+            update_product_sum_check_to_variable_messages_for_check(
+                graph, syndrome, workspace, check,
+            );
         }
     }
 }
@@ -430,7 +434,9 @@ pub(crate) fn run_bp_compiled_in_place(
         Schedule::Parallel => BpSchedule::Parallel,
         Schedule::Serial => BpSchedule::Serial,
     };
-    run_bp_selected_in_place(graph, syndrome, prior_llrs, config, workspace, rule, schedule)
+    run_bp_selected_in_place(
+        graph, syndrome, prior_llrs, config, workspace, rule, schedule,
+    )
 }
 
 pub(crate) fn run_minimum_sum_compiled_in_place(
@@ -468,12 +474,12 @@ fn run_bp_selected_in_place(
 
     initialize_variable_to_check_messages(graph, prior_llrs, workspace);
     match schedule {
-        BpSchedule::Parallel => run_bp_parallel_in_place(
-            graph, syndrome, prior_llrs, config, workspace, rule,
-        ),
-        BpSchedule::Serial => run_bp_serial_in_place(
-            graph, syndrome, prior_llrs, config, workspace, rule,
-        ),
+        BpSchedule::Parallel => {
+            run_bp_parallel_in_place(graph, syndrome, prior_llrs, config, workspace, rule)
+        }
+        BpSchedule::Serial => {
+            run_bp_serial_in_place(graph, syndrome, prior_llrs, config, workspace, rule)
+        }
     }
 }
 
@@ -577,10 +583,9 @@ mod tests {
 
     use super::{
         BpSchedule, BpWorkspace, CheckUpdateRule, CompiledGraph,
-        recompute_residual_from_hard_decision, run_bp_compiled_in_place,
+        recompute_residual_from_hard_decision, run_bp_compiled_in_place, run_bp_selected_in_place,
         run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
-        run_bp_selected_in_place, update_check_to_variable_messages,
-        update_check_to_variable_messages_with_rule,
+        update_check_to_variable_messages, update_check_to_variable_messages_with_rule,
     };
 
     #[test]
@@ -729,7 +734,7 @@ mod tests {
     }
 
     #[test]
-    fn selector_dispatch_routes_product_sum_serial_through_current_kernel() {
+    fn selector_dispatch_runs_product_sum_serial_path() {
         let pcm = ParityCheckMatrix::from_sparse_rows(
             4,
             5,
@@ -814,17 +819,19 @@ mod tests {
         );
 
         assert_ne!(minimum_workspace.c_to_v, product_workspace.c_to_v);
-        assert!(product_workspace.c_to_v.iter().all(|value| value.is_finite()));
+        assert!(
+            product_workspace
+                .c_to_v
+                .iter()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]
     fn serial_schedule_updates_messages_differently_from_parallel_schedule() {
-        let pcm = ParityCheckMatrix::from_sparse_rows(
-            3,
-            4,
-            vec![vec![0, 1], vec![1, 2], vec![2, 3]],
-        )
-        .unwrap();
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(3, 4, vec![vec![0, 1], vec![1, 2], vec![2, 3]])
+                .unwrap();
         let graph = CompiledGraph::from_pcm(&pcm);
         let syndrome = Syndrome::from(vec![true, false, true]);
         let prior_llrs = vec![
