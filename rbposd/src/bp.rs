@@ -473,6 +473,8 @@ fn run_bp_selected_in_place(
     }
 
     initialize_variable_to_check_messages(graph, prior_llrs, workspace);
+    refresh_all_bit_posteriors(graph, prior_llrs, workspace);
+
     match schedule {
         BpSchedule::Parallel => {
             run_bp_parallel_in_place(graph, syndrome, prior_llrs, config, workspace, rule)
@@ -582,10 +584,10 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        BpSchedule, BpWorkspace, CheckUpdateRule, CompiledGraph,
         recompute_residual_from_hard_decision, run_bp_compiled_in_place, run_bp_selected_in_place,
         run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
-        update_check_to_variable_messages, update_check_to_variable_messages_with_rule,
+        update_check_to_variable_messages, update_check_to_variable_messages_with_rule, BpSchedule,
+        BpWorkspace, CheckUpdateRule, CompiledGraph,
     };
 
     #[test]
@@ -819,12 +821,10 @@ mod tests {
         );
 
         assert_ne!(minimum_workspace.c_to_v, product_workspace.c_to_v);
-        assert!(
-            product_workspace
-                .c_to_v
-                .iter()
-                .all(|value| value.is_finite())
-        );
+        assert!(product_workspace
+            .c_to_v
+            .iter()
+            .all(|value| value.is_finite()));
     }
 
     #[test]
@@ -873,5 +873,27 @@ mod tests {
             serial_workspace.hard_decision_bits,
             vec![false, true, true, false]
         );
+    }
+
+    #[test]
+    fn serial_schedule_preserves_isolated_bit_prior_snapshot() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let syndrome = Syndrome::from(vec![false]);
+        let prior_llrs = vec![2.0, 2.0, -4.0];
+        let config = DecoderConfig {
+            max_bp_iterations: 1,
+            early_stop: false,
+            bp_variant: BpVariant::ProductSum,
+            schedule: Schedule::Serial,
+            ..DecoderConfig::default()
+        };
+        let mut workspace = BpWorkspace::new(&graph);
+
+        run_bp_compiled_in_place(&graph, &syndrome, &prior_llrs, &config, &mut workspace);
+
+        assert!(workspace.hard_decision_bits[2]);
+        assert_eq!(workspace.posterior_llr[2], -4.0);
+        assert_eq!(workspace.reliability[2], 4.0);
     }
 }
