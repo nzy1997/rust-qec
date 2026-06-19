@@ -124,7 +124,7 @@ result difference between default `MinimumSum + Parallel` and non-default
   },
   "expected": {
     "status": "success",
-    "correction": [true, false, false, true],
+    "correction": [false, true, true, false],
     "diagnostics": {
       "converged": true,
       "bp_iterations": 3,
