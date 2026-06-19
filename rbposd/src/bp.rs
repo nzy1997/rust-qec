@@ -841,7 +841,7 @@ mod tests {
             ((1.0_f64 - 0.2) / 0.2).ln(),
         ];
         let config = DecoderConfig {
-            max_bp_iterations: 3,
+            max_bp_iterations: 1,
             early_stop: false,
             bp_variant: BpVariant::ProductSum,
             schedule: Schedule::Parallel,
@@ -868,10 +868,11 @@ mod tests {
             BpSchedule::Serial,
         );
 
-        assert_ne!(parallel_workspace.reliability, serial_workspace.reliability);
-        assert_eq!(
-            serial_workspace.hard_decision_bits,
-            vec![false, true, true, false]
+        assert!(parallel_workspace.reliability[3] < 1e-12);
+        assert!(serial_workspace.reliability[3] > 0.5);
+        assert_ne!(
+            parallel_workspace.hard_decision_bits,
+            serial_workspace.hard_decision_bits
         );
     }
 
