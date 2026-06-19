@@ -1,11 +1,13 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BpVariant {
     MinimumSum,
+    ProductSum,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Schedule {
     Parallel,
+    Serial,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

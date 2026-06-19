@@ -16,6 +16,34 @@ fn decoder_config_default_contract() {
 }
 
 #[test]
+fn decoder_config_defaults_do_not_silently_change() {
+    let cfg = DecoderConfig::default();
+
+    assert_eq!(cfg.bp_variant, BpVariant::MinimumSum);
+    assert_eq!(cfg.schedule, Schedule::Parallel);
+}
+
+#[test]
+fn decoder_config_exposes_bp_method_and_schedule_variants() {
+    let methods = [BpVariant::MinimumSum, BpVariant::ProductSum];
+    let schedules = [Schedule::Parallel, Schedule::Serial];
+
+    assert_eq!(methods[0], BpVariant::MinimumSum);
+    assert_eq!(methods[1], BpVariant::ProductSum);
+    assert_eq!(schedules[0], Schedule::Parallel);
+    assert_eq!(schedules[1], Schedule::Serial);
+
+    let cfg = DecoderConfig {
+        bp_variant: BpVariant::ProductSum,
+        schedule: Schedule::Serial,
+        ..DecoderConfig::default()
+    };
+
+    assert_eq!(cfg.bp_variant, BpVariant::ProductSum);
+    assert_eq!(cfg.schedule, Schedule::Serial);
+}
+
+#[test]
 fn lsd_config_default_contract() {
     let cfg = LsdConfig::default();
 
