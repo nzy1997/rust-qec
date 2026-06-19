@@ -10,6 +10,8 @@ Included:
 - `DecoderConfig` and its default contract:
   `max_bp_iterations=30`, `early_stop=true`, `bp_variant=MinimumSum`,
   `schedule=Parallel`, `osd_variant=Osd0`
+- `BpVariant` with `MinimumSum` and `ProductSum`
+- `Schedule` with `Parallel` and `Serial`
 - `LsdConfig` and its default contract:
   `method=LocalizedStatistics`, `lsd_order=0`
 - `LsdMethod` with the first supported variant:
@@ -32,6 +34,9 @@ Included:
 
 Excluded:
 - Any decoding algorithm implementation (BP, OSD, or hybrid solver logic)
+- mathematically distinct `ProductSum` updates and true serial message
+  scheduling internals; the issue #94 public selectors are compatibility
+  surface until those algorithms are implemented
 - Sparse/H matrix parsing, loading, or validation beyond public error typing
 - Performance tuning, SIMD/parallel execution internals, and benchmarking hooks
 - CLI/API integration outside this crate's foundational type contract

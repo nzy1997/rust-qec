@@ -1,4 +1,4 @@
-use crate::bp::{BpRunInfo, BpWorkspace, CompiledGraph, run_minimum_sum_compiled_in_place};
+use crate::bp::{BpRunInfo, BpWorkspace, CompiledGraph, run_bp_compiled_in_place};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
@@ -29,13 +29,13 @@ impl BpCore {
         prior_hard_decision(&self.prior_llrs)
     }
 
-    pub(crate) fn run_minimum_sum_in_place(
+    pub(crate) fn run_bp_in_place(
         &self,
         syndrome: &Syndrome,
         config: &DecoderConfig,
         workspace: &mut BpWorkspace,
     ) -> BpRunInfo {
-        run_minimum_sum_compiled_in_place(
+        run_bp_compiled_in_place(
             &self.graph,
             syndrome,
             &self.prior_llrs,

@@ -95,7 +95,7 @@ impl BpLsdDecoder {
         let mut bp_workspace = self.bp_workspace.lock().unwrap();
         let bp_info =
             self.core
-                .run_minimum_sum_in_place(syndrome, &self.bp_config, &mut bp_workspace);
+                .run_bp_in_place(syndrome, &self.bp_config, &mut bp_workspace);
         if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {
                 correction: Correction::from(bp_workspace.hard_decision_bits.clone()),
