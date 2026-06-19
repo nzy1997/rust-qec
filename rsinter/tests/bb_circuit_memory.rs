@@ -165,3 +165,60 @@ fn tiny_seeded_smoke_run_reports_zero_failures_without_sampled_faults() {
     assert_eq!(result.num_trials, 2);
     assert_eq!(result.num_failed_trials, 0);
 }
+
+#[test]
+fn zero_noise_smoke_run_reports_zero_failures() {
+    let result = run_simulation(SimulationConfig {
+        physical_error_rate: 0.0,
+        num_cycles: 1,
+        num_trials: 2,
+        seed: Some(1),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    })
+    .unwrap();
+
+    assert_eq!(result.physical_error_rate, 0.0);
+    assert_eq!(result.num_cycles, 1);
+    assert_eq!(result.num_trials, 2);
+    assert_eq!(result.num_failed_trials, 0);
+}
+
+#[test]
+fn effective_models_only_use_basis_specific_logical_rows() {
+    let code = build_upstream_code().unwrap();
+    let cycle = build_syndrome_cycle(&code);
+    let config = SimulationConfig {
+        physical_error_rate: 0.003,
+        num_cycles: 1,
+        num_trials: 1,
+        seed: Some(7),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    };
+
+    let models = build_effective_models(&code, &cycle, &config).unwrap();
+
+    for model in [&models.z_faults, &models.x_faults] {
+        let first_logical_row = model.first_logical_row;
+        let logical_rows_end = first_logical_row + code.k();
+        let logical_rows = model
+            .augmented_columns
+            .iter()
+            .flat_map(|column| column.iter().copied())
+            .filter(|&row| row >= first_logical_row)
+            .collect::<Vec<_>>();
+
+        assert!(
+            !logical_rows.is_empty(),
+            "expected at least one augmented column with logical support"
+        );
+        assert!(logical_rows
+            .iter()
+            .all(|&row| row < logical_rows_end));
+        assert!(model
+            .augmented_columns
+            .iter()
+            .any(|column| column.iter().any(|&row| row >= first_logical_row)));
+    }
+}

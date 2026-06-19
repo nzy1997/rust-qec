@@ -722,9 +722,9 @@ fn validate_simulation_config(config: &SimulationConfig) -> Result<(), String> {
 }
 
 fn validate_physical_error_rate(physical_error_rate: f64) -> Result<(), String> {
-    if !physical_error_rate.is_finite() || physical_error_rate <= 0.0 || physical_error_rate >= 1.0
+    if !physical_error_rate.is_finite() || physical_error_rate < 0.0 || physical_error_rate >= 1.0
     {
-        return Err("physical_error_rate must be finite and lie in (0, 1)".into());
+        return Err("physical_error_rate must be finite and lie in [0, 1)".into());
     }
     Ok(())
 }
