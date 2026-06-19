@@ -1,4 +1,7 @@
-use rsinter::bb_circuit_memory::{OperationKind, build_syndrome_cycle, build_upstream_code};
+use rsinter::bb_circuit_memory::{
+    build_effective_models, build_syndrome_cycle, build_upstream_code, run_simulation,
+    OperationKind, SimulationConfig,
+};
 
 #[test]
 fn upstream_bb144_code_has_expected_shape() {
@@ -75,18 +78,22 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
     assert!(operations[round6 + 72..round6 + 144]
         .iter()
         .all(|operation| operation.kind() == OperationKind::Cnot));
-    assert!(operations[round6 + 144..round6 + 216].iter().all(|operation| {
-        operation.kind() == OperationKind::Idle
-            && operation.qubits().len() == 1
-            && (data_start..=data_end).contains(&operation.qubits()[0])
-    }));
+    assert!(operations[round6 + 144..round6 + 216]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
 
     let final_layer = round6 + 216;
-    assert!(operations[final_layer..final_layer + 144].iter().all(|operation| {
-        operation.kind() == OperationKind::Idle
-            && operation.qubits().len() == 1
-            && (data_start..=data_end).contains(&operation.qubits()[0])
-    }));
+    assert!(operations[final_layer..final_layer + 144]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
     assert!(operations[final_layer + 144..final_layer + 216]
         .iter()
         .all(|operation| operation.kind() == OperationKind::MeasX));
@@ -108,4 +115,53 @@ fn upstream_syndrome_cycle_idles_only_data_qubits() {
             assert!(code.data_qubits().contains(&operation.qubits()[0]));
         }
     }
+}
+
+#[test]
+fn one_cycle_effective_models_have_expected_syndrome_rows() {
+    let code = build_upstream_code().unwrap();
+    let cycle = build_syndrome_cycle(&code);
+    let config = SimulationConfig {
+        physical_error_rate: 0.003,
+        num_cycles: 1,
+        num_trials: 1,
+        seed: Some(7),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    };
+
+    let models = build_effective_models(&code, &cycle, &config).unwrap();
+
+    assert_eq!(models.z_faults.decoder.num_checks(), 72 * 3);
+    assert_eq!(models.x_faults.decoder.num_checks(), 72 * 3);
+    assert_eq!(models.z_faults.first_logical_row, 72 * 3);
+    assert_eq!(models.x_faults.first_logical_row, 72 * 3);
+    assert!(!models.z_faults.channel_probs.is_empty());
+    assert!(!models.x_faults.channel_probs.is_empty());
+    assert_eq!(
+        models.z_faults.decoder.num_bits(),
+        models.z_faults.channel_probs.len()
+    );
+    assert_eq!(
+        models.x_faults.decoder.num_bits(),
+        models.x_faults.channel_probs.len()
+    );
+}
+
+#[test]
+fn tiny_seeded_smoke_run_reports_zero_failures_without_sampled_faults() {
+    let result = run_simulation(SimulationConfig {
+        physical_error_rate: 1.0e-12,
+        num_cycles: 1,
+        num_trials: 2,
+        seed: Some(1),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    })
+    .unwrap();
+
+    assert_eq!(result.physical_error_rate, 1.0e-12);
+    assert_eq!(result.num_cycles, 1);
+    assert_eq!(result.num_trials, 2);
+    assert_eq!(result.num_failed_trials, 0);
 }
