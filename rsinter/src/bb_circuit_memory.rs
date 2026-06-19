@@ -1223,7 +1223,9 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 
 #[cfg(test)]
 mod tests {
-    use super::{PauliAxis, PauliFault, cnot_fault_for_index};
+    use super::{
+        FaultBasis, PauliAxis, PauliFault, build_upstream_code, cnot_fault_for_index,
+    };
 
     #[test]
     fn cnot_fault_indices_match_upstream_order() {
@@ -1295,5 +1297,14 @@ mod tests {
         for (index, expected_fault) in expected.into_iter().enumerate() {
             assert_eq!(cnot_fault_for_index(qubits, index), expected_fault);
         }
+    }
+
+    #[test]
+    fn fault_basis_routes_to_upstream_logical_rows() {
+        let code = build_upstream_code().unwrap();
+
+        assert_eq!(FaultBasis::Z.logical_rows(&code), code.logical_x_rows());
+        assert_eq!(FaultBasis::X.logical_rows(&code), code.logical_z_rows());
+        assert_ne!(code.logical_x_rows(), code.logical_z_rows());
     }
 }
