@@ -1,4 +1,4 @@
-use crate::config::DecoderConfig;
+use crate::config::{BpVariant, DecoderConfig, Schedule};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
@@ -231,6 +231,23 @@ pub(crate) fn run_minimum_sum_compiled(
     }
 }
 
+pub(crate) fn run_bp_compiled_in_place(
+    graph: &CompiledGraph,
+    syndrome: &Syndrome,
+    prior_llrs: &[f64],
+    config: &DecoderConfig,
+    workspace: &mut BpWorkspace,
+) -> BpRunInfo {
+    match (config.bp_variant, config.schedule) {
+        (BpVariant::MinimumSum, Schedule::Parallel)
+        | (BpVariant::MinimumSum, Schedule::Serial)
+        | (BpVariant::ProductSum, Schedule::Parallel)
+        | (BpVariant::ProductSum, Schedule::Serial) => {
+            run_minimum_sum_compiled_in_place(graph, syndrome, prior_llrs, config, workspace)
+        }
+    }
+}
+
 pub(crate) fn run_minimum_sum_compiled_in_place(
     graph: &CompiledGraph,
     syndrome: &Syndrome,
@@ -324,12 +341,13 @@ pub(crate) fn run_minimum_sum_compiled_in_place(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::DecoderConfig;
+    use crate::config::{BpVariant, DecoderConfig, Schedule};
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
     use super::{
         BpWorkspace, CompiledGraph, recompute_residual_from_hard_decision,
+        run_bp_compiled_in_place,
         run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
         update_check_to_variable_messages,
     };
@@ -477,6 +495,39 @@ mod tests {
             vec![true, false, false, false, false]
         );
         assert!(workspace.reliability.iter().all(|value| value.is_finite()));
+    }
+
+    #[test]
+    fn selector_dispatch_routes_product_sum_serial_through_current_kernel() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(
+            4,
+            5,
+            vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]],
+        )
+        .unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let mut workspace = BpWorkspace::new(&graph);
+        let prior_llrs = vec![((1.0_f64 - 0.05) / 0.05).ln(); 5];
+        let config = DecoderConfig {
+            bp_variant: BpVariant::ProductSum,
+            schedule: Schedule::Serial,
+            ..DecoderConfig::default()
+        };
+
+        let info = run_bp_compiled_in_place(
+            &graph,
+            &Syndrome::from(vec![true, false, false, false]),
+            &prior_llrs,
+            &config,
+            &mut workspace,
+        );
+
+        assert!(info.converged);
+        assert_eq!(info.residual_weight, 0);
+        assert_eq!(
+            workspace.hard_decision_bits,
+            vec![true, false, false, false, false]
+        );
     }
 
     #[test]
