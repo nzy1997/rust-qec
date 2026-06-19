@@ -228,52 +228,71 @@ pub fn build_upstream_code() -> Result<BbCode, String> {
 pub fn build_syndrome_cycle(code: &BbCode) -> SyndromeCycle {
     let mut operations = Vec::with_capacity(1440);
 
+    let round0_sz_slot = parse_schedule_slot(SZ_LABELS[0]).expect("round 0 must use a Z slot");
+    let round6_sx_slot =
+        parse_schedule_slot(SX_LABELS[6]).expect("round 6 must use an X slot");
+
     for &check in &code.x_checks {
         operations.push(Operation::new(OperationKind::PrepX, vec![check]));
     }
-    for &check in &code.z_checks {
-        operations.push(Operation::new(OperationKind::PrepZ, vec![check]));
+    for (row, &check) in code.z_checks.iter().enumerate() {
+        operations.push(Operation::new(
+            OperationKind::Cnot,
+            vec![code.z_cnot_targets[row][round0_sz_slot], check],
+        ));
     }
+    append_idle_untouched_data(
+        &mut operations,
+        code,
+        code.z_cnot_targets
+            .iter()
+            .map(|targets| targets[round0_sz_slot]),
+    );
 
-    for round in 0..SX_LABELS.len() {
-        let sx_slot = parse_schedule_slot(SX_LABELS[round]);
-        let sz_slot = parse_schedule_slot(SZ_LABELS[round]);
+    for round in 1..6 {
+        let sx_slot = parse_schedule_slot(SX_LABELS[round]).expect("middle rounds must use X");
+        let sz_slot = parse_schedule_slot(SZ_LABELS[round]).expect("middle rounds must use Z");
 
         for (row, &check) in code.x_checks.iter().enumerate() {
-            if let Some(slot) = sx_slot {
-                operations.push(Operation::new(
-                    OperationKind::Cnot,
-                    vec![check, code.x_cnot_targets[row][slot]],
-                ));
-            } else {
-                operations.push(Operation::new(OperationKind::Idle, vec![check]));
-            }
+            operations.push(Operation::new(
+                OperationKind::Cnot,
+                vec![check, code.x_cnot_targets[row][sx_slot]],
+            ));
         }
 
         for (row, &check) in code.z_checks.iter().enumerate() {
-            if let Some(slot) = sz_slot {
-                operations.push(Operation::new(
-                    OperationKind::Cnot,
-                    vec![code.z_cnot_targets[row][slot], check],
-                ));
-            } else {
-                operations.push(Operation::new(OperationKind::Idle, vec![check]));
-            }
+            operations.push(Operation::new(
+                OperationKind::Cnot,
+                vec![code.z_cnot_targets[row][sz_slot], check],
+            ));
         }
     }
 
-    for &check in &code.x_checks {
-        operations.push(Operation::new(OperationKind::Idle, vec![check]));
-    }
     for &check in &code.z_checks {
-        operations.push(Operation::new(OperationKind::Idle, vec![check]));
+        operations.push(Operation::new(OperationKind::MeasZ, vec![check]));
     }
+    for (row, &check) in code.x_checks.iter().enumerate() {
+        operations.push(Operation::new(
+            OperationKind::Cnot,
+            vec![check, code.x_cnot_targets[row][round6_sx_slot]],
+        ));
+    }
+    append_idle_untouched_data(
+        &mut operations,
+        code,
+        code.x_cnot_targets
+            .iter()
+            .map(|targets| targets[round6_sx_slot]),
+    );
 
+    for &data in &code.data_qubits {
+        operations.push(Operation::new(OperationKind::Idle, vec![data]));
+    }
     for &check in &code.x_checks {
         operations.push(Operation::new(OperationKind::MeasX, vec![check]));
     }
     for &check in &code.z_checks {
-        operations.push(Operation::new(OperationKind::MeasZ, vec![check]));
+        operations.push(Operation::new(OperationKind::PrepZ, vec![check]));
     }
 
     SyndromeCycle {
@@ -340,6 +359,23 @@ fn parse_schedule_slot(label: &str) -> Option<usize> {
         None
     } else {
         label.parse::<usize>().ok()
+    }
+}
+
+fn append_idle_untouched_data(
+    operations: &mut Vec<Operation>,
+    code: &BbCode,
+    touched_data: impl IntoIterator<Item = usize>,
+) {
+    let mut touched = vec![false; code.num_circuit_qubits()];
+    for qubit in touched_data {
+        touched[qubit] = true;
+    }
+
+    for &data in &code.data_qubits {
+        if !touched[data] {
+            operations.push(Operation::new(OperationKind::Idle, vec![data]));
+        }
     }
 }
 
