@@ -178,18 +178,22 @@ fn rbposd_osd_order_changes_ler() {
 #[test]
 fn rbposd_lsd_order_changes_logical_error_rate() {
     let dem = DetectorErrorModel::parse(concat!(
-        "error(0.3775406687981454) D0\n",
-        "error(0.3775406687981454) D1\n",
-        "error(0.3775406687981454) D1 L0\n",
+        "error(0.05) D0\n",
+        "error(0.1) D0 L0\n",
+        "error(0.1) D0\n",
     ))
     .unwrap();
 
     let order0_ler = exact_three_error_lsd_logical_error_rate(&dem, 0);
     let order1_ler = exact_three_error_lsd_logical_error_rate(&dem, 1);
 
-    assert_ne!(
-        order1_ler, order0_ler,
-        "expected lsd_order to change LER: order0={order0_ler}, order1={order1_ler}"
+    assert!(
+        (order0_ler - 0.14).abs() < 1e-12,
+        "expected exact order0 LER from fixture to be 0.14, got {order0_ler}"
+    );
+    assert!(
+        (order1_ler - 0.1).abs() < 1e-12,
+        "expected exact order1 LER from fixture to be 0.1, got {order1_ler}"
     );
     assert!(
         order1_ler < order0_ler,
@@ -202,12 +206,14 @@ fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order:
         lsd_order,
         ..LsdConfig::default()
     };
-    let decoder = RbposdLsdDemDecoder::new(lsd_config);
+    let mut bp_config = DecoderConfig::default();
+    bp_config.max_bp_iterations = 0;
+    let decoder = RbposdLsdDemDecoder::with_bp_config(lsd_config, bp_config);
     let compiled = decoder.compile_for_dem(dem).unwrap();
     let probabilities = [
-        0.377_540_668_798_145_4,
-        0.377_540_668_798_145_4,
-        0.377_540_668_798_145_4,
+        0.05,
+        0.1,
+        0.1,
     ];
     let mut ler = 0.0;
     for e0 in [false, true] {
@@ -219,12 +225,11 @@ fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order:
                     .zip(probabilities.iter())
                     .map(|(&fired, &p)| if fired { p } else { 1.0 - p })
                     .product::<f64>();
-                let det0 = e0;
-                let det1 = e1 ^ e2;
-                let observed = det1;
-                let det_byte = u8::from(det0) | (u8::from(det1) << 1);
+                let det0 = e0 ^ e1 ^ e2;
+                let observed = e1;
+                let det_byte = u8::from(det0);
                 let predicted = compiled
-                    .decode_shots_bit_packed(&[det_byte], 1, 2, 1)
+                    .decode_shots_bit_packed(&[det_byte], 1, 1, 1)
                     .unwrap()[0]
                     & 1
                     != 0;
