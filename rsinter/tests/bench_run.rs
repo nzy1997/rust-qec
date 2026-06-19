@@ -1,5 +1,5 @@
 use rsinter::bench::registry::build_default_rust_runner_registry;
-use rsinter::bench::result::read_results_jsonl;
+use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
@@ -45,6 +45,35 @@ scale = "log"
 label = "Logical Error Rate"
 "#
     )
+}
+
+fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let spec_text = issue91_surface_spec(extra_params);
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+
+    (dir, artifact_root)
+}
+
+fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
+    let data = fs::read(
+        artifact_root
+            .join("rbposd_lsd")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    read_results_jsonl(&data[..]).unwrap()
 }
 
 #[test]
@@ -598,6 +627,78 @@ lsd_order = 1
     .unwrap_err();
 
     assert_eq!(err, "rbposd params must not mix OSD and LSD decoder params");
+    assert!(!dir.path().join("rbposd_lsd").exists());
+}
+
+#[test]
+fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
+    let (_dir, artifact_root) = run_issue91_surface_benchmark("lsd_order = 1");
+    let rows = read_issue91_lsd_results(&artifact_root);
+
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    assert_eq!(row.status, "ok");
+    assert_eq!(row.error, None);
+    assert_eq!(row.params["input_type"], serde_json::json!("surface"));
+    assert_eq!(row.params["distance"], serde_json::json!(3));
+    assert_eq!(row.params["rounds"], serde_json::json!(3));
+    assert_eq!(row.params["p"], serde_json::json!(0.002));
+    assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(row.params["bp_iters"], serde_json::json!(30));
+    assert_eq!(row.params["early_stop"], serde_json::json!(true));
+    assert_eq!(
+        row.params["lsd_method"],
+        serde_json::json!("localized_statistics")
+    );
+    assert_eq!(row.params["lsd_order"], serde_json::json!(1));
+    assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
+    assert_eq!(row.params["seed"], serde_json::json!(12_345));
+}
+
+#[test]
+fn rbposd_lsd_benchmark_run_writes_results_jsonl() {
+    let (_dir, artifact_root) = run_issue91_surface_benchmark(
+        r#"
+lsd_method = "localized_statistics"
+lsd_order = 1
+"#,
+    );
+
+    let artifact_dir = artifact_root.join("rbposd_lsd").join("test-run");
+    assert!(artifact_dir.join("run_manifest.json").exists());
+    assert!(artifact_dir.join("results.jsonl").exists());
+
+    let rows = read_issue91_lsd_results(&artifact_root);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].runner, "rbposd_lsd");
+    assert_eq!(rows[0].language, "rust");
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+    assert_eq!(
+        rows[0].params["lsd_method"],
+        serde_json::json!("localized_statistics")
+    );
+    assert_eq!(rows[0].params["lsd_order"], serde_json::json!(1));
+    assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
+}
+
+#[test]
+fn rbposd_lsd_benchmark_rejects_unknown_decoder_param_without_results() {
+    let spec_text = issue91_surface_spec("bogus_lsd = 1");
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "unknown rbposd runner param: bogus_lsd");
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 

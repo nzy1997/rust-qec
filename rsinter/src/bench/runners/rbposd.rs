@@ -90,6 +90,7 @@ impl RbposdRunnerParams {
                     ("bp_algorithm", serde_json::json!(bp_algorithm)),
                     ("bp_iters", serde_json::json!(bp_config.max_bp_iterations)),
                     ("early_stop", serde_json::json!(bp_config.early_stop)),
+                    ("input_type", serde_json::json!("surface")),
                     ("lsd_method", serde_json::json!(lsd_method)),
                     ("lsd_order", serde_json::json!(lsd_order)),
                 ]),
