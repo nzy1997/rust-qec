@@ -639,7 +639,10 @@ fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     let row = &rows[0];
     assert_eq!(row.status, "ok");
     assert_eq!(row.error, None);
-    assert_eq!(row.params["input_type"], serde_json::json!("surface"));
+    assert_eq!(
+        row.params["input_type"],
+        serde_json::json!("surface_rotated_memory_x")
+    );
     assert_eq!(row.params["distance"], serde_json::json!(3));
     assert_eq!(row.params["rounds"], serde_json::json!(3));
     assert_eq!(row.params["p"], serde_json::json!(0.002));
