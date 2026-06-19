@@ -7,7 +7,7 @@ use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
 use crate::bench::result::{BenchmarkResultRow, PairMapExt, ParamMap};
 use crate::bench::runners::params::{optional_bool, optional_string, optional_usize};
 use crate::bench::runners::{DemBuildMode, run_decoder_point_with_dem_mode};
-use crate::decode::RbposdDemDecoder;
+use crate::decode::{RbposdDemDecoder, RbposdLsdDemDecoder};
 
 pub struct RbposdRunner;
 
@@ -149,8 +149,16 @@ impl RustBenchRunner for RbposdRunner {
                     DemBuildMode::Raw,
                 )
             }
-            RbposdDecoderFamily::Lsd { .. } => {
-                Err("rbposd LSD DEM decoding is not implemented yet; see issue #92".into())
+            RbposdDecoderFamily::Lsd { lsd_config, .. } => {
+                let decoder = RbposdLsdDemDecoder::new(*lsd_config);
+                run_decoder_point_with_dem_mode(
+                    self.name(),
+                    &decoder,
+                    point,
+                    ctx,
+                    &params.normalized,
+                    DemBuildMode::Raw,
+                )
             }
         }
     }
