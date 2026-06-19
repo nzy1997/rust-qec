@@ -150,7 +150,7 @@ impl RustBenchRunner for RbposdRunner {
                 )
             }
             RbposdDecoderFamily::Lsd { lsd_config, .. } => {
-                let decoder = RbposdLsdDemDecoder::new(*lsd_config);
+                let decoder = RbposdLsdDemDecoder::with_bp_config(*lsd_config, params.bp_config);
                 run_decoder_point_with_dem_mode(
                     self.name(),
                     &decoder,

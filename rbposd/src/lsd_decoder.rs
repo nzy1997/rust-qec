@@ -38,6 +38,15 @@ impl BpLsdDecoder {
         channel: ChannelModel,
         config: LsdConfig,
     ) -> Result<Self, DecodeError> {
+        Self::with_bp_config(pcm, channel, config, DecoderConfig::default())
+    }
+
+    pub fn with_bp_config(
+        pcm: ParityCheckMatrix,
+        channel: ChannelModel,
+        config: LsdConfig,
+        bp_config: DecoderConfig,
+    ) -> Result<Self, DecodeError> {
         match config.method {
             LsdMethod::LocalizedStatistics => {}
         }
@@ -55,7 +64,7 @@ impl BpLsdDecoder {
             pcm,
             core,
             config,
-            bp_config: DecoderConfig::default(),
+            bp_config,
             bp_workspace,
             lsd_workspace,
         })

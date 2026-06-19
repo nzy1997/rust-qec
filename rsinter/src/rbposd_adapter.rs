@@ -20,17 +20,25 @@ impl RbposdDemDecoder {
 
 pub struct RbposdLsdDemDecoder {
     config: LsdConfig,
+    bp_config: DecoderConfig,
 }
 
 impl RbposdLsdDemDecoder {
     pub fn new(config: LsdConfig) -> Self {
-        Self { config }
+        Self::with_bp_config(config, DecoderConfig::default())
+    }
+
+    pub fn with_bp_config(config: LsdConfig, bp_config: DecoderConfig) -> Self {
+        Self { config, bp_config }
     }
 }
 
 enum RbposdDemBackendConfig {
     Osd(DecoderConfig),
-    Lsd(LsdConfig),
+    Lsd {
+        lsd_config: LsdConfig,
+        bp_config: DecoderConfig,
+    },
 }
 
 enum RbposdDemBackend {
@@ -49,9 +57,11 @@ impl RbposdDemBackendConfig {
             Self::Osd(config) => {
                 BpOsdDecoder::new(pcm, channel, config.clone()).map(RbposdDemBackend::Osd)
             }
-            Self::Lsd(config) => {
-                BpLsdDecoder::new(pcm, channel, *config).map(RbposdDemBackend::Lsd)
-            }
+            Self::Lsd {
+                lsd_config,
+                bp_config,
+            } => BpLsdDecoder::with_bp_config(pcm, channel, *lsd_config, *bp_config)
+                .map(RbposdDemBackend::Lsd),
         }
         .map_err(|error| format!("failed to compile rbposd decoder: {error}"))
     }
@@ -90,7 +100,13 @@ impl Decoder for RbposdLsdDemDecoder {
         &self,
         dem: &DetectorErrorModel,
     ) -> Result<Box<dyn CompiledDecoder>, String> {
-        compile_rbposd_dem_with_backend(dem, RbposdDemBackendConfig::Lsd(self.config))
+        compile_rbposd_dem_with_backend(
+            dem,
+            RbposdDemBackendConfig::Lsd {
+                lsd_config: self.config,
+                bp_config: self.bp_config,
+            },
+        )
     }
 }
 
