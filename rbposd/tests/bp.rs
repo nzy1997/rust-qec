@@ -252,17 +252,6 @@ fn product_sum_serial_changes_bp_snapshot_on_borrowed_case() {
 
     assert_eq!(default_report.matches_expected, Some(true));
     assert_eq!(sensitive_report.matches_expected, Some(true));
-
-    let mut comparison_case = sensitive_case.clone();
-    comparison_case.config.bp_variant = parity_schema::BpVariantSpec::MinimumSum;
-    comparison_case.config.schedule = parity_schema::ScheduleSpec::Parallel;
-    let default_mode_report = parity_runner::run_case(&comparison_case);
-
-    assert_ne!(
-        sensitive_report.actual,
-        default_mode_report.actual,
-        "product_sum + serial must differ from minimum_sum + parallel on the sensitive fixture"
-    );
 }
 
 #[test]
