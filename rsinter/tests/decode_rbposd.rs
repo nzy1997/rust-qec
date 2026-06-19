@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rbposd::{DecoderConfig, LsdConfig};
-use rsinter::collect::{collect, CollectOptions};
+use rsinter::collect::{CollectOptions, collect};
 use rsinter::decode::{Decoder, RbposdDemDecoder, RbposdLsdDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::{DemTarget, DetectorErrorModel};

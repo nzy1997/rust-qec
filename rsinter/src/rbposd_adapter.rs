@@ -46,9 +46,12 @@ impl RbposdDemBackendConfig {
     ) -> Result<RbposdDemBackend, String> {
         let channel = ChannelModel::BitFlipProbabilities(probabilities);
         match self {
-            Self::Osd(config) => BpOsdDecoder::new(pcm, channel, config.clone())
-                .map(RbposdDemBackend::Osd),
-            Self::Lsd(config) => BpLsdDecoder::new(pcm, channel, *config).map(RbposdDemBackend::Lsd),
+            Self::Osd(config) => {
+                BpOsdDecoder::new(pcm, channel, config.clone()).map(RbposdDemBackend::Osd)
+            }
+            Self::Lsd(config) => {
+                BpLsdDecoder::new(pcm, channel, *config).map(RbposdDemBackend::Lsd)
+            }
         }
         .map_err(|error| format!("failed to compile rbposd decoder: {error}"))
     }
@@ -78,10 +81,7 @@ impl Decoder for RbposdDemDecoder {
         &self,
         dem: &DetectorErrorModel,
     ) -> Result<Box<dyn CompiledDecoder>, String> {
-        compile_rbposd_dem_with_backend(
-            dem,
-            RbposdDemBackendConfig::Osd(self.config.clone()),
-        )
+        compile_rbposd_dem_with_backend(dem, RbposdDemBackendConfig::Osd(self.config.clone()))
     }
 }
 
