@@ -175,6 +175,73 @@ fn rbposd_osd_order_changes_ler() {
     );
 }
 
+#[test]
+fn rbposd_lsd_order_changes_logical_error_rate() {
+    let dem = DetectorErrorModel::parse(concat!(
+        "error(0.05) D0\n",
+        "error(0.1) D0 L0\n",
+        "error(0.1) D0\n",
+    ))
+    .unwrap();
+
+    let order0_ler = exact_three_error_lsd_logical_error_rate(&dem, 0);
+    let order1_ler = exact_three_error_lsd_logical_error_rate(&dem, 1);
+
+    assert!(
+        (order0_ler - 0.14).abs() < 1e-12,
+        "expected exact order0 LER from fixture to be 0.14, got {order0_ler}"
+    );
+    assert!(
+        (order1_ler - 0.1).abs() < 1e-12,
+        "expected exact order1 LER from fixture to be 0.1, got {order1_ler}"
+    );
+    assert!(
+        order1_ler < order0_ler,
+        "expected lsd_order=1 to improve LER: order0={order0_ler}, order1={order1_ler}"
+    );
+}
+
+fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order: usize) -> f64 {
+    let lsd_config = LsdConfig {
+        lsd_order,
+        ..LsdConfig::default()
+    };
+    let mut bp_config = DecoderConfig::default();
+    bp_config.max_bp_iterations = 0;
+    let decoder = RbposdLsdDemDecoder::with_bp_config(lsd_config, bp_config);
+    let compiled = decoder.compile_for_dem(dem).unwrap();
+    let probabilities = [
+        0.05,
+        0.1,
+        0.1,
+    ];
+    let mut ler = 0.0;
+    for e0 in [false, true] {
+        for e1 in [false, true] {
+            for e2 in [false, true] {
+                let event = [e0, e1, e2];
+                let probability = event
+                    .iter()
+                    .zip(probabilities.iter())
+                    .map(|(&fired, &p)| if fired { p } else { 1.0 - p })
+                    .product::<f64>();
+                let det0 = e0 ^ e1 ^ e2;
+                let observed = e1;
+                let det_byte = u8::from(det0);
+                let predicted = compiled
+                    .decode_shots_bit_packed(&[det_byte], 1, 1, 1)
+                    .unwrap()[0]
+                    & 1
+                    != 0;
+                if predicted != observed {
+                    ler += probability;
+                }
+            }
+        }
+    }
+    ler
+}
+
 fn exact_three_error_logical_error_rate(dem: &DetectorErrorModel, osd_order: usize) -> f64 {
     let mut config = DecoderConfig::default();
     config.max_bp_iterations = 0;
