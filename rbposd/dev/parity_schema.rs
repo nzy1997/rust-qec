@@ -136,16 +136,18 @@ impl ChannelSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BpVariantSpec {
     MinimumSum,
+    ProductSum,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScheduleSpec {
     Parallel,
+    Serial,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -206,9 +208,11 @@ impl ConfigSpec {
             early_stop: self.early_stop,
             bp_variant: match self.bp_variant {
                 BpVariantSpec::MinimumSum => BpVariant::MinimumSum,
+                BpVariantSpec::ProductSum => BpVariant::ProductSum,
             },
             schedule: match self.schedule {
                 ScheduleSpec::Parallel => Schedule::Parallel,
+                ScheduleSpec::Serial => Schedule::Serial,
             },
             osd_variant: match self.osd_variant {
                 OsdVariantSpec::Osd0 => OsdVariant::Osd0,
@@ -249,7 +253,12 @@ impl ParityCase {
             .lsd_config
             .map(LsdConfigSpec::build)
             .unwrap_or_default();
-        BpLsdDecoder::new(self.matrix.build()?, self.channel.build(), lsd_config)
+        BpLsdDecoder::with_bp_config(
+            self.matrix.build()?,
+            self.channel.build(),
+            lsd_config,
+            self.config.build(),
+        )
     }
 
     pub fn decode(&self) -> Result<DecodeResult, DecodeError> {

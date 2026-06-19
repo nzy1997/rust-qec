@@ -1,0 +1,31 @@
+{
+  "name": "bp_product_sum_serial_sensitive",
+  "matrix": {
+    "num_checks": 3,
+    "num_bits": 4,
+    "rows": [[0, 1], [1, 2], [2, 3]]
+  },
+  "channel": {
+    "kind": "bit_flip_probabilities",
+    "probabilities": [0.2, 0.35, 0.2, 0.2]
+  },
+  "syndrome": [true, false, true],
+  "config": {
+    "max_bp_iterations": 3,
+    "early_stop": false,
+    "bp_variant": "product_sum",
+    "schedule": "serial",
+    "osd_variant": "osd0"
+  },
+  "expected": {
+    "status": "success",
+    "correction": [true, false, false, true],
+    "diagnostics": {
+      "converged": true,
+      "bp_iterations": 3,
+      "used_osd": false,
+      "residual_syndrome_weight": 0
+    }
+  },
+  "tags": ["static-baseline", "bp-only", "product-sum", "serial"]
+}

@@ -1,6 +1,22 @@
+#[path = "../dev/parity_runner.rs"]
+mod parity_runner;
+#[path = "../dev/parity_schema.rs"]
+#[allow(dead_code)]
+mod parity_schema;
+
+use std::path::PathBuf;
+
 use rbposd::{
     BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
 };
+
+fn parity_fixture_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parity")
+}
+
+fn load_parity_case(name: &str) -> parity_schema::ParityCase {
+    parity_schema::load_case(&parity_fixture_dir().join(name))
+}
 
 fn repetition_pcm() -> ParityCheckMatrix {
     ParityCheckMatrix::from_sparse_rows(4, 5, vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4]])
@@ -207,4 +223,65 @@ fn decoder_rejects_invalid_probability_inputs() {
     )
     .unwrap_err();
     assert_eq!(err, DecodeError::InvalidProbability);
+}
+
+#[test]
+fn product_sum_serial_changes_bp_snapshot_on_borrowed_case() {
+    let default_case = load_parity_case("bp_repetition_single_flip.json");
+    let sensitive_case = load_parity_case("bp_product_sum_serial_sensitive.json");
+
+    assert_eq!(
+        default_case.config.bp_variant,
+        parity_schema::BpVariantSpec::MinimumSum
+    );
+    assert_eq!(
+        default_case.config.schedule,
+        parity_schema::ScheduleSpec::Parallel
+    );
+    assert_eq!(
+        sensitive_case.config.bp_variant,
+        parity_schema::BpVariantSpec::ProductSum
+    );
+    assert_eq!(
+        sensitive_case.config.schedule,
+        parity_schema::ScheduleSpec::Serial
+    );
+
+    let default_report = parity_runner::run_case(&default_case);
+    let sensitive_report = parity_runner::run_case(&sensitive_case);
+
+    assert_eq!(default_report.matches_expected, Some(true));
+    assert_eq!(sensitive_report.matches_expected, Some(true));
+
+    let mut comparison_case = sensitive_case.clone();
+    comparison_case.config.bp_variant = parity_schema::BpVariantSpec::MinimumSum;
+    comparison_case.config.schedule = parity_schema::ScheduleSpec::Parallel;
+    let default_mode_report = parity_runner::run_case(&comparison_case);
+
+    assert_ne!(
+        sensitive_report.actual,
+        default_mode_report.actual,
+        "product_sum + serial must differ from minimum_sum + parallel on the sensitive fixture"
+    );
+}
+
+#[test]
+fn minimum_sum_parallel_regression_suite_still_passes() {
+    for fixture_name in [
+        "bp_repetition_single_flip.json",
+        "osd_equal_reliability_tiebreak.json",
+        "osd_small_sparse_code.json",
+    ] {
+        let case = load_parity_case(fixture_name);
+        assert_eq!(case.config.bp_variant, parity_schema::BpVariantSpec::MinimumSum);
+        assert_eq!(case.config.schedule, parity_schema::ScheduleSpec::Parallel);
+        let report = parity_runner::run_case(&case);
+        assert_eq!(
+            report.matches_expected,
+            Some(true),
+            "default regression fixture {fixture_name} changed: expected {:?}, actual {:?}",
+            report.expected,
+            report.actual
+        );
+    }
 }
