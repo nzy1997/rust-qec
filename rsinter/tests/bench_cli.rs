@@ -152,3 +152,30 @@ fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
             .contains("<svg")
     );
 }
+
+#[test]
+fn rsinter_bb_circuit_bposd_memory_prints_four_column_result_line() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bb-circuit-bposd-memory",
+            "--physical-error-rate",
+            "0.000000000001",
+            "--num-cycles",
+            "1",
+            "--num-trials",
+            "1",
+            "--seed",
+            "1",
+            "--max-bp-iterations",
+            "10",
+            "--osd-order",
+            "0",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let fields: Vec<_> = stdout.trim().split('\t').collect();
+    assert_eq!(fields, vec!["0.000000000001", "1", "1", "0"]);
+}
