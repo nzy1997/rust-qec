@@ -97,7 +97,10 @@ fn build_lsd_decoder(&self) -> Result<BpLsdDecoder, DecodeError> {
 
 - [ ] **Step 3: Add the non-default-sensitive parity fixture**
 
-Create `rbposd/tests/fixtures/parity/bp_product_sum_serial_sensitive.json`:
+Create `rbposd/tests/fixtures/parity/bp_product_sum_serial_sensitive.json`
+from a deterministic 3-check / 4-bit chain case that exposes a public decode
+result difference between default `MinimumSum + Parallel` and non-default
+`ProductSum + Serial`:
 
 ```json
 {
@@ -108,13 +111,13 @@ Create `rbposd/tests/fixtures/parity/bp_product_sum_serial_sensitive.json`:
     "rows": [[0, 1], [1, 2], [2, 3]]
   },
   "channel": {
-    "kind": "bit_flip_probabilities",
-    "probabilities": [0.2, 0.35, 0.2, 0.2]
+    "kind": "bsc",
+    "error_rate": 0.05
   },
   "syndrome": [true, false, true],
   "config": {
-    "max_bp_iterations": 3,
-    "early_stop": false,
+    "max_bp_iterations": 30,
+    "early_stop": true,
     "bp_variant": "product_sum",
     "schedule": "serial",
     "osd_variant": "osd0"
