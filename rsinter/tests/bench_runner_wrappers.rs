@@ -152,6 +152,56 @@ fn rbposd_runner_preflight_rejects_mixed_osd_and_lsd_params() {
 }
 
 #[test]
+fn rbposd_lsd_runner_order_changes_benchmark_logical_error_rate() {
+    let runner = RbposdRunner;
+    let ctx = BenchRunContext {
+        benchmark_name: "surface_decoder".into(),
+        runner_name: "rbposd_lsd".into(),
+        language: "rust".into(),
+        seed: 12_345,
+        spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+    };
+
+    let mut order0 = rbposd_point_with_decoder_params(BTreeMap::from([
+        ("bp_iters".into(), toml::Value::Integer(0)),
+        ("lsd_order".into(), toml::Value::Integer(0)),
+    ]));
+    order0.rounds = 1;
+    order0.p = 0.02;
+    order0.seed = 1;
+    order0.max_shots = 64;
+    order0.max_errors = 64;
+    order0.batch_size = 16;
+
+    let mut order1 = rbposd_point_with_decoder_params(BTreeMap::from([
+        ("bp_iters".into(), toml::Value::Integer(0)),
+        ("lsd_order".into(), toml::Value::Integer(1)),
+    ]));
+    order1.rounds = order0.rounds;
+    order1.p = order0.p;
+    order1.seed = order0.seed;
+    order1.max_shots = order0.max_shots;
+    order1.max_errors = order0.max_errors;
+    order1.batch_size = order0.batch_size;
+
+    let order0_row = runner.run_point(&order0, &ctx).unwrap();
+    let order1_row = runner.run_point(&order1, &ctx).unwrap();
+
+    assert_eq!(order0_row.params["lsd_order"], serde_json::json!(0));
+    assert_eq!(order1_row.params["lsd_order"], serde_json::json!(1));
+    assert_eq!(order0_row.metrics["shots_used"], 64.0);
+    assert_eq!(order1_row.metrics["shots_used"], 64.0);
+    assert_eq!(order0_row.metrics["logical_errors"], 5.0);
+    assert_eq!(order1_row.metrics["logical_errors"], 1.0);
+    assert!(
+        order1_row.metrics["logical_error_rate"] < order0_row.metrics["logical_error_rate"],
+        "expected parsed lsd_order=1 to improve runner LER: order0={}, order1={}",
+        order0_row.metrics["logical_error_rate"],
+        order1_row.metrics["logical_error_rate"]
+    );
+}
+
+#[test]
 fn rilpqec_runner_handles_zero_shot_benchmark_points() {
     let runner = RilpqecRunner;
     let point = BenchCasePoint {

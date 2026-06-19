@@ -153,19 +153,27 @@ and assert the runner artifact directory was not created.
 ### Deterministic LSD Order Behavior
 
 Add `rbposd_lsd_order_changes_logical_error_rate` in
-`rsinter/tests/decode_rbposd.rs`. Use the small matrix shape from the existing
-`rbposd` LSD fixture where order 0 and order 1 choose different corrections for
-the same syndrome. Represent it as a DEM with three independent error
-mechanisms:
+`rsinter/tests/decode_rbposd.rs`. Use a tiny DEM where order 0 and order 1 choose
+different corrections for the same one-detector syndrome. Represent it as three
+independent error mechanisms:
 
-- `D0`
-- `D1`
-- `D1 L0`
+- `D0` with probability `0.05`
+- `D0 L0` with probability `0.1`
+- `D0` with probability `0.1`
 
-with probability `0.3775406687981454` for each. Enumerate all eight error
+Compile the LSD decoder with zero BP iterations, enumerate all eight error
 events exactly, compute actual logical flips from the DEM's observable column,
 decode each syndrome with `RbposdLsdDemDecoder` for order 0 and order 1, and sum
-logical-error probabilities. Assert the rates differ and that order 1 is lower.
+logical-error probabilities. Assert the exact rates are `0.14` for order 0 and
+`0.1` for order 1.
+
+Add `rbposd_lsd_runner_order_changes_benchmark_logical_error_rate` in
+`rsinter/tests/bench_runner_wrappers.rs` to prove the benchmark runner applies
+the parsed `lsd_order` value, not just the adapter-level config. Run two
+otherwise identical small surface-code benchmark points with `bp_iters = 0`,
+`seed = 1`, `max_shots = 64`, and `batch_size = 16`; assert the normalized
+`lsd_order` params are recorded and that order 0 produces 5 logical errors while
+order 1 produces 1 logical error.
 
 ## Error Handling
 

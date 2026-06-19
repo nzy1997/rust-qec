@@ -105,7 +105,10 @@ fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     let row = &rows[0];
     assert_eq!(row.status, "ok");
     assert_eq!(row.error, None);
-    assert_eq!(row.params["input_type"], serde_json::json!("surface"));
+    assert_eq!(
+        row.params["input_type"],
+        serde_json::json!("surface_rotated_memory_x")
+    );
     assert_eq!(row.params["distance"], serde_json::json!(3));
     assert_eq!(row.params["rounds"], serde_json::json!(3));
     assert_eq!(row.params["p"], serde_json::json!(0.002));
@@ -213,18 +216,22 @@ In `rsinter/tests/decode_rbposd.rs`, immediately after `rbposd_osd_order_changes
 #[test]
 fn rbposd_lsd_order_changes_logical_error_rate() {
     let dem = DetectorErrorModel::parse(concat!(
-        "error(0.3775406687981454) D0\n",
-        "error(0.3775406687981454) D1\n",
-        "error(0.3775406687981454) D1 L0\n",
+        "error(0.05) D0\n",
+        "error(0.1) D0 L0\n",
+        "error(0.1) D0\n",
     ))
     .unwrap();
 
     let order0_ler = exact_three_error_lsd_logical_error_rate(&dem, 0);
     let order1_ler = exact_three_error_lsd_logical_error_rate(&dem, 1);
 
-    assert_ne!(
-        order1_ler, order0_ler,
-        "expected lsd_order to change LER: order0={order0_ler}, order1={order1_ler}"
+    assert!(
+        (order0_ler - 0.14).abs() < 1e-12,
+        "expected exact order-0 LER 0.14, got {order0_ler}"
+    );
+    assert!(
+        (order1_ler - 0.1).abs() < 1e-12,
+        "expected exact order-1 LER 0.1, got {order1_ler}"
     );
     assert!(
         order1_ler < order0_ler,
@@ -241,13 +248,11 @@ fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order:
         lsd_order,
         ..LsdConfig::default()
     };
-    let decoder = RbposdLsdDemDecoder::new(lsd_config);
+    let mut bp_config = DecoderConfig::default();
+    bp_config.max_bp_iterations = 0;
+    let decoder = RbposdLsdDemDecoder::with_bp_config(lsd_config, bp_config);
     let compiled = decoder.compile_for_dem(dem).unwrap();
-    let probabilities = [
-        0.377_540_668_798_145_4,
-        0.377_540_668_798_145_4,
-        0.377_540_668_798_145_4,
-    ];
+    let probabilities = [0.05, 0.1, 0.1];
     let mut ler = 0.0;
     for e0 in [false, true] {
         for e1 in [false, true] {
@@ -258,12 +263,10 @@ fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order:
                     .zip(probabilities.iter())
                     .map(|(&fired, &p)| if fired { p } else { 1.0 - p })
                     .product::<f64>();
-                let det0 = e0;
-                let det1 = e1 ^ e2;
-                let observed = e2;
-                let det_byte = u8::from(det0) | (u8::from(det1) << 1);
+                let det0 = e0 ^ e1 ^ e2;
+                let observed = e1;
                 let predicted = compiled
-                    .decode_shots_bit_packed(&[det_byte], 1, 2, 1)
+                    .decode_shots_bit_packed(&[u8::from(det0)], 1, 1, 1)
                     .unwrap()[0]
                     & 1
                     != 0;
@@ -285,7 +288,7 @@ Run:
 cargo test -p rsinter rbposd_lsd_order_changes_logical_error_rate
 ```
 
-Expected: the command passes. If `order1_ler` is not lower than `order0_ler`, inspect the printed assertion values and swap the observable marker from the `D1 L0` column to the `D1` column so the known order-1 correction is the lower-error observable prediction, then rerun this command.
+Expected: the command passes with exact LERs `0.14` for order 0 and `0.1` for order 1.
 
 - [ ] **Step 3: Commit Task 2**
 
@@ -303,10 +306,20 @@ Expected: a commit is created.
 ### Task 3: Final Verification And PR Preparation
 
 **Files:**
-- No planned source edits. Modify only if verification exposes a defect in files touched by Tasks 1 or 2.
+- `rsinter/tests/bench_runner_wrappers.rs`
 
 **Interfaces:**
 - Produces: verified branch ready for code review and pull request creation.
+
+- [ ] **Step 0: Add runner-level LSD order regression after final review**
+
+In `rsinter/tests/bench_runner_wrappers.rs`, add
+`rbposd_lsd_runner_order_changes_benchmark_logical_error_rate`. Run two
+otherwise identical `RbposdRunner` surface-code points with `bp_iters = 0`,
+`lsd_order = 0` vs `lsd_order = 1`, `seed = 1`, `max_shots = 64`, and
+`batch_size = 16`. Assert both result rows record the normalized `lsd_order`,
+consume 64 shots, and differ in benchmark-facing behavior with 5 logical errors
+for order 0 and 1 logical error for order 1.
 
 - [ ] **Step 1: Run the issue verification commands**
 
@@ -317,9 +330,10 @@ cargo test -p rsinter rbposd_lsd_benchmark_records_normalized_decoder_params
 cargo test -p rsinter rbposd_lsd_benchmark_run_writes_results_jsonl
 cargo test -p rsinter rbposd_lsd_order_changes_logical_error_rate
 cargo test -p rsinter rbposd_lsd_benchmark_rejects_unknown_decoder_param_without_results
+cargo test -p rsinter rbposd_lsd_runner_order_changes_benchmark_logical_error_rate
 ```
 
-Expected: all four commands pass.
+Expected: all five commands pass.
 
 - [ ] **Step 2: Run package and workspace verification**
 
@@ -345,6 +359,6 @@ Use `superpowers:finishing-a-development-branch`. Under the Standing Answer Poli
 
 ## Self-Review Notes
 
-- Spec coverage: Task 1 covers normalized params, `results.jsonl`, and the negative control. Task 2 covers deterministic LSD-order behavior. Task 3 covers requested verification, whole-package/workspace verification, review, and PR creation.
+- Spec coverage: Task 1 covers normalized params, `results.jsonl`, and the negative control. Task 2 covers exact adapter-level LSD-order behavior. Task 3 covers runner-level LSD-order behavior, requested verification, whole-package/workspace verification, review, and PR creation.
 - Placeholder scan: no unfinished markers remain.
 - Type consistency: helper and test names match the files and imports they use.
