@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use rbposd::DecoderConfig;
-use rsinter::collect::{collect, CollectOptions};
-use rsinter::decode::{Decoder, RbposdDemDecoder};
+use rbposd::{DecoderConfig, LsdConfig};
+use rsinter::collect::{CollectOptions, collect};
+use rsinter::decode::{Decoder, RbposdDemDecoder, RbposdLsdDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
-use rstim::dem::DetectorErrorModel;
+use rstim::dem::{DemTarget, DetectorErrorModel};
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::parser::parse_lines;
 
@@ -19,6 +19,39 @@ fn rbposd_dem_decoder_predicts_a_single_observable_flip() {
         .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001]);
+}
+
+#[test]
+fn lsd_dem_decoder_predicts_a_known_single_observable_flip() {
+    let dem = DetectorErrorModel::parse("error(0.125) D0 L0\nerror(0.25) D1\n").unwrap();
+    let decoder = RbposdLsdDemDecoder::new(LsdConfig::default());
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
+
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
+
+    assert_eq!(predictions, vec![0b0000_0001]);
+}
+
+#[test]
+fn lsd_dem_decoder_returns_compile_error_for_invalid_matrix_problem() {
+    let mut dem = DetectorErrorModel::new();
+    dem.add_error(
+        f64::NAN,
+        vec![DemTarget::Detector(0), DemTarget::Observable(0)],
+    );
+    let decoder = RbposdLsdDemDecoder::new(LsdConfig::default());
+
+    let err = match decoder.compile_for_dem(&dem) {
+        Ok(_) => panic!("expected invalid LSD DEM compile to fail"),
+        Err(err) => err,
+    };
+
+    assert!(
+        err.contains("failed to compile rbposd decoder"),
+        "expected rbposd compile error, got {err:?}"
+    );
 }
 
 #[test]

@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 
-use rbposd::{BpOsdDecoder, ChannelModel, Correction, DecoderConfig, ParityCheckMatrix, Syndrome};
+use rbposd::{
+    BpLsdDecoder, BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, LsdConfig,
+    ParityCheckMatrix, Syndrome,
+};
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 
 use crate::decode::{CompiledDecoder, Decoder};
@@ -15,8 +18,67 @@ impl RbposdDemDecoder {
     }
 }
 
+pub struct RbposdLsdDemDecoder {
+    config: LsdConfig,
+    bp_config: DecoderConfig,
+}
+
+impl RbposdLsdDemDecoder {
+    pub fn new(config: LsdConfig) -> Self {
+        Self::with_bp_config(config, DecoderConfig::default())
+    }
+
+    pub fn with_bp_config(config: LsdConfig, bp_config: DecoderConfig) -> Self {
+        Self { config, bp_config }
+    }
+}
+
+enum RbposdDemBackendConfig {
+    Osd(DecoderConfig),
+    Lsd {
+        lsd_config: LsdConfig,
+        bp_config: DecoderConfig,
+    },
+}
+
+enum RbposdDemBackend {
+    Osd(BpOsdDecoder),
+    Lsd(BpLsdDecoder),
+}
+
+impl RbposdDemBackendConfig {
+    fn compile(
+        &self,
+        pcm: ParityCheckMatrix,
+        probabilities: Vec<f64>,
+    ) -> Result<RbposdDemBackend, String> {
+        let channel = ChannelModel::BitFlipProbabilities(probabilities);
+        match self {
+            Self::Osd(config) => {
+                BpOsdDecoder::new(pcm, channel, config.clone()).map(RbposdDemBackend::Osd)
+            }
+            Self::Lsd {
+                lsd_config,
+                bp_config,
+            } => BpLsdDecoder::with_bp_config(pcm, channel, *lsd_config, *bp_config)
+                .map(RbposdDemBackend::Lsd),
+        }
+        .map_err(|error| format!("failed to compile rbposd decoder: {error}"))
+    }
+}
+
+impl RbposdDemBackend {
+    fn decode(&self, syndrome: &Syndrome) -> Result<Correction, DecodeError> {
+        match self {
+            Self::Osd(decoder) => decoder.decode(syndrome),
+            Self::Lsd(decoder) => decoder.decode(syndrome),
+        }
+        .map(|result| result.correction)
+    }
+}
+
 struct CompiledRbposdDemDecoder {
-    decoder: Option<BpOsdDecoder>,
+    decoder: Option<RbposdDemBackend>,
     num_dets: usize,
     num_obs: usize,
     observable_columns: Vec<Vec<usize>>,
@@ -29,71 +91,86 @@ impl Decoder for RbposdDemDecoder {
         &self,
         dem: &DetectorErrorModel,
     ) -> Result<Box<dyn CompiledDecoder>, String> {
-        let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
-            dem_to_matrix_problem(dem);
+        compile_rbposd_dem_with_backend(dem, RbposdDemBackendConfig::Osd(self.config.clone()))
+    }
+}
 
-        let mut filtered_detector_columns = Vec::new();
-        let mut filtered_observable_columns = Vec::new();
-        let mut filtered_probabilities = Vec::new();
-        let mut forced_syndrome = vec![false; num_dets];
-        let mut baseline_observables = vec![false; num_obs];
+impl Decoder for RbposdLsdDemDecoder {
+    fn compile_for_dem(
+        &self,
+        dem: &DetectorErrorModel,
+    ) -> Result<Box<dyn CompiledDecoder>, String> {
+        compile_rbposd_dem_with_backend(
+            dem,
+            RbposdDemBackendConfig::Lsd {
+                lsd_config: self.config,
+                bp_config: self.bp_config,
+            },
+        )
+    }
+}
 
-        for ((detectors, observables), probability) in detector_columns
-            .into_iter()
-            .zip(observable_columns.into_iter())
-            .zip(probabilities.into_iter())
-        {
-            if probability <= 0.0 {
-                continue;
-            }
+fn compile_rbposd_dem_with_backend(
+    dem: &DetectorErrorModel,
+    backend_config: RbposdDemBackendConfig,
+) -> Result<Box<dyn CompiledDecoder>, String> {
+    let (detector_columns, probabilities, observable_columns, num_dets, num_obs) =
+        dem_to_matrix_problem(dem);
 
-            if probability >= 1.0 {
-                xor_indices(&mut forced_syndrome, &detectors);
-                xor_indices(&mut baseline_observables, &observables);
-                continue;
-            }
+    let mut filtered_detector_columns = Vec::new();
+    let mut filtered_observable_columns = Vec::new();
+    let mut filtered_probabilities = Vec::new();
+    let mut forced_syndrome = vec![false; num_dets];
+    let mut baseline_observables = vec![false; num_obs];
 
-            if detectors.is_empty() {
-                if probability > 0.5 {
-                    xor_indices(&mut baseline_observables, &observables);
-                }
-                continue;
-            }
-
-            filtered_detector_columns.push(detectors);
-            filtered_observable_columns.push(observables);
-            filtered_probabilities.push(probability);
+    for ((detectors, observables), probability) in detector_columns
+        .into_iter()
+        .zip(observable_columns.into_iter())
+        .zip(probabilities.into_iter())
+    {
+        if probability <= 0.0 {
+            continue;
         }
 
-        let decoder = if filtered_detector_columns.is_empty() {
-            None
-        } else {
-            let pcm = ParityCheckMatrix::from_sparse_columns(
-                num_dets,
-                filtered_detector_columns.len(),
-                filtered_detector_columns,
-            )
-            .map_err(|error| format!("invalid rbposd parity matrix: {error}"))?;
+        if probability >= 1.0 {
+            xor_indices(&mut forced_syndrome, &detectors);
+            xor_indices(&mut baseline_observables, &observables);
+            continue;
+        }
 
-            Some(
-                BpOsdDecoder::new(
-                    pcm,
-                    ChannelModel::BitFlipProbabilities(filtered_probabilities),
-                    self.config.clone(),
-                )
-                .map_err(|error| format!("failed to compile rbposd decoder: {error}"))?,
-            )
-        };
+        if detectors.is_empty() {
+            if probability > 0.5 {
+                xor_indices(&mut baseline_observables, &observables);
+            }
+            continue;
+        }
 
-        Ok(Box::new(CompiledRbposdDemDecoder {
-            decoder,
-            num_dets,
-            num_obs,
-            observable_columns: filtered_observable_columns,
-            forced_syndrome,
-            baseline_observables,
-        }))
+        filtered_detector_columns.push(detectors);
+        filtered_observable_columns.push(observables);
+        filtered_probabilities.push(probability);
     }
+
+    let decoder = if filtered_detector_columns.is_empty() {
+        None
+    } else {
+        let pcm = ParityCheckMatrix::from_sparse_columns(
+            num_dets,
+            filtered_detector_columns.len(),
+            filtered_detector_columns,
+        )
+        .map_err(|error| format!("invalid rbposd parity matrix: {error}"))?;
+
+        Some(backend_config.compile(pcm, filtered_probabilities)?)
+    };
+
+    Ok(Box::new(CompiledRbposdDemDecoder {
+        decoder,
+        num_dets,
+        num_obs,
+        observable_columns: filtered_observable_columns,
+        forced_syndrome,
+        baseline_observables,
+    }))
 }
 
 impl CompiledDecoder for CompiledRbposdDemDecoder {
@@ -120,14 +197,11 @@ impl CompiledDecoder for CompiledRbposdDemDecoder {
 
             let mut observable_bits = self.baseline_observables.clone();
             if let Some(decoder) = &self.decoder {
-                let result = decoder
+                let correction = decoder
                     .decode(&Syndrome::from(syndrome_bits))
                     .map_err(|error| format!("rbposd decode failed: {error}"))?;
-                let decoded_observables = correction_to_observables(
-                    &result.correction,
-                    &self.observable_columns,
-                    self.num_obs,
-                );
+                let decoded_observables =
+                    correction_to_observables(&correction, &self.observable_columns, self.num_obs);
                 xor_bits(&mut observable_bits, &decoded_observables);
             }
 

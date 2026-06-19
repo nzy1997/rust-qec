@@ -602,7 +602,7 @@ lsd_order = 1
 }
 
 #[test]
-fn rbposd_lsd_run_fails_without_silent_osd_fallback_or_artifacts() {
+fn rbposd_lsd_run_uses_lsd_dem_adapter_and_writes_artifacts() {
     let spec_text = issue91_surface_spec(
         r#"
 lsd_method = "localized_statistics"
@@ -613,20 +613,32 @@ lsd_order = 1
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 
-    let err = run_rust_benchmark(
+    let artifact_root = run_rust_benchmark(
         &spec,
         "rust",
         dir.path(),
         &registry,
         Path::new(env!("CARGO_MANIFEST_DIR")),
     )
-    .unwrap_err();
+    .unwrap();
 
+    let artifact_dir = artifact_root.join("rbposd_lsd").join("test-run");
+    assert!(artifact_dir.join("run_manifest.json").exists());
+    assert!(artifact_dir.join("results.jsonl").exists());
+
+    let data = fs::read(artifact_dir.join("results.jsonl")).unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].runner, "rbposd_lsd");
+    assert_eq!(rows[0].language, "rust");
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
     assert_eq!(
-        err,
-        "rbposd LSD DEM decoding is not implemented yet; see issue #92"
+        rows[0].params["lsd_method"],
+        serde_json::json!("localized_statistics")
     );
-    assert!(!dir.path().join("rbposd_lsd").exists());
+    assert_eq!(rows[0].params["lsd_order"], serde_json::json!(1));
+    assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
 }
 
 #[test]
