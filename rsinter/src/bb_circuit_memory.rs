@@ -1134,66 +1134,70 @@ fn sample_single_axis<R: Rng + ?Sized>(rng: &mut R) -> PauliAxis {
 }
 
 fn sample_cnot_fault<R: Rng + ?Sized>(qubits: [usize; 2], rng: &mut R) -> PauliFault {
-    match rng.gen_range(0..15) {
+    cnot_fault_for_index(qubits, rng.gen_range(0..15))
+}
+
+fn cnot_fault_for_index(qubits: [usize; 2], index: usize) -> PauliFault {
+    match index {
         0 => PauliFault::Single {
-            qubit: qubits[1],
+            qubit: qubits[0],
             axis: PauliAxis::X,
         },
         1 => PauliFault::Single {
-            qubit: qubits[1],
+            qubit: qubits[0],
             axis: PauliAxis::Y,
         },
         2 => PauliFault::Single {
-            qubit: qubits[1],
+            qubit: qubits[0],
             axis: PauliAxis::Z,
         },
         3 => PauliFault::Single {
-            qubit: qubits[0],
+            qubit: qubits[1],
             axis: PauliAxis::X,
         },
-        4 => PauliFault::TwoQubit {
-            qubits,
-            axes: [PauliAxis::X, PauliAxis::X],
+        4 => PauliFault::Single {
+            qubit: qubits[1],
+            axis: PauliAxis::Y,
         },
-        5 => PauliFault::TwoQubit {
-            qubits,
-            axes: [PauliAxis::X, PauliAxis::Y],
+        5 => PauliFault::Single {
+            qubit: qubits[1],
+            axis: PauliAxis::Z,
         },
         6 => PauliFault::TwoQubit {
             qubits,
-            axes: [PauliAxis::X, PauliAxis::Z],
+            axes: [PauliAxis::X, PauliAxis::X],
         },
-        7 => PauliFault::Single {
-            qubit: qubits[0],
-            axis: PauliAxis::Y,
-        },
-        8 => PauliFault::TwoQubit {
-            qubits,
-            axes: [PauliAxis::Y, PauliAxis::X],
-        },
-        9 => PauliFault::TwoQubit {
+        7 => PauliFault::TwoQubit {
             qubits,
             axes: [PauliAxis::Y, PauliAxis::Y],
         },
+        8 => PauliFault::TwoQubit {
+            qubits,
+            axes: [PauliAxis::Z, PauliAxis::Z],
+        },
+        9 => PauliFault::TwoQubit {
+            qubits,
+            axes: [PauliAxis::X, PauliAxis::Y],
+        },
         10 => PauliFault::TwoQubit {
+            qubits,
+            axes: [PauliAxis::Y, PauliAxis::X],
+        },
+        11 => PauliFault::TwoQubit {
             qubits,
             axes: [PauliAxis::Y, PauliAxis::Z],
         },
-        11 => PauliFault::Single {
-            qubit: qubits[0],
-            axis: PauliAxis::Z,
-        },
         12 => PauliFault::TwoQubit {
-            qubits,
-            axes: [PauliAxis::Z, PauliAxis::X],
-        },
-        13 => PauliFault::TwoQubit {
             qubits,
             axes: [PauliAxis::Z, PauliAxis::Y],
         },
+        13 => PauliFault::TwoQubit {
+            qubits,
+            axes: [PauliAxis::X, PauliAxis::Z],
+        },
         _ => PauliFault::TwoQubit {
             qubits,
-            axes: [PauliAxis::Z, PauliAxis::Z],
+            axes: [PauliAxis::Z, PauliAxis::X],
         },
     }
 }
@@ -1214,5 +1218,82 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
     }
     if matches!(axis, PauliAxis::Z | PauliAxis::Y) {
         z_state[qubit] ^= true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PauliAxis, PauliFault, cnot_fault_for_index};
+
+    #[test]
+    fn cnot_fault_indices_match_upstream_order() {
+        let qubits = [10, 20];
+
+        let expected = [
+            PauliFault::Single {
+                qubit: 10,
+                axis: PauliAxis::X,
+            },
+            PauliFault::Single {
+                qubit: 10,
+                axis: PauliAxis::Y,
+            },
+            PauliFault::Single {
+                qubit: 10,
+                axis: PauliAxis::Z,
+            },
+            PauliFault::Single {
+                qubit: 20,
+                axis: PauliAxis::X,
+            },
+            PauliFault::Single {
+                qubit: 20,
+                axis: PauliAxis::Y,
+            },
+            PauliFault::Single {
+                qubit: 20,
+                axis: PauliAxis::Z,
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::X, PauliAxis::X],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Y, PauliAxis::Y],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Z, PauliAxis::Z],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::X, PauliAxis::Y],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Y, PauliAxis::X],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Y, PauliAxis::Z],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Z, PauliAxis::Y],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::X, PauliAxis::Z],
+            },
+            PauliFault::TwoQubit {
+                qubits,
+                axes: [PauliAxis::Z, PauliAxis::X],
+            },
+        ];
+
+        for (index, expected_fault) in expected.into_iter().enumerate() {
+            assert_eq!(cnot_fault_for_index(qubits, index), expected_fault);
+        }
     }
 }
