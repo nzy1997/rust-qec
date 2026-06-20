@@ -79,6 +79,18 @@ fn fixture_catalog_rejects_unsupported_bp_option_modes_and_config() {
         "expected schedule mode validation error, got {error:?}"
     );
 
+    let mut extra_early_stop_mode = valid.clone();
+    bp_entry_mut(&mut extra_early_stop_mode)
+        .modes
+        .push("early_stop=false".to_string());
+    let error =
+        fixture_catalog::validate_catalog(&extra_early_stop_mode, &fixture_catalog::fixture_root())
+            .unwrap_err();
+    assert!(
+        error.contains("early_stop") || error.contains("unsupported mode"),
+        "expected unsupported early_stop mode validation error, got {error:?}"
+    );
+
     let mut unsupported_mode_value = valid.clone();
     let bp_entry = bp_entry_mut(&mut unsupported_mode_value);
     replace_mode(
@@ -175,6 +187,18 @@ fn fixture_catalog_rejects_unsupported_lsd_modes_and_decoder_combinations() {
     assert!(
         error.contains("decoder"),
         "expected decoder mode validation error, got {error:?}"
+    );
+
+    let mut unknown_extra_mode = valid.clone();
+    lsd_entry_mut(&mut unknown_extra_mode, "lsd_small_sparse_code")
+        .modes
+        .push("unknown_mode=value".to_string());
+    let error =
+        fixture_catalog::validate_catalog(&unknown_extra_mode, &fixture_catalog::fixture_root())
+            .unwrap_err();
+    assert!(
+        error.contains("unknown_mode") || error.contains("unsupported mode"),
+        "expected unsupported unknown_mode validation error, got {error:?}"
     );
 
     let mut unsupported_method = valid.clone();

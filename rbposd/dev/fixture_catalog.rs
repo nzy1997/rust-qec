@@ -315,29 +315,14 @@ fn validate_bp_option_modes(
         ));
     }
 
-    let modes = parse_modes(entry)?;
+    let modes = parse_modes(
+        entry,
+        &["bp_variant", "schedule", "osd_variant"],
+        &["bp_variant", "schedule", "osd_variant"],
+    )?;
     expect_exact_mode(entry, &modes, "bp_variant", &config.bp_variant)?;
     expect_exact_mode(entry, &modes, "schedule", &config.schedule)?;
     expect_exact_mode(entry, &modes, "osd_variant", &config.osd_variant)?;
-
-    if let Some(value) = modes.get("decoder") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported decoder mode {} for BP-option fixture",
-            entry.id, value
-        ));
-    }
-    if let Some(value) = modes.get("lsd_method") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported lsd_method mode {} for BP-option fixture",
-            entry.id, value
-        ));
-    }
-    if let Some(value) = modes.get("lsd_order") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported lsd_order mode {} for BP-option fixture",
-            entry.id, value
-        ));
-    }
 
     Ok(())
 }
@@ -350,29 +335,14 @@ fn validate_lsd_modes(entry: &FixtureCatalogEntry, lsd_order: usize) -> Result<(
         ));
     }
 
-    let modes = parse_modes(entry)?;
+    let modes = parse_modes(
+        entry,
+        &["decoder", "lsd_method", "lsd_order"],
+        &["decoder", "lsd_method", "lsd_order"],
+    )?;
     expect_exact_mode(entry, &modes, "decoder", "bp_lsd")?;
     expect_exact_mode(entry, &modes, "lsd_method", "localized_statistics")?;
     expect_exact_mode(entry, &modes, "lsd_order", &lsd_order.to_string())?;
-
-    if let Some(value) = modes.get("bp_variant") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported bp_variant mode {} for LSD fixture",
-            entry.id, value
-        ));
-    }
-    if let Some(value) = modes.get("schedule") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported schedule mode {} for LSD fixture",
-            entry.id, value
-        ));
-    }
-    if let Some(value) = modes.get("osd_variant") {
-        return Err(format!(
-            "fixture catalog entry {} has unsupported osd_variant mode {} for LSD fixture",
-            entry.id, value
-        ));
-    }
 
     Ok(())
 }
@@ -409,7 +379,11 @@ fn validate_supported_bp_fixture_config(
     Ok(())
 }
 
-fn parse_modes(entry: &FixtureCatalogEntry) -> Result<BTreeMap<&str, &str>, String> {
+fn parse_modes<'a>(
+    entry: &'a FixtureCatalogEntry,
+    allowed_fields: &[&str],
+    required_fields: &[&str],
+) -> Result<BTreeMap<&'a str, &'a str>, String> {
     if entry.modes.is_empty() {
         return Err(format!(
             "fixture catalog entry {} modes must not be empty",
@@ -417,6 +391,7 @@ fn parse_modes(entry: &FixtureCatalogEntry) -> Result<BTreeMap<&str, &str>, Stri
         ));
     }
 
+    let allowed_fields = allowed_fields.iter().copied().collect::<BTreeSet<_>>();
     let mut modes = BTreeMap::new();
     for mode in &entry.modes {
         let (field, value) = mode.split_once('=').ok_or_else(|| {
@@ -431,10 +406,25 @@ fn parse_modes(entry: &FixtureCatalogEntry) -> Result<BTreeMap<&str, &str>, Stri
                 entry.id, mode
             ));
         }
+        if !allowed_fields.contains(field) {
+            return Err(format!(
+                "fixture catalog entry {} has unsupported mode key {}",
+                entry.id, field
+            ));
+        }
         if let Some(existing) = modes.insert(field, value) {
             return Err(format!(
                 "fixture catalog entry {} mode {} duplicates {}={}",
                 entry.id, mode, field, existing
+            ));
+        }
+    }
+
+    for field in required_fields {
+        if !modes.contains_key(field) {
+            return Err(format!(
+                "fixture catalog entry {} modes must include {}",
+                entry.id, field
             ));
         }
     }
