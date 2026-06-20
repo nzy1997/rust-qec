@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use rbposd::{DecoderConfig, LsdConfig, LsdMethod};
+use rbposd::{BpVariant, DecoderConfig, LsdConfig, LsdMethod, Schedule};
 use toml::Value;
 
 use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
@@ -33,13 +33,27 @@ enum RbposdDecoderFamily {
 impl RbposdRunnerParams {
     fn parse(params: &BTreeMap<String, Value>) -> Result<Self, String> {
         let mut bp_config = DecoderConfig::default();
-        let bp_algorithm =
-            optional_string(params, "bp_algorithm")?.unwrap_or_else(|| "min_sum".to_string());
-        if bp_algorithm != "min_sum" {
-            return Err(format!(
-                "rbposd bp_algorithm must be \"min_sum\", got \"{bp_algorithm}\""
-            ));
+        let legacy_bp_algorithm = optional_string(params, "bp_algorithm")?;
+        let explicit_bp_method = optional_string(params, "bp_method")?;
+        if legacy_bp_algorithm.is_some() && explicit_bp_method.is_some() {
+            return Err("rbposd params must not set both bp_algorithm and bp_method".into());
         }
+
+        let bp_method = match (explicit_bp_method, legacy_bp_algorithm.as_deref()) {
+            (Some(value), None) => value,
+            (None, Some("min_sum")) | (None, None) => "minimum_sum".to_string(),
+            (None, Some(value)) => {
+                return Err(format!(
+                    "rbposd bp_algorithm must be \"min_sum\", got \"{value}\""
+                ));
+            }
+            (Some(_), Some(_)) => unreachable!("checked above"),
+        };
+        bp_config.bp_variant = parse_bp_method(&bp_method)?;
+
+        let bp_schedule =
+            optional_string(params, "schedule")?.unwrap_or_else(|| "parallel".to_string());
+        bp_config.schedule = parse_bp_schedule(&bp_schedule)?;
 
         let bp_iters = optional_usize(params, "bp_iters")?;
         let max_bp_iterations = optional_usize(params, "max_bp_iterations")?;
@@ -87,7 +101,9 @@ impl RbposdRunnerParams {
                     lsd_config,
                 },
                 normalized: ParamMap::from_pairs([
-                    ("bp_algorithm", serde_json::json!(bp_algorithm)),
+                    ("bp_algorithm", serde_json::json!("min_sum")),
+                    ("bp_method", serde_json::json!(bp_method)),
+                    ("bp_schedule", serde_json::json!(bp_schedule)),
                     ("bp_iters", serde_json::json!(bp_config.max_bp_iterations)),
                     ("early_stop", serde_json::json!(bp_config.early_stop)),
                     ("lsd_method", serde_json::json!(lsd_method)),
@@ -112,13 +128,43 @@ impl RbposdRunnerParams {
                 osd_order: bp_config.osd_order,
             },
             normalized: ParamMap::from_pairs([
-                ("bp_algorithm", serde_json::json!(bp_algorithm)),
+                ("bp_algorithm", serde_json::json!("min_sum")),
+                ("bp_method", serde_json::json!(bp_method)),
+                ("bp_schedule", serde_json::json!(bp_schedule)),
                 ("bp_iters", serde_json::json!(bp_config.max_bp_iterations)),
                 ("early_stop", serde_json::json!(bp_config.early_stop)),
                 ("osd_method", serde_json::json!(osd_method)),
                 ("osd_order", serde_json::json!(bp_config.osd_order)),
             ]),
         })
+    }
+
+    fn normalized_for_point(&self, point: &BenchCasePoint) -> ParamMap {
+        let mut normalized = self.normalized.clone();
+        if point.schedule.is_none() {
+            normalized.insert("schedule".into(), normalized["bp_schedule"].clone());
+        }
+        normalized
+    }
+}
+
+fn parse_bp_method(value: &str) -> Result<BpVariant, String> {
+    match value {
+        "minimum_sum" => Ok(BpVariant::MinimumSum),
+        "product_sum" => Ok(BpVariant::ProductSum),
+        other => Err(format!(
+            "rbposd bp_method must be \"minimum_sum\" or \"product_sum\", got \"{other}\""
+        )),
+    }
+}
+
+fn parse_bp_schedule(value: &str) -> Result<Schedule, String> {
+    match value {
+        "parallel" => Ok(Schedule::Parallel),
+        "serial" => Ok(Schedule::Serial),
+        other => Err(format!(
+            "rbposd schedule must be \"parallel\" or \"serial\", got \"{other}\""
+        )),
     }
 }
 
@@ -137,6 +183,7 @@ impl RustBenchRunner for RbposdRunner {
         ctx: &BenchRunContext,
     ) -> Result<BenchmarkResultRow, String> {
         let params = RbposdRunnerParams::parse(&point.decoder_params)?;
+        let normalized = params.normalized_for_point(point);
         match &params.decoder {
             RbposdDecoderFamily::Osd { .. } => {
                 let decoder = RbposdDemDecoder::new(params.bp_config);
@@ -145,7 +192,7 @@ impl RustBenchRunner for RbposdRunner {
                     &decoder,
                     point,
                     ctx,
-                    &params.normalized,
+                    &normalized,
                     DemBuildMode::Raw,
                 )
             }
@@ -156,7 +203,7 @@ impl RustBenchRunner for RbposdRunner {
                     &decoder,
                     point,
                     ctx,
-                    &params.normalized,
+                    &normalized,
                     DemBuildMode::Raw,
                 )
             }

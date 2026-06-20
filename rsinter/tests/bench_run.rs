@@ -76,6 +76,52 @@ fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
     read_results_jsonl(&data[..]).unwrap()
 }
 
+fn issue96_css_rbposd_spec(schedule: &str, extra_params: &str) -> String {
+    format!(
+        r#"
+name = "css_rbposd"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_css"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "tests/fixtures/css/steane_hx.json"
+hz = "tests/fixtures/css/steane_hz.json"
+basis = "x"
+schedule = "{schedule}"
+rounds = [1]
+p = [0.0]
+max_shots = 0
+max_errors = 4
+batch_size = 4
+{extra_params}
+
+[plot]
+title = "CSS Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{{runner}} {{params.code_id}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#
+    )
+}
+
 #[test]
 fn rust_benchmark_run_writes_manifest_and_results_jsonl() {
     let spec_text = r#"
@@ -347,6 +393,11 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
     assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
     assert_eq!(
+        rows[0].params["bp_method"],
+        serde_json::json!("minimum_sum")
+    );
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("parallel"));
+    assert_eq!(
         rows[0].params["osd_method"],
         serde_json::json!("combination_sweep")
     );
@@ -409,6 +460,209 @@ label = "Logical Error Rate"
         err,
         "rbposd params must not set both bp_iters and max_bp_iterations"
     );
+}
+
+#[test]
+fn rbposd_benchmark_records_bp_method_and_schedule() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_product_sum_serial"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+bp_method = "product_sum"
+schedule = "serial"
+bp_iters = 3
+osd_order = 0
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd_product_sum_serial")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+    assert_eq!(
+        rows[0].params["bp_method"],
+        serde_json::json!("product_sum")
+    );
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("serial"));
+    assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(rows[0].params["bp_iters"], serde_json::json!(3));
+    assert_eq!(
+        rows[0].params["osd_method"],
+        serde_json::json!("combination_sweep")
+    );
+    assert_eq!(rows[0].params["osd_order"], serde_json::json!(0));
+}
+
+#[test]
+fn rbposd_css_benchmark_preserves_circuit_schedule_param() {
+    let spec_text = issue96_css_rbposd_spec(
+        "greedy",
+        r#"
+bp_method = "product_sum"
+bp_iters = 3
+osd_order = 0
+"#,
+    );
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd_css")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("greedy"));
+    assert_eq!(rows[0].params["bp_schedule"], serde_json::json!("parallel"));
+    assert_eq!(
+        rows[0].params["bp_method"],
+        serde_json::json!("product_sum")
+    );
+}
+
+#[test]
+fn rbposd_css_benchmark_accepts_sequential_circuit_schedule() {
+    let spec_text = issue96_css_rbposd_spec(
+        "sequential",
+        r#"
+bp_iters = 3
+osd_order = 0
+"#,
+    );
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd_css")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("sequential"));
+    assert_eq!(rows[0].params["bp_schedule"], serde_json::json!("parallel"));
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_bp_method_without_results() {
+    let spec_text = issue91_surface_spec(r#"bp_method = "sum_product""#);
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd bp_method must be \"minimum_sum\" or \"product_sum\", got \"sum_product\""
+    );
+    assert!(!dir.path().join("rbposd_lsd").exists());
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_bp_schedule_without_results() {
+    let spec_text = issue91_surface_spec(r#"schedule = "flooding""#);
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd schedule must be \"parallel\" or \"serial\", got \"flooding\""
+    );
+    assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
 #[test]
@@ -647,6 +901,8 @@ fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     assert_eq!(row.params["rounds"], serde_json::json!(3));
     assert_eq!(row.params["p"], serde_json::json!(0.002));
     assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
+    assert_eq!(row.params["schedule"], serde_json::json!("parallel"));
     assert_eq!(row.params["bp_iters"], serde_json::json!(30));
     assert_eq!(row.params["early_stop"], serde_json::json!(true));
     assert_eq!(
@@ -1545,6 +1801,9 @@ fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
         assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
         assert_eq!(row.params["seed"], serde_json::json!(12_345));
         assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+        assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
+        assert_eq!(row.params["schedule"], serde_json::json!("greedy"));
+        assert_eq!(row.params["bp_schedule"], serde_json::json!("parallel"));
         assert_eq!(row.params["bp_iters"], serde_json::json!(10_000));
         assert_eq!(
             row.params["osd_method"],
@@ -1617,6 +1876,15 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     assert_eq!(
         rbposd_row.params["bp_algorithm"],
         serde_json::json!("min_sum")
+    );
+    assert_eq!(
+        rbposd_row.params["bp_method"],
+        serde_json::json!("minimum_sum")
+    );
+    assert_eq!(rbposd_row.params["schedule"], serde_json::json!("greedy"));
+    assert_eq!(
+        rbposd_row.params["bp_schedule"],
+        serde_json::json!("parallel")
     );
     assert_eq!(rbposd_row.params["bp_iters"], serde_json::json!(50));
     assert_eq!(
