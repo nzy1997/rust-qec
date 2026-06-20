@@ -84,6 +84,52 @@ fn rbposd_runner_preflight_defaults_lsd_order_when_method_is_set() {
 }
 
 #[test]
+fn rbposd_runner_accepts_bp_method_and_schedule_params() {
+    let runner = RbposdRunner;
+    let point = rbposd_point_with_decoder_params(BTreeMap::from([
+        (
+            "bp_method".into(),
+            toml::Value::String("product_sum".into()),
+        ),
+        ("schedule".into(), toml::Value::String("serial".into())),
+    ]));
+
+    runner.preflight_point(&point).unwrap();
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_bp_method() {
+    let runner = RbposdRunner;
+    let point = rbposd_point_with_decoder_params(BTreeMap::from([(
+        "bp_method".into(),
+        toml::Value::String("sum_product".into()),
+    )]));
+
+    let err = runner.preflight_point(&point).unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd bp_method must be \"minimum_sum\" or \"product_sum\", got \"sum_product\""
+    );
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_bp_schedule() {
+    let runner = RbposdRunner;
+    let point = rbposd_point_with_decoder_params(BTreeMap::from([(
+        "schedule".into(),
+        toml::Value::String("flooding".into()),
+    )]));
+
+    let err = runner.preflight_point(&point).unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd schedule must be \"parallel\" or \"serial\", got \"flooding\""
+    );
+}
+
+#[test]
 fn rbposd_runner_preflight_rejects_unsupported_lsd_method() {
     let runner = RbposdRunner;
     let point = rbposd_point_with_decoder_params(BTreeMap::from([(

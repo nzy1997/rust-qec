@@ -412,6 +412,103 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn rbposd_benchmark_records_bp_method_and_schedule() {
+    let spec_text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_product_sum_serial"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 0
+max_errors = 5
+batch_size = 4
+bp_method = "product_sum"
+schedule = "serial"
+bp_iters = 3
+osd_order = 0
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let data = fs::read(
+        artifact_root
+            .join("rbposd_product_sum_serial")
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    let rows = read_results_jsonl(&data[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].error, None);
+    assert_eq!(rows[0].params["bp_method"], serde_json::json!("product_sum"));
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("serial"));
+    assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(rows[0].params["bp_iters"], serde_json::json!(3));
+    assert_eq!(rows[0].params["osd_method"], serde_json::json!("combination_sweep"));
+    assert_eq!(rows[0].params["osd_order"], serde_json::json!(0));
+}
+
+#[test]
+fn rbposd_runner_rejects_unknown_bp_method_without_results() {
+    let spec_text = issue91_surface_spec(r#"bp_method = "sum_product""#);
+    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let err = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        "rbposd bp_method must be \"minimum_sum\" or \"product_sum\", got \"sum_product\""
+    );
+    assert!(!dir.path().join("rbposd_lsd").exists());
+}
+
+#[test]
 fn rbposd_benchmark_rejects_unsupported_bp_algorithm() {
     let spec_text = r#"
 name = "surface_decoder"

@@ -327,6 +327,58 @@ fn expand_runner_points_accepts_rbposd_lsd_params() {
 }
 
 #[test]
+fn expand_runner_points_accepts_rbposd_bp_method_and_schedule_params() {
+    let mut params = valid_runner_params();
+    params.insert(
+        "bp_method".into(),
+        toml::Value::String("product_sum".into()),
+    );
+    params.insert("schedule".into(), toml::Value::String("serial".into()));
+
+    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(
+        points[0]
+            .decoder_params
+            .get("bp_method")
+            .and_then(toml::Value::as_str),
+        Some("product_sum")
+    );
+    assert_eq!(
+        points[0]
+            .decoder_params
+            .get("schedule")
+            .and_then(toml::Value::as_str),
+        Some("serial")
+    );
+    assert_eq!(points[0].schedule, None);
+}
+
+#[test]
+fn expand_runner_points_keeps_css_greedy_schedule_generic_for_rbposd() {
+    let mut params = valid_css_runner_params();
+    params.insert("schedule".into(), toml::Value::String("greedy".into()));
+    params.insert(
+        "bp_method".into(),
+        toml::Value::String("minimum_sum".into()),
+    );
+
+    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
+
+    assert_eq!(points.len(), 1);
+    assert_eq!(points[0].schedule.as_deref(), Some("greedy"));
+    assert!(!points[0].decoder_params.contains_key("schedule"));
+    assert_eq!(
+        points[0]
+            .decoder_params
+            .get("bp_method")
+            .and_then(toml::Value::as_str),
+        Some("minimum_sum")
+    );
+}
+
+#[test]
 fn expand_runner_points_for_runner_rejects_unknown_decoder_param() {
     let mut params = valid_runner_params();
     params.insert("bogus".into(), toml::Value::Integer(1));
