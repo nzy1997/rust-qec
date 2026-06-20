@@ -1,0 +1,56 @@
+{
+  "fixtures": [
+    {
+      "id": "bp_product_sum_serial_sensitive",
+      "kind": "bp_option",
+      "decoder": "bp_osd",
+      "path": "parity/bp_product_sum_serial_sensitive.json",
+      "matrix_path": "parity/bp_product_sum_serial_sensitive.json#/matrix",
+      "syndrome_path": "parity/bp_product_sum_serial_sensitive.json#/syndrome",
+      "provenance": "Repo-owned BP-option teeth fixture introduced by issues #95 and #97 to prove product_sum + serial changes public rbposd parity-driver behavior.",
+      "verifier": "cargo test -p rbposd product_sum_serial_teeth_cases",
+      "pass_condition": "The product_sum + serial fixture matches its expected Rust parity-driver output and differs from minimum_sum serial and product_sum parallel variants.",
+      "consumes": ["#95", "#97", "#98"],
+      "modes": ["bp_variant=product_sum", "schedule=serial", "osd_variant=osd0"]
+    },
+    {
+      "id": "lsd_order_one_improves_over_baseline",
+      "kind": "lsd",
+      "decoder": "bp_lsd",
+      "path": "lsd/lsd_order_one_improves_over_baseline.json",
+      "matrix_path": "lsd/lsd_order_one_improves_over_baseline.json#/matrix",
+      "syndrome_path": "lsd/lsd_order_one_improves_over_baseline.json#/syndrome",
+      "provenance": "Repo-owned small-matrix LSD alignment case introduced by issue #89 to exercise deterministic order-one candidate selection against the upstream ldpc-style contract.",
+      "verifier": "cargo test -p rbposd bplsd_fixture_manifest_cases_decode_cleanly",
+      "pass_condition": "BpLsdDecoder with lsd_order=1 returns the expected residual-zero order-one correction and differs from the order-zero baseline.",
+      "consumes": ["#89", "#90", "#98"],
+      "modes": ["decoder=bp_lsd", "lsd_order=1", "lsd_method=localized_statistics"]
+    },
+    {
+      "id": "lsd_small_sparse_code",
+      "kind": "lsd",
+      "decoder": "bp_lsd",
+      "path": "lsd/lsd_small_sparse_code.json",
+      "matrix_path": "lsd/lsd_small_sparse_code.json#/matrix",
+      "syndrome_path": "lsd/lsd_small_sparse_code.json#/syndrome",
+      "provenance": "Repo-owned small sparse LSD alignment case introduced by issue #89 for the first borrowed fixture set.",
+      "verifier": "cargo test -p rbposd bplsd_fixture_manifest_cases_decode_cleanly",
+      "pass_condition": "BpLsdDecoder with lsd_order=1 decodes the syndrome to residual zero without using OSD.",
+      "consumes": ["#89", "#90", "#98"],
+      "modes": ["decoder=bp_lsd", "lsd_order=1", "lsd_method=localized_statistics"]
+    },
+    {
+      "id": "lsd_unsatisfiable_case",
+      "kind": "lsd",
+      "decoder": "bp_lsd",
+      "path": "lsd/lsd_unsatisfiable_case.json",
+      "matrix_path": "lsd/lsd_unsatisfiable_case.json#/matrix",
+      "syndrome_path": "lsd/lsd_unsatisfiable_case.json#/syndrome",
+      "provenance": "Repo-owned negative LSD alignment case introduced by issue #89 to lock the NoLsdSolution failure path.",
+      "verifier": "cargo test -p rbposd bplsd_fixture_manifest_cases_decode_cleanly",
+      "pass_condition": "BpLsdDecoder with lsd_order=1 returns DecodeError::NoLsdSolution.",
+      "consumes": ["#89", "#90", "#98"],
+      "modes": ["decoder=bp_lsd", "lsd_order=1", "lsd_method=localized_statistics"]
+    }
+  ]
+}

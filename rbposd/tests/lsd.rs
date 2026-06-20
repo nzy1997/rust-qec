@@ -1,4 +1,3 @@
-use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +5,9 @@ use rbposd::{
     BpLsdDecoder, ChannelModel, Correction, DecodeError, LsdConfig, ParityCheckMatrix, Syndrome,
 };
 use serde::Deserialize;
+
+#[path = "../dev/fixture_catalog.rs"]
+mod fixture_catalog;
 
 #[derive(Debug, Deserialize)]
 struct LsdFixture {
@@ -40,27 +42,6 @@ struct ExpectedFixture {
     order_0_correction: Option<Vec<bool>>,
     #[serde(default)]
     order_1_correction: Option<Vec<bool>>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct LsdFixtureManifest {
-    fixtures: Vec<LsdFixtureManifestEntry>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct LsdFixtureManifestEntry {
-    id: String,
-    path: String,
-    provenance: String,
-    verifier: String,
-    pass_condition: String,
-    consumes: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ValidatedLsdManifestEntry {
-    id: String,
-    path: PathBuf,
 }
 
 impl LsdFixture {
@@ -107,134 +88,11 @@ impl LsdFixture {
     }
 }
 
-impl LsdFixtureManifest {
-    fn load(path: &Path) -> Self {
-        let contents = fs::read_to_string(path)
-            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        serde_json::from_str(&contents)
-            .unwrap_or_else(|error| panic!("failed to parse {}: {error}", path.display()))
-    }
-}
-
 fn lsd_fixture_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
         .join("lsd")
-}
-
-fn lsd_manifest_path() -> PathBuf {
-    lsd_fixture_dir().join("manifest.json")
-}
-
-fn assert_manifest_error(manifest: &LsdFixtureManifest, needle: &str) {
-    let error = validate_lsd_fixture_manifest(manifest, &lsd_fixture_dir()).unwrap_err();
-    assert!(
-        error.contains(needle),
-        "expected manifest error containing {needle:?}, got {error:?}"
-    );
-}
-
-fn validate_lsd_fixture_manifest(
-    manifest: &LsdFixtureManifest,
-    fixture_dir: &Path,
-) -> Result<Vec<ValidatedLsdManifestEntry>, String> {
-    if manifest.fixtures.is_empty() {
-        return Err("manifest fixtures must not be empty".to_string());
-    }
-
-    let mut fixture_files = fs::read_dir(fixture_dir)
-        .map_err(|error| format!("failed to read {}: {error}", fixture_dir.display()))?
-        .map(|entry| entry.map(|entry| entry.path()))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("failed to read fixture entry: {error}"))?;
-    fixture_files.retain(|path| {
-        path.extension().and_then(|value| value.to_str()) == Some("json")
-            && path.file_name().and_then(|value| value.to_str()) != Some("manifest.json")
-    });
-    fixture_files.sort();
-
-    let checked_in_paths = fixture_files
-        .iter()
-        .map(|path| {
-            path.file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string()
-        })
-        .collect::<BTreeSet<_>>();
-
-    let mut seen_ids = BTreeSet::new();
-    let mut seen_paths = BTreeSet::new();
-    let mut entries_by_path = BTreeMap::new();
-    let mut validated = Vec::new();
-
-    for entry in &manifest.fixtures {
-        if entry.id.trim().is_empty() {
-            return Err("manifest entry id must not be empty".to_string());
-        }
-        if entry.path.trim().is_empty() {
-            return Err(format!("manifest entry {} path must not be empty", entry.id));
-        }
-        if entry.provenance.trim().is_empty() {
-            return Err(format!("manifest entry {} provenance must not be empty", entry.id));
-        }
-        if entry.verifier.trim().is_empty() {
-            return Err(format!("manifest entry {} verifier must not be empty", entry.id));
-        }
-        if entry.pass_condition.trim().is_empty() {
-            return Err(format!(
-                "manifest entry {} pass_condition must not be empty",
-                entry.id
-            ));
-        }
-        if entry.consumes.is_empty() || !entry.consumes.iter().any(|value| value == "#90") {
-            return Err(format!("manifest entry {} must consume #90", entry.id));
-        }
-        if !seen_ids.insert(entry.id.clone()) {
-            return Err(format!("duplicate manifest id {}", entry.id));
-        }
-        if !seen_paths.insert(entry.path.clone()) {
-            return Err(format!("duplicate manifest path {}", entry.path));
-        }
-
-        let full_path = fixture_dir.join(&entry.path);
-        if !full_path.exists() {
-            return Err(format!(
-                "manifest entry {} points to missing fixture {}",
-                entry.id, entry.path
-            ));
-        }
-
-        let fixture = LsdFixture::load_from_path(&full_path);
-        if fixture.id != entry.id {
-            return Err(format!(
-                "manifest id {} does not match fixture id {} in {}",
-                entry.id, fixture.id, entry.path
-            ));
-        }
-
-        entries_by_path.insert(entry.path.clone(), entry.id.clone());
-        validated.push(ValidatedLsdManifestEntry {
-            id: entry.id.clone(),
-            path: full_path,
-        });
-    }
-
-    for fixture_path in &checked_in_paths {
-        if !entries_by_path.contains_key(fixture_path) {
-            return Err(format!("missing manifest entry for {fixture_path}"));
-        }
-    }
-    for entry_path in entries_by_path.keys() {
-        if !checked_in_paths.contains(entry_path) {
-            return Err(format!("manifest entry has no checked-in fixture {entry_path}"));
-        }
-    }
-
-    validated.sort_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
-    Ok(validated)
 }
 
 #[test]
@@ -466,9 +324,12 @@ fn bplsd_order_one_recovers_the_borrowed_small_matrix_cases() {
 
 #[test]
 fn bplsd_fixture_manifest_cases_decode_cleanly() {
-    let fixture_dir = lsd_fixture_dir();
-    let manifest = LsdFixtureManifest::load(&lsd_manifest_path());
-    let entries = validate_lsd_fixture_manifest(&manifest, &fixture_dir).unwrap();
+    let catalog = fixture_catalog::load_catalog(&fixture_catalog::catalog_path());
+    let entries = fixture_catalog::validate_catalog(&catalog, &fixture_catalog::fixture_root())
+        .unwrap()
+        .into_iter()
+        .filter(|entry| entry.kind == fixture_catalog::FixtureKind::Lsd)
+        .collect::<Vec<_>>();
     let ids = entries
         .iter()
         .map(|entry| entry.id.as_str())
@@ -513,58 +374,6 @@ fn bplsd_fixture_manifest_cases_decode_cleanly() {
             other => panic!("unsupported expected status {other:?} in {}", fixture.id),
         }
     }
-}
-
-#[test]
-fn bplsd_fixture_manifest_rejects_invalid_case_metadata() {
-    let valid = LsdFixtureManifest::load(&lsd_manifest_path());
-
-    let empty = LsdFixtureManifest { fixtures: vec![] };
-    assert_manifest_error(&empty, "must not be empty");
-
-    let mut missing_id = valid.clone();
-    missing_id.fixtures[0].id.clear();
-    assert_manifest_error(&missing_id, "id");
-
-    let mut missing_path = valid.clone();
-    missing_path.fixtures[0].path.clear();
-    assert_manifest_error(&missing_path, "path");
-
-    let mut missing_provenance = valid.clone();
-    missing_provenance.fixtures[0].provenance.clear();
-    assert_manifest_error(&missing_provenance, "provenance");
-
-    let mut missing_verifier = valid.clone();
-    missing_verifier.fixtures[0].verifier.clear();
-    assert_manifest_error(&missing_verifier, "verifier");
-
-    let mut missing_pass_condition = valid.clone();
-    missing_pass_condition.fixtures[0].pass_condition.clear();
-    assert_manifest_error(&missing_pass_condition, "pass_condition");
-
-    let mut missing_issue = valid.clone();
-    missing_issue.fixtures[0].consumes.retain(|value| value != "#90");
-    assert_manifest_error(&missing_issue, "#90");
-
-    let mut duplicate_id = valid.clone();
-    duplicate_id.fixtures[1].id = duplicate_id.fixtures[0].id.clone();
-    assert_manifest_error(&duplicate_id, "duplicate manifest id");
-
-    let mut duplicate_path = valid.clone();
-    duplicate_path.fixtures[1].path = duplicate_path.fixtures[0].path.clone();
-    assert_manifest_error(&duplicate_path, "duplicate manifest path");
-
-    let mut stale_path = valid.clone();
-    stale_path.fixtures[0].path = "missing_lsd_fixture.json".to_string();
-    assert_manifest_error(&stale_path, "missing_lsd_fixture.json");
-
-    let mut mismatched_fixture_id = valid.clone();
-    mismatched_fixture_id.fixtures[0].id = "mismatched_fixture_id".to_string();
-    assert_manifest_error(&mismatched_fixture_id, "does not match fixture id");
-
-    let mut missing_entry = valid.clone();
-    missing_entry.fixtures.pop();
-    assert_manifest_error(&missing_entry, "missing manifest entry");
 }
 
 #[test]
