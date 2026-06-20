@@ -266,6 +266,41 @@ fn product_sum_serial_changes_bp_snapshot_on_borrowed_case() {
 }
 
 #[test]
+fn product_sum_serial_teeth_cases() {
+    let sensitive_case = load_parity_case("bp_product_sum_serial_sensitive.json");
+    assert_eq!(
+        sensitive_case.config.bp_variant,
+        parity_schema::BpVariantSpec::ProductSum
+    );
+    assert_eq!(
+        sensitive_case.config.schedule,
+        parity_schema::ScheduleSpec::Serial
+    );
+
+    let product_sum_serial = parity_runner::run_case(&sensitive_case);
+    assert_eq!(product_sum_serial.matches_expected, Some(true));
+
+    let mut minimum_sum_serial_case = sensitive_case.clone();
+    minimum_sum_serial_case.config.bp_variant = parity_schema::BpVariantSpec::MinimumSum;
+    let minimum_sum_serial = parity_runner::run_case(&minimum_sum_serial_case);
+
+    let mut product_sum_parallel_case = sensitive_case.clone();
+    product_sum_parallel_case.config.schedule = parity_schema::ScheduleSpec::Parallel;
+    let product_sum_parallel = parity_runner::run_case(&product_sum_parallel_case);
+
+    assert_ne!(
+        product_sum_serial.actual,
+        minimum_sum_serial.actual,
+        "product_sum must change decoder behavior while schedule stays serial"
+    );
+    assert_ne!(
+        product_sum_serial.actual,
+        product_sum_parallel.actual,
+        "serial schedule must change decoder behavior while bp method stays product_sum"
+    );
+}
+
+#[test]
 fn minimum_sum_parallel_regression_suite_still_passes() {
     for fixture_name in [
         "bp_repetition_single_flip.json",
