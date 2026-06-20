@@ -127,45 +127,41 @@ Issue #89 checks in a minimal Rust-side fixture set under
 Fixture manifests, Python `ldpc` differential harness coverage, and broader
 fixture catalog validation are owned by #90/#98.
 
-## LSD Fixture Manifest
+## Shared LSD and BP-Option Fixture Catalog
 
-Issue #90 adds an LSD-only fixture manifest at
-`rbposd/tests/fixtures/lsd/manifest.json`.
+Issue #98 replaces the old LSD-only manifest with the shared catalog at
+`rbposd/tests/fixtures/catalog.json`.
 
-The manifest covers the current checked-in LSD fixtures:
+The catalog covers the checked-in LSD fixtures and
+`bp_product_sum_serial_sensitive.json`, alongside the other cataloged BP/OSD
+parity cases that remain part of the Rust stability baseline.
 
-- `lsd_small_sparse_code.json`
-- `lsd_order_one_improves_over_baseline.json`
-- `lsd_unsatisfiable_case.json`
-
-Each manifest entry records:
+Each catalog entry records:
 
 - fixture id
-- fixture path
+- kind
+- decoder
+- path
+- matrix path
+- syndrome path
 - provenance
-- verifier command
+- verifier
 - pass condition
 - consuming issue ids
+- modes
 
-Rust tests validate that each checked-in LSD fixture has exactly one manifest
-entry and that malformed metadata is rejected instead of silently skipped.
+Rust tests validate catalog coverage and reject missing provenance or verifier
+metadata instead of silently skipping malformed entries.
 
-The Python parity harness can opt into these LSD fixtures with:
+The Python parity harness uses the catalog for `--include-lsd` and for
+cataloged BP-option parity cases:
 
 ```bash
-python3 rbposd/scripts/parity_harness.py --include-lsd --skip-generated
+python3 rbposd/scripts/parity_harness.py --include-lsd
 ```
 
-The harness path converts manifest-listed LSD fixtures into the existing parity
-report shape and compares supported `BpLsdDecoder` cases against upstream
-`ldpc`. Unsupported LSD mappings are reported as structured errors and are not
-coerced into OSD decoding.
-
-Harness unit coverage for the LSD manifest path can be run with:
+Harness unit coverage for the catalog-backed LSD path can be run with:
 
 ```bash
 python3 -m pytest rbposd/scripts/test_parity_harness.py -k lsd
 ```
-
-Existing OSD/BP parity fixtures remain outside the #90 manifest. The broader
-shared LSD and BP-option fixture catalog remains owned by #98.

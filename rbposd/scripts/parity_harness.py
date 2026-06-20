@@ -51,13 +51,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--include-lsd",
         action="store_true",
-        help="Also run checked-in LSD fixtures from the LSD fixture manifest.",
+        help="Also run checked-in LSD fixtures from the shared fixture catalog.",
     )
     parser.add_argument(
-        "--lsd-fixtures-dir",
+        "--fixture-catalog",
         type=Path,
-        default=Path("rbposd/tests/fixtures/lsd"),
-        help="Directory containing checked-in LSD fixture JSON files and manifest.json.",
+        default=Path("rbposd/tests/fixtures/catalog.json"),
+        help="Shared LSD and BP-option fixture catalog.",
     )
     parser.add_argument(
         "--skip-generated",
@@ -98,59 +98,266 @@ def fixture_case_paths(fixtures_dir: Path) -> list[Path]:
     return sorted(fixtures_dir.glob("*.json"))
 
 
-def load_lsd_manifest(lsd_fixtures_dir: Path) -> dict[str, Any]:
-    manifest_path = lsd_fixtures_dir / "manifest.json"
-    with manifest_path.open("r", encoding="utf-8") as infile:
-        manifest = json.load(infile)
-    if not isinstance(manifest.get("fixtures"), list) or not manifest["fixtures"]:
-        raise ValueError(f"LSD manifest {manifest_path} must contain a non-empty fixtures list")
-    return manifest
+def load_fixture_catalog(catalog_path: Path) -> dict[str, Any]:
+    with catalog_path.open("r", encoding="utf-8") as infile:
+        catalog = json.load(infile)
+    if not isinstance(catalog.get("fixtures"), list) or not catalog["fixtures"]:
+        raise ValueError(
+            f"Fixture catalog {catalog_path} must contain a non-empty fixtures list"
+        )
+    return catalog
 
 
-def iter_lsd_fixture_cases(lsd_fixtures_dir: Path) -> list[dict[str, Any]]:
-    manifest = load_lsd_manifest(lsd_fixtures_dir)
+def validate_catalog_mode_keys(
+    fixture_id: str,
+    kind: str,
+    modes_by_key: dict[str, str],
+    required_keys: set[str],
+) -> None:
+    for key in modes_by_key:
+        if key not in required_keys:
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes key {key} is unsupported for kind {kind}"
+            )
+    for key in sorted(required_keys):
+        if key not in modes_by_key:
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes key {key} is required for kind {kind}"
+            )
+
+
+def validate_catalog_entry_metadata(entry: dict[str, Any]) -> dict[str, Any]:
+    fixture_id = str(entry.get("id", "")).strip()
+    for field in (
+        "id",
+        "kind",
+        "decoder",
+        "path",
+        "matrix_path",
+        "syndrome_path",
+        "provenance",
+        "verifier",
+        "pass_condition",
+    ):
+        if not str(entry.get(field, "")).strip():
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id or '<unknown>'} {field} must not be empty"
+            )
+
+    consumes = entry.get("consumes")
+    if not isinstance(consumes, list) or not consumes:
+        raise ValueError(
+            f"Fixture catalog entry {fixture_id} consumes must be a non-empty list of strings"
+        )
+    if any(not isinstance(tag, str) or not tag.strip() for tag in consumes):
+        raise ValueError(
+            f"Fixture catalog entry {fixture_id} consumes must be a non-empty list of strings"
+        )
+    if "#98" not in consumes:
+        raise ValueError(
+            f"Fixture catalog entry {fixture_id} consumes must include #98"
+        )
+
+    modes = entry.get("modes")
+    if not isinstance(modes, list) or not modes:
+        raise ValueError(
+            f"Fixture catalog entry {fixture_id} modes must be a non-empty list of key=value strings"
+        )
+
+    modes_by_key: dict[str, str] = {}
+    for raw_mode in modes:
+        if not isinstance(raw_mode, str):
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes must be a non-empty list of key=value strings"
+            )
+        key, separator, value = raw_mode.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if separator != "=" or not key or not value:
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes must be a non-empty list of key=value strings"
+            )
+        if key in modes_by_key:
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes key {key} must not be repeated"
+            )
+        modes_by_key[key] = value
+
+    kind = str(entry["kind"]).strip()
+    decoder = str(entry["decoder"]).strip()
+    if kind == "lsd":
+        if decoder != "bp_lsd":
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} decoder must be bp_lsd for kind lsd"
+            )
+        validate_catalog_mode_keys(
+            fixture_id,
+            kind,
+            modes_by_key,
+            {"decoder", "lsd_method", "lsd_order"},
+        )
+        if modes_by_key["decoder"] != "bp_lsd":
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes decoder must be bp_lsd"
+            )
+        if modes_by_key["lsd_method"] != "localized_statistics":
+            raise ValueError(
+                "Fixture catalog entry "
+                f"{fixture_id} modes lsd_method must be localized_statistics"
+            )
+        if modes_by_key["lsd_order"] not in {"0", "1"}:
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes lsd_order must be 0 or 1"
+            )
+    elif kind == "bp_option":
+        if decoder != "bp_osd":
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} decoder must be bp_osd for kind bp_option"
+            )
+        validate_catalog_mode_keys(
+            fixture_id,
+            kind,
+            modes_by_key,
+            {"bp_variant", "schedule", "osd_variant"},
+        )
+        if modes_by_key["bp_variant"] not in BP_METHOD_MAP:
+            raise ValueError(
+                "Fixture catalog entry "
+                f"{fixture_id} modes bp_variant must be one of {sorted(BP_METHOD_MAP)}"
+            )
+        if modes_by_key["schedule"] not in BP_SCHEDULE_MAP:
+            raise ValueError(
+                "Fixture catalog entry "
+                f"{fixture_id} modes schedule must be one of {sorted(BP_SCHEDULE_MAP)}"
+            )
+        if modes_by_key["osd_variant"] != "osd0":
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} modes osd_variant must be osd0"
+            )
+    else:
+        raise ValueError(f"Fixture catalog entry {fixture_id} kind is unsupported: {kind}")
+
+    return {
+        "consumes": consumes,
+        "modes": modes_by_key,
+    }
+
+
+def catalog_fixture_root(catalog_path: Path) -> Path:
+    return catalog_path.parent
+
+
+def iter_lsd_fixture_cases(catalog_path: Path) -> list[dict[str, Any]]:
+    catalog = load_fixture_catalog(catalog_path)
+    fixture_root = catalog_fixture_root(catalog_path)
     cases: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for entry in manifest["fixtures"]:
+    for entry in catalog["fixtures"]:
+        if entry.get("kind") != "lsd":
+            continue
+        metadata = validate_catalog_entry_metadata(entry)
         fixture_id = str(entry.get("id", ""))
         fixture_path_name = str(entry.get("path", ""))
         if not fixture_id:
-            raise ValueError("LSD manifest entry id must not be empty")
+            raise ValueError("Fixture catalog entry id must not be empty")
         if fixture_id in seen_ids:
-            raise ValueError(f"Duplicate LSD manifest id: {fixture_id}")
+            raise ValueError(f"Duplicate LSD catalog id: {fixture_id}")
         seen_ids.add(fixture_id)
         if not fixture_path_name:
-            raise ValueError(f"LSD manifest entry {fixture_id} path must not be empty")
-        for metadata_field in ("provenance", "verifier", "pass_condition"):
-            if not str(entry.get(metadata_field, "")).strip():
-                raise ValueError(
-                    f"LSD manifest entry {fixture_id} {metadata_field} must not be empty"
-                )
-        if "#90" not in entry.get("consumes", []):
-            raise ValueError(f"LSD manifest entry {fixture_id} must consume #90")
+            raise ValueError(
+                f"Fixture catalog entry {fixture_id} path must not be empty"
+            )
 
-        fixture_path = lsd_fixtures_dir / fixture_path_name
+        fixture_path = fixture_root / fixture_path_name
         fixture = load_case(fixture_path)
         if fixture.get("id") != fixture_id:
             raise ValueError(
-                f"LSD manifest id {fixture_id} does not match fixture id {fixture.get('id')}"
+                f"Fixture catalog id {fixture_id} does not match fixture id {fixture.get('id')}"
+            )
+        fixture_lsd_order = int(fixture["lsd_order"])
+        catalog_lsd_order = int(metadata["modes"]["lsd_order"])
+        if fixture_lsd_order != catalog_lsd_order:
+            raise ValueError(
+                "Fixture catalog entry "
+                f"{fixture_id} modes lsd_order {catalog_lsd_order} does not match fixture lsd_order {fixture_lsd_order}"
             )
 
         cases.append(
             {
                 "name": fixture["id"],
-                "decoder": "bp_lsd",
+                "decoder": entry["decoder"],
                 "matrix": fixture["matrix"],
                 "channel": fixture["channel"],
                 "syndrome": fixture["syndrome"],
                 "config": dict(DEFAULT_BP_CONFIG),
                 "lsd_config": {
-                    "method": "localized_statistics",
-                    "lsd_order": int(fixture["lsd_order"]),
+                    "method": metadata["modes"]["lsd_method"],
+                    "lsd_order": catalog_lsd_order,
                 },
-                "tags": ["fixture", "lsd", "#90"],
+                "tags": ["fixture", "lsd", *metadata["consumes"]],
             }
         )
+    return cases
+
+
+def iter_catalog_fixture_cases(
+    catalog_path: Path, include_lsd: bool
+) -> list[dict[str, Any]]:
+    catalog = load_fixture_catalog(catalog_path)
+    fixture_root = catalog_fixture_root(catalog_path)
+    cases: list[dict[str, Any]] = []
+    lsd_cases_by_id = (
+        {case["name"]: case for case in iter_lsd_fixture_cases(catalog_path)}
+        if include_lsd
+        else {}
+    )
+
+    for entry in catalog["fixtures"]:
+        kind = entry.get("kind")
+        if kind == "lsd" and include_lsd:
+            case = lsd_cases_by_id.get(str(entry["id"]))
+            if case is not None:
+                cases.append(
+                    {
+                        "source": "catalog_fixture",
+                        "case_path": None,
+                        "case": case,
+                        "catalog_path": entry["path"],
+                    }
+                )
+            continue
+        if kind == "bp_option":
+            metadata = validate_catalog_entry_metadata(entry)
+            fixture_path = fixture_root / str(entry["path"])
+            case = load_case(fixture_path)
+            if case.get("name") != entry["id"]:
+                raise ValueError(
+                    "Fixture catalog id "
+                    f"{entry['id']} does not match fixture name {case.get('name')}"
+                )
+            case_config = case.get("config", {})
+            for key in ("bp_variant", "schedule", "osd_variant"):
+                if case_config.get(key) != metadata["modes"][key]:
+                    raise ValueError(
+                        "Fixture catalog entry "
+                        f"{entry['id']} config {key} must match modes value {metadata['modes'][key]}"
+                    )
+            if all(
+                case_config.get(key) == DEFAULT_BP_CONFIG[key]
+                for key in ("bp_variant", "schedule", "osd_variant")
+            ):
+                raise ValueError(
+                    f"Fixture catalog entry {entry['id']} config must not use default bp_option modes"
+                )
+            cases.append(
+                {
+                    "source": "catalog_fixture",
+                    "case_path": fixture_path,
+                    "case": case,
+                    "catalog_path": entry["path"],
+                }
+            )
+
     return cases
 
 
@@ -257,6 +464,10 @@ def map_bp_config_to_ldpc_kwargs(
 
 
 def map_lsd_case_to_ldpc_kwargs(case: dict[str, Any]) -> dict[str, Any]:
+    decoder = case.get("decoder")
+    if decoder not in ("bp_lsd", "bplsd"):
+        raise ValueError(f"Unsupported LSD decoder mode: {decoder}")
+
     config = case.get("config", {})
     decoder_kwargs = map_bp_config_to_ldpc_kwargs(config, " for LSD")
 
@@ -417,18 +628,30 @@ def build_entries(
     skip_generated: bool,
     case_limit: int | None,
     include_lsd: bool = False,
-    lsd_fixtures_dir: Path = Path("rbposd/tests/fixtures/lsd"),
+    fixture_catalog: Path = Path("rbposd/tests/fixtures/catalog.json"),
 ) -> list[dict[str, Any]]:
     case_items: list[dict[str, Any]] = []
 
+    catalog_items = iter_catalog_fixture_cases(
+        fixture_catalog, include_lsd=include_lsd
+    )
+    cataloged_fixture_paths = {
+        Path(item["case_path"]).resolve()
+        for item in catalog_items
+        if item.get("case_path") is not None
+    }
+    case_items.extend(catalog_items)
+
     for fixture_path in fixture_case_paths(fixtures_dir):
+        if fixture_path.resolve() in cataloged_fixture_paths:
+            continue
         case_items.append(
             {
                 "source": "fixture",
                 "case_path": fixture_path,
                 "case": load_case(fixture_path),
             }
-        )
+            )
 
     if not skip_generated:
         for generated_case in iter_generated_cases(repo_root):
@@ -437,16 +660,6 @@ def build_entries(
                     "source": "generated",
                     "case_path": None,
                     "case": generated_case,
-                }
-            )
-
-    if include_lsd:
-        for lsd_case in iter_lsd_fixture_cases(lsd_fixtures_dir):
-            case_items.append(
-                {
-                    "source": "lsd_fixture",
-                    "case_path": None,
-                    "case": lsd_case,
                 }
             )
 
@@ -496,7 +709,7 @@ def main(argv: list[str] | None = None) -> int:
         skip_generated=args.skip_generated,
         case_limit=args.case_limit,
         include_lsd=args.include_lsd,
-        lsd_fixtures_dir=args.lsd_fixtures_dir,
+        fixture_catalog=args.fixture_catalog,
     )
     mismatch_count = sum(1 for entry in entries if entry["is_mismatch"])
     total_count = len(entries)
