@@ -38,7 +38,11 @@ class ParityHarnessTests(unittest.TestCase):
       "verifier": "python3 -m pytest rbposd/scripts/test_parity_harness.py -k lsd",
       "pass_condition": "unit test pass condition",
       "consumes": ["#90", "#98"],
-      "modes": ["decoder=bp_lsd", "lsd_order=1"]
+      "modes": [
+        "decoder=bp_lsd",
+        "lsd_method=localized_statistics",
+        "lsd_order=1"
+      ]
     },
     {
       "id": "bp_product_sum_serial_sensitive",
@@ -51,7 +55,11 @@ class ParityHarnessTests(unittest.TestCase):
       "verifier": "cargo test -p rbposd product_sum_serial_teeth_cases",
       "pass_condition": "unit test bp pass condition",
       "consumes": ["#97", "#98"],
-      "modes": ["bp_variant=product_sum", "schedule=serial"]
+      "modes": [
+        "bp_variant=product_sum",
+        "schedule=serial",
+        "osd_variant=osd0"
+      ]
     }
   ]
 }
@@ -351,6 +359,116 @@ class ParityHarnessTests(unittest.TestCase):
                 "Fixture catalog entry lsd_small_sparse_code verifier must not be empty",
             ):
                 iter_lsd_fixture_cases(catalog_path)
+
+    def test_iter_catalog_fixture_cases_rejects_string_consumes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][0]["consumes"] = "#98"
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry lsd_small_sparse_code consumes",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=True)
+
+    def test_iter_catalog_fixture_cases_rejects_string_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][0]["modes"] = "decoder=bp_lsd"
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry lsd_small_sparse_code modes",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=True)
+
+    def test_iter_catalog_fixture_cases_rejects_lsd_decoder_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][0]["decoder"] = "bp_osd"
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry lsd_small_sparse_code decoder",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=True)
+
+    def test_iter_catalog_fixture_cases_rejects_lsd_unsupported_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][0]["modes"] = [
+                "decoder=bp_lsd",
+                "lsd_method=localized_statistics",
+                "lsd_order=2",
+            ]
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry lsd_small_sparse_code modes lsd_order",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=True)
+
+    def test_iter_catalog_fixture_cases_rejects_lsd_extra_mode_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][0]["modes"] = [
+                "decoder=bp_lsd",
+                "lsd_method=localized_statistics",
+                "bp_variant=product_sum",
+            ]
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry lsd_small_sparse_code modes key bp_variant",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=True)
+
+    def test_iter_catalog_fixture_cases_rejects_bp_option_unsupported_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][1]["modes"] = [
+                "bp_variant=product_sum",
+                "schedule=flooding",
+                "osd_variant=osd0",
+            ]
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry bp_product_sum_serial_sensitive modes schedule",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=False)
+
+    def test_iter_catalog_fixture_cases_rejects_bp_option_decoder_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            catalog = load_fixture_catalog(catalog_path)
+            catalog["fixtures"][1]["decoder"] = "bp_lsd"
+            catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog entry bp_product_sum_serial_sensitive decoder",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=False)
 
     def test_map_lsd_case_to_ldpc_kwargs_maps_supported_lsd(self) -> None:
         case = {
