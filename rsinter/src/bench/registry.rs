@@ -308,7 +308,7 @@ fn is_decoder_param_entry(runner_name: &str, key: &str, value: &Value) -> bool {
 }
 
 fn is_rbposd_bp_schedule_entry(key: &str, value: &Value) -> bool {
-    key == "schedule" && !matches!(value.as_str(), Some("greedy"))
+    key == "schedule" && !matches!(value.as_str(), Some("greedy" | "sequential"))
 }
 
 fn optional_string(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<String>, String> {

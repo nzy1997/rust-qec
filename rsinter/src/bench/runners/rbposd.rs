@@ -103,7 +103,7 @@ impl RbposdRunnerParams {
                 normalized: ParamMap::from_pairs([
                     ("bp_algorithm", serde_json::json!("min_sum")),
                     ("bp_method", serde_json::json!(bp_method)),
-                    ("schedule", serde_json::json!(bp_schedule)),
+                    ("bp_schedule", serde_json::json!(bp_schedule)),
                     ("bp_iters", serde_json::json!(bp_config.max_bp_iterations)),
                     ("early_stop", serde_json::json!(bp_config.early_stop)),
                     ("lsd_method", serde_json::json!(lsd_method)),
@@ -130,13 +130,21 @@ impl RbposdRunnerParams {
             normalized: ParamMap::from_pairs([
                 ("bp_algorithm", serde_json::json!("min_sum")),
                 ("bp_method", serde_json::json!(bp_method)),
-                ("schedule", serde_json::json!(bp_schedule)),
+                ("bp_schedule", serde_json::json!(bp_schedule)),
                 ("bp_iters", serde_json::json!(bp_config.max_bp_iterations)),
                 ("early_stop", serde_json::json!(bp_config.early_stop)),
                 ("osd_method", serde_json::json!(osd_method)),
                 ("osd_order", serde_json::json!(bp_config.osd_order)),
             ]),
         })
+    }
+
+    fn normalized_for_point(&self, point: &BenchCasePoint) -> ParamMap {
+        let mut normalized = self.normalized.clone();
+        if point.schedule.is_none() {
+            normalized.insert("schedule".into(), normalized["bp_schedule"].clone());
+        }
+        normalized
     }
 }
 
@@ -175,6 +183,7 @@ impl RustBenchRunner for RbposdRunner {
         ctx: &BenchRunContext,
     ) -> Result<BenchmarkResultRow, String> {
         let params = RbposdRunnerParams::parse(&point.decoder_params)?;
+        let normalized = params.normalized_for_point(point);
         match &params.decoder {
             RbposdDecoderFamily::Osd { .. } => {
                 let decoder = RbposdDemDecoder::new(params.bp_config);
@@ -183,7 +192,7 @@ impl RustBenchRunner for RbposdRunner {
                     &decoder,
                     point,
                     ctx,
-                    &params.normalized,
+                    &normalized,
                     DemBuildMode::Raw,
                 )
             }
@@ -194,7 +203,7 @@ impl RustBenchRunner for RbposdRunner {
                     &decoder,
                     point,
                     ctx,
-                    &params.normalized,
+                    &normalized,
                     DemBuildMode::Raw,
                 )
             }

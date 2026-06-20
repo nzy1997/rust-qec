@@ -4,7 +4,7 @@
 
 **Goal:** Extend `rsinter` so `rbposd` benchmark specs accept BP method and schedule parameters, pass them into typed `rbposd::DecoderConfig`, and record normalized row params.
 
-**Architecture:** Keep all parser behavior in the existing `rsinter` benchmark registry and `rbposd` runner wrapper. Add narrow disambiguation for the already-used generic `schedule` key so any non-`greedy` `rbposd` schedule routes to the decoder while existing CSS `schedule = "greedy"` remains a circuit-generation parameter. Keep legacy `bp_algorithm = "min_sum"` accepted and recorded.
+**Architecture:** Keep all parser behavior in the existing `rsinter` benchmark registry and `rbposd` runner wrapper. Add narrow disambiguation for the already-used generic `schedule` key so CSS `schedule = "greedy"` and `schedule = "sequential"` remain circuit-generation parameters while other `rbposd` schedule values route to the decoder. Keep legacy `bp_algorithm = "min_sum"` accepted and recorded, and normalize decoder schedule as `bp_schedule` so CSS rows can preserve their circuit schedule field.
 
 **Tech Stack:** Rust 2024, Cargo workspace, `rsinter` integration tests, `rbposd::DecoderConfig`, `toml::Value`, `serde_json`.
 
@@ -12,8 +12,8 @@
 
 - Preserve existing `bp_iters`, `max_bp_iterations`, `early_stop`, OSD, and LSD parameter behavior.
 - Preserve legacy `bp_algorithm = "min_sum"` compatibility.
-- Record normalized upstream-facing row params named `bp_method` and `schedule`.
-- Do not break existing CSS benchmark specs that use `schedule = "greedy"`.
+- Record normalized upstream-facing row params named `bp_method` and `bp_schedule`.
+- Do not break existing CSS benchmark specs that use `schedule = "greedy"` or `schedule = "sequential"`.
 - Fail unsupported BP method or schedule values during preflight before result artifacts are written.
 - Do not change plot semantics, smoke/full benchmark specs, or Python differential harnesses.
 
@@ -25,7 +25,7 @@
 - Modify `rsinter/tests/bench_runner_wrappers.rs`: add focused `RbposdRunner::preflight_point` tests for accepted and rejected BP method/schedule values.
 - Modify `rsinter/tests/bench_run.rs`: add end-to-end benchmark result and negative-control artifact tests.
 - Modify `rsinter/src/bench/registry.rs`: recognize `bp_method` and route `schedule` by runner/value.
-- Modify `rsinter/src/bench/runners/rbposd.rs`: parse `bp_method`, legacy `bp_algorithm`, BP `schedule`, map them to `DecoderConfig`, and normalize row params.
+- Modify `rsinter/src/bench/runners/rbposd.rs`: parse `bp_method`, legacy `bp_algorithm`, BP `schedule`, map them to `DecoderConfig`, and normalize row params while omitting decoder `schedule` when a point already has a circuit schedule.
 
 ## Task 1: Add Failing rsinter Coverage
 
