@@ -21,6 +21,16 @@ DEFAULT_BP_CONFIG = {
     "osd_variant": "osd0",
 }
 
+BP_METHOD_MAP = {
+    "minimum_sum": "minimum_sum",
+    "product_sum": "product_sum",
+}
+
+BP_SCHEDULE_MAP = {
+    "parallel": "parallel",
+    "serial": "serial",
+}
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -204,19 +214,7 @@ def run_rust_case(repo_root: Path, case_path: Path) -> dict[str, Any]:
 
 
 def map_config_to_ldpc_kwargs(config: dict[str, Any]) -> dict[str, Any]:
-    bp_variant = config.get("bp_variant")
-    bp_method_map = {
-        "minimum_sum": "minimum_sum",
-    }
-    if bp_variant not in bp_method_map:
-        raise ValueError(f"Unsupported bp_variant: {bp_variant}")
-
-    schedule = config.get("schedule")
-    schedule_map = {
-        "parallel": "parallel",
-    }
-    if schedule not in schedule_map:
-        raise ValueError(f"Unsupported schedule: {schedule}")
+    decoder_kwargs = map_bp_config_to_ldpc_kwargs(config)
 
     osd_variant = config.get("osd_variant")
     osd_method_map = {
@@ -225,39 +223,42 @@ def map_config_to_ldpc_kwargs(config: dict[str, Any]) -> dict[str, Any]:
     if osd_variant not in osd_method_map:
         raise ValueError(f"Unsupported osd_variant: {osd_variant}")
 
-    early_stop = config.get("early_stop")
-    if early_stop is not True:
-        raise ValueError(
-            f"Unsupported early_stop value: {early_stop}. "
-            "Python ldpc parity harness currently requires early_stop=true."
-        )
-
     return {
-        "max_iter": int(config["max_bp_iterations"]),
-        "bp_method": bp_method_map[bp_variant],
-        "schedule": schedule_map[schedule],
+        **decoder_kwargs,
         "osd_method": osd_method_map[osd_variant],
         "osd_order": 0,
         "input_vector_type": "syndrome",
     }
 
 
-def map_lsd_case_to_ldpc_kwargs(case: dict[str, Any]) -> dict[str, Any]:
-    config = case.get("config", {})
+def map_bp_config_to_ldpc_kwargs(
+    config: dict[str, Any], error_context: str = ""
+) -> dict[str, Any]:
     bp_variant = config.get("bp_variant")
-    if bp_variant != "minimum_sum":
-        raise ValueError(f"Unsupported bp_variant for LSD: {bp_variant}")
+    if bp_variant not in BP_METHOD_MAP:
+        raise ValueError(f"Unsupported bp_variant{error_context}: {bp_variant}")
 
     schedule = config.get("schedule")
-    if schedule != "parallel":
-        raise ValueError(f"Unsupported schedule for LSD: {schedule}")
+    if schedule not in BP_SCHEDULE_MAP:
+        raise ValueError(f"Unsupported schedule{error_context}: {schedule}")
 
     early_stop = config.get("early_stop")
     if early_stop is not True:
         raise ValueError(
-            f"Unsupported early_stop value for LSD: {early_stop}. "
+            f"Unsupported early_stop value{error_context}: {early_stop}. "
             "Python ldpc parity harness currently requires early_stop=true."
         )
+
+    return {
+        "max_iter": int(config["max_bp_iterations"]),
+        "bp_method": BP_METHOD_MAP[bp_variant],
+        "schedule": BP_SCHEDULE_MAP[schedule],
+    }
+
+
+def map_lsd_case_to_ldpc_kwargs(case: dict[str, Any]) -> dict[str, Any]:
+    config = case.get("config", {})
+    decoder_kwargs = map_bp_config_to_ldpc_kwargs(config, " for LSD")
 
     lsd_config = case.get("lsd_config", {})
     lsd_method = lsd_config.get("method")
@@ -269,9 +270,7 @@ def map_lsd_case_to_ldpc_kwargs(case: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(f"Unsupported lsd_order: {lsd_order}")
 
     return {
-        "max_iter": int(config["max_bp_iterations"]),
-        "bp_method": "minimum_sum",
-        "schedule": "parallel",
+        **decoder_kwargs,
         "lsd_method": "localized_statistics",
         "lsd_order": lsd_order,
         "input_vector_type": "syndrome",
