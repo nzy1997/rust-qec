@@ -198,6 +198,19 @@ class ParityHarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unsupported schedule: flooding"):
             map_config_to_ldpc_kwargs(config)
 
+    def test_map_config_to_ldpc_kwargs_rejects_unsupported_bp_method(self) -> None:
+        config = {
+            "max_bp_iterations": 30,
+            "early_stop": True,
+            "bp_variant": "belief_propagation",
+            "schedule": "serial",
+            "osd_variant": "osd0",
+        }
+        with self.assertRaisesRegex(
+            ValueError, "Unsupported bp_variant: belief_propagation"
+        ):
+            map_config_to_ldpc_kwargs(config)
+
     def test_map_config_to_ldpc_kwargs_rejects_unsupported_early_stop(self) -> None:
         config = {
             "max_bp_iterations": 30,
