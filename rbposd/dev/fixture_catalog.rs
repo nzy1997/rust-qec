@@ -112,16 +112,20 @@ pub fn validate_catalog(
                 entry.id
             ));
         }
-        if entry.matrix_path.trim().is_empty() || !entry.matrix_path.starts_with(&entry.path) {
+        let expected_matrix_path = format!("{}#/matrix", entry.path);
+        if entry.matrix_path.trim().is_empty() || entry.matrix_path != expected_matrix_path {
             return Err(format!(
-                "fixture catalog entry {} matrix_path must reference its fixture path",
-                entry.id
+                "fixture catalog entry {} matrix_path must equal {}",
+                entry.id, expected_matrix_path
             ));
         }
-        if entry.syndrome_path.trim().is_empty() || !entry.syndrome_path.starts_with(&entry.path) {
+        let expected_syndrome_path = format!("{}#/syndrome", entry.path);
+        if entry.syndrome_path.trim().is_empty()
+            || entry.syndrome_path != expected_syndrome_path
+        {
             return Err(format!(
-                "fixture catalog entry {} syndrome_path must reference its fixture path",
-                entry.id
+                "fixture catalog entry {} syndrome_path must equal {}",
+                entry.id, expected_syndrome_path
             ));
         }
         if entry.provenance.trim().is_empty() {

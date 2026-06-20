@@ -54,6 +54,33 @@ fn fixture_catalog_rejects_missing_provenance_or_verifier() {
 }
 
 #[test]
+fn fixture_catalog_rejects_non_exact_matrix_or_syndrome_pointers() {
+    let valid = fixture_catalog::load_catalog(&fixture_catalog::catalog_path());
+
+    let mut wrong_matrix_path = valid.clone();
+    wrong_matrix_path.fixtures[0].matrix_path =
+        format!("{}#/wrong", wrong_matrix_path.fixtures[0].path);
+    let error =
+        fixture_catalog::validate_catalog(&wrong_matrix_path, &fixture_catalog::fixture_root())
+            .unwrap_err();
+    assert!(
+        error.contains("matrix_path"),
+        "expected matrix_path validation error, got {error:?}"
+    );
+
+    let mut wrong_syndrome_path = valid;
+    wrong_syndrome_path.fixtures[0].syndrome_path =
+        format!("{}#/wrong", wrong_syndrome_path.fixtures[0].path);
+    let error =
+        fixture_catalog::validate_catalog(&wrong_syndrome_path, &fixture_catalog::fixture_root())
+            .unwrap_err();
+    assert!(
+        error.contains("syndrome_path"),
+        "expected syndrome_path validation error, got {error:?}"
+    );
+}
+
+#[test]
 fn fixture_catalog_rejects_unsupported_bp_option_modes_and_config() {
     let valid = fixture_catalog::load_catalog(&fixture_catalog::catalog_path());
 

@@ -330,6 +330,11 @@ def iter_catalog_fixture_cases(
             metadata = validate_catalog_entry_metadata(entry)
             fixture_path = fixture_root / str(entry["path"])
             case = load_case(fixture_path)
+            if case.get("name") != entry["id"]:
+                raise ValueError(
+                    "Fixture catalog id "
+                    f"{entry['id']} does not match fixture name {case.get('name')}"
+                )
             case_config = case.get("config", {})
             for key in ("bp_variant", "schedule", "osd_variant"):
                 if case_config.get(key) != metadata["modes"][key]:

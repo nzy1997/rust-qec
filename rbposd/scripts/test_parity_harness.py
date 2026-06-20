@@ -470,6 +470,21 @@ class ParityHarnessTests(unittest.TestCase):
             ):
                 iter_catalog_fixture_cases(catalog_path, include_lsd=False)
 
+    def test_iter_catalog_fixture_cases_rejects_bp_option_id_name_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture_dir = Path(tmp_dir)
+            catalog_path = self.write_catalog_fixture(fixture_dir)
+            parity_path = fixture_dir / "parity" / "bp_product_sum_serial_sensitive.json"
+            fixture = json.loads(parity_path.read_text(encoding="utf-8"))
+            fixture["name"] = "wrong_bp_fixture_name"
+            parity_path.write_text(json.dumps(fixture), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Fixture catalog id bp_product_sum_serial_sensitive does not match fixture name wrong_bp_fixture_name",
+            ):
+                iter_catalog_fixture_cases(catalog_path, include_lsd=False)
+
     def test_map_lsd_case_to_ldpc_kwargs_maps_supported_lsd(self) -> None:
         case = {
             "decoder": "bp_lsd",
