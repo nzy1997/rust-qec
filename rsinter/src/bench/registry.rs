@@ -250,10 +250,10 @@ fn split_runner_params(
     let mut generic = BTreeMap::new();
     let mut decoder = BTreeMap::new();
     for (key, value) in params {
-        if is_generic_param_key(key) {
-            generic.insert(key.clone(), value.clone());
-        } else if is_decoder_param_key(runner_name, key) {
+        if is_decoder_param_entry(runner_name, key, value) {
             decoder.insert(key.clone(), value.clone());
+        } else if is_generic_param_key(key) {
+            generic.insert(key.clone(), value.clone());
         } else {
             return Err(format!("unknown {runner_name} runner param: {key}"));
         }
@@ -282,19 +282,22 @@ fn is_generic_param_key(key: &str) -> bool {
     )
 }
 
-fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
+fn is_decoder_param_entry(runner_name: &str, key: &str, value: &Value) -> bool {
     match runner_name {
-        "rbposd" => matches!(
-            key,
-            "bp_algorithm"
-                | "bp_iters"
-                | "max_bp_iterations"
-                | "early_stop"
-                | "osd_method"
-                | "osd_order"
-                | "lsd_method"
-                | "lsd_order"
-        ),
+        "rbposd" => {
+            matches!(
+                key,
+                "bp_algorithm"
+                    | "bp_method"
+                    | "bp_iters"
+                    | "max_bp_iterations"
+                    | "early_stop"
+                    | "osd_method"
+                    | "osd_order"
+                    | "lsd_method"
+                    | "lsd_order"
+            ) || is_rbposd_bp_schedule_entry(key, value)
+        }
         "rilpqec" => matches!(
             key,
             "backend" | "time_limit_s" | "mip_gap" | "threads" | "verbose"
@@ -302,6 +305,10 @@ fn is_decoder_param_key(runner_name: &str, key: &str) -> bool {
         "rmatching" | "generic" => false,
         _ => false,
     }
+}
+
+fn is_rbposd_bp_schedule_entry(key: &str, value: &Value) -> bool {
+    key == "schedule" && !matches!(value.as_str(), Some("greedy"))
 }
 
 fn optional_string(params: &BTreeMap<String, Value>, key: &str) -> Result<Option<String>, String> {

@@ -346,6 +346,8 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["early_stop"], serde_json::json!(false));
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
     assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(rows[0].params["bp_method"], serde_json::json!("minimum_sum"));
+    assert_eq!(rows[0].params["schedule"], serde_json::json!("parallel"));
     assert_eq!(
         rows[0].params["osd_method"],
         serde_json::json!("combination_sweep")
@@ -744,6 +746,8 @@ fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     assert_eq!(row.params["rounds"], serde_json::json!(3));
     assert_eq!(row.params["p"], serde_json::json!(0.002));
     assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+    assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
+    assert_eq!(row.params["schedule"], serde_json::json!("parallel"));
     assert_eq!(row.params["bp_iters"], serde_json::json!(30));
     assert_eq!(row.params["early_stop"], serde_json::json!(true));
     assert_eq!(
@@ -1642,6 +1646,8 @@ fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
         assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
         assert_eq!(row.params["seed"], serde_json::json!(12_345));
         assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
+        assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
+        assert_eq!(row.params["schedule"], serde_json::json!("parallel"));
         assert_eq!(row.params["bp_iters"], serde_json::json!(10_000));
         assert_eq!(
             row.params["osd_method"],
@@ -1715,6 +1721,11 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
         rbposd_row.params["bp_algorithm"],
         serde_json::json!("min_sum")
     );
+    assert_eq!(
+        rbposd_row.params["bp_method"],
+        serde_json::json!("minimum_sum")
+    );
+    assert_eq!(rbposd_row.params["schedule"], serde_json::json!("parallel"));
     assert_eq!(rbposd_row.params["bp_iters"], serde_json::json!(50));
     assert_eq!(
         rbposd_row.params["osd_method"],
