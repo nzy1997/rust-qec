@@ -41,6 +41,7 @@ pub struct ValidatedFixtureCatalogEntry {
 #[derive(Debug, Deserialize)]
 struct LsdFixtureFile {
     id: String,
+    lsd_order: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,8 +52,10 @@ struct ParityFixtureFile {
 
 #[derive(Debug, Deserialize)]
 struct ParityFixtureConfig {
+    early_stop: bool,
     bp_variant: String,
     schedule: String,
+    osd_variant: String,
 }
 
 pub fn fixture_root() -> PathBuf {
@@ -145,12 +148,6 @@ pub fn validate_catalog(
                 entry.id
             ));
         }
-        if entry.modes.is_empty() {
-            return Err(format!(
-                "fixture catalog entry {} modes must not be empty",
-                entry.id
-            ));
-        }
         if !seen_ids.insert(entry.id.clone()) {
             return Err(format!("duplicate fixture catalog id {}", entry.id));
         }
@@ -187,6 +184,7 @@ pub fn validate_catalog(
                         entry.id, fixture.id, entry.path
                     ));
                 }
+                validate_lsd_modes(entry, fixture.lsd_order)?;
                 if !required_lsd.contains(&entry.path) {
                     return Err(format!(
                         "fixture catalog entry {} has no checked-in LSD fixture requirement",
@@ -214,14 +212,7 @@ pub fn validate_catalog(
                         entry.id, fixture.name, entry.path
                     ));
                 }
-                if fixture.config.bp_variant == "minimum_sum"
-                    && fixture.config.schedule == "parallel"
-                {
-                    return Err(format!(
-                        "fixture catalog entry {} must point to a non-default BP config fixture",
-                        entry.id
-                    ));
-                }
+                validate_bp_option_modes(entry, &fixture.config)?;
                 if !required_bp.contains(&entry.path) {
                     return Err(format!(
                         "fixture catalog entry {} has no checked-in BP-option fixture requirement",
@@ -292,13 +283,12 @@ fn required_bp_catalog_paths(dir: &Path) -> Result<BTreeSet<String>, String> {
 
     for path in files {
         let fixture: ParityFixtureFile = load_fixture_file(&path)?;
+        let file_name = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| format!("failed to read parity fixture file name {}", path.display()))?;
+        validate_supported_bp_fixture_config(file_name, &fixture.config)?;
         if fixture.config.bp_variant != "minimum_sum" || fixture.config.schedule != "parallel" {
-            let file_name = path
-                .file_name()
-                .and_then(|value| value.to_str())
-                .ok_or_else(|| {
-                    format!("failed to read parity fixture file name {}", path.display())
-                })?;
             required.insert(format!("parity/{file_name}"));
         }
     }
@@ -311,4 +301,162 @@ fn load_fixture_file<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, Str
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     serde_json::from_str(&contents)
         .map_err(|error| format!("failed to parse {}: {error}", path.display()))
+}
+
+fn validate_bp_option_modes(
+    entry: &FixtureCatalogEntry,
+    config: &ParityFixtureConfig,
+) -> Result<(), String> {
+    validate_supported_bp_fixture_config(&entry.id, config)?;
+    if config.bp_variant == "minimum_sum" && config.schedule == "parallel" {
+        return Err(format!(
+            "fixture catalog entry {} must point to a non-default BP config fixture",
+            entry.id
+        ));
+    }
+
+    let modes = parse_modes(entry)?;
+    expect_exact_mode(entry, &modes, "bp_variant", &config.bp_variant)?;
+    expect_exact_mode(entry, &modes, "schedule", &config.schedule)?;
+    expect_exact_mode(entry, &modes, "osd_variant", &config.osd_variant)?;
+
+    if let Some(value) = modes.get("decoder") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported decoder mode {} for BP-option fixture",
+            entry.id, value
+        ));
+    }
+    if let Some(value) = modes.get("lsd_method") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported lsd_method mode {} for BP-option fixture",
+            entry.id, value
+        ));
+    }
+    if let Some(value) = modes.get("lsd_order") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported lsd_order mode {} for BP-option fixture",
+            entry.id, value
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_lsd_modes(entry: &FixtureCatalogEntry, lsd_order: usize) -> Result<(), String> {
+    if !matches!(lsd_order, 0 | 1) {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported lsd_order {}",
+            entry.id, lsd_order
+        ));
+    }
+
+    let modes = parse_modes(entry)?;
+    expect_exact_mode(entry, &modes, "decoder", "bp_lsd")?;
+    expect_exact_mode(entry, &modes, "lsd_method", "localized_statistics")?;
+    expect_exact_mode(entry, &modes, "lsd_order", &lsd_order.to_string())?;
+
+    if let Some(value) = modes.get("bp_variant") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported bp_variant mode {} for LSD fixture",
+            entry.id, value
+        ));
+    }
+    if let Some(value) = modes.get("schedule") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported schedule mode {} for LSD fixture",
+            entry.id, value
+        ));
+    }
+    if let Some(value) = modes.get("osd_variant") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported osd_variant mode {} for LSD fixture",
+            entry.id, value
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_supported_bp_fixture_config(
+    id: &str,
+    config: &ParityFixtureConfig,
+) -> Result<(), String> {
+    if !matches!(config.bp_variant.as_str(), "minimum_sum" | "product_sum") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported bp_variant {}",
+            id, config.bp_variant
+        ));
+    }
+    if !matches!(config.schedule.as_str(), "parallel" | "serial") {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported schedule {}",
+            id, config.schedule
+        ));
+    }
+    if !config.early_stop {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported early_stop false",
+            id
+        ));
+    }
+    if config.osd_variant != "osd0" {
+        return Err(format!(
+            "fixture catalog entry {} has unsupported osd_variant {}",
+            id, config.osd_variant
+        ));
+    }
+
+    Ok(())
+}
+
+fn parse_modes(entry: &FixtureCatalogEntry) -> Result<BTreeMap<&str, &str>, String> {
+    if entry.modes.is_empty() {
+        return Err(format!(
+            "fixture catalog entry {} modes must not be empty",
+            entry.id
+        ));
+    }
+
+    let mut modes = BTreeMap::new();
+    for mode in &entry.modes {
+        let (field, value) = mode.split_once('=').ok_or_else(|| {
+            format!(
+                "fixture catalog entry {} mode {} must be in key=value form",
+                entry.id, mode
+            )
+        })?;
+        if field.is_empty() || value.is_empty() {
+            return Err(format!(
+                "fixture catalog entry {} mode {} must be in key=value form",
+                entry.id, mode
+            ));
+        }
+        if let Some(existing) = modes.insert(field, value) {
+            return Err(format!(
+                "fixture catalog entry {} mode {} duplicates {}={}",
+                entry.id, mode, field, existing
+            ));
+        }
+    }
+
+    Ok(modes)
+}
+
+fn expect_exact_mode(
+    entry: &FixtureCatalogEntry,
+    modes: &BTreeMap<&str, &str>,
+    field: &str,
+    expected: &str,
+) -> Result<(), String> {
+    match modes.get(field) {
+        Some(value) if value == &expected => Ok(()),
+        Some(value) => Err(format!(
+            "fixture catalog entry {} has unsupported {} mode {}",
+            entry.id, field, value
+        )),
+        None => Err(format!(
+            "fixture catalog entry {} modes must include {}={}",
+            entry.id, field, expected
+        )),
+    }
 }
