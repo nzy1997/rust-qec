@@ -10,15 +10,41 @@ This design targets the main performance gap between the in-tree Rust BPOSD
 decoder and the Python `ldpc` package on the repository's shared surface-code
 benchmark.
 
-The current checked-in `full` benchmark results show `rbposd` decode time per
-shot trailing `ldpc` by roughly:
+An evidence update from issue #100 supersedes the original benchmark-gap
+summary in this design. The tracked artifact at
+`benchmarks/surface_decoder_compare/results/full/results.csv` is the source for
+the current checked-in full-tier comparison rows. It is evidence of the
+checked-in benchmark artifact, not a fresh claim about current local machine speed.
 
-- `39.7x` at `distance=3, p=0.002`
-- `67.6x` at `distance=3, p=0.005`
-- `85.8x` at `distance=3, p=0.010`
-- `104.0x` at `distance=5, p=0.002`
-- `121.8x` at `distance=5, p=0.005`
-- `131.0x` at `distance=5, p=0.010`
+In the tracked checked-in full-tier native rows, `rbposd` has lower
+`decode_us_per_shot` than `ldpc` for every paired `distance in {3, 5}` and
+`p in {0.002, 0.005, 0.010}` case:
+
+| distance | rounds | p | ldpc decode_us_per_shot | rbposd decode_us_per_shot | rbposd / ldpc |
+| --- | --- | --- | ---: | ---: | ---: |
+| 3 | 3 | 0.002 | 9.28949949957314 | 5.533358 | 0.596 |
+| 3 | 3 | 0.005 | 15.255653700023686 | 9.888312299999999 | 0.648 |
+| 3 | 3 | 0.010 | 22.875337890445515 | 18.083490234375002 | 0.791 |
+| 5 | 5 | 0.002 | 194.81863700011675 | 128.28873740000003 | 0.659 |
+| 5 | 5 | 0.005 | 386.04600850012497 | 322.0114498 | 0.834 |
+| 5 | 5 | 0.010 | 737.693568638826 | 639.9339513020834 | 0.867 |
+
+The table should not be read as a machine-independent speed promise or as proof
+that all `rbposd` configurations are faster than upstream `ldpc`. It only says
+that the tracked native full-tier comparison artifact no longer supports the
+old claim that default `rbposd` trails `ldpc` on every checked-in case.
+
+The LSD and BP-option milestone work also changes the alignment story. The repo
+now has LSD execution and result-row coverage, BP method/schedule configuration,
+behavioral teeth for `product_sum` plus `serial`, and checked-in `rsinter`
+benchmark spec entries named `rbposd_lsd_order1` and
+`rbposd_product_sum_serial`.
+
+Those milestones do not mean the tracked comparison CSV covers every expanded
+decoder surface. `benchmarks/surface_decoder_compare/results/full/results.csv`
+does not contain checked-in timing rows for `rbposd_lsd_order1` or
+`rbposd_product_sum_serial`, and the implemented option surface is still a
+narrow subset of upstream `ldpc` rather than full feature parity.
 
 The goal of this work is to remove structural inefficiencies from the
 `rbposd` core decode path without changing correctness semantics, benchmark
@@ -433,10 +459,10 @@ This project is successful only if all of the following are true:
 - the refactored decoder passes repository correctness gates
 - repeated decode calls reuse internal structure instead of rebuilding the main
   BP and OSD state each time
-- `surface_decoder_compare` shows a substantial reduction in `rbposd`
-  `decode_us_per_shot`
-- the remaining performance gap to `ldpc`, if any, is no longer dominated by
-  avoidable allocation and matrix-rebuild costs
+- fresh `surface_decoder_compare` runs, when regenerated for performance work,
+  should be reported separately from the tracked CSV artifact cited above
+- any remaining `ldpc` comparison claim is grounded in the specific benchmark
+  artifact being discussed, not copied forward from stale checked-in numbers
 
 ## Implementation Boundaries
 
