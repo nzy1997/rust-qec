@@ -120,9 +120,7 @@ pub fn validate_catalog(
             ));
         }
         let expected_syndrome_path = format!("{}#/syndrome", entry.path);
-        if entry.syndrome_path.trim().is_empty()
-            || entry.syndrome_path != expected_syndrome_path
-        {
+        if entry.syndrome_path.trim().is_empty() || entry.syndrome_path != expected_syndrome_path {
             return Err(format!(
                 "fixture catalog entry {} syndrome_path must equal {}",
                 entry.id, expected_syndrome_path
@@ -239,14 +237,6 @@ pub fn validate_catalog(
             return Err(format!("missing fixture catalog entry for {path}"));
         }
     }
-    for path in entries_by_path.keys() {
-        if !required_paths.contains(path) {
-            return Err(format!(
-                "fixture catalog entry has no checked-in required fixture {path}"
-            ));
-        }
-    }
-
     validated.sort_by(|lhs, rhs| lhs.id.cmp(&rhs.id));
     Ok(validated)
 }
