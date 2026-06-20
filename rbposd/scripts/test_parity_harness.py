@@ -139,6 +139,78 @@ class ParityHarnessTests(unittest.TestCase):
             },
         )
 
+    def test_map_config_to_ldpc_kwargs_maps_product_sum_serial_bp_method(self) -> None:
+        config = {
+            "max_bp_iterations": 7,
+            "early_stop": True,
+            "bp_variant": "product_sum",
+            "schedule": "serial",
+            "osd_variant": "osd0",
+        }
+        self.assertEqual(
+            map_config_to_ldpc_kwargs(config),
+            {
+                "max_iter": 7,
+                "bp_method": "product_sum",
+                "schedule": "serial",
+                "osd_method": "OSD_0",
+                "osd_order": 0,
+                "input_vector_type": "syndrome",
+            },
+        )
+
+    def test_map_lsd_case_to_ldpc_kwargs_maps_product_sum_serial_bp_method(self) -> None:
+        case = {
+            "decoder": "bp_lsd",
+            "config": {
+                "max_bp_iterations": 9,
+                "early_stop": True,
+                "bp_variant": "product_sum",
+                "schedule": "serial",
+                "osd_variant": "osd0",
+            },
+            "lsd_config": {
+                "method": "localized_statistics",
+                "lsd_order": 1,
+            },
+        }
+
+        self.assertEqual(
+            map_lsd_case_to_ldpc_kwargs(case),
+            {
+                "max_iter": 9,
+                "bp_method": "product_sum",
+                "schedule": "serial",
+                "lsd_method": "localized_statistics",
+                "lsd_order": 1,
+                "input_vector_type": "syndrome",
+            },
+        )
+
+    def test_map_config_to_ldpc_kwargs_rejects_unsupported_schedule(self) -> None:
+        config = {
+            "max_bp_iterations": 30,
+            "early_stop": True,
+            "bp_variant": "product_sum",
+            "schedule": "flooding",
+            "osd_variant": "osd0",
+        }
+        with self.assertRaisesRegex(ValueError, "Unsupported schedule: flooding"):
+            map_config_to_ldpc_kwargs(config)
+
+    def test_map_config_to_ldpc_kwargs_rejects_unsupported_bp_method(self) -> None:
+        config = {
+            "max_bp_iterations": 30,
+            "early_stop": True,
+            "bp_variant": "belief_propagation",
+            "schedule": "serial",
+            "osd_variant": "osd0",
+        }
+        with self.assertRaisesRegex(
+            ValueError, "Unsupported bp_variant: belief_propagation"
+        ):
+            map_config_to_ldpc_kwargs(config)
+
     def test_map_config_to_ldpc_kwargs_rejects_unsupported_early_stop(self) -> None:
         config = {
             "max_bp_iterations": 30,
