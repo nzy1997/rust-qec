@@ -29,6 +29,36 @@ max_errors = 20
 batch_size = 256
 
 [[runner]]
+name = "rbposd_lsd_order1"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002, 0.005, 0.010]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+lsd_method = "localized_statistics"
+lsd_order = 1
+
+[[runner]]
+name = "rbposd_product_sum_serial"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002, 0.005, 0.010]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+bp_method = "product_sum"
+schedule = "serial"
+
+[[runner]]
 name = "rilpqec"
 language = "rust"
 impl_key = "rilpqec"
