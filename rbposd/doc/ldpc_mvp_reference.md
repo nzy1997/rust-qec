@@ -33,10 +33,10 @@ Included:
   OsdVariant, Schedule, DecodeError`
 
 Excluded:
-- Any decoding algorithm implementation (BP, OSD, or hybrid solver logic)
-- mathematically distinct `ProductSum` updates and true serial message
-  scheduling internals; the issue #94 public selectors are compatibility
-  surface until those algorithms are implemented
+- Additional decoding algorithm variants beyond the current BP, OSD, and LSD
+  solver paths.
+- BP methods and schedules beyond the implemented `MinimumSum`, `ProductSum`,
+  `Parallel`, and `Serial` selectors.
 - Sparse/H matrix parsing, loading, or validation beyond public error typing
 - Performance tuning, SIMD/parallel execution internals, and benchmarking hooks
 - CLI/API integration outside this crate's foundational type contract
@@ -44,6 +44,8 @@ Excluded:
 Reference fixtures:
 - Repetition-style 4-check / 5-bit code with a single-flip syndrome that BP
   should solve without OSD.
+- Small 3-check / 4-bit chain where `ProductSum + Serial` produces a
+  residual-zero BP-only correction that differs from `MinimumSum + Parallel`.
 - Small 2-check / 3-bit code that is solved by `OSD_0` when BP is disabled.
 - Small 2-check / 3-bit code with equal reliability values that locks the OSD
   tie-break outcome.
@@ -55,6 +57,7 @@ Static parity fixtures live in `rbposd/tests/fixtures/parity/`.
 Seed cases:
 
 - `bp_repetition_single_flip.json`
+- `bp_product_sum_serial_sensitive.json`
 - `osd_small_sparse_code.json`
 - `osd_equal_reliability_tiebreak.json`
 
@@ -74,6 +77,25 @@ decode paths or corrections. These are reported as
 `zero_iter_semantics_mismatch` and do not fail parity, because Rust treats
 `max_bp_iterations=0` as "disable BP and run OSD" while Python `ldpc` does not
 share that contract.
+
+## BP Method and Schedule Contract
+
+Issue #95 implements the first non-default compiled BP execution path behind
+the public selector surface:
+
+- `BpVariant::MinimumSum` keeps the existing minimum-sum check update.
+- `BpVariant::ProductSum` uses the product-sum tanh check update.
+- `Schedule::Parallel` keeps the existing check-update then variable-update
+  iteration order.
+- `Schedule::Serial` updates one check at a time and immediately refreshes
+  the affected variable messages before moving to the next check.
+
+Both `BpOsdDecoder` and `BpLsdDecoder::with_bp_config` route through the same
+selector-aware BP core. The `bp_product_sum_serial_sensitive.json` parity
+fixture documents a deterministic case where `ProductSum + Serial` returns
+`[false, true, true, false]`, while the same case under `MinimumSum + Parallel`
+returns `[true, false, false, true]`; both corrections have residual syndrome
+weight zero.
 
 ## LSD Public API Contract
 

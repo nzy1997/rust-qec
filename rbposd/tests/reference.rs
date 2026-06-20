@@ -46,6 +46,7 @@ fn parity_fixture_directory_contains_the_seed_contract_cases() {
     assert_eq!(
         files,
         vec![
+            "bp_product_sum_serial_sensitive.json",
             "bp_repetition_single_flip.json",
             "osd_equal_reliability_tiebreak.json",
             "osd_small_sparse_code.json",
