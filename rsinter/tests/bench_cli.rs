@@ -179,3 +179,58 @@ fn rsinter_bb_circuit_bposd_memory_prints_four_column_result_line() {
     let fields: Vec<_> = stdout.trim().split('\t').collect();
     assert_eq!(fields, vec!["0.000000000001", "1", "1", "0"]);
 }
+
+#[test]
+fn rsinter_bb_circuit_bposd_memory_rejects_negative_physical_error_rate() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bb-circuit-bposd-memory",
+            "--physical-error-rate",
+            "-0.1",
+            "--num-cycles",
+            "12",
+            "--num-trials",
+            "100",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success(), "{output:?}");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(
+        stdout.trim().is_empty(),
+        "invalid command should not print a completed result line: {stdout:?}"
+    );
+    assert!(stderr.contains("physical_error_rate must be finite and lie in [0, 1)"));
+    assert!(
+        !stdout
+            .lines()
+            .any(|line| line.split_whitespace().count() == 4),
+        "invalid command printed a four-column result line: {stdout:?}"
+    );
+}
+
+#[test]
+fn bb144_reproduction_evidence_note_records_required_context() {
+    let note = include_str!("../../docs/bb144_circuit_bposd_reproduction.md");
+
+    for required in [
+        "0.003\t12\t5\t0",
+        "--num-trials 50000",
+        "--seed 12345",
+        "95% one-sided Clopper-Pearson upper bound",
+        "does not claim statistical agreement",
+        "small_ldpc.png",
+        "red [[144,12,12]] LDPC curve",
+        "ldpc_vs_surface.png",
+        "red-diamond LDPC [[144,12,12]] curve",
+        "--max-bp-iterations 10000",
+        "--osd-order 7",
+        "physical_error_rate must be finite and lie in [0, 1)",
+    ] {
+        assert!(note.contains(required), "missing evidence token: {required}");
+    }
+}
