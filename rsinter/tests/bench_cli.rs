@@ -204,10 +204,7 @@ fn rsinter_bb_circuit_bposd_memory_rejects_negative_physical_error_rate() {
         stdout.trim().is_empty(),
         "invalid command should not print a completed result line: {stdout:?}"
     );
-    assert!(
-        stderr.contains("physical_error_rate"),
-        "stderr should identify the invalid physical error rate: {stderr}"
-    );
+    assert!(stderr.contains("physical_error_rate must be finite and lie in [0, 1)"));
     assert!(
         !stdout
             .lines()
