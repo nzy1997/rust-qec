@@ -30,7 +30,7 @@ enum Commands {
         command: BenchCommands,
     },
     BbCircuitBposdMemory {
-        #[arg(long, default_value_t = 0.003)]
+        #[arg(long, default_value_t = 0.003, allow_hyphen_values = true)]
         physical_error_rate: f64,
         #[arg(long, default_value_t = 12)]
         num_cycles: usize,
