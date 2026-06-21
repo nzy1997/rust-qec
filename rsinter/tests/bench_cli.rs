@@ -179,3 +179,23 @@ fn rsinter_bb_circuit_bposd_memory_prints_four_column_result_line() {
     let fields: Vec<_> = stdout.trim().split('\t').collect();
     assert_eq!(fields, vec!["0.000000000001", "1", "1", "0"]);
 }
+
+#[test]
+fn bb144_reproduction_evidence_note_records_required_context() {
+    let note = include_str!("../../docs/bb144_circuit_bposd_reproduction.md");
+
+    for required in [
+        "0.003\t12\t5\t0",
+        "--num-trials 50000",
+        "--seed 12345",
+        "95% one-sided Clopper-Pearson upper bound",
+        "does not claim statistical agreement",
+        "small_ldpc.png",
+        "red [[144,12,12]] LDPC curve",
+        "ldpc_vs_surface.png",
+        "red-diamond LDPC [[144,12,12]] curve",
+        "physical_error_rate must be finite and lie in [0, 1)",
+    ] {
+        assert!(note.contains(required), "missing evidence token: {required}");
+    }
+}
