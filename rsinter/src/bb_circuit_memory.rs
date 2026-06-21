@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rbposd::{BpOsdDecoder, ChannelModel, Correction, DecoderConfig, ParityCheckMatrix, Syndrome};
 
 const SX_LABELS: [&str; 7] = ["idle", "1", "4", "3", "5", "0", "2"];
@@ -722,8 +722,7 @@ fn validate_simulation_config(config: &SimulationConfig) -> Result<(), String> {
 }
 
 fn validate_physical_error_rate(physical_error_rate: f64) -> Result<(), String> {
-    if !physical_error_rate.is_finite() || physical_error_rate < 0.0 || physical_error_rate >= 1.0
-    {
+    if !physical_error_rate.is_finite() || physical_error_rate < 0.0 || physical_error_rate >= 1.0 {
         return Err("physical_error_rate must be finite and lie in [0, 1)".into());
     }
     Ok(())
@@ -1224,8 +1223,234 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 #[cfg(test)]
 mod tests {
     use super::{
-        FaultBasis, PauliAxis, PauliFault, build_upstream_code, cnot_fault_for_index,
+        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
+        SimulationConfig, apply_pauli_fault, build_upstream_code, cnot_fault_for_index,
+        correction_to_logicals, in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
+        sample_operation_fault, sample_single_axis, validate_model_config,
+        validate_physical_error_rate, validate_simulation_config,
     };
+    use rand::{SeedableRng, rngs::StdRng};
+    use rbposd::{Correction, ParityCheckMatrix};
+
+    #[test]
+    fn simulation_config_default_matches_upstream_defaults() {
+        let config = SimulationConfig::default();
+
+        assert_eq!(config.physical_error_rate, 0.003);
+        assert_eq!(config.num_cycles, 12);
+        assert_eq!(config.num_trials, 50_000);
+        assert_eq!(config.seed, None);
+        assert_eq!(config.max_bp_iterations, 10_000);
+        assert_eq!(config.osd_order, 7);
+    }
+
+    #[test]
+    fn config_validation_rejects_invalid_values() {
+        let mut config = SimulationConfig::default();
+        config.num_cycles = 0;
+        assert_eq!(
+            validate_model_config(&config).unwrap_err(),
+            "num_cycles must be greater than zero"
+        );
+
+        let mut config = SimulationConfig::default();
+        config.max_bp_iterations = 0;
+        assert_eq!(
+            validate_model_config(&config).unwrap_err(),
+            "max_bp_iterations must be greater than zero"
+        );
+
+        let mut config = SimulationConfig::default();
+        config.num_trials = 0;
+        assert_eq!(
+            validate_simulation_config(&config).unwrap_err(),
+            "num_trials must be greater than zero"
+        );
+
+        for physical_error_rate in [f64::NAN, -0.1, 1.0, f64::INFINITY] {
+            assert_eq!(
+                validate_physical_error_rate(physical_error_rate).unwrap_err(),
+                "physical_error_rate must be finite and lie in [0, 1)"
+            );
+        }
+    }
+
+    #[test]
+    fn linear_algebra_helpers_handle_degenerate_inputs() {
+        assert_eq!(parse_schedule_slot("idle"), None);
+
+        let empty_rows: Vec<Vec<u8>> = Vec::new();
+        assert_eq!(rref(&empty_rows), (Vec::new(), Vec::new()));
+        assert_eq!(
+            nullspace(&empty_rows, 3),
+            vec![vec![1u8, 0, 0], vec![0, 1u8, 0], vec![0, 0, 1u8],]
+        );
+        assert!(in_row_span(&empty_rows, &[0u8, 0]));
+        assert!(!in_row_span(&empty_rows, &[0u8, 1]));
+
+        let (_, pivot_cols) = rref(&[vec![1u8, 0, 0], vec![0, 1u8, 0]]);
+        assert_eq!(pivot_cols, vec![0, 1]);
+    }
+
+    #[test]
+    fn seedless_zero_noise_simulation_uses_entropy_rng() {
+        let result = run_simulation(SimulationConfig {
+            physical_error_rate: 0.0,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: None,
+            max_bp_iterations: 10,
+            osd_order: 0,
+        })
+        .unwrap();
+
+        assert_eq!(result.num_failed_trials, 0);
+    }
+
+    #[test]
+    fn correction_to_logicals_xors_enabled_logical_rows() {
+        let model = EffectiveDecoderModel {
+            decoder: ParityCheckMatrix::from_sparse_columns(
+                2,
+                3,
+                vec![vec![0], vec![1], Vec::new()],
+            )
+            .unwrap(),
+            augmented_columns: vec![vec![0, 2], vec![3], vec![2, 4]],
+            channel_probs: vec![0.1, 0.2, 0.3],
+            first_logical_row: 2,
+        };
+        let correction = Correction::from(vec![true, true, true]);
+
+        assert_eq!(
+            correction_to_logicals(&correction, &model, 3),
+            vec![false, true, true]
+        );
+    }
+
+    #[test]
+    fn sample_operation_fault_maps_operation_kinds_to_axes() {
+        let mut rng = StdRng::seed_from_u64(1);
+        assert_eq!(
+            sample_operation_fault(&Operation::new(OperationKind::Idle, vec![7]), 0.0, &mut rng),
+            None
+        );
+
+        let mut rng = StdRng::seed_from_u64(2);
+        match sample_operation_fault(&Operation::new(OperationKind::Idle, vec![7]), 1.0, &mut rng)
+            .unwrap()
+        {
+            PauliFault::Single { qubit, axis } => {
+                assert_eq!(qubit, 7);
+                assert!(matches!(axis, PauliAxis::X | PauliAxis::Y | PauliAxis::Z));
+            }
+            other => panic!("idle should sample a single-qubit fault, got {other:?}"),
+        }
+
+        let mut rng = StdRng::seed_from_u64(3);
+        match sample_operation_fault(
+            &Operation::new(OperationKind::Cnot, vec![3, 4]),
+            1.0,
+            &mut rng,
+        )
+        .unwrap()
+        {
+            PauliFault::Single { qubit, .. } => assert!([3, 4].contains(&qubit)),
+            PauliFault::TwoQubit { qubits, .. } => assert_eq!(qubits, [3, 4]),
+        }
+
+        for kind in [OperationKind::PrepX, OperationKind::MeasX] {
+            let mut rng = StdRng::seed_from_u64(4);
+            assert_eq!(
+                sample_operation_fault(&Operation::new(kind, vec![11]), 1.0, &mut rng),
+                Some(PauliFault::Single {
+                    qubit: 11,
+                    axis: PauliAxis::Z,
+                })
+            );
+        }
+
+        for kind in [OperationKind::PrepZ, OperationKind::MeasZ] {
+            let mut rng = StdRng::seed_from_u64(5);
+            assert_eq!(
+                sample_operation_fault(&Operation::new(kind, vec![13]), 1.0, &mut rng),
+                Some(PauliFault::Single {
+                    qubit: 13,
+                    axis: PauliAxis::X,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn sample_single_axis_can_return_each_pauli_axis() {
+        let mut saw_x = false;
+        let mut saw_y = false;
+        let mut saw_z = false;
+
+        for seed in 0..100 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            match sample_single_axis(&mut rng) {
+                PauliAxis::X => saw_x = true,
+                PauliAxis::Y => saw_y = true,
+                PauliAxis::Z => saw_z = true,
+            }
+        }
+
+        assert!(saw_x && saw_y && saw_z);
+    }
+
+    #[test]
+    fn apply_pauli_fault_toggles_x_and_z_components() {
+        let mut x_state = vec![false; 4];
+        let mut z_state = vec![false; 4];
+
+        apply_pauli_fault(
+            &mut x_state,
+            &mut z_state,
+            PauliFault::Single {
+                qubit: 0,
+                axis: PauliAxis::X,
+            },
+        );
+        assert!(x_state[0]);
+        assert!(!z_state[0]);
+
+        apply_pauli_fault(
+            &mut x_state,
+            &mut z_state,
+            PauliFault::Single {
+                qubit: 1,
+                axis: PauliAxis::Z,
+            },
+        );
+        assert!(!x_state[1]);
+        assert!(z_state[1]);
+
+        apply_pauli_fault(
+            &mut x_state,
+            &mut z_state,
+            PauliFault::Single {
+                qubit: 2,
+                axis: PauliAxis::Y,
+            },
+        );
+        assert!(x_state[2]);
+        assert!(z_state[2]);
+
+        apply_pauli_fault(
+            &mut x_state,
+            &mut z_state,
+            PauliFault::TwoQubit {
+                qubits: [0, 3],
+                axes: [PauliAxis::Y, PauliAxis::X],
+            },
+        );
+        assert!(!x_state[0]);
+        assert!(z_state[0]);
+        assert!(x_state[3]);
+        assert!(!z_state[3]);
+    }
 
     #[test]
     fn cnot_fault_indices_match_upstream_order() {
