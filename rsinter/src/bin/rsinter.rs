@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use rsinter::bb_circuit_memory::{run_simulation, SimulationConfig};
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
@@ -27,6 +28,20 @@ enum Commands {
     Bench {
         #[command(subcommand)]
         command: BenchCommands,
+    },
+    BbCircuitBposdMemory {
+        #[arg(long, default_value_t = 0.003)]
+        physical_error_rate: f64,
+        #[arg(long, default_value_t = 12)]
+        num_cycles: usize,
+        #[arg(long, default_value_t = 50_000)]
+        num_trials: u64,
+        #[arg(long)]
+        seed: Option<u64>,
+        #[arg(long, default_value_t = 10_000)]
+        max_bp_iterations: usize,
+        #[arg(long, default_value_t = 7)]
+        osd_order: usize,
     },
 }
 
@@ -118,6 +133,32 @@ fn run() -> Result<(), String> {
                 render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
             }
         },
+        Commands::BbCircuitBposdMemory {
+            physical_error_rate,
+            num_cycles,
+            num_trials,
+            seed,
+            max_bp_iterations,
+            osd_order,
+        } => {
+            let num_trials = usize::try_from(num_trials)
+                .map_err(|_| "num_trials exceeds supported platform usize".to_string())?;
+            let result = run_simulation(SimulationConfig {
+                physical_error_rate,
+                num_cycles,
+                num_trials,
+                seed,
+                max_bp_iterations,
+                osd_order,
+            })?;
+            println!(
+                "{}\t{}\t{}\t{}",
+                result.physical_error_rate,
+                result.num_cycles,
+                result.num_trials,
+                result.num_failed_trials
+            );
+        }
     }
     Ok(())
 }
