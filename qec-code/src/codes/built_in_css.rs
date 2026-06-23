@@ -60,6 +60,10 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
         description: "fixed [[72,12,6]] bivariate-bicycle CSS code",
     },
     BuiltInCssCatalogEntry {
+        spec: "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
+        description: "bivariate-bicycle CSS family over periodic lattice",
+    },
+    BuiltInCssCatalogEntry {
         spec: "repetition_x:d=<distance>",
         description: "X-check chain, distance >= 2",
     },
@@ -485,10 +489,8 @@ pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
         BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::BivariateBicycle,
-            ..
-        } => Err(QecError::UnknownBuiltInCssCode {
-            code_id: code_id.to_owned(),
-        }),
+            params: BuiltInCssParams::BivariateBicycle(params),
+        } => bivariate_bicycle_css_checks(params),
         BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params),
     }
 }

@@ -37,6 +37,8 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
     run(Cli::parse_from(argv))
 }
 
+const BB72_PARAMETERIZED_SPEC: &str = "bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
+
 fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
     fs::write(&path, contents).expect("matrix fixture should be writable");
@@ -78,6 +80,16 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
     },
     BuiltInCssFixtureCase {
         code_id: "bb72",
+        matrix: "hz",
+        fixture: "bb72_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: BB72_PARAMETERIZED_SPEC,
+        matrix: "hx",
+        fixture: "bb72_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: BB72_PARAMETERIZED_SPEC,
         matrix: "hz",
         fixture: "bb72_hz.json",
     },
@@ -248,6 +260,46 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
 }
 
 #[test]
+fn code_css_bb_parameterized_hx_matches_bb72_fixture() {
+    let output = run_qec_code(&["code", "css", BB72_PARAMETERIZED_SPEC, "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/bb72_hx.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_bb_parameterized_hz_matches_bb72_fixture() {
+    let output = run_qec_code(&["code", "css", BB72_PARAMETERIZED_SPEC, "hz"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/bb72_hz.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_bb_parameterized_invalid_lattice_dimension_fails_without_json() {
+    let output = run_qec_code(&["code", "css", "bb:lx=0,ly=6,a=3:0,b=0:3", "hx"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        stderr.contains("out-of-range built-in CSS integer parameter lx for family bb: 0"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
 fn code_css_surface_rotated_d3_hx_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hx"]);
 
@@ -403,6 +455,10 @@ fn code_css_list_includes_supported_built_ins() {
     assert!(stdout.contains("steane"), "stdout was: {stdout}");
     assert!(stdout.contains("bb72"), "stdout was: {stdout}");
     assert!(
+        stdout.contains("bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|..."),
+        "stdout was: {stdout}"
+    );
+    assert!(
         stdout.contains("repetition_x:d=<distance>"),
         "stdout was: {stdout}"
     );
@@ -515,7 +571,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
     })
     .unwrap();
 
-    let expected = "Built-in CSS codes:\n  steane                        fixed [[7,1,3]] CSS code\n  bb72                          fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>     X-check chain, distance >= 2\n  repetition_z:d=<distance>     Z-check chain, distance >= 2\n  surface_rotated:d=<distance>  rotated surface CSS code, distance >= 2\n  toric:d=<distance>            periodic square-lattice toric CSS code, distance >= 2";
+    let expected = "Built-in CSS codes:\n  steane                                                          fixed [[7,1,3]] CSS code\n  bb72                                                            fixed [[72,12,6]] bivariate-bicycle CSS code\n  bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...  bivariate-bicycle CSS family over periodic lattice\n  repetition_x:d=<distance>                                       X-check chain, distance >= 2\n  repetition_z:d=<distance>                                       Z-check chain, distance >= 2\n  surface_rotated:d=<distance>                                    rotated surface CSS code, distance >= 2\n  toric:d=<distance>                                              periodic square-lattice toric CSS code, distance >= 2";
     assert_eq!(output, expected);
 }
 
