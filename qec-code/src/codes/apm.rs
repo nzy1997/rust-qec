@@ -569,4 +569,33 @@ mod tests {
         ));
         assert!(errors[0].to_string().contains("apm_kasai:p=96"));
     }
+
+    #[test]
+    fn affine_commutation_validator_rejects_unexpected_commutation() {
+        let left = AffinePermutation::new(96, 5, 41).unwrap();
+        let right = left;
+        let checks = [AffineCommutationCheck::new(
+            "apm_kasai:p=96",
+            "f0",
+            "f0",
+            left,
+            right,
+            AffineCommutationExpectation::DoesNotCommute,
+        )];
+
+        let errors = validate_affine_commutation_checks(&checks).unwrap_err();
+        assert_eq!(
+            errors[0],
+            AffineCommutationError::UnexpectedCommutation {
+                code_id: "apm_kasai:p=96".to_owned(),
+                left_label: "f0".to_owned(),
+                right_label: "f0".to_owned(),
+                residual: 0,
+            }
+        );
+        let message = errors[0].to_string();
+        assert!(message.contains("apm_kasai:p=96"), "{message}");
+        assert!(message.contains("f0 vs f0"), "{message}");
+        assert!(message.contains("unexpectedly commuted"), "{message}");
+    }
 }
