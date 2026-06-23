@@ -1,6 +1,21 @@
 #![allow(dead_code)]
 
+use std::collections::BTreeSet;
 use std::fmt;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ApmActiveRowSets {
+    pub(crate) delta: Vec<usize>,
+    pub(crate) gamma: Vec<(usize, usize)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ApmActiveRowSetError {
+    OddBlockColumnCount { l: usize },
+    EmptyActiveRows,
+    EmptyHalfBlockColumnCount { l: usize },
+    ActiveRowsExceedHalfBlockColumnCount { j: usize, l2: usize },
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AffinePermutation {
@@ -73,6 +88,45 @@ pub(crate) enum AffineCommutationError {
         right_label: String,
         residual: u64,
     },
+}
+
+pub(crate) fn build_apm_active_row_sets(
+    j: usize,
+    l: usize,
+) -> Result<ApmActiveRowSets, ApmActiveRowSetError> {
+    if l % 2 != 0 {
+        return Err(ApmActiveRowSetError::OddBlockColumnCount { l });
+    }
+
+    let l2 = l / 2;
+    if l2 == 0 {
+        return Err(ApmActiveRowSetError::EmptyHalfBlockColumnCount { l });
+    }
+    if j == 0 {
+        return Err(ApmActiveRowSetError::EmptyActiveRows);
+    }
+    if j > l2 {
+        return Err(ApmActiveRowSetError::ActiveRowsExceedHalfBlockColumnCount { j, l2 });
+    }
+
+    let mut delta_set = BTreeSet::new();
+    for i in 0..j {
+        for k in 0..j {
+            delta_set.insert((k + l2 - i) % l2);
+        }
+    }
+
+    let delta = delta_set.iter().copied().collect::<Vec<_>>();
+    let mut gamma = Vec::new();
+    for left in 0..l2 {
+        for right in 0..l2 {
+            if delta_set.contains(&((left + right) % l2)) {
+                gamma.push((left, right));
+            }
+        }
+    }
+
+    Ok(ApmActiveRowSets { delta, gamma })
 }
 
 impl AffinePermutation {
@@ -240,6 +294,30 @@ impl fmt::Display for AffinePermutationError {
     }
 }
 
+impl fmt::Display for ApmActiveRowSetError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OddBlockColumnCount { l } => {
+                write!(
+                    formatter,
+                    "APM block column count L must be even, got L={l}"
+                )
+            }
+            Self::EmptyActiveRows => write!(formatter, "APM active row count J must be > 0"),
+            Self::EmptyHalfBlockColumnCount { l } => {
+                write!(
+                    formatter,
+                    "APM half block column count L2 must be > 0, got L={l}"
+                )
+            }
+            Self::ActiveRowsExceedHalfBlockColumnCount { j, l2 } => write!(
+                formatter,
+                "APM active row count J must be <= L/2, got J={j} and L/2={l2}"
+            ),
+        }
+    }
+}
+
 impl fmt::Display for AffineCommutationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -276,6 +354,7 @@ impl fmt::Display for AffineCommutationError {
 }
 
 impl std::error::Error for AffinePermutationError {}
+impl std::error::Error for ApmActiveRowSetError {}
 impl std::error::Error for AffineCommutationError {}
 
 fn add_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
@@ -597,5 +676,117 @@ mod tests {
         assert!(message.contains("apm_kasai:p=96"), "{message}");
         assert!(message.contains("f0 vs f0"), "{message}");
         assert!(message.contains("unexpectedly commuted"), "{message}");
+    }
+
+    #[test]
+    fn apm_active_row_sets_reject_invalid_parameters() {
+        let odd_l = build_apm_active_row_sets(1, 5).unwrap_err();
+        assert_eq!(odd_l, ApmActiveRowSetError::OddBlockColumnCount { l: 5 });
+        assert_eq!(
+            odd_l.to_string(),
+            "APM block column count L must be even, got L=5"
+        );
+
+        let empty_j = build_apm_active_row_sets(0, 2).unwrap_err();
+        assert_eq!(empty_j, ApmActiveRowSetError::EmptyActiveRows);
+        assert_eq!(empty_j.to_string(), "APM active row count J must be > 0");
+
+        let empty_l2 = build_apm_active_row_sets(1, 0).unwrap_err();
+        assert_eq!(
+            empty_l2,
+            ApmActiveRowSetError::EmptyHalfBlockColumnCount { l: 0 }
+        );
+        assert_eq!(
+            empty_l2.to_string(),
+            "APM half block column count L2 must be > 0, got L=0"
+        );
+
+        let too_many_rows = build_apm_active_row_sets(4, 6).unwrap_err();
+        assert_eq!(
+            too_many_rows,
+            ApmActiveRowSetError::ActiveRowsExceedHalfBlockColumnCount { j: 4, l2: 3 }
+        );
+        assert!(
+            too_many_rows.to_string().contains("J must be <= L/2"),
+            "{}",
+            too_many_rows
+        );
+    }
+
+    #[test]
+    fn apm_delta_gamma_matches_kasai_reference() {
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/apm/table_a1_manifest.json"
+        ))
+        .unwrap();
+        let p96 = apm_entry_by_code_id(&manifest, "apm_kasai:p=96");
+
+        let active_sets =
+            build_apm_active_row_sets(u64_json(&p96["J"]) as usize, u64_json(&p96["L"]) as usize)
+                .unwrap();
+
+        assert_eq!(active_sets.delta, vec![0, 1, 2, 4, 5]);
+        assert_eq!(
+            active_sets.gamma,
+            vec![
+                (0, 0),
+                (0, 1),
+                (0, 2),
+                (0, 4),
+                (0, 5),
+                (1, 0),
+                (1, 1),
+                (1, 3),
+                (1, 4),
+                (1, 5),
+                (2, 0),
+                (2, 2),
+                (2, 3),
+                (2, 4),
+                (2, 5),
+                (3, 1),
+                (3, 2),
+                (3, 3),
+                (3, 4),
+                (3, 5),
+                (4, 0),
+                (4, 1),
+                (4, 2),
+                (4, 3),
+                (4, 4),
+                (5, 0),
+                (5, 1),
+                (5, 2),
+                (5, 3),
+                (5, 5),
+            ]
+        );
+
+        let gamma_labels = active_sets
+            .gamma
+            .iter()
+            .map(|(left, right)| (format!("f{left}"), format!("g{right}")))
+            .collect::<Vec<_>>();
+        let checks = gamma_labels
+            .iter()
+            .map(|(left_label, right_label)| {
+                commutation_check_from_pair(
+                    p96,
+                    "apm_kasai:p=96",
+                    left_label,
+                    right_label,
+                    u64_json(&p96["P"]),
+                    AffineCommutationExpectation::Commutes,
+                )
+            })
+            .collect::<Vec<_>>();
+        validate_affine_commutation_checks(&checks).unwrap();
+
+        let invalid = build_apm_active_row_sets(4, 6).unwrap_err();
+        assert!(
+            invalid.to_string().contains("J must be <= L/2"),
+            "{}",
+            invalid
+        );
     }
 }

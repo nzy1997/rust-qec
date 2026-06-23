@@ -57,15 +57,20 @@ Let the active block-row set be `A = {0, 1, ..., J-1}` for the standard top-row
 choice. The active difference set is:
 
 ```text
-Delta = { (r - s) mod L | r in A, s in A }
+Delta = { (r - s) mod L2 | r in A, s in A }
 ```
 
-The construction needs affine block pairs that contribute to active
-differences in `Delta` to commute. In this repository vocabulary, `Gamma` is
-the explicit list of such checked pairs carried by
-`required_commuting_pairs` in the manifest. For the checked P=96 and P=192
-entries those pairs are column-component constraints evaluated modulo
-`column_component_modulus`, not necessarily modulo the full `P`.
+`Gamma` is the sorted set of affine block pairs whose indices sum to an active
+difference:
+
+```text
+Gamma = { (i, j) | (i + j) mod L2 in Delta }
+```
+
+Every generated Gamma pair must commute for the APM-CSS construction. The
+manifest `required_commuting_pairs` field is a smaller pinned subset of
+column-component constraints from earlier fixture issues, not the full
+generated Gamma set.
 
 The latent/noncommuting controls are the manifest
 `required_noncommuting_pairs`; for Table A1 they are interpreted as
