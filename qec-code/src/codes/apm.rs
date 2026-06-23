@@ -3,6 +3,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use super::built_in_css::BuiltInCssChecks;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ApmActiveRowSets {
     pub(crate) delta: Vec<usize>,
@@ -90,6 +92,75 @@ pub(crate) enum AffineCommutationError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ApmCssManifestEntry {
+    code_id: &'static str,
+    p: usize,
+    j: usize,
+    l: usize,
+    num_rows: usize,
+    num_cols: usize,
+    f: Vec<AffinePermutation>,
+    g: Vec<AffinePermutation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ApmCssBuildError {
+    InvalidActiveRows(ApmActiveRowSetError),
+    UnsupportedParameterWidth {
+        parameter: &'static str,
+        value: u64,
+    },
+    AffineFamilyLengthMismatch {
+        family: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    AffineMapModulusMismatch {
+        family: &'static str,
+        index: usize,
+        expected: u64,
+        actual: u64,
+    },
+    ArithmeticOverflow {
+        operation: &'static str,
+        lhs: usize,
+        rhs: usize,
+    },
+}
+
+impl ApmCssManifestEntry {
+    pub(crate) fn new(
+        code_id: &'static str,
+        p: u64,
+        j: u64,
+        l: u64,
+        f: Vec<AffinePermutation>,
+        g: Vec<AffinePermutation>,
+    ) -> Result<Self, ApmCssBuildError> {
+        let p_usize = usize_from_apm_parameter("P", p)?;
+        let j_usize = usize_from_apm_parameter("J", j)?;
+        let l_usize = usize_from_apm_parameter("L", l)?;
+        build_apm_active_row_sets(j_usize, l_usize).map_err(ApmCssBuildError::InvalidActiveRows)?;
+        let l2 = l_usize / 2;
+        validate_apm_affine_family("f", l2, p, &f)?;
+        validate_apm_affine_family("g", l2, p, &g)?;
+        let num_rows = checked_usize_mul("J * P", j_usize, p_usize)?;
+        let num_cols = checked_usize_mul("L * P", l_usize, p_usize)?;
+
+        Ok(Self {
+            code_id,
+            p: p_usize,
+            j: j_usize,
+            l: l_usize,
+            num_rows,
+            num_cols,
+            f,
+            g,
+        })
+    }
+}
+
 pub(crate) fn build_apm_active_row_sets(
     j: usize,
     l: usize,
@@ -127,6 +198,175 @@ pub(crate) fn build_apm_active_row_sets(
     }
 
     Ok(ApmActiveRowSets { delta, gamma })
+}
+
+pub(crate) fn build_apm_css_checks(
+    entry: &ApmCssManifestEntry,
+) -> Result<BuiltInCssChecks, ApmCssBuildError> {
+    let hx = build_apm_hx_rows(entry)?;
+    let hz = build_apm_hz_rows(entry)?;
+
+    Ok(BuiltInCssChecks {
+        code_id: entry.code_id,
+        num_cols: entry.num_cols,
+        hx,
+        hz,
+    })
+}
+
+fn validate_apm_affine_family(
+    family: &'static str,
+    expected_len: usize,
+    expected_modulus: u64,
+    maps: &[AffinePermutation],
+) -> Result<(), ApmCssBuildError> {
+    if maps.len() != expected_len {
+        return Err(ApmCssBuildError::AffineFamilyLengthMismatch {
+            family,
+            expected: expected_len,
+            actual: maps.len(),
+        });
+    }
+    for (index, map) in maps.iter().enumerate() {
+        if map.modulus != expected_modulus {
+            return Err(ApmCssBuildError::AffineMapModulusMismatch {
+                family,
+                index,
+                expected: expected_modulus,
+                actual: map.modulus,
+            });
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_pointer_width = "64")]
+fn usize_from_apm_parameter(
+    _parameter: &'static str,
+    value: u64,
+) -> Result<usize, ApmCssBuildError> {
+    Ok(value as usize)
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn usize_from_apm_parameter(
+    parameter: &'static str,
+    value: u64,
+) -> Result<usize, ApmCssBuildError> {
+    usize::try_from(value)
+        .map_err(|_| ApmCssBuildError::UnsupportedParameterWidth { parameter, value })
+}
+
+fn build_apm_hx_rows(entry: &ApmCssManifestEntry) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
+    build_apm_rows(entry, |entry, block_row, block_col| {
+        let l2 = entry.l / 2;
+        let family = if block_col < l2 { &entry.f } else { &entry.g };
+        &family[(block_col % l2 + l2 - block_row) % l2]
+    })
+}
+
+fn build_apm_hz_rows(entry: &ApmCssManifestEntry) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
+    let inverse_f = entry
+        .f
+        .iter()
+        .map(AffinePermutation::inverse)
+        .collect::<Vec<_>>();
+    let inverse_g = entry
+        .g
+        .iter()
+        .map(AffinePermutation::inverse)
+        .collect::<Vec<_>>();
+    build_apm_rows_with_families(
+        entry,
+        &inverse_g,
+        &inverse_f,
+        |entry, block_row, block_col| {
+            let l2 = entry.l / 2;
+            (block_row + l2 - block_col % l2) % l2
+        },
+    )
+}
+
+#[cfg(test)]
+fn build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(
+    entry: &ApmCssManifestEntry,
+    wrong_block_row: usize,
+    wrong_block_col: usize,
+) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
+    let mut rows = build_apm_hz_rows(entry)?;
+    let l2 = entry.l / 2;
+    let block_row_base = checked_usize_mul("wrong_block_row * P", wrong_block_row, entry.p)?;
+    let wrong_block_base = checked_usize_mul("wrong_block_col * P", wrong_block_col, entry.p)?;
+    let wrong_block_end = checked_usize_add("wrong_block_col * P + P", wrong_block_base, entry.p)?;
+    let map_index = (wrong_block_row + l2 - wrong_block_col % l2) % l2;
+    let wrong_map = if wrong_block_col < l2 {
+        &entry.g[map_index]
+    } else {
+        &entry.f[map_index]
+    };
+
+    for local_row in 0..entry.p {
+        let row_index =
+            checked_usize_add("wrong_block_row * P + local_row", block_row_base, local_row)?;
+        let row = &mut rows[row_index];
+        row.retain(|col| *col < wrong_block_base || *col >= wrong_block_end);
+        let local_col = usize::try_from(wrong_map.apply(local_row as u64))
+            .expect("validated affine output must fit usize");
+        let wrong_col = checked_usize_add(
+            "wrong_block_col * P + local_col",
+            wrong_block_base,
+            local_col,
+        )?;
+        row.push(wrong_col);
+        row.sort_unstable();
+        row.dedup();
+    }
+
+    Ok(rows)
+}
+
+fn build_apm_rows<'a>(
+    entry: &'a ApmCssManifestEntry,
+    map_for_block: impl Fn(&'a ApmCssManifestEntry, usize, usize) -> &'a AffinePermutation,
+) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
+    let mut rows = vec![Vec::new(); entry.num_rows];
+    for block_row in 0..entry.j {
+        let block_row_base = checked_usize_mul("block_row * P", block_row, entry.p)?;
+        for local_row in 0..entry.p {
+            let mut row = Vec::with_capacity(entry.l);
+            for block_col in 0..entry.l {
+                let local_col = usize::try_from(
+                    map_for_block(entry, block_row, block_col).apply(local_row as u64),
+                )
+                .expect("validated affine output must fit usize");
+                let block_col_base = checked_usize_mul("block_col * P", block_col, entry.p)?;
+                let col_index = checked_usize_add("block col + local", block_col_base, local_col)?;
+                row.push(col_index);
+            }
+            row.sort_unstable();
+            row.dedup();
+            let row_index = checked_usize_add("block row + local", block_row_base, local_row)?;
+            rows[row_index] = row;
+        }
+    }
+    Ok(rows)
+}
+
+fn build_apm_rows_with_families(
+    entry: &ApmCssManifestEntry,
+    first_half: &[AffinePermutation],
+    second_half: &[AffinePermutation],
+    index_for_block: impl Fn(&ApmCssManifestEntry, usize, usize) -> usize,
+) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
+    build_apm_rows(entry, |entry, block_row, block_col| {
+        let l2 = entry.l / 2;
+        let family = if block_col < l2 {
+            first_half
+        } else {
+            second_half
+        };
+        &family[index_for_block(entry, block_row, block_col)]
+    })
 }
 
 impl AffinePermutation {
@@ -353,9 +593,49 @@ impl fmt::Display for AffineCommutationError {
     }
 }
 
+impl fmt::Display for ApmCssBuildError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidActiveRows(error) => write!(formatter, "{error}"),
+            Self::UnsupportedParameterWidth { parameter, value } => {
+                write!(
+                    formatter,
+                    "APM parameter {parameter}={value} does not fit usize"
+                )
+            }
+            Self::AffineFamilyLengthMismatch {
+                family,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "APM affine family {family} has {actual} maps, expected {expected}"
+            ),
+            Self::AffineMapModulusMismatch {
+                family,
+                index,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "APM affine map {family}{index} has modulus {actual}, expected {expected}"
+            ),
+            Self::ArithmeticOverflow {
+                operation,
+                lhs,
+                rhs,
+            } => write!(
+                formatter,
+                "APM arithmetic overflow while computing {operation} with {lhs} and {rhs}"
+            ),
+        }
+    }
+}
+
 impl std::error::Error for AffinePermutationError {}
 impl std::error::Error for ApmActiveRowSetError {}
 impl std::error::Error for AffineCommutationError {}
+impl std::error::Error for ApmCssBuildError {}
 
 fn add_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
     ((lhs as u128 + rhs as u128) % modulus as u128) as u64
@@ -375,6 +655,32 @@ fn neg_mod(value: u64, modulus: u64) -> u64 {
     } else {
         modulus - value
     }
+}
+
+fn checked_usize_mul(
+    operation: &'static str,
+    lhs: usize,
+    rhs: usize,
+) -> Result<usize, ApmCssBuildError> {
+    lhs.checked_mul(rhs)
+        .ok_or(ApmCssBuildError::ArithmeticOverflow {
+            operation,
+            lhs,
+            rhs,
+        })
+}
+
+fn checked_usize_add(
+    operation: &'static str,
+    lhs: usize,
+    rhs: usize,
+) -> Result<usize, ApmCssBuildError> {
+    lhs.checked_add(rhs)
+        .ok_or(ApmCssBuildError::ArithmeticOverflow {
+            operation,
+            lhs,
+            rhs,
+        })
 }
 
 fn gcd_u64(mut lhs: u64, mut rhs: u64) -> u64 {
@@ -462,6 +768,55 @@ mod tests {
             parse_documented_affine_map(entry, right_label, modulus),
             expected,
         )
+    }
+
+    fn parse_p96_apm_manifest_entry(manifest: &Value) -> ApmCssManifestEntry {
+        let entry = apm_entry_by_code_id(manifest, "apm_kasai:p=96");
+        let p = u64_json(&entry["P"]);
+        let f = (0..6)
+            .map(|index| {
+                let map = &entry["f"][index];
+                AffinePermutation::new(p, u64_json(&map["a"]), u64_json(&map["b"])).unwrap()
+            })
+            .collect::<Vec<_>>();
+        let g = (0..6)
+            .map(|index| {
+                let map = &entry["g"][index];
+                AffinePermutation::new(p, u64_json(&map["c"]), u64_json(&map["d"])).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        ApmCssManifestEntry::new(
+            "apm_kasai:p=96",
+            p,
+            u64_json(&entry["J"]),
+            u64_json(&entry["L"]),
+            f,
+            g,
+        )
+        .unwrap()
+    }
+
+    fn load_sparse_rows_fixture(input: &str) -> (usize, Vec<Vec<usize>>) {
+        let matrix = crate::css::sparse_rows_matrix_from_json_str(input).unwrap();
+        (matrix.num_cols(), matrix.rows().to_vec())
+    }
+
+    fn assert_canonical_sparse_rows(rows: &[Vec<usize>]) {
+        for row in rows {
+            assert!(
+                row.windows(2).all(|pair| pair[0] < pair[1]),
+                "row is not sorted and deduplicated: {row:?}"
+            );
+        }
+    }
+
+    fn sparse_rows_are_orthogonal(hx: &[Vec<usize>], hz: &[Vec<usize>]) -> bool {
+        hx.iter().all(|x_row| {
+            let x_support = x_row.iter().copied().collect::<BTreeSet<_>>();
+            hz.iter()
+                .all(|z_row| z_row.iter().filter(|col| x_support.contains(col)).count() % 2 == 0)
+        })
     }
 
     #[test]
@@ -787,6 +1142,152 @@ mod tests {
             invalid.to_string().contains("J must be <= L/2"),
             "{}",
             invalid
+        );
+    }
+
+    #[test]
+    fn apm_p96_builds_expected_hx_hz() {
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/apm/table_a1_manifest.json"
+        ))
+        .unwrap();
+        let entry = parse_p96_apm_manifest_entry(&manifest);
+
+        let checks = build_apm_css_checks(&entry).unwrap();
+        let (expected_num_cols, expected_hx) =
+            load_sparse_rows_fixture(include_str!("../../tests/fixtures/apm/p96_hx.json"));
+        let (expected_hz_num_cols, expected_hz) =
+            load_sparse_rows_fixture(include_str!("../../tests/fixtures/apm/p96_hz.json"));
+
+        assert_eq!(checks.code_id, "apm_kasai:p=96");
+        assert_eq!(checks.num_cols, expected_num_cols);
+        assert_eq!(checks.num_cols, expected_hz_num_cols);
+        assert_eq!(checks.num_cols, 1152);
+        assert_eq!(checks.hx.len(), 288);
+        assert_eq!(checks.hz.len(), 288);
+        assert_canonical_sparse_rows(&checks.hx);
+        assert_canonical_sparse_rows(&checks.hz);
+        assert_eq!(checks.hx, expected_hx);
+        assert_eq!(checks.hz, expected_hz);
+        assert!(sparse_rows_are_orthogonal(&checks.hx, &checks.hz));
+
+        let wrong_hz =
+            build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(&entry, 0, 0)
+                .unwrap();
+        let p = entry.p;
+        assert_ne!(wrong_hz, expected_hz);
+        assert_ne!(&wrong_hz[..p], &expected_hz[..p]);
+        assert_eq!(&wrong_hz[p..], &expected_hz[p..]);
+        assert!(!sparse_rows_are_orthogonal(&checks.hx, &wrong_hz));
+
+        let wrong_hz_second_half =
+            build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(&entry, 0, 6)
+                .unwrap();
+        assert_ne!(wrong_hz_second_half, expected_hz);
+        assert!(!sparse_rows_are_orthogonal(
+            &checks.hx,
+            &wrong_hz_second_half
+        ));
+    }
+
+    #[test]
+    fn apm_css_builder_rejects_num_cols_overflow() {
+        let p = usize::MAX as u64;
+        let maps = vec![
+            AffinePermutation::new(p, 1, 0).unwrap(),
+            AffinePermutation::new(p, 1, 0).unwrap(),
+        ];
+        assert_eq!(
+            ApmCssManifestEntry::new("overflow", p, 1, 4, maps.clone(), maps),
+            Err(ApmCssBuildError::ArithmeticOverflow {
+                operation: "L * P",
+                lhs: 4,
+                rhs: usize::MAX,
+            })
+        );
+    }
+
+    #[test]
+    fn apm_css_manifest_entry_rejects_affine_modulus_mismatch() {
+        let f = vec![
+            AffinePermutation::new(7, 1, 0).unwrap(),
+            AffinePermutation::new(7, 1, 0).unwrap(),
+        ];
+        let g = vec![
+            AffinePermutation::new(7, 1, 0).unwrap(),
+            AffinePermutation::new(11, 1, 0).unwrap(),
+        ];
+
+        assert_eq!(
+            ApmCssManifestEntry::new("modulus-mismatch", 7, 1, 4, f, g),
+            Err(ApmCssBuildError::AffineMapModulusMismatch {
+                family: "g",
+                index: 1,
+                expected: 7,
+                actual: 11,
+            })
+        );
+    }
+
+    #[test]
+    fn apm_css_manifest_entry_rejects_affine_family_length_mismatch() {
+        let map = AffinePermutation::new(7, 1, 0).unwrap();
+
+        assert_eq!(
+            ApmCssManifestEntry::new("length-mismatch", 7, 1, 4, vec![map], vec![map, map]),
+            Err(ApmCssBuildError::AffineFamilyLengthMismatch {
+                family: "f",
+                expected: 2,
+                actual: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn apm_css_build_errors_have_clear_messages() {
+        assert_eq!(
+            ApmCssBuildError::InvalidActiveRows(ApmActiveRowSetError::OddBlockColumnCount { l: 3 })
+                .to_string(),
+            "APM block column count L must be even, got L=3"
+        );
+        assert_eq!(
+            ApmCssBuildError::UnsupportedParameterWidth {
+                parameter: "P",
+                value: u64::MAX,
+            }
+            .to_string(),
+            format!("APM parameter P={} does not fit usize", u64::MAX)
+        );
+        assert_eq!(
+            ApmCssBuildError::AffineFamilyLengthMismatch {
+                family: "f",
+                expected: 2,
+                actual: 1,
+            }
+            .to_string(),
+            "APM affine family f has 1 maps, expected 2"
+        );
+        assert_eq!(
+            ApmCssBuildError::AffineMapModulusMismatch {
+                family: "g",
+                index: 1,
+                expected: 7,
+                actual: 11,
+            }
+            .to_string(),
+            "APM affine map g1 has modulus 11, expected 7"
+        );
+        assert_eq!(
+            ApmCssBuildError::ArithmeticOverflow {
+                operation: "L * P",
+                lhs: 4,
+                rhs: usize::MAX,
+            }
+            .to_string(),
+            format!(
+                "APM arithmetic overflow while computing L * P with 4 and {}",
+                usize::MAX
+            )
         );
     }
 }
