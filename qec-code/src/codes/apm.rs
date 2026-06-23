@@ -98,6 +98,8 @@ pub(crate) struct ApmCssManifestEntry {
     p: usize,
     j: usize,
     l: usize,
+    num_rows: usize,
+    num_cols: usize,
     f: Vec<AffinePermutation>,
     g: Vec<AffinePermutation>,
 }
@@ -119,6 +121,11 @@ pub(crate) enum ApmCssBuildError {
         index: usize,
         expected: u64,
         actual: u64,
+    },
+    ArithmeticOverflow {
+        operation: &'static str,
+        lhs: usize,
+        rhs: usize,
     },
 }
 
@@ -150,12 +157,16 @@ impl ApmCssManifestEntry {
         let l2 = l_usize / 2;
         validate_apm_affine_family("f", l2, p, &f)?;
         validate_apm_affine_family("g", l2, p, &g)?;
+        let num_rows = checked_usize_mul("J * P", j_usize, p_usize)?;
+        let num_cols = checked_usize_mul("L * P", l_usize, p_usize)?;
 
         Ok(Self {
             code_id,
             p: p_usize,
             j: j_usize,
             l: l_usize,
+            num_rows,
+            num_cols,
             f,
             g,
         })
@@ -209,7 +220,7 @@ pub(crate) fn build_apm_css_checks(
 
     Ok(BuiltInCssChecks {
         code_id: entry.code_id,
-        num_cols: entry.l * entry.p,
+        num_cols: entry.num_cols,
         hx,
         hz,
     })
@@ -272,30 +283,76 @@ fn build_apm_hz_rows(entry: &ApmCssManifestEntry) -> Result<Vec<Vec<usize>>, Apm
 }
 
 #[cfg(test)]
-fn build_apm_hz_rows_with_forward_blocks_for_negative_control(
+fn build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(
     entry: &ApmCssManifestEntry,
+    wrong_block_col: usize,
 ) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
-    build_apm_rows_with_families(entry, &entry.g, &entry.f, |entry, block_row, block_col| {
-        let l2 = entry.l / 2;
-        (block_row + l2 - block_col % l2) % l2
-    })
+    let mut rows = build_apm_hz_rows(entry)?;
+    let l2 = entry.l / 2;
+    let wrong_block_base = checked_usize_mul("wrong_block_col * P", wrong_block_col, entry.p)?;
+    let wrong_block_end = checked_usize_add(
+        "wrong_block_col * P + P",
+        wrong_block_base,
+        entry.p,
+    )?;
+
+    for block_row in 0..entry.j {
+        let block_row_base = checked_usize_mul("block_row * P", block_row, entry.p)?;
+        let map_index = (block_row + l2 - wrong_block_col % l2) % l2;
+        let wrong_map = if wrong_block_col < l2 {
+            &entry.g[map_index]
+        } else {
+            &entry.f[map_index]
+        };
+
+        for local_row in 0..entry.p {
+            let row_index =
+                checked_usize_add("block_row * P + local_row", block_row_base, local_row)?;
+            let row = &mut rows[row_index];
+            row.retain(|col| *col < wrong_block_base || *col >= wrong_block_end);
+            let local_col = usize::try_from(wrong_map.apply(local_row as u64))
+                .expect("validated affine output must fit usize");
+            let wrong_col = checked_usize_add(
+                "wrong_block_col * P + local_col",
+                wrong_block_base,
+                local_col,
+            )?;
+            row.push(wrong_col);
+            row.sort_unstable();
+            row.dedup();
+        }
+    }
+
+    Ok(rows)
 }
 
 fn build_apm_rows<'a>(
     entry: &'a ApmCssManifestEntry,
     map_for_block: impl Fn(&'a ApmCssManifestEntry, usize, usize) -> &'a AffinePermutation,
 ) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
-    let mut rows = Vec::with_capacity(entry.j * entry.p);
+    let mut rows = vec![Vec::new(); entry.num_rows];
     for block_row in 0..entry.j {
+        let block_row_base = checked_usize_mul("block_row * P", block_row, entry.p)?;
         for local_row in 0..entry.p {
             let mut row = Vec::with_capacity(entry.l);
             for block_col in 0..entry.l {
-                let local_col = map_for_block(entry, block_row, block_col).apply(local_row as u64);
-                row.push(block_col * entry.p + local_col as usize);
+                let local_col = usize::try_from(
+                    map_for_block(entry, block_row, block_col).apply(local_row as u64),
+                )
+                .expect("validated affine output must fit usize");
+                let block_col_base = checked_usize_mul("block_col * P", block_col, entry.p)?;
+                let col_index = checked_usize_add(
+                    "block_col * P + local_col",
+                    block_col_base,
+                    local_col,
+                )?;
+                row.push(col_index);
             }
             row.sort_unstable();
             row.dedup();
-            rows.push(row);
+            let row_index =
+                checked_usize_add("block_row * P + local_row", block_row_base, local_row)?;
+            rows[row_index] = row;
         }
     }
     Ok(rows)
@@ -569,6 +626,14 @@ impl fmt::Display for ApmCssBuildError {
                 formatter,
                 "APM affine map {family}{index} has modulus {actual}, expected {expected}"
             ),
+            Self::ArithmeticOverflow {
+                operation,
+                lhs,
+                rhs,
+            } => write!(
+                formatter,
+                "APM arithmetic overflow while computing {operation} with {lhs} and {rhs}"
+            ),
         }
     }
 }
@@ -596,6 +661,32 @@ fn neg_mod(value: u64, modulus: u64) -> u64 {
     } else {
         modulus - value
     }
+}
+
+fn checked_usize_mul(
+    operation: &'static str,
+    lhs: usize,
+    rhs: usize,
+) -> Result<usize, ApmCssBuildError> {
+    lhs.checked_mul(rhs)
+        .ok_or(ApmCssBuildError::ArithmeticOverflow {
+            operation,
+            lhs,
+            rhs,
+        })
+}
+
+fn checked_usize_add(
+    operation: &'static str,
+    lhs: usize,
+    rhs: usize,
+) -> Result<usize, ApmCssBuildError> {
+    lhs.checked_add(rhs)
+        .ok_or(ApmCssBuildError::ArithmeticOverflow {
+            operation,
+            lhs,
+            rhs,
+        })
 }
 
 fn gcd_u64(mut lhs: u64, mut rhs: u64) -> u64 {
@@ -1071,11 +1162,12 @@ mod tests {
         let checks = build_apm_css_checks(&entry).unwrap();
         let (expected_num_cols, expected_hx) =
             load_sparse_rows_fixture(include_str!("../../tests/fixtures/apm/p96_hx.json"));
-        let (_, expected_hz) =
+        let (expected_hz_num_cols, expected_hz) =
             load_sparse_rows_fixture(include_str!("../../tests/fixtures/apm/p96_hz.json"));
 
         assert_eq!(checks.code_id, "apm_kasai:p=96");
         assert_eq!(checks.num_cols, expected_num_cols);
+        assert_eq!(checks.num_cols, expected_hz_num_cols);
         assert_eq!(checks.num_cols, 1152);
         assert_eq!(checks.hx.len(), 288);
         assert_eq!(checks.hz.len(), 288);
@@ -1085,8 +1177,40 @@ mod tests {
         assert_eq!(checks.hz, expected_hz);
         assert!(sparse_rows_are_orthogonal(&checks.hx, &checks.hz));
 
-        let wrong_hz = build_apm_hz_rows_with_forward_blocks_for_negative_control(&entry).unwrap();
+        let wrong_hz =
+            build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(&entry, 0).unwrap();
         assert_ne!(wrong_hz, expected_hz);
         assert!(!sparse_rows_are_orthogonal(&checks.hx, &wrong_hz));
+    }
+
+    #[test]
+    fn apm_css_builder_rejects_num_cols_overflow() {
+        let p = usize::MAX as u64;
+        let maps = vec![
+            AffinePermutation::new(p, 1, 0).unwrap(),
+            AffinePermutation::new(p, 1, 0).unwrap(),
+        ];
+        assert_eq!(
+            ApmCssManifestEntry::new("overflow", p, 1, 4, maps.clone(), maps),
+            Err(ApmCssBuildError::ArithmeticOverflow {
+                operation: "L * P",
+                lhs: 4,
+                rhs: usize::MAX,
+            })
+        );
+    }
+
+    #[test]
+    fn apm_css_manifest_entry_rejects_affine_family_length_mismatch() {
+        let map = AffinePermutation::new(7, 1, 0).unwrap();
+
+        assert_eq!(
+            ApmCssManifestEntry::new("length-mismatch", 7, 1, 4, vec![map], vec![map, map]),
+            Err(ApmCssBuildError::AffineFamilyLengthMismatch {
+                family: "f",
+                expected: 2,
+                actual: 1,
+            })
+        );
     }
 }
