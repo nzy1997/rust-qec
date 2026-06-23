@@ -285,42 +285,36 @@ fn build_apm_hz_rows(entry: &ApmCssManifestEntry) -> Result<Vec<Vec<usize>>, Apm
 #[cfg(test)]
 fn build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(
     entry: &ApmCssManifestEntry,
+    wrong_block_row: usize,
     wrong_block_col: usize,
 ) -> Result<Vec<Vec<usize>>, ApmCssBuildError> {
     let mut rows = build_apm_hz_rows(entry)?;
     let l2 = entry.l / 2;
+    let block_row_base = checked_usize_mul("wrong_block_row * P", wrong_block_row, entry.p)?;
     let wrong_block_base = checked_usize_mul("wrong_block_col * P", wrong_block_col, entry.p)?;
-    let wrong_block_end = checked_usize_add(
-        "wrong_block_col * P + P",
-        wrong_block_base,
-        entry.p,
-    )?;
+    let wrong_block_end = checked_usize_add("wrong_block_col * P + P", wrong_block_base, entry.p)?;
+    let map_index = (wrong_block_row + l2 - wrong_block_col % l2) % l2;
+    let wrong_map = if wrong_block_col < l2 {
+        &entry.g[map_index]
+    } else {
+        &entry.f[map_index]
+    };
 
-    for block_row in 0..entry.j {
-        let block_row_base = checked_usize_mul("block_row * P", block_row, entry.p)?;
-        let map_index = (block_row + l2 - wrong_block_col % l2) % l2;
-        let wrong_map = if wrong_block_col < l2 {
-            &entry.g[map_index]
-        } else {
-            &entry.f[map_index]
-        };
-
-        for local_row in 0..entry.p {
-            let row_index =
-                checked_usize_add("block_row * P + local_row", block_row_base, local_row)?;
-            let row = &mut rows[row_index];
-            row.retain(|col| *col < wrong_block_base || *col >= wrong_block_end);
-            let local_col = usize::try_from(wrong_map.apply(local_row as u64))
-                .expect("validated affine output must fit usize");
-            let wrong_col = checked_usize_add(
-                "wrong_block_col * P + local_col",
-                wrong_block_base,
-                local_col,
-            )?;
-            row.push(wrong_col);
-            row.sort_unstable();
-            row.dedup();
-        }
+    for local_row in 0..entry.p {
+        let row_index =
+            checked_usize_add("wrong_block_row * P + local_row", block_row_base, local_row)?;
+        let row = &mut rows[row_index];
+        row.retain(|col| *col < wrong_block_base || *col >= wrong_block_end);
+        let local_col = usize::try_from(wrong_map.apply(local_row as u64))
+            .expect("validated affine output must fit usize");
+        let wrong_col = checked_usize_add(
+            "wrong_block_col * P + local_col",
+            wrong_block_base,
+            local_col,
+        )?;
+        row.push(wrong_col);
+        row.sort_unstable();
+        row.dedup();
     }
 
     Ok(rows)
@@ -341,11 +335,8 @@ fn build_apm_rows<'a>(
                 )
                 .expect("validated affine output must fit usize");
                 let block_col_base = checked_usize_mul("block_col * P", block_col, entry.p)?;
-                let col_index = checked_usize_add(
-                    "block_col * P + local_col",
-                    block_col_base,
-                    local_col,
-                )?;
+                let col_index =
+                    checked_usize_add("block_col * P + local_col", block_col_base, local_col)?;
                 row.push(col_index);
             }
             row.sort_unstable();
@@ -1178,8 +1169,12 @@ mod tests {
         assert!(sparse_rows_are_orthogonal(&checks.hx, &checks.hz));
 
         let wrong_hz =
-            build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(&entry, 0).unwrap();
+            build_apm_hz_rows_with_one_wrong_forward_block_for_negative_control(&entry, 0, 0)
+                .unwrap();
+        let p = entry.p;
         assert_ne!(wrong_hz, expected_hz);
+        assert_ne!(&wrong_hz[..p], &expected_hz[..p]);
+        assert_eq!(&wrong_hz[p..], &expected_hz[p..]);
         assert!(!sparse_rows_are_orthogonal(&checks.hx, &wrong_hz));
     }
 
