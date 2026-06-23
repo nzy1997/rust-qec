@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
+    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
@@ -620,6 +620,7 @@ fn built_in_css_catalog_lists_supported_specs() {
         vec![
             "steane",
             "bb72",
+            "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
             "surface_rotated:d=<distance>",
@@ -1194,8 +1195,9 @@ fn built_in_css_code_spec_rejects_malformed_bivariate_bicycle_shapes() {
 }
 
 #[test]
-fn built_in_css_checks_rejects_parser_only_bivariate_bicycle_specs() {
+fn built_in_css_checks_accepts_bivariate_bicycle_specs() {
     let spec = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
+    let expected = bivariate_bicycle_css_checks(bb144_bivariate_bicycle_params()).unwrap();
 
     assert_eq!(
         parse_built_in_css_code_spec(spec),
@@ -1204,12 +1206,7 @@ fn built_in_css_checks_rejects_parser_only_bivariate_bicycle_specs() {
             params: BuiltInCssParams::BivariateBicycle(bb144_bivariate_bicycle_params()),
         })
     );
-    assert_eq!(
-        built_in_css_checks(spec),
-        Err(QecError::UnknownBuiltInCssCode {
-            code_id: spec.to_owned(),
-        })
-    );
+    assert_eq!(built_in_css_checks(spec), Ok(expected));
 }
 
 #[test]
