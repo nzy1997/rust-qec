@@ -38,6 +38,7 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
 }
 
 const BB72_PARAMETERIZED_SPEC: &str = "bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
+const BB144_PARAMETERIZED_SPEC: &str = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
 const BB_FAMILY_CATALOG_SPEC: &str =
     "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...";
 const BB_INVALID_LX_ERROR: &str = "out-of-range built-in CSS integer parameter lx for family bb: 0";
@@ -289,6 +290,32 @@ fn code_css_bb_parameterized_hz_matches_bb72_fixture() {
 }
 
 #[test]
+fn code_css_bb144_parameterized_hx_prints_sparse_rows_shape() {
+    // This is qec-code construction/export coverage only; circuit-level
+    // BB144 work and benchmark reproduction remain downstream in #110/#124.
+    let output = run_qec_code(&["code", "css", BB144_PARAMETERIZED_SPEC, "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
+    let rows = json["rows"]
+        .as_array()
+        .expect("sparse-row JSON should contain rows");
+
+    assert_eq!(json["format"], "sparse_rows");
+    assert_eq!(json["num_cols"], 144);
+    assert_eq!(rows.len(), 72);
+    assert!(
+        rows.iter()
+            .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
+        "all BB144 hx rows should have weight 6: {rows:?}"
+    );
+}
+
+#[test]
 fn code_css_bb_parameterized_invalid_lattice_dimension_fails_without_json() {
     let output = run_qec_code(&["code", "css", "bb:lx=0,ly=6,a=3:0,b=0:3", "hx"]);
 
@@ -297,6 +324,20 @@ fn code_css_bb_parameterized_invalid_lattice_dimension_fails_without_json() {
 
     let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
     assert!(stderr.contains(BB_INVALID_LX_ERROR), "stderr was: {stderr}");
+}
+
+#[test]
+fn code_css_bb_parameterized_malformed_shift_term_fails_without_json() {
+    let output = run_qec_code(&["code", "css", "bb:lx=12,ly=6,a=3:0|,b=0:3", "hx"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        stderr.contains("invalid built-in CSS integer parameter a for family bb"),
+        "stderr was: {stderr}"
+    );
 }
 
 #[test]
