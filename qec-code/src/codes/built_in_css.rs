@@ -190,15 +190,13 @@ const BB72_LY: usize = 6;
 const BB72_A_TERMS: &[(usize, usize)] = &[(3, 0), (0, 1), (0, 2)];
 const BB72_B_TERMS: &[(usize, usize)] = &[(0, 3), (1, 0), (2, 0)];
 
-fn bb72_checks() -> Result<BuiltInCssChecks> {
-    let mut checks = bivariate_bicycle_css_checks(BivariateBicycleParams {
+fn bb72_bivariate_bicycle_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
         lx: BB72_LX,
         ly: BB72_LY,
         a_terms: BB72_A_TERMS.to_vec(),
         b_terms: BB72_B_TERMS.to_vec(),
-    })?;
-    checks.code_id = "bb72";
-    Ok(checks)
+    }
 }
 
 fn bivariate_bicycle_checks(
@@ -337,7 +335,11 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
                 hz: hx,
             })
         }
-        "bb72" => bb72_checks(),
+        "bb72" => {
+            let mut checks = bivariate_bicycle_css_checks(bb72_bivariate_bicycle_params())?;
+            checks.code_id = "bb72";
+            Ok(checks)
+        }
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: code_id.to_owned(),
         }),

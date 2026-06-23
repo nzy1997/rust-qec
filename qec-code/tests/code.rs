@@ -289,14 +289,12 @@ fn bb72_has_expected_shape_and_css_orthogonality() {
 }
 
 #[test]
-fn bivariate_bicycle_css_checks_bb72_matches_fixed_alias() {
+fn bb72_fixed_alias_is_generic_bivariate_bicycle_preset() {
     let fixed = built_in_css_checks("bb72").unwrap();
-    let generic = bivariate_bicycle_css_checks(bb72_bivariate_bicycle_params()).unwrap();
+    let mut generic = bivariate_bicycle_css_checks(bb72_bivariate_bicycle_params()).unwrap();
+    generic.code_id = "bb72";
 
-    assert_eq!(generic.code_id, "bb");
-    assert_eq!(generic.num_cols, fixed.num_cols);
-    assert_eq!(generic.hx, fixed.hx);
-    assert_eq!(generic.hz, fixed.hz);
+    assert_eq!(fixed, generic);
 }
 
 #[test]
