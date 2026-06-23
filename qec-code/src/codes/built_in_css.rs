@@ -483,6 +483,12 @@ fn validate_bivariate_bicycle_terms(
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match parse_built_in_css_code_spec(code_id)? {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
+        BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::BivariateBicycle,
+            ..
+        } => Err(QecError::UnknownBuiltInCssCode {
+            code_id: code_id.to_owned(),
+        }),
         BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params),
     }
 }
@@ -550,12 +556,7 @@ fn family_css_checks(
             };
             toric_css_checks(distance)
         }
-        BuiltInCssFamily::BivariateBicycle => {
-            let BuiltInCssParams::BivariateBicycle(params) = params else {
-                unreachable!("bb only uses bivariate-bicycle params");
-            };
-            bivariate_bicycle_css_checks(params)
-        }
+        BuiltInCssFamily::BivariateBicycle => unreachable!("bb specs are parser-only here"),
     }
 }
 

@@ -697,12 +697,38 @@ fn built_in_css_code_spec_rejects_bad_bivariate_bicycle_params() {
             parameter: "foo".to_owned(),
         })
     );
-    assert!(parse_built_in_css_code_spec("bb:lx=12,ly=6,a=3,b=0:3").is_err());
+    assert_eq!(
+        parse_built_in_css_code_spec("bb:lx=12,ly=6,a=3,b=0:3"),
+        Err(QecError::InvalidBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "a".to_owned(),
+            value: "3".to_owned(),
+        })
+    );
     assert_eq!(
         parse_built_in_css_code_spec("bb:lx=6,ly=6,a=0:0|6:0,b=0:3"),
         Err(QecError::DuplicateBuiltInCssParameter {
             family: "bb".to_owned(),
             parameter: "a_terms".to_owned(),
+        })
+    );
+}
+
+#[test]
+fn built_in_css_checks_rejects_parser_only_bivariate_bicycle_specs() {
+    let spec = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
+
+    assert_eq!(
+        parse_built_in_css_code_spec(spec),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::BivariateBicycle,
+            params: BuiltInCssParams::BivariateBicycle(bb144_bivariate_bicycle_params()),
+        })
+    );
+    assert_eq!(
+        built_in_css_checks(spec),
+        Err(QecError::UnknownBuiltInCssCode {
+            code_id: spec.to_owned(),
         })
     );
 }
