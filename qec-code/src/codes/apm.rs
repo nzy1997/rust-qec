@@ -16,6 +16,65 @@ pub(crate) enum AffinePermutationError {
     ModulusMismatch { lhs: u64, rhs: u64 },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AffineCommutationExpectation {
+    Commutes,
+    DoesNotCommute,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AffineCommutationCheck<'a> {
+    pub(crate) code_id: &'a str,
+    pub(crate) left_label: &'a str,
+    pub(crate) right_label: &'a str,
+    pub(crate) left: AffinePermutation,
+    pub(crate) right: AffinePermutation,
+    pub(crate) expected: AffineCommutationExpectation,
+}
+
+impl<'a> AffineCommutationCheck<'a> {
+    pub(crate) fn new(
+        code_id: &'a str,
+        left_label: &'a str,
+        right_label: &'a str,
+        left: AffinePermutation,
+        right: AffinePermutation,
+        expected: AffineCommutationExpectation,
+    ) -> Self {
+        Self {
+            code_id,
+            left_label,
+            right_label,
+            left,
+            right,
+            expected,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum AffineCommutationError {
+    ModulusMismatch {
+        code_id: String,
+        left_label: String,
+        right_label: String,
+        lhs: u64,
+        rhs: u64,
+    },
+    UnexpectedCommutation {
+        code_id: String,
+        left_label: String,
+        right_label: String,
+        residual: u64,
+    },
+    UnexpectedNoncommutation {
+        code_id: String,
+        left_label: String,
+        right_label: String,
+        residual: u64,
+    },
+}
+
 impl AffinePermutation {
     pub(crate) fn new(
         modulus: u64,
@@ -82,6 +141,75 @@ impl AffinePermutation {
     pub(crate) fn is_unit_slope(&self) -> bool {
         gcd_u64(self.slope, self.modulus) == 1
     }
+
+    pub(crate) fn commutation_residual(&self, other: &Self) -> Result<u64, AffinePermutationError> {
+        if self.modulus != other.modulus {
+            return Err(AffinePermutationError::ModulusMismatch {
+                lhs: self.modulus,
+                rhs: other.modulus,
+            });
+        }
+
+        Ok(mod_i128(
+            self.slope as i128 * other.offset as i128 + self.offset as i128
+                - other.slope as i128 * self.offset as i128
+                - other.offset as i128,
+            self.modulus,
+        ))
+    }
+
+    pub(crate) fn commutes_with(&self, other: &Self) -> Result<bool, AffinePermutationError> {
+        Ok(self.commutation_residual(other)? == 0)
+    }
+}
+
+pub(crate) fn validate_affine_commutation_checks(
+    checks: &[AffineCommutationCheck<'_>],
+) -> Result<(), Vec<AffineCommutationError>> {
+    let mut errors = Vec::new();
+
+    for check in checks {
+        match check.left.commutation_residual(&check.right) {
+            Err(AffinePermutationError::ModulusMismatch { lhs, rhs }) => {
+                errors.push(AffineCommutationError::ModulusMismatch {
+                    code_id: check.code_id.to_owned(),
+                    left_label: check.left_label.to_owned(),
+                    right_label: check.right_label.to_owned(),
+                    lhs,
+                    rhs,
+                });
+            }
+            Err(AffinePermutationError::InvalidModulus)
+            | Err(AffinePermutationError::NonUnitSlope { .. }) => {
+                unreachable!("validated affine permutations must be constructible")
+            }
+            Ok(residual) => match check.expected {
+                AffineCommutationExpectation::Commutes if residual != 0 => {
+                    errors.push(AffineCommutationError::UnexpectedNoncommutation {
+                        code_id: check.code_id.to_owned(),
+                        left_label: check.left_label.to_owned(),
+                        right_label: check.right_label.to_owned(),
+                        residual,
+                    });
+                }
+                AffineCommutationExpectation::DoesNotCommute if residual == 0 => {
+                    errors.push(AffineCommutationError::UnexpectedCommutation {
+                        code_id: check.code_id.to_owned(),
+                        left_label: check.left_label.to_owned(),
+                        right_label: check.right_label.to_owned(),
+                        residual,
+                    });
+                }
+                _ => {}
+            },
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 impl fmt::Display for AffinePermutationError {
@@ -106,7 +234,43 @@ impl fmt::Display for AffinePermutationError {
     }
 }
 
+impl fmt::Display for AffineCommutationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ModulusMismatch {
+                code_id,
+                left_label,
+                right_label,
+                lhs,
+                rhs,
+            } => write!(
+                formatter,
+                "{code_id}: commutation check {left_label} vs {right_label} requires shared modulus, got {lhs} and {rhs}"
+            ),
+            Self::UnexpectedCommutation {
+                code_id,
+                left_label,
+                right_label,
+                residual,
+            } => write!(
+                formatter,
+                "{code_id}: commutation check {left_label} vs {right_label} unexpectedly commuted (residual {residual})"
+            ),
+            Self::UnexpectedNoncommutation {
+                code_id,
+                left_label,
+                right_label,
+                residual,
+            } => write!(
+                formatter,
+                "{code_id}: commutation check {left_label} vs {right_label} unexpectedly failed to commute (residual {residual})"
+            ),
+        }
+    }
+}
+
 impl std::error::Error for AffinePermutationError {}
+impl std::error::Error for AffineCommutationError {}
 
 fn add_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
     ((lhs as u128 + rhs as u128) % modulus as u128) as u64
@@ -114,6 +278,10 @@ fn add_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
 
 fn mul_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
     ((lhs as u128 * rhs as u128) % modulus as u128) as u64
+}
+
+fn mod_i128(value: i128, modulus: u64) -> u64 {
+    value.rem_euclid(modulus as i128) as u64
 }
 
 fn neg_mod(value: u64, modulus: u64) -> u64 {
@@ -165,6 +333,51 @@ fn modular_inverse(value: u64, modulus: u64) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
+
+    fn u64_json(value: &Value) -> u64 {
+        value.as_u64().unwrap()
+    }
+
+    fn apm_entry_by_code_id<'a>(manifest: &'a Value, code_id: &str) -> &'a Value {
+        manifest["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["code_id"] == code_id)
+            .unwrap()
+    }
+
+    fn parse_documented_affine_map(entry: &Value, label: &str, modulus: u64) -> AffinePermutation {
+        let label = label.strip_prefix("column_component:").unwrap_or(label);
+        let (family, index) = label.split_at(1);
+        let index: usize = index.parse().unwrap();
+        let map = &entry[family][index];
+        let (slope, offset) = match family {
+            "f" => (u64_json(&map["a"]), u64_json(&map["b"])),
+            "g" => (u64_json(&map["c"]), u64_json(&map["d"])),
+            _ => panic!("unknown APM family label {label}"),
+        };
+        AffinePermutation::new(modulus, slope, offset).unwrap()
+    }
+
+    fn commutation_check_from_pair<'a>(
+        entry: &'a Value,
+        code_id: &'a str,
+        left_label: &'a str,
+        right_label: &'a str,
+        modulus: u64,
+        expected: AffineCommutationExpectation,
+    ) -> AffineCommutationCheck<'a> {
+        AffineCommutationCheck::new(
+            code_id,
+            left_label,
+            right_label,
+            parse_documented_affine_map(entry, left_label, modulus),
+            parse_documented_affine_map(entry, right_label, modulus),
+            expected,
+        )
+    }
 
     #[test]
     fn affine_permutation_round_trips_and_composes() {
@@ -237,5 +450,101 @@ mod tests {
     #[test]
     fn modular_inverse_returns_none_for_non_unit() {
         assert_eq!(modular_inverse(2, 96), None);
+    }
+
+    #[test]
+    fn affine_commutation_matches_table_a1() {
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/apm/table_a1_manifest.json"
+        ))
+        .unwrap();
+        let p96 = apm_entry_by_code_id(&manifest, "apm_kasai:p=96");
+
+        let mut checks = Vec::new();
+        for pair in p96["required_commuting_pairs"].as_array().unwrap() {
+            let modulus = u64_json(&pair["modulus"]);
+            checks.push(commutation_check_from_pair(
+                p96,
+                "apm_kasai:p=96",
+                pair["left"].as_str().unwrap(),
+                pair["right"].as_str().unwrap(),
+                modulus,
+                AffineCommutationExpectation::Commutes,
+            ));
+        }
+        for pair in p96["required_noncommuting_pairs"].as_array().unwrap() {
+            let modulus = u64_json(&p96["P"]);
+            let left_label = format!("f{}", u64_json(&pair["left_index"]));
+            let right_label = format!("g{}", u64_json(&pair["right_index"]));
+            checks.push(commutation_check_from_pair(
+                p96,
+                "apm_kasai:p=96",
+                Box::leak(left_label.into_boxed_str()),
+                Box::leak(right_label.into_boxed_str()),
+                modulus,
+                AffineCommutationExpectation::DoesNotCommute,
+            ));
+        }
+
+        assert!(validate_affine_commutation_checks(&checks).is_ok());
+
+        for check in &checks {
+            let commutes = check.left.commutes_with(&check.right).unwrap();
+            assert_eq!(
+                commutes,
+                matches!(check.expected, AffineCommutationExpectation::Commutes)
+            );
+            let residual = check.left.commutation_residual(&check.right).unwrap();
+            for x in 0..check.left.modulus {
+                let lhs_rhs = check.left.apply(check.right.apply(x));
+                let rhs_lhs = check.right.apply(check.left.apply(x));
+                assert_eq!(lhs_rhs == rhs_lhs, residual == 0);
+            }
+        }
+
+        let mut negative_checks = checks.clone();
+        negative_checks
+            .iter_mut()
+            .find(|check| {
+                check.code_id == "apm_kasai:p=96"
+                    && check.left_label == "f0"
+                    && check.right_label == "g3"
+            })
+            .unwrap()
+            .expected = AffineCommutationExpectation::Commutes;
+        let errors = validate_affine_commutation_checks(&negative_checks).unwrap_err();
+        let error = &errors[0];
+        let message = error.to_string();
+        assert!(message.contains("apm_kasai:p=96"), "{message}");
+        assert!(message.contains("f0"), "{message}");
+        assert!(message.contains("g3"), "{message}");
+    }
+
+    #[test]
+    fn affine_commutation_rejects_modulus_mismatch() {
+        let lhs = AffinePermutation::new(96, 5, 41).unwrap();
+        let rhs = AffinePermutation::new(192, 71, 127).unwrap();
+        assert_eq!(
+            lhs.commutes_with(&rhs),
+            Err(AffinePermutationError::ModulusMismatch { lhs: 96, rhs: 192 })
+        );
+        let checks = [AffineCommutationCheck::new(
+            "apm_kasai:p=96",
+            "f0",
+            "g0",
+            lhs,
+            rhs,
+            AffineCommutationExpectation::Commutes,
+        )];
+        let errors = validate_affine_commutation_checks(&checks).unwrap_err();
+        assert!(matches!(
+            errors[0],
+            AffineCommutationError::ModulusMismatch {
+                lhs: 96,
+                rhs: 192,
+                ..
+            }
+        ));
+        assert!(errors[0].to_string().contains("apm_kasai:p=96"));
     }
 }
