@@ -8,6 +8,7 @@ use qec_code::codes::built_in_css::{
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
+use serde_json::Value;
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
     for row in rows {
@@ -47,6 +48,382 @@ fn row_weight_counts(rows: &[Vec<usize>]) -> std::collections::BTreeMap<usize, u
         *counts.entry(row.len()).or_insert(0) += 1;
     }
     counts
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExpectedApmEntry {
+    code_id: &'static str,
+    p: u64,
+    n: u64,
+    mx: u64,
+    mz: u64,
+    k: u64,
+    distance_upper_bound: u64,
+    rate: &'static str,
+    f: [(u64, u64); 6],
+    g: [(u64, u64); 6],
+    column_component_modulus: u64,
+    column_component_group: &'static str,
+}
+
+const EXPECTED_APM_TABLE_A1: &[ExpectedApmEntry] = &[
+    ExpectedApmEntry {
+        code_id: "apm_kasai:p=96",
+        p: 96,
+        n: 1152,
+        mx: 288,
+        mz: 288,
+        k: 580,
+        distance_upper_bound: 12,
+        rate: "0.503",
+        f: [(5, 41), (85, 77), (73, 66), (1, 0), (1, 72), (37, 9)],
+        g: [(61, 15), (1, 24), (89, 62), (25, 22), (85, 93), (25, 78)],
+        column_component_modulus: 32,
+        column_component_group: "Z32",
+    },
+    ExpectedApmEntry {
+        code_id: "apm_kasai:p=192",
+        p: 192,
+        n: 2304,
+        mx: 576,
+        mz: 576,
+        k: 1156,
+        distance_upper_bound: 14,
+        rate: "0.502",
+        f: [
+            (71, 127),
+            (97, 80),
+            (67, 117),
+            (163, 165),
+            (25, 60),
+            (187, 33),
+        ],
+        g: [
+            (163, 165),
+            (55, 183),
+            (167, 79),
+            (139, 41),
+            (109, 78),
+            (31, 27),
+        ],
+        column_component_modulus: 64,
+        column_component_group: "Z32xZ2",
+    },
+];
+
+fn required_field<'a>(object: &'a Value, path: &str, key: &str) -> Result<&'a Value, String> {
+    object
+        .get(key)
+        .ok_or_else(|| format!("{path}.{key}: missing field"))
+}
+
+fn required_array_field<'a>(
+    object: &'a Value,
+    path: &str,
+    key: &str,
+) -> Result<&'a Vec<Value>, String> {
+    let field_path = format!("{path}.{key}");
+    required_field(object, path, key)?
+        .as_array()
+        .ok_or_else(|| format!("{field_path}: expected array"))
+}
+
+fn expect_len(path: &str, actual: usize, expected: usize) -> Result<(), String> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!("{path}: expected length {expected}, got {actual}"))
+    }
+}
+
+fn expect_u64_value(value: &Value, path: &str, expected: u64) -> Result<(), String> {
+    match value.as_u64() {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!("{path}: expected {expected}, got {actual}")),
+        None => Err(format!("{path}: expected unsigned integer")),
+    }
+}
+
+fn expect_str_value(value: &Value, path: &str, expected: &str) -> Result<(), String> {
+    match value.as_str() {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!("{path}: expected {expected:?}, got {actual:?}")),
+        None => Err(format!("{path}: expected string")),
+    }
+}
+
+fn expect_u64_field(object: &Value, path: &str, key: &str, expected: u64) -> Result<(), String> {
+    let field_path = format!("{path}.{key}");
+    expect_u64_value(required_field(object, path, key)?, &field_path, expected)
+}
+
+fn expect_str_field(object: &Value, path: &str, key: &str, expected: &str) -> Result<(), String> {
+    let field_path = format!("{path}.{key}");
+    expect_str_value(required_field(object, path, key)?, &field_path, expected)
+}
+
+fn expect_string_array_field(
+    object: &Value,
+    path: &str,
+    key: &str,
+    expected: &[&str],
+) -> Result<(), String> {
+    let values = required_array_field(object, path, key)?;
+    let array_path = format!("{path}.{key}");
+    expect_len(&array_path, values.len(), expected.len())?;
+    for (index, expected_value) in expected.iter().enumerate() {
+        let value_path = format!("{array_path}[{index}]");
+        expect_str_value(&values[index], &value_path, expected_value)?;
+    }
+    Ok(())
+}
+
+fn validate_affine_family(
+    entry: &Value,
+    code_id: &str,
+    family_key: &str,
+    coefficient_keys: (&str, &str),
+    expected_coefficients: &[(u64, u64); 6],
+) -> Result<(), String> {
+    let family = required_array_field(entry, code_id, family_key)?;
+    expect_len(
+        &format!("{code_id}.{family_key}"),
+        family.len(),
+        expected_coefficients.len(),
+    )?;
+    for (index, (expected_left, expected_right)) in expected_coefficients.iter().enumerate() {
+        let coefficient_path = format!("{code_id} {family_key}[{index}]");
+        expect_u64_field(&family[index], &coefficient_path, "i", index as u64)?;
+        expect_u64_field(
+            &family[index],
+            &coefficient_path,
+            coefficient_keys.0,
+            *expected_left,
+        )?;
+        expect_u64_field(
+            &family[index],
+            &coefficient_path,
+            coefficient_keys.1,
+            *expected_right,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_expected_code_shape(entry: &Value, expected: ExpectedApmEntry) -> Result<(), String> {
+    let path = format!("{} expected_code_shape", expected.code_id);
+    let shape = required_field(entry, expected.code_id, "expected_code_shape")?;
+    expect_u64_field(shape, &path, "n", expected.n)?;
+    expect_u64_field(shape, &path, "mx", expected.mx)?;
+    expect_u64_field(shape, &path, "mz", expected.mz)?;
+    expect_u64_field(shape, &path, "k", expected.k)?;
+    expect_str_field(shape, &path, "rate", expected.rate)?;
+
+    let distance_path = format!("{path}.distance");
+    let distance = required_field(shape, &path, "distance")?;
+    expect_str_field(distance, &distance_path, "kind", "upper_bound")?;
+    expect_u64_field(
+        distance,
+        &distance_path,
+        "value",
+        expected.distance_upper_bound,
+    )
+}
+
+fn validate_expected_weights(entry: &Value, code_id: &str) -> Result<(), String> {
+    let path = format!("{code_id} expected_weights");
+    let weights = required_field(entry, code_id, "expected_weights")?;
+    expect_u64_field(weights, &path, "hx_row", 12)?;
+    expect_u64_field(weights, &path, "hz_row", 12)?;
+    expect_u64_field(weights, &path, "hx_column", 3)?;
+    expect_u64_field(weights, &path, "hz_column", 3)?;
+    expect_u64_field(weights, &path, "combined_data_qubit_degree", 6)
+}
+
+fn validate_girth(entry: &Value, code_id: &str) -> Result<(), String> {
+    let path = format!("{code_id} girth");
+    let girth = required_field(entry, code_id, "girth")?;
+    expect_str_field(girth, &path, "kind", "lower_bound")?;
+    expect_u64_field(girth, &path, "value", 6)
+}
+
+fn validate_required_commuting_pairs(
+    entry: &Value,
+    expected: ExpectedApmEntry,
+) -> Result<(), String> {
+    let pairs = required_array_field(entry, expected.code_id, "required_commuting_pairs")?;
+    expect_len(
+        &format!("{}.required_commuting_pairs", expected.code_id),
+        pairs.len(),
+        3,
+    )?;
+    let expected_pairs = [
+        ("column_component:f0", "column_component:f1"),
+        ("column_component:f0", "column_component:g0"),
+        ("column_component:g0", "column_component:g1"),
+    ];
+    for (index, (left, right)) in expected_pairs.iter().enumerate() {
+        let path = format!("{} required_commuting_pairs[{index}]", expected.code_id);
+        expect_str_field(&pairs[index], &path, "left", left)?;
+        expect_str_field(&pairs[index], &path, "right", right)?;
+        expect_u64_field(
+            &pairs[index],
+            &path,
+            "modulus",
+            expected.column_component_modulus,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_required_noncommuting_pairs(entry: &Value, code_id: &str) -> Result<(), String> {
+    let pairs = required_array_field(entry, code_id, "required_noncommuting_pairs")?;
+    expect_len(
+        &format!("{code_id}.required_noncommuting_pairs"),
+        pairs.len(),
+        2,
+    )?;
+    let expected_pairs = [(0, 3), (1, 2)];
+    for (index, (left, right)) in expected_pairs.iter().enumerate() {
+        let path = format!("{code_id} required_noncommuting_pairs[{index}]");
+        expect_u64_field(&pairs[index], &path, "left_index", *left)?;
+        expect_u64_field(&pairs[index], &path, "right_index", *right)?;
+    }
+    Ok(())
+}
+
+fn validate_structural_expectations(
+    entry: &Value,
+    expected: ExpectedApmEntry,
+) -> Result<(), String> {
+    let path = format!("{} structural_expectations", expected.code_id);
+    let structural = required_field(entry, expected.code_id, "structural_expectations")?;
+    expect_u64_field(structural, &path, "active_block_rows", 3)?;
+    expect_u64_field(structural, &path, "block_columns", 12)?;
+    expect_u64_field(structural, &path, "apm_maps_per_family", 6)?;
+    expect_u64_field(
+        structural,
+        &path,
+        "column_component_modulus",
+        expected.column_component_modulus,
+    )?;
+    expect_str_field(
+        structural,
+        &path,
+        "column_component_group_status",
+        "abelian",
+    )?;
+    expect_str_field(
+        structural,
+        &path,
+        "column_component_group",
+        expected.column_component_group,
+    )
+}
+
+fn validate_provenance(entry: &Value, code_id: &str) -> Result<(), String> {
+    let path = format!("{code_id} provenance");
+    let provenance = required_field(entry, code_id, "provenance")?;
+    expect_str_field(provenance, &path, "paper", "arXiv:2604.16209v1")?;
+    expect_str_field(provenance, &path, "table", "Table A1")?;
+    expect_string_array_field(
+        provenance,
+        &path,
+        "source_grounded_fields",
+        &[
+            "P",
+            "J",
+            "L",
+            "L2",
+            "f",
+            "g",
+            "expected_code_shape.n",
+            "expected_code_shape.k",
+            "expected_code_shape.rate",
+            "expected_code_shape.distance",
+            "girth",
+            "required_noncommuting_pairs",
+        ],
+    )?;
+    expect_string_array_field(
+        provenance,
+        &path,
+        "derived_fields",
+        &[
+            "expected_code_shape.mx",
+            "expected_code_shape.mz",
+            "expected_weights",
+            "required_commuting_pairs",
+            "structural_expectations",
+        ],
+    )
+}
+
+fn validate_references(entry: &Value, code_id: &str) -> Result<(), String> {
+    let references = required_array_field(entry, code_id, "references")?;
+    expect_len(&format!("{code_id}.references"), references.len(), 4)?;
+
+    let paper_references = [
+        ("https://arxiv.org/abs/2604.16209", "Appendix A / Table A1"),
+        ("https://arxiv.org/pdf/2604.16209", "Appendix D.2"),
+    ];
+    for (index, (url, section)) in paper_references.iter().enumerate() {
+        let path = format!("{code_id} references[{index}]");
+        expect_str_field(&references[index], &path, "kind", "paper")?;
+        expect_str_field(&references[index], &path, "url", url)?;
+        expect_str_field(&references[index], &path, "section", section)?;
+    }
+
+    let local_references = [
+        "drafts/construct_apm_css_code/README.md",
+        "drafts/joint_BP_plus_PP/README.md",
+    ];
+    for (offset, local_path) in local_references.iter().enumerate() {
+        let index = offset + paper_references.len();
+        let path = format!("{code_id} references[{index}]");
+        expect_str_field(&references[index], &path, "kind", "local")?;
+        expect_str_field(&references[index], &path, "path", local_path)?;
+    }
+
+    Ok(())
+}
+
+fn validate_apm_table_a1_entry(
+    entry: &Value,
+    index: usize,
+    expected: ExpectedApmEntry,
+) -> Result<(), String> {
+    let index_path = format!("entries[{index}]");
+    expect_str_field(entry, &index_path, "code_id", expected.code_id)?;
+    expect_u64_field(entry, expected.code_id, "P", expected.p)?;
+    expect_u64_field(entry, expected.code_id, "J", 3)?;
+    expect_u64_field(entry, expected.code_id, "L", 12)?;
+    expect_u64_field(entry, expected.code_id, "L2", 6)?;
+    validate_affine_family(entry, expected.code_id, "f", ("a", "b"), &expected.f)?;
+    validate_affine_family(entry, expected.code_id, "g", ("c", "d"), &expected.g)?;
+    validate_expected_code_shape(entry, expected)?;
+    validate_expected_weights(entry, expected.code_id)?;
+    validate_girth(entry, expected.code_id)?;
+    validate_required_commuting_pairs(entry, expected)?;
+    validate_required_noncommuting_pairs(entry, expected.code_id)?;
+    validate_structural_expectations(entry, expected)?;
+    validate_provenance(entry, expected.code_id)?;
+    validate_references(entry, expected.code_id)
+}
+
+fn validate_apm_table_a1_manifest(manifest: &Value) -> std::result::Result<(), String> {
+    expect_u64_field(manifest, "manifest", "schema_version", 1)?;
+    expect_str_field(manifest, "manifest", "manifest_id", "apm_kasai_table_a1")?;
+    let entries = required_array_field(manifest, "manifest", "entries")?;
+    expect_len(
+        "manifest.entries",
+        entries.len(),
+        EXPECTED_APM_TABLE_A1.len(),
+    )?;
+    for (index, expected) in EXPECTED_APM_TABLE_A1.iter().copied().enumerate() {
+        validate_apm_table_a1_entry(&entries[index], index, expected)?;
+    }
+    Ok(())
 }
 
 fn assert_surface_rotated_d5_weights(rows: &[Vec<usize>]) {
@@ -90,6 +467,27 @@ fn bivariate_bicycle_normalized_shift_params() -> BivariateBicycleParams {
         a_terms: vec![(0, 1)],
         b_terms: vec![(1, 1)],
     }
+}
+
+#[test]
+fn apm_table_a1_manifest_pins_table_a1_reference_data() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("fixtures/apm/table_a1_manifest.json")).unwrap();
+
+    validate_apm_table_a1_manifest(&manifest).unwrap();
+}
+
+#[test]
+fn apm_table_a1_manifest_rejects_mutated_affine_coefficient() {
+    let mut manifest: Value =
+        serde_json::from_str(include_str!("fixtures/apm/table_a1_manifest.json")).unwrap();
+    manifest["entries"][0]["f"][0]["a"] = Value::from(7);
+
+    let err = validate_apm_table_a1_manifest(&manifest).unwrap_err();
+    assert!(
+        err.contains("apm_kasai:p=96") && err.contains("f[0].a"),
+        "error should identify the changed coefficient and code id: {err}"
+    );
 }
 
 #[test]
