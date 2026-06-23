@@ -38,6 +38,9 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
 }
 
 const BB72_PARAMETERIZED_SPEC: &str = "bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
+const BB_FAMILY_CATALOG_SPEC: &str =
+    "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...";
+const BB_INVALID_LX_ERROR: &str = "out-of-range built-in CSS integer parameter lx for family bb: 0";
 
 fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
@@ -293,10 +296,7 @@ fn code_css_bb_parameterized_invalid_lattice_dimension_fails_without_json() {
     assert_eq!(output.stdout, b"");
 
     let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
-    assert!(
-        stderr.contains("out-of-range built-in CSS integer parameter lx for family bb: 0"),
-        "stderr was: {stderr}"
-    );
+    assert!(stderr.contains(BB_INVALID_LX_ERROR), "stderr was: {stderr}");
 }
 
 #[test]
@@ -455,7 +455,7 @@ fn code_css_list_includes_supported_built_ins() {
     assert!(stdout.contains("steane"), "stdout was: {stdout}");
     assert!(stdout.contains("bb72"), "stdout was: {stdout}");
     assert!(
-        stdout.contains("bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|..."),
+        stdout.contains(BB_FAMILY_CATALOG_SPEC),
         "stdout was: {stdout}"
     );
     assert!(
