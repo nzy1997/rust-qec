@@ -44,11 +44,11 @@
 - Produces: Rust test `apm_p96_fixture_matches_reference_stats`.
 - Produces: Rust test `apm_p96_fixture_rejects_mutated_support`.
 
-- [ ] **Step 1: Add failing Rust fixture tests first**
+- [x] **Step 1: Add failing Rust fixture tests first**
 
 Modify `qec-code/tests/code.rs`:
 
-1. Add `binary::binary_rank` and `sparse_rows_matrix_from_json_str` to the imports:
+1. Add `binary::binary_rank` and `sparse_rows_matrix_from_json_str` to the imports, preserving the existing `CssCode` import used by other tests in this file:
 
 ```rust
 use qec_code::binary::binary_rank;
@@ -139,12 +139,9 @@ fn assert_apm_p96_fixture_stats(
             rank_x + rank_z
         ));
     }
-    let css = CssCode::from_hx_hz(hx_dense, hz_dense).map_err(|err| err.to_string())?;
-    if css.code().num_logical_qubits() != 580 {
-        return Err(format!(
-            "expected k = 580, got {}",
-            css.code().num_logical_qubits()
-        ));
+    let logical_qubits = hx.num_cols - rank_x - rank_z;
+    if logical_qubits != 580 {
+        return Err(format!("expected k = 580, got {logical_qubits}"));
     }
     Ok(())
 }
@@ -179,7 +176,7 @@ fn apm_p96_fixture_rejects_mutated_support() {
 }
 ```
 
-- [ ] **Step 2: Run focused test and verify RED**
+- [x] **Step 2: Run focused test and verify RED**
 
 Run:
 
@@ -189,7 +186,7 @@ cargo test -p qec-code apm_p96_fixture_matches_reference_stats -q
 
 Expected: FAIL because `qec-code/tests/fixtures/apm/p96_hx.json` and `qec-code/tests/fixtures/apm/p96_hz.json` do not exist yet.
 
-- [ ] **Step 3: Add the fixture generator**
+- [x] **Step 3: Add the fixture generator**
 
 Create `qec-code/tests/fixtures/apm/generate_p96_fixtures.py` with:
 
@@ -334,7 +331,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Generate fixtures and run generator check**
+- [x] **Step 4: Generate fixtures and run generator check**
 
 Run:
 
@@ -345,7 +342,7 @@ python3 qec-code/tests/fixtures/apm/generate_p96_fixtures.py --check
 
 Expected: first command writes `p96_hx.json` and `p96_hz.json`; second command exits 0 with no output.
 
-- [ ] **Step 5: Run focused test and verify GREEN**
+- [x] **Step 5: Run focused test and verify GREEN**
 
 Run:
 
@@ -355,7 +352,7 @@ cargo test -p qec-code apm_p96_fixture_matches_reference_stats -q
 
 Expected: PASS. The positive test verifies dimensions, row/column weights, orthogonality, and rank sum.
 
-- [ ] **Step 6: Run negative-control test**
+- [x] **Step 6: Run negative-control test**
 
 Run:
 
@@ -365,7 +362,7 @@ cargo test -p qec-code apm_p96_fixture_rejects_mutated_support -q
 
 Expected: PASS. The test mutates one `Hz` support and verifies the in-memory structural verifier rejects it.
 
-- [ ] **Step 7: Format and run required gates**
+- [x] **Step 7: Format and run required gates**
 
 Run:
 
@@ -377,7 +374,7 @@ cargo test
 
 Expected: all commands exit 0. Existing warning-only noise is acceptable only if tests pass.
 
-- [ ] **Step 8: Commit implementation**
+- [x] **Step 8: Commit implementation**
 
 Run:
 
