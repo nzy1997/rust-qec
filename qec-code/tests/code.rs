@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
+    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
@@ -426,6 +426,102 @@ fn validate_apm_table_a1_manifest(manifest: &Value) -> std::result::Result<(), S
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DocumentedAffineMap {
+    a: u64,
+    b: u64,
+    modulus: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DocumentedApmShape {
+    n: u64,
+    mx: u64,
+    mz: u64,
+}
+
+fn gcd_u64(mut lhs: u64, mut rhs: u64) -> u64 {
+    while rhs != 0 {
+        let next = lhs % rhs;
+        lhs = rhs;
+        rhs = next;
+    }
+    lhs
+}
+
+fn parse_documented_affine_map(
+    a: u64,
+    b: u64,
+    modulus: u64,
+) -> Result<DocumentedAffineMap, String> {
+    if modulus == 0 {
+        return Err("affine map modulus must be positive".to_owned());
+    }
+    if gcd_u64(a, modulus) != 1 {
+        return Err(format!("affine slope {a} is not a unit modulo {modulus}"));
+    }
+    Ok(DocumentedAffineMap {
+        a: a % modulus,
+        b: b % modulus,
+        modulus,
+    })
+}
+
+fn mod_i128(value: i128, modulus: u64) -> u64 {
+    let modulus = modulus as i128;
+    value.rem_euclid(modulus) as u64
+}
+
+fn affine_commutation_residual(lhs: DocumentedAffineMap, rhs: DocumentedAffineMap) -> u64 {
+    assert_eq!(
+        lhs.modulus, rhs.modulus,
+        "affine residual requires a shared modulus"
+    );
+    mod_i128(
+        lhs.a as i128 * rhs.b as i128 + lhs.b as i128
+            - rhs.a as i128 * lhs.b as i128
+            - rhs.b as i128,
+        lhs.modulus,
+    )
+}
+
+fn documented_apm_shape(p: u64, j: u64, l: u64) -> DocumentedApmShape {
+    DocumentedApmShape {
+        n: p * l,
+        mx: p * j,
+        mz: p * j,
+    }
+}
+
+fn apm_entry_by_code_id<'a>(manifest: &'a Value, code_id: &str) -> &'a Value {
+    manifest["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["code_id"] == code_id)
+        .unwrap()
+}
+
+fn u64_json(value: &Value) -> u64 {
+    value.as_u64().unwrap()
+}
+
+fn documented_manifest_map(
+    entry: &Value,
+    label: &str,
+    modulus: u64,
+) -> Result<DocumentedAffineMap, String> {
+    let label = label.strip_prefix("column_component:").unwrap_or(label);
+    let (family, index) = label.split_at(1);
+    let index: usize = index.parse().unwrap();
+    let map = &entry[family][index];
+    match family {
+        "f" => parse_documented_affine_map(u64_json(&map["a"]), u64_json(&map["b"]), modulus),
+        "g" => parse_documented_affine_map(u64_json(&map["c"]), u64_json(&map["d"]), modulus),
+        _ => panic!("unknown APM family label {label}"),
+    }
+}
+
 fn assert_surface_rotated_d5_weights(rows: &[Vec<usize>]) {
     let counts = row_weight_counts(rows);
     assert_eq!(counts.get(&2), Some(&4));
@@ -488,6 +584,61 @@ fn apm_table_a1_manifest_rejects_mutated_affine_coefficient() {
         err.contains("apm_kasai:p=96") && err.contains("f[0].a"),
         "error should identify the changed coefficient and code id: {err}"
     );
+}
+
+#[test]
+fn apm_contract_doc_examples_compile() {
+    let doc = include_str!("../doc/apm_css.md");
+    assert!(doc.contains("AffineMap { a, b, modulus }"));
+    assert!(doc.contains("Delta"));
+    assert!(doc.contains("Gamma"));
+    assert!(doc.contains("qec-code/tests/fixtures/apm/table_a1_manifest.json"));
+
+    let manifest: Value =
+        serde_json::from_str(include_str!("fixtures/apm/table_a1_manifest.json")).unwrap();
+    let p96 = apm_entry_by_code_id(&manifest, "apm_kasai:p=96");
+
+    assert_eq!(
+        documented_apm_shape(
+            u64_json(&p96["P"]),
+            u64_json(&p96["J"]),
+            u64_json(&p96["L"])
+        ),
+        DocumentedApmShape {
+            n: 1152,
+            mx: 288,
+            mz: 288,
+        }
+    );
+
+    let gamma_pair = &p96["required_commuting_pairs"][0];
+    let gamma_modulus = u64_json(&gamma_pair["modulus"]);
+    let gamma_left =
+        documented_manifest_map(p96, gamma_pair["left"].as_str().unwrap(), gamma_modulus).unwrap();
+    let gamma_right =
+        documented_manifest_map(p96, gamma_pair["right"].as_str().unwrap(), gamma_modulus).unwrap();
+    assert_eq!(affine_commutation_residual(gamma_left, gamma_right), 0);
+
+    let noncommuting_pair = &p96["required_noncommuting_pairs"][0];
+    let noncommuting_left = documented_manifest_map(
+        p96,
+        &format!("f{}", u64_json(&noncommuting_pair["left_index"])),
+        u64_json(&p96["P"]),
+    )
+    .unwrap();
+    let noncommuting_right = documented_manifest_map(
+        p96,
+        &format!("g{}", u64_json(&noncommuting_pair["right_index"])),
+        u64_json(&p96["P"]),
+    )
+    .unwrap();
+    assert_ne!(
+        affine_commutation_residual(noncommuting_left, noncommuting_right),
+        0
+    );
+
+    let invalid = parse_documented_affine_map(2, 0, 96).unwrap_err();
+    assert!(invalid.contains("not a unit modulo 96"));
 }
 
 #[test]
