@@ -150,12 +150,18 @@ impl AffinePermutation {
             });
         }
 
-        Ok(mod_i128(
-            self.slope as i128 * other.offset as i128 + self.offset as i128
-                - other.slope as i128 * self.offset as i128
-                - other.offset as i128,
+        let lhs = add_mod(
+            mul_mod(self.slope, other.offset, self.modulus),
+            self.offset,
             self.modulus,
-        ))
+        );
+        let rhs = add_mod(
+            mul_mod(other.slope, self.offset, self.modulus),
+            other.offset,
+            self.modulus,
+        );
+
+        Ok(sub_mod(lhs, rhs, self.modulus))
     }
 
     pub(crate) fn commutes_with(&self, other: &Self) -> Result<bool, AffinePermutationError> {
@@ -280,8 +286,8 @@ fn mul_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
     ((lhs as u128 * rhs as u128) % modulus as u128) as u64
 }
 
-fn mod_i128(value: i128, modulus: u64) -> u64 {
-    value.rem_euclid(modulus as i128) as u64
+fn sub_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
+    ((lhs as u128 + modulus as u128 - rhs as u128) % modulus as u128) as u64
 }
 
 fn neg_mod(value: u64, modulus: u64) -> u64 {
@@ -450,6 +456,22 @@ mod tests {
     #[test]
     fn modular_inverse_returns_none_for_non_unit() {
         assert_eq!(modular_inverse(2, 96), None);
+    }
+
+    #[test]
+    fn affine_commutation_residual_handles_large_parameters() {
+        let modulus = u64::MAX - 58;
+        let lhs = AffinePermutation::new(modulus, modulus - 1, modulus - 2).unwrap();
+        let rhs = AffinePermutation::new(modulus, modulus - 1, modulus - 3).unwrap();
+
+        let residual = lhs.commutation_residual(&rhs).unwrap();
+        assert_ne!(residual, 0);
+
+        for x in [0, 1, modulus / 3, modulus - 1] {
+            let lhs_rhs = lhs.apply(rhs.apply(x));
+            let rhs_lhs = rhs.apply(lhs.apply(x));
+            assert_eq!(lhs_rhs == rhs_lhs, residual == 0);
+        }
     }
 
     #[test]
