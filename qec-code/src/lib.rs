@@ -1,3 +1,6 @@
+#[cfg(test)]
+extern crate self as qec_code;
+
 pub mod binary;
 pub mod cli;
 pub mod code;
