@@ -60,8 +60,8 @@
       "provenance": {
         "paper": "arXiv:2604.16209v1",
         "table": "Table A1",
-        "source_grounded_fields": ["P", "J", "L", "f", "g", "rate", "distance", "girth", "required_noncommuting_pairs"],
-        "derived_fields": ["n", "mx", "mz", "expected_weights", "structural_expectations"]
+        "source_grounded_fields": ["P", "J", "L", "L2", "f", "g", "expected_code_shape.n", "expected_code_shape.k", "expected_code_shape.rate", "expected_code_shape.distance", "girth", "required_noncommuting_pairs"],
+        "derived_fields": ["expected_code_shape.mx", "expected_code_shape.mz", "expected_weights", "required_commuting_pairs", "structural_expectations"]
       },
       "references": [
         {"kind": "paper", "url": "https://arxiv.org/abs/2604.16209", "section": "Appendix A / Table A1"},
@@ -128,8 +128,8 @@
       "provenance": {
         "paper": "arXiv:2604.16209v1",
         "table": "Table A1",
-        "source_grounded_fields": ["P", "J", "L", "f", "g", "rate", "distance", "girth", "required_noncommuting_pairs"],
-        "derived_fields": ["n", "mx", "mz", "expected_weights", "structural_expectations"]
+        "source_grounded_fields": ["P", "J", "L", "L2", "f", "g", "expected_code_shape.n", "expected_code_shape.k", "expected_code_shape.rate", "expected_code_shape.distance", "girth", "required_noncommuting_pairs"],
+        "derived_fields": ["expected_code_shape.mx", "expected_code_shape.mz", "expected_weights", "required_commuting_pairs", "structural_expectations"]
       },
       "references": [
         {"kind": "paper", "url": "https://arxiv.org/abs/2604.16209", "section": "Appendix A / Table A1"},
