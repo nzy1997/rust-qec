@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "manifest_id": "apm_kasai_table_a1",
+  "entries": [
+    {
+      "code_id": "apm_kasai:p=96",
+      "P": 96,
+      "J": 3,
+      "L": 12,
+      "L2": 6,
+      "f": [
+        {"i": 0, "a": 5, "b": 41},
+        {"i": 1, "a": 85, "b": 77},
+        {"i": 2, "a": 73, "b": 66},
+        {"i": 3, "a": 1, "b": 0},
+        {"i": 4, "a": 1, "b": 72},
+        {"i": 5, "a": 37, "b": 9}
+      ],
+      "g": [
+        {"i": 0, "c": 61, "d": 15},
+        {"i": 1, "c": 1, "d": 24},
+        {"i": 2, "c": 89, "d": 62},
+        {"i": 3, "c": 25, "d": 22},
+        {"i": 4, "c": 85, "d": 93},
+        {"i": 5, "c": 25, "d": 78}
+      ],
+      "expected_code_shape": {
+        "n": 1152,
+        "mx": 288,
+        "mz": 288,
+        "k": 580,
+        "rate": "0.503",
+        "distance": {"kind": "upper_bound", "value": 12}
+      },
+      "expected_weights": {
+        "hx_row": 12,
+        "hz_row": 12,
+        "hx_column": 3,
+        "hz_column": 3,
+        "combined_data_qubit_degree": 6
+      },
+      "girth": {"kind": "lower_bound", "value": 6},
+      "required_commuting_pairs": [
+        {"left": "column_component:f0", "right": "column_component:f1", "modulus": 32},
+        {"left": "column_component:f0", "right": "column_component:g0", "modulus": 32},
+        {"left": "column_component:g0", "right": "column_component:g1", "modulus": 32}
+      ],
+      "required_noncommuting_pairs": [
+        {"left_index": 0, "right_index": 3},
+        {"left_index": 1, "right_index": 2}
+      ],
+      "structural_expectations": {
+        "active_block_rows": 3,
+        "block_columns": 12,
+        "apm_maps_per_family": 6,
+        "column_component_modulus": 32,
+        "column_component_group_status": "abelian",
+        "column_component_group": "Z32"
+      },
+      "provenance": {
+        "paper": "arXiv:2604.16209v1",
+        "table": "Table A1",
+        "source_grounded_fields": ["P", "J", "L", "L2", "f", "g", "expected_code_shape.n", "expected_code_shape.k", "expected_code_shape.rate", "expected_code_shape.distance", "girth", "required_noncommuting_pairs"],
+        "derived_fields": ["expected_code_shape.mx", "expected_code_shape.mz", "expected_weights", "required_commuting_pairs", "structural_expectations"]
+      },
+      "references": [
+        {"kind": "paper", "url": "https://arxiv.org/abs/2604.16209", "section": "Appendix A / Table A1"},
+        {"kind": "paper", "url": "https://arxiv.org/pdf/2604.16209", "section": "Appendix D.2"},
+        {"kind": "local", "path": "drafts/construct_apm_css_code/README.md"},
+        {"kind": "local", "path": "drafts/joint_BP_plus_PP/README.md"}
+      ]
+    },
+    {
+      "code_id": "apm_kasai:p=192",
+      "P": 192,
+      "J": 3,
+      "L": 12,
+      "L2": 6,
+      "f": [
+        {"i": 0, "a": 71, "b": 127},
+        {"i": 1, "a": 97, "b": 80},
+        {"i": 2, "a": 67, "b": 117},
+        {"i": 3, "a": 163, "b": 165},
+        {"i": 4, "a": 25, "b": 60},
+        {"i": 5, "a": 187, "b": 33}
+      ],
+      "g": [
+        {"i": 0, "c": 163, "d": 165},
+        {"i": 1, "c": 55, "d": 183},
+        {"i": 2, "c": 167, "d": 79},
+        {"i": 3, "c": 139, "d": 41},
+        {"i": 4, "c": 109, "d": 78},
+        {"i": 5, "c": 31, "d": 27}
+      ],
+      "expected_code_shape": {
+        "n": 2304,
+        "mx": 576,
+        "mz": 576,
+        "k": 1156,
+        "rate": "0.502",
+        "distance": {"kind": "upper_bound", "value": 14}
+      },
+      "expected_weights": {
+        "hx_row": 12,
+        "hz_row": 12,
+        "hx_column": 3,
+        "hz_column": 3,
+        "combined_data_qubit_degree": 6
+      },
+      "girth": {"kind": "lower_bound", "value": 6},
+      "required_commuting_pairs": [
+        {"left": "column_component:f0", "right": "column_component:f1", "modulus": 64},
+        {"left": "column_component:f0", "right": "column_component:g0", "modulus": 64},
+        {"left": "column_component:g0", "right": "column_component:g1", "modulus": 64}
+      ],
+      "required_noncommuting_pairs": [
+        {"left_index": 0, "right_index": 3},
+        {"left_index": 1, "right_index": 2}
+      ],
+      "structural_expectations": {
+        "active_block_rows": 3,
+        "block_columns": 12,
+        "apm_maps_per_family": 6,
+        "column_component_modulus": 64,
+        "column_component_group_status": "abelian",
+        "column_component_group": "Z32xZ2"
+      },
+      "provenance": {
+        "paper": "arXiv:2604.16209v1",
+        "table": "Table A1",
+        "source_grounded_fields": ["P", "J", "L", "L2", "f", "g", "expected_code_shape.n", "expected_code_shape.k", "expected_code_shape.rate", "expected_code_shape.distance", "girth", "required_noncommuting_pairs"],
+        "derived_fields": ["expected_code_shape.mx", "expected_code_shape.mz", "expected_weights", "required_commuting_pairs", "structural_expectations"]
+      },
+      "references": [
+        {"kind": "paper", "url": "https://arxiv.org/abs/2604.16209", "section": "Appendix A / Table A1"},
+        {"kind": "paper", "url": "https://arxiv.org/pdf/2604.16209", "section": "Appendix D.2"},
+        {"kind": "local", "path": "drafts/construct_apm_css_code/README.md"},
+        {"kind": "local", "path": "drafts/joint_BP_plus_PP/README.md"}
+      ]
+    }
+  ]
+}
