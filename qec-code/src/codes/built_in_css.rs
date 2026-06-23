@@ -33,11 +33,13 @@ pub enum BuiltInCssFamily {
     RepetitionZ,
     SurfaceRotated,
     Toric,
+    BivariateBicycle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BuiltInCssParams {
-    pub distance: usize,
+pub enum BuiltInCssParams {
+    Distance { distance: usize },
+    BivariateBicycle(BivariateBicycleParams),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +95,10 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
                 parameter: "d".to_owned(),
             })
         }
+        "bb" => Err(QecError::MissingBuiltInCssParameter {
+            family: input.to_owned(),
+            parameter: "lx".to_owned(),
+        }),
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: input.to_owned(),
         }),
@@ -103,23 +109,40 @@ fn parse_built_in_css_family_spec(
     family_name: &str,
     params_text: &str,
 ) -> Result<BuiltInCssCodeSpec> {
-    let family = match family_name {
-        "repetition_x" => BuiltInCssFamily::RepetitionX,
-        "repetition_z" => BuiltInCssFamily::RepetitionZ,
-        "surface_rotated" => BuiltInCssFamily::SurfaceRotated,
-        "toric" => BuiltInCssFamily::Toric,
-        _ => {
-            return Err(QecError::UnknownBuiltInCssFamily {
-                family: family_name.to_owned(),
-            });
+    match family_name {
+        "repetition_x" => {
+            parse_distance_family_spec(family_name, BuiltInCssFamily::RepetitionX, params_text)
         }
-    };
+        "repetition_z" => {
+            parse_distance_family_spec(family_name, BuiltInCssFamily::RepetitionZ, params_text)
+        }
+        "surface_rotated" => {
+            parse_distance_family_spec(family_name, BuiltInCssFamily::SurfaceRotated, params_text)
+        }
+        "toric" => parse_distance_family_spec(family_name, BuiltInCssFamily::Toric, params_text),
+        "bb" => {
+            let params = parse_bivariate_bicycle_params(family_name, params_text)?;
+            Ok(BuiltInCssCodeSpec::Family {
+                family: BuiltInCssFamily::BivariateBicycle,
+                params: BuiltInCssParams::BivariateBicycle(params),
+            })
+        }
+        _ => Err(QecError::UnknownBuiltInCssFamily {
+            family: family_name.to_owned(),
+        }),
+    }
+}
 
+fn parse_distance_family_spec(
+    family_name: &str,
+    family: BuiltInCssFamily,
+    params_text: &str,
+) -> Result<BuiltInCssCodeSpec> {
     let distance = parse_repetition_distance(family_name, params_text)?;
 
     Ok(BuiltInCssCodeSpec::Family {
         family,
-        params: BuiltInCssParams { distance },
+        params: BuiltInCssParams::Distance { distance },
     })
 }
 
@@ -181,6 +204,148 @@ fn parse_repetition_distance(family_name: &str, params_text: &str) -> Result<usi
         family: family_name.to_owned(),
         parameter: "d".to_owned(),
     })
+}
+
+fn parse_bivariate_bicycle_params(
+    family_name: &str,
+    params_text: &str,
+) -> Result<BivariateBicycleParams> {
+    if params_text.is_empty() {
+        return Err(QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "lx".to_owned(),
+        });
+    }
+
+    let mut lx = None;
+    let mut ly = None;
+    let mut a_terms = None;
+    let mut b_terms = None;
+
+    for pair in params_text.split(',') {
+        let Some((key, value)) = pair.split_once('=') else {
+            return Err(QecError::UnexpectedBuiltInCssParameter {
+                family: family_name.to_owned(),
+                parameter: pair.to_owned(),
+            });
+        };
+
+        match key {
+            "lx" => parse_unique_positive_usize_param(family_name, "lx", value, &mut lx)?,
+            "ly" => parse_unique_positive_usize_param(family_name, "ly", value, &mut ly)?,
+            "a" => parse_unique_bivariate_bicycle_terms(family_name, "a", value, &mut a_terms)?,
+            "b" => parse_unique_bivariate_bicycle_terms(family_name, "b", value, &mut b_terms)?,
+            _ => {
+                return Err(QecError::UnexpectedBuiltInCssParameter {
+                    family: family_name.to_owned(),
+                    parameter: key.to_owned(),
+                });
+            }
+        }
+    }
+
+    let params = BivariateBicycleParams {
+        lx: lx.ok_or_else(|| QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "lx".to_owned(),
+        })?,
+        ly: ly.ok_or_else(|| QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "ly".to_owned(),
+        })?,
+        a_terms: a_terms.ok_or_else(|| QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "a".to_owned(),
+        })?,
+        b_terms: b_terms.ok_or_else(|| QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "b".to_owned(),
+        })?,
+    };
+
+    validate_bivariate_bicycle_params(&params)?;
+    Ok(params)
+}
+
+fn parse_unique_positive_usize_param(
+    family_name: &str,
+    parameter: &'static str,
+    value: &str,
+    slot: &mut Option<usize>,
+) -> Result<()> {
+    if slot.is_some() {
+        return Err(QecError::DuplicateBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: parameter.to_owned(),
+        });
+    }
+
+    let parsed =
+        value
+            .parse::<usize>()
+            .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
+                family: family_name.to_owned(),
+                parameter: parameter.to_owned(),
+                value: value.to_owned(),
+            })?;
+
+    if parsed == 0 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: family_name.to_owned(),
+            parameter: parameter.to_owned(),
+            value: parsed,
+        });
+    }
+
+    *slot = Some(parsed);
+    Ok(())
+}
+
+fn parse_unique_bivariate_bicycle_terms(
+    family_name: &str,
+    parameter: &'static str,
+    value: &str,
+    slot: &mut Option<Vec<(usize, usize)>>,
+) -> Result<()> {
+    if slot.is_some() {
+        return Err(QecError::DuplicateBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: parameter.to_owned(),
+        });
+    }
+
+    let mut terms = Vec::new();
+    for term in value.split('|') {
+        let Some((dx_text, dy_text)) = term.split_once(':') else {
+            return Err(QecError::InvalidBuiltInCssIntegerParameter {
+                family: family_name.to_owned(),
+                parameter: parameter.to_owned(),
+                value: term.to_owned(),
+            });
+        };
+
+        let dx =
+            dx_text
+                .parse::<usize>()
+                .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
+                    family: family_name.to_owned(),
+                    parameter: parameter.to_owned(),
+                    value: dx_text.to_owned(),
+                })?;
+        let dy =
+            dy_text
+                .parse::<usize>()
+                .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
+                    family: family_name.to_owned(),
+                    parameter: parameter.to_owned(),
+                    value: dy_text.to_owned(),
+                })?;
+
+        terms.push((dx, dy));
+    }
+
+    *slot = Some(terms);
+    Ok(())
 }
 
 const STEANE_ROW_SUPPORTS: &[&[usize]] = &[&[0, 3, 5, 6], &[1, 3, 4, 6], &[2, 4, 5, 6]];
@@ -318,7 +483,7 @@ fn validate_bivariate_bicycle_terms(
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match parse_built_in_css_code_spec(code_id)? {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
-        BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params.distance),
+        BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params),
     }
 }
 
@@ -344,9 +509,15 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
     }
 }
 
-fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltInCssChecks> {
+fn family_css_checks(
+    family: BuiltInCssFamily,
+    params: BuiltInCssParams,
+) -> Result<BuiltInCssChecks> {
     match family {
         BuiltInCssFamily::RepetitionX => {
+            let BuiltInCssParams::Distance { distance } = params else {
+                unreachable!("repetition_x only uses distance params");
+            };
             let hx = chain_supports("repetition_x", distance)?;
             Ok(BuiltInCssChecks {
                 code_id: "repetition_x",
@@ -356,6 +527,9 @@ fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltI
             })
         }
         BuiltInCssFamily::RepetitionZ => {
+            let BuiltInCssParams::Distance { distance } = params else {
+                unreachable!("repetition_z only uses distance params");
+            };
             let hz = chain_supports("repetition_z", distance)?;
             Ok(BuiltInCssChecks {
                 code_id: "repetition_z",
@@ -364,8 +538,24 @@ fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltI
                 hz,
             })
         }
-        BuiltInCssFamily::SurfaceRotated => surface_rotated_css_checks(distance),
-        BuiltInCssFamily::Toric => toric_css_checks(distance),
+        BuiltInCssFamily::SurfaceRotated => {
+            let BuiltInCssParams::Distance { distance } = params else {
+                unreachable!("surface_rotated only uses distance params");
+            };
+            surface_rotated_css_checks(distance)
+        }
+        BuiltInCssFamily::Toric => {
+            let BuiltInCssParams::Distance { distance } = params else {
+                unreachable!("toric only uses distance params");
+            };
+            toric_css_checks(distance)
+        }
+        BuiltInCssFamily::BivariateBicycle => {
+            let BuiltInCssParams::BivariateBicycle(params) = params else {
+                unreachable!("bb only uses bivariate-bicycle params");
+            };
+            bivariate_bicycle_css_checks(params)
+        }
     }
 }
 
