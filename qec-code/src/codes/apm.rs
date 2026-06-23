@@ -722,6 +722,10 @@ fn modular_inverse(value: u64, modulus: u64) -> Option<u64> {
 }
 
 #[cfg(test)]
+#[path = "../../tests/support/apm_verifier.rs"]
+mod apm_verifier;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::Value;
@@ -1188,6 +1192,123 @@ mod tests {
             &checks.hx,
             &wrong_hz_second_half
         ));
+    }
+
+    fn apm_p96_verifier_expectations() -> apm_verifier::ApmCssVerifierExpectations {
+        apm_verifier::ApmCssVerifierExpectations {
+            num_cols: Some(1152),
+            mx: Some(288),
+            mz: Some(288),
+            row_weight_x: Some(12),
+            row_weight_z: Some(12),
+            column_weight_x: Some(3),
+            column_weight_z: Some(3),
+            k: Some(580),
+            orthogonal: Some(true),
+            girth_lower_bound: Some(6),
+        }
+    }
+
+    #[test]
+    fn apm_p96_verifier_reports_paper_stats() {
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/apm/table_a1_manifest.json"
+        ))
+        .unwrap();
+        let entry = parse_p96_apm_manifest_entry(&manifest);
+        let checks = build_apm_css_checks(&entry).unwrap();
+
+        let report = apm_verifier::verify_apm_css_matrices(
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hx",
+                num_cols: checks.num_cols,
+                rows: &checks.hx,
+            },
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hz",
+                num_cols: checks.num_cols,
+                rows: &checks.hz,
+            },
+            &apm_p96_verifier_expectations(),
+        )
+        .unwrap();
+
+        assert!(report.orthogonal);
+        assert_eq!(report.num_cols, 1152);
+        assert_eq!(report.mx, 288);
+        assert_eq!(report.mz, 288);
+        assert_eq!(report.k, 580);
+        assert_eq!(report.rank_x + report.rank_z, 572);
+        assert_eq!(
+            report.x.row_weight,
+            apm_verifier::WeightStats {
+                min: 12,
+                average: 12.0,
+                max: 12
+            }
+        );
+        assert_eq!(
+            report.z.row_weight,
+            apm_verifier::WeightStats {
+                min: 12,
+                average: 12.0,
+                max: 12
+            }
+        );
+        assert_eq!(
+            report.x.column_weight,
+            apm_verifier::WeightStats {
+                min: 3,
+                average: 3.0,
+                max: 3
+            }
+        );
+        assert_eq!(
+            report.z.column_weight,
+            apm_verifier::WeightStats {
+                min: 3,
+                average: 3.0,
+                max: 3
+            }
+        );
+        assert!(report.x.girth.meets_lower_bound(6));
+        assert!(report.z.girth.meets_lower_bound(6));
+
+        let mut duplicate_hx = checks.hx.clone();
+        duplicate_hx[0][1] = duplicate_hx[0][0];
+        let duplicate_err = apm_verifier::verify_apm_css_matrices(
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hx",
+                num_cols: checks.num_cols,
+                rows: &duplicate_hx,
+            },
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hz",
+                num_cols: checks.num_cols,
+                rows: &checks.hz,
+            },
+            &apm_p96_verifier_expectations(),
+        )
+        .unwrap_err();
+        assert!(duplicate_err.contains("duplicate support"), "{duplicate_err}");
+
+        let mut out_of_range_hz = checks.hz.clone();
+        out_of_range_hz[0][0] = checks.num_cols;
+        let range_err = apm_verifier::verify_apm_css_matrices(
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hx",
+                num_cols: checks.num_cols,
+                rows: &checks.hx,
+            },
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hz",
+                num_cols: checks.num_cols,
+                rows: &out_of_range_hz,
+            },
+            &apm_p96_verifier_expectations(),
+        )
+        .unwrap_err();
+        assert!(range_err.contains("out-of-range support"), "{range_err}");
     }
 
     #[test]
