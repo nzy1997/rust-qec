@@ -74,6 +74,24 @@ fn bb144_bivariate_bicycle_params() -> BivariateBicycleParams {
     }
 }
 
+fn bivariate_bicycle_large_shift_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 3,
+        ly: 2,
+        a_terms: vec![(usize::MAX, 1)],
+        b_terms: vec![(1, usize::MAX)],
+    }
+}
+
+fn bivariate_bicycle_normalized_shift_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 3,
+        ly: 2,
+        a_terms: vec![(0, 1)],
+        b_terms: vec![(1, 1)],
+    }
+}
+
 #[test]
 fn stabilizer_code_rejects_noncommuting_generators() {
     let x0 = Pauli::from_xz_bits(vec![1], vec![0]).unwrap();
@@ -327,6 +345,15 @@ fn bivariate_bicycle_css_checks_rejects_modulo_duplicate_terms() {
     params.a_terms = vec![(0, 0), (6, 0)];
 
     assert!(bivariate_bicycle_css_checks(params).is_err());
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_normalizes_large_shifts_before_row_generation() {
+    let large = bivariate_bicycle_css_checks(bivariate_bicycle_large_shift_params()).unwrap();
+    let normalized =
+        bivariate_bicycle_css_checks(bivariate_bicycle_normalized_shift_params()).unwrap();
+
+    assert_eq!(large, normalized);
 }
 
 #[test]

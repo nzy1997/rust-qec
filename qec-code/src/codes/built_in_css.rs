@@ -209,6 +209,15 @@ fn bivariate_bicycle_checks(
 ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
     let block = lx * ly;
     let index = |x: usize, y: usize| -> usize { (x % lx) * ly + (y % ly) };
+    let periodic_add = |coord: usize, shift: usize, period: usize| -> usize {
+        if shift == 0 {
+            coord
+        } else if coord >= period - shift {
+            coord - (period - shift)
+        } else {
+            coord + shift
+        }
+    };
     let mut hx = Vec::with_capacity(block);
     let mut hz = Vec::with_capacity(block);
 
@@ -216,10 +225,14 @@ fn bivariate_bicycle_checks(
         for y in 0..ly {
             let mut x_row = Vec::new();
             for &(dx, dy) in a_terms {
-                x_row.push(index(x + dx, y + dy));
+                let dx = dx % lx;
+                let dy = dy % ly;
+                x_row.push(index(periodic_add(x, dx, lx), periodic_add(y, dy, ly)));
             }
             for &(dx, dy) in b_terms {
-                x_row.push(block + index(x + dx, y + dy));
+                let dx = dx % lx;
+                let dy = dy % ly;
+                x_row.push(block + index(periodic_add(x, dx, lx), periodic_add(y, dy, ly)));
             }
             x_row.sort_unstable();
             hx.push(x_row);
