@@ -203,6 +203,27 @@ mod tests {
     }
 
     #[test]
+    fn affine_permutation_displays_validation_errors() {
+        assert_eq!(
+            AffinePermutationError::InvalidModulus.to_string(),
+            "affine permutation modulus must be positive"
+        );
+        assert_eq!(
+            AffinePermutationError::ModulusMismatch { lhs: 96, rhs: 192 }.to_string(),
+            "affine permutation modulus mismatch: 96 != 192"
+        );
+    }
+
+    #[test]
+    fn affine_permutation_inverse_handles_zero_offset() {
+        let permutation = AffinePermutation::new(96, 5, 0).unwrap();
+        let inverse = permutation.inverse();
+
+        assert_eq!(inverse.apply(permutation.apply(0)), 0);
+        assert_eq!(inverse.apply(permutation.apply(95)), 95);
+    }
+
+    #[test]
     fn affine_permutation_rejects_modulus_mismatch_composition() {
         let lhs = AffinePermutation::new(96, 5, 41).unwrap();
         let rhs = AffinePermutation::new(192, 71, 127).unwrap();
@@ -211,5 +232,10 @@ mod tests {
             lhs.compose_after(&rhs),
             Err(AffinePermutationError::ModulusMismatch { lhs: 96, rhs: 192 })
         );
+    }
+
+    #[test]
+    fn modular_inverse_returns_none_for_non_unit() {
+        assert_eq!(modular_inverse(2, 96), None);
     }
 }
