@@ -715,6 +715,89 @@ fn built_in_css_code_spec_rejects_bad_bivariate_bicycle_params() {
 }
 
 #[test]
+fn built_in_css_code_spec_rejects_malformed_bivariate_bicycle_shapes() {
+    let cases = [
+        (
+            "bb",
+            QecError::MissingBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "lx".to_owned(),
+            },
+        ),
+        (
+            "bb:",
+            QecError::MissingBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "lx".to_owned(),
+            },
+        ),
+        (
+            "bb:lx",
+            QecError::UnexpectedBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "lx".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=nope,ly=6,a=3:0,b=0:3",
+            QecError::InvalidBuiltInCssIntegerParameter {
+                family: "bb".to_owned(),
+                parameter: "lx".to_owned(),
+                value: "nope".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,a=3:0,b=0:3",
+            QecError::MissingBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "ly".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,ly=6,a=3:0",
+            QecError::MissingBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "b".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,ly=6,a=3:0,a=0:1,b=0:3",
+            QecError::DuplicateBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "a".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,ly=6,a=3:0,b=0:3,b=1:0",
+            QecError::DuplicateBuiltInCssParameter {
+                family: "bb".to_owned(),
+                parameter: "b".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,ly=6,a=x:0,b=0:3",
+            QecError::InvalidBuiltInCssIntegerParameter {
+                family: "bb".to_owned(),
+                parameter: "a".to_owned(),
+                value: "x".to_owned(),
+            },
+        ),
+        (
+            "bb:lx=12,ly=6,a=3:x,b=0:3",
+            QecError::InvalidBuiltInCssIntegerParameter {
+                family: "bb".to_owned(),
+                parameter: "a".to_owned(),
+                value: "x".to_owned(),
+            },
+        ),
+    ];
+
+    for (spec, expected) in cases {
+        assert_eq!(parse_built_in_css_code_spec(spec), Err(expected), "{spec}");
+    }
+}
+
+#[test]
 fn built_in_css_checks_rejects_parser_only_bivariate_bicycle_specs() {
     let spec = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
 
