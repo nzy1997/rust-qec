@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
-    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_catalog,
-    built_in_css_checks, parse_built_in_css_code_spec,
+    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
+    bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
+    parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix};
@@ -53,6 +54,42 @@ fn assert_surface_rotated_d5_weights(rows: &[Vec<usize>]) {
     assert_eq!(counts.get(&2), Some(&4));
     assert_eq!(counts.get(&4), Some(&8));
     assert_eq!(counts.values().sum::<usize>(), 12);
+}
+
+fn bb72_bivariate_bicycle_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 6,
+        ly: 6,
+        a_terms: vec![(3, 0), (0, 1), (0, 2)],
+        b_terms: vec![(0, 3), (1, 0), (2, 0)],
+    }
+}
+
+fn bb144_bivariate_bicycle_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 12,
+        ly: 6,
+        a_terms: vec![(3, 0), (0, 1), (0, 2)],
+        b_terms: vec![(0, 3), (1, 0), (2, 0)],
+    }
+}
+
+fn bivariate_bicycle_large_shift_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 3,
+        ly: 2,
+        a_terms: vec![(usize::MAX, 1)],
+        b_terms: vec![(1, usize::MAX)],
+    }
+}
+
+fn bivariate_bicycle_normalized_shift_params() -> BivariateBicycleParams {
+    BivariateBicycleParams {
+        lx: 3,
+        ly: 2,
+        a_terms: vec![(0, 1)],
+        b_terms: vec![(1, 1)],
+    }
 }
 
 #[test]
@@ -249,6 +286,111 @@ fn bb72_has_expected_shape_and_css_orthogonality() {
         dense_rows(&checks.hz, checks.num_cols),
     )
     .unwrap();
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_bb72_matches_fixed_alias() {
+    let fixed = built_in_css_checks("bb72").unwrap();
+    let generic = bivariate_bicycle_css_checks(bb72_bivariate_bicycle_params()).unwrap();
+
+    assert_eq!(generic.code_id, "bb");
+    assert_eq!(generic.num_cols, fixed.num_cols);
+    assert_eq!(generic.hx, fixed.hx);
+    assert_eq!(generic.hz, fixed.hz);
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_bb144_shape_orthogonality_and_canonical_rows() {
+    let checks = bivariate_bicycle_css_checks(bb144_bivariate_bicycle_params()).unwrap();
+
+    assert_eq!(checks.code_id, "bb");
+    assert_eq!(checks.num_cols, 144);
+    assert_eq!(checks.hx.len(), 72);
+    assert_eq!(checks.hz.len(), 72);
+
+    for row in checks.hx.iter().chain(checks.hz.iter()) {
+        assert_eq!(row.len(), 6, "row has wrong weight: {row:?}");
+    }
+
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    CssCode::from_hx_hz(
+        dense_rows(&checks.hx, checks.num_cols),
+        dense_rows(&checks.hz, checks.num_cols),
+    )
+    .unwrap();
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_rejects_zero_lattice_dimension() {
+    let mut params = bb144_bivariate_bicycle_params();
+    params.lx = 0;
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "lx".to_owned(),
+            value: 0,
+        })
+    );
+
+    let mut params = bb144_bivariate_bicycle_params();
+    params.ly = 0;
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "ly".to_owned(),
+            value: 0,
+        })
+    );
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_rejects_empty_term_lists() {
+    let mut params = bb72_bivariate_bicycle_params();
+    params.a_terms = vec![];
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "bb".to_owned(),
+            parameter: "a_terms".to_owned(),
+        })
+    );
+
+    let mut params = bb72_bivariate_bicycle_params();
+    params.b_terms = vec![];
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "bb".to_owned(),
+            parameter: "b_terms".to_owned(),
+        })
+    );
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_rejects_modulo_duplicate_terms() {
+    let mut params = bb72_bivariate_bicycle_params();
+    params.a_terms = vec![(0, 0), (6, 0)];
+
+    assert!(bivariate_bicycle_css_checks(params).is_err());
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_normalizes_large_shifts_before_row_generation() {
+    let large = bivariate_bicycle_css_checks(bivariate_bicycle_large_shift_params()).unwrap();
+    let normalized =
+        bivariate_bicycle_css_checks(bivariate_bicycle_normalized_shift_params()).unwrap();
+
+    assert_eq!(large, normalized);
 }
 
 #[test]
