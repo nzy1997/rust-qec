@@ -337,6 +337,43 @@ fn bivariate_bicycle_css_checks_rejects_zero_lattice_dimension() {
             value: 0,
         })
     );
+
+    let mut params = bb144_bivariate_bicycle_params();
+    params.ly = 0;
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "ly".to_owned(),
+            value: 0,
+        })
+    );
+}
+
+#[test]
+fn bivariate_bicycle_css_checks_rejects_empty_term_lists() {
+    let mut params = bb72_bivariate_bicycle_params();
+    params.a_terms = vec![];
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "bb".to_owned(),
+            parameter: "a_terms".to_owned(),
+        })
+    );
+
+    let mut params = bb72_bivariate_bicycle_params();
+    params.b_terms = vec![];
+
+    assert_eq!(
+        bivariate_bicycle_css_checks(params),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "bb".to_owned(),
+            parameter: "b_terms".to_owned(),
+        })
+    );
 }
 
 #[test]
