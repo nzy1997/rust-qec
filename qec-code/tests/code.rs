@@ -509,10 +509,6 @@ fn assert_apm_p96_fixture_stats(
             rank_x + rank_z
         ));
     }
-    let logical_qubits = hx.num_cols - rank_x - rank_z;
-    if logical_qubits != 580 {
-        return Err(format!("expected k = 580, got {logical_qubits}"));
-    }
     Ok(())
 }
 
@@ -699,6 +695,58 @@ fn apm_p96_fixture_rejects_mutated_support() {
         err.contains("column") || err.contains("overlap") || err.contains("rank"),
         "mutating one support should trip a structural verifier, got: {err}"
     );
+}
+
+#[test]
+fn apm_p96_fixture_rejects_structural_stat_mismatches() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+
+    let mut wrong_width = hz.clone();
+    wrong_width.num_cols -= 1;
+    let err = assert_apm_p96_fixture_stats(&hx, &wrong_width).unwrap_err();
+    assert!(err.contains("1152 columns"));
+
+    let mut missing_row = hz.clone();
+    missing_row.rows.pop();
+    let err = assert_apm_p96_fixture_stats(&hx, &missing_row).unwrap_err();
+    assert!(err.contains("288 rows"));
+
+    let mut short_row = hz.clone();
+    short_row.rows[0].pop();
+    let err = assert_apm_p96_fixture_stats(&hx, &short_row).unwrap_err();
+    assert!(err.contains("row 0 has weight 11"));
+}
+
+#[test]
+fn apm_p96_fixture_rejects_balanced_nonorthogonal_swap() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let mut hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+    hz.rows[0][0] = 58;
+    hz.rows[1][0] = 69;
+
+    let err = assert_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    assert!(
+        err.contains("overlap"),
+        "balanced swap should preserve degrees but break orthogonality, got: {err}"
+    );
+}
+
+#[test]
+fn apm_p96_fixture_rejects_low_rank_shape() {
+    let rows = (0..288)
+        .map(|row| {
+            let start = (row % 96) * 12;
+            (start..start + 12).collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let low_rank = ApmSparseFixture {
+        num_cols: 1152,
+        rows,
+    };
+
+    let err = assert_apm_p96_fixture_stats(&low_rank, &low_rank).unwrap_err();
+    assert!(err.contains("rank_x + rank_z == 572"));
 }
 
 #[test]
