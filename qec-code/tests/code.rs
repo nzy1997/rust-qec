@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
+use qec_code::binary::binary_rank;
 use qec_code::codes::built_in_css::{
+    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::css::{CssCode, SparseRowsMatrix};
+use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 
@@ -426,6 +427,95 @@ fn validate_apm_table_a1_manifest(manifest: &Value) -> std::result::Result<(), S
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+struct ApmSparseFixture {
+    num_cols: usize,
+    rows: Vec<Vec<usize>>,
+}
+
+fn load_apm_sparse_fixture(input: &str) -> ApmSparseFixture {
+    let matrix = sparse_rows_matrix_from_json_str(input).unwrap();
+    ApmSparseFixture {
+        num_cols: matrix.num_cols(),
+        rows: matrix.rows().to_vec(),
+    }
+}
+
+fn column_weights(rows: &[Vec<usize>], num_cols: usize) -> Vec<usize> {
+    let mut weights = vec![0; num_cols];
+    for row in rows {
+        for &col in row {
+            weights[col] += 1;
+        }
+    }
+    weights
+}
+
+fn assert_apm_p96_fixture_stats(
+    hx: &ApmSparseFixture,
+    hz: &ApmSparseFixture,
+) -> std::result::Result<(), String> {
+    if hx.num_cols != 1152 || hz.num_cols != 1152 {
+        return Err(format!(
+            "expected both matrices to have 1152 columns, got Hx={} Hz={}",
+            hx.num_cols, hz.num_cols
+        ));
+    }
+    if hx.rows.len() != 288 || hz.rows.len() != 288 {
+        return Err(format!(
+            "expected both matrices to have 288 rows, got Hx={} Hz={}",
+            hx.rows.len(),
+            hz.rows.len()
+        ));
+    }
+    for (name, rows) in [("Hx", hx.rows.as_slice()), ("Hz", hz.rows.as_slice())] {
+        if let Some((row_index, row)) = rows.iter().enumerate().find(|(_, row)| row.len() != 12) {
+            return Err(format!(
+                "{name} row {row_index} has weight {}, expected 12",
+                row.len()
+            ));
+        }
+    }
+    for (name, matrix) in [("Hx", hx), ("Hz", hz)] {
+        let weights = column_weights(&matrix.rows, matrix.num_cols);
+        if let Some((col, weight)) = weights.iter().enumerate().find(|(_, weight)| **weight != 3) {
+            return Err(format!(
+                "{name} column {col} has weight {weight}, expected 3"
+            ));
+        }
+    }
+    for (x_index, x_row) in hx.rows.iter().enumerate() {
+        let x_support = x_row.iter().copied().collect::<HashSet<_>>();
+        for (z_index, z_row) in hz.rows.iter().enumerate() {
+            let overlap = z_row
+                .iter()
+                .filter(|&&col| x_support.contains(&col))
+                .count();
+            if overlap % 2 != 0 {
+                return Err(format!(
+                    "Hx row {x_index} and Hz row {z_index} overlap with odd parity {overlap}"
+                ));
+            }
+        }
+    }
+
+    let hx_dense = dense_rows(&hx.rows, hx.num_cols);
+    let hz_dense = dense_rows(&hz.rows, hz.num_cols);
+    let rank_x = binary_rank(&hx_dense);
+    let rank_z = binary_rank(&hz_dense);
+    if rank_x + rank_z != 572 {
+        return Err(format!(
+            "expected rank_x + rank_z == 572, got {rank_x} + {rank_z} = {}",
+            rank_x + rank_z
+        ));
+    }
+    let logical_qubits = hx.num_cols - rank_x - rank_z;
+    if logical_qubits != 580 {
+        return Err(format!("expected k = 580, got {logical_qubits}"));
+    }
+    Ok(())
+}
+
 fn assert_surface_rotated_d5_weights(rows: &[Vec<usize>]) {
     let counts = row_weight_counts(rows);
     assert_eq!(counts.get(&2), Some(&4));
@@ -487,6 +577,31 @@ fn apm_table_a1_manifest_rejects_mutated_affine_coefficient() {
     assert!(
         err.contains("apm_kasai:p=96") && err.contains("f[0].a"),
         "error should identify the changed coefficient and code id: {err}"
+    );
+}
+
+#[test]
+fn apm_p96_fixture_matches_reference_stats() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+
+    assert_apm_p96_fixture_stats(&hx, &hz).unwrap();
+}
+
+#[test]
+fn apm_p96_fixture_rejects_mutated_support() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let mut hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+    let replacement = (0..hz.num_cols)
+        .find(|candidate| !hz.rows[0].contains(candidate))
+        .unwrap();
+    hz.rows[0][0] = replacement;
+    hz.rows[0].sort_unstable();
+
+    let err = assert_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    assert!(
+        err.contains("column") || err.contains("overlap") || err.contains("rank"),
+        "mutating one support should trip a structural verifier, got: {err}"
     );
 }
 
