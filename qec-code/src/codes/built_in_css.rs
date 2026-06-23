@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +38,14 @@ pub enum BuiltInCssFamily {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuiltInCssParams {
     pub distance: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BivariateBicycleParams {
+    pub lx: usize,
+    pub ly: usize,
+    pub a_terms: Vec<(usize, usize)>,
+    pub b_terms: Vec<(usize, usize)>,
 }
 
 const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
@@ -180,8 +190,15 @@ const BB72_LY: usize = 6;
 const BB72_A_TERMS: &[(usize, usize)] = &[(3, 0), (0, 1), (0, 2)];
 const BB72_B_TERMS: &[(usize, usize)] = &[(0, 3), (1, 0), (2, 0)];
 
-fn bb72_checks() -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
-    bivariate_bicycle_checks(BB72_LX, BB72_LY, BB72_A_TERMS, BB72_B_TERMS)
+fn bb72_checks() -> Result<BuiltInCssChecks> {
+    let mut checks = bivariate_bicycle_css_checks(BivariateBicycleParams {
+        lx: BB72_LX,
+        ly: BB72_LY,
+        a_terms: BB72_A_TERMS.to_vec(),
+        b_terms: BB72_B_TERMS.to_vec(),
+    })?;
+    checks.code_id = "bb72";
+    Ok(checks)
 }
 
 fn bivariate_bicycle_checks(
@@ -222,6 +239,69 @@ fn bivariate_bicycle_checks(
     (hx, hz)
 }
 
+pub fn bivariate_bicycle_css_checks(params: BivariateBicycleParams) -> Result<BuiltInCssChecks> {
+    validate_bivariate_bicycle_params(&params)?;
+
+    let (hx, hz) = bivariate_bicycle_checks(params.lx, params.ly, &params.a_terms, &params.b_terms);
+
+    Ok(BuiltInCssChecks {
+        code_id: "bb",
+        num_cols: 2 * params.lx * params.ly,
+        hx,
+        hz,
+    })
+}
+
+fn validate_bivariate_bicycle_params(params: &BivariateBicycleParams) -> Result<()> {
+    if params.lx == 0 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "lx".to_owned(),
+            value: 0,
+        });
+    }
+
+    if params.ly == 0 {
+        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
+            family: "bb".to_owned(),
+            parameter: "ly".to_owned(),
+            value: 0,
+        });
+    }
+
+    validate_bivariate_bicycle_terms("bb", "a_terms", params.lx, params.ly, &params.a_terms)?;
+    validate_bivariate_bicycle_terms("bb", "b_terms", params.lx, params.ly, &params.b_terms)?;
+    Ok(())
+}
+
+fn validate_bivariate_bicycle_terms(
+    family: &'static str,
+    parameter: &'static str,
+    lx: usize,
+    ly: usize,
+    terms: &[(usize, usize)],
+) -> Result<()> {
+    if terms.is_empty() {
+        return Err(QecError::MissingBuiltInCssParameter {
+            family: family.to_owned(),
+            parameter: parameter.to_owned(),
+        });
+    }
+
+    let mut seen = HashSet::new();
+    for &(dx, dy) in terms {
+        let normalized = (dx % lx, dy % ly);
+        if !seen.insert(normalized) {
+            return Err(QecError::DuplicateBuiltInCssParameter {
+                family: family.to_owned(),
+                parameter: parameter.to_owned(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match parse_built_in_css_code_spec(code_id)? {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
@@ -244,16 +324,7 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
                 hz: hx,
             })
         }
-        "bb72" => {
-            let (hx, hz) = bb72_checks();
-
-            Ok(BuiltInCssChecks {
-                code_id: "bb72",
-                num_cols: 2 * BB72_LX * BB72_LY,
-                hx,
-                hz,
-            })
-        }
+        "bb72" => bb72_checks(),
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: code_id.to_owned(),
         }),
