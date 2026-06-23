@@ -12,7 +12,8 @@ use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str}
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
-    ApmCssVerifierExpectations, ApmSparseMatrixView, GirthStatus, verify_apm_css_matrices,
+    ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView, GirthStatus,
+    WeightStats, verify_apm_css_matrices,
 };
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -463,7 +464,7 @@ fn apm_p96_expectations() -> ApmCssVerifierExpectations {
 fn verify_apm_p96_fixture_stats(
     hx: &ApmSparseFixture,
     hz: &ApmSparseFixture,
-) -> std::result::Result<support::apm_verifier::ApmCssVerifierReport, String> {
+) -> std::result::Result<ApmCssVerifierReport, String> {
     verify_apm_css_matrices(
         ApmSparseMatrixView {
             name: "Hx",
@@ -476,6 +477,28 @@ fn verify_apm_p96_fixture_stats(
             rows: &hz.rows,
         },
         &apm_p96_expectations(),
+    )
+}
+
+fn verify_small_apm_sparse_rows(
+    hx_num_cols: usize,
+    hx_rows: &[Vec<usize>],
+    hz_num_cols: usize,
+    hz_rows: &[Vec<usize>],
+    expectations: &ApmCssVerifierExpectations,
+) -> std::result::Result<ApmCssVerifierReport, String> {
+    verify_apm_css_matrices(
+        ApmSparseMatrixView {
+            name: "Hx",
+            num_cols: hx_num_cols,
+            rows: hx_rows,
+        },
+        ApmSparseMatrixView {
+            name: "Hz",
+            num_cols: hz_num_cols,
+            rows: hz_rows,
+        },
+        expectations,
     )
 }
 
@@ -773,6 +796,130 @@ fn apm_p96_fixture_rejects_low_rank_shape() {
 
     let err = verify_apm_p96_fixture_stats(&low_rank, &low_rank).unwrap_err();
     assert!(err.contains("expected k=580"));
+}
+
+#[test]
+fn apm_verifier_rejects_invalid_small_shapes_before_reporting() {
+    let one_column_row = vec![vec![0]];
+    let empty_rows: Vec<Vec<usize>> = Vec::new();
+    let expectations = ApmCssVerifierExpectations::default();
+
+    let err = verify_small_apm_sparse_rows(2, &one_column_row, 3, &one_column_row, &expectations)
+        .unwrap_err();
+    assert!(err.contains("expected shared width"));
+
+    let err =
+        verify_small_apm_sparse_rows(0, &empty_rows, 0, &empty_rows, &expectations).unwrap_err();
+    assert!(err.contains("invalid sparse-rows width 0"));
+
+    let err = verify_small_apm_sparse_rows(1, &one_column_row, 1, &one_column_row, &expectations)
+        .unwrap_err();
+    assert!(err.contains("invalid CSS dimensions"));
+}
+
+#[test]
+fn apm_verifier_reports_acyclic_girth_and_empty_row_weights() {
+    let hx_rows = vec![vec![0], vec![1]];
+    let hz_rows: Vec<Vec<usize>> = Vec::new();
+
+    let report = verify_small_apm_sparse_rows(
+        3,
+        &hx_rows,
+        3,
+        &hz_rows,
+        &ApmCssVerifierExpectations::default(),
+    )
+    .unwrap();
+
+    assert_eq!(report.x.girth, GirthStatus::Acyclic);
+    assert_eq!(report.z.girth, GirthStatus::Acyclic);
+    assert!(report.x.girth.meets_lower_bound(100));
+    assert!(GirthStatus::AtLeast(6).meets_lower_bound(6));
+    assert!(!GirthStatus::AtLeast(6).meets_lower_bound(8));
+    assert_eq!(
+        report.z.row_weight,
+        WeightStats {
+            min: 0,
+            average: 0.0,
+            max: 0,
+        }
+    );
+}
+
+#[test]
+fn apm_verifier_rejects_small_stat_expectation_mismatches() {
+    let hx_rows = vec![vec![0], vec![1]];
+    let hz_rows: Vec<Vec<usize>> = Vec::new();
+
+    let err = verify_small_apm_sparse_rows(
+        3,
+        &hx_rows,
+        3,
+        &hz_rows,
+        &ApmCssVerifierExpectations {
+            num_cols: Some(4),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert!(err.contains("expected num_cols=4"));
+
+    let err = verify_small_apm_sparse_rows(
+        3,
+        &hx_rows,
+        3,
+        &hz_rows,
+        &ApmCssVerifierExpectations {
+            mx: Some(3),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert!(err.contains("expected mx=3"));
+
+    let err = verify_small_apm_sparse_rows(
+        3,
+        &hx_rows,
+        3,
+        &hz_rows,
+        &ApmCssVerifierExpectations {
+            row_weight_x: Some(2),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert!(err.contains("expected Hx row weight 2"));
+
+    let err = verify_small_apm_sparse_rows(
+        3,
+        &hx_rows,
+        3,
+        &hz_rows,
+        &ApmCssVerifierExpectations {
+            column_weight_x: Some(1),
+            ..Default::default()
+        },
+    )
+    .unwrap_err();
+    assert!(err.contains("expected Hx column weight 1"));
+}
+
+#[test]
+fn apm_verifier_rejects_girth_below_expected_bound_on_either_side() {
+    let cycle_four_rows = vec![vec![0, 1], vec![0, 1]];
+    let empty_rows: Vec<Vec<usize>> = Vec::new();
+    let expectations = ApmCssVerifierExpectations {
+        girth_lower_bound: Some(6),
+        ..Default::default()
+    };
+
+    let err = verify_small_apm_sparse_rows(2, &cycle_four_rows, 2, &empty_rows, &expectations)
+        .unwrap_err();
+    assert!(err.contains("expected Hx Tanner girth >= 6"));
+
+    let err = verify_small_apm_sparse_rows(2, &empty_rows, 2, &cycle_four_rows, &expectations)
+        .unwrap_err();
+    assert!(err.contains("expected Hz Tanner girth >= 6"));
 }
 
 #[test]
