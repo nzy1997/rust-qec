@@ -1,6 +1,7 @@
+mod support;
+
 use std::collections::HashSet;
 
-use qec_code::binary::binary_rank;
 use qec_code::codes::built_in_css::{
     BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
@@ -10,6 +11,9 @@ use qec_code::codes::steane::Steane;
 use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
+use support::apm_verifier::{
+    ApmCssVerifierExpectations, ApmSparseMatrixView, GirthStatus, verify_apm_css_matrices,
+};
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
     for row in rows {
@@ -441,75 +445,38 @@ fn load_apm_sparse_fixture(input: &str) -> ApmSparseFixture {
     }
 }
 
-fn column_weights(rows: &[Vec<usize>], num_cols: usize) -> Vec<usize> {
-    let mut weights = vec![0; num_cols];
-    for row in rows {
-        for &col in row {
-            weights[col] += 1;
-        }
+fn apm_p96_expectations() -> ApmCssVerifierExpectations {
+    ApmCssVerifierExpectations {
+        num_cols: Some(1152),
+        mx: Some(288),
+        mz: Some(288),
+        row_weight_x: Some(12),
+        row_weight_z: Some(12),
+        column_weight_x: Some(3),
+        column_weight_z: Some(3),
+        k: Some(580),
+        orthogonal: Some(true),
+        girth_lower_bound: Some(6),
     }
-    weights
 }
 
-fn assert_apm_p96_fixture_stats(
+fn verify_apm_p96_fixture_stats(
     hx: &ApmSparseFixture,
     hz: &ApmSparseFixture,
-) -> std::result::Result<(), String> {
-    if hx.num_cols != 1152 || hz.num_cols != 1152 {
-        return Err(format!(
-            "expected both matrices to have 1152 columns, got Hx={} Hz={}",
-            hx.num_cols, hz.num_cols
-        ));
-    }
-    if hx.rows.len() != 288 || hz.rows.len() != 288 {
-        return Err(format!(
-            "expected both matrices to have 288 rows, got Hx={} Hz={}",
-            hx.rows.len(),
-            hz.rows.len()
-        ));
-    }
-    for (name, rows) in [("Hx", hx.rows.as_slice()), ("Hz", hz.rows.as_slice())] {
-        if let Some((row_index, row)) = rows.iter().enumerate().find(|(_, row)| row.len() != 12) {
-            return Err(format!(
-                "{name} row {row_index} has weight {}, expected 12",
-                row.len()
-            ));
-        }
-    }
-    for (name, matrix) in [("Hx", hx), ("Hz", hz)] {
-        let weights = column_weights(&matrix.rows, matrix.num_cols);
-        if let Some((col, weight)) = weights.iter().enumerate().find(|(_, weight)| **weight != 3) {
-            return Err(format!(
-                "{name} column {col} has weight {weight}, expected 3"
-            ));
-        }
-    }
-    for (x_index, x_row) in hx.rows.iter().enumerate() {
-        let x_support = x_row.iter().copied().collect::<HashSet<_>>();
-        for (z_index, z_row) in hz.rows.iter().enumerate() {
-            let overlap = z_row
-                .iter()
-                .filter(|&&col| x_support.contains(&col))
-                .count();
-            if overlap % 2 != 0 {
-                return Err(format!(
-                    "Hx row {x_index} and Hz row {z_index} overlap with odd parity {overlap}"
-                ));
-            }
-        }
-    }
-
-    let hx_dense = dense_rows(&hx.rows, hx.num_cols);
-    let hz_dense = dense_rows(&hz.rows, hz.num_cols);
-    let rank_x = binary_rank(&hx_dense);
-    let rank_z = binary_rank(&hz_dense);
-    if rank_x + rank_z != 572 {
-        return Err(format!(
-            "expected rank_x + rank_z == 572, got {rank_x} + {rank_z} = {}",
-            rank_x + rank_z
-        ));
-    }
-    Ok(())
+) -> std::result::Result<support::apm_verifier::ApmCssVerifierReport, String> {
+    verify_apm_css_matrices(
+        ApmSparseMatrixView {
+            name: "Hx",
+            num_cols: hx.num_cols,
+            rows: &hx.rows,
+        },
+        ApmSparseMatrixView {
+            name: "Hz",
+            num_cols: hz.num_cols,
+            rows: &hz.rows,
+        },
+        &apm_p96_expectations(),
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -677,7 +644,46 @@ fn apm_p96_fixture_matches_reference_stats() {
     let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
     let hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
 
-    assert_apm_p96_fixture_stats(&hx, &hz).unwrap();
+    let report = verify_apm_p96_fixture_stats(&hx, &hz).unwrap();
+    assert!(report.orthogonal);
+    assert_eq!(report.num_cols, 1152);
+    assert_eq!(report.mx, 288);
+    assert_eq!(report.mz, 288);
+    assert_eq!(report.k, 580);
+    assert_eq!(
+        report.x.row_weight,
+        support::apm_verifier::WeightStats {
+            min: 12,
+            average: 12.0,
+            max: 12
+        }
+    );
+    assert_eq!(
+        report.z.row_weight,
+        support::apm_verifier::WeightStats {
+            min: 12,
+            average: 12.0,
+            max: 12
+        }
+    );
+    assert_eq!(
+        report.x.column_weight,
+        support::apm_verifier::WeightStats {
+            min: 3,
+            average: 3.0,
+            max: 3
+        }
+    );
+    assert_eq!(
+        report.z.column_weight,
+        support::apm_verifier::WeightStats {
+            min: 3,
+            average: 3.0,
+            max: 3
+        }
+    );
+    assert!(matches!(report.x.girth, GirthStatus::Exact(girth) if girth >= 6));
+    assert!(matches!(report.z.girth, GirthStatus::Exact(girth) if girth >= 6));
 }
 
 #[test]
@@ -690,11 +696,31 @@ fn apm_p96_fixture_rejects_mutated_support() {
     hz.rows[0][0] = replacement;
     hz.rows[0].sort_unstable();
 
-    let err = assert_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    let err = verify_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
     assert!(
         err.contains("column") || err.contains("overlap") || err.contains("rank"),
         "mutating one support should trip a structural verifier, got: {err}"
     );
+}
+
+#[test]
+fn apm_p96_fixture_rejects_duplicate_support_before_rank_checks() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let mut hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+    hz.rows[0][1] = hz.rows[0][0];
+
+    let err = verify_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    assert!(err.contains("duplicate support"));
+}
+
+#[test]
+fn apm_p96_fixture_rejects_out_of_range_support_before_rank_checks() {
+    let hx = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hx.json"));
+    let mut hz = load_apm_sparse_fixture(include_str!("fixtures/apm/p96_hz.json"));
+    hz.rows[0][0] = hz.num_cols;
+
+    let err = verify_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    assert!(err.contains("out-of-range support"));
 }
 
 #[test]
@@ -704,18 +730,18 @@ fn apm_p96_fixture_rejects_structural_stat_mismatches() {
 
     let mut wrong_width = hz.clone();
     wrong_width.num_cols -= 1;
-    let err = assert_apm_p96_fixture_stats(&hx, &wrong_width).unwrap_err();
-    assert!(err.contains("1152 columns"));
+    let err = verify_apm_p96_fixture_stats(&hx, &wrong_width).unwrap_err();
+    assert!(err.contains("out-of-range support"));
 
     let mut missing_row = hz.clone();
     missing_row.rows.pop();
-    let err = assert_apm_p96_fixture_stats(&hx, &missing_row).unwrap_err();
-    assert!(err.contains("288 rows"));
+    let err = verify_apm_p96_fixture_stats(&hx, &missing_row).unwrap_err();
+    assert!(err.contains("expected mz=288"));
 
     let mut short_row = hz.clone();
     short_row.rows[0].pop();
-    let err = assert_apm_p96_fixture_stats(&hx, &short_row).unwrap_err();
-    assert!(err.contains("row 0 has weight 11"));
+    let err = verify_apm_p96_fixture_stats(&hx, &short_row).unwrap_err();
+    assert!(err.contains("expected Hz row weight 12"));
 }
 
 #[test]
@@ -725,9 +751,9 @@ fn apm_p96_fixture_rejects_balanced_nonorthogonal_swap() {
     hz.rows[0][0] = 58;
     hz.rows[1][0] = 69;
 
-    let err = assert_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
+    let err = verify_apm_p96_fixture_stats(&hx, &hz).unwrap_err();
     assert!(
-        err.contains("overlap"),
+        err.contains("expected orthogonal=true, got false"),
         "balanced swap should preserve degrees but break orthogonality, got: {err}"
     );
 }
@@ -745,8 +771,8 @@ fn apm_p96_fixture_rejects_low_rank_shape() {
         rows,
     };
 
-    let err = assert_apm_p96_fixture_stats(&low_rank, &low_rank).unwrap_err();
-    assert!(err.contains("rank_x + rank_z == 572"));
+    let err = verify_apm_p96_fixture_stats(&low_rank, &low_rank).unwrap_err();
+    assert!(err.contains("expected k=580"));
 }
 
 #[test]
