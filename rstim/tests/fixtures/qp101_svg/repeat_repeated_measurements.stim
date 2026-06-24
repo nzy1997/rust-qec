@@ -1,0 +1,5 @@
+QUBIT_COORDS(0, 0) 0
+REPEAT 3 {
+  M 0
+  TICK
+}
