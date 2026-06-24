@@ -1670,6 +1670,46 @@ fn quantum_tanner_local_code_tensor_dual_repetition_example_rejects_bad_inputs()
         fixture["local_codes"]["g_a"] = serde_json::json!([[1, 0]]);
     });
     expect_quantum_tanner_local_code_matrix_error(&nonorthogonal_g_a, "code_a", "not orthogonal");
+
+    let valid_supplied_generators = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[1, 1]]);
+        fixture["local_codes"]["g_b"] = serde_json::json!([[1, 1]]);
+    });
+    let local = quantum_tanner_local_code_tensor_dual(
+        &quantum_tanner_spec_from_json_str(&valid_supplied_generators).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(local.code_a.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.x_sector_rows, vec![vec![1, 1, 1, 1]]);
+
+    let rank_mismatch_g_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[0, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&rank_mismatch_g_a, "code_a", "rank is 0");
+
+    let nonorthogonal_g_b = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_b"] = serde_json::json!([[1, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonorthogonal_g_b, "code_b", "not orthogonal");
+
+    let mut corrupted_code_a = spec.clone();
+    corrupted_code_a.local_codes.h_a[0][0] = 2;
+    let error = quantum_tanner_local_code_tensor_dual(&corrupted_code_a).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, "code_a");
+    assert!(reason.contains("expected 0 or 1"), "got {reason:?}");
+
+    let mut corrupted_code_b = spec;
+    corrupted_code_b.local_codes.h_b[0].push(1);
+    let error = quantum_tanner_local_code_tensor_dual(&corrupted_code_b).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, "code_b");
+    assert!(reason.contains("width 3"), "got {reason:?}");
 }
 
 fn toric_d4_json_with(mutator: impl FnOnce(&mut Value)) -> String {
