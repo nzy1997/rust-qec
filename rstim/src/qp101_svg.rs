@@ -55,7 +55,6 @@ struct RepeatGroupSpan {
     start_column: usize,
     end_column: usize,
     iteration_starts: Vec<usize>,
-    annotations: Vec<Qp101Annotation>,
 }
 
 #[derive(Debug, Default)]
@@ -352,6 +351,8 @@ fn render_operations(
                 annotations,
             } => {
                 let start_column = *column;
+                let x = x_for_column(start_column);
+                render_annotations(out, x, &[0], annotations);
                 let mut iteration_starts = Vec::new();
                 for _ in 0..*count {
                     iteration_starts.push(*column);
@@ -363,7 +364,6 @@ fn render_operations(
                         start_column,
                         end_column: *column - 1,
                         iteration_starts,
-                        annotations: annotations.clone(),
                     });
                 }
             }
@@ -563,7 +563,11 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) { "!" } else { "" }
+    if inverted.unwrap_or(false) {
+        "!"
+    } else {
+        ""
+    }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1091,7 +1095,6 @@ fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: us
         top + 13,
         group.count
     ));
-    render_annotations(out, x_start, &[0], &group.annotations);
 }
 
 fn render_repeat_iteration_boundaries(

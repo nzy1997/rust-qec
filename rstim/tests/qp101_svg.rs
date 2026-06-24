@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
-    export_qp101,
+    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
+    Qp101TargetRef,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -328,6 +328,14 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
     assert!(
         svg.contains("noise: q&quot;: p&apos;"),
         "annotations should render and escape quote/apostrophe characters: {svg}"
+    );
+    assert!(
+        svg.find("class=\"wire\"")
+            .expect("wire layer should be present")
+            < svg
+                .find("loop: round: body")
+                .expect("repeat annotation should be present"),
+        "repeat annotations should render in the foreground buffer after wires: {svg}"
     );
 }
 
@@ -943,6 +951,56 @@ fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
             < svg.find(">m2</text>").expect("m2 should be present"),
         "measurement anchors should appear in expanded repeat order: {svg}"
     );
+}
+
+#[test]
+fn svg_renderer_draws_nested_repeat_groups_and_preserves_measurement_order() {
+    let instrs = parse_lines("REPEAT 2 {\n  REPEAT 3 {\n    M 0\n    DETECTOR rec[-1]\n  }\n}\n")
+        .expect("nested repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("nested repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("nested repeat fixture should render");
+
+    assert_eq!(
+        svg.matches("class=\"repeat-group\"").count(),
+        3,
+        "nested repeats should render one outer and two expanded inner repeat groups: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">repeat x2</text>").count(),
+        1,
+        "outer repeat label should render once: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">repeat x3</text>").count(),
+        2,
+        "inner repeat label should render once per expanded outer iteration: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">iter 2</text>").count(),
+        3,
+        "nested repeats should include one outer iter 2 marker and two inner iter 2 markers: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">iter 3</text>").count(),
+        2,
+        "each expanded inner repeat should include an iter 3 marker: {svg}"
+    );
+
+    for index in 1..=6 {
+        let measurement = format!(">m{index}</text>");
+        let detector = format!(">D{} = m{index}</text>", index - 1);
+        assert_eq!(
+            svg.matches(&measurement).count(),
+            1,
+            "nested repeat should contain exactly one {measurement}: {svg}"
+        );
+        assert_eq!(
+            svg.matches(&detector).count(),
+            1,
+            "nested repeat should contain exactly one {detector}: {svg}"
+        );
+    }
 }
 
 #[test]
