@@ -8,6 +8,7 @@ const LANE_GAP: i32 = 48;
 const COLUMN_GAP: i32 = 72;
 const GATE_WIDTH: i32 = 38;
 const GATE_HEIGHT: i32 = 28;
+const ANNOTATION_LINE_GAP: i32 = 12;
 
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
@@ -333,8 +334,14 @@ fn render_gate(
         }
     }
 
-    render_annotations(out, x, &lanes, annotations);
     render_measurement_anchors(out, x, &measurement_targets);
+    render_annotations_with_line_offset(
+        out,
+        x,
+        &lanes,
+        annotations,
+        measurement_annotation_line_offset(&measurement_targets),
+    );
     Ok(())
 }
 
@@ -510,8 +517,18 @@ fn render_top_note(out: &mut String, x: i32, label: &str) {
 }
 
 fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[Qp101Annotation]) {
+    render_annotations_with_line_offset(out, x, lanes, annotations, 0);
+}
+
+fn render_annotations_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    line_offset: usize,
+) {
     let base_lane = lanes.first().copied().unwrap_or(0);
-    let base_y = lane_y(base_lane) + GATE_HEIGHT / 2 + 14;
+    let base_y = below_gate_text_y(base_lane) + line_offset as i32 * ANNOTATION_LINE_GAP;
     for (idx, annotation) in annotations.iter().enumerate() {
         let mut parts = Vec::new();
         parts.push(annotation.kind.clone());
@@ -524,17 +541,25 @@ fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[
         let content = escape_xml(&parts.join(": "));
         out.push_str(&format!(
             "<text x=\"{x}\" y=\"{}\" fill=\"#7a5af8\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
-            base_y + idx as i32 * 12
+            base_y + idx as i32 * ANNOTATION_LINE_GAP
         ));
     }
+}
+
+fn measurement_annotation_line_offset(targets: &[MeasurementTarget]) -> usize {
+    usize::from(!targets.is_empty())
 }
 
 fn render_measurement_anchors(out: &mut String, x: i32, targets: &[MeasurementTarget]) {
     for target in targets {
         out.push_str(&format!(
             "<text class=\"measurement-anchor\" x=\"{x}\" y=\"{}\" fill=\"#2563eb\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
-            lane_y(target.lane) + GATE_HEIGHT / 2 + 14,
+            below_gate_text_y(target.lane),
             escape_xml(&target.anchor())
         ));
     }
+}
+
+fn below_gate_text_y(lane: usize) -> i32 {
+    lane_y(lane) + GATE_HEIGHT / 2 + 14
 }

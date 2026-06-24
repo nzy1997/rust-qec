@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
-    export_qp101,
+    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
+    Qp101TargetRef,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -349,7 +349,13 @@ fn svg_renderer_rejects_out_of_range_qubit_targets() {
 fn svg_renderer_labels_measurements_with_global_anchors() {
     let instrs =
         parse_lines("M 0\nMRL 1\nMX 0\n").expect("measurement anchor fixture should parse");
-    let doc = export_qp101(&instrs).expect("measurement anchor fixture should export");
+    let mut doc = export_qp101(&instrs).expect("measurement anchor fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Gate { annotations, .. } => {
+            annotations.push(annotation("measure", Some("first"), Some("annotated")));
+        }
+        op => panic!("expected first operation to be a measurement gate, got {op:?}"),
+    }
     let original_doc = doc.clone();
 
     let svg = render_svg(&doc).expect("measurement anchor fixture should render");
@@ -376,6 +382,14 @@ fn svg_renderer_labels_measurements_with_global_anchors() {
             < svg.find(">m4</text>").expect("m4 should be present"),
         "MRL should reserve m2 and m3 before MX receives m4: {svg}"
     );
+    let anchor_y = text_y(&svg, "m1").expect("m1 anchor should have a y coordinate");
+    let annotation_y = text_y(&svg, "measure: first: annotated")
+        .expect("measurement annotation should have a y coordinate");
+    assert_eq!(
+        annotation_y,
+        anchor_y + 12,
+        "measurement annotations should render one text line below their anchor: {svg}"
+    );
     assert_eq!(
         doc, original_doc,
         "SVG rendering must not mutate the QP101 document"
@@ -390,6 +404,17 @@ fn svg_renderer_labels_measurements_with_global_anchors() {
         !reset_svg.contains(">m1</text>"),
         "reset-only gates must not receive measurement anchors: {reset_svg}"
     );
+}
+
+fn text_y(svg: &str, content: &str) -> Option<i32> {
+    let needle = format!(">{content}</text>");
+    let text_end = svg.find(&needle)?;
+    let text_start = svg[..text_end].rfind("<text")?;
+    let attrs = &svg[text_start..text_end];
+    let y_start = attrs.find(" y=\"")? + " y=\"".len();
+    let y = &attrs[y_start..];
+    let y_end = y.find('"')?;
+    y[..y_end].parse().ok()
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
