@@ -100,6 +100,16 @@ pub enum QecError {
         parameter: String,
         value: usize,
     },
+    #[error(
+        "unsupported built-in CSS integer parameter {parameter} for family {family}: {value} (supported: {supported}; {note})"
+    )]
+    UnsupportedBuiltInCssIntegerParameter {
+        family: String,
+        parameter: String,
+        value: usize,
+        supported: String,
+        note: String,
+    },
 }
 
 pub type Result<T> = core::result::Result<T, QecError>;

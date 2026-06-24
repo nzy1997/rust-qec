@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use super::apm::{AffinePermutation, ApmCssManifestEntry, build_apm_css_checks};
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,12 +35,14 @@ pub enum BuiltInCssFamily {
     SurfaceRotated,
     Toric,
     BivariateBicycle,
+    ApmKasai,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltInCssParams {
     Distance { distance: usize },
     BivariateBicycle(BivariateBicycleParams),
+    ApmKasai { p: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +61,10 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
     BuiltInCssCatalogEntry {
         spec: "bb72",
         description: "fixed [[72,12,6]] bivariate-bicycle CSS code",
+    },
+    BuiltInCssCatalogEntry {
+        spec: "apm_kasai:p=96",
+        description: "fixed Table A1 P=96 APM-CSS code",
     },
     BuiltInCssCatalogEntry {
         spec: "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
@@ -93,6 +100,10 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
         "bb72" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" }),
+        "apm_kasai" => Err(QecError::MissingBuiltInCssParameter {
+            family: input.to_owned(),
+            parameter: "p".to_owned(),
+        }),
         "repetition_x" | "repetition_z" | "surface_rotated" | "toric" => {
             Err(QecError::MissingBuiltInCssParameter {
                 family: input.to_owned(),
@@ -124,6 +135,13 @@ fn parse_built_in_css_family_spec(
             parse_distance_family_spec(family_name, BuiltInCssFamily::SurfaceRotated, params_text)
         }
         "toric" => parse_distance_family_spec(family_name, BuiltInCssFamily::Toric, params_text),
+        "apm_kasai" => {
+            let p = parse_apm_kasai_params(family_name, params_text)?;
+            Ok(BuiltInCssCodeSpec::Family {
+                family: BuiltInCssFamily::ApmKasai,
+                params: BuiltInCssParams::ApmKasai { p },
+            })
+        }
         "bb" => {
             let params = parse_bivariate_bicycle_params(family_name, params_text)?;
             Ok(BuiltInCssCodeSpec::Family {
@@ -269,6 +287,98 @@ fn parse_bivariate_bicycle_params(
 
     validate_bivariate_bicycle_params(&params)?;
     Ok(params)
+}
+
+const APM_KASAI_SUPPORTED_P: usize = 96;
+const APM_KASAI_P96_CODE_ID: &str = "apm_kasai:p=96";
+const APM_KASAI_P96_J: u64 = 3;
+const APM_KASAI_P96_L: u64 = 12;
+const APM_KASAI_P96_F: &[(u64, u64)] = &[(5, 41), (85, 77), (73, 66), (1, 0), (1, 72), (37, 9)];
+const APM_KASAI_P96_G: &[(u64, u64)] = &[(61, 15), (1, 24), (89, 62), (25, 22), (85, 93), (25, 78)];
+
+fn parse_apm_kasai_params(family_name: &str, params_text: &str) -> Result<usize> {
+    if params_text.is_empty() {
+        return Err(QecError::MissingBuiltInCssParameter {
+            family: family_name.to_owned(),
+            parameter: "p".to_owned(),
+        });
+    }
+
+    let mut p = None;
+    for pair in params_text.split(',') {
+        let Some((key, value)) = pair.split_once('=') else {
+            return Err(QecError::UnexpectedBuiltInCssParameter {
+                family: family_name.to_owned(),
+                parameter: pair.to_owned(),
+            });
+        };
+
+        match key {
+            "p" => {
+                if p.is_some() {
+                    return Err(QecError::DuplicateBuiltInCssParameter {
+                        family: family_name.to_owned(),
+                        parameter: "p".to_owned(),
+                    });
+                }
+                p = Some(value.parse::<usize>().map_err(|_| {
+                    QecError::InvalidBuiltInCssIntegerParameter {
+                        family: family_name.to_owned(),
+                        parameter: "p".to_owned(),
+                        value: value.to_owned(),
+                    }
+                })?);
+            }
+            _ => {
+                return Err(QecError::UnexpectedBuiltInCssParameter {
+                    family: family_name.to_owned(),
+                    parameter: key.to_owned(),
+                });
+            }
+        }
+    }
+
+    Ok(p.expect("apm_kasai parameter parser should require p before success"))
+}
+
+fn apm_kasai_css_checks(p: usize) -> Result<BuiltInCssChecks> {
+    if p != APM_KASAI_SUPPORTED_P {
+        return Err(QecError::UnsupportedBuiltInCssIntegerParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+            value: p,
+            supported: APM_KASAI_SUPPORTED_P.to_string(),
+            note: "P=192 is tracked by #143".to_owned(),
+        });
+    }
+
+    let entry = apm_kasai_p96_manifest_entry();
+    Ok(build_apm_css_checks(&entry).expect("pinned APM Kasai P=96 manifest must build"))
+}
+
+fn apm_kasai_p96_manifest_entry() -> ApmCssManifestEntry {
+    let affine = |slope, offset| {
+        AffinePermutation::new(APM_KASAI_SUPPORTED_P as u64, slope, offset)
+            .expect("pinned APM Kasai P=96 affine maps must be permutations")
+    };
+    let f = APM_KASAI_P96_F
+        .iter()
+        .map(|&(slope, offset)| affine(slope, offset))
+        .collect();
+    let g = APM_KASAI_P96_G
+        .iter()
+        .map(|&(slope, offset)| affine(slope, offset))
+        .collect();
+
+    ApmCssManifestEntry::new(
+        APM_KASAI_P96_CODE_ID,
+        APM_KASAI_SUPPORTED_P as u64,
+        APM_KASAI_P96_J,
+        APM_KASAI_P96_L,
+        f,
+        g,
+    )
+    .expect("pinned APM Kasai P=96 manifest must satisfy invariants")
 }
 
 fn parse_unique_positive_usize_param(
@@ -559,6 +669,12 @@ fn family_css_checks(
                 unreachable!("toric only uses distance params");
             };
             toric_css_checks(distance)
+        }
+        BuiltInCssFamily::ApmKasai => {
+            let BuiltInCssParams::ApmKasai { p } = params else {
+                unreachable!("apm_kasai only uses p params");
+            };
+            apm_kasai_css_checks(p)
         }
         BuiltInCssFamily::BivariateBicycle => unreachable!("bb specs are parser-only here"),
     }
