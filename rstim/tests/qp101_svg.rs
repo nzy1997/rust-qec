@@ -31,11 +31,7 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
     assert!(svg.starts_with("<svg"), "SVG should start with <svg: {svg}");
-    for attr in [
-        "width=\"512\"",
-        "height=\"112\"",
-        "viewBox=\"0 0 512 112\"",
-    ] {
+    for attr in ["width=\"512\"", "height=\"112\"", "viewBox=\"0 0 512 112\""] {
         assert!(svg.contains(attr), "SVG missing root attr {attr}: {svg}");
     }
     for marker in ["q0", "q1", "H", "CX", "tick"] {
@@ -114,13 +110,22 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
 
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
-    assert!(svg.contains("class=\"CZ\""), "CZ should render specialized wiring: {svg}");
+    assert!(
+        svg.contains("class=\"CZ\""),
+        "CZ should render specialized wiring: {svg}"
+    );
     assert!(
         svg.contains("class=\"target CZ\""),
         "CZ should render a labeled target box: {svg}"
     );
-    assert!(svg.contains("class=\"SWAP\""), "SWAP should render specialized wiring: {svg}");
-    assert!(svg.contains(">SWAP</text>"), "SWAP should retain its note label: {svg}");
+    assert!(
+        svg.contains("class=\"SWAP\""),
+        "SWAP should render specialized wiring: {svg}"
+    );
+    assert!(
+        svg.contains(">SWAP</text>"),
+        "SWAP should retain its note label: {svg}"
+    );
 }
 
 #[test]
@@ -338,6 +343,157 @@ fn svg_renderer_rejects_out_of_range_qubit_targets() {
         err.contains("qubit 3") && err.contains("num_qubits"),
         "error should name the invalid target and qubit count, got {err}"
     );
+}
+
+#[test]
+fn svg_renderer_labels_measurements_with_global_anchors() {
+    let instrs =
+        parse_lines("M 0\nMRL 1\nMX 0\n").expect("measurement anchor fixture should parse");
+    let mut doc = export_qp101(&instrs).expect("measurement anchor fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Gate { annotations, .. } => {
+            annotations.push(annotation("measure", Some("first"), Some("annotated")));
+        }
+        op => panic!("expected first operation to be a measurement gate, got {op:?}"),
+    }
+    let original_doc = doc.clone();
+
+    let svg = render_svg(&doc).expect("measurement anchor fixture should render");
+
+    for marker in [">M</text>", ">MRL</text>", ">MX</text>"] {
+        assert!(
+            svg.contains(marker),
+            "SVG should keep original measurement gate label {marker}: {svg}"
+        );
+    }
+    for anchor in [">m1</text>", ">m2-m3</text>", ">m4</text>"] {
+        assert!(
+            svg.contains(anchor),
+            "SVG should contain measurement anchor {anchor}: {svg}"
+        );
+    }
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2-m3</text>").expect("m2-m3 should be present"),
+        "m1 should appear before the MRL span: {svg}"
+    );
+    assert!(
+        svg.find(">m2-m3</text>").expect("m2-m3 should be present")
+            < svg.find(">m4</text>").expect("m4 should be present"),
+        "MRL should reserve m2 and m3 before MX receives m4: {svg}"
+    );
+    let anchor_y = text_y(&svg, "m1").expect("m1 anchor should have a y coordinate");
+    let annotation_y = text_y(&svg, "measure: first: annotated")
+        .expect("measurement annotation should have a y coordinate");
+    assert_eq!(
+        annotation_y,
+        anchor_y + 12,
+        "measurement annotations should render one text line below their anchor: {svg}"
+    );
+    assert_eq!(
+        doc, original_doc,
+        "SVG rendering must not mutate the QP101 document"
+    );
+
+    let reset_only =
+        export_qp101(&parse_lines("R 0\nRX 1\n").expect("reset-only fixture should parse"))
+            .expect("reset-only fixture should export");
+    let reset_svg = render_svg(&reset_only).expect("reset-only fixture should render");
+
+    assert!(
+        !reset_svg.contains(">m1</text>"),
+        "reset-only gates must not receive measurement anchors: {reset_svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
+    let instrs = parse_lines("M 0\n").expect("measurement annotation fixture should parse");
+    let mut doc = export_qp101(&instrs).expect("measurement annotation fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Gate { annotations, .. } => {
+            annotations.push(annotation("measure", Some("single"), Some("annotated")));
+        }
+        op => panic!("expected first operation to be a measurement gate, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("measurement annotation fixture should render");
+
+    let height = root_attr_i32(&svg, "height").expect("root height should be present");
+    let viewbox_height = root_viewbox_height(&svg).expect("viewBox height should be present");
+    let annotation_y = text_y(&svg, "measure: single: annotated")
+        .expect("measurement annotation should have a y coordinate");
+    assert!(
+        annotation_y + 4 <= height,
+        "measurement annotation baseline should fit within the SVG height with padding: {svg}"
+    );
+    assert_eq!(
+        viewbox_height, height,
+        "viewBox height should track the rendered SVG height: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
+    let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
+        .expect("repeat measurement anchor fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat measurement anchor fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat measurement anchor fixture should render");
+
+    for anchor in ["m1", "m2", "m3", "m4"] {
+        let marker = format!(">{anchor}</text>");
+        assert_eq!(
+            svg.matches(&marker).count(),
+            1,
+            "SVG should contain one {anchor} measurement anchor: {svg}"
+        );
+    }
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2</text>").expect("m2 should be present"),
+        "repeat body should continue measurement anchors after top-level m1: {svg}"
+    );
+    assert!(
+        svg.find(">m2</text>").expect("m2 should be present")
+            < svg.find(">m3</text>").expect("m3 should be present"),
+        "second repeat iteration should continue after first repeat-body m2: {svg}"
+    );
+    assert!(
+        svg.find(">m3</text>").expect("m3 should be present")
+            < svg.find(">m4</text>").expect("m4 should be present"),
+        "post-repeat measurement should continue after the expanded repeat-body m3: {svg}"
+    );
+}
+
+fn root_attr_i32(svg: &str, attr: &str) -> Option<i32> {
+    let root_end = svg.find('>')?;
+    let attrs = &svg[..root_end];
+    let needle = format!("{attr}=\"");
+    let value_start = attrs.find(&needle)? + needle.len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].parse().ok()
+}
+
+fn root_viewbox_height(svg: &str) -> Option<i32> {
+    let root_end = svg.find('>')?;
+    let attrs = &svg[..root_end];
+    let value_start = attrs.find("viewBox=\"")? + "viewBox=\"".len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].split_whitespace().nth(3)?.parse().ok()
+}
+
+fn text_y(svg: &str, content: &str) -> Option<i32> {
+    let needle = format!(">{content}</text>");
+    let text_end = svg.find(&needle)?;
+    let text_start = svg[..text_end].rfind("<text")?;
+    let attrs = &svg[text_start..text_end];
+    let y_start = attrs.find(" y=\"")? + " y=\"".len();
+    let y = &attrs[y_start..];
+    let y_end = y.find('"')?;
+    y[..y_end].parse().ok()
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
