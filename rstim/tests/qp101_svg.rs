@@ -315,6 +315,7 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
         "D0 = m1",
         "OBS_INCLUDE(7)",
         "L7 *= m1",
+        "loop: round: body",
         "NOTE: A&amp;B&lt;test&gt;",
         "SWAP",
         "EMPTY",
@@ -327,6 +328,14 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
     assert!(
         svg.contains("noise: q&quot;: p&apos;"),
         "annotations should render and escape quote/apostrophe characters: {svg}"
+    );
+    assert!(
+        svg.find("class=\"wire\"")
+            .expect("wire layer should be present")
+            < svg
+                .find("loop: round: body")
+                .expect("repeat annotation should be present"),
+        "repeat annotations should render in the foreground buffer after wires: {svg}"
     );
 }
 
@@ -901,6 +910,246 @@ fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
 }
 
 #[test]
+fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
+    let instrs = parse_lines("REPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n")
+        .expect("repeat group fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat group fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat group fixture should render");
+
+    for marker in [
+        "class=\"repeat-group\"",
+        ">repeat x2</text>",
+        "class=\"repeat-iteration-boundary\"",
+        ">iter 2</text>",
+        ">m1</text>",
+        ">m2</text>",
+        ">D0 = m1</text>",
+        ">D1 = m2</text>",
+    ] {
+        assert!(
+            svg.contains(marker),
+            "repeat SVG should contain {marker}: {svg}"
+        );
+    }
+    assert_eq!(
+        svg.matches(">m1</text>").count(),
+        1,
+        "first repeat iteration should contain exactly one m1 anchor: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">m2</text>").count(),
+        1,
+        "second repeat iteration should continue to m2 instead of resetting to m1: {svg}"
+    );
+    assert!(
+        !svg.contains(">D1 = m1</text>"),
+        "second detector source must not resolve to the first iteration anchor: {svg}"
+    );
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2</text>").expect("m2 should be present"),
+        "measurement anchors should appear in expanded repeat order: {svg}"
+    );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("body gate boxes should be present")
+            < svg
+                .find(">repeat x2</text>")
+                .expect("repeat label should be present"),
+        "repeat labels should paint after body gates so they remain visible: {svg}"
+    );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("body gate boxes should be present")
+            < svg
+                .find(">iter 2</text>")
+                .expect("iter label should be present"),
+        "iteration labels should paint after body gates so they remain visible: {svg}"
+    );
+
+    let first_gate_top =
+        first_element_attr_i32(&svg, "<rect class=\"gate-box\"", "y").expect("gate y");
+    let repeat_label_y = text_y(&svg, "repeat x2").expect("repeat label y");
+    let iter_label_y = text_y(&svg, "iter 2").expect("iteration label y");
+    assert!(
+        repeat_label_y < first_gate_top,
+        "repeat label baseline should sit above the first body gate band: {svg}"
+    );
+    assert!(
+        iter_label_y > first_gate_top,
+        "iteration label baseline should use a separate row from the repeat label: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_separates_compact_repeat_labels() {
+    let instrs =
+        parse_lines("REPEAT 2 {\n  M 0\n}\n").expect("compact repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("compact repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("compact repeat fixture should render");
+
+    let repeat_label = text_xy(&svg, "repeat x2").expect("repeat label should be positioned");
+    let iter_label = text_xy(&svg, "iter 2").expect("iteration label should be positioned");
+    assert_ne!(
+        repeat_label.1, iter_label.1,
+        "compact repeat and iteration labels should not share a collision-prone baseline: {svg}"
+    );
+    assert!(
+        iter_label.1 > repeat_label.1,
+        "iteration label should use the lower repeat-group row in compact repeats: {svg}"
+    );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("compact repeat body gate should be present")
+            < svg
+                .find(">iter 2</text>")
+                .expect("iteration label should be present"),
+        "iteration label should paint above body gates in compact repeats: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_reserves_top_row_for_repeat_label_next_to_body_top_notes() {
+    let instrs =
+        parse_lines("R 0\nREPEAT 2 {\n  TICK\n}\n").expect("repeat tick fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat tick fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat tick fixture should render");
+
+    let content_y_offset =
+        content_translate_y(&svg).expect("repeat SVG should reserve a translated content row");
+    let repeat_label_y = text_y(&svg, "repeat x2").expect("repeat label should be positioned");
+    let tick_y =
+        text_y(&svg, "tick").expect("body tick label should be positioned") + content_y_offset;
+    assert!(
+        repeat_label_y + 8 <= tick_y,
+        "repeat label should use a reserved row above translated body top notes: {svg}"
+    );
+    assert!(
+        svg.find(">tick</text>")
+            .expect("body tick label should be present")
+            < svg
+                .find(">repeat x2</text>")
+                .expect("repeat label should be present"),
+        "repeat labels should still paint above body top notes after row separation: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_draws_nested_repeat_groups_and_preserves_measurement_order() {
+    let instrs = parse_lines("REPEAT 2 {\n  REPEAT 3 {\n    M 0\n    DETECTOR rec[-1]\n  }\n}\n")
+        .expect("nested repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("nested repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("nested repeat fixture should render");
+
+    assert_eq!(
+        svg.matches("class=\"repeat-group\"").count(),
+        3,
+        "nested repeats should render one outer and two expanded inner repeat groups: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">repeat x2</text>").count(),
+        1,
+        "outer repeat label should render once: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">repeat x3</text>").count(),
+        2,
+        "inner repeat label should render once per expanded outer iteration: {svg}"
+    );
+    let outer_labels = text_positions(&svg, "repeat x2");
+    let inner_labels = text_positions(&svg, "repeat x3");
+    assert_eq!(
+        outer_labels.len(),
+        1,
+        "outer repeat should have one positioned label: {svg}"
+    );
+    assert_eq!(
+        inner_labels.len(),
+        2,
+        "inner repeat should have two positioned labels: {svg}"
+    );
+    assert!(
+        !inner_labels.contains(&outer_labels[0]),
+        "no inner repeat label should share the outer repeat label coordinate: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">iter 2</text>").count(),
+        3,
+        "nested repeats should include one outer iter 2 marker and two inner iter 2 markers: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">iter 3</text>").count(),
+        2,
+        "each expanded inner repeat should include an iter 3 marker: {svg}"
+    );
+
+    for index in 1..=6 {
+        let measurement = format!(">m{index}</text>");
+        let detector = format!(">D{} = m{index}</text>", index - 1);
+        assert_eq!(
+            svg.matches(&measurement).count(),
+            1,
+            "nested repeat should contain exactly one {measurement}: {svg}"
+        );
+        assert_eq!(
+            svg.matches(&detector).count(),
+            1,
+            "nested repeat should contain exactly one {detector}: {svg}"
+        );
+    }
+}
+
+#[test]
+fn svg_renderer_keeps_deep_nested_repeat_labels_inside_group_bounds() {
+    let instrs =
+        parse_lines("REPEAT 2 {\n  REPEAT 2 {\n    REPEAT 2 {\n      M 0\n    }\n  }\n}\n")
+            .expect("deep nested repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("deep nested repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("deep nested repeat fixture should render");
+    let label_bounds = repeat_group_label_bounds(&svg);
+
+    assert!(
+        !label_bounds.is_empty(),
+        "deep nested repeat fixture should render repeat group labels: {svg}"
+    );
+    for (rect_left, rect_right, label_x) in label_bounds {
+        assert!(
+            label_x >= rect_left && label_x <= rect_right,
+            "repeat label x={label_x} should stay inside its own group bounds {rect_left}..={rect_right}: {svg}"
+        );
+    }
+}
+
+#[test]
+fn svg_renderer_offsets_repeat_annotations_from_first_body_measurement_anchor() {
+    let instrs = parse_lines("REPEAT 2 {\n  M 0\n}\n")
+        .expect("annotated repeat measurement fixture should parse");
+    let mut doc =
+        export_qp101(&instrs).expect("annotated repeat measurement fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Repeat { annotations, .. } => {
+            annotations.push(annotation("loop", Some("round"), Some("body")));
+        }
+        op => panic!("expected first operation to be a repeat block, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("annotated repeat measurement fixture should render");
+
+    let repeat_annotation =
+        text_xy(&svg, "loop: round: body").expect("repeat annotation should be positioned");
+    let first_anchor = text_xy(&svg, "m1").expect("first measurement anchor should be positioned");
+    assert_ne!(
+        repeat_annotation, first_anchor,
+        "repeat annotation should not overlap the first body measurement anchor: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
     let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
         .expect("repeat measurement anchor fixture should parse");
@@ -964,14 +1213,90 @@ fn qp101_doc(num_qubits: usize, operations: Vec<Qp101Operation>) -> Qp101Documen
 }
 
 fn text_y(svg: &str, content: &str) -> Option<i32> {
+    text_xy(svg, content).map(|(_, y)| y)
+}
+
+fn text_xy(svg: &str, content: &str) -> Option<(i32, i32)> {
+    text_positions(svg, content).into_iter().next()
+}
+
+fn text_positions(svg: &str, content: &str) -> Vec<(i32, i32)> {
     let needle = format!(">{content}</text>");
-    let text_end = svg.find(&needle)?;
-    let text_start = svg[..text_end].rfind("<text")?;
-    let attrs = &svg[text_start..text_end];
-    let y_start = attrs.find(" y=\"")? + " y=\"".len();
-    let y = &attrs[y_start..];
-    let y_end = y.find('"')?;
-    y[..y_end].parse().ok()
+    let mut positions = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(relative_end) = svg[search_start..].find(&needle) {
+        let text_end = search_start + relative_end;
+        if let Some(text_start) = svg[..text_end].rfind("<text") {
+            let attrs = &svg[text_start..text_end];
+            if let (Some(x_start), Some(y_start)) = (attrs.find(" x=\""), attrs.find(" y=\"")) {
+                let x = &attrs[x_start + " x=\"".len()..];
+                let y = &attrs[y_start + " y=\"".len()..];
+                if let (Some(x_end), Some(y_end)) = (x.find('"'), y.find('"')) {
+                    if let (Ok(x), Ok(y)) = (x[..x_end].parse(), y[..y_end].parse()) {
+                        positions.push((x, y));
+                    }
+                }
+            }
+        }
+        search_start = text_end + needle.len();
+    }
+    positions
+}
+
+fn repeat_group_label_bounds(svg: &str) -> Vec<(i32, i32, i32)> {
+    let mut bounds = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(relative_rect_start) = svg[search_start..].find("<rect class=\"repeat-group\"") {
+        let rect_start = search_start + relative_rect_start;
+        let Some(rect_end) = svg[rect_start..].find("/>") else {
+            break;
+        };
+        let rect_attrs = &svg[rect_start..rect_start + rect_end];
+        let Some(label_start_relative) =
+            svg[rect_start + rect_end..].find("<text class=\"repeat-group-label\"")
+        else {
+            break;
+        };
+        let label_start = rect_start + rect_end + label_start_relative;
+        let Some(label_end) = svg[label_start..].find("</text>") else {
+            break;
+        };
+        let label_attrs = &svg[label_start..label_start + label_end];
+
+        if let (Some(rect_x), Some(rect_width), Some(label_x)) = (
+            svg_attr_i32(rect_attrs, "x"),
+            svg_attr_i32(rect_attrs, "width"),
+            svg_attr_i32(label_attrs, "x"),
+        ) {
+            bounds.push((rect_x, rect_x + rect_width, label_x));
+        }
+        search_start = label_start + label_end;
+    }
+    bounds
+}
+
+fn svg_attr_i32(attrs: &str, name: &str) -> Option<i32> {
+    let needle = format!("{name}=\"");
+    let value_start = attrs.find(&needle)? + needle.len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].parse().ok()
+}
+
+fn first_element_attr_i32(svg: &str, start: &str, name: &str) -> Option<i32> {
+    let element_start = svg.find(start)?;
+    let element_end = svg[element_start..].find('>')?;
+    svg_attr_i32(&svg[element_start..element_start + element_end], name)
+}
+
+fn content_translate_y(svg: &str) -> Option<i32> {
+    let group_start = svg.find("<g class=\"qp101-content\"")?;
+    let group_end = svg[group_start..].find('>')?;
+    let attrs = &svg[group_start..group_start + group_end];
+    let value_start = attrs.find("transform=\"translate(0 ")? + "transform=\"translate(0 ".len();
+    let value = &attrs[value_start..];
+    let value_end = value.find(')')?;
+    value[..value_end].parse().ok()
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
