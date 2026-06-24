@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
-    Qp101TargetRef,
+    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    export_qp101,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -902,10 +902,8 @@ fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
 
 #[test]
 fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
-    let instrs = parse_lines(
-        "REPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n",
-    )
-    .expect("repeat group fixture should parse");
+    let instrs = parse_lines("REPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n")
+        .expect("repeat group fixture should parse");
     let doc = export_qp101(&instrs).expect("repeat group fixture should export");
 
     let svg = render_svg(&doc).expect("repeat group fixture should render");

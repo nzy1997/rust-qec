@@ -12,6 +12,9 @@ const GATE_WIDTH: i32 = 38;
 const GATE_HEIGHT: i32 = 28;
 const ANNOTATION_LINE_GAP: i32 = 12;
 const BELOW_GATE_TEXT_BOTTOM_PAD: i32 = 4;
+const REPEAT_GROUP_TOP_PAD: i32 = 8;
+const REPEAT_GROUP_BOTTOM_PAD: i32 = 8;
+const REPEAT_GROUP_X_PAD: i32 = 4;
 
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
@@ -46,11 +49,20 @@ impl MeasurementRecord {
     }
 }
 
+#[derive(Debug, Clone)]
+struct RepeatGroupSpan {
+    count: u64,
+    start_column: usize,
+    end_column: usize,
+    iteration_starts: Vec<usize>,
+}
+
 #[derive(Debug, Default)]
 struct RenderState {
     next_measurement_index: usize,
     next_detector_index: usize,
     measurements: Vec<MeasurementRecord>,
+    repeat_groups: Vec<RepeatGroupSpan>,
 }
 
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
@@ -69,16 +81,19 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     out.push_str(
         "<g class=\"qp101-svg\" fill=\"none\" font-family=\"monospace\" font-size=\"14\">\n",
     );
-    render_wires(&mut out, doc.num_qubits, width);
+    let mut operation_out = String::new();
     let mut column = 0usize;
     let mut state = RenderState::default();
     render_operations(
-        &mut out,
+        &mut operation_out,
         &doc.operations,
         doc.num_qubits,
         &mut column,
         &mut state,
     )?;
+    render_repeat_decorations(&mut out, &state.repeat_groups, doc.num_qubits);
+    render_wires(&mut out, doc.num_qubits, width);
+    out.push_str(&operation_out);
     out.push_str("</g>\n</svg>\n");
     Ok(out)
 }
@@ -89,7 +104,7 @@ fn count_visible_columns(ops: &[Qp101Operation]) -> usize {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => 0,
             Qp101Operation::Repeat { count, body, .. } => {
                 let count = usize::try_from(*count).unwrap_or(usize::MAX);
-                1usize.saturating_add(count_visible_columns(body).saturating_mul(count))
+                count_visible_columns(body).saturating_mul(count)
             }
             _ => 1,
         };
@@ -330,18 +345,20 @@ fn render_operations(
                 );
                 *column += 1;
             }
-            Qp101Operation::Repeat {
-                count,
-                body,
-                annotations,
-            } => {
-                let x = x_for_column(*column);
-                let label = format!("repeat x{count}");
-                render_top_note(out, x, &label);
-                render_annotations(out, x, &[0], annotations);
-                *column += 1;
+            Qp101Operation::Repeat { count, body, .. } => {
+                let start_column = *column;
+                let mut iteration_starts = Vec::new();
                 for _ in 0..*count {
+                    iteration_starts.push(*column);
                     render_operations(out, body, num_qubits, column, state)?;
+                }
+                if *column > start_column {
+                    state.repeat_groups.push(RepeatGroupSpan {
+                        count: *count,
+                        start_column,
+                        end_column: *column - 1,
+                        iteration_starts,
+                    });
                 }
             }
             Qp101Operation::Detector {
@@ -540,11 +557,7 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) {
-        "!"
-    } else {
-        ""
-    }
+    if inverted.unwrap_or(false) { "!" } else { "" }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1045,6 +1058,53 @@ fn render_top_note(out: &mut String, x: i32, label: &str) {
         TOP_MARGIN - 18,
         escape_xml(label)
     ));
+}
+
+fn render_repeat_decorations(out: &mut String, groups: &[RepeatGroupSpan], num_qubits: usize) {
+    for group in groups.iter().rev() {
+        render_repeat_group(out, group, num_qubits);
+        render_repeat_iteration_boundaries(out, group, num_qubits);
+    }
+}
+
+fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: usize) {
+    let x_start = x_for_column(group.start_column);
+    let x_end = x_for_column(group.end_column);
+    let left = x_start - COLUMN_GAP / 2 + REPEAT_GROUP_X_PAD;
+    let right = x_end + COLUMN_GAP / 2 - REPEAT_GROUP_X_PAD;
+    let top = lane_y(0) - GATE_HEIGHT / 2 - REPEAT_GROUP_TOP_PAD;
+    let bottom = lane_y(num_qubits.saturating_sub(1)) + GATE_HEIGHT / 2 + REPEAT_GROUP_BOTTOM_PAD;
+    let width = right - left;
+    let height = bottom - top;
+    out.push_str(&format!(
+        "<rect class=\"repeat-group\" x=\"{left}\" y=\"{top}\" width=\"{width}\" height=\"{height}\" rx=\"6\" ry=\"6\" stroke=\"#98a2b3\" stroke-width=\"1\" stroke-dasharray=\"6 4\" fill=\"#f8fafc\" />\n"
+    ));
+    out.push_str(&format!(
+        "<text class=\"repeat-group-label\" x=\"{}\" y=\"{}\" fill=\"#475467\" text-anchor=\"start\" font-size=\"12\">repeat x{}</text>\n",
+        left + 8,
+        top + 13,
+        group.count
+    ));
+}
+
+fn render_repeat_iteration_boundaries(
+    out: &mut String,
+    group: &RepeatGroupSpan,
+    num_qubits: usize,
+) {
+    let top = lane_y(0) - GATE_HEIGHT / 2 - REPEAT_GROUP_TOP_PAD;
+    let bottom = lane_y(num_qubits.saturating_sub(1)) + GATE_HEIGHT / 2 + REPEAT_GROUP_BOTTOM_PAD;
+    for (iteration_offset, &start_column) in group.iteration_starts.iter().enumerate().skip(1) {
+        let x = x_for_column(start_column) - COLUMN_GAP / 2;
+        out.push_str(&format!(
+            "<line class=\"repeat-iteration-boundary\" x1=\"{x}\" y1=\"{top}\" x2=\"{x}\" y2=\"{bottom}\" stroke=\"#98a2b3\" stroke-width=\"1\" stroke-dasharray=\"4 4\" />\n"
+        ));
+        out.push_str(&format!(
+            "<text class=\"repeat-iteration-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">iter {}</text>\n",
+            top - 4,
+            iteration_offset + 1
+        ));
+    }
 }
 
 fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[Qp101Annotation]) {
