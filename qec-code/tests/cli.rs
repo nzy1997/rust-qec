@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -536,11 +536,7 @@ fn apm_kasai_css_export() {
 
     for matrix in ["hx", "hz"] {
         let output = run_qec_code(&["code", "css", "apm_kasai:p=96", matrix]);
-        assert!(
-            output.status.success(),
-            "{matrix} stderr: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert!(output.status.success());
         assert_eq!(output.stderr, b"");
 
         let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");

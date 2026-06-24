@@ -3,17 +3,17 @@ mod support;
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
+    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
+use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
-    verify_apm_css_matrices, ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView,
-    GirthStatus, WeightStats,
+    ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView, GirthStatus,
+    WeightStats, verify_apm_css_matrices,
 };
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -1531,11 +1531,39 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         })
     );
     assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+        })
+    );
+    assert_eq!(
         parse_built_in_css_code_spec("apm_kasai:p=nope"),
         Err(QecError::InvalidBuiltInCssIntegerParameter {
             family: "apm_kasai".to_owned(),
             parameter: "p".to_owned(),
             value: "nope".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:p=96,p=96"),
+        Err(QecError::DuplicateBuiltInCssParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:p"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:p=96,foo=1"),
+        Err(QecError::UnexpectedBuiltInCssParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "foo".to_owned(),
         })
     );
     assert_eq!(

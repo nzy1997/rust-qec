@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::apm::{build_apm_css_checks, AffinePermutation, ApmCssBuildError, ApmCssManifestEntry};
+use super::apm::{AffinePermutation, ApmCssManifestEntry, build_apm_css_checks};
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -338,10 +338,7 @@ fn parse_apm_kasai_params(family_name: &str, params_text: &str) -> Result<usize>
         }
     }
 
-    p.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-        family: family_name.to_owned(),
-        parameter: "p".to_owned(),
-    })
+    Ok(p.expect("apm_kasai parameter parser should require p before success"))
 }
 
 fn apm_kasai_css_checks(p: usize) -> Result<BuiltInCssChecks> {
@@ -355,11 +352,11 @@ fn apm_kasai_css_checks(p: usize) -> Result<BuiltInCssChecks> {
         });
     }
 
-    let entry = apm_kasai_p96_manifest_entry()?;
-    build_apm_css_checks(&entry).map_err(|error| apm_build_error(APM_KASAI_P96_CODE_ID, error))
+    let entry = apm_kasai_p96_manifest_entry();
+    Ok(build_apm_css_checks(&entry).expect("pinned APM Kasai P=96 manifest must build"))
 }
 
-fn apm_kasai_p96_manifest_entry() -> Result<ApmCssManifestEntry> {
+fn apm_kasai_p96_manifest_entry() -> ApmCssManifestEntry {
     let affine = |slope, offset| {
         AffinePermutation::new(APM_KASAI_SUPPORTED_P as u64, slope, offset)
             .expect("pinned APM Kasai P=96 affine maps must be permutations")
@@ -381,14 +378,7 @@ fn apm_kasai_p96_manifest_entry() -> Result<ApmCssManifestEntry> {
         f,
         g,
     )
-    .map_err(|error| apm_build_error(APM_KASAI_P96_CODE_ID, error))
-}
-
-fn apm_build_error(code_id: &str, error: ApmCssBuildError) -> QecError {
-    QecError::BuiltInCssBuildFailed {
-        code_id: code_id.to_owned(),
-        reason: error.to_string(),
-    }
+    .expect("pinned APM Kasai P=96 manifest must satisfy invariants")
 }
 
 fn parse_unique_positive_usize_param(
