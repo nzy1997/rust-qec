@@ -17,6 +17,7 @@ const REPEAT_GROUP_BOTTOM_PAD: i32 = 8;
 const REPEAT_GROUP_X_PAD: i32 = 4;
 const REPEAT_GROUP_LABEL_X_PAD: i32 = 8;
 const REPEAT_GROUP_LABEL_DEPTH_STAGGER: i32 = 16;
+const REPEAT_GROUP_LABEL_GATE_GAP: i32 = 4;
 const REPEAT_ANNOTATION_LINE_OFFSET: usize = 1;
 
 #[derive(Debug, Clone)]
@@ -96,9 +97,10 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
         &mut column,
         &mut state,
     )?;
-    render_repeat_decorations(&mut out, &state.repeat_groups, doc.num_qubits);
+    render_repeat_backgrounds(&mut out, &state.repeat_groups, doc.num_qubits);
     render_wires(&mut out, doc.num_qubits, width);
     out.push_str(&operation_out);
+    render_repeat_labels(&mut out, &state.repeat_groups);
     out.push_str("</g>\n</svg>\n");
     Ok(out)
 }
@@ -1084,14 +1086,21 @@ fn render_top_note(out: &mut String, x: i32, label: &str) {
     ));
 }
 
-fn render_repeat_decorations(out: &mut String, groups: &[RepeatGroupSpan], num_qubits: usize) {
+fn render_repeat_backgrounds(out: &mut String, groups: &[RepeatGroupSpan], num_qubits: usize) {
     for group in groups.iter().rev() {
-        render_repeat_group(out, group, num_qubits);
-        render_repeat_iteration_boundaries(out, group, num_qubits);
+        render_repeat_group_background(out, group, num_qubits);
+        render_repeat_iteration_boundary_lines(out, group, num_qubits);
     }
 }
 
-fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: usize) {
+fn render_repeat_labels(out: &mut String, groups: &[RepeatGroupSpan]) {
+    for group in groups.iter().rev() {
+        render_repeat_group_label(out, group);
+        render_repeat_iteration_labels(out, group);
+    }
+}
+
+fn render_repeat_group_background(out: &mut String, group: &RepeatGroupSpan, num_qubits: usize) {
     let x_start = x_for_column(group.start_column);
     let x_end = x_for_column(group.end_column);
     let left = x_start - COLUMN_GAP / 2 + REPEAT_GROUP_X_PAD;
@@ -1103,10 +1112,17 @@ fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: us
     out.push_str(&format!(
         "<rect class=\"repeat-group\" x=\"{left}\" y=\"{top}\" width=\"{width}\" height=\"{height}\" rx=\"6\" ry=\"6\" stroke=\"#98a2b3\" stroke-width=\"1\" stroke-dasharray=\"6 4\" fill=\"#f8fafc\" />\n"
     ));
+}
+
+fn render_repeat_group_label(out: &mut String, group: &RepeatGroupSpan) {
+    let x_start = x_for_column(group.start_column);
+    let x_end = x_for_column(group.end_column);
+    let left = x_start - COLUMN_GAP / 2 + REPEAT_GROUP_X_PAD;
+    let right = x_end + COLUMN_GAP / 2 - REPEAT_GROUP_X_PAD;
     out.push_str(&format!(
         "<text class=\"repeat-group-label\" x=\"{}\" y=\"{}\" fill=\"#475467\" text-anchor=\"start\" font-size=\"12\">repeat x{}</text>\n",
         repeat_group_label_x(left, right, group.depth),
-        top + 13,
+        repeat_group_label_y(),
         group.count
     ));
 }
@@ -1136,24 +1152,34 @@ fn render_repeat_annotations(
     );
 }
 
-fn render_repeat_iteration_boundaries(
+fn render_repeat_iteration_boundary_lines(
     out: &mut String,
     group: &RepeatGroupSpan,
     num_qubits: usize,
 ) {
     let top = lane_y(0) - GATE_HEIGHT / 2 - REPEAT_GROUP_TOP_PAD;
     let bottom = lane_y(num_qubits.saturating_sub(1)) + GATE_HEIGHT / 2 + REPEAT_GROUP_BOTTOM_PAD;
-    for (iteration_offset, &start_column) in group.iteration_starts.iter().enumerate().skip(1) {
+    for &start_column in group.iteration_starts.iter().skip(1) {
         let x = x_for_column(start_column) - COLUMN_GAP / 2;
         out.push_str(&format!(
             "<line class=\"repeat-iteration-boundary\" x1=\"{x}\" y1=\"{top}\" x2=\"{x}\" y2=\"{bottom}\" stroke=\"#98a2b3\" stroke-width=\"1\" stroke-dasharray=\"4 4\" />\n"
         ));
+    }
+}
+
+fn render_repeat_iteration_labels(out: &mut String, group: &RepeatGroupSpan) {
+    for (iteration_offset, &start_column) in group.iteration_starts.iter().enumerate().skip(1) {
+        let x = x_for_column(start_column) - COLUMN_GAP / 2;
         out.push_str(&format!(
             "<text class=\"repeat-iteration-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">iter {}</text>\n",
-            top - 4,
+            repeat_group_label_y(),
             iteration_offset + 1
         ));
     }
+}
+
+fn repeat_group_label_y() -> i32 {
+    lane_y(0) - GATE_HEIGHT / 2 - REPEAT_GROUP_LABEL_GATE_GAP
 }
 
 fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[Qp101Annotation]) {

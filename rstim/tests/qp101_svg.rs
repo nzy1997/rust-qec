@@ -951,6 +951,35 @@ fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
             < svg.find(">m2</text>").expect("m2 should be present"),
         "measurement anchors should appear in expanded repeat order: {svg}"
     );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("body gate boxes should be present")
+            < svg
+                .find(">repeat x2</text>")
+                .expect("repeat label should be present"),
+        "repeat labels should paint after body gates so they remain visible: {svg}"
+    );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("body gate boxes should be present")
+            < svg
+                .find(">iter 2</text>")
+                .expect("iter label should be present"),
+        "iteration labels should paint after body gates so they remain visible: {svg}"
+    );
+
+    let first_gate_top =
+        first_element_attr_i32(&svg, "<rect class=\"gate-box\"", "y").expect("gate y");
+    let repeat_label_y = text_y(&svg, "repeat x2").expect("repeat label y");
+    let iter_label_y = text_y(&svg, "iter 2").expect("iteration label y");
+    assert!(
+        repeat_label_y < first_gate_top,
+        "repeat label baseline should sit above the first body gate band: {svg}"
+    );
+    assert!(
+        iter_label_y > 0 && iter_label_y < first_gate_top,
+        "iteration label baseline should stay inside the viewBox and above the first body gate band: {svg}"
+    );
 }
 
 #[test]
@@ -1197,6 +1226,12 @@ fn svg_attr_i32(attrs: &str, name: &str) -> Option<i32> {
     let value = &attrs[value_start..];
     let value_end = value.find('"')?;
     value[..value_end].parse().ok()
+}
+
+fn first_element_attr_i32(svg: &str, start: &str, name: &str) -> Option<i32> {
+    let element_start = svg.find(start)?;
+    let element_end = svg[element_start..].find('>')?;
+    svg_attr_i32(&svg[element_start..element_start + element_end], name)
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
