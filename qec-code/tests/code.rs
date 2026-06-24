@@ -1024,6 +1024,541 @@ fn generators_are_symmetric(table: &[Vec<usize>], identity: usize, generators: &
     })
 }
 
+const QUANTUM_TANNER_FIXTURE_DIR: &str = "tests/fixtures/quantum_tanner";
+const QUANTUM_TANNER_VERIFIER_COMMAND: &str =
+    "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q";
+
+#[derive(Clone, Copy)]
+enum QuantumTannerExpectedResult<'a> {
+    Success,
+    Rejection(&'a str),
+}
+
+fn qec_code_manifest_fixture_path(rel_path: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel_path)
+}
+
+fn load_quantum_tanner_fixture(path: &str) -> Value {
+    let full_path = qec_code_manifest_fixture_path(path);
+    let contents = std::fs::read_to_string(&full_path)
+        .unwrap_or_else(|error| panic!("fixture {full_path:?} should be readable: {error}"));
+    serde_json::from_str(&contents)
+        .unwrap_or_else(|error| panic!("fixture {full_path:?} should be valid JSON: {error}"))
+}
+
+fn nonempty_string_field<'a>(object: &'a Value, path: &str, key: &str) -> Result<&'a str, String> {
+    let field_path = format!("{path}.{key}");
+    let value = required_field(object, path, key)?
+        .as_str()
+        .ok_or_else(|| format!("{field_path}: expected string"))?;
+    if value.trim().is_empty() {
+        Err(format!("{field_path}: expected nonempty string"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn expect_u64_array_field(
+    object: &Value,
+    path: &str,
+    key: &str,
+    expected: &[u64],
+) -> Result<(), String> {
+    let values = required_array_field(object, path, key)?;
+    let array_path = format!("{path}.{key}");
+    expect_len(&array_path, values.len(), expected.len())?;
+    for (index, expected_value) in expected.iter().enumerate() {
+        expect_u64_value(
+            &values[index],
+            &format!("{array_path}[{index}]"),
+            *expected_value,
+        )?;
+    }
+    Ok(())
+}
+
+fn expect_usize_array_value(
+    value: &Value,
+    path: &str,
+    expected: &[usize],
+) -> Result<Vec<usize>, String> {
+    let actual = usize_array(value, path);
+    if actual.as_slice() == expected {
+        Ok(actual)
+    } else {
+        Err(format!("{path}: expected {expected:?}, got {actual:?}"))
+    }
+}
+
+fn expect_quantum_tanner_manifest_reference(
+    reference: &Value,
+    path: &str,
+    kind: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    expect_str_field(reference, path, "kind", kind)?;
+    expect_str_field(reference, path, key, value)
+}
+
+fn validate_quantum_tanner_references(entry: &Value, path: &str) -> Result<(), String> {
+    let references = required_array_field(entry, path, "references")?;
+    let references_path = format!("{path}.references");
+    expect_len(&references_path, references.len(), 5)?;
+    expect_quantum_tanner_manifest_reference(
+        &references[0],
+        &format!("{references_path}[0]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/codes/quantum.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[1],
+        &format!("{references_path}[1]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/objects.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[2],
+        &format!("{references_path}[2]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/codes/quantum_test.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[3],
+        &format!("{references_path}[3]"),
+        "external",
+        "url",
+        "https://github.com/qLDPCOrg/qLDPC",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[4],
+        &format!("{references_path}[4]"),
+        "external",
+        "url",
+        "https://github.com/RebKatRad/qTanner",
+    )
+}
+
+fn validate_quantum_tanner_provenance(entry: &Value, path: &str) -> Result<(), String> {
+    let provenance = required_field(entry, path, "provenance")?;
+    let provenance_path = format!("{path}.provenance");
+    expect_str_field(
+        provenance,
+        &provenance_path,
+        "kind",
+        "reference_derived_known_answer",
+    )?;
+    let summary = nonempty_string_field(provenance, &provenance_path, "summary")?;
+    if !summary.contains("no qLDPC implementation code is copied") {
+        return Err(format!(
+            "{provenance_path}.summary: expected no-code-copy provenance"
+        ));
+    }
+    expect_string_array_field(
+        provenance,
+        &provenance_path,
+        "source_grounded_fields",
+        &[
+            "construction_mode",
+            "base_group",
+            "a_generator_indices",
+            "b_generator_indices",
+            "local_codes",
+            "expected_result",
+        ],
+    )
+}
+
+fn validate_quantum_tanner_contract_reference(entry: &Value, path: &str) -> Result<(), String> {
+    let contract_reference = required_field(entry, path, "contract_reference")?;
+    let reference_path = format!("{path}.contract_reference");
+    expect_u64_field(contract_reference, &reference_path, "issue", 177)?;
+    expect_str_field(
+        contract_reference,
+        &reference_path,
+        "path",
+        "qec-code/doc/quantum_tanner.md",
+    )?;
+    expect_u64_field(contract_reference, &reference_path, "schema_version", 1)
+}
+
+fn validate_quantum_tanner_expected_result(
+    entry: &Value,
+    path: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    let expected = required_field(entry, path, "expected_result")?;
+    let expected_path = format!("{path}.expected_result");
+    match expected_result {
+        QuantumTannerExpectedResult::Success => {
+            expect_str_field(expected, &expected_path, "kind", "success")?;
+            expect_u64_field(expected, &expected_path, "n", 16)?;
+            expect_u64_field(expected, &expected_path, "k", 2)?;
+            expect_u64_field(expected, &expected_path, "d", 4)?;
+            expect_u64_field(expected, &expected_path, "check_weight", 4)
+        }
+        QuantumTannerExpectedResult::Rejection(reason) => {
+            expect_str_field(expected, &expected_path, "kind", "rejection")?;
+            expect_str_field(expected, &expected_path, "reason", reason)
+        }
+    }
+}
+
+fn validate_quantum_tanner_expected_result_shape(entry: &Value, path: &str) -> Result<(), String> {
+    let expected = required_field(entry, path, "expected_result")?;
+    let expected_path = format!("{path}.expected_result");
+    match nonempty_string_field(expected, &expected_path, "kind")? {
+        "success" => {
+            for key in ["n", "k", "d", "check_weight"] {
+                required_field(expected, &expected_path, key)?
+                    .as_u64()
+                    .ok_or_else(|| format!("{expected_path}.{key}: expected unsigned integer"))?;
+            }
+            Ok(())
+        }
+        "rejection" => {
+            nonempty_string_field(expected, &expected_path, "reason")?;
+            Ok(())
+        }
+        other => Err(format!(
+            "{expected_path}.kind: expected success or rejection, got {other:?}"
+        )),
+    }
+}
+
+fn validate_nonempty_u64_array_field(object: &Value, path: &str, key: &str) -> Result<(), String> {
+    let values = required_array_field(object, path, key)?;
+    let array_path = format!("{path}.{key}");
+    if values.is_empty() {
+        return Err(format!("{array_path}: expected nonempty array"));
+    }
+    for (index, value) in values.iter().enumerate() {
+        value
+            .as_u64()
+            .ok_or_else(|| format!("{array_path}[{index}]: expected unsigned integer"))?;
+    }
+    Ok(())
+}
+
+fn validate_z4xz4_table(table: &[Vec<usize>], path: &str) -> Result<(), String> {
+    for left in 0..16 {
+        let (left_x, left_y) = (left / 4, left % 4);
+        for right in 0..16 {
+            let (right_x, right_y) = (right / 4, right % 4);
+            let expected = 4 * ((left_x + right_x) % 4) + ((left_y + right_y) % 4);
+            if table[left][right] != expected {
+                return Err(format!(
+                    "{path}[{left}][{right}]: expected {expected}, got {}",
+                    table[left][right]
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_quantum_tanner_local_codes(
+    fixture: &Value,
+    path: &str,
+    expected_widths: Option<(usize, usize)>,
+) -> Result<(), String> {
+    let local_codes = required_field(fixture, path, "local_codes")?;
+    let local_path = format!("{path}.local_codes");
+    expect_str_field(local_codes, &local_path, "matrix_role", "parity_check")?;
+    expect_str_field(local_codes, &local_path, "field", "GF(2)")?;
+
+    let h_a = usize_matrix(
+        required_field(local_codes, &local_path, "h_a")?,
+        &format!("{local_path}.h_a"),
+    );
+    let h_b = usize_matrix(
+        required_field(local_codes, &local_path, "h_b")?,
+        &format!("{local_path}.h_b"),
+    );
+    if h_a != vec![vec![1, 1]] {
+        return Err(format!("{local_path}.h_a: expected [[1, 1]], got {h_a:?}"));
+    }
+    if h_b != vec![vec![1, 1]] {
+        return Err(format!("{local_path}.h_b: expected [[1, 1]], got {h_b:?}"));
+    }
+    if let Some((a_width, b_width)) = expected_widths {
+        if h_a.iter().any(|row| row.len() != a_width) {
+            return Err(format!("{local_path}.h_a: expected row width {a_width}"));
+        }
+        if h_b.iter().any(|row| row.len() != b_width) {
+            return Err(format!("{local_path}.h_b: expected row width {b_width}"));
+        }
+    }
+    if h_a.iter().chain(&h_b).flatten().any(|&bit| bit > 1) {
+        return Err(format!("{local_path}: expected GF(2) entries"));
+    }
+    Ok(())
+}
+
+fn validate_quantum_tanner_fixture(
+    fixture: &Value,
+    path: &str,
+    fixture_id: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    expect_str_field(fixture, path, "fixture_id", fixture_id)?;
+    expect_str_field(fixture, path, "construction_mode", "lr_cayley_no_cover_v1")?;
+    let group = required_field(fixture, path, "base_group")?;
+    let group_path = format!("{path}.base_group");
+    expect_str_field(group, &group_path, "name", "Z4xZ4")?;
+    expect_str_field(
+        group,
+        &group_path,
+        "element_order",
+        "id = 4*x + y for (x,y) in Z4 x Z4",
+    )?;
+    expect_u64_field(group, &group_path, "order", 16)?;
+    expect_u64_field(group, &group_path, "identity", 0)?;
+
+    let table_path = format!("{group_path}.multiplication_table");
+    let table = usize_matrix(
+        required_field(group, &group_path, "multiplication_table")?,
+        &table_path,
+    );
+    let a_generators_path = format!("{path}.a_generator_indices");
+    let b_generators_path = format!("{path}.b_generator_indices");
+
+    match expected_result {
+        QuantumTannerExpectedResult::Success => {
+            assert_group_table_shape(&table, 16);
+            validate_z4xz4_table(&table, &table_path)?;
+            let a_generators = expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4, 12],
+            )?;
+            let b_generators = expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            if !generators_are_symmetric(&table, 0, &a_generators) {
+                return Err(format!("{a_generators_path}: expected symmetric set"));
+            }
+            if !generators_are_symmetric(&table, 0, &b_generators) {
+                return Err(format!("{b_generators_path}: expected symmetric set"));
+            }
+            validate_quantum_tanner_local_codes(
+                fixture,
+                path,
+                Some((a_generators.len(), b_generators.len())),
+            )?;
+            let face_count = documented_face_count(&table, &a_generators, &b_generators);
+            if face_count != 16 {
+                return Err(format!(
+                    "{path}: expected 16 physical faces, got {face_count}"
+                ));
+            }
+            Ok(())
+        }
+        QuantumTannerExpectedResult::Rejection("NonSymmetricGeneratorSet") => {
+            assert_group_table_shape(&table, 16);
+            validate_z4xz4_table(&table, &table_path)?;
+            let a_generators = expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4],
+            )?;
+            let b_generators = expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            if generators_are_symmetric(&table, 0, &a_generators) {
+                return Err(format!("{a_generators_path}: expected non-symmetric set"));
+            }
+            if !generators_are_symmetric(&table, 0, &b_generators) {
+                return Err(format!("{b_generators_path}: expected symmetric set"));
+            }
+            validate_quantum_tanner_local_codes(fixture, path, None)
+        }
+        QuantumTannerExpectedResult::Rejection("InvalidGroupTable") => {
+            expect_len(&format!("{table_path}.rows"), table.len(), 16)?;
+            if table.first().map(|row| row.len()) != Some(15) {
+                return Err(format!("{table_path}[0]: expected malformed length 15"));
+            }
+            if !table.iter().any(|row| row.len() != 16) {
+                return Err(format!("{table_path}: expected malformed table"));
+            }
+            for (row_index, row) in table.iter().enumerate() {
+                for &entry in row {
+                    if entry >= 16 {
+                        return Err(format!(
+                            "{table_path}[{row_index}]: entry {entry} out of range"
+                        ));
+                    }
+                }
+            }
+            expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4, 12],
+            )?;
+            expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            validate_quantum_tanner_local_codes(fixture, path, Some((2, 2)))
+        }
+        QuantumTannerExpectedResult::Rejection(reason) => {
+            Err(format!("{path}: unrecognized rejection reason {reason}"))
+        }
+    }
+}
+
+fn validate_quantum_tanner_catalog_entry_metadata(entry: &Value, path: &str) -> Result<(), String> {
+    let fixture_id = nonempty_string_field(entry, path, "fixture_id")?;
+    let input_path = nonempty_string_field(entry, path, "input_path")?;
+    let expected_input_path = format!("qec-code/{QUANTUM_TANNER_FIXTURE_DIR}/{fixture_id}.json");
+    if input_path != expected_input_path {
+        return Err(format!(
+            "{path}.input_path: expected {expected_input_path:?}, got {input_path:?}"
+        ));
+    }
+
+    validate_quantum_tanner_contract_reference(entry, path)?;
+    validate_quantum_tanner_provenance(entry, path)?;
+    validate_quantum_tanner_references(entry, path)?;
+    validate_quantum_tanner_expected_result_shape(entry, path)?;
+    expect_str_field(
+        entry,
+        path,
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+    validate_nonempty_u64_array_field(entry, path, "consuming_issues")?;
+
+    let fixture_rel_path = input_path
+        .strip_prefix("qec-code/")
+        .ok_or_else(|| format!("{path}.input_path: expected qec-code/ prefix"))?;
+    let fixture = load_quantum_tanner_fixture(fixture_rel_path);
+    expect_str_field(&fixture, fixture_rel_path, "fixture_id", fixture_id)
+}
+
+fn validate_quantum_tanner_catalog_entry(
+    entry: &Value,
+    path: &str,
+    fixture_id: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    validate_quantum_tanner_catalog_entry_metadata(entry, path)?;
+    let actual_fixture_id = nonempty_string_field(entry, path, "fixture_id")?;
+    if actual_fixture_id != fixture_id {
+        return Err(format!(
+            "{path}.fixture_id: expected {fixture_id:?}, got {actual_fixture_id:?}"
+        ));
+    }
+
+    let input_path = nonempty_string_field(entry, path, "input_path")?;
+    let expected_input_path = format!("qec-code/{QUANTUM_TANNER_FIXTURE_DIR}/{fixture_id}.json");
+    if input_path != expected_input_path {
+        return Err(format!(
+            "{path}.input_path: expected {expected_input_path:?}, got {input_path:?}"
+        ));
+    }
+
+    validate_quantum_tanner_expected_result(entry, path, expected_result)?;
+    expect_str_field(
+        entry,
+        path,
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+    expect_u64_array_field(
+        entry,
+        path,
+        "consuming_issues",
+        &[178, 180, 181, 183, 184, 185, 186, 188],
+    )?;
+
+    let fixture_rel_path = input_path
+        .strip_prefix("qec-code/")
+        .ok_or_else(|| format!("{path}.input_path: expected qec-code/ prefix"))?;
+    let fixture = load_quantum_tanner_fixture(fixture_rel_path);
+    validate_quantum_tanner_fixture(&fixture, fixture_rel_path, fixture_id, expected_result)
+}
+
+fn validate_quantum_tanner_catalog(manifest: &Value) -> Result<(), String> {
+    expect_u64_field(manifest, "manifest", "schema_version", 1)?;
+    expect_str_field(
+        manifest,
+        "manifest",
+        "manifest_id",
+        "quantum_tanner_acceptance_v1",
+    )?;
+    let contract = required_field(manifest, "manifest", "contract")?;
+    expect_u64_field(contract, "manifest.contract", "issue", 177)?;
+    expect_str_field(
+        contract,
+        "manifest.contract",
+        "path",
+        "qec-code/doc/quantum_tanner.md",
+    )?;
+    expect_str_field(
+        contract,
+        "manifest.contract",
+        "construction_mode",
+        "lr_cayley_no_cover_v1",
+    )?;
+    expect_str_field(
+        manifest,
+        "manifest",
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+
+    let entries = required_array_field(manifest, "manifest", "entries")?;
+    if entries.is_empty() {
+        return Err("manifest.entries: expected at least one entry".to_owned());
+    }
+    let mut seen_fixture_ids = HashSet::new();
+    for (index, entry) in entries.iter().enumerate() {
+        let entry_path = format!("manifest.entries[{index}]");
+        let fixture_id = nonempty_string_field(entry, &entry_path, "fixture_id")?;
+        if !seen_fixture_ids.insert(fixture_id.to_owned()) {
+            return Err(format!("{entry_path}.fixture_id: duplicate {fixture_id:?}"));
+        }
+        match fixture_id {
+            "toric_d4" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "toric_d4",
+                QuantumTannerExpectedResult::Success,
+            )?,
+            "invalid_non_symmetric_a" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "invalid_non_symmetric_a",
+                QuantumTannerExpectedResult::Rejection("NonSymmetricGeneratorSet"),
+            )?,
+            "invalid_bad_table" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "invalid_bad_table",
+                QuantumTannerExpectedResult::Rejection("InvalidGroupTable"),
+            )?,
+            _ => validate_quantum_tanner_catalog_entry_metadata(entry, &entry_path)?,
+        }
+    }
+    for required_fixture_id in ["toric_d4", "invalid_non_symmetric_a", "invalid_bad_table"] {
+        if !seen_fixture_ids.contains(required_fixture_id) {
+            return Err(format!(
+                "manifest.entries: missing required fixture {required_fixture_id:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn documented_face_count(
     table: &[Vec<usize>],
     a_generators: &[usize],
@@ -1045,6 +1580,12 @@ fn documented_face_count(
         }
     }
     faces.len()
+}
+
+#[test]
+fn quantum_tanner_fixture_catalog_has_grounded_cases() {
+    let manifest = load_quantum_tanner_fixture("tests/fixtures/quantum_tanner/manifest.json");
+    validate_quantum_tanner_catalog(&manifest).unwrap();
 }
 
 #[test]
