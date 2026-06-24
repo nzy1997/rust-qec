@@ -64,14 +64,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install system dependencies
         run: sudo apt-get install -y libfontconfig1-dev
-      - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
-        run: cargo tarpaulin --workspace --include-tests --exclude-files rbposd/dev/fixture_catalog.rs --out xml
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
-          files: cobertura.xml
+          files: lcov.info
           disable_search: true
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
