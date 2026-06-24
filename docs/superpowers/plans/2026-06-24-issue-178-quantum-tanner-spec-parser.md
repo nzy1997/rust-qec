@@ -46,7 +46,7 @@
 - Produces: public enum `QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1`.
 - Produces: public typed value `QuantumTannerSpec` with public fields `construction_mode`, `base_group`, `a_generator_indices`, `b_generator_indices`, and `local_codes`.
 
-- [ ] **Step 1: Write the failing parser test**
+- [x] **Step 1: Write the failing parser test**
 
 Modify the `qec-code/tests/code.rs` imports to include the parser API:
 
@@ -101,7 +101,7 @@ fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
 }
 ```
 
-- [ ] **Step 2: Run the focused test to verify RED**
+- [x] **Step 2: Run the focused test to verify RED**
 
 Run:
 
@@ -111,7 +111,7 @@ cargo test -p qec-code quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad
 
 Expected: FAIL to compile because `qec_code::codes::quantum_tanner` does not exist yet. That proves the test is wired to the missing parser API.
 
-- [ ] **Step 3: Add typed parser errors**
+- [x] **Step 3: Add typed parser errors**
 
 Add these variants to `QecError` in `qec-code/src/error.rs` near the other input-parsing errors:
 
@@ -129,7 +129,7 @@ InvalidQuantumTannerLocalCodeMatrix {
 },
 ```
 
-- [ ] **Step 4: Export the parser module**
+- [x] **Step 4: Export the parser module**
 
 Modify `qec-code/src/codes/mod.rs`:
 
@@ -140,7 +140,7 @@ pub mod quantum_tanner;
 pub mod steane;
 ```
 
-- [ ] **Step 5: Implement the parser module**
+- [x] **Step 5: Implement the parser module**
 
 Create `qec-code/src/codes/quantum_tanner.rs` with this complete implementation:
 
@@ -363,7 +363,7 @@ fn validate_binary_matrix_width(
 }
 ```
 
-- [ ] **Step 6: Run the focused test to verify GREEN**
+- [x] **Step 6: Run the focused test to verify GREEN**
 
 Run:
 
@@ -373,7 +373,7 @@ cargo test -p qec-code quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad
 
 Expected: PASS with the new parser test executed.
 
-- [ ] **Step 7: Run formatting for touched Rust files**
+- [x] **Step 7: Run formatting for touched Rust files**
 
 Run:
 
@@ -383,7 +383,7 @@ rustfmt qec-code/src/error.rs qec-code/src/codes/mod.rs qec-code/src/codes/quant
 
 Expected: command exits 0 and only formats the touched Rust files.
 
-- [ ] **Step 8: Run focused verification after formatting**
+- [x] **Step 8: Run focused verification after formatting**
 
 Run:
 
@@ -393,7 +393,7 @@ cargo test -p qec-code quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad
 
 Expected: PASS.
 
-- [ ] **Step 9: Run broader verification**
+- [x] **Step 9: Run broader verification**
 
 Run:
 
@@ -403,7 +403,7 @@ cargo test
 
 Expected: PASS for the workspace test suite.
 
-- [ ] **Step 10: Check whitespace and scope**
+- [x] **Step 10: Check whitespace and scope**
 
 Run:
 
@@ -415,7 +415,7 @@ Expected: no whitespace errors.
 
 Review the diff and confirm it only includes the parser, parser test, and required Superpowers spec/plan files. There must be no constructor, CLI, face enumeration, CSS generation, or unrelated refactor.
 
-- [ ] **Step 11: Commit implementation**
+- [x] **Step 11: Commit implementation**
 
 Run:
 

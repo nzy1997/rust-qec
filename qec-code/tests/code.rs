@@ -7,6 +7,9 @@ use qec_code::codes::built_in_css::{
     parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec,
     BuiltInCssFamily, BuiltInCssParams,
 };
+use qec_code::codes::quantum_tanner::{
+    quantum_tanner_spec_from_json_str, QuantumTannerConstructionMode,
+};
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
@@ -1586,6 +1589,46 @@ fn documented_face_count(
 fn quantum_tanner_fixture_catalog_has_grounded_cases() {
     let manifest = load_quantum_tanner_fixture("tests/fixtures/quantum_tanner/manifest.json");
     validate_quantum_tanner_catalog(&manifest).unwrap();
+}
+
+#[test]
+fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+
+    assert_eq!(
+        spec.construction_mode,
+        QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1
+    );
+    assert_eq!(spec.base_group.order, 16);
+    assert_eq!(spec.base_group.identity, 0);
+    assert_eq!(spec.base_group.multiplication_table.len(), 16);
+    assert!(spec
+        .base_group
+        .multiplication_table
+        .iter()
+        .all(|row| row.len() == 16));
+    assert_eq!(spec.a_generator_indices, vec![4, 12]);
+    assert_eq!(spec.b_generator_indices, vec![1, 3]);
+    assert_eq!(spec.local_codes.matrix_role.as_str(), "parity_check");
+    assert_eq!(spec.local_codes.field.as_str(), "GF(2)");
+    assert_eq!(spec.local_codes.h_a, vec![vec![1, 1]]);
+    assert_eq!(spec.local_codes.h_b, vec![vec![1, 1]]);
+
+    let error = quantum_tanner_spec_from_json_str(include_str!(
+        "fixtures/quantum_tanner/invalid_bad_table.json"
+    ))
+    .unwrap_err();
+
+    assert!(
+        matches!(error, QecError::InvalidQuantumTannerGroupTable { .. }),
+        "expected malformed table to fail before construction, got {error:?}"
+    );
+    assert!(
+        error.to_string().contains("row 0"),
+        "malformed table error should identify the bad row: {error}"
+    );
 }
 
 #[test]
