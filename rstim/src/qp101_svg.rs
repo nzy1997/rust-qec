@@ -246,52 +246,21 @@ fn render_gate(
 
     match gate {
         "CX" | "CZ" => {
-            let pairs = if !controls.is_empty() {
-                let mut pairs = Vec::new();
-                for (&control, &target) in controls.iter().zip(targets.iter()) {
-                    pairs.push((
-                        validate_lane(control, num_qubits, gate)?,
-                        validate_lane(target, num_qubits, gate)?,
-                    ));
-                }
-                pairs
-            } else {
-                targets
-                    .chunks(2)
-                    .filter(|chunk| chunk.len() == 2)
-                    .map(|chunk| {
-                        Ok((
-                            validate_lane(chunk[0], num_qubits, gate)?,
-                            validate_lane(chunk[1], num_qubits, gate)?,
-                        ))
-                    })
-                    .collect::<Result<Vec<_>, String>>()?
-            };
-            if pairs.is_empty() {
-                render_generic_box(out, x, num_qubits, &label, &lanes, "#eef2ff")?;
-            } else {
+            if let Some(pairs) = controlled_pairs(targets, controls, num_qubits, gate)? {
                 for (control_lane, target_lane) in &pairs {
                     render_controlled_pair(out, x, *control_lane, *target_lane, gate);
                 }
+            } else {
+                render_generic_box(out, x, num_qubits, &label, &lanes, "#eef2ff")?;
             }
         }
         "SWAP" => {
-            let pairs = targets
-                .chunks(2)
-                .filter(|chunk| chunk.len() == 2)
-                .map(|chunk| {
-                    Ok((
-                        validate_lane(chunk[0], num_qubits, gate)?,
-                        validate_lane(chunk[1], num_qubits, gate)?,
-                    ))
-                })
-                .collect::<Result<Vec<_>, String>>()?;
-            if pairs.is_empty() {
-                render_generic_box(out, x, num_qubits, &label, &lanes, "#ecfeff")?;
-            } else {
+            if let Some(pairs) = target_pairs(targets, num_qubits, gate)? {
                 for (lane_a, lane_b) in &pairs {
                     render_swap_pair(out, x, *lane_a, *lane_b);
                 }
+            } else {
+                render_generic_box(out, x, num_qubits, &label, &lanes, "#ecfeff")?;
             }
         }
         _ => {
@@ -307,6 +276,46 @@ fn render_gate(
 
     render_annotations(out, x, &lanes, annotations);
     Ok(())
+}
+
+fn controlled_pairs(
+    targets: &[u32],
+    controls: &[u32],
+    num_qubits: usize,
+    gate: &str,
+) -> Result<Option<Vec<(usize, usize)>>, String> {
+    if !controls.is_empty() {
+        if controls.len() != targets.len() {
+            return Ok(None);
+        }
+        let mut pairs = Vec::with_capacity(controls.len());
+        for (&control, &target) in controls.iter().zip(targets.iter()) {
+            pairs.push((
+                validate_lane(control, num_qubits, gate)?,
+                validate_lane(target, num_qubits, gate)?,
+            ));
+        }
+        return Ok(Some(pairs));
+    }
+    target_pairs(targets, num_qubits, gate)
+}
+
+fn target_pairs(
+    targets: &[u32],
+    num_qubits: usize,
+    gate: &str,
+) -> Result<Option<Vec<(usize, usize)>>, String> {
+    if targets.len() % 2 != 0 {
+        return Ok(None);
+    }
+    let mut pairs = Vec::with_capacity(targets.len() / 2);
+    for chunk in targets.chunks_exact(2) {
+        pairs.push((
+            validate_lane(chunk[0], num_qubits, gate)?,
+            validate_lane(chunk[1], num_qubits, gate)?,
+        ));
+    }
+    Ok(Some(pairs))
 }
 
 fn render_single_qubit_boxes(

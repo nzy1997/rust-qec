@@ -28,6 +28,13 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
     assert!(svg.starts_with("<svg"), "SVG should start with <svg: {svg}");
+    for attr in [
+        "width=\"512\"",
+        "height=\"112\"",
+        "viewBox=\"0 0 512 112\"",
+    ] {
+        assert!(svg.contains(attr), "SVG missing root attr {attr}: {svg}");
+    }
     for marker in ["q0", "q1", "H", "CX", "tick"] {
         assert!(
             svg.contains(marker),
@@ -65,5 +72,87 @@ fn svg_renderer_rejects_zero_qubits() {
     assert!(
         err.contains("num_qubits") || err.contains("qubits"),
         "error should name num_qubits or qubits, got {err}"
+    );
+}
+
+#[test]
+fn svg_renderer_draws_cz_and_swap_specializations() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 3,
+        operations: vec![
+            Qp101Operation::Gate {
+                gate: "CZ".to_string(),
+                targets: vec![1],
+                controls: vec![0],
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: None,
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Gate {
+                gate: "SWAP".to_string(),
+                targets: vec![1, 2],
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: None,
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+        ],
+        metadata: None,
+        extensions: None,
+    };
+
+    let svg = render_svg(&doc).expect("renderer should produce SVG");
+
+    assert!(svg.contains("class=\"CZ\""), "CZ should render specialized wiring: {svg}");
+    assert!(
+        svg.contains("class=\"target CZ\""),
+        "CZ should render a labeled target box: {svg}"
+    );
+    assert!(svg.contains("class=\"SWAP\""), "SWAP should render specialized wiring: {svg}");
+    assert!(svg.contains(">SWAP</text>"), "SWAP should retain its note label: {svg}");
+}
+
+#[test]
+fn svg_renderer_falls_back_when_paired_gate_operands_are_unmatched() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 3,
+        operations: vec![Qp101Operation::Gate {
+            gate: "CX".to_string(),
+            targets: vec![1, 2],
+            controls: vec![0],
+            control_configs: None,
+            params: Vec::new(),
+            raw_targets: None,
+            display: None,
+            tags: Vec::new(),
+            annotations: Vec::new(),
+        }],
+        metadata: None,
+        extensions: None,
+    };
+
+    let svg = render_svg(&doc).expect("renderer should produce SVG");
+
+    assert!(
+        svg.contains("class=\"gate-box\""),
+        "unmatched paired operands should render a generic fallback box: {svg}"
+    );
+    assert!(
+        svg.contains("height=\"124\""),
+        "fallback box should span all validated lanes instead of dropping one: {svg}"
+    );
+    assert!(
+        !svg.contains("class=\"target CX\""),
+        "unmatched paired operands must not partially render a specialized CX shape: {svg}"
     );
 }
