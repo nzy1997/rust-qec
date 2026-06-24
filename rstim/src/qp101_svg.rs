@@ -9,6 +9,32 @@ const COLUMN_GAP: i32 = 72;
 const GATE_WIDTH: i32 = 38;
 const GATE_HEIGHT: i32 = 28;
 
+#[derive(Debug, Clone)]
+struct MeasurementTarget {
+    lane: usize,
+    first_index: usize,
+    output_count: usize,
+}
+
+impl MeasurementTarget {
+    fn anchor(&self) -> String {
+        if self.output_count == 1 {
+            format!("m{}", self.first_index)
+        } else {
+            format!(
+                "m{}-m{}",
+                self.first_index,
+                self.first_index + self.output_count - 1
+            )
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct RenderState {
+    next_measurement_index: usize,
+}
+
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     if doc.num_qubits == 0 {
         return Err("cannot render QP101 SVG with num_qubits = 0".to_string());
@@ -27,7 +53,14 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     );
     render_wires(&mut out, doc.num_qubits, width);
     let mut column = 0usize;
-    render_operations(&mut out, &doc.operations, doc.num_qubits, &mut column)?;
+    let mut state = RenderState::default();
+    render_operations(
+        &mut out,
+        &doc.operations,
+        doc.num_qubits,
+        &mut column,
+        &mut state,
+    )?;
     out.push_str("</g>\n</svg>\n");
     Ok(out)
 }
@@ -61,6 +94,7 @@ fn render_operations(
     ops: &[Qp101Operation],
     num_qubits: usize,
     column: &mut usize,
+    state: &mut RenderState,
 ) -> Result<(), String> {
     for op in ops {
         match op {
@@ -89,6 +123,7 @@ fn render_operations(
                     raw_targets.as_deref(),
                     display.as_ref(),
                     annotations,
+                    state,
                 )?;
                 *column += 1;
             }
@@ -114,7 +149,7 @@ fn render_operations(
                 render_top_note(out, x, &label);
                 render_annotations(out, x, &[0], annotations);
                 *column += 1;
-                render_operations(out, body, num_qubits, column)?;
+                render_operations(out, body, num_qubits, column, state)?;
             }
             Qp101Operation::Detector { annotations, .. } => {
                 let x = x_for_column(*column);
@@ -215,6 +250,30 @@ fn raw_target_lanes(
     Ok(lanes)
 }
 
+fn measurement_targets(
+    gate: &str,
+    targets: &[u32],
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<Vec<MeasurementTarget>, String> {
+    let Some(output_count) = measurement_output_count(gate) else {
+        return Ok(Vec::new());
+    };
+
+    let mut measurement_targets = Vec::with_capacity(targets.len());
+    for &target in targets {
+        let lane = validate_lane(target, num_qubits, gate)?;
+        let first_index = state.next_measurement_index + 1;
+        state.next_measurement_index += output_count;
+        measurement_targets.push(MeasurementTarget {
+            lane,
+            first_index,
+            output_count,
+        });
+    }
+    Ok(measurement_targets)
+}
+
 fn validate_lane(index: u32, num_qubits: usize, gate: &str) -> Result<usize, String> {
     let lane = usize::try_from(index)
         .map_err(|_| format!("gate {gate} uses invalid qubit index {index}"))?;
@@ -236,6 +295,7 @@ fn render_gate(
     raw_targets: Option<&[Qp101TargetRef]>,
     display: Option<&Qp101Display>,
     annotations: &[Qp101Annotation],
+    state: &mut RenderState,
 ) -> Result<(), String> {
     let label = gate_label(gate, display);
     let lanes = if let Some(raw_targets) = raw_targets {
@@ -243,6 +303,7 @@ fn render_gate(
     } else {
         gate_lanes(targets, controls, num_qubits, gate)?
     };
+    let measurement_targets = measurement_targets(gate, targets, num_qubits, state)?;
 
     match gate {
         "CX" | "CZ" => {
@@ -273,6 +334,7 @@ fn render_gate(
     }
 
     render_annotations(out, x, &lanes, annotations);
+    render_measurement_anchors(out, x, &measurement_targets);
     Ok(())
 }
 
@@ -320,12 +382,15 @@ fn is_simple_single_qubit_gate(gate: &str) -> bool {
     matches!(gate, "H" | "X" | "Y" | "Z" | "S" | "T" | "R" | "RX")
 }
 
-fn render_single_qubit_boxes(
-    out: &mut String,
-    x: i32,
-    label: &str,
-    lanes: &[usize],
-) {
+fn measurement_output_count(gate: &str) -> Option<usize> {
+    match gate {
+        "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => Some(1),
+        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => Some(2),
+        _ => None,
+    }
+}
+
+fn render_single_qubit_boxes(out: &mut String, x: i32, label: &str, lanes: &[usize]) {
     for &lane in lanes {
         render_gate_box(out, x, lane_y(lane), label, "#ffffff");
     }
@@ -460,6 +525,16 @@ fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[
         out.push_str(&format!(
             "<text x=\"{x}\" y=\"{}\" fill=\"#7a5af8\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
             base_y + idx as i32 * 12
+        ));
+    }
+}
+
+fn render_measurement_anchors(out: &mut String, x: i32, targets: &[MeasurementTarget]) {
+    for target in targets {
+        out.push_str(&format!(
+            "<text class=\"measurement-anchor\" x=\"{x}\" y=\"{}\" fill=\"#2563eb\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
+            lane_y(target.lane) + GATE_HEIGHT / 2 + 14,
+            escape_xml(&target.anchor())
         ));
     }
 }

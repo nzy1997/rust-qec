@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
-    Qp101TargetRef,
+    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    export_qp101,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -31,11 +31,7 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
     assert!(svg.starts_with("<svg"), "SVG should start with <svg: {svg}");
-    for attr in [
-        "width=\"512\"",
-        "height=\"112\"",
-        "viewBox=\"0 0 512 112\"",
-    ] {
+    for attr in ["width=\"512\"", "height=\"112\"", "viewBox=\"0 0 512 112\""] {
         assert!(svg.contains(attr), "SVG missing root attr {attr}: {svg}");
     }
     for marker in ["q0", "q1", "H", "CX", "tick"] {
@@ -114,13 +110,22 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
 
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
-    assert!(svg.contains("class=\"CZ\""), "CZ should render specialized wiring: {svg}");
+    assert!(
+        svg.contains("class=\"CZ\""),
+        "CZ should render specialized wiring: {svg}"
+    );
     assert!(
         svg.contains("class=\"target CZ\""),
         "CZ should render a labeled target box: {svg}"
     );
-    assert!(svg.contains("class=\"SWAP\""), "SWAP should render specialized wiring: {svg}");
-    assert!(svg.contains(">SWAP</text>"), "SWAP should retain its note label: {svg}");
+    assert!(
+        svg.contains("class=\"SWAP\""),
+        "SWAP should render specialized wiring: {svg}"
+    );
+    assert!(
+        svg.contains(">SWAP</text>"),
+        "SWAP should retain its note label: {svg}"
+    );
 }
 
 #[test]
@@ -337,6 +342,53 @@ fn svg_renderer_rejects_out_of_range_qubit_targets() {
     assert!(
         err.contains("qubit 3") && err.contains("num_qubits"),
         "error should name the invalid target and qubit count, got {err}"
+    );
+}
+
+#[test]
+fn svg_renderer_labels_measurements_with_global_anchors() {
+    let instrs =
+        parse_lines("M 0\nMRL 1\nMX 0\n").expect("measurement anchor fixture should parse");
+    let doc = export_qp101(&instrs).expect("measurement anchor fixture should export");
+    let original_doc = doc.clone();
+
+    let svg = render_svg(&doc).expect("measurement anchor fixture should render");
+
+    for marker in [">M</text>", ">MRL</text>", ">MX</text>"] {
+        assert!(
+            svg.contains(marker),
+            "SVG should keep original measurement gate label {marker}: {svg}"
+        );
+    }
+    for anchor in [">m1</text>", ">m2-m3</text>", ">m4</text>"] {
+        assert!(
+            svg.contains(anchor),
+            "SVG should contain measurement anchor {anchor}: {svg}"
+        );
+    }
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2-m3</text>").expect("m2-m3 should be present"),
+        "m1 should appear before the MRL span: {svg}"
+    );
+    assert!(
+        svg.find(">m2-m3</text>").expect("m2-m3 should be present")
+            < svg.find(">m4</text>").expect("m4 should be present"),
+        "MRL should reserve m2 and m3 before MX receives m4: {svg}"
+    );
+    assert_eq!(
+        doc, original_doc,
+        "SVG rendering must not mutate the QP101 document"
+    );
+
+    let reset_only =
+        export_qp101(&parse_lines("R 0\nRX 1\n").expect("reset-only fixture should parse"))
+            .expect("reset-only fixture should export");
+    let reset_svg = render_svg(&reset_only).expect("reset-only fixture should render");
+
+    assert!(
+        !reset_svg.contains(">m1</text>"),
+        "reset-only gates must not receive measurement anchors: {reset_svg}"
     );
 }
 
