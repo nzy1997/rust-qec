@@ -3,17 +3,17 @@ mod support;
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
-    BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams, bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec,
+    bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
+    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec,
+    BuiltInCssFamily, BuiltInCssParams,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
+use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
-    ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView, GirthStatus,
-    WeightStats, verify_apm_css_matrices,
+    verify_apm_css_matrices, ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView,
+    GirthStatus, WeightStats,
 };
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -954,6 +954,160 @@ fn apm_verifier_rejects_girth_below_expected_bound_on_either_side() {
     let err = verify_small_apm_sparse_rows(2, &empty_rows, 2, &cycle_four_rows, &expectations)
         .unwrap_err();
     assert!(err.contains("expected Hz Tanner girth >= 6"));
+}
+
+fn extract_marked_json(doc: &str, marker: &str) -> Result<Value, String> {
+    let marker_text = format!("<!-- {marker} -->");
+    let after_marker = doc
+        .split_once(&marker_text)
+        .map(|(_, after)| after)
+        .ok_or_else(|| format!("missing marker {marker_text}"))?;
+    let fence_start = after_marker
+        .find("```json")
+        .ok_or_else(|| format!("missing json fence after {marker_text}"))?;
+    let json_start = fence_start + "```json".len();
+    let json_tail = &after_marker[json_start..];
+    let json_end = json_tail
+        .find("```")
+        .ok_or_else(|| format!("missing closing json fence after {marker_text}"))?;
+    serde_json::from_str(json_tail[..json_end].trim())
+        .map_err(|error| format!("invalid json after {marker_text}: {error}"))
+}
+
+fn usize_array(value: &Value, path: &str) -> Vec<usize> {
+    value
+        .as_array()
+        .unwrap_or_else(|| panic!("{path}: expected array"))
+        .iter()
+        .map(|entry| {
+            entry
+                .as_u64()
+                .unwrap_or_else(|| panic!("{path}: expected unsigned integer")) as usize
+        })
+        .collect()
+}
+
+fn usize_matrix(value: &Value, path: &str) -> Vec<Vec<usize>> {
+    value
+        .as_array()
+        .unwrap_or_else(|| panic!("{path}: expected matrix"))
+        .iter()
+        .enumerate()
+        .map(|(row_index, row)| usize_array(row, &format!("{path}[{row_index}]")))
+        .collect()
+}
+
+fn assert_group_table_shape(table: &[Vec<usize>], order: usize) {
+    assert_eq!(table.len(), order, "multiplication table row count");
+    for row in table {
+        assert_eq!(row.len(), order, "multiplication table column count");
+        for &entry in row {
+            assert!(
+                entry < order,
+                "table entry {entry} out of range for order {order}"
+            );
+        }
+    }
+}
+
+fn inverse_index(table: &[Vec<usize>], identity: usize, element: usize) -> Option<usize> {
+    (0..table.len()).find(|&candidate| {
+        table[element][candidate] == identity && table[candidate][element] == identity
+    })
+}
+
+fn generators_are_symmetric(table: &[Vec<usize>], identity: usize, generators: &[usize]) -> bool {
+    generators.iter().all(|&generator| {
+        inverse_index(table, identity, generator)
+            .map(|inverse| generators.contains(&inverse))
+            .unwrap_or(false)
+    })
+}
+
+fn documented_face_count(
+    table: &[Vec<usize>],
+    a_generators: &[usize],
+    b_generators: &[usize],
+) -> usize {
+    let mut faces = std::collections::BTreeSet::new();
+    for g in 0..table.len() {
+        for &a in a_generators {
+            for &b in b_generators {
+                let ag = table[a][g];
+                let gb = table[g][b];
+                let agb = table[ag][b];
+                let mut face = vec![g, ag, gb, agb];
+                face.sort_unstable();
+                face.dedup();
+                assert_eq!(face.len(), 4, "face must be nondegenerate");
+                faces.insert(face);
+            }
+        }
+    }
+    faces.len()
+}
+
+#[test]
+fn quantum_tanner_contract_examples_compile() {
+    let doc = include_str!("../doc/quantum_tanner.md");
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/codes/quantum.py"));
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/objects.py"));
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/codes/quantum_test.py"));
+    assert!(doc.contains("https://github.com/qLDPCOrg/qLDPC"));
+    assert!(doc.contains("https://github.com/QuantumSavory/QuantumExpanders.jl"));
+    assert!(doc.contains("lr_cayley_no_cover_v1"));
+    assert!(doc.contains("lr_cayley_bipartite_double_cover_v1"));
+    assert!(doc.contains("lr_cayley_quadripartite_cover_v1"));
+    assert!(doc.contains("UnsupportedConstructionMode"));
+    assert!(doc.contains("<!-- quantum_tanner_contract:toric_d4_counting_convention -->"));
+    assert!(doc.contains("n = |G| * |A| * |B| / 4 = 16 * 2 * 2 / 4 = 16"));
+    assert!(doc.contains("<!-- quantum_tanner_contract:bad_non_symmetric_generator -->"));
+
+    let toric = extract_marked_json(doc, "quantum_tanner_contract:toric_d4").unwrap();
+    assert_eq!(toric["example_id"].as_str(), Some("toric_d4"));
+    assert_eq!(
+        toric["construction_mode"].as_str(),
+        Some("lr_cayley_no_cover_v1")
+    );
+
+    let group = &toric["base_group"];
+    assert_eq!(group["name"].as_str(), Some("Z4xZ4"));
+    assert_eq!(group["identity"].as_u64(), Some(0));
+    let table = usize_matrix(
+        &group["multiplication_table"],
+        "base_group.multiplication_table",
+    );
+    assert_group_table_shape(&table, 16);
+
+    let a_generators = usize_array(&toric["a_generator_indices"], "a_generator_indices");
+    let b_generators = usize_array(&toric["b_generator_indices"], "b_generator_indices");
+    assert!(generators_are_symmetric(&table, 0, &a_generators));
+    assert!(generators_are_symmetric(&table, 0, &b_generators));
+
+    let expected = &toric["expected_css"];
+    assert_eq!(expected["n"].as_u64(), Some(16));
+    assert_eq!(expected["k"].as_u64(), Some(2));
+    assert_eq!(expected["expected_distance"].as_u64(), Some(4));
+    assert_eq!(
+        documented_face_count(&table, &a_generators, &b_generators),
+        expected["n"].as_u64().unwrap() as usize
+    );
+
+    let local_a = usize_matrix(&toric["local_codes"]["h_a"], "local_codes.h_a");
+    let local_b = usize_matrix(&toric["local_codes"]["h_b"], "local_codes.h_b");
+    assert!(local_a.iter().all(|row| row.len() == a_generators.len()));
+    assert!(local_b.iter().all(|row| row.len() == b_generators.len()));
+    assert!(local_a.iter().flatten().all(|&bit| bit <= 1));
+    assert!(local_b.iter().flatten().all(|&bit| bit <= 1));
+
+    let bad =
+        extract_marked_json(doc, "quantum_tanner_contract:bad_non_symmetric_generator").unwrap();
+    let bad_a = usize_array(&bad["a_generator_indices"], "bad.a_generator_indices");
+    assert!(!generators_are_symmetric(&table, 0, &bad_a));
+    assert_eq!(
+        bad["expected_error"].as_str(),
+        Some("NonSymmetricGeneratorSet")
+    );
 }
 
 #[test]
