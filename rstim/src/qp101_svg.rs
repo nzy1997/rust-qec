@@ -55,6 +55,7 @@ struct RepeatGroupSpan {
     start_column: usize,
     end_column: usize,
     iteration_starts: Vec<usize>,
+    depth: usize,
 }
 
 #[derive(Debug, Default)]
@@ -63,6 +64,7 @@ struct RenderState {
     next_detector_index: usize,
     measurements: Vec<MeasurementRecord>,
     repeat_groups: Vec<RepeatGroupSpan>,
+    repeat_depth: usize,
 }
 
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
@@ -354,16 +356,20 @@ fn render_operations(
                 let x = x_for_column(start_column);
                 render_annotations(out, x, &[0], annotations);
                 let mut iteration_starts = Vec::new();
+                let depth = state.repeat_depth;
+                state.repeat_depth += 1;
                 for _ in 0..*count {
                     iteration_starts.push(*column);
                     render_operations(out, body, num_qubits, column, state)?;
                 }
+                state.repeat_depth = depth;
                 if *column > start_column {
                     state.repeat_groups.push(RepeatGroupSpan {
                         count: *count,
                         start_column,
                         end_column: *column - 1,
                         iteration_starts,
+                        depth,
                     });
                 }
             }
@@ -1091,7 +1097,7 @@ fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: us
     ));
     out.push_str(&format!(
         "<text class=\"repeat-group-label\" x=\"{}\" y=\"{}\" fill=\"#475467\" text-anchor=\"start\" font-size=\"12\">repeat x{}</text>\n",
-        left + 8,
+        left + 8 + group.depth as i32 * COLUMN_GAP,
         top + 13,
         group.count
     ));

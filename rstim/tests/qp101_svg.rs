@@ -976,6 +976,22 @@ fn svg_renderer_draws_nested_repeat_groups_and_preserves_measurement_order() {
         2,
         "inner repeat label should render once per expanded outer iteration: {svg}"
     );
+    let outer_labels = text_positions(&svg, "repeat x2");
+    let inner_labels = text_positions(&svg, "repeat x3");
+    assert_eq!(
+        outer_labels.len(),
+        1,
+        "outer repeat should have one positioned label: {svg}"
+    );
+    assert_eq!(
+        inner_labels.len(),
+        2,
+        "inner repeat should have two positioned labels: {svg}"
+    );
+    assert!(
+        !inner_labels.contains(&outer_labels[0]),
+        "no inner repeat label should share the outer repeat label coordinate: {svg}"
+    );
     assert_eq!(
         svg.matches(">iter 2</text>").count(),
         3,
@@ -1067,14 +1083,34 @@ fn qp101_doc(num_qubits: usize, operations: Vec<Qp101Operation>) -> Qp101Documen
 }
 
 fn text_y(svg: &str, content: &str) -> Option<i32> {
+    text_xy(svg, content).map(|(_, y)| y)
+}
+
+fn text_xy(svg: &str, content: &str) -> Option<(i32, i32)> {
+    text_positions(svg, content).into_iter().next()
+}
+
+fn text_positions(svg: &str, content: &str) -> Vec<(i32, i32)> {
     let needle = format!(">{content}</text>");
-    let text_end = svg.find(&needle)?;
-    let text_start = svg[..text_end].rfind("<text")?;
-    let attrs = &svg[text_start..text_end];
-    let y_start = attrs.find(" y=\"")? + " y=\"".len();
-    let y = &attrs[y_start..];
-    let y_end = y.find('"')?;
-    y[..y_end].parse().ok()
+    let mut positions = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(relative_end) = svg[search_start..].find(&needle) {
+        let text_end = search_start + relative_end;
+        if let Some(text_start) = svg[..text_end].rfind("<text") {
+            let attrs = &svg[text_start..text_end];
+            if let (Some(x_start), Some(y_start)) = (attrs.find(" x=\""), attrs.find(" y=\"")) {
+                let x = &attrs[x_start + " x=\"".len()..];
+                let y = &attrs[y_start + " y=\"".len()..];
+                if let (Some(x_end), Some(y_end)) = (x.find('"'), y.find('"')) {
+                    if let (Ok(x), Ok(y)) = (x[..x_end].parse(), y[..y_end].parse()) {
+                        positions.push((x, y));
+                    }
+                }
+            }
+        }
+        search_start = text_end + needle.len();
+    }
+    positions
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
