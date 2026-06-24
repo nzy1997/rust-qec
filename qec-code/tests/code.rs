@@ -1601,6 +1601,7 @@ fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
         spec.construction_mode,
         QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1
     );
+    assert_eq!(spec.construction_mode.as_str(), "lr_cayley_no_cover_v1");
     assert_eq!(spec.base_group.order, 16);
     assert_eq!(spec.base_group.identity, 0);
     assert_eq!(spec.base_group.multiplication_table.len(), 16);
@@ -1641,6 +1642,108 @@ fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
         error.to_string().contains("identity"),
         "nonzero identity error should identify the bad field: {error}"
     );
+}
+
+fn toric_d4_json_with(mutator: impl FnOnce(&mut Value)) -> String {
+    let mut fixture: Value =
+        serde_json::from_str(include_str!("fixtures/quantum_tanner/toric_d4.json")).unwrap();
+    mutator(&mut fixture);
+    serde_json::to_string(&fixture).unwrap()
+}
+
+fn expect_quantum_tanner_group_table_error(input: &str, expected_reason_part: &str) {
+    let error = quantum_tanner_spec_from_json_str(input).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected InvalidQuantumTannerGroupTable, got {error:?}");
+    };
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+fn expect_quantum_tanner_local_code_error(
+    input: &str,
+    expected_matrix: &'static str,
+    expected_reason_part: &str,
+) {
+    let error = quantum_tanner_spec_from_json_str(input).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, expected_matrix);
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_invalid_json() {
+    assert!(matches!(
+        quantum_tanner_spec_from_json_str("{").unwrap_err(),
+        QecError::InvalidQuantumTannerSpecJson(_)
+    ));
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_unsupported_construction_mode() {
+    let input = toric_d4_json_with(|fixture| {
+        fixture["construction_mode"] = Value::String("lr_cayley_quadripartite_cover_v1".to_owned());
+    });
+
+    assert!(matches!(
+        quantum_tanner_spec_from_json_str(&input).unwrap_err(),
+        QecError::UnsupportedQuantumTannerConstructionMode { mode }
+            if mode == "lr_cayley_quadripartite_cover_v1"
+    ));
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_group_table_contract_errors() {
+    let zero_order = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["order"] = Value::from(0);
+    });
+    expect_quantum_tanner_group_table_error(&zero_order, "order must be positive");
+
+    let short_table = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["multiplication_table"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+    });
+    expect_quantum_tanner_group_table_error(&short_table, "expected 16 rows, got 15");
+
+    let out_of_range_entry = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["multiplication_table"][0][0] = Value::from(16);
+    });
+    expect_quantum_tanner_group_table_error(&out_of_range_entry, "expected < 16");
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_invalid_local_code_shapes() {
+    let bad_role = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["matrix_role"] = Value::String("generator".to_owned());
+    });
+    expect_quantum_tanner_local_code_error(&bad_role, "local_codes", "matrix_role");
+
+    let bad_field = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["field"] = Value::String("GF(4)".to_owned());
+    });
+    expect_quantum_tanner_local_code_error(&bad_field, "local_codes", "field");
+
+    let wrong_h_a_width = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_a"][0]
+            .as_array_mut()
+            .unwrap()
+            .push(Value::from(1));
+    });
+    expect_quantum_tanner_local_code_error(&wrong_h_a_width, "h_a", "width 3");
+
+    let nonbinary_h_b = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_b"][0][1] = Value::from(2);
+    });
+    expect_quantum_tanner_local_code_error(&nonbinary_h_b, "h_b", "expected 0 or 1");
 }
 
 #[test]
