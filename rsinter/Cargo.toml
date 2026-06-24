@@ -23,6 +23,7 @@ toml = "0.8"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"] }
 
 [dev-dependencies]
+qec-code = { path = "../qec-code" }
 tempfile = "3"
 
 [[bin]]
