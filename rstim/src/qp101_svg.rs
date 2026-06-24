@@ -17,6 +17,7 @@ const REPEAT_GROUP_BOTTOM_PAD: i32 = 8;
 const REPEAT_GROUP_X_PAD: i32 = 4;
 const REPEAT_GROUP_LABEL_X_PAD: i32 = 8;
 const REPEAT_GROUP_LABEL_DEPTH_STAGGER: i32 = 16;
+const REPEAT_ANNOTATION_LINE_OFFSET: usize = 1;
 
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
@@ -200,7 +201,12 @@ fn max_rendered_below_gate_text_baseline_with_state(
                 body,
                 annotations,
             } => {
-                update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
+                update_max_baseline_from_annotations(
+                    &mut max_baseline,
+                    &[0usize],
+                    annotations,
+                    REPEAT_ANNOTATION_LINE_OFFSET,
+                );
                 for _ in 0..*count {
                     if let Some(body_baseline) =
                         max_rendered_below_gate_text_baseline_with_state(body, num_qubits, state)?
@@ -355,8 +361,6 @@ fn render_operations(
                 annotations,
             } => {
                 let start_column = *column;
-                let x = x_for_column(start_column);
-                render_annotations(out, x, &[0], annotations);
                 let mut iteration_starts = Vec::new();
                 let depth = state.repeat_depth;
                 state.repeat_depth += 1;
@@ -366,13 +370,15 @@ fn render_operations(
                 }
                 state.repeat_depth = depth;
                 if *column > start_column {
-                    state.repeat_groups.push(RepeatGroupSpan {
+                    let span = RepeatGroupSpan {
                         count: *count,
                         start_column,
                         end_column: *column - 1,
                         iteration_starts,
                         depth,
-                    });
+                    };
+                    render_repeat_annotations(out, &span, annotations);
+                    state.repeat_groups.push(span);
                 }
             }
             Qp101Operation::Detector {
@@ -1110,6 +1116,24 @@ fn repeat_group_label_x(left: i32, right: i32, depth: usize) -> i32 {
     let max_x = (right - REPEAT_GROUP_LABEL_X_PAD).max(min_x);
     let desired_x = min_x + depth as i32 * REPEAT_GROUP_LABEL_DEPTH_STAGGER;
     desired_x.min(max_x)
+}
+
+fn render_repeat_annotations(
+    out: &mut String,
+    group: &RepeatGroupSpan,
+    annotations: &[Qp101Annotation],
+) {
+    let x_start = x_for_column(group.start_column);
+    let x_end = x_for_column(group.end_column);
+    let left = x_start - COLUMN_GAP / 2 + REPEAT_GROUP_X_PAD;
+    let right = x_end + COLUMN_GAP / 2 - REPEAT_GROUP_X_PAD;
+    render_annotations_with_line_offset(
+        out,
+        repeat_group_label_x(left, right, group.depth),
+        &[0],
+        annotations,
+        REPEAT_ANNOTATION_LINE_OFFSET,
+    );
 }
 
 fn render_repeat_iteration_boundaries(

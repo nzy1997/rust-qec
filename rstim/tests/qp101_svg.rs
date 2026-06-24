@@ -1042,6 +1042,30 @@ fn svg_renderer_keeps_deep_nested_repeat_labels_inside_group_bounds() {
 }
 
 #[test]
+fn svg_renderer_offsets_repeat_annotations_from_first_body_measurement_anchor() {
+    let instrs = parse_lines("REPEAT 2 {\n  M 0\n}\n")
+        .expect("annotated repeat measurement fixture should parse");
+    let mut doc =
+        export_qp101(&instrs).expect("annotated repeat measurement fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Repeat { annotations, .. } => {
+            annotations.push(annotation("loop", Some("round"), Some("body")));
+        }
+        op => panic!("expected first operation to be a repeat block, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("annotated repeat measurement fixture should render");
+
+    let repeat_annotation =
+        text_xy(&svg, "loop: round: body").expect("repeat annotation should be positioned");
+    let first_anchor = text_xy(&svg, "m1").expect("first measurement anchor should be positioned");
+    assert_ne!(
+        repeat_annotation, first_anchor,
+        "repeat annotation should not overlap the first body measurement anchor: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
     let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
         .expect("repeat measurement anchor fixture should parse");
