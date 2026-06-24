@@ -1,5 +1,8 @@
 use rstim::parser::parse_lines;
-use rstim::qp101::{export_qp101, Qp101Display, Qp101Document, Qp101Operation, Qp101TargetRef};
+use rstim::qp101::{
+    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
+    Qp101TargetRef,
+};
 use rstim::qp101_svg::render_svg;
 
 #[test]
@@ -193,4 +196,158 @@ fn svg_renderer_renders_unsupported_multi_qubit_gate_as_fallback_box() {
         svg.contains(">ISWAP</text>"),
         "fallback box should keep the gate label: {svg}"
     );
+}
+
+#[test]
+fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 2,
+        operations: vec![
+            Qp101Operation::QubitCoords {
+                coords: vec![0.0],
+                targets: vec![0],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::ShiftCoords {
+                delta: vec![1.0],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Noise {
+                gate: "PAULI_CHANNEL_1".to_string(),
+                params: vec![0.1, 0.0, 0.0],
+                raw_targets: vec![
+                    Qp101TargetRef::Pauli {
+                        basis: Qp101PauliBasis::X,
+                        qubit: 1,
+                        inverted: None,
+                    },
+                    Qp101TargetRef::Rec { offset: -1 },
+                    Qp101TargetRef::Combiner,
+                    Qp101TargetRef::Sweep { index: 0 },
+                ],
+                annotations: vec![annotation("noise", Some("q\""), Some("p'"))],
+            },
+            Qp101Operation::Repeat {
+                count: 2,
+                body: vec![Qp101Operation::Gate {
+                    gate: "X".to_string(),
+                    targets: vec![0],
+                    controls: Vec::new(),
+                    control_configs: None,
+                    params: Vec::new(),
+                    raw_targets: None,
+                    display: None,
+                    tags: Vec::new(),
+                    annotations: Vec::new(),
+                }],
+                annotations: vec![annotation("loop", Some("round"), Some("body"))],
+            },
+            Qp101Operation::Detector {
+                coords: vec![0.0],
+                sources: vec![Qp101TargetRef::Rec { offset: -1 }],
+                annotations: vec![annotation("det", None, Some("seen"))],
+            },
+            Qp101Operation::ObservableInclude {
+                index: 7,
+                sources: vec![Qp101TargetRef::Rec { offset: -1 }],
+                annotations: vec![annotation("obs", Some("logical"), None)],
+            },
+            Qp101Operation::Annotation {
+                kind: "NOTE".to_string(),
+                text: "A&B<test>".to_string(),
+                annotations: vec![annotation("meta", Some("kind"), Some("text"))],
+            },
+            Qp101Operation::Gate {
+                gate: "SWAP".to_string(),
+                targets: vec![0],
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: None,
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Gate {
+                gate: "EMPTY".to_string(),
+                targets: Vec::new(),
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: Some(vec![
+                    Qp101TargetRef::Rec { offset: -2 },
+                    Qp101TargetRef::Combiner,
+                    Qp101TargetRef::Sweep { index: 1 },
+                ]),
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+        ],
+        metadata: None,
+        extensions: None,
+    };
+
+    let svg = render_svg(&doc).expect("fallback QP101 operations should render");
+
+    for marker in [
+        "PAULI_CHANNEL_1",
+        "repeat x2",
+        "detector",
+        "L7",
+        "NOTE: A&amp;B&lt;test&gt;",
+        "SWAP",
+        "EMPTY",
+    ] {
+        assert!(
+            svg.contains(marker),
+            "SVG missing fallback marker {marker}: {svg}"
+        );
+    }
+    assert!(
+        svg.contains("noise: q&quot;: p&apos;"),
+        "annotations should render and escape quote/apostrophe characters: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_rejects_out_of_range_qubit_targets() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 1,
+        operations: vec![Qp101Operation::Gate {
+            gate: "H".to_string(),
+            targets: vec![3],
+            controls: Vec::new(),
+            control_configs: None,
+            params: Vec::new(),
+            raw_targets: None,
+            display: None,
+            tags: Vec::new(),
+            annotations: Vec::new(),
+        }],
+        metadata: None,
+        extensions: None,
+    };
+
+    let err = render_svg(&doc).expect_err("out-of-range qubit target should fail layout");
+    assert!(
+        err.contains("qubit 3") && err.contains("num_qubits"),
+        "error should name the invalid target and qubit count, got {err}"
+    );
+}
+
+fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
+    Qp101Annotation {
+        kind: kind.to_string(),
+        target_slots: Vec::new(),
+        label: label.map(str::to_string),
+        text: text.map(str::to_string),
+        style: None,
+        tags: Vec::new(),
+        context: None,
+    }
 }
