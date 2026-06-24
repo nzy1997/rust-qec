@@ -113,7 +113,7 @@ impl MeasurementTarget {
             format!("m{}", self.first_index)
         } else {
             format!(
-                "m{}-{}",
+                "m{}-m{}",
                 self.first_index,
                 self.first_index + self.output_count - 1
             )
