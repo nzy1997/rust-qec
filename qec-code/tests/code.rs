@@ -1928,6 +1928,60 @@ fn quantum_tanner_cayley_faces_match_toric_d4_counts() {
 }
 
 #[test]
+fn quantum_tanner_cayley_faces_reject_invalid_generator_sets_and_degenerate_faces() {
+    let empty_a_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![], vec![1]);
+    let empty_a_group = validate_quantum_tanner_group_table(&empty_a_spec).unwrap();
+    let error =
+        enumerate_quantum_tanner_cayley_faces(empty_a_spec.construction_mode, &empty_a_group)
+            .unwrap_err();
+    let QecError::InvalidQuantumTannerGeneratorSet { set, reason } = error else {
+        panic!("expected generator-set error, got {error:?}");
+    };
+    assert_eq!(set, "A");
+    assert!(reason.contains("nonempty"), "got {reason:?}");
+
+    let duplicate_a_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![1, 1], vec![2]);
+    let duplicate_a_group = validate_quantum_tanner_group_table(&duplicate_a_spec).unwrap();
+    let error = enumerate_quantum_tanner_cayley_faces(
+        duplicate_a_spec.construction_mode,
+        &duplicate_a_group,
+    )
+    .unwrap_err();
+    let QecError::InvalidQuantumTannerGeneratorSet { set, reason } = error else {
+        panic!("expected generator-set error, got {error:?}");
+    };
+    assert_eq!(set, "A");
+    assert!(
+        reason.contains("duplicate generator 1 at coordinate 1"),
+        "got {reason:?}"
+    );
+
+    let degenerate_spec = quantum_tanner_group_table_validator_spec(
+        2,
+        0,
+        vec![vec![0, 1], vec![1, 0]],
+        vec![1],
+        vec![1],
+    );
+    let degenerate_group = validate_quantum_tanner_group_table(&degenerate_spec).unwrap();
+    assert!(matches!(
+        enumerate_quantum_tanner_cayley_faces(
+            degenerate_spec.construction_mode,
+            &degenerate_group,
+        )
+        .unwrap_err(),
+        QecError::DegenerateQuantumTannerFace {
+            root: 0,
+            a: 1,
+            b: 1,
+            vertices,
+        } if vertices == vec![0, 0, 1, 1]
+    ));
+}
+
+#[test]
 fn quantum_tanner_fixture_catalog_has_grounded_cases() {
     let manifest = load_quantum_tanner_fixture("tests/fixtures/quantum_tanner/manifest.json");
     validate_quantum_tanner_catalog(&manifest).unwrap();

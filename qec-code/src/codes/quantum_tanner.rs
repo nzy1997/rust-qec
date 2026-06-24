@@ -88,7 +88,7 @@ pub struct QuantumTannerOrientedFace {
     pub face_id: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct QuantumTannerLocalIncidence {
     pub source_vertex: usize,
     pub a_index: usize,
@@ -359,8 +359,8 @@ pub fn enumerate_quantum_tanner_cayley_faces(
         });
     }
 
-    x_incidence.sort_by_key(local_incidence_sort_key);
-    z_incidence.sort_by_key(local_incidence_sort_key);
+    x_incidence.sort();
+    z_incidence.sort();
 
     Ok(QuantumTannerCayleyComplex {
         faces,
@@ -451,28 +451,18 @@ fn inverse_generator_indices(
     generators: &[usize],
     group: &ValidatedFiniteGroup,
 ) -> Result<BTreeMap<usize, usize>> {
-    let mut inverse_indices = BTreeMap::new();
-    for &generator in generators {
-        let inverse = group.inv(generator)?;
-        let inverse_index = generators
-            .iter()
-            .position(|&value| value == inverse)
-            .ok_or_else(|| QecError::InvalidQuantumTannerGeneratorSet {
-                set: "A",
-                reason: format!("generator {generator} is missing inverse {inverse}"),
-            })?;
-        inverse_indices.insert(generator, inverse_index);
-    }
-    Ok(inverse_indices)
-}
-
-fn local_incidence_sort_key(record: &QuantumTannerLocalIncidence) -> (usize, usize, usize, usize) {
-    (
-        record.source_vertex,
-        record.a_index,
-        record.b_index,
-        record.face_id,
-    )
+    let generator_indices = generators
+        .iter()
+        .enumerate()
+        .map(|(index, &generator)| (generator, index))
+        .collect::<BTreeMap<_, _>>();
+    generators
+        .iter()
+        .map(|&generator| {
+            let inverse = group.inv(generator)?;
+            Ok((generator, generator_indices[&inverse]))
+        })
+        .collect()
 }
 
 fn parse_local_codes(
