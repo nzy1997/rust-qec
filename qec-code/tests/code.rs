@@ -8,9 +8,9 @@ use qec_code::codes::built_in_css::{
     BuiltInCssFamily, BuiltInCssParams,
 };
 use qec_code::codes::quantum_tanner::{
-    quantum_tanner_local_code_tensor_dual, quantum_tanner_spec_from_json_str,
-    validate_quantum_tanner_group_table, ExplicitFiniteGroup, QuantumTannerConstructionMode,
-    QuantumTannerLocalCodes, QuantumTannerSpec,
+    enumerate_quantum_tanner_cayley_faces, quantum_tanner_local_code_tensor_dual,
+    quantum_tanner_spec_from_json_str, validate_quantum_tanner_group_table, ExplicitFiniteGroup,
+    QuantumTannerConstructionMode, QuantumTannerLocalCodes, QuantumTannerSpec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
@@ -1797,6 +1797,133 @@ fn quantum_tanner_group_table_validator_rejects_out_of_range_generators_and_elem
             element: 4,
             order: 4
         }
+    ));
+}
+
+#[test]
+fn quantum_tanner_cayley_faces_match_toric_d4_counts() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+
+    let complex = enumerate_quantum_tanner_cayley_faces(spec.construction_mode, &group).unwrap();
+
+    assert_eq!(complex.faces.len(), 16);
+    assert_eq!(complex.oriented_faces.len(), 64);
+    assert_eq!(complex.x_incidence.len(), 64);
+    assert_eq!(complex.z_incidence.len(), 64);
+    assert_eq!(
+        complex
+            .faces
+            .iter()
+            .map(|face| (face.id, face.vertices))
+            .take(4)
+            .collect::<Vec<_>>(),
+        vec![
+            (0, [0, 1, 4, 5]),
+            (1, [0, 1, 12, 13]),
+            (2, [0, 3, 4, 7]),
+            (3, [0, 3, 12, 15]),
+        ]
+    );
+
+    for source_vertex in 0..group.order() {
+        let x_local = complex
+            .x_incidence
+            .iter()
+            .filter(|record| record.source_vertex == source_vertex)
+            .map(|record| {
+                (
+                    record.a_index,
+                    record.a_generator,
+                    record.b_index,
+                    record.b_generator,
+                )
+            })
+            .collect::<Vec<_>>();
+        let z_local = complex
+            .z_incidence
+            .iter()
+            .filter(|record| record.source_vertex == source_vertex)
+            .map(|record| {
+                (
+                    record.a_index,
+                    record.a_generator,
+                    record.b_index,
+                    record.b_generator,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            x_local,
+            vec![(0, 4, 0, 1), (0, 4, 1, 3), (1, 12, 0, 1), (1, 12, 1, 3)]
+        );
+        assert_eq!(z_local, x_local);
+    }
+
+    let x_identity = complex
+        .x_incidence
+        .iter()
+        .filter(|record| record.source_vertex == 0)
+        .map(|record| (record.a_generator, record.b_generator, record.face_id))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        x_identity,
+        vec![(4, 1, 0), (4, 3, 2), (12, 1, 1), (12, 3, 3)]
+    );
+
+    let z_source_four = complex
+        .z_incidence
+        .iter()
+        .filter(|record| record.source_vertex == 4)
+        .map(|record| (record.a_generator, record.b_generator, record.face_id))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        z_source_four,
+        vec![(4, 1, 8), (4, 3, 9), (12, 1, 0), (12, 3, 2)]
+    );
+
+    let x_face = complex
+        .x_incidence
+        .iter()
+        .find(|record| {
+            record.source_vertex == 0 && record.a_generator == 4 && record.b_generator == 1
+        })
+        .unwrap()
+        .face_id;
+    let z_face = complex
+        .z_incidence
+        .iter()
+        .find(|record| {
+            record.source_vertex == 4 && record.a_generator == 12 && record.b_generator == 1
+        })
+        .unwrap()
+        .face_id;
+    assert_eq!(x_face, z_face);
+
+    let non_symmetric_input = toric_d4_json_with(|fixture| {
+        fixture["a_generator_indices"] = Value::Array(vec![Value::from(4_u64)]);
+        fixture["local_codes"]["h_a"] = Value::Array(vec![Value::Array(vec![Value::from(1_u64)])]);
+    });
+    let non_symmetric_spec = quantum_tanner_spec_from_json_str(&non_symmetric_input).unwrap();
+    let non_symmetric_group = validate_quantum_tanner_group_table(&non_symmetric_spec).unwrap();
+    assert!(matches!(
+        enumerate_quantum_tanner_cayley_faces(
+            non_symmetric_spec.construction_mode,
+            &non_symmetric_group
+        )
+        .unwrap_err(),
+        QecError::InvalidQuantumTannerGeneratorSet { set: "A", .. }
+    ));
+
+    let unsupported_mode = toric_d4_json_with(|fixture| {
+        fixture["construction_mode"] = Value::String("lr_cayley_quadripartite_cover_v1".to_owned());
+    });
+    assert!(matches!(
+        quantum_tanner_spec_from_json_str(&unsupported_mode).unwrap_err(),
+        QecError::UnsupportedQuantumTannerConstructionMode { mode }
+            if mode == "lr_cayley_quadripartite_cover_v1"
     ));
 }
 
