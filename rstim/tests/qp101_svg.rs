@@ -472,6 +472,144 @@ fn svg_renderer_resolves_detector_observable_sources() {
 }
 
 #[test]
+fn svg_renderer_covers_source_history_edge_cases() {
+    let empty_source_doc = qp101_doc(
+        1,
+        vec![
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::ObservableInclude {
+                index: 5,
+                sources: Vec::new(),
+                annotations: Vec::new(),
+            },
+        ],
+    );
+    let empty_source_svg =
+        render_svg(&empty_source_doc).expect("empty source labels should render");
+
+    for marker in [">D0 = -</text>", ">L5 *= -</text>"] {
+        assert!(
+            empty_source_svg.contains(marker),
+            "empty source SVG should contain {marker}: {empty_source_svg}"
+        );
+    }
+
+    let hand_built_doc = qp101_doc(
+        3,
+        vec![
+            Qp101Operation::Gate {
+                gate: "MPP".to_string(),
+                targets: Vec::new(),
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: Some(Vec::new()),
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Gate {
+                gate: "MPP".to_string(),
+                targets: vec![0, 1],
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: None,
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Gate {
+                gate: "MXX".to_string(),
+                targets: vec![0, 1, 2],
+                controls: Vec::new(),
+                control_configs: None,
+                params: Vec::new(),
+                raw_targets: None,
+                display: None,
+                tags: Vec::new(),
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Noise {
+                gate: "HERALDED_PAULI_CHANNEL_1".to_string(),
+                params: vec![0.0, 0.0, 0.0, 0.0],
+                raw_targets: vec![
+                    Qp101TargetRef::Sweep { index: 0 },
+                    Qp101TargetRef::Combiner,
+                    Qp101TargetRef::Qubit {
+                        index: 1,
+                        inverted: None,
+                    },
+                ],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Rec { offset: -5 }],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Rec { offset: -4 }],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Rec { offset: -3 }],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Rec { offset: -2 }],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Rec { offset: -1 }],
+                annotations: Vec::new(),
+            },
+            Qp101Operation::Detector {
+                coords: Vec::new(),
+                sources: vec![Qp101TargetRef::Pauli {
+                    basis: Qp101PauliBasis::Y,
+                    qubit: 0,
+                    inverted: None,
+                }],
+                annotations: Vec::new(),
+            },
+        ],
+    );
+    let svg = render_svg(&hand_built_doc).expect("hand-built history fixture should render");
+
+    for marker in [
+        ">m1</text>",
+        ">m2</text>",
+        ">m3</text>",
+        ">m4</text>",
+        ">m5</text>",
+        ">D0 = m1</text>",
+        ">D1 = m2</text>",
+        ">D2 = m3</text>",
+        ">D3 = m4</text>",
+        ">D4 = m5</text>",
+        ">D5 = Y0</text>",
+    ] {
+        assert!(
+            svg.contains(marker),
+            "hand-built history SVG should contain {marker}: {svg}"
+        );
+    }
+    assert!(
+        !svg.contains(">m6</text>"),
+        "combiner-only raw targets should not create measurement anchors: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_preserves_explicit_combiner_sources() {
     let doc = Qp101Document {
         standard: "QP101-ZY".to_string(),
@@ -812,6 +950,17 @@ fn root_viewbox_height(svg: &str) -> Option<i32> {
     let value = &attrs[value_start..];
     let value_end = value.find('"')?;
     value[..value_end].split_whitespace().nth(3)?.parse().ok()
+}
+
+fn qp101_doc(num_qubits: usize, operations: Vec<Qp101Operation>) -> Qp101Document {
+    Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits,
+        operations,
+        metadata: None,
+        extensions: None,
+    }
 }
 
 fn text_y(svg: &str, content: &str) -> Option<i32> {
