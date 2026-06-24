@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis,
-    Qp101TargetRef,
+    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    export_qp101,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -31,11 +31,7 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
     assert!(svg.starts_with("<svg"), "SVG should start with <svg: {svg}");
-    for attr in [
-        "width=\"512\"",
-        "height=\"112\"",
-        "viewBox=\"0 0 512 112\"",
-    ] {
+    for attr in ["width=\"512\"", "height=\"112\"", "viewBox=\"0 0 512 112\""] {
         assert!(svg.contains(attr), "SVG missing root attr {attr}: {svg}");
     }
     for marker in ["q0", "q1", "H", "CX", "tick"] {
@@ -114,13 +110,22 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
 
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
-    assert!(svg.contains("class=\"CZ\""), "CZ should render specialized wiring: {svg}");
+    assert!(
+        svg.contains("class=\"CZ\""),
+        "CZ should render specialized wiring: {svg}"
+    );
     assert!(
         svg.contains("class=\"target CZ\""),
         "CZ should render a labeled target box: {svg}"
     );
-    assert!(svg.contains("class=\"SWAP\""), "SWAP should render specialized wiring: {svg}");
-    assert!(svg.contains(">SWAP</text>"), "SWAP should retain its note label: {svg}");
+    assert!(
+        svg.contains("class=\"SWAP\""),
+        "SWAP should render specialized wiring: {svg}"
+    );
+    assert!(
+        svg.contains(">SWAP</text>"),
+        "SWAP should retain its note label: {svg}"
+    );
 }
 
 #[test]
@@ -337,6 +342,90 @@ fn svg_renderer_rejects_out_of_range_qubit_targets() {
     assert!(
         err.contains("qubit 3") && err.contains("num_qubits"),
         "error should name the invalid target and qubit count, got {err}"
+    );
+}
+
+#[test]
+fn svg_renderer_draws_noise_boxes() {
+    let instrs = parse_lines(
+        "H 0\n\
+         X_ERROR(0.1) 0\n\
+         Z_ERROR(0.2) 1\n\
+         DEPOLARIZE1(0.3) 0\n\
+         DEPOLARIZE2(0.4) 0 1\n\
+         LOSS(0.5) 1\n\
+         M 0\n",
+    )
+    .expect("test circuit should parse");
+    let doc = export_qp101(&instrs).expect("test circuit should export to QP101");
+
+    let svg = render_svg(&doc).expect("renderer should produce SVG");
+
+    for marker in ["q0", "q1", "H", "M"] {
+        assert!(
+            svg.contains(marker),
+            "SVG should preserve neighboring timeline marker {marker}: {svg}"
+        );
+    }
+    for label in ["XE", "ZE", "D1", "D2", "LOSS"] {
+        let marker = format!(">{label}</text>");
+        assert!(
+            svg.contains(&marker),
+            "SVG missing compact noise label {label}: {svg}"
+        );
+    }
+    assert!(
+        svg.contains("p=0.1"),
+        "noise parameter note should remain visible for X_ERROR: {svg}"
+    );
+    assert!(
+        svg.matches("class=\"noise-box\"").count() >= 6,
+        "known noise should render as compact per-target or paired boxes: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_falls_back_for_odd_depolarize2_targets() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 2,
+        operations: vec![Qp101Operation::Noise {
+            gate: "DEPOLARIZE2".to_string(),
+            params: vec![0.4],
+            raw_targets: vec![
+                Qp101TargetRef::Qubit {
+                    index: 0,
+                    inverted: None,
+                },
+                Qp101TargetRef::Qubit {
+                    index: 1,
+                    inverted: None,
+                },
+                Qp101TargetRef::Qubit {
+                    index: 0,
+                    inverted: None,
+                },
+            ],
+            annotations: Vec::new(),
+        }],
+        metadata: None,
+        extensions: None,
+    };
+
+    let svg = render_svg(&doc).expect("odd DEPOLARIZE2 target groups should visibly fall back");
+
+    assert!(
+        svg.contains(">DEPOLARIZE2</text>"),
+        "odd paired noise should keep a visible generic DEPOLARIZE2 label: {svg}"
+    );
+    assert!(
+        svg.contains("p=0.4"),
+        "fallback noise should still show parameter text: {svg}"
+    );
+    assert!(
+        svg.contains("class=\"gate-box\""),
+        "odd paired noise should use the generic fallback box: {svg}"
     );
 }
 

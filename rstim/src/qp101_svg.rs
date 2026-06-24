@@ -94,14 +94,13 @@ fn render_operations(
             }
             Qp101Operation::Noise {
                 gate,
+                params,
                 raw_targets,
                 annotations,
                 ..
             } => {
                 let x = x_for_column(*column);
-                let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
-                render_generic_box(out, x, num_qubits, gate, &lanes, "#fff7ed")?;
-                render_annotations(out, x, &lanes, annotations);
+                render_noise(out, x, num_qubits, gate, params, raw_targets, annotations)?;
                 *column += 1;
             }
             Qp101Operation::Repeat {
@@ -320,12 +319,119 @@ fn is_simple_single_qubit_gate(gate: &str) -> bool {
     matches!(gate, "H" | "X" | "Y" | "Z" | "S" | "T" | "R" | "RX")
 }
 
-fn render_single_qubit_boxes(
+enum NoisePolicy {
+    Single,
+    Pair,
+    Fallback,
+}
+
+fn noise_policy(gate: &str) -> NoisePolicy {
+    match gate {
+        "X_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "LOSS" => NoisePolicy::Single,
+        "DEPOLARIZE2" => NoisePolicy::Pair,
+        _ => NoisePolicy::Fallback,
+    }
+}
+
+fn noise_label(gate: &str) -> &str {
+    match gate {
+        "X_ERROR" => "XE",
+        "Z_ERROR" => "ZE",
+        "DEPOLARIZE1" => "D1",
+        "DEPOLARIZE2" => "D2",
+        "LOSS" => "LOSS",
+        _ => gate,
+    }
+}
+
+fn noise_param_note(params: &[f64]) -> Option<String> {
+    if params.is_empty() {
+        return None;
+    }
+    let values = params
+        .iter()
+        .map(|value| value.to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some(format!("p={values}"))
+}
+
+fn render_noise(
     out: &mut String,
     x: i32,
-    label: &str,
-    lanes: &[usize],
-) {
+    num_qubits: usize,
+    gate: &str,
+    params: &[f64],
+    raw_targets: &[Qp101TargetRef],
+    annotations: &[Qp101Annotation],
+) -> Result<(), String> {
+    let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
+    let note = noise_param_note(params);
+
+    match noise_policy(gate) {
+        NoisePolicy::Single if !lanes.is_empty() => {
+            if let Some(note) = note.as_deref() {
+                render_param_note(out, x, &lanes, note);
+            }
+            for &lane in &lanes {
+                render_noise_box(out, x, lane_y(lane), noise_label(gate));
+            }
+        }
+        NoisePolicy::Pair if !lanes.is_empty() && lanes.len() % 2 == 0 => {
+            if let Some(note) = note.as_deref() {
+                render_param_note(out, x, &lanes, note);
+            }
+            for pair in lanes.chunks_exact(2) {
+                render_noise_pair(out, x, pair[0], pair[1], noise_label(gate));
+            }
+        }
+        _ => {
+            if let Some(note) = note.as_deref() {
+                render_param_note(out, x, &lanes, note);
+            }
+            render_generic_box(out, x, num_qubits, gate, &lanes, "#fff7ed")?;
+        }
+    }
+
+    render_annotations(out, x, &lanes, annotations);
+    Ok(())
+}
+
+fn render_param_note(out: &mut String, x: i32, lanes: &[usize], note: &str) {
+    let y = lanes
+        .iter()
+        .min()
+        .map(|lane| lane_y(*lane) - GATE_HEIGHT / 2 - 6)
+        .unwrap_or(TOP_MARGIN - 4);
+    out.push_str(&format!(
+        "<text class=\"param-note\" x=\"{x}\" y=\"{y}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
+        escape_xml(note)
+    ));
+}
+
+fn render_noise_box(out: &mut String, x: i32, y: i32, label: &str) {
+    out.push_str(&format!(
+        "<rect class=\"noise-box\" x=\"{}\" y=\"{}\" width=\"{GATE_WIDTH}\" height=\"{GATE_HEIGHT}\" rx=\"4\" ry=\"4\" stroke=\"#9a3412\" fill=\"#fff7ed\" />\n",
+        x - GATE_WIDTH / 2,
+        y - GATE_HEIGHT / 2
+    ));
+    out.push_str(&format!(
+        "<text x=\"{x}\" y=\"{y}\" fill=\"#111827\" text-anchor=\"middle\" dominant-baseline=\"middle\">{}</text>\n",
+        escape_xml(label)
+    ));
+}
+
+fn render_noise_pair(out: &mut String, x: i32, lane_a: usize, lane_b: usize, label: &str) {
+    let y1 = lane_y(lane_a);
+    let y2 = lane_y(lane_b);
+    out.push_str(&format!(
+        "<line class=\"noise-pair\" x1=\"{x}\" y1=\"{y1}\" x2=\"{x}\" y2=\"{y2}\" stroke=\"#9a3412\" stroke-width=\"1.5\" />\n"
+    ));
+    render_noise_box(out, x, y1, label);
+    render_noise_box(out, x, y2, label);
+}
+
+fn render_single_qubit_boxes(out: &mut String, x: i32, label: &str, lanes: &[usize]) {
     for &lane in lanes {
         render_gate_box(out, x, lane_y(lane), label, "#ffffff");
     }
