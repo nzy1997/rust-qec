@@ -20,7 +20,7 @@ The selected approach keeps the change small while still creating the reusable m
 
 ## Rendering Behavior
 
-For measurement gates, render the existing gate label exactly as before and add a separate anchor label near each measurement target. Single-output targets display one anchor, for example `m1`. Multi-output targets display an inclusive span, for example `m2-m3`, while reserving both measurement indices internally. Anchor numbering is global across the full rendered document and follows the existing recursive visual traversal, including repeat bodies.
+For measurement gates, render the existing gate label exactly as before and add a separate anchor label near each measurement target. Single-output targets display one anchor, for example `m1`. Multi-output targets display an inclusive span, for example `m2-m3`, while reserving both measurement indices internally. Anchor numbering is global across the full rendered document and follows expanded visual traversal, including each repeat-body iteration counted by its repeat count. Repeat group decorations remain out of scope.
 
 Reset-only gates such as `R` and `RX` are not measurement-producing operations and must not display anchors.
 

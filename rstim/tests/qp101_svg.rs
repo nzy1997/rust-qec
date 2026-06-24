@@ -434,14 +434,14 @@ fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
 }
 
 #[test]
-fn svg_renderer_does_not_reset_measurement_anchors_per_repeat_body() {
+fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
     let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
         .expect("repeat measurement anchor fixture should parse");
     let doc = export_qp101(&instrs).expect("repeat measurement anchor fixture should export");
 
     let svg = render_svg(&doc).expect("repeat measurement anchor fixture should render");
 
-    for anchor in ["m1", "m2", "m3"] {
+    for anchor in ["m1", "m2", "m3", "m4"] {
         let marker = format!(">{anchor}</text>");
         assert_eq!(
             svg.matches(&marker).count(),
@@ -457,7 +457,12 @@ fn svg_renderer_does_not_reset_measurement_anchors_per_repeat_body() {
     assert!(
         svg.find(">m2</text>").expect("m2 should be present")
             < svg.find(">m3</text>").expect("m3 should be present"),
-        "post-repeat measurement should continue after repeat-body m2: {svg}"
+        "second repeat iteration should continue after first repeat-body m2: {svg}"
+    );
+    assert!(
+        svg.find(">m3</text>").expect("m3 should be present")
+            < svg.find(">m4</text>").expect("m4 should be present"),
+        "post-repeat measurement should continue after the expanded repeat-body m3: {svg}"
     );
 }
 

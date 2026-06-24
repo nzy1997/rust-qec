@@ -68,13 +68,17 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
 }
 
 fn count_visible_columns(ops: &[Qp101Operation]) -> usize {
-    ops.iter()
-        .map(|op| match op {
+    ops.iter().fold(0usize, |total, op| {
+        let columns = match op {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => 0,
-            Qp101Operation::Repeat { body, .. } => 1 + count_visible_columns(body),
+            Qp101Operation::Repeat { count, body, .. } => {
+                let count = usize::try_from(*count).unwrap_or(usize::MAX);
+                1usize.saturating_add(count_visible_columns(body).saturating_mul(count))
+            }
             _ => 1,
-        })
-        .sum()
+        };
+        total.saturating_add(columns)
+    })
 }
 
 fn svg_height(doc: &Qp101Document) -> Result<i32, String> {
@@ -270,7 +274,9 @@ fn render_operations(
                 render_top_note(out, x, &label);
                 render_annotations(out, x, &[0], annotations);
                 *column += 1;
-                render_operations(out, body, num_qubits, column, state)?;
+                for _ in 0..*count {
+                    render_operations(out, body, num_qubits, column, state)?;
+                }
             }
             Qp101Operation::Detector { annotations, .. } => {
                 let x = x_for_column(*column);

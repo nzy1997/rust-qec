@@ -14,6 +14,7 @@
 - Do not mutate the input `Qp101Document`.
 - Measurement anchors are renderer-only SVG labels.
 - Anchor numbering is global across the full rendered document and does not reset per moment, repeat body, or qubit.
+- Repeat counts contribute expanded visual columns and measurement indices; the existing `repeat xN` note stays as-is and no new repeat decorations are added.
 - Supported one-output families are `M`, `MX`, `MY`, `MZ`, `MR`, `MRX`, `MRY`, `MRZ`.
 - Supported two-output families are `ML`, `MXL`, `MYL`, `MZL`, `MRL`, `MRXL`, `MRYL`, `MRZL`.
 - Reset-only gates such as `R` and `RX` must not receive measurement anchors.
