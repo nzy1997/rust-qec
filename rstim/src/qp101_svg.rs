@@ -55,6 +55,7 @@ struct RepeatGroupSpan {
     start_column: usize,
     end_column: usize,
     iteration_starts: Vec<usize>,
+    annotations: Vec<Qp101Annotation>,
 }
 
 #[derive(Debug, Default)]
@@ -345,7 +346,11 @@ fn render_operations(
                 );
                 *column += 1;
             }
-            Qp101Operation::Repeat { count, body, .. } => {
+            Qp101Operation::Repeat {
+                count,
+                body,
+                annotations,
+            } => {
                 let start_column = *column;
                 let mut iteration_starts = Vec::new();
                 for _ in 0..*count {
@@ -358,6 +363,7 @@ fn render_operations(
                         start_column,
                         end_column: *column - 1,
                         iteration_starts,
+                        annotations: annotations.clone(),
                     });
                 }
             }
@@ -1085,6 +1091,7 @@ fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: us
         top + 13,
         group.count
     ));
+    render_annotations(out, x_start, &[0], &group.annotations);
 }
 
 fn render_repeat_iteration_boundaries(

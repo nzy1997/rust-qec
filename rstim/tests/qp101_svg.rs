@@ -315,6 +315,7 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
         "D0 = m1",
         "OBS_INCLUDE(7)",
         "L7 *= m1",
+        "loop: round: body",
         "NOTE: A&amp;B&lt;test&gt;",
         "SWAP",
         "EMPTY",
