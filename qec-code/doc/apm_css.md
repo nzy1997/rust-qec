@@ -17,6 +17,14 @@ vocabulary into the data model used by `qec-code`.
   `drafts/construct_apm_css_code/README.md` and
   `drafts/construct_apm_css_code/apm_g8_mod.cpp`.
 
+## Searcher Integration
+
+Future APM searcher work is tracked separately in
+[`apm_searcher_integration.md`](apm_searcher_integration.md). The searcher
+roadmap preserves the fixed Table A1 built-ins as the production path and starts
+future integration with manifest import validation before any wrapper or native
+searcher work.
+
 ## Data Model
 
 Use `AffineMap { a, b, modulus }` for every affine permutation:
