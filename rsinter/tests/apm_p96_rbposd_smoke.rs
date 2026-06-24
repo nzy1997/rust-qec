@@ -16,8 +16,8 @@ const APM_P96_CHANNEL_ERROR_RATE: f64 = 0.02;
 
 #[test]
 fn apm_p96_rbposd_smoke_decodes_seeded_syndromes() {
-    let hx = parse_sparse_rows(APM_P96_HX_JSON, "Hx");
-    let hz = parse_sparse_rows(APM_P96_HZ_JSON, "Hz");
+    let hx = parse_sparse_rows(APM_P96_HX_JSON, "failed to parse APM P=96 Hx fixture");
+    let hz = parse_sparse_rows(APM_P96_HZ_JSON, "failed to parse APM P=96 Hz fixture");
     assert_eq!(hx.num_cols(), APM_P96_NUM_QUBITS);
     assert_eq!(hz.num_cols(), APM_P96_NUM_QUBITS);
     assert!(!hz.rows().is_empty(), "APM P=96 Hz fixture should be loaded");
@@ -30,7 +30,7 @@ fn apm_p96_rbposd_smoke_decodes_seeded_syndromes() {
         },
         apm_p96_decoder_config(),
     )
-    .unwrap_or_else(|error| panic!("failed to compile APM P=96 Hx rbposd decoder: {error}"));
+    .expect("failed to compile APM P=96 Hx rbposd decoder");
 
     let supports = seeded_error_supports(
         APM_P96_SEED,
@@ -51,9 +51,9 @@ fn apm_p96_rbposd_smoke_decodes_seeded_syndromes() {
         zero_control_left_residual |=
             residual_weight(&pcm, &Correction::zero(APM_P96_NUM_QUBITS), &syndrome) > 0;
 
-        let result = decoder.decode(&syndrome).unwrap_or_else(|error| {
-            panic!("failed to decode seeded support {support:?}: {error}")
-        });
+        let result = decoder
+            .decode(&syndrome)
+            .expect("failed to decode seeded APM P=96 syndrome");
         assert_eq!(
             residual_weight(&pcm, &result.correction, &syndrome),
             0,
@@ -78,9 +78,8 @@ fn apm_p96_decoder_config() -> DecoderConfig {
     }
 }
 
-fn parse_sparse_rows(input: &str, label: &str) -> SparseRowsMatrix {
-    sparse_rows_matrix_from_json_str(input)
-        .unwrap_or_else(|error| panic!("failed to parse APM P=96 {label} fixture: {error}"))
+fn parse_sparse_rows(input: &str, error_message: &str) -> SparseRowsMatrix {
+    sparse_rows_matrix_from_json_str(input).expect(error_message)
 }
 
 fn parity_check_from_sparse_rows(matrix: &SparseRowsMatrix) -> ParityCheckMatrix {
@@ -89,7 +88,7 @@ fn parity_check_from_sparse_rows(matrix: &SparseRowsMatrix) -> ParityCheckMatrix
         matrix.num_cols(),
         matrix.rows().to_vec(),
     )
-    .unwrap_or_else(|error| panic!("failed to build rbposd parity matrix: {error}"))
+    .expect("failed to build rbposd parity matrix")
 }
 
 fn seeded_error_supports(seed: u64, weights: &[usize], num_bits: usize) -> Vec<Vec<usize>> {
