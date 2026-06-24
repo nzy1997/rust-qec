@@ -264,10 +264,8 @@ fn render_gate(
             }
         }
         _ => {
-            if controls.is_empty() && !targets.is_empty() && raw_targets.is_none() {
-                render_single_qubit_boxes(out, x, gate, display, targets, num_qubits)?;
-            } else if controls.is_empty() && !lanes.is_empty() && lanes.len() == targets.len() {
-                render_single_qubit_boxes(out, x, gate, display, targets, num_qubits)?;
+            if controls.is_empty() && is_simple_single_qubit_gate(gate) && !lanes.is_empty() {
+                render_single_qubit_boxes(out, x, &label, &lanes);
             } else {
                 render_generic_box(out, x, num_qubits, &label, &lanes, "#ffffff")?;
             }
@@ -318,20 +316,19 @@ fn target_pairs(
     Ok(Some(pairs))
 }
 
+fn is_simple_single_qubit_gate(gate: &str) -> bool {
+    matches!(gate, "H" | "X" | "Y" | "Z" | "S" | "T" | "R" | "RX")
+}
+
 fn render_single_qubit_boxes(
     out: &mut String,
     x: i32,
-    gate: &str,
-    display: Option<&Qp101Display>,
-    targets: &[u32],
-    num_qubits: usize,
-) -> Result<(), String> {
-    let label = gate_label(gate, display);
-    for &target in targets {
-        let lane = validate_lane(target, num_qubits, gate)?;
-        render_gate_box(out, x, lane_y(lane), &label, "#ffffff");
+    label: &str,
+    lanes: &[usize],
+) {
+    for &lane in lanes {
+        render_gate_box(out, x, lane_y(lane), label, "#ffffff");
     }
-    Ok(())
 }
 
 fn render_controlled_pair(
