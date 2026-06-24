@@ -8,7 +8,8 @@ use qec_code::codes::built_in_css::{
     BuiltInCssFamily, BuiltInCssParams,
 };
 use qec_code::codes::quantum_tanner::{
-    quantum_tanner_spec_from_json_str, QuantumTannerConstructionMode,
+    quantum_tanner_local_code_tensor_dual, quantum_tanner_spec_from_json_str,
+    QuantumTannerConstructionMode,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
@@ -1644,6 +1645,33 @@ fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
     );
 }
 
+#[test]
+fn quantum_tanner_local_code_tensor_dual_repetition_example_rejects_bad_inputs() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+    let local = quantum_tanner_local_code_tensor_dual(&spec).unwrap();
+
+    assert_eq!(local.code_a.width, 2);
+    assert_eq!(local.code_a.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_a.dual_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.width, 2);
+    assert_eq!(local.code_b.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.dual_rows, vec![vec![1, 1]]);
+    assert_eq!(local.x_sector_rows, vec![vec![1, 1, 1, 1]]);
+    assert_eq!(local.z_sector_rows, vec![vec![1, 1, 1, 1]]);
+
+    let nonbinary_h_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_a"][0][0] = Value::from(2);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonbinary_h_a, "h_a", "expected 0 or 1");
+
+    let nonorthogonal_g_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[1, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonorthogonal_g_a, "code_a", "not orthogonal");
+}
+
 fn toric_d4_json_with(mutator: impl FnOnce(&mut Value)) -> String {
     let mut fixture: Value =
         serde_json::from_str(include_str!("fixtures/quantum_tanner/toric_d4.json")).unwrap();
@@ -1668,6 +1696,24 @@ fn expect_quantum_tanner_local_code_error(
     expected_reason_part: &str,
 ) {
     let error = quantum_tanner_spec_from_json_str(input).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, expected_matrix);
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+fn expect_quantum_tanner_local_code_matrix_error(
+    input: &str,
+    expected_matrix: &'static str,
+    expected_reason_part: &str,
+) {
+    let error = quantum_tanner_spec_from_json_str(input)
+        .and_then(|spec| quantum_tanner_local_code_tensor_dual(&spec))
+        .unwrap_err();
     let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
         panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
     };

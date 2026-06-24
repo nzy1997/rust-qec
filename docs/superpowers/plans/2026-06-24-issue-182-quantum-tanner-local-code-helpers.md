@@ -1,6 +1,6 @@
 # Issue 182 Quantum Tanner Local Code Helpers Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add local GF(2) binary-code dual and tensor helpers for the quantum Tanner parser.
 
@@ -45,7 +45,7 @@
 - Produces: `pub fn quantum_tanner_local_code_tensor_dual(spec: &QuantumTannerSpec) -> Result<QuantumTannerLocalCodeTensorDual>`.
 - Extends: `QuantumTannerLocalCodes` with `pub g_a: Option<Vec<Vec<u8>>>` and `pub g_b: Option<Vec<Vec<u8>>>`.
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Modify the quantum Tanner import in `qec-code/tests/code.rs`:
 
@@ -113,7 +113,7 @@ fn quantum_tanner_local_code_tensor_dual_repetition_example_rejects_bad_inputs()
 }
 ```
 
-- [ ] **Step 2: Run the focused test to verify RED**
+- [x] **Step 2: Run the focused test to verify RED**
 
 Run:
 
@@ -129,7 +129,7 @@ cargo test -p qec-code quantum_tanner_local_code_tensor_dual -q
 
 Expected for the exact command in the Agent Desk sandbox may be a crates.io proxy/network failure before compilation; record that separately if it happens.
 
-- [ ] **Step 3: Extend the parser local-code structs**
+- [x] **Step 3: Extend the parser local-code structs**
 
 In `qec-code/src/codes/quantum_tanner.rs`, add `use crate::gf2;` after the existing crate imports:
 
@@ -186,7 +186,7 @@ Modify the end of `parse_local_codes` so optional generator rows are validated a
     })
 ```
 
-- [ ] **Step 4: Add the local-code helper structs and functions**
+- [x] **Step 4: Add the local-code helper structs and functions**
 
 Add this code below `QuantumTannerLocalCodes` in `qec-code/src/codes/quantum_tanner.rs`:
 
@@ -338,7 +338,7 @@ fn local_code_error(matrix: &'static str, reason: String) -> QecError {
 }
 ```
 
-- [ ] **Step 5: Run the focused test to verify GREEN**
+- [x] **Step 5: Run the focused test to verify GREEN**
 
 Run:
 
@@ -348,7 +348,7 @@ cargo test -p qec-code quantum_tanner_local_code_tensor_dual -q --offline
 
 Expected: PASS with `quantum_tanner_local_code_tensor_dual_repetition_example_rejects_bad_inputs` executed.
 
-- [ ] **Step 6: Format touched Rust files**
+- [x] **Step 6: Format touched Rust files**
 
 Run:
 
@@ -358,7 +358,7 @@ rustfmt qec-code/src/codes/quantum_tanner.rs qec-code/tests/code.rs
 
 Expected: command exits 0 and only formats touched Rust files.
 
-- [ ] **Step 7: Run focused verification after formatting**
+- [x] **Step 7: Run focused verification after formatting**
 
 Run:
 
@@ -368,7 +368,7 @@ cargo test -p qec-code quantum_tanner_local_code_tensor_dual -q --offline
 
 Expected: PASS.
 
-- [ ] **Step 8: Run broader verification**
+- [x] **Step 8: Run broader verification**
 
 Run:
 
@@ -384,7 +384,7 @@ cargo test
 
 Expected in a network-enabled environment: PASS. If the sandbox blocks crates.io access through the configured proxy, record the network failure and keep the offline `cargo test --offline` result as the executable verification evidence.
 
-- [ ] **Step 9: Check whitespace and review scope**
+- [x] **Step 9: Check whitespace and review scope**
 
 Run:
 
@@ -396,7 +396,7 @@ git diff --stat HEAD
 
 Expected: no whitespace errors. Scope should be limited to the design doc commit, this plan, `qec-code/src/codes/quantum_tanner.rs`, and `qec-code/tests/code.rs`.
 
-- [ ] **Step 10: Commit implementation**
+- [x] **Step 10: Commit implementation**
 
 Run:
 
