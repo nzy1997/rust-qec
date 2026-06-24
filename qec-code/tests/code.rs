@@ -1629,6 +1629,18 @@ fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
         error.to_string().contains("row 0"),
         "malformed table error should identify the bad row: {error}"
     );
+
+    let nonzero_identity_json = include_str!("fixtures/quantum_tanner/toric_d4.json")
+        .replace("\"identity\": 0", "\"identity\": 1");
+    let error = quantum_tanner_spec_from_json_str(&nonzero_identity_json).unwrap_err();
+    assert!(
+        matches!(error, QecError::InvalidQuantumTannerGroupTable { .. }),
+        "expected nonzero identity to fail before construction, got {error:?}"
+    );
+    assert!(
+        error.to_string().contains("identity"),
+        "nonzero identity error should identify the bad field: {error}"
+    );
 }
 
 #[test]

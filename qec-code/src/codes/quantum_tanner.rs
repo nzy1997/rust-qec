@@ -122,6 +122,11 @@ fn validate_group_table(order: usize, identity: usize, table: &[Vec<usize>]) -> 
             reason: "order must be positive".to_owned(),
         });
     }
+    if identity != 0 {
+        return Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: format!("identity must be 0 in v1, got {identity}"),
+        });
+    }
     if identity >= order {
         return Err(QecError::InvalidQuantumTannerGroupTable {
             reason: format!("identity {identity} is out of range for order {order}"),
