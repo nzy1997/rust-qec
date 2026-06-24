@@ -94,12 +94,26 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    #[error(
+        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
+    )]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,
         value: usize,
     },
+    #[error(
+        "unsupported built-in CSS integer parameter {parameter} for family {family}: {value} (supported: {supported}; {note})"
+    )]
+    UnsupportedBuiltInCssIntegerParameter {
+        family: String,
+        parameter: String,
+        value: usize,
+        supported: String,
+        note: String,
+    },
+    #[error("failed to build built-in CSS code {code_id}: {reason}")]
+    BuiltInCssBuildFailed { code_id: String, reason: String },
 }
 
 pub type Result<T> = core::result::Result<T, QecError>;

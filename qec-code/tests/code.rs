@@ -3,17 +3,17 @@ mod support;
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
-    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
     bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec,
+    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily,
+    BuiltInCssParams,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
+use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
-    ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView, GirthStatus,
-    WeightStats, verify_apm_css_matrices,
+    verify_apm_css_matrices, ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView,
+    GirthStatus, WeightStats,
 };
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -1107,6 +1107,7 @@ fn built_in_css_catalog_lists_supported_specs() {
         vec![
             "steane",
             "bb72",
+            "apm_kasai:p=96",
             "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
@@ -1125,6 +1126,12 @@ fn built_in_css_catalog_lists_supported_specs() {
             .any(|entry| entry.spec == "repetition_x:d=<distance>"
                 && entry.description.contains("distance >= 2")),
         "repetition_x entry should describe the distance constraint: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "apm_kasai:p=96" && entry.description.contains("P=96")),
+        "apm_kasai entry should describe the fixed P=96 code: {catalog:?}"
     );
     assert!(
         catalog
@@ -1181,6 +1188,31 @@ fn bb72_fixed_alias_is_generic_bivariate_bicycle_preset() {
     generic.code_id = "bb72";
 
     assert_eq!(fixed, generic);
+}
+
+#[test]
+fn apm_kasai_p96_matches_expected_checks_and_rejects_other_p_values() {
+    let checks = built_in_css_checks("apm_kasai:p=96").unwrap();
+
+    assert_eq!(checks.code_id, "apm_kasai:p=96");
+    assert_eq!(checks.num_cols, 1152);
+    assert!(!checks.hx.is_empty());
+    assert!(!checks.hz.is_empty());
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    assert_eq!(
+        built_in_css_checks("apm_kasai:p=128"),
+        Err(QecError::UnsupportedBuiltInCssIntegerParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+            value: 128,
+            supported: "96".to_owned(),
+            note: "P=192 is tracked by #143".to_owned(),
+        })
+    );
 }
 
 #[test]
@@ -1419,6 +1451,13 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
         Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" })
     );
     assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:p=96"),
+        Ok(BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::ApmKasai,
+            params: BuiltInCssParams::ApmKasai { p: 96 },
+        })
+    );
+    assert_eq!(
         parse_built_in_css_code_spec("repetition_x:d=5"),
         Ok(BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::RepetitionX,
@@ -1482,6 +1521,21 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         Err(QecError::MissingBuiltInCssParameter {
             family: "repetition_x".to_owned(),
             parameter: "d".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_built_in_css_code_spec("apm_kasai:p=nope"),
+        Err(QecError::InvalidBuiltInCssIntegerParameter {
+            family: "apm_kasai".to_owned(),
+            parameter: "p".to_owned(),
+            value: "nope".to_owned(),
         })
     );
     assert_eq!(

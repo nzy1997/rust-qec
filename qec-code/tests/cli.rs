@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -519,6 +519,68 @@ fn code_css_list_includes_supported_built_ins() {
 }
 
 #[test]
+fn apm_kasai_css_export() {
+    let list = run_qec_code(&["code", "css", "list"]);
+    assert!(list.status.success());
+    assert_eq!(list.stderr, b"");
+
+    let list_stdout = String::from_utf8(list.stdout).expect("stdout should be valid utf-8");
+    assert!(
+        list_stdout.contains("apm_kasai:p=96"),
+        "stdout was: {list_stdout}"
+    );
+    assert!(
+        !list_stdout.contains("apm_kasai:p=192"),
+        "stdout was: {list_stdout}"
+    );
+
+    for matrix in ["hx", "hz"] {
+        let output = run_qec_code(&["code", "css", "apm_kasai:p=96", matrix]);
+        assert!(
+            output.status.success(),
+            "{matrix} stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(output.stderr, b"");
+
+        let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
+        assert_eq!(json["format"], "sparse_rows");
+        assert_eq!(json["num_cols"], 1152);
+        assert!(
+            json["rows"].as_array().is_some_and(|rows| !rows.is_empty()),
+            "rows should be non-empty: {json}"
+        );
+    }
+
+    let p128 = run_qec_code(&["code", "css", "apm_kasai:p=128", "hx"]);
+    assert!(!p128.status.success());
+    assert_eq!(p128.stdout, b"");
+    let p128_stderr = String::from_utf8(p128.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        p128_stderr
+            .contains("unsupported built-in CSS integer parameter p for family apm_kasai: 128"),
+        "stderr was: {p128_stderr}"
+    );
+    assert!(
+        p128_stderr.contains("supported: 96"),
+        "stderr was: {p128_stderr}"
+    );
+
+    let p192 = run_qec_code(&["code", "css", "apm_kasai:p=192", "hx"]);
+    assert!(!p192.status.success());
+    assert_eq!(p192.stdout, b"");
+    let p192_stderr = String::from_utf8(p192.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        p192_stderr
+            .contains("unsupported built-in CSS integer parameter p for family apm_kasai: 192"),
+        "stderr was: {p192_stderr}"
+    );
+    assert!(p192_stderr.contains("#143"), "stderr was: {p192_stderr}");
+}
+
+#[test]
 fn code_css_list_rejects_unexpected_extra_arguments() {
     let output = run_qec_code(&["code", "css", "list", "extra"]);
 
@@ -612,7 +674,19 @@ fn run_code_css_list_returns_catalog_without_newline() {
     })
     .unwrap();
 
-    let expected = "Built-in CSS codes:\n  steane                                                          fixed [[7,1,3]] CSS code\n  bb72                                                            fixed [[72,12,6]] bivariate-bicycle CSS code\n  bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...  bivariate-bicycle CSS family over periodic lattice\n  repetition_x:d=<distance>                                       X-check chain, distance >= 2\n  repetition_z:d=<distance>                                       Z-check chain, distance >= 2\n  surface_rotated:d=<distance>                                    rotated surface CSS code, distance >= 2\n  toric:d=<distance>                                              periodic square-lattice toric CSS code, distance >= 2";
+    let width = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...".len();
+    let expected = format!(
+        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm:width$}  fixed Table A1 P=96 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2",
+        steane = "steane",
+        bb72 = "bb72",
+        apm = "apm_kasai:p=96",
+        bb = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
+        rep_x = "repetition_x:d=<distance>",
+        rep_z = "repetition_z:d=<distance>",
+        surf = "surface_rotated:d=<distance>",
+        toric = "toric:d=<distance>",
+        width = width,
+    );
     assert_eq!(output, expected);
 }
 
