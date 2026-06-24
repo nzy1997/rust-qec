@@ -171,7 +171,7 @@ cargo run -p qec-code -- code css apm_kasai:p=96 hz > rsinter/tests/fixtures/css
 The native BP/BP-OSD baseline for these fixtures is checked by
 `rsinter/tests/apm_p96_rbposd_smoke.rs`. Future relay-BP and MIP fallback
 reproduction is tracked in
-[`docs/apm_decoder_hierarchy.md`](../../../docs/apm_decoder_hierarchy.md).
+[`docs/apm_decoder_hierarchy.md`](../../../../docs/apm_decoder_hierarchy.md).
 ```
 
 - [ ] **Step 3: Verify the docs contain the required future acceptance gates**
