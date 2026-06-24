@@ -205,6 +205,14 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Render a circuit as SVG through QP101
+    #[command(name = "render_svg")]
+    RenderSvg {
+        #[arg(long = "in")]
+        r#in: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Run performance evidence workflows
     Perf {
         #[command(subcommand)]
@@ -529,6 +537,13 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 seed,
                 &mut w,
             )
+        }
+        Some(Commands::RenderSvg { r#in, out }) => {
+            let text = read_input(r#in.as_deref())?;
+            let svg = run_render_svg_to_string(&text)?;
+            let mut w = open_output(out.as_deref())?;
+            w.write_all(svg.as_bytes())
+                .map_err(|e| format!("write error: {e}"))
         }
         Some(Commands::Perf { command }) => match command {
             PerfCommands::Run {
@@ -1103,7 +1118,7 @@ fn run_export_json(
                 }
             })?
         }
-        None => crate::qp101::export_qp101(&instrs)?,
+        None => build_plain_qp101_document(&instrs)?,
     };
     match format {
         JsonOutputFormat::Pretty => {
@@ -1116,6 +1131,18 @@ fn run_export_json(
     w.write_all(b"\n")
         .map_err(|e| format!("write error: {e}"))?;
     Ok(())
+}
+
+fn build_plain_qp101_document(
+    instrs: &[crate::ir::StimInstr],
+) -> Result<crate::qp101::Qp101Document, String> {
+    crate::qp101::export_qp101(instrs)
+}
+
+fn run_render_svg_to_string(text: &str) -> Result<String, String> {
+    let instrs = parse_lines(text)?;
+    let doc = build_plain_qp101_document(&instrs)?;
+    crate::qp101_svg::render_svg(&doc)
 }
 
 pub fn run_sample_dem(

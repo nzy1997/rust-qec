@@ -28,6 +28,28 @@ pub enum QecError {
     UnsupportedCssMatrixFormat { format: String },
     #[error("invalid CSS matrix JSON: {0}")]
     InvalidCssMatrixJson(String),
+    #[error("invalid quantum Tanner spec JSON: {0}")]
+    InvalidQuantumTannerSpecJson(String),
+    #[error("invalid quantum Tanner group table: {reason}")]
+    InvalidQuantumTannerGroupTable { reason: String },
+    #[error("unsupported quantum Tanner construction mode: {mode}")]
+    UnsupportedQuantumTannerConstructionMode { mode: String },
+    #[error("invalid quantum Tanner local code matrix {matrix}: {reason}")]
+    InvalidQuantumTannerLocalCodeMatrix {
+        matrix: &'static str,
+        reason: String,
+    },
+    #[error(
+        "invalid quantum Tanner generator {set}[{index}]: element {element} is out of range for group order {order}"
+    )]
+    InvalidQuantumTannerGeneratorIndex {
+        set: &'static str,
+        index: usize,
+        element: usize,
+        order: usize,
+    },
+    #[error("invalid quantum Tanner group element {element}: expected < {order}")]
+    InvalidQuantumTannerGroupElement { element: usize, order: usize },
     #[error("JSON output is required for {command}")]
     JsonOutputRequired { command: &'static str },
     #[error("invalid CSS distance input: {0}")]
@@ -94,7 +116,9 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    #[error(
+        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
+    )]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

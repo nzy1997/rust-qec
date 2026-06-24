@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "manifest_id": "quantum_tanner_acceptance_v1",
+  "contract": {
+    "issue": 177,
+    "path": "qec-code/doc/quantum_tanner.md",
+    "construction_mode": "lr_cayley_no_cover_v1"
+  },
+  "verifier_command": "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q",
+  "entries": [
+    {
+      "fixture_id": "toric_d4",
+      "input_path": "qec-code/tests/fixtures/quantum_tanner/toric_d4.json",
+      "contract_reference": {
+        "issue": 177,
+        "path": "qec-code/doc/quantum_tanner.md",
+        "schema_version": 1
+      },
+      "provenance": {
+        "kind": "reference_derived_known_answer",
+        "summary": "Derived from the qLDPC toric Tanner known-answer test semantics; no qLDPC implementation code is copied.",
+        "source_grounded_fields": [
+          "construction_mode",
+          "base_group",
+          "a_generator_indices",
+          "b_generator_indices",
+          "local_codes",
+          "expected_result"
+        ]
+      },
+      "references": [
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/objects.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum_test.py"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/qLDPCOrg/qLDPC"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/RebKatRad/qTanner"
+        }
+      ],
+      "expected_result": {
+        "kind": "success",
+        "n": 16,
+        "k": 2,
+        "d": 4,
+        "check_weight": 4
+      },
+      "verifier_command": "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q",
+      "consuming_issues": [
+        178,
+        180,
+        181,
+        183,
+        184,
+        185,
+        186,
+        188
+      ]
+    },
+    {
+      "fixture_id": "invalid_non_symmetric_a",
+      "input_path": "qec-code/tests/fixtures/quantum_tanner/invalid_non_symmetric_a.json",
+      "contract_reference": {
+        "issue": 177,
+        "path": "qec-code/doc/quantum_tanner.md",
+        "schema_version": 1
+      },
+      "provenance": {
+        "kind": "reference_derived_known_answer",
+        "summary": "Derived from the qLDPC toric Tanner known-answer test semantics; no qLDPC implementation code is copied.",
+        "source_grounded_fields": [
+          "construction_mode",
+          "base_group",
+          "a_generator_indices",
+          "b_generator_indices",
+          "local_codes",
+          "expected_result"
+        ]
+      },
+      "references": [
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/objects.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum_test.py"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/qLDPCOrg/qLDPC"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/RebKatRad/qTanner"
+        }
+      ],
+      "expected_result": {
+        "kind": "rejection",
+        "reason": "NonSymmetricGeneratorSet"
+      },
+      "verifier_command": "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q",
+      "consuming_issues": [
+        178,
+        180,
+        181,
+        183,
+        184,
+        185,
+        186,
+        188
+      ]
+    },
+    {
+      "fixture_id": "invalid_bad_table",
+      "input_path": "qec-code/tests/fixtures/quantum_tanner/invalid_bad_table.json",
+      "contract_reference": {
+        "issue": 177,
+        "path": "qec-code/doc/quantum_tanner.md",
+        "schema_version": 1
+      },
+      "provenance": {
+        "kind": "reference_derived_known_answer",
+        "summary": "Derived from the qLDPC toric Tanner known-answer test semantics; no qLDPC implementation code is copied.",
+        "source_grounded_fields": [
+          "construction_mode",
+          "base_group",
+          "a_generator_indices",
+          "b_generator_indices",
+          "local_codes",
+          "expected_result"
+        ]
+      },
+      "references": [
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/objects.py"
+        },
+        {
+          "kind": "local",
+          "path": "drafts/qLDPC/src/qldpc/codes/quantum_test.py"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/qLDPCOrg/qLDPC"
+        },
+        {
+          "kind": "external",
+          "url": "https://github.com/RebKatRad/qTanner"
+        }
+      ],
+      "expected_result": {
+        "kind": "rejection",
+        "reason": "InvalidGroupTable"
+      },
+      "verifier_command": "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q",
+      "consuming_issues": [
+        178,
+        180,
+        181,
+        183,
+        184,
+        185,
+        186,
+        188
+      ]
+    }
+  ]
+}

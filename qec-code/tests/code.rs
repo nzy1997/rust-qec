@@ -3,17 +3,22 @@ mod support;
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
-    BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams, bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
-    parse_built_in_css_code_spec,
+    bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
+    parse_built_in_css_code_spec, BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec,
+    BuiltInCssFamily, BuiltInCssParams,
+};
+use qec_code::codes::quantum_tanner::{
+    quantum_tanner_local_code_tensor_dual, quantum_tanner_spec_from_json_str,
+    validate_quantum_tanner_group_table, ExplicitFiniteGroup, QuantumTannerConstructionMode,
+    QuantumTannerLocalCodes, QuantumTannerSpec,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
+use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
-    ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView, GirthStatus,
-    WeightStats, verify_apm_css_matrices,
+    verify_apm_css_matrices, ApmCssVerifierExpectations, ApmCssVerifierReport, ApmSparseMatrixView,
+    GirthStatus, WeightStats,
 };
 
 fn assert_strictly_increasing_rows(rows: &[Vec<usize>]) {
@@ -954,6 +959,1154 @@ fn apm_verifier_rejects_girth_below_expected_bound_on_either_side() {
     let err = verify_small_apm_sparse_rows(2, &empty_rows, 2, &cycle_four_rows, &expectations)
         .unwrap_err();
     assert!(err.contains("expected Hz Tanner girth >= 6"));
+}
+
+fn extract_marked_json(doc: &str, marker: &str) -> Result<Value, String> {
+    let marker_text = format!("<!-- {marker} -->");
+    let after_marker = doc
+        .split_once(&marker_text)
+        .map(|(_, after)| after)
+        .ok_or_else(|| format!("missing marker {marker_text}"))?;
+    let fence_start = after_marker
+        .find("```json")
+        .ok_or_else(|| format!("missing json fence after {marker_text}"))?;
+    let json_start = fence_start + "```json".len();
+    let json_tail = &after_marker[json_start..];
+    let json_end = json_tail
+        .find("```")
+        .ok_or_else(|| format!("missing closing json fence after {marker_text}"))?;
+    serde_json::from_str(json_tail[..json_end].trim())
+        .map_err(|error| format!("invalid json after {marker_text}: {error}"))
+}
+
+fn usize_array(value: &Value, path: &str) -> Vec<usize> {
+    value
+        .as_array()
+        .unwrap_or_else(|| panic!("{path}: expected array"))
+        .iter()
+        .map(|entry| {
+            entry
+                .as_u64()
+                .unwrap_or_else(|| panic!("{path}: expected unsigned integer")) as usize
+        })
+        .collect()
+}
+
+fn usize_matrix(value: &Value, path: &str) -> Vec<Vec<usize>> {
+    value
+        .as_array()
+        .unwrap_or_else(|| panic!("{path}: expected matrix"))
+        .iter()
+        .enumerate()
+        .map(|(row_index, row)| usize_array(row, &format!("{path}[{row_index}]")))
+        .collect()
+}
+
+fn assert_group_table_shape(table: &[Vec<usize>], order: usize) {
+    assert_eq!(table.len(), order, "multiplication table row count");
+    for row in table {
+        assert_eq!(row.len(), order, "multiplication table column count");
+        for &entry in row {
+            assert!(
+                entry < order,
+                "table entry {entry} out of range for order {order}"
+            );
+        }
+    }
+}
+
+fn inverse_index(table: &[Vec<usize>], identity: usize, element: usize) -> Option<usize> {
+    (0..table.len()).find(|&candidate| {
+        table[element][candidate] == identity && table[candidate][element] == identity
+    })
+}
+
+fn generators_are_symmetric(table: &[Vec<usize>], identity: usize, generators: &[usize]) -> bool {
+    generators.iter().all(|&generator| {
+        inverse_index(table, identity, generator)
+            .map(|inverse| generators.contains(&inverse))
+            .unwrap_or(false)
+    })
+}
+
+const QUANTUM_TANNER_FIXTURE_DIR: &str = "tests/fixtures/quantum_tanner";
+const QUANTUM_TANNER_VERIFIER_COMMAND: &str =
+    "cargo test -p qec-code quantum_tanner_fixture_catalog_has_grounded_cases -q";
+
+#[derive(Clone, Copy)]
+enum QuantumTannerExpectedResult<'a> {
+    Success,
+    Rejection(&'a str),
+}
+
+fn qec_code_manifest_fixture_path(rel_path: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel_path)
+}
+
+fn load_quantum_tanner_fixture(path: &str) -> Value {
+    let full_path = qec_code_manifest_fixture_path(path);
+    let contents = std::fs::read_to_string(&full_path)
+        .unwrap_or_else(|error| panic!("fixture {full_path:?} should be readable: {error}"));
+    serde_json::from_str(&contents)
+        .unwrap_or_else(|error| panic!("fixture {full_path:?} should be valid JSON: {error}"))
+}
+
+fn nonempty_string_field<'a>(object: &'a Value, path: &str, key: &str) -> Result<&'a str, String> {
+    let field_path = format!("{path}.{key}");
+    let value = required_field(object, path, key)?
+        .as_str()
+        .ok_or_else(|| format!("{field_path}: expected string"))?;
+    if value.trim().is_empty() {
+        Err(format!("{field_path}: expected nonempty string"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn expect_u64_array_field(
+    object: &Value,
+    path: &str,
+    key: &str,
+    expected: &[u64],
+) -> Result<(), String> {
+    let values = required_array_field(object, path, key)?;
+    let array_path = format!("{path}.{key}");
+    expect_len(&array_path, values.len(), expected.len())?;
+    for (index, expected_value) in expected.iter().enumerate() {
+        expect_u64_value(
+            &values[index],
+            &format!("{array_path}[{index}]"),
+            *expected_value,
+        )?;
+    }
+    Ok(())
+}
+
+fn expect_usize_array_value(
+    value: &Value,
+    path: &str,
+    expected: &[usize],
+) -> Result<Vec<usize>, String> {
+    let actual = usize_array(value, path);
+    if actual.as_slice() == expected {
+        Ok(actual)
+    } else {
+        Err(format!("{path}: expected {expected:?}, got {actual:?}"))
+    }
+}
+
+fn expect_quantum_tanner_manifest_reference(
+    reference: &Value,
+    path: &str,
+    kind: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    expect_str_field(reference, path, "kind", kind)?;
+    expect_str_field(reference, path, key, value)
+}
+
+fn validate_quantum_tanner_references(entry: &Value, path: &str) -> Result<(), String> {
+    let references = required_array_field(entry, path, "references")?;
+    let references_path = format!("{path}.references");
+    expect_len(&references_path, references.len(), 5)?;
+    expect_quantum_tanner_manifest_reference(
+        &references[0],
+        &format!("{references_path}[0]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/codes/quantum.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[1],
+        &format!("{references_path}[1]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/objects.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[2],
+        &format!("{references_path}[2]"),
+        "local",
+        "path",
+        "drafts/qLDPC/src/qldpc/codes/quantum_test.py",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[3],
+        &format!("{references_path}[3]"),
+        "external",
+        "url",
+        "https://github.com/qLDPCOrg/qLDPC",
+    )?;
+    expect_quantum_tanner_manifest_reference(
+        &references[4],
+        &format!("{references_path}[4]"),
+        "external",
+        "url",
+        "https://github.com/RebKatRad/qTanner",
+    )
+}
+
+fn validate_quantum_tanner_provenance(entry: &Value, path: &str) -> Result<(), String> {
+    let provenance = required_field(entry, path, "provenance")?;
+    let provenance_path = format!("{path}.provenance");
+    expect_str_field(
+        provenance,
+        &provenance_path,
+        "kind",
+        "reference_derived_known_answer",
+    )?;
+    let summary = nonempty_string_field(provenance, &provenance_path, "summary")?;
+    if !summary.contains("no qLDPC implementation code is copied") {
+        return Err(format!(
+            "{provenance_path}.summary: expected no-code-copy provenance"
+        ));
+    }
+    expect_string_array_field(
+        provenance,
+        &provenance_path,
+        "source_grounded_fields",
+        &[
+            "construction_mode",
+            "base_group",
+            "a_generator_indices",
+            "b_generator_indices",
+            "local_codes",
+            "expected_result",
+        ],
+    )
+}
+
+fn validate_quantum_tanner_contract_reference(entry: &Value, path: &str) -> Result<(), String> {
+    let contract_reference = required_field(entry, path, "contract_reference")?;
+    let reference_path = format!("{path}.contract_reference");
+    expect_u64_field(contract_reference, &reference_path, "issue", 177)?;
+    expect_str_field(
+        contract_reference,
+        &reference_path,
+        "path",
+        "qec-code/doc/quantum_tanner.md",
+    )?;
+    expect_u64_field(contract_reference, &reference_path, "schema_version", 1)
+}
+
+fn validate_quantum_tanner_expected_result(
+    entry: &Value,
+    path: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    let expected = required_field(entry, path, "expected_result")?;
+    let expected_path = format!("{path}.expected_result");
+    match expected_result {
+        QuantumTannerExpectedResult::Success => {
+            expect_str_field(expected, &expected_path, "kind", "success")?;
+            expect_u64_field(expected, &expected_path, "n", 16)?;
+            expect_u64_field(expected, &expected_path, "k", 2)?;
+            expect_u64_field(expected, &expected_path, "d", 4)?;
+            expect_u64_field(expected, &expected_path, "check_weight", 4)
+        }
+        QuantumTannerExpectedResult::Rejection(reason) => {
+            expect_str_field(expected, &expected_path, "kind", "rejection")?;
+            expect_str_field(expected, &expected_path, "reason", reason)
+        }
+    }
+}
+
+fn validate_quantum_tanner_expected_result_shape(entry: &Value, path: &str) -> Result<(), String> {
+    let expected = required_field(entry, path, "expected_result")?;
+    let expected_path = format!("{path}.expected_result");
+    match nonempty_string_field(expected, &expected_path, "kind")? {
+        "success" => {
+            for key in ["n", "k", "d", "check_weight"] {
+                required_field(expected, &expected_path, key)?
+                    .as_u64()
+                    .ok_or_else(|| format!("{expected_path}.{key}: expected unsigned integer"))?;
+            }
+            Ok(())
+        }
+        "rejection" => {
+            nonempty_string_field(expected, &expected_path, "reason")?;
+            Ok(())
+        }
+        other => Err(format!(
+            "{expected_path}.kind: expected success or rejection, got {other:?}"
+        )),
+    }
+}
+
+fn validate_nonempty_u64_array_field(object: &Value, path: &str, key: &str) -> Result<(), String> {
+    let values = required_array_field(object, path, key)?;
+    let array_path = format!("{path}.{key}");
+    if values.is_empty() {
+        return Err(format!("{array_path}: expected nonempty array"));
+    }
+    for (index, value) in values.iter().enumerate() {
+        value
+            .as_u64()
+            .ok_or_else(|| format!("{array_path}[{index}]: expected unsigned integer"))?;
+    }
+    Ok(())
+}
+
+fn validate_z4xz4_table(table: &[Vec<usize>], path: &str) -> Result<(), String> {
+    for left in 0..16 {
+        let (left_x, left_y) = (left / 4, left % 4);
+        for right in 0..16 {
+            let (right_x, right_y) = (right / 4, right % 4);
+            let expected = 4 * ((left_x + right_x) % 4) + ((left_y + right_y) % 4);
+            if table[left][right] != expected {
+                return Err(format!(
+                    "{path}[{left}][{right}]: expected {expected}, got {}",
+                    table[left][right]
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_quantum_tanner_local_codes(
+    fixture: &Value,
+    path: &str,
+    expected_widths: Option<(usize, usize)>,
+) -> Result<(), String> {
+    let local_codes = required_field(fixture, path, "local_codes")?;
+    let local_path = format!("{path}.local_codes");
+    expect_str_field(local_codes, &local_path, "matrix_role", "parity_check")?;
+    expect_str_field(local_codes, &local_path, "field", "GF(2)")?;
+
+    let h_a = usize_matrix(
+        required_field(local_codes, &local_path, "h_a")?,
+        &format!("{local_path}.h_a"),
+    );
+    let h_b = usize_matrix(
+        required_field(local_codes, &local_path, "h_b")?,
+        &format!("{local_path}.h_b"),
+    );
+    if h_a != vec![vec![1, 1]] {
+        return Err(format!("{local_path}.h_a: expected [[1, 1]], got {h_a:?}"));
+    }
+    if h_b != vec![vec![1, 1]] {
+        return Err(format!("{local_path}.h_b: expected [[1, 1]], got {h_b:?}"));
+    }
+    if let Some((a_width, b_width)) = expected_widths {
+        if h_a.iter().any(|row| row.len() != a_width) {
+            return Err(format!("{local_path}.h_a: expected row width {a_width}"));
+        }
+        if h_b.iter().any(|row| row.len() != b_width) {
+            return Err(format!("{local_path}.h_b: expected row width {b_width}"));
+        }
+    }
+    if h_a.iter().chain(&h_b).flatten().any(|&bit| bit > 1) {
+        return Err(format!("{local_path}: expected GF(2) entries"));
+    }
+    Ok(())
+}
+
+fn validate_quantum_tanner_fixture(
+    fixture: &Value,
+    path: &str,
+    fixture_id: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    expect_str_field(fixture, path, "fixture_id", fixture_id)?;
+    expect_str_field(fixture, path, "construction_mode", "lr_cayley_no_cover_v1")?;
+    let group = required_field(fixture, path, "base_group")?;
+    let group_path = format!("{path}.base_group");
+    expect_str_field(group, &group_path, "name", "Z4xZ4")?;
+    expect_str_field(
+        group,
+        &group_path,
+        "element_order",
+        "id = 4*x + y for (x,y) in Z4 x Z4",
+    )?;
+    expect_u64_field(group, &group_path, "order", 16)?;
+    expect_u64_field(group, &group_path, "identity", 0)?;
+
+    let table_path = format!("{group_path}.multiplication_table");
+    let table = usize_matrix(
+        required_field(group, &group_path, "multiplication_table")?,
+        &table_path,
+    );
+    let a_generators_path = format!("{path}.a_generator_indices");
+    let b_generators_path = format!("{path}.b_generator_indices");
+
+    match expected_result {
+        QuantumTannerExpectedResult::Success => {
+            assert_group_table_shape(&table, 16);
+            validate_z4xz4_table(&table, &table_path)?;
+            let a_generators = expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4, 12],
+            )?;
+            let b_generators = expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            if !generators_are_symmetric(&table, 0, &a_generators) {
+                return Err(format!("{a_generators_path}: expected symmetric set"));
+            }
+            if !generators_are_symmetric(&table, 0, &b_generators) {
+                return Err(format!("{b_generators_path}: expected symmetric set"));
+            }
+            validate_quantum_tanner_local_codes(
+                fixture,
+                path,
+                Some((a_generators.len(), b_generators.len())),
+            )?;
+            let face_count = documented_face_count(&table, &a_generators, &b_generators);
+            if face_count != 16 {
+                return Err(format!(
+                    "{path}: expected 16 physical faces, got {face_count}"
+                ));
+            }
+            Ok(())
+        }
+        QuantumTannerExpectedResult::Rejection("NonSymmetricGeneratorSet") => {
+            assert_group_table_shape(&table, 16);
+            validate_z4xz4_table(&table, &table_path)?;
+            let a_generators = expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4],
+            )?;
+            let b_generators = expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            if generators_are_symmetric(&table, 0, &a_generators) {
+                return Err(format!("{a_generators_path}: expected non-symmetric set"));
+            }
+            if !generators_are_symmetric(&table, 0, &b_generators) {
+                return Err(format!("{b_generators_path}: expected symmetric set"));
+            }
+            validate_quantum_tanner_local_codes(fixture, path, None)
+        }
+        QuantumTannerExpectedResult::Rejection("InvalidGroupTable") => {
+            expect_len(&format!("{table_path}.rows"), table.len(), 16)?;
+            if table.first().map(|row| row.len()) != Some(15) {
+                return Err(format!("{table_path}[0]: expected malformed length 15"));
+            }
+            if !table.iter().any(|row| row.len() != 16) {
+                return Err(format!("{table_path}: expected malformed table"));
+            }
+            for (row_index, row) in table.iter().enumerate() {
+                for &entry in row {
+                    if entry >= 16 {
+                        return Err(format!(
+                            "{table_path}[{row_index}]: entry {entry} out of range"
+                        ));
+                    }
+                }
+            }
+            expect_usize_array_value(
+                required_field(fixture, path, "a_generator_indices")?,
+                &a_generators_path,
+                &[4, 12],
+            )?;
+            expect_usize_array_value(
+                required_field(fixture, path, "b_generator_indices")?,
+                &b_generators_path,
+                &[1, 3],
+            )?;
+            validate_quantum_tanner_local_codes(fixture, path, Some((2, 2)))
+        }
+        QuantumTannerExpectedResult::Rejection(reason) => {
+            Err(format!("{path}: unrecognized rejection reason {reason}"))
+        }
+    }
+}
+
+fn validate_quantum_tanner_catalog_entry_metadata(entry: &Value, path: &str) -> Result<(), String> {
+    let fixture_id = nonempty_string_field(entry, path, "fixture_id")?;
+    let input_path = nonempty_string_field(entry, path, "input_path")?;
+    let expected_input_path = format!("qec-code/{QUANTUM_TANNER_FIXTURE_DIR}/{fixture_id}.json");
+    if input_path != expected_input_path {
+        return Err(format!(
+            "{path}.input_path: expected {expected_input_path:?}, got {input_path:?}"
+        ));
+    }
+
+    validate_quantum_tanner_contract_reference(entry, path)?;
+    validate_quantum_tanner_provenance(entry, path)?;
+    validate_quantum_tanner_references(entry, path)?;
+    validate_quantum_tanner_expected_result_shape(entry, path)?;
+    expect_str_field(
+        entry,
+        path,
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+    validate_nonempty_u64_array_field(entry, path, "consuming_issues")?;
+
+    let fixture_rel_path = input_path
+        .strip_prefix("qec-code/")
+        .ok_or_else(|| format!("{path}.input_path: expected qec-code/ prefix"))?;
+    let fixture = load_quantum_tanner_fixture(fixture_rel_path);
+    expect_str_field(&fixture, fixture_rel_path, "fixture_id", fixture_id)
+}
+
+fn validate_quantum_tanner_catalog_entry(
+    entry: &Value,
+    path: &str,
+    fixture_id: &str,
+    expected_result: QuantumTannerExpectedResult<'_>,
+) -> Result<(), String> {
+    validate_quantum_tanner_catalog_entry_metadata(entry, path)?;
+    let actual_fixture_id = nonempty_string_field(entry, path, "fixture_id")?;
+    if actual_fixture_id != fixture_id {
+        return Err(format!(
+            "{path}.fixture_id: expected {fixture_id:?}, got {actual_fixture_id:?}"
+        ));
+    }
+
+    let input_path = nonempty_string_field(entry, path, "input_path")?;
+    let expected_input_path = format!("qec-code/{QUANTUM_TANNER_FIXTURE_DIR}/{fixture_id}.json");
+    if input_path != expected_input_path {
+        return Err(format!(
+            "{path}.input_path: expected {expected_input_path:?}, got {input_path:?}"
+        ));
+    }
+
+    validate_quantum_tanner_expected_result(entry, path, expected_result)?;
+    expect_str_field(
+        entry,
+        path,
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+    expect_u64_array_field(
+        entry,
+        path,
+        "consuming_issues",
+        &[178, 180, 181, 183, 184, 185, 186, 188],
+    )?;
+
+    let fixture_rel_path = input_path
+        .strip_prefix("qec-code/")
+        .ok_or_else(|| format!("{path}.input_path: expected qec-code/ prefix"))?;
+    let fixture = load_quantum_tanner_fixture(fixture_rel_path);
+    validate_quantum_tanner_fixture(&fixture, fixture_rel_path, fixture_id, expected_result)
+}
+
+fn validate_quantum_tanner_catalog(manifest: &Value) -> Result<(), String> {
+    expect_u64_field(manifest, "manifest", "schema_version", 1)?;
+    expect_str_field(
+        manifest,
+        "manifest",
+        "manifest_id",
+        "quantum_tanner_acceptance_v1",
+    )?;
+    let contract = required_field(manifest, "manifest", "contract")?;
+    expect_u64_field(contract, "manifest.contract", "issue", 177)?;
+    expect_str_field(
+        contract,
+        "manifest.contract",
+        "path",
+        "qec-code/doc/quantum_tanner.md",
+    )?;
+    expect_str_field(
+        contract,
+        "manifest.contract",
+        "construction_mode",
+        "lr_cayley_no_cover_v1",
+    )?;
+    expect_str_field(
+        manifest,
+        "manifest",
+        "verifier_command",
+        QUANTUM_TANNER_VERIFIER_COMMAND,
+    )?;
+
+    let entries = required_array_field(manifest, "manifest", "entries")?;
+    if entries.is_empty() {
+        return Err("manifest.entries: expected at least one entry".to_owned());
+    }
+    let mut seen_fixture_ids = HashSet::new();
+    for (index, entry) in entries.iter().enumerate() {
+        let entry_path = format!("manifest.entries[{index}]");
+        let fixture_id = nonempty_string_field(entry, &entry_path, "fixture_id")?;
+        if !seen_fixture_ids.insert(fixture_id.to_owned()) {
+            return Err(format!("{entry_path}.fixture_id: duplicate {fixture_id:?}"));
+        }
+        match fixture_id {
+            "toric_d4" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "toric_d4",
+                QuantumTannerExpectedResult::Success,
+            )?,
+            "invalid_non_symmetric_a" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "invalid_non_symmetric_a",
+                QuantumTannerExpectedResult::Rejection("NonSymmetricGeneratorSet"),
+            )?,
+            "invalid_bad_table" => validate_quantum_tanner_catalog_entry(
+                entry,
+                &entry_path,
+                "invalid_bad_table",
+                QuantumTannerExpectedResult::Rejection("InvalidGroupTable"),
+            )?,
+            _ => validate_quantum_tanner_catalog_entry_metadata(entry, &entry_path)?,
+        }
+    }
+    for required_fixture_id in ["toric_d4", "invalid_non_symmetric_a", "invalid_bad_table"] {
+        if !seen_fixture_ids.contains(required_fixture_id) {
+            return Err(format!(
+                "manifest.entries: missing required fixture {required_fixture_id:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn documented_face_count(
+    table: &[Vec<usize>],
+    a_generators: &[usize],
+    b_generators: &[usize],
+) -> usize {
+    let mut faces = std::collections::BTreeSet::new();
+    for g in 0..table.len() {
+        for &a in a_generators {
+            for &b in b_generators {
+                let ag = table[a][g];
+                let gb = table[g][b];
+                let agb = table[ag][b];
+                let mut face = vec![g, ag, gb, agb];
+                face.sort_unstable();
+                face.dedup();
+                assert_eq!(face.len(), 4, "face must be nondegenerate");
+                faces.insert(face);
+            }
+        }
+    }
+    faces.len()
+}
+
+fn quantum_tanner_group_table_validator_spec(
+    order: usize,
+    identity: usize,
+    multiplication_table: Vec<Vec<usize>>,
+    a_generator_indices: Vec<usize>,
+    b_generator_indices: Vec<usize>,
+) -> QuantumTannerSpec {
+    let a_width = a_generator_indices.len();
+    let b_width = b_generator_indices.len();
+    QuantumTannerSpec {
+        construction_mode: QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1,
+        base_group: ExplicitFiniteGroup {
+            name: None,
+            element_order: None,
+            order,
+            identity,
+            multiplication_table,
+        },
+        a_generator_indices,
+        b_generator_indices,
+        local_codes: QuantumTannerLocalCodes {
+            matrix_role: "parity_check".to_owned(),
+            field: "GF(2)".to_owned(),
+            h_a: vec![vec![1; a_width]],
+            h_b: vec![vec![1; b_width]],
+            g_a: None,
+            g_b: None,
+        },
+    }
+}
+
+fn z2xz2_group_table() -> Vec<Vec<usize>> {
+    vec![
+        vec![0, 1, 2, 3],
+        vec![1, 0, 3, 2],
+        vec![2, 3, 0, 1],
+        vec![3, 2, 1, 0],
+    ]
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_accepts_z2xz2_and_safe_accessors() {
+    let spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![1, 2], vec![3]);
+
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+
+    assert_eq!(group.order(), 4);
+    assert_eq!(group.identity(), 0);
+    assert_eq!(group.multiply(1, 2).unwrap(), 3);
+    assert_eq!(group.multiply(2, 1).unwrap(), 3);
+    assert_eq!(group.multiply(3, 3).unwrap(), 0);
+    assert_eq!(group.inv(0).unwrap(), 0);
+    assert_eq!(group.inv(1).unwrap(), 1);
+    assert_eq!(group.inv(2).unwrap(), 2);
+    assert_eq!(group.inv(3).unwrap(), 3);
+    assert_eq!(group.a_generators(), &[1, 2]);
+    assert_eq!(group.b_generators(), &[3]);
+    assert_eq!(group.a_generator(0), Some(1));
+    assert_eq!(group.a_generator(1), Some(2));
+    assert_eq!(group.a_generator(2), None);
+    assert_eq!(group.b_generator(0), Some(3));
+    assert_eq!(group.b_generator(1), None);
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_accepts_toric_d4_catalog_fixture() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+
+    assert_eq!(group.order(), 16);
+    assert_eq!(group.identity(), 0);
+    assert_eq!(group.multiply(4, 12).unwrap(), 0);
+    assert_eq!(group.multiply(12, 4).unwrap(), 0);
+    assert_eq!(group.inv(4).unwrap(), 12);
+    assert_eq!(group.inv(12).unwrap(), 4);
+    assert_eq!(group.multiply(1, 3).unwrap(), 0);
+    assert_eq!(group.inv(1).unwrap(), 3);
+    assert_eq!(group.inv(3).unwrap(), 1);
+    assert_eq!(group.a_generator(0), Some(4));
+    assert_eq!(group.a_generator(1), Some(12));
+    assert_eq!(group.b_generator(0), Some(1));
+    assert_eq!(group.b_generator(1), Some(3));
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_rejects_square_in_range_non_associative_table() {
+    let non_associative_table = vec![
+        vec![0, 1, 2, 3],
+        vec![1, 0, 2, 3],
+        vec![2, 3, 0, 1],
+        vec![3, 2, 1, 0],
+    ];
+    let spec =
+        quantum_tanner_group_table_validator_spec(4, 0, non_associative_table, vec![1], vec![2]);
+
+    let error = validate_quantum_tanner_group_table(&spec).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("associativity failed for (1, 2, 2)"),
+        "expected the square in-range negative control to fail associativity, got {reason:?}"
+    );
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_rejects_identity_and_inverse_contract_errors() {
+    let declared_identity_mismatch =
+        quantum_tanner_group_table_validator_spec(4, 1, z2xz2_group_table(), vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&declared_identity_mismatch).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("declared identity 1 does not match table identity 0"),
+        "got {reason:?}"
+    );
+
+    let identity_out_of_range =
+        quantum_tanner_group_table_validator_spec(4, 4, z2xz2_group_table(), vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&identity_out_of_range).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("identity 4 is out of range for order 4"),
+        "got {reason:?}"
+    );
+
+    let no_identity_table = vec![vec![1, 1], vec![1, 1]];
+    let no_identity =
+        quantum_tanner_group_table_validator_spec(2, 0, no_identity_table, vec![1], vec![1]);
+    let error = validate_quantum_tanner_group_table(&no_identity).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("expected exactly one two-sided identity, found none"),
+        "got {reason:?}"
+    );
+
+    let no_inverse_table = vec![vec![0, 1], vec![1, 1]];
+    let no_inverse =
+        quantum_tanner_group_table_validator_spec(2, 0, no_inverse_table, vec![1], vec![1]);
+    let error = validate_quantum_tanner_group_table(&no_inverse).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("element 1 has no two-sided inverse under identity 0"),
+        "got {reason:?}"
+    );
+
+    let multiple_inverse_table = vec![vec![0, 1, 2], vec![1, 0, 0], vec![2, 0, 0]];
+    let multiple_inverses =
+        quantum_tanner_group_table_validator_spec(3, 0, multiple_inverse_table, vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&multiple_inverses).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("element 1 has multiple two-sided inverses under identity 0: [1, 2]"),
+        "got {reason:?}"
+    );
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_rejects_out_of_range_generators_and_elements() {
+    let bad_generator_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![4], vec![1]);
+
+    let error = validate_quantum_tanner_group_table(&bad_generator_spec).unwrap_err();
+    assert!(matches!(
+        error,
+        QecError::InvalidQuantumTannerGeneratorIndex {
+            set: "A",
+            index: 0,
+            element: 4,
+            order: 4
+        }
+    ));
+
+    let valid_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![1], vec![2]);
+    let group = validate_quantum_tanner_group_table(&valid_spec).unwrap();
+
+    assert!(matches!(
+        group.multiply(4, 0).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
+    assert!(matches!(
+        group.multiply(0, 4).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
+    assert!(matches!(
+        group.inv(4).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
+}
+
+#[test]
+fn quantum_tanner_fixture_catalog_has_grounded_cases() {
+    let manifest = load_quantum_tanner_fixture("tests/fixtures/quantum_tanner/manifest.json");
+    validate_quantum_tanner_catalog(&manifest).unwrap();
+}
+
+#[test]
+fn quantum_tanner_spec_json_accepts_toric_d4_and_rejects_bad_table() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+
+    assert_eq!(
+        spec.construction_mode,
+        QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1
+    );
+    assert_eq!(spec.construction_mode.as_str(), "lr_cayley_no_cover_v1");
+    assert_eq!(spec.base_group.order, 16);
+    assert_eq!(spec.base_group.identity, 0);
+    assert_eq!(spec.base_group.multiplication_table.len(), 16);
+    assert!(spec
+        .base_group
+        .multiplication_table
+        .iter()
+        .all(|row| row.len() == 16));
+    assert_eq!(spec.a_generator_indices, vec![4, 12]);
+    assert_eq!(spec.b_generator_indices, vec![1, 3]);
+    assert_eq!(spec.local_codes.matrix_role.as_str(), "parity_check");
+    assert_eq!(spec.local_codes.field.as_str(), "GF(2)");
+    assert_eq!(spec.local_codes.h_a, vec![vec![1, 1]]);
+    assert_eq!(spec.local_codes.h_b, vec![vec![1, 1]]);
+
+    let error = quantum_tanner_spec_from_json_str(include_str!(
+        "fixtures/quantum_tanner/invalid_bad_table.json"
+    ))
+    .unwrap_err();
+
+    assert!(
+        matches!(error, QecError::InvalidQuantumTannerGroupTable { .. }),
+        "expected malformed table to fail before construction, got {error:?}"
+    );
+    assert!(
+        error.to_string().contains("row 0"),
+        "malformed table error should identify the bad row: {error}"
+    );
+
+    let nonzero_identity_json = include_str!("fixtures/quantum_tanner/toric_d4.json")
+        .replace("\"identity\": 0", "\"identity\": 1");
+    let error = quantum_tanner_spec_from_json_str(&nonzero_identity_json).unwrap_err();
+    assert!(
+        matches!(error, QecError::InvalidQuantumTannerGroupTable { .. }),
+        "expected nonzero identity to fail before construction, got {error:?}"
+    );
+    assert!(
+        error.to_string().contains("identity"),
+        "nonzero identity error should identify the bad field: {error}"
+    );
+}
+
+#[test]
+fn quantum_tanner_local_code_tensor_dual_repetition_example_rejects_bad_inputs() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+    let local = quantum_tanner_local_code_tensor_dual(&spec).unwrap();
+
+    assert_eq!(local.code_a.width, 2);
+    assert_eq!(local.code_a.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_a.dual_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.width, 2);
+    assert_eq!(local.code_b.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.dual_rows, vec![vec![1, 1]]);
+    assert_eq!(local.x_sector_rows, vec![vec![1, 1, 1, 1]]);
+    assert_eq!(local.z_sector_rows, vec![vec![1, 1, 1, 1]]);
+
+    let nonbinary_h_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_a"][0][0] = Value::from(2);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonbinary_h_a, "h_a", "expected 0 or 1");
+
+    let nonorthogonal_g_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[1, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonorthogonal_g_a, "code_a", "not orthogonal");
+
+    let valid_supplied_generators = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[1, 1]]);
+        fixture["local_codes"]["g_b"] = serde_json::json!([[1, 1]]);
+    });
+    let local = quantum_tanner_local_code_tensor_dual(
+        &quantum_tanner_spec_from_json_str(&valid_supplied_generators).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(local.code_a.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.code_b.generator_rows, vec![vec![1, 1]]);
+    assert_eq!(local.x_sector_rows, vec![vec![1, 1, 1, 1]]);
+
+    let rank_mismatch_g_a = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_a"] = serde_json::json!([[0, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&rank_mismatch_g_a, "code_a", "rank is 0");
+
+    let nonorthogonal_g_b = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["g_b"] = serde_json::json!([[1, 0]]);
+    });
+    expect_quantum_tanner_local_code_matrix_error(&nonorthogonal_g_b, "code_b", "not orthogonal");
+
+    let mut corrupted_code_a = spec.clone();
+    corrupted_code_a.local_codes.h_a[0][0] = 2;
+    let error = quantum_tanner_local_code_tensor_dual(&corrupted_code_a).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, "code_a");
+    assert!(reason.contains("expected 0 or 1"), "got {reason:?}");
+
+    let mut corrupted_code_b = spec;
+    corrupted_code_b.local_codes.h_b[0].push(1);
+    let error = quantum_tanner_local_code_tensor_dual(&corrupted_code_b).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, "code_b");
+    assert!(reason.contains("width 3"), "got {reason:?}");
+}
+
+fn toric_d4_json_with(mutator: impl FnOnce(&mut Value)) -> String {
+    let mut fixture: Value =
+        serde_json::from_str(include_str!("fixtures/quantum_tanner/toric_d4.json")).unwrap();
+    mutator(&mut fixture);
+    serde_json::to_string(&fixture).unwrap()
+}
+
+fn expect_quantum_tanner_group_table_error(input: &str, expected_reason_part: &str) {
+    let error = quantum_tanner_spec_from_json_str(input).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected InvalidQuantumTannerGroupTable, got {error:?}");
+    };
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+fn expect_quantum_tanner_local_code_error(
+    input: &str,
+    expected_matrix: &'static str,
+    expected_reason_part: &str,
+) {
+    let error = quantum_tanner_spec_from_json_str(input).unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, expected_matrix);
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+fn expect_quantum_tanner_local_code_matrix_error(
+    input: &str,
+    expected_matrix: &'static str,
+    expected_reason_part: &str,
+) {
+    let error = quantum_tanner_spec_from_json_str(input)
+        .and_then(|spec| quantum_tanner_local_code_tensor_dual(&spec))
+        .unwrap_err();
+    let QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason } = error else {
+        panic!("expected InvalidQuantumTannerLocalCodeMatrix, got {error:?}");
+    };
+    assert_eq!(matrix, expected_matrix);
+    assert!(
+        reason.contains(expected_reason_part),
+        "expected reason to contain {expected_reason_part:?}, got {reason:?}"
+    );
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_invalid_json() {
+    assert!(matches!(
+        quantum_tanner_spec_from_json_str("{").unwrap_err(),
+        QecError::InvalidQuantumTannerSpecJson(_)
+    ));
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_unsupported_construction_mode() {
+    let input = toric_d4_json_with(|fixture| {
+        fixture["construction_mode"] = Value::String("lr_cayley_quadripartite_cover_v1".to_owned());
+    });
+
+    assert!(matches!(
+        quantum_tanner_spec_from_json_str(&input).unwrap_err(),
+        QecError::UnsupportedQuantumTannerConstructionMode { mode }
+            if mode == "lr_cayley_quadripartite_cover_v1"
+    ));
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_group_table_contract_errors() {
+    let zero_order = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["order"] = Value::from(0);
+    });
+    expect_quantum_tanner_group_table_error(&zero_order, "order must be positive");
+
+    let short_table = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["multiplication_table"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+    });
+    expect_quantum_tanner_group_table_error(&short_table, "expected 16 rows, got 15");
+
+    let out_of_range_entry = toric_d4_json_with(|fixture| {
+        fixture["base_group"]["multiplication_table"][0][0] = Value::from(16);
+    });
+    expect_quantum_tanner_group_table_error(&out_of_range_entry, "expected < 16");
+}
+
+#[test]
+fn quantum_tanner_spec_json_rejects_invalid_local_code_shapes() {
+    let bad_role = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["matrix_role"] = Value::String("generator".to_owned());
+    });
+    expect_quantum_tanner_local_code_error(&bad_role, "local_codes", "matrix_role");
+
+    let bad_field = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["field"] = Value::String("GF(4)".to_owned());
+    });
+    expect_quantum_tanner_local_code_error(&bad_field, "local_codes", "field");
+
+    let wrong_h_a_width = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_a"][0]
+            .as_array_mut()
+            .unwrap()
+            .push(Value::from(1));
+    });
+    expect_quantum_tanner_local_code_error(&wrong_h_a_width, "h_a", "width 3");
+
+    let nonbinary_h_b = toric_d4_json_with(|fixture| {
+        fixture["local_codes"]["h_b"][0][1] = Value::from(2);
+    });
+    expect_quantum_tanner_local_code_error(&nonbinary_h_b, "h_b", "expected 0 or 1");
+}
+
+#[test]
+fn quantum_tanner_contract_examples_compile() {
+    let doc = include_str!("../doc/quantum_tanner.md");
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/codes/quantum.py"));
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/objects.py"));
+    assert!(doc.contains("drafts/qLDPC/src/qldpc/codes/quantum_test.py"));
+    assert!(doc.contains("https://github.com/qLDPCOrg/qLDPC"));
+    assert!(doc.contains("https://github.com/QuantumSavory/QuantumExpanders.jl"));
+    assert!(doc.contains("lr_cayley_no_cover_v1"));
+    assert!(doc.contains("lr_cayley_bipartite_double_cover_v1"));
+    assert!(doc.contains("lr_cayley_quadripartite_cover_v1"));
+    assert!(doc.contains("UnsupportedConstructionMode"));
+    assert!(doc.contains("<!-- quantum_tanner_contract:toric_d4_counting_convention -->"));
+    assert!(doc.contains("n = |G| * |A| * |B| / 4 = 16 * 2 * 2 / 4 = 16"));
+    assert!(doc.contains("<!-- quantum_tanner_contract:bad_non_symmetric_generator -->"));
+
+    let toric = extract_marked_json(doc, "quantum_tanner_contract:toric_d4").unwrap();
+    assert_eq!(toric["example_id"].as_str(), Some("toric_d4"));
+    assert_eq!(
+        toric["construction_mode"].as_str(),
+        Some("lr_cayley_no_cover_v1")
+    );
+
+    let group = &toric["base_group"];
+    assert_eq!(group["name"].as_str(), Some("Z4xZ4"));
+    assert_eq!(group["identity"].as_u64(), Some(0));
+    let table = usize_matrix(
+        &group["multiplication_table"],
+        "base_group.multiplication_table",
+    );
+    assert_group_table_shape(&table, 16);
+
+    let a_generators = usize_array(&toric["a_generator_indices"], "a_generator_indices");
+    let b_generators = usize_array(&toric["b_generator_indices"], "b_generator_indices");
+    assert!(generators_are_symmetric(&table, 0, &a_generators));
+    assert!(generators_are_symmetric(&table, 0, &b_generators));
+
+    let expected = &toric["expected_css"];
+    assert_eq!(expected["n"].as_u64(), Some(16));
+    assert_eq!(expected["k"].as_u64(), Some(2));
+    assert_eq!(expected["expected_distance"].as_u64(), Some(4));
+    assert_eq!(
+        documented_face_count(&table, &a_generators, &b_generators),
+        expected["n"].as_u64().unwrap() as usize
+    );
+
+    let local_a = usize_matrix(&toric["local_codes"]["h_a"], "local_codes.h_a");
+    let local_b = usize_matrix(&toric["local_codes"]["h_b"], "local_codes.h_b");
+    assert!(local_a.iter().all(|row| row.len() == a_generators.len()));
+    assert!(local_b.iter().all(|row| row.len() == b_generators.len()));
+    assert!(local_a.iter().flatten().all(|&bit| bit <= 1));
+    assert!(local_b.iter().flatten().all(|&bit| bit <= 1));
+
+    let bad =
+        extract_marked_json(doc, "quantum_tanner_contract:bad_non_symmetric_generator").unwrap();
+    let bad_a = usize_array(&bad["a_generator_indices"], "bad.a_generator_indices");
+    assert!(!generators_are_symmetric(&table, 0, &bad_a));
+    assert_eq!(
+        bad["expected_error"].as_str(),
+        Some("NonSymmetricGeneratorSet")
+    );
 }
 
 #[test]
