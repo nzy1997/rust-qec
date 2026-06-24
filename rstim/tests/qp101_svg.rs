@@ -977,8 +977,36 @@ fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
         "repeat label baseline should sit above the first body gate band: {svg}"
     );
     assert!(
-        iter_label_y > 0 && iter_label_y < first_gate_top,
-        "iteration label baseline should stay inside the viewBox and above the first body gate band: {svg}"
+        iter_label_y > first_gate_top,
+        "iteration label baseline should use a separate row from the repeat label: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_separates_compact_repeat_labels() {
+    let instrs =
+        parse_lines("REPEAT 2 {\n  M 0\n}\n").expect("compact repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("compact repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("compact repeat fixture should render");
+
+    let repeat_label = text_xy(&svg, "repeat x2").expect("repeat label should be positioned");
+    let iter_label = text_xy(&svg, "iter 2").expect("iteration label should be positioned");
+    assert_ne!(
+        repeat_label.1, iter_label.1,
+        "compact repeat and iteration labels should not share a collision-prone baseline: {svg}"
+    );
+    assert!(
+        iter_label.1 > repeat_label.1,
+        "iteration label should use the lower repeat-group row in compact repeats: {svg}"
+    );
+    assert!(
+        svg.find("class=\"gate-box\"")
+            .expect("compact repeat body gate should be present")
+            < svg
+                .find(">iter 2</text>")
+                .expect("iteration label should be present"),
+        "iteration label should paint above body gates in compact repeats: {svg}"
     );
 }
 

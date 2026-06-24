@@ -100,7 +100,7 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     render_repeat_backgrounds(&mut out, &state.repeat_groups, doc.num_qubits);
     render_wires(&mut out, doc.num_qubits, width);
     out.push_str(&operation_out);
-    render_repeat_labels(&mut out, &state.repeat_groups);
+    render_repeat_labels(&mut out, &state.repeat_groups, doc.num_qubits);
     out.push_str("</g>\n</svg>\n");
     Ok(out)
 }
@@ -1093,10 +1093,10 @@ fn render_repeat_backgrounds(out: &mut String, groups: &[RepeatGroupSpan], num_q
     }
 }
 
-fn render_repeat_labels(out: &mut String, groups: &[RepeatGroupSpan]) {
+fn render_repeat_labels(out: &mut String, groups: &[RepeatGroupSpan], num_qubits: usize) {
     for group in groups.iter().rev() {
         render_repeat_group_label(out, group);
-        render_repeat_iteration_labels(out, group);
+        render_repeat_iteration_labels(out, group, num_qubits);
     }
 }
 
@@ -1167,12 +1167,12 @@ fn render_repeat_iteration_boundary_lines(
     }
 }
 
-fn render_repeat_iteration_labels(out: &mut String, group: &RepeatGroupSpan) {
+fn render_repeat_iteration_labels(out: &mut String, group: &RepeatGroupSpan, num_qubits: usize) {
     for (iteration_offset, &start_column) in group.iteration_starts.iter().enumerate().skip(1) {
         let x = x_for_column(start_column) - COLUMN_GAP / 2;
         out.push_str(&format!(
             "<text class=\"repeat-iteration-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">iter {}</text>\n",
-            repeat_group_label_y(),
+            repeat_iteration_label_y(num_qubits),
             iteration_offset + 1
         ));
     }
@@ -1180,6 +1180,10 @@ fn render_repeat_iteration_labels(out: &mut String, group: &RepeatGroupSpan) {
 
 fn repeat_group_label_y() -> i32 {
     lane_y(0) - GATE_HEIGHT / 2 - REPEAT_GROUP_LABEL_GATE_GAP
+}
+
+fn repeat_iteration_label_y(num_qubits: usize) -> i32 {
+    lane_y(num_qubits.saturating_sub(1)) + GATE_HEIGHT / 2 + REPEAT_GROUP_BOTTOM_PAD - 4
 }
 
 fn render_annotations(out: &mut String, x: i32, lanes: &[usize], annotations: &[Qp101Annotation]) {
