@@ -50,7 +50,10 @@ fn load_manifest() -> FixtureManifest {
 
 fn validate_manifest(manifest: &FixtureManifest, base_dir: &Path) -> Result<(), String> {
     if manifest.version != 1 {
-        return Err(format!("manifest version must be 1, got {}", manifest.version));
+        return Err(format!(
+            "manifest version must be 1, got {}",
+            manifest.version
+        ));
     }
     if manifest.cases.len() < MIN_CASES {
         return Err(format!(
@@ -89,7 +92,9 @@ fn validate_case(case: &FixtureCase, base_dir: &Path) -> Result<(), String> {
     }
     for marker in &case.expected_semantic_markers {
         if marker.kind.trim().is_empty() || marker.value.trim().is_empty() {
-            return Err(format!("case {case_id} has an empty expected semantic marker"));
+            return Err(format!(
+                "case {case_id} has an empty expected semantic marker"
+            ));
         }
     }
 
@@ -100,8 +105,12 @@ fn validate_case(case: &FixtureCase, base_dir: &Path) -> Result<(), String> {
             input_path.display()
         ));
     }
-    let text = fs::read_to_string(&input_path)
-        .map_err(|err| format!("case {case_id} failed to read {}: {err}", input_path.display()))?;
+    let text = fs::read_to_string(&input_path).map_err(|err| {
+        format!(
+            "case {case_id} failed to read {}: {err}",
+            input_path.display()
+        )
+    })?;
 
     match case.source_kind.as_str() {
         "stim" => {
@@ -109,12 +118,13 @@ fn validate_case(case: &FixtureCase, base_dir: &Path) -> Result<(), String> {
                 .map_err(|err| format!("case {case_id} failed to parse Stim input: {err}"))?;
         }
         "qp101_json" => {
-            serde_json::from_str::<Qp101Document>(&text).map_err(|err| {
-                format!("case {case_id} failed to parse QP101 JSON input: {err}")
-            })?;
+            serde_json::from_str::<Qp101Document>(&text)
+                .map_err(|err| format!("case {case_id} failed to parse QP101 JSON input: {err}"))?;
         }
         other => {
-            return Err(format!("case {case_id} has unsupported source_kind {other}"));
+            return Err(format!(
+                "case {case_id} has unsupported source_kind {other}"
+            ));
         }
     }
 
@@ -141,7 +151,8 @@ fn assert_invalid_case_names_id(mut case: FixtureCase, mutate: impl FnOnce(&mut 
 #[test]
 fn qp101_svg_fixture_manifest_is_valid() {
     let manifest = load_manifest();
-    validate_manifest(&manifest, &fixture_dir()).expect("QP101 SVG fixture manifest should be valid");
+    validate_manifest(&manifest, &fixture_dir())
+        .expect("QP101 SVG fixture manifest should be valid");
 
     let first_case = manifest
         .cases
