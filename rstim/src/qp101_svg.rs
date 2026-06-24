@@ -1,4 +1,6 @@
-use crate::qp101::{Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101TargetRef};
+use crate::qp101::{
+    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+};
 
 const LEFT_MARGIN: i32 = 56;
 const RIGHT_MARGIN: i32 = 24;
@@ -32,9 +34,23 @@ impl MeasurementTarget {
     }
 }
 
+#[derive(Debug, Clone)]
+struct MeasurementRecord {
+    index: usize,
+    lane: usize,
+}
+
+impl MeasurementRecord {
+    fn anchor(&self) -> String {
+        format!("m{}", self.index)
+    }
+}
+
 #[derive(Debug, Default)]
 struct RenderState {
     next_measurement_index: usize,
+    next_detector_index: usize,
+    measurements: Vec<MeasurementRecord>,
 }
 
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
@@ -100,6 +116,15 @@ fn max_rendered_below_gate_text_baseline(
     ops: &[Qp101Operation],
     num_qubits: usize,
 ) -> Result<Option<i32>, String> {
+    let mut state = RenderState::default();
+    max_rendered_below_gate_text_baseline_with_state(ops, num_qubits, &mut state)
+}
+
+fn max_rendered_below_gate_text_baseline_with_state(
+    ops: &[Qp101Operation],
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<Option<i32>, String> {
     let mut max_baseline = None;
     for op in ops {
         match op {
@@ -120,15 +145,16 @@ fn max_rendered_below_gate_text_baseline(
                 } else {
                     gate_lanes(targets, controls, num_qubits, gate)?
                 };
-                let measurement_lanes = measurement_lanes(gate, targets, num_qubits)?;
-                for lane in &measurement_lanes {
-                    update_max_baseline(&mut max_baseline, below_gate_text_y(*lane));
+                let measurement_targets =
+                    measurement_targets(gate, targets, raw_targets.as_deref(), num_qubits, state)?;
+                for target in &measurement_targets {
+                    update_max_baseline(&mut max_baseline, below_gate_text_y(target.lane));
                 }
                 update_max_baseline_from_annotations(
                     &mut max_baseline,
                     &lanes,
                     annotations,
-                    usize::from(!measurement_lanes.is_empty()),
+                    usize::from(!measurement_targets.is_empty()),
                 );
             }
             Qp101Operation::Noise {
@@ -138,36 +164,67 @@ fn max_rendered_below_gate_text_baseline(
                 ..
             } => {
                 let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
-                update_max_baseline_from_annotations(&mut max_baseline, &lanes, annotations, 0);
+                let measurement_targets =
+                    measurement_targets(gate, &[], Some(raw_targets), num_qubits, state)?;
+                for target in &measurement_targets {
+                    update_max_baseline(&mut max_baseline, below_gate_text_y(target.lane));
+                }
+                update_max_baseline_from_annotations(
+                    &mut max_baseline,
+                    &lanes,
+                    annotations,
+                    usize::from(!measurement_targets.is_empty()),
+                );
             }
             Qp101Operation::Repeat {
-                body, annotations, ..
+                count,
+                body,
+                annotations,
             } => {
                 update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
-                if let Some(body_baseline) =
-                    max_rendered_below_gate_text_baseline(body, num_qubits)?
-                {
-                    update_max_baseline(&mut max_baseline, body_baseline);
+                for _ in 0..*count {
+                    if let Some(body_baseline) =
+                        max_rendered_below_gate_text_baseline_with_state(body, num_qubits, state)?
+                    {
+                        update_max_baseline(&mut max_baseline, body_baseline);
+                    }
                 }
             }
-            Qp101Operation::Detector { annotations, .. }
-            | Qp101Operation::ObservableInclude { annotations, .. }
-            | Qp101Operation::Annotation { annotations, .. } => {
+            Qp101Operation::Detector {
+                sources,
+                annotations,
+                ..
+            } => {
+                let source = source_label(sources, &state.measurements, num_qubits);
+                update_max_baseline(&mut max_baseline, below_gate_text_y(source.host_lane));
+                update_max_baseline_from_annotations(
+                    &mut max_baseline,
+                    &[source.host_lane],
+                    annotations,
+                    1,
+                );
+                state.next_detector_index += 1;
+            }
+            Qp101Operation::ObservableInclude {
+                sources,
+                annotations,
+                ..
+            } => {
+                let source = source_label(sources, &state.measurements, num_qubits);
+                update_max_baseline(&mut max_baseline, below_gate_text_y(source.host_lane));
+                update_max_baseline_from_annotations(
+                    &mut max_baseline,
+                    &[source.host_lane],
+                    annotations,
+                    1,
+                );
+            }
+            Qp101Operation::Annotation { annotations, .. } => {
                 update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
             }
         }
     }
     Ok(max_baseline)
-}
-
-fn measurement_lanes(gate: &str, targets: &[u32], num_qubits: usize) -> Result<Vec<usize>, String> {
-    if measurement_output_count(gate).is_none() {
-        return Ok(Vec::new());
-    }
-    targets
-        .iter()
-        .map(|&target| validate_lane(target, num_qubits, gate))
-        .collect()
 }
 
 fn update_max_baseline_from_annotations(
@@ -261,7 +318,16 @@ fn render_operations(
                 let x = x_for_column(*column);
                 let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
                 render_generic_box(out, x, num_qubits, gate, &lanes, "#fff7ed")?;
-                render_annotations(out, x, &lanes, annotations);
+                let measurement_targets =
+                    measurement_targets(gate, &[], Some(raw_targets), num_qubits, state)?;
+                render_measurement_anchors(out, x, &measurement_targets);
+                render_annotations_with_line_offset(
+                    out,
+                    x,
+                    &lanes,
+                    annotations,
+                    measurement_annotation_line_offset(&measurement_targets),
+                );
                 *column += 1;
             }
             Qp101Operation::Repeat {
@@ -278,19 +344,41 @@ fn render_operations(
                     render_operations(out, body, num_qubits, column, state)?;
                 }
             }
-            Qp101Operation::Detector { annotations, .. } => {
+            Qp101Operation::Detector {
+                sources,
+                annotations,
+                ..
+            } => {
                 let x = x_for_column(*column);
-                render_top_note(out, x, "detector");
-                render_annotations(out, x, &[0], annotations);
+                let detector_index = state.next_detector_index;
+                state.next_detector_index += 1;
+                let source = source_label(sources, &state.measurements, num_qubits);
+                render_source_operation(
+                    out,
+                    x,
+                    source.host_lane,
+                    "DETECTOR",
+                    &format!("D{detector_index} = {}", source.text),
+                );
+                render_annotations_with_line_offset(out, x, &[source.host_lane], annotations, 1);
                 *column += 1;
             }
             Qp101Operation::ObservableInclude {
-                index, annotations, ..
+                index,
+                sources,
+                annotations,
+                ..
             } => {
                 let x = x_for_column(*column);
-                let label = format!("L{index}");
-                render_top_note(out, x, &label);
-                render_annotations(out, x, &[0], annotations);
+                let source = source_label(sources, &state.measurements, num_qubits);
+                render_source_operation(
+                    out,
+                    x,
+                    source.host_lane,
+                    &format!("OBS_INCLUDE({index})"),
+                    &format!("L{index} *= {}", source.text),
+                );
+                render_annotations_with_line_offset(out, x, &[source.host_lane], annotations, 1);
                 *column += 1;
             }
             Qp101Operation::Annotation {
@@ -330,6 +418,141 @@ fn escape_xml(text: &str) -> String {
         }
     }
     escaped
+}
+
+#[derive(Debug)]
+struct SourceLabel {
+    text: String,
+    host_lane: usize,
+}
+
+fn source_label(
+    sources: &[Qp101TargetRef],
+    measurements: &[MeasurementRecord],
+    num_qubits: usize,
+) -> SourceLabel {
+    let mut resolved_lanes = Vec::new();
+    let mut fallback_lanes = Vec::new();
+    let mut text = String::new();
+    let mut needs_separator = false;
+
+    for source in sources {
+        let resolved = resolve_source_ref(source, measurements);
+        if let Some(lane) = resolved.resolved_lane {
+            resolved_lanes.push(lane);
+        }
+        if let Some(lane) = target_ref_lane(source, num_qubits) {
+            fallback_lanes.push(lane);
+        }
+
+        match source {
+            Qp101TargetRef::Combiner => {
+                text.push('*');
+                needs_separator = false;
+            }
+            _ => {
+                if needs_separator {
+                    text.push('*');
+                }
+                text.push_str(&resolved.text);
+                needs_separator = true;
+            }
+        }
+    }
+
+    let host_lane = resolved_lanes
+        .into_iter()
+        .min()
+        .or_else(|| fallback_lanes.into_iter().min())
+        .unwrap_or(0);
+    let text = if sources.is_empty() {
+        "-".to_string()
+    } else {
+        text
+    };
+
+    SourceLabel { text, host_lane }
+}
+
+#[derive(Debug)]
+struct ResolvedSourceRef {
+    text: String,
+    resolved_lane: Option<usize>,
+}
+
+fn resolve_source_ref(
+    source: &Qp101TargetRef,
+    measurements: &[MeasurementRecord],
+) -> ResolvedSourceRef {
+    if let Qp101TargetRef::Rec { offset } = source {
+        if *offset < 0 {
+            let resolved_index = measurements.len() as i64 + i64::from(*offset) + 1;
+            if resolved_index >= 1 && resolved_index <= measurements.len() as i64 {
+                if let Some(measurement) = measurements
+                    .iter()
+                    .find(|measurement| measurement.index == resolved_index as usize)
+                {
+                    return ResolvedSourceRef {
+                        text: measurement.anchor(),
+                        resolved_lane: Some(measurement.lane),
+                    };
+                }
+            }
+        }
+    }
+
+    ResolvedSourceRef {
+        text: target_ref_text(source),
+        resolved_lane: None,
+    }
+}
+
+fn target_ref_lane(source: &Qp101TargetRef, num_qubits: usize) -> Option<usize> {
+    let index = match source {
+        Qp101TargetRef::Qubit { index, .. } => *index,
+        Qp101TargetRef::Pauli { qubit, .. } => *qubit,
+        Qp101TargetRef::Rec { .. } | Qp101TargetRef::Combiner | Qp101TargetRef::Sweep { .. } => {
+            return None;
+        }
+    };
+    let lane = usize::try_from(index).ok()?;
+    (lane < num_qubits).then_some(lane)
+}
+
+fn target_ref_text(source: &Qp101TargetRef) -> String {
+    match source {
+        Qp101TargetRef::Qubit { index, inverted } => {
+            format!("{}q{index}", inverted_prefix(*inverted))
+        }
+        Qp101TargetRef::Rec { offset } => format!("rec[{offset}]"),
+        Qp101TargetRef::Pauli {
+            basis,
+            qubit,
+            inverted,
+        } => format!(
+            "{}{}{qubit}",
+            inverted_prefix(*inverted),
+            pauli_basis_text(basis)
+        ),
+        Qp101TargetRef::Combiner => "*".to_string(),
+        Qp101TargetRef::Sweep { index } => format!("sweep[{index}]"),
+    }
+}
+
+fn inverted_prefix(inverted: Option<bool>) -> &'static str {
+    if inverted.unwrap_or(false) {
+        "!"
+    } else {
+        ""
+    }
+}
+
+fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
+    match basis {
+        Qp101PauliBasis::X => "X",
+        Qp101PauliBasis::Y => "Y",
+        Qp101PauliBasis::Z => "Z",
+    }
 }
 
 fn gate_label(gate: &str, display: Option<&Qp101Display>) -> String {
@@ -380,25 +603,206 @@ fn raw_target_lanes(
 fn measurement_targets(
     gate: &str,
     targets: &[u32],
+    raw_targets: Option<&[Qp101TargetRef]>,
     num_qubits: usize,
     state: &mut RenderState,
 ) -> Result<Vec<MeasurementTarget>, String> {
-    let Some(output_count) = measurement_output_count(gate) else {
-        return Ok(Vec::new());
-    };
-
-    let mut measurement_targets = Vec::with_capacity(targets.len());
-    for &target in targets {
-        let lane = validate_lane(target, num_qubits, gate)?;
-        let first_index = state.next_measurement_index + 1;
-        state.next_measurement_index += output_count;
-        measurement_targets.push(MeasurementTarget {
-            lane,
-            first_index,
-            output_count,
-        });
+    let mut measurement_targets = Vec::new();
+    match gate {
+        "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => {
+            record_target_measurements(
+                &mut measurement_targets,
+                state,
+                targets,
+                1,
+                num_qubits,
+                gate,
+            )?;
+        }
+        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
+            record_target_measurements(
+                &mut measurement_targets,
+                state,
+                targets,
+                2,
+                num_qubits,
+                gate,
+            )?;
+        }
+        "MPP" => record_mpp_measurements(
+            &mut measurement_targets,
+            state,
+            raw_targets,
+            targets,
+            num_qubits,
+            gate,
+        )?,
+        "MXX" | "MYY" | "MZZ" => {
+            record_pair_measurements(&mut measurement_targets, state, targets, num_qubits, gate)?
+        }
+        "MPAD" | "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+            record_raw_target_measurements(
+                &mut measurement_targets,
+                state,
+                raw_targets,
+                targets,
+                num_qubits,
+                gate,
+            )?;
+        }
+        _ => {}
     }
     Ok(measurement_targets)
+}
+
+fn record_target_measurements(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    targets: &[u32],
+    output_count: usize,
+    num_qubits: usize,
+    gate: &str,
+) -> Result<(), String> {
+    for &target in targets {
+        let lane = validate_lane(target, num_qubits, gate)?;
+        record_measurement_target(measurement_targets, state, lane, output_count);
+    }
+    Ok(())
+}
+
+fn record_pair_measurements(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    targets: &[u32],
+    num_qubits: usize,
+    gate: &str,
+) -> Result<(), String> {
+    let mut chunks = targets.chunks_exact(2);
+    for chunk in &mut chunks {
+        let lane_a = validate_lane(chunk[0], num_qubits, gate)?;
+        let lane_b = validate_lane(chunk[1], num_qubits, gate)?;
+        record_measurement_target(measurement_targets, state, lane_a.min(lane_b), 1);
+    }
+    for &target in chunks.remainder() {
+        validate_lane(target, num_qubits, gate)?;
+    }
+    Ok(())
+}
+
+fn record_mpp_measurements(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    raw_targets: Option<&[Qp101TargetRef]>,
+    targets: &[u32],
+    num_qubits: usize,
+    gate: &str,
+) -> Result<(), String> {
+    let Some(raw_targets) = raw_targets else {
+        return record_target_measurements(
+            measurement_targets,
+            state,
+            targets,
+            1,
+            num_qubits,
+            gate,
+        );
+    };
+
+    let mut group_lanes = Vec::new();
+    let mut group_has_target = false;
+    let mut previous_was_combiner = false;
+    for target in raw_targets {
+        if matches!(target, Qp101TargetRef::Combiner) {
+            previous_was_combiner = true;
+            continue;
+        }
+
+        if group_has_target && !previous_was_combiner {
+            record_mpp_group(measurement_targets, state, &group_lanes, group_has_target);
+            group_lanes.clear();
+        }
+        group_has_target = true;
+        previous_was_combiner = false;
+        if let Some(lane) = validated_target_ref_lane(target, num_qubits, gate)? {
+            group_lanes.push(lane);
+        }
+    }
+    record_mpp_group(measurement_targets, state, &group_lanes, group_has_target);
+    Ok(())
+}
+
+fn record_mpp_group(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    group_lanes: &[usize],
+    group_has_target: bool,
+) {
+    if !group_has_target {
+        return;
+    }
+    let lane = group_lanes.iter().copied().min().unwrap_or(0);
+    record_measurement_target(measurement_targets, state, lane, 1);
+}
+
+fn record_raw_target_measurements(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    raw_targets: Option<&[Qp101TargetRef]>,
+    targets: &[u32],
+    num_qubits: usize,
+    gate: &str,
+) -> Result<(), String> {
+    if let Some(raw_targets) = raw_targets {
+        for target in raw_targets {
+            if matches!(target, Qp101TargetRef::Combiner) {
+                continue;
+            }
+            let lane = validated_target_ref_lane(target, num_qubits, gate)?.unwrap_or(0);
+            record_measurement_target(measurement_targets, state, lane, 1);
+        }
+        return Ok(());
+    }
+
+    record_target_measurements(measurement_targets, state, targets, 1, num_qubits, gate)
+}
+
+fn validated_target_ref_lane(
+    source: &Qp101TargetRef,
+    num_qubits: usize,
+    gate: &str,
+) -> Result<Option<usize>, String> {
+    match source {
+        Qp101TargetRef::Qubit { index, .. } => Ok(Some(validate_lane(*index, num_qubits, gate)?)),
+        Qp101TargetRef::Pauli { qubit, .. } => Ok(Some(validate_lane(*qubit, num_qubits, gate)?)),
+        Qp101TargetRef::Rec { .. } | Qp101TargetRef::Combiner | Qp101TargetRef::Sweep { .. } => {
+            Ok(None)
+        }
+    }
+}
+
+fn record_measurement_target(
+    measurement_targets: &mut Vec<MeasurementTarget>,
+    state: &mut RenderState,
+    lane: usize,
+    output_count: usize,
+) {
+    if output_count == 0 {
+        return;
+    }
+
+    let first_index = state.next_measurement_index + 1;
+    state.next_measurement_index += output_count;
+    for output_offset in 0..output_count {
+        state.measurements.push(MeasurementRecord {
+            index: first_index + output_offset,
+            lane,
+        });
+    }
+    measurement_targets.push(MeasurementTarget {
+        lane,
+        first_index,
+        output_count,
+    });
 }
 
 fn validate_lane(index: u32, num_qubits: usize, gate: &str) -> Result<usize, String> {
@@ -430,7 +834,7 @@ fn render_gate(
     } else {
         gate_lanes(targets, controls, num_qubits, gate)?
     };
-    let measurement_targets = measurement_targets(gate, targets, num_qubits, state)?;
+    let measurement_targets = measurement_targets(gate, targets, raw_targets, num_qubits, state)?;
 
     match gate {
         "CX" | "CZ" => {
@@ -513,14 +917,6 @@ fn target_pairs(
 
 fn is_simple_single_qubit_gate(gate: &str) -> bool {
     matches!(gate, "H" | "X" | "Y" | "Z" | "S" | "T" | "R" | "RX")
-}
-
-fn measurement_output_count(gate: &str) -> Option<usize> {
-    match gate {
-        "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => Some(1),
-        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => Some(2),
-        _ => None,
-    }
 }
 
 fn render_single_qubit_boxes(out: &mut String, x: i32, label: &str, lanes: &[usize]) {
@@ -618,6 +1014,15 @@ fn render_gate_box(out: &mut String, x: i32, y: i32, label: &str, fill: &str) {
     out.push_str(&format!(
         "<text x=\"{x}\" y=\"{y}\" fill=\"#111827\" text-anchor=\"middle\" dominant-baseline=\"middle\">{}</text>\n",
         escape_xml(label)
+    ));
+}
+
+fn render_source_operation(out: &mut String, x: i32, lane: usize, label: &str, source: &str) {
+    render_gate_box(out, x, lane_y(lane), label, "#f8fafc");
+    out.push_str(&format!(
+        "<text class=\"source-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
+        below_gate_text_y(lane),
+        escape_xml(source)
     ));
 }
 
