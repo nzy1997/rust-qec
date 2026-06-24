@@ -801,6 +801,34 @@ mod tests {
         .unwrap()
     }
 
+    fn p192_apm_manifest_entry_with_one_p96_coefficient() -> ApmCssManifestEntry {
+        let p = 192;
+        let f = [
+            (5, 127),
+            (97, 80),
+            (67, 117),
+            (163, 165),
+            (25, 60),
+            (187, 33),
+        ]
+        .into_iter()
+        .map(|(slope, offset)| AffinePermutation::new(p, slope, offset).unwrap())
+        .collect::<Vec<_>>();
+        let g = [
+            (163, 165),
+            (55, 183),
+            (167, 79),
+            (139, 41),
+            (109, 78),
+            (31, 27),
+        ]
+        .into_iter()
+        .map(|(slope, offset)| AffinePermutation::new(p, slope, offset).unwrap())
+        .collect::<Vec<_>>();
+
+        ApmCssManifestEntry::new("apm_kasai:p=192", p, 3, 12, f, g).unwrap()
+    }
+
     fn load_sparse_rows_fixture(input: &str) -> (usize, Vec<Vec<usize>>) {
         let matrix = crate::css::sparse_rows_matrix_from_json_str(input).unwrap();
         (matrix.num_cols(), matrix.rows().to_vec())
@@ -1209,6 +1237,21 @@ mod tests {
         }
     }
 
+    fn apm_p192_verifier_expectations() -> apm_verifier::ApmCssVerifierExpectations {
+        apm_verifier::ApmCssVerifierExpectations {
+            num_cols: Some(2304),
+            mx: Some(576),
+            mz: Some(576),
+            row_weight_x: Some(12),
+            row_weight_z: Some(12),
+            column_weight_x: Some(3),
+            column_weight_z: Some(3),
+            k: Some(1156),
+            orthogonal: Some(true),
+            girth_lower_bound: Some(6),
+        }
+    }
+
     #[test]
     fn apm_p96_verifier_reports_paper_stats() {
         let manifest: Value = serde_json::from_str(include_str!(
@@ -1309,6 +1352,35 @@ mod tests {
         )
         .unwrap_err();
         assert!(range_err.contains("out-of-range support"), "{range_err}");
+    }
+
+    #[test]
+    fn apm_p192_verifier_rejects_one_p96_affine_coefficient() {
+        let entry = p192_apm_manifest_entry_with_one_p96_coefficient();
+        let checks = build_apm_css_checks(&entry).unwrap();
+
+        let err = apm_verifier::verify_apm_css_matrices(
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hx",
+                num_cols: checks.num_cols,
+                rows: &checks.hx,
+            },
+            apm_verifier::ApmSparseMatrixView {
+                name: "Hz",
+                num_cols: checks.num_cols,
+                rows: &checks.hz,
+            },
+            &apm_p192_verifier_expectations(),
+        )
+        .unwrap_err();
+
+        assert!(
+            err.contains("expected orthogonal=true")
+                || err.contains("expected k=1156")
+                || err.contains("row weight")
+                || err.contains("column weight"),
+            "mutated P=192 coefficient should fail structural verifier, got: {err}"
+        );
     }
 
     #[test]

@@ -3,8 +3,8 @@ mod support;
 use std::collections::HashSet;
 
 use qec_code::codes::built_in_css::{
-    BivariateBicycleParams, BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams,
-    bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
+    BivariateBicycleParams, BuiltInCssChecks, BuiltInCssCodeSpec, BuiltInCssFamily,
+    BuiltInCssParams, bivariate_bicycle_css_checks, built_in_css_catalog, built_in_css_checks,
     parse_built_in_css_code_spec,
 };
 use qec_code::codes::steane::Steane;
@@ -459,6 +459,40 @@ fn apm_p96_expectations() -> ApmCssVerifierExpectations {
         orthogonal: Some(true),
         girth_lower_bound: Some(6),
     }
+}
+
+fn apm_p192_expectations() -> ApmCssVerifierExpectations {
+    ApmCssVerifierExpectations {
+        num_cols: Some(2304),
+        mx: Some(576),
+        mz: Some(576),
+        row_weight_x: Some(12),
+        row_weight_z: Some(12),
+        column_weight_x: Some(3),
+        column_weight_z: Some(3),
+        k: Some(1156),
+        orthogonal: Some(true),
+        girth_lower_bound: Some(6),
+    }
+}
+
+fn verify_apm_checks(
+    checks: &BuiltInCssChecks,
+    expectations: &ApmCssVerifierExpectations,
+) -> std::result::Result<ApmCssVerifierReport, String> {
+    verify_apm_css_matrices(
+        ApmSparseMatrixView {
+            name: "Hx",
+            num_cols: checks.num_cols,
+            rows: &checks.hx,
+        },
+        ApmSparseMatrixView {
+            name: "Hz",
+            num_cols: checks.num_cols,
+            rows: &checks.hz,
+        },
+        expectations,
+    )
 }
 
 fn verify_apm_p96_fixture_stats(
@@ -1108,6 +1142,7 @@ fn built_in_css_catalog_lists_supported_specs() {
             "steane",
             "bb72",
             "apm_kasai:p=96",
+            "apm_kasai:p=192",
             "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
@@ -1132,6 +1167,12 @@ fn built_in_css_catalog_lists_supported_specs() {
             .iter()
             .any(|entry| entry.spec == "apm_kasai:p=96" && entry.description.contains("P=96")),
         "apm_kasai entry should describe the fixed P=96 code: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "apm_kasai:p=192" && entry.description.contains("P=192")),
+        "apm_kasai entry should describe the fixed P=192 code: {catalog:?}"
     );
     assert!(
         catalog
@@ -1209,10 +1250,99 @@ fn apm_kasai_p96_matches_expected_checks_and_rejects_other_p_values() {
             family: "apm_kasai".to_owned(),
             parameter: "p".to_owned(),
             value: 128,
-            supported: "96".to_owned(),
-            note: "P=192 is tracked by #143".to_owned(),
+            supported: "96, 192".to_owned(),
+            note: "available Table A1 APM-CSS instances".to_owned(),
         })
     );
+}
+
+#[test]
+fn apm_p192_builds_paper_stats() {
+    let catalog = built_in_css_catalog();
+    assert!(
+        catalog.iter().any(|entry| entry.spec == "apm_kasai:p=192"),
+        "catalog should expose apm_kasai:p=192: {catalog:?}"
+    );
+
+    let checks = built_in_css_checks("apm_kasai:p=192").unwrap();
+    assert_eq!(checks.code_id, "apm_kasai:p=192");
+    assert_eq!(checks.num_cols, 2304);
+    assert_eq!(checks.hx.len(), 576);
+    assert_eq!(checks.hz.len(), 576);
+    assert_strictly_increasing_rows(&checks.hx);
+    assert_strictly_increasing_rows(&checks.hz);
+    assert_rows_in_range(&checks.hx, checks.num_cols);
+    assert_rows_in_range(&checks.hz, checks.num_cols);
+
+    let report = verify_apm_checks(&checks, &apm_p192_expectations()).unwrap();
+    assert!(report.orthogonal);
+    assert_eq!(report.num_cols, 2304);
+    assert_eq!(report.mx, 576);
+    assert_eq!(report.mz, 576);
+    assert_eq!(report.k, 1156);
+    assert_eq!(report.rank_x + report.rank_z, 1148);
+    assert_eq!(
+        report.x.row_weight,
+        WeightStats {
+            min: 12,
+            average: 12.0,
+            max: 12
+        }
+    );
+    assert_eq!(
+        report.z.row_weight,
+        WeightStats {
+            min: 12,
+            average: 12.0,
+            max: 12
+        }
+    );
+    assert_eq!(
+        report.x.column_weight,
+        WeightStats {
+            min: 3,
+            average: 3.0,
+            max: 3
+        }
+    );
+    assert_eq!(
+        report.z.column_weight,
+        WeightStats {
+            min: 3,
+            average: 3.0,
+            max: 3
+        }
+    );
+    assert!(report.x.girth.meets_lower_bound(6));
+    assert!(report.z.girth.meets_lower_bound(6));
+
+    let mutated = apm_kasai_p192_checks_with_mutated_support();
+    let err = verify_apm_checks(&mutated, &apm_p192_expectations()).unwrap_err();
+    assert!(
+        err.contains("expected orthogonal=true")
+            || err.contains("expected k=1156")
+            || err.contains("row weight")
+            || err.contains("column weight"),
+        "mutated P=192 support should fail structural verifier, got: {err}"
+    );
+
+    let unsupported = built_in_css_checks("apm_kasai:p=128").unwrap_err();
+    let message = unsupported.to_string();
+    assert!(
+        message.contains("unsupported built-in CSS integer parameter p for family apm_kasai: 128"),
+        "{message}"
+    );
+    assert!(message.contains("supported: 96, 192"), "{message}");
+}
+
+fn apm_kasai_p192_checks_with_mutated_support() -> BuiltInCssChecks {
+    let mut checks = built_in_css_checks("apm_kasai:p=192").unwrap();
+    let replacement = (0..checks.num_cols)
+        .find(|candidate| !checks.hz[0].contains(candidate))
+        .unwrap();
+    checks.hz[0][0] = replacement;
+    checks.hz[0].sort_unstable();
+    checks
 }
 
 #[test]

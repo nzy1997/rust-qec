@@ -67,6 +67,10 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
         description: "fixed Table A1 P=96 APM-CSS code",
     },
     BuiltInCssCatalogEntry {
+        spec: "apm_kasai:p=192",
+        description: "fixed Table A1 P=192 APM-CSS code",
+    },
+    BuiltInCssCatalogEntry {
         spec: "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
         description: "bivariate-bicycle CSS family over periodic lattice",
     },
@@ -289,12 +293,31 @@ fn parse_bivariate_bicycle_params(
     Ok(params)
 }
 
-const APM_KASAI_SUPPORTED_P: usize = 96;
+const APM_KASAI_SUPPORTED_P_VALUES: &str = "96, 192";
 const APM_KASAI_P96_CODE_ID: &str = "apm_kasai:p=96";
-const APM_KASAI_P96_J: u64 = 3;
-const APM_KASAI_P96_L: u64 = 12;
+const APM_KASAI_P192_CODE_ID: &str = "apm_kasai:p=192";
+const APM_KASAI_P96_P: u64 = 96;
+const APM_KASAI_P192_P: u64 = 192;
+const APM_KASAI_J: u64 = 3;
+const APM_KASAI_L: u64 = 12;
 const APM_KASAI_P96_F: &[(u64, u64)] = &[(5, 41), (85, 77), (73, 66), (1, 0), (1, 72), (37, 9)];
 const APM_KASAI_P96_G: &[(u64, u64)] = &[(61, 15), (1, 24), (89, 62), (25, 22), (85, 93), (25, 78)];
+const APM_KASAI_P192_F: &[(u64, u64)] = &[
+    (71, 127),
+    (97, 80),
+    (67, 117),
+    (163, 165),
+    (25, 60),
+    (187, 33),
+];
+const APM_KASAI_P192_G: &[(u64, u64)] = &[
+    (163, 165),
+    (55, 183),
+    (167, 79),
+    (139, 41),
+    (109, 78),
+    (31, 27),
+];
 
 fn parse_apm_kasai_params(family_name: &str, params_text: &str) -> Result<usize> {
     if params_text.is_empty() {
@@ -342,43 +365,54 @@ fn parse_apm_kasai_params(family_name: &str, params_text: &str) -> Result<usize>
 }
 
 fn apm_kasai_css_checks(p: usize) -> Result<BuiltInCssChecks> {
-    if p != APM_KASAI_SUPPORTED_P {
-        return Err(QecError::UnsupportedBuiltInCssIntegerParameter {
-            family: "apm_kasai".to_owned(),
-            parameter: "p".to_owned(),
-            value: p,
-            supported: APM_KASAI_SUPPORTED_P.to_string(),
-            note: "P=192 is tracked by #143".to_owned(),
-        });
-    }
+    let entry = match p {
+        96 => apm_kasai_manifest_entry(
+            APM_KASAI_P96_CODE_ID,
+            APM_KASAI_P96_P,
+            APM_KASAI_P96_F,
+            APM_KASAI_P96_G,
+        ),
+        192 => apm_kasai_manifest_entry(
+            APM_KASAI_P192_CODE_ID,
+            APM_KASAI_P192_P,
+            APM_KASAI_P192_F,
+            APM_KASAI_P192_G,
+        ),
+        _ => {
+            return Err(QecError::UnsupportedBuiltInCssIntegerParameter {
+                family: "apm_kasai".to_owned(),
+                parameter: "p".to_owned(),
+                value: p,
+                supported: APM_KASAI_SUPPORTED_P_VALUES.to_owned(),
+                note: "available Table A1 APM-CSS instances".to_owned(),
+            });
+        }
+    };
 
-    let entry = apm_kasai_p96_manifest_entry();
-    Ok(build_apm_css_checks(&entry).expect("pinned APM Kasai P=96 manifest must build"))
+    Ok(build_apm_css_checks(&entry).expect("pinned APM Kasai manifest must build"))
 }
 
-fn apm_kasai_p96_manifest_entry() -> ApmCssManifestEntry {
+fn apm_kasai_manifest_entry(
+    code_id: &'static str,
+    p: u64,
+    f_params: &[(u64, u64)],
+    g_params: &[(u64, u64)],
+) -> ApmCssManifestEntry {
     let affine = |slope, offset| {
-        AffinePermutation::new(APM_KASAI_SUPPORTED_P as u64, slope, offset)
-            .expect("pinned APM Kasai P=96 affine maps must be permutations")
+        AffinePermutation::new(p, slope, offset)
+            .expect("pinned APM Kasai affine maps must be permutations")
     };
-    let f = APM_KASAI_P96_F
+    let f = f_params
         .iter()
         .map(|&(slope, offset)| affine(slope, offset))
         .collect();
-    let g = APM_KASAI_P96_G
+    let g = g_params
         .iter()
         .map(|&(slope, offset)| affine(slope, offset))
         .collect();
 
-    ApmCssManifestEntry::new(
-        APM_KASAI_P96_CODE_ID,
-        APM_KASAI_SUPPORTED_P as u64,
-        APM_KASAI_P96_J,
-        APM_KASAI_P96_L,
-        f,
-        g,
-    )
-    .expect("pinned APM Kasai P=96 manifest must satisfy invariants")
+    ApmCssManifestEntry::new(code_id, p, APM_KASAI_J, APM_KASAI_L, f, g)
+        .expect("pinned APM Kasai manifest must satisfy invariants")
 }
 
 fn parse_unique_positive_usize_param(
