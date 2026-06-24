@@ -374,13 +374,50 @@ fn svg_renderer_draws_noise_boxes() {
             "SVG missing compact noise label {label}: {svg}"
         );
     }
-    assert!(
-        svg.contains("p=0.1"),
-        "noise parameter note should remain visible for X_ERROR: {svg}"
-    );
+    for note in ["p=0.1", "p=0.2", "p=0.3", "p=0.4", "p=0.5"] {
+        assert!(
+            svg.contains(note),
+            "noise parameter note should remain visible for {note}: {svg}"
+        );
+    }
     assert!(
         svg.matches("class=\"noise-box\"").count() >= 6,
         "known noise should render as compact per-target or paired boxes: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_falls_back_for_unknown_noise_gates() {
+    let doc = Qp101Document {
+        standard: "QP101-ZY".to_string(),
+        version: "1.0".to_string(),
+        num_qubits: 1,
+        operations: vec![Qp101Operation::Noise {
+            gate: "PAULI_CHANNEL_1".to_string(),
+            params: vec![0.4, 0.5],
+            raw_targets: vec![Qp101TargetRef::Qubit {
+                index: 0,
+                inverted: None,
+            }],
+            annotations: Vec::new(),
+        }],
+        metadata: None,
+        extensions: None,
+    };
+
+    let svg = render_svg(&doc).expect("unsupported noise gates should still render");
+
+    assert!(
+        svg.contains(">PAULI_CHANNEL_1</text>"),
+        "generic fallback should keep the canonical noise gate label visible: {svg}"
+    );
+    assert!(
+        svg.contains("p=0.4, 0.5"),
+        "generic fallback should keep the parameter text visible: {svg}"
+    );
+    assert!(
+        svg.contains("class=\"gate-box\""),
+        "generic fallback should use the generic gate box styling: {svg}"
     );
 }
 
