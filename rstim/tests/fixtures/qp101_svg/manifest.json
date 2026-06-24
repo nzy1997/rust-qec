@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "basic_wires_gates_tick",
+      "provenance": "Small rstim Stim fixture created for issue #165 to cover wires, H/CX gates, tick separators, and measurement labels.",
+      "source_kind": "stim",
+      "input_path": "basic_wires_gates_tick.stim",
+      "expected_semantic_markers": [
+        { "kind": "qubit_label", "value": "q0" },
+        { "kind": "qubit_label", "value": "q1" },
+        { "kind": "operation_label", "value": "H" },
+        { "kind": "operation_label", "value": "CX" },
+        { "kind": "tick", "value": "tick" }
+      ]
+    },
+    {
+      "id": "measurement_detector_source",
+      "provenance": "Small rstim Stim fixture created for issue #165 to cover measurement anchors and detector rec[-1] source resolution.",
+      "source_kind": "stim",
+      "input_path": "measurement_detector_source.stim",
+      "expected_semantic_markers": [
+        { "kind": "operation_label", "value": "M" },
+        { "kind": "measurement_anchor", "value": "m1" },
+        { "kind": "detector_label", "value": "D0" },
+        { "kind": "detector_source", "value": "rec[-1]" }
+      ]
+    },
+    {
+      "id": "observable_include_source",
+      "provenance": "Small rstim Stim fixture created for issue #165 to cover observable include labels and rec[-1] source rendering.",
+      "source_kind": "stim",
+      "input_path": "observable_include_source.stim",
+      "expected_semantic_markers": [
+        { "kind": "operation_label", "value": "M" },
+        { "kind": "observable_label", "value": "L0" },
+        { "kind": "observable_source", "value": "rec[-1]" }
+      ]
+    },
+    {
+      "id": "repeat_repeated_measurements",
+      "provenance": "Small rstim Stim fixture created for issue #165 to cover repeat group labels and measurements inside repeated bodies.",
+      "source_kind": "stim",
+      "input_path": "repeat_repeated_measurements.stim",
+      "expected_semantic_markers": [
+        { "kind": "repeat_label", "value": "repeat x3" },
+        { "kind": "operation_label", "value": "M" },
+        { "kind": "measurement_anchor", "value": "m1" }
+      ]
+    },
+    {
+      "id": "noise_operation_rendering",
+      "provenance": "Reuses qp101-viz/checks/noise-render.qp101.json, the existing Typst renderer noise-operation check.",
+      "source_kind": "qp101_json",
+      "input_path": "../../../../qp101-viz/checks/noise-render.qp101.json",
+      "expected_semantic_markers": [
+        { "kind": "noise_label", "value": "X_ERROR" },
+        { "kind": "noise_label", "value": "DEPOLARIZE1" },
+        { "kind": "noise_label", "value": "DEPOLARIZE2" }
+      ]
+    },
+    {
+      "id": "sample_shot_overlay",
+      "provenance": "Reuses rstim/tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json, the seeded sample-shot QP101 fixture already verified by qp101_fixtures.",
+      "source_kind": "qp101_json",
+      "input_path": "../qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json",
+      "expected_semantic_markers": [
+        { "kind": "annotation_tag", "value": "sample-shot" },
+        { "kind": "annotation_tag", "value": "measurement-sample" },
+        { "kind": "annotation_tag", "value": "noise-sample" }
+      ]
+    }
+  ]
+}
