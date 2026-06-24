@@ -18,6 +18,7 @@ const REPEAT_GROUP_X_PAD: i32 = 4;
 const REPEAT_GROUP_LABEL_X_PAD: i32 = 8;
 const REPEAT_GROUP_LABEL_DEPTH_STAGGER: i32 = 16;
 const REPEAT_GROUP_LABEL_GATE_GAP: i32 = 4;
+const REPEAT_LABEL_TOP_RESERVE: i32 = 16;
 const REPEAT_ANNOTATION_LINE_OFFSET: usize = 1;
 
 #[derive(Debug, Clone)]
@@ -78,7 +79,8 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
 
     let visible_columns = count_visible_columns(&doc.operations).max(1);
     let width = LEFT_MARGIN + RIGHT_MARGIN + (visible_columns as i32 + 1) * COLUMN_GAP;
-    let height = svg_height(doc)?;
+    let top_reserve = repeat_label_top_reserve(&doc.operations);
+    let height = svg_height(doc)? + top_reserve;
     let mut out = String::new();
 
     out.push_str(&format!(
@@ -97,12 +99,31 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
         &mut column,
         &mut state,
     )?;
+    if top_reserve > 0 {
+        out.push_str(&format!(
+            "<g class=\"qp101-content\" transform=\"translate(0 {top_reserve})\">\n"
+        ));
+    }
     render_repeat_backgrounds(&mut out, &state.repeat_groups, doc.num_qubits);
     render_wires(&mut out, doc.num_qubits, width);
     out.push_str(&operation_out);
-    render_repeat_labels(&mut out, &state.repeat_groups, doc.num_qubits);
+    if top_reserve > 0 {
+        out.push_str("</g>\n");
+    }
+    render_repeat_labels(&mut out, &state.repeat_groups, doc.num_qubits, top_reserve);
     out.push_str("</g>\n</svg>\n");
     Ok(out)
+}
+
+fn repeat_label_top_reserve(ops: &[Qp101Operation]) -> i32 {
+    if ops
+        .iter()
+        .any(|op| matches!(op, Qp101Operation::Repeat { .. }))
+    {
+        REPEAT_LABEL_TOP_RESERVE
+    } else {
+        0
+    }
 }
 
 fn count_visible_columns(ops: &[Qp101Operation]) -> usize {
@@ -1093,10 +1114,15 @@ fn render_repeat_backgrounds(out: &mut String, groups: &[RepeatGroupSpan], num_q
     }
 }
 
-fn render_repeat_labels(out: &mut String, groups: &[RepeatGroupSpan], num_qubits: usize) {
+fn render_repeat_labels(
+    out: &mut String,
+    groups: &[RepeatGroupSpan],
+    num_qubits: usize,
+    content_y_offset: i32,
+) {
     for group in groups.iter().rev() {
         render_repeat_group_label(out, group);
-        render_repeat_iteration_labels(out, group, num_qubits);
+        render_repeat_iteration_labels(out, group, num_qubits, content_y_offset);
     }
 }
 
@@ -1167,12 +1193,17 @@ fn render_repeat_iteration_boundary_lines(
     }
 }
 
-fn render_repeat_iteration_labels(out: &mut String, group: &RepeatGroupSpan, num_qubits: usize) {
+fn render_repeat_iteration_labels(
+    out: &mut String,
+    group: &RepeatGroupSpan,
+    num_qubits: usize,
+    content_y_offset: i32,
+) {
     for (iteration_offset, &start_column) in group.iteration_starts.iter().enumerate().skip(1) {
         let x = x_for_column(start_column) - COLUMN_GAP / 2;
         out.push_str(&format!(
             "<text class=\"repeat-iteration-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">iter {}</text>\n",
-            repeat_iteration_label_y(num_qubits),
+            repeat_iteration_label_y(num_qubits) + content_y_offset,
             iteration_offset + 1
         ));
     }

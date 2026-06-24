@@ -1011,6 +1011,33 @@ fn svg_renderer_separates_compact_repeat_labels() {
 }
 
 #[test]
+fn svg_renderer_reserves_top_row_for_repeat_label_next_to_body_top_notes() {
+    let instrs =
+        parse_lines("R 0\nREPEAT 2 {\n  TICK\n}\n").expect("repeat tick fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat tick fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat tick fixture should render");
+
+    let content_y_offset =
+        content_translate_y(&svg).expect("repeat SVG should reserve a translated content row");
+    let repeat_label_y = text_y(&svg, "repeat x2").expect("repeat label should be positioned");
+    let tick_y =
+        text_y(&svg, "tick").expect("body tick label should be positioned") + content_y_offset;
+    assert!(
+        repeat_label_y + 8 <= tick_y,
+        "repeat label should use a reserved row above translated body top notes: {svg}"
+    );
+    assert!(
+        svg.find(">tick</text>")
+            .expect("body tick label should be present")
+            < svg
+                .find(">repeat x2</text>")
+                .expect("repeat label should be present"),
+        "repeat labels should still paint above body top notes after row separation: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_draws_nested_repeat_groups_and_preserves_measurement_order() {
     let instrs = parse_lines("REPEAT 2 {\n  REPEAT 3 {\n    M 0\n    DETECTOR rec[-1]\n  }\n}\n")
         .expect("nested repeat fixture should parse");
@@ -1260,6 +1287,16 @@ fn first_element_attr_i32(svg: &str, start: &str, name: &str) -> Option<i32> {
     let element_start = svg.find(start)?;
     let element_end = svg[element_start..].find('>')?;
     svg_attr_i32(&svg[element_start..element_start + element_end], name)
+}
+
+fn content_translate_y(svg: &str) -> Option<i32> {
+    let group_start = svg.find("<g class=\"qp101-content\"")?;
+    let group_end = svg[group_start..].find('>')?;
+    let attrs = &svg[group_start..group_start + group_end];
+    let value_start = attrs.find("transform=\"translate(0 ")? + "transform=\"translate(0 ".len();
+    let value = &attrs[value_start..];
+    let value_end = value.find(')')?;
+    value[..value_end].parse().ok()
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {
