@@ -901,6 +901,52 @@ fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
 }
 
 #[test]
+fn svg_renderer_draws_repeat_groups_and_iteration_boundaries() {
+    let instrs = parse_lines(
+        "REPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n",
+    )
+    .expect("repeat group fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat group fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat group fixture should render");
+
+    for marker in [
+        "class=\"repeat-group\"",
+        ">repeat x2</text>",
+        "class=\"repeat-iteration-boundary\"",
+        ">iter 2</text>",
+        ">m1</text>",
+        ">m2</text>",
+        ">D0 = m1</text>",
+        ">D1 = m2</text>",
+    ] {
+        assert!(
+            svg.contains(marker),
+            "repeat SVG should contain {marker}: {svg}"
+        );
+    }
+    assert_eq!(
+        svg.matches(">m1</text>").count(),
+        1,
+        "first repeat iteration should contain exactly one m1 anchor: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">m2</text>").count(),
+        1,
+        "second repeat iteration should continue to m2 instead of resetting to m1: {svg}"
+    );
+    assert!(
+        !svg.contains(">D1 = m1</text>"),
+        "second detector source must not resolve to the first iteration anchor: {svg}"
+    );
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2</text>").expect("m2 should be present"),
+        "measurement anchors should appear in expanded repeat order: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
     let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
         .expect("repeat measurement anchor fixture should parse");
