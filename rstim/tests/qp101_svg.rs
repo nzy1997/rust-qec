@@ -1020,6 +1020,28 @@ fn svg_renderer_draws_nested_repeat_groups_and_preserves_measurement_order() {
 }
 
 #[test]
+fn svg_renderer_keeps_deep_nested_repeat_labels_inside_group_bounds() {
+    let instrs =
+        parse_lines("REPEAT 2 {\n  REPEAT 2 {\n    REPEAT 2 {\n      M 0\n    }\n  }\n}\n")
+            .expect("deep nested repeat fixture should parse");
+    let doc = export_qp101(&instrs).expect("deep nested repeat fixture should export");
+
+    let svg = render_svg(&doc).expect("deep nested repeat fixture should render");
+    let label_bounds = repeat_group_label_bounds(&svg);
+
+    assert!(
+        !label_bounds.is_empty(),
+        "deep nested repeat fixture should render repeat group labels: {svg}"
+    );
+    for (rect_left, rect_right, label_x) in label_bounds {
+        assert!(
+            label_x >= rect_left && label_x <= rect_right,
+            "repeat label x={label_x} should stay inside its own group bounds {rect_left}..={rect_right}: {svg}"
+        );
+    }
+}
+
+#[test]
 fn svg_renderer_assigns_measurement_anchors_in_expanded_repeat_order() {
     let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
         .expect("repeat measurement anchor fixture should parse");
@@ -1111,6 +1133,46 @@ fn text_positions(svg: &str, content: &str) -> Vec<(i32, i32)> {
         search_start = text_end + needle.len();
     }
     positions
+}
+
+fn repeat_group_label_bounds(svg: &str) -> Vec<(i32, i32, i32)> {
+    let mut bounds = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(relative_rect_start) = svg[search_start..].find("<rect class=\"repeat-group\"") {
+        let rect_start = search_start + relative_rect_start;
+        let Some(rect_end) = svg[rect_start..].find("/>") else {
+            break;
+        };
+        let rect_attrs = &svg[rect_start..rect_start + rect_end];
+        let Some(label_start_relative) =
+            svg[rect_start + rect_end..].find("<text class=\"repeat-group-label\"")
+        else {
+            break;
+        };
+        let label_start = rect_start + rect_end + label_start_relative;
+        let Some(label_end) = svg[label_start..].find("</text>") else {
+            break;
+        };
+        let label_attrs = &svg[label_start..label_start + label_end];
+
+        if let (Some(rect_x), Some(rect_width), Some(label_x)) = (
+            svg_attr_i32(rect_attrs, "x"),
+            svg_attr_i32(rect_attrs, "width"),
+            svg_attr_i32(label_attrs, "x"),
+        ) {
+            bounds.push((rect_x, rect_x + rect_width, label_x));
+        }
+        search_start = label_start + label_end;
+    }
+    bounds
+}
+
+fn svg_attr_i32(attrs: &str, name: &str) -> Option<i32> {
+    let needle = format!("{name}=\"");
+    let value_start = attrs.find(&needle)? + needle.len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].parse().ok()
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {

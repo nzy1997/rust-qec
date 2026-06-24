@@ -15,6 +15,8 @@ const BELOW_GATE_TEXT_BOTTOM_PAD: i32 = 4;
 const REPEAT_GROUP_TOP_PAD: i32 = 8;
 const REPEAT_GROUP_BOTTOM_PAD: i32 = 8;
 const REPEAT_GROUP_X_PAD: i32 = 4;
+const REPEAT_GROUP_LABEL_X_PAD: i32 = 8;
+const REPEAT_GROUP_LABEL_DEPTH_STAGGER: i32 = 16;
 
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
@@ -1097,10 +1099,17 @@ fn render_repeat_group(out: &mut String, group: &RepeatGroupSpan, num_qubits: us
     ));
     out.push_str(&format!(
         "<text class=\"repeat-group-label\" x=\"{}\" y=\"{}\" fill=\"#475467\" text-anchor=\"start\" font-size=\"12\">repeat x{}</text>\n",
-        left + 8 + group.depth as i32 * COLUMN_GAP,
+        repeat_group_label_x(left, right, group.depth),
         top + 13,
         group.count
     ));
+}
+
+fn repeat_group_label_x(left: i32, right: i32, depth: usize) -> i32 {
+    let min_x = left + REPEAT_GROUP_LABEL_X_PAD;
+    let max_x = (right - REPEAT_GROUP_LABEL_X_PAD).max(min_x);
+    let desired_x = min_x + depth as i32 * REPEAT_GROUP_LABEL_DEPTH_STAGGER;
+    desired_x.min(max_x)
 }
 
 fn render_repeat_iteration_boundaries(
