@@ -8,7 +8,8 @@ use qec_code::codes::built_in_css::{
     BuiltInCssFamily, BuiltInCssParams,
 };
 use qec_code::codes::quantum_tanner::{
-    quantum_tanner_spec_from_json_str, QuantumTannerConstructionMode,
+    quantum_tanner_spec_from_json_str, validate_quantum_tanner_group_table, ExplicitFiniteGroup,
+    QuantumTannerConstructionMode, QuantumTannerLocalCodes, QuantumTannerSpec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
@@ -1583,6 +1584,156 @@ fn documented_face_count(
         }
     }
     faces.len()
+}
+
+fn quantum_tanner_group_table_validator_spec(
+    order: usize,
+    identity: usize,
+    multiplication_table: Vec<Vec<usize>>,
+    a_generator_indices: Vec<usize>,
+    b_generator_indices: Vec<usize>,
+) -> QuantumTannerSpec {
+    let a_width = a_generator_indices.len();
+    let b_width = b_generator_indices.len();
+    QuantumTannerSpec {
+        construction_mode: QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1,
+        base_group: ExplicitFiniteGroup {
+            name: None,
+            element_order: None,
+            order,
+            identity,
+            multiplication_table,
+        },
+        a_generator_indices,
+        b_generator_indices,
+        local_codes: QuantumTannerLocalCodes {
+            matrix_role: "parity_check".to_owned(),
+            field: "GF(2)".to_owned(),
+            h_a: vec![vec![1; a_width]],
+            h_b: vec![vec![1; b_width]],
+        },
+    }
+}
+
+fn z2xz2_group_table() -> Vec<Vec<usize>> {
+    vec![
+        vec![0, 1, 2, 3],
+        vec![1, 0, 3, 2],
+        vec![2, 3, 0, 1],
+        vec![3, 2, 1, 0],
+    ]
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_accepts_z2xz2_and_safe_accessors() {
+    let spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![1, 2], vec![3]);
+
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+
+    assert_eq!(group.order(), 4);
+    assert_eq!(group.identity(), 0);
+    assert_eq!(group.multiply(1, 2).unwrap(), 3);
+    assert_eq!(group.multiply(2, 1).unwrap(), 3);
+    assert_eq!(group.multiply(3, 3).unwrap(), 0);
+    assert_eq!(group.inv(0).unwrap(), 0);
+    assert_eq!(group.inv(1).unwrap(), 1);
+    assert_eq!(group.inv(2).unwrap(), 2);
+    assert_eq!(group.inv(3).unwrap(), 3);
+    assert_eq!(group.a_generators(), &[1, 2]);
+    assert_eq!(group.b_generators(), &[3]);
+    assert_eq!(group.a_generator(0), Some(1));
+    assert_eq!(group.a_generator(1), Some(2));
+    assert_eq!(group.a_generator(2), None);
+    assert_eq!(group.b_generator(0), Some(3));
+    assert_eq!(group.b_generator(1), None);
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_accepts_toric_d4_catalog_fixture() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+
+    assert_eq!(group.order(), 16);
+    assert_eq!(group.identity(), 0);
+    assert_eq!(group.multiply(4, 12).unwrap(), 0);
+    assert_eq!(group.multiply(12, 4).unwrap(), 0);
+    assert_eq!(group.inv(4).unwrap(), 12);
+    assert_eq!(group.inv(12).unwrap(), 4);
+    assert_eq!(group.multiply(1, 3).unwrap(), 0);
+    assert_eq!(group.inv(1).unwrap(), 3);
+    assert_eq!(group.inv(3).unwrap(), 1);
+    assert_eq!(group.a_generator(0), Some(4));
+    assert_eq!(group.a_generator(1), Some(12));
+    assert_eq!(group.b_generator(0), Some(1));
+    assert_eq!(group.b_generator(1), Some(3));
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_rejects_square_in_range_non_associative_table() {
+    let non_associative_table = vec![
+        vec![0, 1, 2, 3],
+        vec![1, 0, 2, 3],
+        vec![2, 3, 0, 1],
+        vec![3, 2, 1, 0],
+    ];
+    let spec =
+        quantum_tanner_group_table_validator_spec(4, 0, non_associative_table, vec![1], vec![2]);
+
+    let error = validate_quantum_tanner_group_table(&spec).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("associativity failed for (1, 2, 2)"),
+        "expected the square in-range negative control to fail associativity, got {reason:?}"
+    );
+}
+
+#[test]
+fn quantum_tanner_group_table_validator_rejects_out_of_range_generators_and_elements() {
+    let bad_generator_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![4], vec![1]);
+
+    let error = validate_quantum_tanner_group_table(&bad_generator_spec).unwrap_err();
+    assert!(matches!(
+        error,
+        QecError::InvalidQuantumTannerGeneratorIndex {
+            set: "A",
+            index: 0,
+            element: 4,
+            order: 4
+        }
+    ));
+
+    let valid_spec =
+        quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![1], vec![2]);
+    let group = validate_quantum_tanner_group_table(&valid_spec).unwrap();
+
+    assert!(matches!(
+        group.multiply(4, 0).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
+    assert!(matches!(
+        group.multiply(0, 4).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
+    assert!(matches!(
+        group.inv(4).unwrap_err(),
+        QecError::InvalidQuantumTannerGroupElement {
+            element: 4,
+            order: 4
+        }
+    ));
 }
 
 #[test]

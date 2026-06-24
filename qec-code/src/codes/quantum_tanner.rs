@@ -43,6 +43,94 @@ pub struct QuantumTannerLocalCodes {
     pub h_b: Vec<Vec<u8>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatedFiniteGroup {
+    identity: usize,
+    multiplication_table: Vec<Vec<usize>>,
+    inverse_table: Vec<usize>,
+    a_generators: Vec<usize>,
+    b_generators: Vec<usize>,
+}
+
+impl ValidatedFiniteGroup {
+    pub fn order(&self) -> usize {
+        self.multiplication_table.len()
+    }
+
+    pub fn identity(&self) -> usize {
+        self.identity
+    }
+
+    pub fn multiply(&self, left: usize, right: usize) -> Result<usize> {
+        self.validate_element(left)?;
+        self.validate_element(right)?;
+        Ok(self.multiplication_table[left][right])
+    }
+
+    pub fn inv(&self, element: usize) -> Result<usize> {
+        self.validate_element(element)?;
+        Ok(self.inverse_table[element])
+    }
+
+    pub fn a_generators(&self) -> &[usize] {
+        &self.a_generators
+    }
+
+    pub fn b_generators(&self) -> &[usize] {
+        &self.b_generators
+    }
+
+    pub fn a_generator(&self, index: usize) -> Option<usize> {
+        self.a_generators.get(index).copied()
+    }
+
+    pub fn b_generator(&self, index: usize) -> Option<usize> {
+        self.b_generators.get(index).copied()
+    }
+
+    fn validate_element(&self, element: usize) -> Result<()> {
+        let order = self.order();
+        if element < order {
+            Ok(())
+        } else {
+            Err(QecError::InvalidQuantumTannerGroupElement { element, order })
+        }
+    }
+}
+
+/// Validate the explicit finite group data used by quantum Tanner construction.
+///
+/// The group-side expectations mirror qLDPC's `CayleyComplex` vocabulary in
+/// `drafts/qLDPC/src/qldpc/objects.py`; later `QTCode` consumption follows
+/// `drafts/qLDPC/src/qldpc/codes/quantum.py`.
+pub fn validate_quantum_tanner_group_table(
+    spec: &QuantumTannerSpec,
+) -> Result<ValidatedFiniteGroup> {
+    let group = &spec.base_group;
+    validate_group_table_shape(group.order, group.identity, &group.multiplication_table)?;
+    let identity = find_unique_table_identity(group.order, &group.multiplication_table)?;
+    if identity != group.identity {
+        return Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: format!(
+                "declared identity {} does not match table identity {identity}",
+                group.identity
+            ),
+        });
+    }
+    let inverse_table = build_inverse_table(&group.multiplication_table, identity)?;
+    validate_associativity(&group.multiplication_table)?;
+    validate_generator_indices("A", &spec.a_generator_indices, group.order)?;
+    validate_generator_indices("B", &spec.b_generator_indices, group.order)?;
+
+    Ok(ValidatedFiniteGroup {
+        identity,
+        multiplication_table: group.multiplication_table.clone(),
+        inverse_table,
+        a_generators: spec.a_generator_indices.clone(),
+        b_generators: spec.b_generator_indices.clone(),
+    })
+}
+
 #[derive(Debug, Deserialize)]
 struct QuantumTannerSpecJson {
     construction_mode: String,
@@ -117,37 +205,11 @@ fn parse_construction_mode(input: &str) -> Result<QuantumTannerConstructionMode>
 }
 
 fn validate_group_table(order: usize, identity: usize, table: &[Vec<usize>]) -> Result<()> {
-    if order == 0 {
-        return Err(QecError::InvalidQuantumTannerGroupTable {
-            reason: "order must be positive".to_owned(),
-        });
-    }
+    validate_group_table_shape(order, identity, table)?;
     if identity != 0 {
         return Err(QecError::InvalidQuantumTannerGroupTable {
             reason: format!("identity must be 0 in v1, got {identity}"),
         });
-    }
-    if table.len() != order {
-        return Err(QecError::InvalidQuantumTannerGroupTable {
-            reason: format!("expected {order} rows, got {}", table.len()),
-        });
-    }
-
-    for (row_index, row) in table.iter().enumerate() {
-        if row.len() != order {
-            return Err(QecError::InvalidQuantumTannerGroupTable {
-                reason: format!("row {row_index} has width {}, expected {order}", row.len()),
-            });
-        }
-        for (col_index, &entry) in row.iter().enumerate() {
-            if entry >= order {
-                return Err(QecError::InvalidQuantumTannerGroupTable {
-                    reason: format!(
-                        "entry at row {row_index}, column {col_index} is {entry}, expected < {order}"
-                    ),
-                });
-            }
-        }
     }
 
     Ok(())
@@ -183,6 +245,127 @@ fn parse_local_codes(
         h_a: local_codes.h_a,
         h_b: local_codes.h_b,
     })
+}
+
+fn validate_group_table_shape(order: usize, identity: usize, table: &[Vec<usize>]) -> Result<()> {
+    if order == 0 {
+        return Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: "order must be positive".to_owned(),
+        });
+    }
+    if identity >= order {
+        return Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: format!("identity {identity} is out of range for order {order}"),
+        });
+    }
+    if table.len() != order {
+        return Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: format!("expected {order} rows, got {}", table.len()),
+        });
+    }
+
+    for (row_index, row) in table.iter().enumerate() {
+        if row.len() != order {
+            return Err(QecError::InvalidQuantumTannerGroupTable {
+                reason: format!("row {row_index} has width {}, expected {order}", row.len()),
+            });
+        }
+        for (col_index, &entry) in row.iter().enumerate() {
+            if entry >= order {
+                return Err(QecError::InvalidQuantumTannerGroupTable {
+                    reason: format!(
+                        "entry at row {row_index}, column {col_index} is {entry}, expected < {order}"
+                    ),
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn find_unique_table_identity(order: usize, table: &[Vec<usize>]) -> Result<usize> {
+    let candidates = (0..order)
+        .filter(|&candidate| {
+            (0..order).all(|element| {
+                table[candidate][element] == element && table[element][candidate] == element
+            })
+        })
+        .collect::<Vec<_>>();
+
+    match candidates.as_slice() {
+        [identity] => Ok(*identity),
+        [] => Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: "expected exactly one two-sided identity, found none".to_owned(),
+        }),
+        many => Err(QecError::InvalidQuantumTannerGroupTable {
+            reason: format!("expected exactly one two-sided identity, found {many:?}"),
+        }),
+    }
+}
+
+fn build_inverse_table(table: &[Vec<usize>], identity: usize) -> Result<Vec<usize>> {
+    let order = table.len();
+    let mut inverse_table = Vec::with_capacity(order);
+    for element in 0..order {
+        let candidates = (0..order)
+            .filter(|&candidate| {
+                table[element][candidate] == identity && table[candidate][element] == identity
+            })
+            .collect::<Vec<_>>();
+        match candidates.as_slice() {
+            [inverse] => inverse_table.push(*inverse),
+            [] => {
+                return Err(QecError::InvalidQuantumTannerGroupTable {
+                    reason: format!(
+                        "element {element} has no two-sided inverse under identity {identity}"
+                    ),
+                });
+            }
+            many => {
+                return Err(QecError::InvalidQuantumTannerGroupTable {
+                    reason: format!(
+                        "element {element} has multiple two-sided inverses under identity {identity}: {many:?}"
+                    ),
+                });
+            }
+        }
+    }
+    Ok(inverse_table)
+}
+
+fn validate_associativity(table: &[Vec<usize>]) -> Result<()> {
+    let order = table.len();
+    for a in 0..order {
+        for b in 0..order {
+            for c in 0..order {
+                let left = table[table[a][b]][c];
+                let right = table[a][table[b][c]];
+                if left != right {
+                    return Err(QecError::InvalidQuantumTannerGroupTable {
+                        reason: format!(
+                            "associativity failed for ({a}, {b}, {c}): ({a} * {b}) * {c} = {left}, but {a} * ({b} * {c}) = {right}"
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_generator_indices(set: &'static str, generators: &[usize], order: usize) -> Result<()> {
+    for (index, &element) in generators.iter().enumerate() {
+        if element >= order {
+            return Err(QecError::InvalidQuantumTannerGeneratorIndex {
+                set,
+                index,
+                element,
+                order,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_binary_matrix_width(

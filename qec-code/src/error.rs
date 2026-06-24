@@ -39,6 +39,17 @@ pub enum QecError {
         matrix: &'static str,
         reason: String,
     },
+    #[error(
+        "invalid quantum Tanner generator {set}[{index}]: element {element} is out of range for group order {order}"
+    )]
+    InvalidQuantumTannerGeneratorIndex {
+        set: &'static str,
+        index: usize,
+        element: usize,
+        order: usize,
+    },
+    #[error("invalid quantum Tanner group element {element}: expected < {order}")]
+    InvalidQuantumTannerGroupElement { element: usize, order: usize },
     #[error("JSON output is required for {command}")]
     JsonOutputRequired { command: &'static str },
     #[error("invalid CSS distance input: {0}")]
