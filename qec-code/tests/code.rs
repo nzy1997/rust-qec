@@ -1697,6 +1697,67 @@ fn quantum_tanner_group_table_validator_rejects_square_in_range_non_associative_
 }
 
 #[test]
+fn quantum_tanner_group_table_validator_rejects_identity_and_inverse_contract_errors() {
+    let declared_identity_mismatch =
+        quantum_tanner_group_table_validator_spec(4, 1, z2xz2_group_table(), vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&declared_identity_mismatch).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("declared identity 1 does not match table identity 0"),
+        "got {reason:?}"
+    );
+
+    let identity_out_of_range =
+        quantum_tanner_group_table_validator_spec(4, 4, z2xz2_group_table(), vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&identity_out_of_range).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("identity 4 is out of range for order 4"),
+        "got {reason:?}"
+    );
+
+    let no_identity_table = vec![vec![1, 1], vec![1, 1]];
+    let no_identity =
+        quantum_tanner_group_table_validator_spec(2, 0, no_identity_table, vec![1], vec![1]);
+    let error = validate_quantum_tanner_group_table(&no_identity).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("expected exactly one two-sided identity, found none"),
+        "got {reason:?}"
+    );
+
+    let no_inverse_table = vec![vec![0, 1], vec![1, 1]];
+    let no_inverse =
+        quantum_tanner_group_table_validator_spec(2, 0, no_inverse_table, vec![1], vec![1]);
+    let error = validate_quantum_tanner_group_table(&no_inverse).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("element 1 has no two-sided inverse under identity 0"),
+        "got {reason:?}"
+    );
+
+    let multiple_inverse_table = vec![vec![0, 1, 2], vec![1, 0, 0], vec![2, 0, 0]];
+    let multiple_inverses =
+        quantum_tanner_group_table_validator_spec(3, 0, multiple_inverse_table, vec![1], vec![2]);
+    let error = validate_quantum_tanner_group_table(&multiple_inverses).unwrap_err();
+    let QecError::InvalidQuantumTannerGroupTable { reason } = error else {
+        panic!("expected group-table validation error, got {error:?}");
+    };
+    assert!(
+        reason.contains("element 1 has multiple two-sided inverses under identity 0: [1, 2]"),
+        "got {reason:?}"
+    );
+}
+
+#[test]
 fn quantum_tanner_group_table_validator_rejects_out_of_range_generators_and_elements() {
     let bad_generator_spec =
         quantum_tanner_group_table_validator_spec(4, 0, z2xz2_group_table(), vec![4], vec![1]);
