@@ -9,6 +9,7 @@ const COLUMN_GAP: i32 = 72;
 const GATE_WIDTH: i32 = 38;
 const GATE_HEIGHT: i32 = 28;
 const ANNOTATION_LINE_GAP: i32 = 12;
+const BELOW_GATE_TEXT_BOTTOM_PAD: i32 = 4;
 
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
@@ -43,7 +44,7 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
 
     let visible_columns = count_visible_columns(&doc.operations).max(1);
     let width = LEFT_MARGIN + RIGHT_MARGIN + (visible_columns as i32 + 1) * COLUMN_GAP;
-    let height = TOP_MARGIN + BOTTOM_MARGIN + (doc.num_qubits.saturating_sub(1) as i32) * LANE_GAP;
+    let height = svg_height(doc)?;
     let mut out = String::new();
 
     out.push_str(&format!(
@@ -74,6 +75,125 @@ fn count_visible_columns(ops: &[Qp101Operation]) -> usize {
             _ => 1,
         })
         .sum()
+}
+
+fn svg_height(doc: &Qp101Document) -> Result<i32, String> {
+    let base_height = base_svg_height(doc.num_qubits);
+    let Some(max_text_baseline) =
+        max_rendered_below_gate_text_baseline(&doc.operations, doc.num_qubits)?
+    else {
+        return Ok(base_height);
+    };
+
+    Ok(base_height.max(max_text_baseline + BELOW_GATE_TEXT_BOTTOM_PAD))
+}
+
+fn base_svg_height(num_qubits: usize) -> i32 {
+    TOP_MARGIN + BOTTOM_MARGIN + (num_qubits.saturating_sub(1) as i32) * LANE_GAP
+}
+
+fn max_rendered_below_gate_text_baseline(
+    ops: &[Qp101Operation],
+    num_qubits: usize,
+) -> Result<Option<i32>, String> {
+    let mut max_baseline = None;
+    for op in ops {
+        match op {
+            Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
+            Qp101Operation::Tick { annotations } => {
+                update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
+            }
+            Qp101Operation::Gate {
+                gate,
+                targets,
+                controls,
+                raw_targets,
+                annotations,
+                ..
+            } => {
+                let lanes = if let Some(raw_targets) = raw_targets {
+                    raw_target_lanes(raw_targets, num_qubits, gate)?
+                } else {
+                    gate_lanes(targets, controls, num_qubits, gate)?
+                };
+                let measurement_lanes = measurement_lanes(gate, targets, num_qubits)?;
+                for lane in &measurement_lanes {
+                    update_max_baseline(&mut max_baseline, below_gate_text_y(*lane));
+                }
+                update_max_baseline_from_annotations(
+                    &mut max_baseline,
+                    &lanes,
+                    annotations,
+                    usize::from(!measurement_lanes.is_empty()),
+                );
+            }
+            Qp101Operation::Noise {
+                gate,
+                raw_targets,
+                annotations,
+                ..
+            } => {
+                let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
+                update_max_baseline_from_annotations(&mut max_baseline, &lanes, annotations, 0);
+            }
+            Qp101Operation::Repeat {
+                body, annotations, ..
+            } => {
+                update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
+                if let Some(body_baseline) =
+                    max_rendered_below_gate_text_baseline(body, num_qubits)?
+                {
+                    update_max_baseline(&mut max_baseline, body_baseline);
+                }
+            }
+            Qp101Operation::Detector { annotations, .. }
+            | Qp101Operation::ObservableInclude { annotations, .. }
+            | Qp101Operation::Annotation { annotations, .. } => {
+                update_max_baseline_from_annotations(&mut max_baseline, &[0usize], annotations, 0);
+            }
+        }
+    }
+    Ok(max_baseline)
+}
+
+fn measurement_lanes(gate: &str, targets: &[u32], num_qubits: usize) -> Result<Vec<usize>, String> {
+    if measurement_output_count(gate).is_none() {
+        return Ok(Vec::new());
+    }
+    targets
+        .iter()
+        .map(|&target| validate_lane(target, num_qubits, gate))
+        .collect()
+}
+
+fn update_max_baseline_from_annotations(
+    max_baseline: &mut Option<i32>,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    line_offset: usize,
+) {
+    if let Some(baseline) = max_annotation_baseline(lanes, annotations, line_offset) {
+        update_max_baseline(max_baseline, baseline);
+    }
+}
+
+fn max_annotation_baseline(
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    line_offset: usize,
+) -> Option<i32> {
+    if annotations.is_empty() {
+        return None;
+    }
+    let base_lane = lanes.first().copied().unwrap_or(0);
+    Some(
+        below_gate_text_y(base_lane)
+            + (line_offset + annotations.len() - 1) as i32 * ANNOTATION_LINE_GAP,
+    )
+}
+
+fn update_max_baseline(max_baseline: &mut Option<i32>, baseline: i32) {
+    *max_baseline = Some(max_baseline.map_or(baseline, |current| current.max(baseline)));
 }
 
 fn render_wires(out: &mut String, num_qubits: usize, width: i32) {

@@ -406,6 +406,80 @@ fn svg_renderer_labels_measurements_with_global_anchors() {
     );
 }
 
+#[test]
+fn svg_renderer_keeps_last_lane_measurement_annotations_in_viewbox() {
+    let instrs = parse_lines("M 0\n").expect("measurement annotation fixture should parse");
+    let mut doc = export_qp101(&instrs).expect("measurement annotation fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Gate { annotations, .. } => {
+            annotations.push(annotation("measure", Some("single"), Some("annotated")));
+        }
+        op => panic!("expected first operation to be a measurement gate, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("measurement annotation fixture should render");
+
+    let height = root_attr_i32(&svg, "height").expect("root height should be present");
+    let viewbox_height = root_viewbox_height(&svg).expect("viewBox height should be present");
+    let annotation_y = text_y(&svg, "measure: single: annotated")
+        .expect("measurement annotation should have a y coordinate");
+    assert!(
+        annotation_y + 4 <= height,
+        "measurement annotation baseline should fit within the SVG height with padding: {svg}"
+    );
+    assert_eq!(
+        viewbox_height, height,
+        "viewBox height should track the rendered SVG height: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_does_not_reset_measurement_anchors_per_repeat_body() {
+    let instrs = parse_lines("M 0\nREPEAT 2 {\n  M 0\n}\nM 0\n")
+        .expect("repeat measurement anchor fixture should parse");
+    let doc = export_qp101(&instrs).expect("repeat measurement anchor fixture should export");
+
+    let svg = render_svg(&doc).expect("repeat measurement anchor fixture should render");
+
+    for anchor in ["m1", "m2", "m3"] {
+        let marker = format!(">{anchor}</text>");
+        assert_eq!(
+            svg.matches(&marker).count(),
+            1,
+            "SVG should contain one {anchor} measurement anchor: {svg}"
+        );
+    }
+    assert!(
+        svg.find(">m1</text>").expect("m1 should be present")
+            < svg.find(">m2</text>").expect("m2 should be present"),
+        "repeat body should continue measurement anchors after top-level m1: {svg}"
+    );
+    assert!(
+        svg.find(">m2</text>").expect("m2 should be present")
+            < svg.find(">m3</text>").expect("m3 should be present"),
+        "post-repeat measurement should continue after repeat-body m2: {svg}"
+    );
+}
+
+fn root_attr_i32(svg: &str, attr: &str) -> Option<i32> {
+    let root_end = svg.find('>')?;
+    let attrs = &svg[..root_end];
+    let needle = format!("{attr}=\"");
+    let value_start = attrs.find(&needle)? + needle.len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].parse().ok()
+}
+
+fn root_viewbox_height(svg: &str) -> Option<i32> {
+    let root_end = svg.find('>')?;
+    let attrs = &svg[..root_end];
+    let value_start = attrs.find("viewBox=\"")? + "viewBox=\"".len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    value[..value_end].split_whitespace().nth(3)?.parse().ok()
+}
+
 fn text_y(svg: &str, content: &str) -> Option<i32> {
     let needle = format!(">{content}</text>");
     let text_end = svg.find(&needle)?;
