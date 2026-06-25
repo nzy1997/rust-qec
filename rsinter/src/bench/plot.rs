@@ -5,10 +5,11 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 
 use crate::bench::result::BenchmarkResultRow;
-use crate::bench::spec::{BenchmarkSpec, LogicalRateUnit, PanelSpec};
+use crate::bench::spec::{
+    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit, PanelSpec,
+};
 use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
-const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
 const BENCH_PANEL_WIDTH: u32 = 800;
 const BENCH_CANVAS_HEIGHT: u32 = 600;
 const MIN_LOG_Y: f64 = 1e-10;
@@ -145,6 +146,14 @@ pub fn logical_rate_fit_for_plot(
     row: &BenchmarkResultRow,
     unit: LogicalRateUnit,
 ) -> Result<LogicalRateFitForPlot, String> {
+    logical_rate_fit_for_plot_with_factor(row, unit, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR)
+}
+
+fn logical_rate_fit_for_plot_with_factor(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+    confidence_interval_likelihood_factor: f64,
+) -> Result<LogicalRateFitForPlot, String> {
     let shots = required_count_metric(row, "shots_used")?;
     if shots == 0 {
         return Err(format!(
@@ -161,7 +170,7 @@ pub fn logical_rate_fit_for_plot(
     }
 
     let pieces = logical_rate_pieces(row, unit)?;
-    let fit = fit_binomial(shots, errors, MAX_LIKELIHOOD_FACTOR);
+    let fit = fit_binomial(shots, errors, confidence_interval_likelihood_factor);
     let low = transform_logical_rate(fit.low.unwrap_or(0.0), pieces).max(MIN_LOG_Y);
     let best = if errors == 0 {
         None
@@ -245,7 +254,11 @@ fn prepare_error_rate_panel(
         let x = resolve_required_numeric_field(row, &spec.plot.x.field)?;
         validate_plot_value(&spec.plot.x.field, x, &spec.plot.x.scale, row)?;
 
-        let fit = logical_rate_fit_for_plot(row, spec.plot.logical_rate_unit)?;
+        let fit = logical_rate_fit_for_plot_with_factor(
+            row,
+            spec.plot.logical_rate_unit,
+            spec.plot.confidence_interval_likelihood_factor,
+        )?;
         let key = series_key(row, spec)?;
         let label = render_series_label(row, spec);
 

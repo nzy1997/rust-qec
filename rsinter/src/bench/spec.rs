@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+pub const DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR: f64 = 9.0;
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct BenchmarkSpec {
     pub name: String,
@@ -19,6 +21,13 @@ impl BenchmarkSpec {
         }
         if self.plot.panels.is_empty() {
             return Err("benchmark spec must declare at least one plot panel".into());
+        }
+        if !self.plot.confidence_interval_likelihood_factor.is_finite()
+            || self.plot.confidence_interval_likelihood_factor < 1.0
+        {
+            return Err(
+                "plot confidence_interval_likelihood_factor must be finite and >= 1.0".into(),
+            );
         }
         for runner in &self.runners {
             if runner.name.trim().is_empty() {
@@ -43,12 +52,18 @@ pub struct RunnerSpec {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct PlotSpec {
     pub title: String,
+    #[serde(default = "default_confidence_interval_likelihood_factor")]
+    pub confidence_interval_likelihood_factor: f64,
     #[serde(default)]
     pub logical_rate_unit: LogicalRateUnit,
     pub x: AxisSpec,
     pub series: SeriesSpec,
     #[serde(default, rename = "panel")]
     pub panels: Vec<PanelSpec>,
+}
+
+fn default_confidence_interval_likelihood_factor() -> f64 {
+    DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]

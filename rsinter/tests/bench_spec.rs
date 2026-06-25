@@ -1,5 +1,6 @@
 use rsinter::bench::spec::{
-    AxisSpec, BenchmarkMode, BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotSpec, SeriesSpec,
+    AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    LogicalRateUnit, PanelSpec, PlotSpec, SeriesSpec,
 };
 use std::path::Path;
 
@@ -248,6 +249,7 @@ fn benchmark_spec_rejects_missing_runners() {
         runners: Vec::new(),
         plot: PlotSpec {
             title: "Surface Decoder".into(),
+            confidence_interval_likelihood_factor: DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
             logical_rate_unit: LogicalRateUnit::PerShot,
             x: AxisSpec {
                 field: "params.p".into(),
