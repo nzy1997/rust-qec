@@ -197,12 +197,72 @@ pub(crate) fn try_nullspace_basis_with_width(
     Ok(basis)
 }
 
+pub(crate) fn try_random_window_kernel_basis_with_width(
+    matrix: &[BinaryRow],
+    width: usize,
+    column_permutation: &[usize],
+) -> Result<Vec<BinaryRow>> {
+    validate_rows_with_width(matrix, width)?;
+    validate_column_permutation(column_permutation, width)?;
+
+    let permuted = matrix
+        .iter()
+        .map(|row| {
+            column_permutation
+                .iter()
+                .map(|&original_col| row[original_col])
+                .collect::<BinaryRow>()
+        })
+        .collect::<Vec<_>>();
+
+    let permuted_basis = try_nullspace_basis_with_width(&permuted, width)?;
+    let mut original_basis = Vec::with_capacity(permuted_basis.len());
+    for permuted_vector in permuted_basis {
+        let mut original_vector = vec![0; width];
+        for (permuted_col, &original_col) in column_permutation.iter().enumerate() {
+            original_vector[original_col] = permuted_vector[permuted_col];
+        }
+        original_basis.push(original_vector);
+    }
+
+    Ok(original_basis)
+}
+
+fn validate_column_permutation(column_permutation: &[usize], width: usize) -> Result<()> {
+    if column_permutation.len() != width {
+        return Err(QecError::InvalidColumnPermutation {
+            reason: format!(
+                "expected length {width}, got {}",
+                column_permutation.len()
+            ),
+        });
+    }
+
+    let mut seen = vec![false; width];
+    for &column in column_permutation {
+        if column >= width {
+            return Err(QecError::InvalidColumnPermutation {
+                reason: format!("column {column} out of range for width {width}"),
+            });
+        }
+        if seen[column] {
+            return Err(QecError::InvalidColumnPermutation {
+                reason: format!("duplicate column {column}"),
+            });
+        }
+        seen[column] = true;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_row_span_with_width, try_nullspace_basis_with_width, try_select_independent_rows,
+        try_in_row_span_with_width, try_nullspace_basis_with_width,
+        try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -251,6 +311,67 @@ mod tests {
             Err(QecError::RowWidthMismatch {
                 expected: 3,
                 actual: 2,
+            })
+        );
+    }
+
+    fn assert_kernel_vector(matrix: &[Vec<u8>], vector: &[u8]) {
+        for row in matrix {
+            assert_eq!(dot(row, vector), 0);
+        }
+    }
+
+    #[test]
+    fn gf2_random_window_kernel_basis_contract() {
+        let matrix = vec![vec![1, 1, 0, 0], vec![0, 1, 1, 0]];
+        let permutation = vec![3, 0, 2, 1];
+
+        let basis =
+            try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
+        let repeated =
+            try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
+        let original_nullspace = try_nullspace_basis_with_width(&matrix, 4).unwrap();
+
+        assert_eq!(basis, vec![vec![0, 0, 0, 1], vec![1, 1, 1, 0]]);
+        assert_eq!(basis, repeated);
+        assert!(basis.iter().all(|row| row.len() == 4));
+        for vector in &basis {
+            assert_kernel_vector(&matrix, vector);
+        }
+        assert_eq!(basis.len(), original_nullspace.len());
+        assert_eq!(try_rank(&basis).unwrap(), original_nullspace.len());
+    }
+
+    #[test]
+    fn gf2_random_window_kernel_basis_rejects_bad_permutation() {
+        let matrix = vec![vec![1, 0, 1, 0], vec![0, 1, 1, 0]];
+        let error =
+            try_random_window_kernel_basis_with_width(&matrix, 4, &[0, 1, 1, 3]).unwrap_err();
+
+        assert_eq!(
+            error,
+            QecError::InvalidColumnPermutation {
+                reason: "duplicate column 1".to_owned(),
+            }
+        );
+        assert!(error.to_string().contains("invalid column permutation"));
+    }
+
+    #[test]
+    fn random_window_kernel_basis_rejects_invalid_matrix_inputs() {
+        assert_eq!(
+            try_random_window_kernel_basis_with_width(&[vec![1, 2]], 2, &[0, 1]),
+            Err(QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            })
+        );
+        assert_eq!(
+            try_random_window_kernel_basis_with_width(&[vec![1, 0], vec![1]], 2, &[0, 1]),
+            Err(QecError::RowWidthMismatch {
+                expected: 2,
+                actual: 1,
             })
         );
     }
