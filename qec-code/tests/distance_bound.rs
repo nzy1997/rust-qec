@@ -139,6 +139,34 @@ fn random_window_upper_bound_finds_surface_and_toric_distance_under_pinned_optio
 }
 
 #[test]
+fn random_window_upper_bound_rejects_stabilizer_span_component_candidate() {
+    let css = css_from_sparse_rows(3, vec![vec![0, 1], vec![1, 2]], vec![]);
+    let result = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 11,
+            target_weight: Some(1),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 1);
+    assert_eq!(result.logical_class, LogicalClass::XLike);
+    assert_ne!(result.witness.x, vec![1, 1, 0]);
+    assert_ne!(result.witness.x, vec![0, 1, 1]);
+    validate_random_window_upper_bound_result(
+        &result,
+        BoundValidationContext {
+            code: css.code(),
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
 fn completed_bound_result_serializes_with_upper_bound_contract() {
     let result = valid_result();
 
