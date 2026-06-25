@@ -16,6 +16,12 @@ fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+fn quantum_tanner_fixture_path(name: &str) -> PathBuf {
+    workspace_root()
+        .join("qec-code/tests/fixtures/quantum_tanner")
+        .join(name)
+}
+
 fn read_fixture(rel_path: &str) -> String {
     std::fs::read_to_string(workspace_root().join(rel_path)).expect("fixture should be readable")
 }
@@ -818,7 +824,9 @@ fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
     assert!(matches!(
         conflicting_inputs,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains("use either --code-id or --hx/--hz")
+            if message.contains(
+                "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz",
+            )
     ));
 
     let missing_pair = run_qec_code_in_process_os(vec![
@@ -852,7 +860,8 @@ fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
     assert!(matches!(
         missing_source,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains("provide --code-id or both --hx and --hz")
+            if message
+                .contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz")
     ));
 }
 
@@ -1012,6 +1021,59 @@ fn code_css_distance_exact_hx_hz_files_return_exact_json() {
 }
 
 #[test]
+fn code_css_distance_exact_quantum_tanner_spec_returns_exact_json() {
+    let spec = quantum_tanner_fixture_path("toric_d4.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--quantum-tanner-spec"])
+        .arg(&spec)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    // Fixture follows qLDPC's toric Tanner test: Z_d x Z_d has distance d.
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 4);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 4);
+    assert_eq!(json["options"]["input"], "quantum_tanner_spec");
+    assert_eq!(
+        json["options"]["quantum_tanner_spec"],
+        spec.display().to_string()
+    );
+}
+
+#[test]
+fn code_css_distance_exact_quantum_tanner_invalid_spec_fails_before_distance_result() {
+    let spec = quantum_tanner_fixture_path("invalid_non_symmetric_a.json");
+    let output = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "exact", "--quantum-tanner-spec"])
+        .arg(spec)
+        .arg("--json")
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("invalid quantum Tanner generator set A"),
+        "stderr was: {stderr}"
+    );
+    assert!(
+        serde_json::from_str::<serde_json::Value>(&stderr).is_err(),
+        "stderr should not be a distance result: {stderr}"
+    );
+}
+
+#[test]
 fn run_code_css_distance_exact_files_return_exact_json() {
     let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
     let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
@@ -1066,7 +1128,8 @@ fn run_code_css_distance_exact_rejects_input_errors() {
     assert!(matches!(
         missing_source,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains("provide --code-id or both --hx and --hz")
+            if message
+                .contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz")
     ));
 
     let dir = tempdir().unwrap();
@@ -1096,7 +1159,9 @@ fn run_code_css_distance_exact_rejects_input_errors() {
     assert!(matches!(
         mixed_input,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains("use either --code-id or --hx/--hz, not both")
+            if message.contains(
+                "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz",
+            )
     ));
 
     let missing_pair = run_qec_code_in_process_os(vec![
@@ -1139,7 +1204,8 @@ fn code_css_distance_exact_rejects_code_id_and_file_input_together() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("use either --code-id or --hx/--hz, not both"),
+        stderr
+            .contains("use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz"),
         "stderr was: {stderr}"
     );
 }
@@ -1173,7 +1239,7 @@ fn code_css_distance_exact_rejects_missing_input_source() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("provide --code-id or both --hx and --hz"),
+        stderr.contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz"),
         "stderr was: {stderr}"
     );
 }
@@ -1375,6 +1441,43 @@ fn css_distance_randomized_upper_bound_hx_hz_files_output_json() {
 }
 
 #[test]
+fn css_distance_randomized_upper_bound_quantum_tanner_spec_outputs_json() {
+    let spec = quantum_tanner_fixture_path("toric_d4.json");
+    let output = Command::new(qec_code_bin())
+        .args([
+            "code",
+            "css-distance",
+            "randomized-upper-bound",
+            "--quantum-tanner-spec",
+        ])
+        .arg(spec)
+        .args([
+            "--iterations",
+            "1000",
+            "--restarts",
+            "8",
+            "--seed",
+            "7",
+            "--target-weight",
+            "4",
+            "--json",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "randomized-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert!(json["upper_bound"].as_u64().unwrap() <= 4);
+}
+
+#[test]
 fn css_distance_randomized_upper_bound_requires_json_flag() {
     let output = run_qec_code(&[
         "code",
@@ -1423,7 +1526,8 @@ fn css_distance_randomized_upper_bound_rejects_code_id_and_file_input_together()
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("use either --code-id or --hx/--hz, not both"),
+        stderr
+            .contains("use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz"),
         "stderr was: {stderr}"
     );
 }
@@ -1466,7 +1570,7 @@ fn css_distance_randomized_upper_bound_rejects_missing_input_source() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("provide --code-id or both --hx and --hz"),
+        stderr.contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz"),
         "stderr was: {stderr}"
     );
 }
