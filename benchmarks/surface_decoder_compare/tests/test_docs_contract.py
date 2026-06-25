@@ -81,8 +81,8 @@ class DocsContractTest(unittest.TestCase):
 
     def test_benchmark_evidence_showcase_rejects_bb_circuit_command_typo(self) -> None:
         doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text().replace(
-            "bb-circuit-bposd-memory",
-            "bb-circuit-bposd-memroy",
+            "cargo run -p rsinter -- bb-circuit-bposd-memory \\",
+            "cargo run -p rsinter -- bb-circuit-bposd-memroy \\",
             1,
         )
 
@@ -148,7 +148,7 @@ def paired_rbposd_ldpc_results() -> list[PairedResult]:
 
 def assert_valid_bb_circuit_command_keys(text: str) -> None:
     known = {"bb-circuit-bposd-memory"}
-    keys = set(re.findall(r"`(bb-circuit-bposd-[^`\s]+)`", text))
+    keys = set(re.findall(r"\bbb-circuit-bposd-[A-Za-z0-9_-]+\b", text))
     unknown = sorted(keys - known)
     if unknown:
         raise AssertionError(f"unknown BB circuit command key: {', '.join(unknown)}")

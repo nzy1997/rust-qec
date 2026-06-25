@@ -112,8 +112,7 @@ python3 -m unittest benchmarks.surface_decoder_compare.tests.test_docs_contract 
 ```
 
 That contract checks the required evidence links and owns the negative control
-for the bb-circuit-bposd-memroy typo by rejecting unknown backtick-delimited
-BB circuit command keys.
+for BB-circuit command-key typos by rejecting unknown BB command keys.
 
 Run the `rsinter` benchmark spec and registry tests:
 
