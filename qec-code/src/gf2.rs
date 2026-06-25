@@ -341,6 +341,27 @@ mod tests {
         assert_eq!(try_in_reduced_row_span(&reduced, &[1, 0, 0]), Ok(false));
     }
 
+    #[test]
+    fn reduced_row_span_membership_rejects_invalid_targets() {
+        let reduced = super::try_rref_with_width(&[vec![1, 1, 0], vec![0, 1, 1]], 3).unwrap();
+
+        assert_eq!(
+            try_in_reduced_row_span(&reduced, &[1, 0]),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            })
+        );
+        assert_eq!(
+            try_in_reduced_row_span(&reduced, &[1, 2, 0]),
+            Err(QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            })
+        );
+    }
+
     fn assert_kernel_vector(matrix: &[Vec<u8>], vector: &[u8]) {
         for row in matrix {
             assert_eq!(dot(row, vector), 0);
