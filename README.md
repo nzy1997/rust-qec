@@ -194,7 +194,7 @@ cargo run -p rstim --example stim_parity_showcase
 Supporting notes live in:
 
 - [`rstim/doc/performance_parity.md`](rstim/doc/performance_parity.md)
-- [`docs/plans/2026-05-25-performance-parity-foundation-design.md`](docs/plans/2026-05-25-performance-parity-foundation-design.md)
+- [`docs/superpowers/specs/2026-05-25-performance-parity-foundation-design.md`](docs/superpowers/specs/2026-05-25-performance-parity-foundation-design.md)
 
 ## Further Reading
 
