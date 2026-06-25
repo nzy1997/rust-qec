@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rbposd::{
     BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig,
     ParityCheckMatrix, Syndrome,
 };
+use serde::Serialize;
 
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::failure::FailureKind;
@@ -36,6 +37,19 @@ impl BivariateBicycleParams {
     pub fn bb144() -> Self {
         Self {
             ell: 12,
+            m: 6,
+            a1: 3,
+            a2: 1,
+            a3: 2,
+            b1: 3,
+            b2: 1,
+            b3: 2,
+        }
+    }
+
+    pub fn bb72() -> Self {
+        Self {
+            ell: 6,
             m: 6,
             a1: 3,
             a2: 1,
@@ -194,11 +208,12 @@ pub fn build_upstream_code() -> Result<BbCode, String> {
 
 pub fn build_code(code_id: &str) -> Result<BbCode, String> {
     let params = match code_id {
+        "bb72" => BivariateBicycleParams::bb72(),
         "bb90" => BivariateBicycleParams::bb90(),
         "bb144" => BivariateBicycleParams::bb144(),
         _ => {
             return Err(format!(
-                "unknown bb code id {code_id:?}; supported ids: bb90, bb144"
+                "unknown bb code id {code_id:?}; supported ids: bb72, bb90, bb144"
             ));
         }
     };
@@ -550,7 +565,7 @@ fn select_logical_rows(
     logicals
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimulationConfig {
     pub physical_error_rate: f64,
     pub num_cycles: usize,
@@ -573,7 +588,7 @@ impl Default for SimulationConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimulationResult {
     pub physical_error_rate: f64,
     pub num_cycles: usize,
@@ -582,7 +597,7 @@ pub struct SimulationResult {
     pub profile: BbCircuitBposdProfile,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct BbCircuitBposdProfile {
     pub setup_seconds: f64,
     pub sample_seconds: f64,
@@ -718,6 +733,46 @@ pub struct SampledTrial {
     pub x_logical: Vec<bool>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct BbCircuitBposdComparisonExport {
+    pub code_id: String,
+    pub physical_error_rate: f64,
+    pub num_cycles: usize,
+    pub num_trials: usize,
+    pub seed: Option<u64>,
+    pub max_bp_iterations: usize,
+    pub osd_order: usize,
+    pub rust_result: SimulationResult,
+    pub z_model: ComparisonModelExport,
+    pub x_model: ComparisonModelExport,
+    pub trials: Vec<ComparisonTrialExport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ComparisonModelExport {
+    pub num_checks: usize,
+    pub num_bits: usize,
+    pub sparse_rows: Vec<Vec<usize>>,
+    pub augmented_columns: Vec<Vec<usize>>,
+    pub channel_probs: Vec<f64>,
+    pub first_logical_row: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ComparisonTrialExport {
+    pub z_syndrome: Vec<bool>,
+    pub x_syndrome: Vec<bool>,
+    pub z_logical: Vec<bool>,
+    pub x_logical: Vec<bool>,
+}
+
+#[derive(Debug, Clone)]
+struct SimulationCaseRun {
+    result: SimulationResult,
+    models: EffectiveModels,
+    trials: Option<Vec<ComparisonTrialExport>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyndromeReplayDiagnostic {
     pub syndrome_weight: usize,
@@ -753,6 +808,35 @@ pub fn run_simulation_for_code(
     code_id: &str,
     config: SimulationConfig,
 ) -> Result<SimulationResult, String> {
+    Ok(run_simulation_case_for_code(code_id, config, false)?.result)
+}
+
+pub fn export_comparison_case_for_code(
+    code_id: &str,
+    config: SimulationConfig,
+) -> Result<BbCircuitBposdComparisonExport, String> {
+    let run = run_simulation_case_for_code(code_id, config.clone(), true)?;
+
+    Ok(BbCircuitBposdComparisonExport {
+        code_id: code_id.to_owned(),
+        physical_error_rate: config.physical_error_rate,
+        num_cycles: config.num_cycles,
+        num_trials: config.num_trials,
+        seed: config.seed,
+        max_bp_iterations: config.max_bp_iterations,
+        osd_order: config.osd_order,
+        rust_result: run.result,
+        z_model: comparison_model_export(&run.models.z_faults),
+        x_model: comparison_model_export(&run.models.x_faults),
+        trials: run.trials.unwrap_or_default(),
+    })
+}
+
+fn run_simulation_case_for_code(
+    code_id: &str,
+    config: SimulationConfig,
+    collect_trials: bool,
+) -> Result<SimulationCaseRun, String> {
     validate_simulation_config(&config)?;
 
     let setup_started = Instant::now();
@@ -794,6 +878,7 @@ pub fn run_simulation_for_code(
         ..BbCircuitBposdProfile::default()
     };
     let mut num_failed_trials = 0usize;
+    let mut trials = collect_trials.then(|| Vec::with_capacity(config.num_trials));
     for _ in 0..config.num_trials {
         let sample_started = Instant::now();
         let sample = simulate_trial(
@@ -804,6 +889,9 @@ pub fn run_simulation_for_code(
             &mut rng,
         );
         profile.sample_seconds += sample_started.elapsed().as_secs_f64();
+        if let Some(trials) = trials.as_mut() {
+            trials.push(comparison_trial_export(&sample));
+        }
 
         let decode_started = Instant::now();
         let z_result = decode_logicals(&z_decoder, &sample.z_syndrome)
@@ -830,13 +918,39 @@ pub fn run_simulation_for_code(
         }
     }
 
-    Ok(SimulationResult {
-        physical_error_rate: config.physical_error_rate,
-        num_cycles: config.num_cycles,
-        num_trials: config.num_trials,
-        num_failed_trials,
-        profile,
+    Ok(SimulationCaseRun {
+        result: SimulationResult {
+            physical_error_rate: config.physical_error_rate,
+            num_cycles: config.num_cycles,
+            num_trials: config.num_trials,
+            num_failed_trials,
+            profile,
+        },
+        models,
+        trials,
     })
+}
+
+fn comparison_model_export(model: &EffectiveDecoderModel) -> ComparisonModelExport {
+    ComparisonModelExport {
+        num_checks: model.decoder.num_checks(),
+        num_bits: model.decoder.num_bits(),
+        sparse_rows: (0..model.decoder.num_checks())
+            .map(|row| model.decoder.row_neighbors(row).to_vec())
+            .collect(),
+        augmented_columns: model.augmented_columns.clone(),
+        channel_probs: model.channel_probs.clone(),
+        first_logical_row: model.first_logical_row,
+    }
+}
+
+fn comparison_trial_export(sample: &SampledTrial) -> ComparisonTrialExport {
+    ComparisonTrialExport {
+        z_syndrome: sample.z_syndrome.clone(),
+        x_syndrome: sample.x_syndrome.clone(),
+        z_logical: sample.z_logical.clone(),
+        x_logical: sample.x_logical.clone(),
+    }
 }
 
 pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> BenchmarkResultRow {
@@ -1658,13 +1772,13 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
-        in_row_span, nullspace, parse_schedule_slot, rref, run_simulation, sample_operation_fault,
-        sample_single_axis, validate_model_config, validate_physical_error_rate,
-        validate_simulation_config, EffectiveDecoderModel, FaultBasis, Operation, OperationKind,
-        PauliAxis, PauliFault, SimulationConfig,
+        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
+        SimulationConfig, apply_pauli_fault, build_upstream_code, cnot_fault_for_index,
+        correction_to_logicals, in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
+        run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
+        validate_model_config, validate_physical_error_rate, validate_simulation_config,
     };
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand::{SeedableRng, rngs::StdRng};
     use rbposd::{Correction, ParityCheckMatrix};
 
     #[test]
@@ -1708,6 +1822,28 @@ mod tests {
                 "physical_error_rate must be finite and lie in [0, 1)"
             );
         }
+    }
+
+    #[test]
+    fn simulation_case_collection_is_export_only() {
+        let config = SimulationConfig {
+            physical_error_rate: 1.0e-12,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(12345),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        };
+
+        let legacy = run_simulation_case_for_code("bb72", config.clone(), false).unwrap();
+        assert!(legacy.trials.is_none());
+
+        let exported = run_simulation_case_for_code("bb72", config, true).unwrap();
+        assert_eq!(exported.trials.as_ref().map(Vec::len), Some(1));
+        assert_eq!(
+            legacy.result.num_failed_trials,
+            exported.result.num_failed_trials
+        );
     }
 
     #[test]
