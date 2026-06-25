@@ -94,6 +94,14 @@ fn surface_rotated_d5_result_with_x_support(support: &[usize]) -> DistanceBoundR
 }
 
 #[test]
+fn css_code_preserves_dense_component_rows_for_search() {
+    let css = CssCode::from_hx_hz(vec![vec![1, 1, 0]], vec![vec![0, 0, 1]]).unwrap();
+
+    assert_eq!(css.hx(), &[vec![1, 1, 0]]);
+    assert_eq!(css.hz(), &[vec![0, 0, 1]]);
+}
+
+#[test]
 fn completed_bound_result_serializes_with_upper_bound_contract() {
     let result = valid_result();
 
