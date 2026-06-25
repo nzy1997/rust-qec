@@ -1356,10 +1356,80 @@ fn render_annotations_with_line_offset(
             parts.push(text.to_string());
         }
         let content = escape_xml(&parts.join(": "));
+        let attrs = annotation_svg_attrs(annotation);
         out.push_str(&format!(
-            "<text x=\"{x}\" y=\"{}\" fill=\"#7a5af8\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
+            "<text {attrs} x=\"{x}\" y=\"{}\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
             base_y + idx as i32 * ANNOTATION_LINE_GAP
         ));
+    }
+}
+
+fn annotation_svg_attrs(annotation: &Qp101Annotation) -> String {
+    let mut classes = vec!["annotation".to_string()];
+    let mut attrs = Vec::new();
+    if let Some(style) = annotation.style.as_ref() {
+        if let Some(preset) = style.preset.as_deref() {
+            classes.push(format!("annotation-preset-{}", css_token(preset)));
+            attrs.push(format!("data-style-preset=\"{}\"", escape_xml(preset)));
+        }
+        if let Some(highlight) = style.highlight {
+            attrs.push(format!("data-style-highlight=\"{highlight}\""));
+        }
+    }
+    if !annotation.tags.is_empty() {
+        attrs.push(format!(
+            "data-annotation-tags=\"{}\"",
+            escape_xml(&annotation.tags.join(" "))
+        ));
+    }
+    attrs.insert(0, format!("class=\"{}\"", classes.join(" ")));
+    attrs.push(format!(
+        "fill=\"{}\"",
+        escape_xml(&annotation_fill(annotation))
+    ));
+    attrs.join(" ")
+}
+
+fn annotation_fill(annotation: &Qp101Annotation) -> String {
+    annotation
+        .style
+        .as_ref()
+        .and_then(|style| style.color.as_deref())
+        .map(annotation_color)
+        .or_else(|| {
+            annotation
+                .style
+                .as_ref()
+                .and_then(|style| style.preset.as_deref())
+                .map(annotation_color)
+        })
+        .unwrap_or("#7a5af8")
+        .to_string()
+}
+
+fn annotation_color(value: &str) -> &str {
+    match value {
+        "danger" | "red" => "#dc2626",
+        "info" | "blue" => "#2563eb",
+        "warning" | "yellow" => "#ca8a04",
+        "success" | "green" => "#16a34a",
+        other => other,
+    }
+}
+
+fn css_token(value: &str) -> String {
+    let mut token = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+            token.push(ch);
+        } else {
+            token.push('-');
+        }
+    }
+    if token.is_empty() {
+        "custom".to_string()
+    } else {
+        token
     }
 }
 

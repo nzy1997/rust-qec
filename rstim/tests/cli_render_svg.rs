@@ -166,6 +166,22 @@ fn render_svg_highlight_dem_error_draws_query_markers() {
             "highlighted SVG missing marker {marker}: {highlighted_svg}"
         );
     }
+    for marker in [
+        "class=\"annotation annotation-preset-danger\"",
+        "data-style-preset=\"danger\"",
+        "data-style-highlight=\"true\"",
+        "data-annotation-tags=\"dem-origin query-result\"",
+        "data-annotation-tags=\"dem-symptom query-result\"",
+    ] {
+        assert!(
+            highlighted_svg.contains(marker),
+            "highlighted SVG missing style marker {marker}: {highlighted_svg}"
+        );
+        assert!(
+            !plain_svg.contains(marker),
+            "plain SVG should not contain highlight style marker {marker}: {plain_svg}"
+        );
+    }
     assert!(
         !plain_svg.contains("marker: X") && highlighted_svg.contains("marker: X"),
         "source highlight text should only appear in highlighted SVG"
