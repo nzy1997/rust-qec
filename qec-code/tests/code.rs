@@ -2500,6 +2500,176 @@ fn quantum_tanner_spec_json_rejects_invalid_local_code_shapes() {
     expect_quantum_tanner_local_code_error(&nonbinary_h_b, "h_b", "expected 0 or 1");
 }
 
+const QUANTUM_TANNER_SOURCES_DOC: &str = include_str!("../doc/quantum_tanner_sources.md");
+
+#[derive(Debug)]
+struct QuantumTannerSourceRow<'a> {
+    source: &'a str,
+    location: &'a str,
+    license: &'a str,
+    intended_use: &'a str,
+    copying_posture: &'a str,
+    definition_of_done: &'a str,
+}
+
+const QUANTUM_TANNER_SOURCE_TABLE_HEADER: &str =
+    "| Source | URL or local path | License status | Intended use | Copying/import posture | Definition of done for future work |";
+
+fn markdown_cells(row: &str) -> Vec<&str> {
+    row.trim()
+        .trim_matches('|')
+        .split('|')
+        .map(str::trim)
+        .collect()
+}
+
+fn quantum_tanner_source_rows(doc: &str) -> Vec<QuantumTannerSourceRow<'_>> {
+    let mut lines = doc.lines();
+    while let Some(line) = lines.next() {
+        if line.trim() == QUANTUM_TANNER_SOURCE_TABLE_HEADER {
+            let separator = lines
+                .next()
+                .expect("source table should include a separator row");
+            assert!(
+                separator
+                    .trim()
+                    .starts_with("| --- | --- | --- | --- | --- | --- |"),
+                "source table separator has unexpected shape: {separator}"
+            );
+
+            return lines
+                .take_while(|line| line.trim_start().starts_with('|'))
+                .map(|line| {
+                    let cells = markdown_cells(line);
+                    assert_eq!(cells.len(), 6, "source table row has unexpected shape: {line}");
+                    QuantumTannerSourceRow {
+                        source: cells[0],
+                        location: cells[1],
+                        license: cells[2],
+                        intended_use: cells[3],
+                        copying_posture: cells[4],
+                        definition_of_done: cells[5],
+                    }
+                })
+                .collect();
+        }
+    }
+    panic!("missing quantum Tanner source roadmap table");
+}
+
+fn expect_quantum_tanner_source_row<'a>(
+    rows: &'a [QuantumTannerSourceRow<'a>],
+    source: &str,
+) -> &'a QuantumTannerSourceRow<'a> {
+    rows.iter()
+        .find(|row| row.source == source)
+        .unwrap_or_else(|| panic!("missing roadmap row for {source}"))
+}
+
+fn assert_source_row_complete(row: &QuantumTannerSourceRow<'_>) {
+    for (column, value) in [
+        ("URL or local path", row.location),
+        ("License status", row.license),
+        ("Intended use", row.intended_use),
+        ("Copying/import posture", row.copying_posture),
+        ("Definition of done", row.definition_of_done),
+    ] {
+        assert!(
+            !value.trim().is_empty() && value != "-",
+            "{} row must have a nonempty {column}",
+            row.source
+        );
+    }
+}
+
+fn assert_cell_contains(row: &QuantumTannerSourceRow<'_>, column: &str, value: &str) {
+    let cell = match column {
+        "location" => row.location,
+        "license" => row.license,
+        "intended_use" => row.intended_use,
+        "copying_posture" => row.copying_posture,
+        "definition_of_done" => row.definition_of_done,
+        _ => panic!("unknown roadmap column {column}"),
+    };
+    assert!(
+        cell.contains(value),
+        "{} {column} should contain {value:?}, got {cell:?}",
+        row.source
+    );
+}
+
+#[test]
+fn quantum_tanner_future_sources_doc_has_reference_table() {
+    assert!(QUANTUM_TANNER_SOURCES_DOC.contains("future adapters/searchers"));
+    assert!(QUANTUM_TANNER_SOURCES_DOC.contains("not part of the initial constructor"));
+    assert!(QUANTUM_TANNER_SOURCES_DOC.contains("does not search for good groups"));
+    assert!(QUANTUM_TANNER_SOURCES_DOC.contains("does not call GAP or Oscar"));
+
+    let rows = quantum_tanner_source_rows(QUANTUM_TANNER_SOURCES_DOC);
+    assert_eq!(rows.len(), 6);
+    for row in &rows {
+        assert_source_row_complete(row);
+    }
+
+    let qldpc = expect_quantum_tanner_source_row(&rows, "qLDPC local clone");
+    assert_cell_contains(qldpc, "location", "drafts/qLDPC");
+    assert_cell_contains(
+        qldpc,
+        "location",
+        "drafts/qLDPC/src/qldpc/codes/quantum.py",
+    );
+    assert_cell_contains(qldpc, "location", "drafts/qLDPC/src/qldpc/objects.py");
+    assert_cell_contains(qldpc, "location", "https://github.com/qLDPCOrg/qLDPC");
+    assert_cell_contains(qldpc, "license", "Apache-2.0");
+    assert_cell_contains(qldpc, "copying_posture", "cite");
+
+    let quantum_expanders = expect_quantum_tanner_source_row(&rows, "QuantumExpanders.jl");
+    assert_cell_contains(
+        quantum_expanders,
+        "location",
+        "https://github.com/QuantumSavory/QuantumExpanders.jl",
+    );
+    assert_cell_contains(
+        quantum_expanders,
+        "intended_use",
+        "mathematical/reference",
+    );
+    assert_cell_contains(
+        quantum_expanders,
+        "copying_posture",
+        "unless license compatibility is confirmed",
+    );
+
+    let qtanner = expect_quantum_tanner_source_row(&rows, "qTanner");
+    assert_cell_contains(qtanner, "location", "https://github.com/RebKatRad/qTanner");
+    assert_cell_contains(qtanner, "intended_use", "source-grounded data/reference");
+    assert_cell_contains(
+        qtanner,
+        "copying_posture",
+        "unless license compatibility is confirmed",
+    );
+
+    let qtc = expect_quantum_tanner_source_row(&rows, "Giacomo-Fregona/QTC");
+    assert_cell_contains(qtc, "location", "https://github.com/Giacomo-Fregona/QTC");
+    assert_cell_contains(qtc, "license", "confirm");
+    assert_cell_contains(qtc, "copying_posture", "No code reuse before license review");
+
+    let sogrand = expect_quantum_tanner_source_row(&rows, "quantum-tanner-sogrand");
+    assert_cell_contains(
+        sogrand,
+        "location",
+        "https://github.com/grand-decoder/quantum-tanner-sogrand",
+    );
+    assert_cell_contains(sogrand, "license", "non-commercial academic");
+    assert_cell_contains(sogrand, "copying_posture", "not suitable for code copying");
+
+    let quits = expect_quantum_tanner_source_row(&rows, "QUITS");
+    assert_cell_contains(quits, "location", "drafts/quits");
+    assert_cell_contains(quits, "location", "https://github.com/mkangquantum/quits");
+    assert_cell_contains(quits, "intended_use", "matrix-consumption inspiration");
+    assert_cell_contains(quits, "copying_posture", "not a quantum Tanner constructor");
+}
+
 #[test]
 fn quantum_tanner_contract_examples_compile() {
     let doc = include_str!("../doc/quantum_tanner.md");
