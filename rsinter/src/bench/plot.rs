@@ -14,7 +14,15 @@ const BENCH_CANVAS_HEIGHT: u32 = 600;
 const MIN_LOG_Y: f64 = 1e-10;
 
 type NumericGroups = BTreeMap<String, Vec<(f64, f64)>>;
-type ErrorRateGroups = BTreeMap<String, Vec<(f64, f64, f64, f64)>>;
+type ErrorRateGroups = BTreeMap<String, Vec<ErrorRatePoint>>;
+
+#[derive(Clone, Copy)]
+struct ErrorRatePoint {
+    x: f64,
+    low: f64,
+    best: Option<f64>,
+    high: f64,
+}
 
 #[derive(Clone, Copy)]
 struct SeriesStyle {
@@ -148,17 +156,27 @@ fn prepare_error_rate_panel(
 
         let fit = fit_binomial(shots, errors, MAX_LIKELIHOOD_FACTOR);
         let low = fit.low.unwrap_or(0.0).max(MIN_LOG_Y);
-        let best = fit.best.unwrap_or(0.0).max(MIN_LOG_Y);
+        let best = if errors == 0 {
+            None
+        } else {
+            Some(fit.best.unwrap_or(0.0).max(MIN_LOG_Y))
+        };
         let high = fit.high.unwrap_or(0.0).max(MIN_LOG_Y);
         let label = render_series_label(row, spec);
 
-        groups.entry(label).or_default().push((x, low, best, high));
+        groups
+            .entry(label)
+            .or_default()
+            .push(ErrorRatePoint { x, low, best, high });
         x_values.push(x);
-        y_values.extend([low, best, high]);
+        y_values.extend([low, high]);
+        if let Some(best) = best {
+            y_values.push(best);
+        }
     }
 
     for points in groups.values_mut() {
-        points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     if groups.is_empty() {
@@ -463,22 +481,28 @@ where
                 .map_err(|e| e.to_string())?;
         }
 
-        let best_points: Vec<(f64, f64)> =
-            points.iter().map(|(x, _, best, _)| (*x, *best)).collect();
-        draw_line_series(chart, label, &best_points, style)?;
+        let best_points: Vec<(f64, f64)> = points
+            .iter()
+            .filter_map(|point| point.best.map(|best| (point.x, best)))
+            .collect();
+        if !best_points.is_empty() {
+            draw_line_series(chart, label, &best_points, style)?;
 
-        chart
-            .draw_series(
-                best_points
-                    .iter()
-                    .copied()
-                    .map(|point| Circle::new(point, 4, ShapeStyle::from(&style.color).filled())),
-            )
-            .map_err(|e| e.to_string())?;
+            chart
+                .draw_series(
+                    best_points.iter().copied().map(|point| {
+                        Circle::new(point, 4, ShapeStyle::from(&style.color).filled())
+                    }),
+                )
+                .map_err(|e| e.to_string())?;
+        }
 
         if points.len() == 1 {
             const CAP_FACTOR: f64 = 1.015;
-            let (x, low, _best, high) = points[0];
+            let point = points[0];
+            let x = point.x;
+            let low = point.low;
+            let high = point.high;
             let x_lo = x / CAP_FACTOR;
             let x_hi = x * CAP_FACTOR;
             chart
@@ -775,10 +799,10 @@ fn default_series_style(index: usize) -> SeriesStyle {
     }
 }
 
-fn confidence_band_polygon(points: &[(f64, f64, f64, f64)]) -> Vec<(f64, f64)> {
+fn confidence_band_polygon(points: &[ErrorRatePoint]) -> Vec<(f64, f64)> {
     let mut polygon = Vec::with_capacity(points.len() * 2);
-    polygon.extend(points.iter().map(|(x, _low, _best, high)| (*x, *high)));
-    polygon.extend(points.iter().rev().map(|(x, low, _best, _high)| (*x, *low)));
+    polygon.extend(points.iter().map(|point| (point.x, point.high)));
+    polygon.extend(points.iter().rev().map(|point| (point.x, point.low)));
     polygon
 }
 

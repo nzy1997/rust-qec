@@ -711,6 +711,52 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn zero_error_logical_rate_uses_interval_without_fake_best_point() {
+    let spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "log",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#,
+    );
+
+    let zero_error_row = ok_row("zero", 3, 0.002, 0.0, 0.0, 2000.0, 12.0);
+    let nonzero_error_row = ok_row("nonzero", 3, 0.004, 0.001, 2.0, 2000.0, 12.0);
+    let dir = tempfile::tempdir().unwrap();
+
+    let combined_out = dir.path().join("zero-and-nonzero.svg");
+    render_benchmark_plot(
+        &spec,
+        &[zero_error_row.clone(), nonzero_error_row],
+        &combined_out,
+    )
+    .unwrap();
+    let combined_svg = std::fs::read_to_string(combined_out).unwrap();
+    let combined_marker_count = combined_svg.matches("<circle").count();
+    assert_eq!(
+        combined_marker_count, 1,
+        "expected only the nonzero row to draw a best marker; svg was:\n{combined_svg}"
+    );
+
+    let zero_only_out = dir.path().join("zero-only.svg");
+    render_benchmark_plot(&spec, &[zero_error_row], &zero_only_out).unwrap();
+    let zero_only_svg = std::fs::read_to_string(zero_only_out).unwrap();
+    assert!(zero_only_svg.contains("<svg"));
+    assert_eq!(
+        zero_only_svg.matches("<circle").count(),
+        0,
+        "zero-error interval-only row must not draw a best marker; svg was:\n{zero_only_svg}"
+    );
+}
+
+#[test]
 fn render_benchmark_plot_handles_single_linear_point_and_dashed_distance_series() {
     let single_point_spec = spec_with_panels(
         "Surface Decoder",
@@ -749,9 +795,11 @@ label = "Decode Time Per Shot"
         &single_out,
     )
     .unwrap();
-    assert!(std::fs::read_to_string(single_out)
-        .unwrap()
-        .contains("<svg"));
+    assert!(
+        std::fs::read_to_string(single_out)
+            .unwrap()
+            .contains("<svg")
+    );
 
     let dashed_rows = vec![
         ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
@@ -761,9 +809,11 @@ label = "Decode Time Per Shot"
     ];
     let dashed_out = dir.path().join("dashed.svg");
     render_benchmark_plot(&dashed_series_spec, &dashed_rows, &dashed_out).unwrap();
-    assert!(std::fs::read_to_string(dashed_out)
-        .unwrap()
-        .contains("rmatching d=5"));
+    assert!(
+        std::fs::read_to_string(dashed_out)
+            .unwrap()
+            .contains("rmatching d=5")
+    );
 }
 
 fn spec_with_panels(
