@@ -1,6 +1,4 @@
 from benchmarks.bb_circuit_bposd_compare.cases import CSV_HEADER, SMOKE_CASES
-from benchmarks.bb_circuit_bposd_compare.summary import write_summary
-from benchmarks.bb_circuit_bposd_compare.verify_smoke import verify_rows
 
 __all__ = [
     "CSV_HEADER",
@@ -8,3 +6,15 @@ __all__ = [
     "verify_rows",
     "write_summary",
 ]
+
+
+def __getattr__(name: str):
+    if name == "verify_rows":
+        from benchmarks.bb_circuit_bposd_compare.verify_smoke import verify_rows
+
+        return verify_rows
+    if name == "write_summary":
+        from benchmarks.bb_circuit_bposd_compare.summary import write_summary
+
+        return write_summary
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
