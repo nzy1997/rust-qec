@@ -253,3 +253,30 @@ fn osd_order_two_decode_reports_candidate_and_gf2_counters() {
     );
     assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
 }
+
+#[test]
+fn profile_decode_with_osd_candidate_limit_counts_bounded_actual_candidates() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 4, vec![vec![0, 2], vec![1, 3]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3, 0.4]),
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let stats = decoder
+        .profile_decode_with_osd_candidate_limit(&Syndrome::from(vec![true, false]), 2)
+        .unwrap();
+
+    assert_eq!(stats.decode_call_count, 1);
+    assert_eq!(stats.osd_use_count, 1);
+    assert_eq!(stats.osd_candidate_count, 2);
+    assert_eq!(stats.gf2_solve_count, 3);
+    assert_eq!(stats.gf2_full_elimination_count, 3);
+    assert!(stats.osd_seconds.is_finite());
+    assert!(stats.osd_seconds >= 0.0);
+}

@@ -865,7 +865,10 @@ pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> 
                 "x_decode_call_count",
                 result.profile.x_decode_call_count as f64,
             ),
-            ("bp_iteration_count", result.profile.bp_iteration_count as f64),
+            (
+                "bp_iteration_count",
+                result.profile.bp_iteration_count as f64,
+            ),
             ("osd_use_count", result.profile.osd_use_count as f64),
             (
                 "osd_candidate_count",
@@ -1013,6 +1016,38 @@ pub fn profile_syndrome_replay(
     max_bp_iterations: usize,
     osd_order: usize,
 ) -> Result<BbCircuitBposdProfile, String> {
+    let decoder = BpOsdDecoder::new(
+        model.decoder.clone(),
+        ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
+        DecoderConfig {
+            max_bp_iterations,
+            osd_order,
+            ..DecoderConfig::default()
+        },
+    )
+    .map_err(|error| format!("failed to compile replay profile decoder: {error}"))?;
+
+    let decode_started = Instant::now();
+    let decode_result = decode_logicals(&decoder, syndrome_bits)
+        .map_err(|error| format!("failed to decode replay syndrome: {error}"))?;
+
+    let mut profile = BbCircuitBposdProfile {
+        setup_seconds: 0.0,
+        sample_seconds: 0.0,
+        decode_seconds: decode_started.elapsed().as_secs_f64(),
+        ..BbCircuitBposdProfile::default()
+    };
+    profile.add_z_stats(&decode_result.stats);
+    Ok(profile)
+}
+
+pub fn profile_syndrome_replay_with_candidate_limit(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+    osd_candidate_limit: usize,
+) -> Result<BbCircuitBposdProfile, String> {
     let syndrome = Syndrome::from(syndrome_bits.to_vec());
     let decoder = BpOsdDecoder::new(
         model.decoder.clone(),
@@ -1026,32 +1061,14 @@ pub fn profile_syndrome_replay(
     .map_err(|error| format!("failed to compile replay profile decoder: {error}"))?;
 
     let decode_started = Instant::now();
-    let diagnostic = decoder
-        .diagnose_osd_path(&syndrome)
-        .map_err(|error| format!("failed to diagnose replay syndrome: {error}"))?;
-    let decode_seconds = decode_started.elapsed().as_secs_f64();
-
-    let osd_candidate_count = usize::try_from(diagnostic.planned_candidate_count)
-        .unwrap_or(usize::MAX);
-    let gf2_count = if diagnostic.used_osd {
-        osd_candidate_count.saturating_add(1)
-    } else {
-        0
-    };
-    let stats = DecodeStats {
-        decode_call_count: 1,
-        bp_iteration_count: diagnostic.bp_iterations,
-        osd_use_count: usize::from(diagnostic.used_osd),
-        osd_candidate_count,
-        gf2_solve_count: gf2_count,
-        gf2_full_elimination_count: gf2_count,
-        ..DecodeStats::default()
-    };
+    let stats = decoder
+        .profile_decode_with_osd_candidate_limit(&syndrome, osd_candidate_limit)
+        .map_err(|error| format!("failed to profile replay syndrome: {error}"))?;
 
     let mut profile = BbCircuitBposdProfile {
         setup_seconds: 0.0,
         sample_seconds: 0.0,
-        decode_seconds,
+        decode_seconds: decode_started.elapsed().as_secs_f64(),
         ..BbCircuitBposdProfile::default()
     };
     profile.add_z_stats(&stats);
@@ -1339,10 +1356,7 @@ fn extract_logical_vector(code: &BbCode, logical_rows: &[Vec<usize>], state: &[b
         .collect()
 }
 
-fn decode_logicals(
-    decoder: &BpOsdDecoder,
-    syndrome_bits: &[bool],
-    ) -> Result<DecodeResult, String> {
+fn decode_logicals(decoder: &BpOsdDecoder, syndrome_bits: &[bool]) -> Result<DecodeResult, String> {
     decoder
         .decode(&Syndrome::from(syndrome_bits.to_vec()))
         .map_err(|error| format!("rbposd decode failed: {error}"))

@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
     EffectiveDecoderModel, SimulationConfig, SyndromeReplayDiagnostic, build_code,
-    build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
+    build_effective_models, build_syndrome_cycle, profile_syndrome_replay_with_candidate_limit,
     replay_syndrome_diagnostic, sample_seeded_trial,
 };
 
@@ -10,6 +10,7 @@ const FIXTURE_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/tests/fixtures/bb_circuit_bposd/bb90_hard_syndrome.json"
 );
+const PROFILE_CANDIDATE_LIMIT: usize = 16;
 
 #[derive(Debug, Clone, Deserialize)]
 struct HardSyndromeFixture {
@@ -141,26 +142,28 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 fn bb90_hard_syndrome_reports_osd_profile_counters() {
     let fixture = load_fixture();
     let computed = compute_fixture_replay(&fixture).unwrap();
-    let profile = profile_syndrome_replay(
+    let profile = profile_syndrome_replay_with_candidate_limit(
         &computed.model,
         &computed.sampled_syndrome,
         fixture.max_bp_iterations,
         fixture.osd_order,
+        PROFILE_CANDIDATE_LIMIT,
     )
     .unwrap();
 
     println!(
-        "case_id={} basis={:?} syndrome_weight={} profile={profile:#?}",
+        "case_id={} basis={:?} syndrome_weight={} candidate_limit={} profile={profile:#?}",
         fixture.case_id,
         fixture.basis,
         computed.sampled_support.len(),
+        PROFILE_CANDIDATE_LIMIT,
     );
 
     assert!(profile.decode_call_count > 0);
     assert!(profile.osd_use_count > 0);
-    assert!(profile.osd_candidate_count > 0);
-    assert!(profile.gf2_solve_count > 0);
-    assert!(profile.gf2_full_elimination_count > 0);
+    assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
 }
 
 fn load_fixture() -> HardSyndromeFixture {

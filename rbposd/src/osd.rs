@@ -111,11 +111,7 @@ pub(crate) fn decode_osd_with_workspace(
 
     let (base, gf2_stats) = workspace
         .prepared
-        .solve_with_column_order_detailed_with_stats(
-            &target_syndrome,
-            &workspace.column_order,
-            &[],
-        )
+        .solve_with_column_order_detailed_with_stats(&target_syndrome, &workspace.column_order, &[])
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
     let best = best_osd_candidate(
@@ -154,6 +150,68 @@ pub(crate) fn diagnose_osd_candidate_search_with_workspace(
     Ok(candidate_search_plan(&base, osd_order))
 }
 
+pub(crate) fn profile_osd_with_workspace(
+    pcm: &ParityCheckMatrix,
+    syndrome: &Syndrome,
+    base_correction_bits: &[bool],
+    reliability: &[f64],
+    workspace: &mut OsdWorkspace,
+    osd_order: usize,
+    candidate_limit: usize,
+) -> Result<OsdDecodeStats, DecodeError> {
+    debug_assert_eq!(workspace.num_checks, pcm.num_checks());
+    debug_assert_eq!(workspace.num_bits, pcm.num_bits());
+    debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
+    debug_assert_eq!(reliability.len(), pcm.num_bits());
+    let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
+    workspace.sort_unreliable_columns(reliability);
+    let mut stats = OsdDecodeStats::default();
+
+    let (base, gf2_stats) = workspace
+        .prepared
+        .solve_with_column_order_detailed_with_stats(&target_syndrome, &workspace.column_order, &[])
+        .map_err(|_| DecodeError::NoOsdSolution)?;
+    accumulate_gf2_stats(&mut stats, gf2_stats);
+
+    if osd_order == 0 || candidate_limit == 0 {
+        return Ok(stats);
+    }
+
+    let frontier_len = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
+    let frontier = base.free_columns[..frontier_len].to_vec();
+    let max_order = osd_order.min(frontier.len());
+    let mut forced = Vec::new();
+    let mut visited = 0usize;
+    for order in 1..=max_order {
+        visit_combinations_until(
+            &frontier,
+            order,
+            0,
+            &mut forced,
+            &mut visited,
+            candidate_limit,
+            &mut |columns| {
+                stats.osd_candidate_count += 1;
+                let mut gf2_stats = Gf2SolveStats::default();
+                let _ = workspace
+                    .prepared
+                    .solve_with_column_order_detailed_counting(
+                        &target_syndrome,
+                        &workspace.column_order,
+                        columns,
+                        &mut gf2_stats,
+                    );
+                accumulate_gf2_stats(&mut stats, gf2_stats);
+            },
+        );
+        if visited >= candidate_limit {
+            break;
+        }
+    }
+
+    Ok(stats)
+}
+
 fn accumulate_gf2_stats(stats: &mut OsdDecodeStats, gf2_stats: Gf2SolveStats) {
     stats.gf2_solve_count += gf2_stats.solve_count;
     stats.gf2_full_elimination_count += gf2_stats.full_elimination_count;
@@ -176,12 +234,14 @@ fn best_osd_candidate(
         visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
             stats.osd_candidate_count += 1;
             let mut gf2_stats = Gf2SolveStats::default();
-            let candidate = workspace.prepared.solve_with_column_order_detailed_counting(
-                target_syndrome,
-                &workspace.column_order,
-                columns,
-                &mut gf2_stats,
-            );
+            let candidate = workspace
+                .prepared
+                .solve_with_column_order_detailed_counting(
+                    target_syndrome,
+                    &workspace.column_order,
+                    columns,
+                    &mut gf2_stats,
+                );
             accumulate_gf2_stats(stats, gf2_stats);
             if let Ok(candidate) = candidate {
                 if is_better_solution(&candidate, &best, reliability) {
@@ -236,6 +296,42 @@ fn visit_combinations(
         forced.push(columns[index]);
         visit_combinations(columns, target_len, index + 1, forced, visit);
         forced.pop();
+    }
+}
+
+fn visit_combinations_until(
+    columns: &[usize],
+    target_len: usize,
+    start: usize,
+    forced: &mut Vec<usize>,
+    visited: &mut usize,
+    limit: usize,
+    visit: &mut impl FnMut(&[usize]),
+) {
+    if *visited >= limit {
+        return;
+    }
+    if forced.len() == target_len {
+        *visited += 1;
+        visit(forced);
+        return;
+    }
+    let remaining = target_len - forced.len();
+    for index in start..=columns.len() - remaining {
+        forced.push(columns[index]);
+        visit_combinations_until(
+            columns,
+            target_len,
+            index + 1,
+            forced,
+            visited,
+            limit,
+            visit,
+        );
+        forced.pop();
+        if *visited >= limit {
+            break;
+        }
     }
 }
 

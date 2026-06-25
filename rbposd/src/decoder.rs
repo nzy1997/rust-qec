@@ -8,6 +8,7 @@ use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{
     OsdWorkspace, decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
+    profile_osd_with_workspace,
 };
 use crate::vector::{Correction, Syndrome};
 
@@ -237,6 +238,72 @@ impl BpOsdDecoder {
             candidate_search_frontier_size: plan.candidate_search_frontier_size,
             max_candidate_order: plan.max_candidate_order,
             planned_candidate_count: plan.planned_candidate_count,
+        })
+    }
+
+    pub fn profile_decode_with_osd_candidate_limit(
+        &self,
+        syndrome: &Syndrome,
+        osd_candidate_limit: usize,
+    ) -> Result<DecodeStats, DecodeError> {
+        if syndrome.len() != self.pcm.num_checks() {
+            return Err(DecodeError::DimensionMismatch {
+                what: "syndrome",
+                expected: self.pcm.num_checks(),
+                actual: syndrome.len(),
+            });
+        }
+
+        if syndrome.weight() == 0 {
+            let prior_correction = self.core.hard_decision_from_prior();
+            if self.pcm.multiply(&prior_correction) == *syndrome {
+                return Ok(DecodeStats {
+                    decode_call_count: 1,
+                    ..DecodeStats::default()
+                });
+            }
+        }
+
+        let bp_start = Instant::now();
+        let mut bp_workspace = self.bp_workspace.lock().unwrap();
+        let bp_info = self
+            .core
+            .run_bp_in_place(syndrome, &self.config, &mut bp_workspace);
+        let bp_seconds = bp_start.elapsed().as_secs_f64();
+        if bp_info.residual_weight == 0 {
+            return Ok(DecodeStats {
+                bp_seconds,
+                decode_call_count: 1,
+                bp_iteration_count: bp_info.iterations,
+                ..DecodeStats::default()
+            });
+        }
+
+        let osd_start = Instant::now();
+        let osd_stats = {
+            let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            profile_osd_with_workspace(
+                &self.pcm,
+                syndrome,
+                &bp_workspace.hard_decision_bits,
+                &bp_workspace.reliability,
+                &mut osd_workspace,
+                self.config.osd_order,
+                osd_candidate_limit,
+            )?
+        };
+        let osd_seconds = osd_start.elapsed().as_secs_f64();
+        drop(bp_workspace);
+
+        Ok(DecodeStats {
+            bp_seconds,
+            osd_seconds,
+            decode_call_count: 1,
+            bp_iteration_count: bp_info.iterations,
+            osd_use_count: 1,
+            osd_candidate_count: osd_stats.osd_candidate_count,
+            gf2_solve_count: osd_stats.gf2_solve_count,
+            gf2_full_elimination_count: osd_stats.gf2_full_elimination_count,
         })
     }
 }
