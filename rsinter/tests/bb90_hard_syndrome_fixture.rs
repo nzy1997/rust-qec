@@ -2,10 +2,10 @@ use rbposd::ParityCheckMatrix;
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
-    EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig, SyndromeReplayDiagnostic,
     build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
     profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit_for_basis,
-    replay_syndrome_diagnostic, sample_seeded_trial,
+    replay_syndrome_diagnostic, sample_seeded_trial, EffectiveDecoderModel, ProfileReplayBasis,
+    SimulationConfig, SyndromeReplayDiagnostic,
 };
 
 const FIXTURE_PATH: &str = concat!(
@@ -75,53 +75,41 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 
     let mut low_p = fixture.clone();
     low_p.physical_error_rate = 1.0e-12;
-    assert!(
-        validate_fixture(&low_p)
-            .unwrap_err()
-            .contains("fixture physical_error_rate mismatch")
-    );
+    assert!(validate_fixture(&low_p)
+        .unwrap_err()
+        .contains("fixture physical_error_rate mismatch"));
 
     let mut osd0 = fixture.clone();
     osd0.osd_order = 0;
-    assert!(
-        validate_fixture(&osd0)
-            .unwrap_err()
-            .contains("fixture osd_order mismatch")
-    );
+    assert!(validate_fixture(&osd0)
+        .unwrap_err()
+        .contains("fixture osd_order mismatch"));
 
     let mut wrong_seed = fixture.clone();
     wrong_seed.seed += 1;
-    assert!(
-        validate_fixture(&wrong_seed)
-            .unwrap_err()
-            .contains("fixture seed mismatch")
-    );
+    assert!(validate_fixture(&wrong_seed)
+        .unwrap_err()
+        .contains("fixture seed mismatch"));
 
     let mut wrong_code = fixture.clone();
     wrong_code.code_id = "bb144".to_owned();
-    assert!(
-        validate_fixture(&wrong_code)
-            .unwrap_err()
-            .contains("expected BB90 shape")
-    );
+    assert!(validate_fixture(&wrong_code)
+        .unwrap_err()
+        .contains("expected BB90 shape"));
 
     let computed = compute_fixture_replay(&fixture).unwrap();
 
     let mut wrong_support = fixture.clone();
     wrong_support.syndrome_support[0] += 1;
-    assert!(
-        validate_computed_fixture(&wrong_support, &computed)
-            .unwrap_err()
-            .contains("sampled syndrome support mismatch")
-    );
+    assert!(validate_computed_fixture(&wrong_support, &computed)
+        .unwrap_err()
+        .contains("sampled syndrome support mismatch"));
 
     let mut wrong_prediction = fixture.clone();
     wrong_prediction.expected_osd0_logical_prediction[0] ^= true;
-    assert!(
-        validate_computed_fixture(&wrong_prediction, &computed)
-            .unwrap_err()
-            .contains("OSD-0 logical prediction mismatch")
-    );
+    assert!(validate_computed_fixture(&wrong_prediction, &computed)
+        .unwrap_err()
+        .contains("OSD-0 logical prediction mismatch"));
 
     let mut wrong_prediction_order = fixture.clone();
     wrong_prediction_order.expected_logical_prediction_decode_order = 7;
@@ -133,11 +121,9 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 
     let mut wrong_frontier = fixture.clone();
     wrong_frontier.expected_candidate_search_frontier_size += 1;
-    assert!(
-        validate_computed_fixture(&wrong_frontier, &computed)
-            .unwrap_err()
-            .contains("candidate_search_frontier_size mismatch")
-    );
+    assert!(validate_computed_fixture(&wrong_frontier, &computed)
+        .unwrap_err()
+        .contains("candidate_search_frontier_size mismatch"));
 }
 
 #[test]

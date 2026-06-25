@@ -394,7 +394,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
+    use super::{binomial, decode_osd0_with_workspace, OsdWorkspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {

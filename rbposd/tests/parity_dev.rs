@@ -249,7 +249,10 @@ fn parity_runner_decodes_bplsd_cases_when_decoder_field_is_set() {
             let pcm = rbposd::ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![1, 2], vec![0]])
                 .unwrap();
             let syndrome = rbposd::Syndrome::from(vec![true, false]);
-            assert_eq!(pcm.multiply(&rbposd::Correction::from(correction)), syndrome);
+            assert_eq!(
+                pcm.multiply(&rbposd::Correction::from(correction)),
+                syndrome
+            );
             assert_eq!(diagnostics.used_osd, Some(false));
             assert_eq!(diagnostics.residual_syndrome_weight, Some(0));
         }

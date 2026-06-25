@@ -6,7 +6,7 @@ use crate::config::{ChannelModel, DecoderConfig, LsdConfig, LsdMethod};
 use crate::decoder::{DecodeResult, DecodeStats};
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
-use crate::lsd::{LsdWorkspace, decode_lsd_with_workspace};
+use crate::lsd::{decode_lsd_with_workspace, LsdWorkspace};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
@@ -99,9 +99,9 @@ impl BpLsdDecoder {
 
         let bp_start = Instant::now();
         let mut bp_workspace = self.bp_workspace.lock().unwrap();
-        let bp_info =
-            self.core
-                .run_bp_in_place(syndrome, &self.bp_config, &mut bp_workspace);
+        let bp_info = self
+            .core
+            .run_bp_in_place(syndrome, &self.bp_config, &mut bp_workspace);
         let bp_seconds = bp_start.elapsed().as_secs_f64();
         if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {

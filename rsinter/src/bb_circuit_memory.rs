@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rbposd::{
     BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig,
     ParityCheckMatrix, Syndrome,
@@ -1641,13 +1641,13 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 #[cfg(test)]
 mod tests {
     use super::{
-        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
-        SimulationConfig, apply_pauli_fault, build_upstream_code, cnot_fault_for_index,
-        correction_to_logicals, in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
-        sample_operation_fault, sample_single_axis, validate_model_config,
-        validate_physical_error_rate, validate_simulation_config,
+        apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
+        in_row_span, nullspace, parse_schedule_slot, rref, run_simulation, sample_operation_fault,
+        sample_single_axis, validate_model_config, validate_physical_error_rate,
+        validate_simulation_config, EffectiveDecoderModel, FaultBasis, Operation, OperationKind,
+        PauliAxis, PauliFault, SimulationConfig,
     };
-    use rand::{SeedableRng, rngs::StdRng};
+    use rand::{rngs::StdRng, SeedableRng};
     use rbposd::{Correction, ParityCheckMatrix};
 
     #[test]

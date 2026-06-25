@@ -7,8 +7,8 @@ use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{
-    OsdWorkspace, decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
-    profile_osd_with_workspace,
+    decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
+    profile_osd_with_workspace, OsdWorkspace,
 };
 use crate::vector::{Correction, Syndrome};
 

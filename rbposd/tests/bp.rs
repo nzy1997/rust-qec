@@ -297,8 +297,7 @@ fn product_sum_serial_changes_bp_snapshot_on_borrowed_case() {
     let default_mode_report = parity_runner::run_case(&comparison_case);
 
     assert_ne!(
-        sensitive_report.actual,
-        default_mode_report.actual,
+        sensitive_report.actual, default_mode_report.actual,
         "product_sum + serial must differ from minimum_sum + parallel on the sensitive fixture"
     );
 }
@@ -327,13 +326,11 @@ fn product_sum_serial_teeth_cases() {
     let product_sum_parallel = parity_runner::run_case(&product_sum_parallel_case);
 
     assert_ne!(
-        product_sum_serial.actual,
-        minimum_sum_serial.actual,
+        product_sum_serial.actual, minimum_sum_serial.actual,
         "product_sum must change decoder behavior while schedule stays serial"
     );
     assert_ne!(
-        product_sum_serial.actual,
-        product_sum_parallel.actual,
+        product_sum_serial.actual, product_sum_parallel.actual,
         "serial schedule must change decoder behavior while bp method stays product_sum"
     );
 }
@@ -346,7 +343,10 @@ fn minimum_sum_parallel_regression_suite_still_passes() {
         "osd_small_sparse_code.json",
     ] {
         let case = load_parity_case(fixture_name);
-        assert_eq!(case.config.bp_variant, parity_schema::BpVariantSpec::MinimumSum);
+        assert_eq!(
+            case.config.bp_variant,
+            parity_schema::BpVariantSpec::MinimumSum
+        );
         assert_eq!(case.config.schedule, parity_schema::ScheduleSpec::Parallel);
         let report = parity_runner::run_case(&case);
         assert_eq!(

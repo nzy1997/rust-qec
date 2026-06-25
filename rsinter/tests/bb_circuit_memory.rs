@@ -1,7 +1,7 @@
 use rsinter::bb_circuit_memory::{
-    OperationKind, SimulationConfig, bb_circuit_bposd_result_row, build_code,
-    build_effective_models, build_syndrome_cycle, build_upstream_code, run_simulation,
-    run_simulation_for_code, sample_seeded_trial, validate_bposd_profile_result_row,
+    bb_circuit_bposd_result_row, build_code, build_effective_models, build_syndrome_cycle,
+    build_upstream_code, run_simulation, run_simulation_for_code, sample_seeded_trial,
+    validate_bposd_profile_result_row, OperationKind, SimulationConfig,
 };
 
 #[test]
@@ -84,16 +84,12 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
 
     assert_eq!(operations.len(), 216 + 5 * 144 + 216 + 288);
 
-    assert!(
-        operations[..72]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::PrepX)
-    );
-    assert!(
-        operations[72..144]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::Cnot)
-    );
+    assert!(operations[..72]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::PrepX));
+    assert!(operations[72..144]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::Cnot));
     assert!(operations[144..216].iter().all(|operation| {
         operation.kind() == OperationKind::Idle
             && operation.qubits().len() == 1
@@ -103,54 +99,40 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
     for round in 0..5 {
         let start = 216 + round * 144;
         let end = start + 144;
-        assert!(
-            operations[start..end]
-                .iter()
-                .all(|operation| operation.kind() == OperationKind::Cnot)
-        );
+        assert!(operations[start..end]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::Cnot));
     }
 
     let round6 = 216 + 5 * 144;
-    assert!(
-        operations[round6..round6 + 72]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::MeasZ)
-    );
-    assert!(
-        operations[round6 + 72..round6 + 144]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::Cnot)
-    );
-    assert!(
-        operations[round6 + 144..round6 + 216]
-            .iter()
-            .all(|operation| {
-                operation.kind() == OperationKind::Idle
-                    && operation.qubits().len() == 1
-                    && (data_start..=data_end).contains(&operation.qubits()[0])
-            })
-    );
+    assert!(operations[round6..round6 + 72]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::MeasZ));
+    assert!(operations[round6 + 72..round6 + 144]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::Cnot));
+    assert!(operations[round6 + 144..round6 + 216]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
 
     let final_layer = round6 + 216;
-    assert!(
-        operations[final_layer..final_layer + 144]
-            .iter()
-            .all(|operation| {
-                operation.kind() == OperationKind::Idle
-                    && operation.qubits().len() == 1
-                    && (data_start..=data_end).contains(&operation.qubits()[0])
-            })
-    );
-    assert!(
-        operations[final_layer + 144..final_layer + 216]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::MeasX)
-    );
-    assert!(
-        operations[final_layer + 216..final_layer + 288]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::PrepZ)
-    );
+    assert!(operations[final_layer..final_layer + 144]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
+    assert!(operations[final_layer + 144..final_layer + 216]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::MeasX));
+    assert!(operations[final_layer + 216..final_layer + 288]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::PrepZ));
 
     assert_eq!(checks, 72);
 }
@@ -265,12 +247,10 @@ fn effective_models_only_use_basis_specific_logical_rows() {
             "expected at least one augmented column with logical support"
         );
         assert!(logical_rows.iter().all(|&row| row < logical_rows_end));
-        assert!(
-            model
-                .augmented_columns
-                .iter()
-                .any(|column| column.iter().any(|&row| row >= first_logical_row))
-        );
+        assert!(model
+            .augmented_columns
+            .iter()
+            .any(|column| column.iter().any(|&row| row >= first_logical_row)));
     }
 }
 
@@ -353,9 +333,7 @@ fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
     assert!(validate_bposd_profile_result_row(&non_finite).is_err());
 
     let mut negative = bb_circuit_bposd_result_row("bb90", &result);
-    negative
-        .metrics
-        .insert("decode_seconds".to_string(), -1.0);
+    negative.metrics.insert("decode_seconds".to_string(), -1.0);
     assert!(validate_bposd_profile_result_row(&negative).is_err());
 
     result.profile.x_decode_call_count += 1;

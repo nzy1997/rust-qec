@@ -202,8 +202,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
-        sort_columns_by_unreliability,
+        solve_with_column_order, sort_columns_by_reliability, sort_columns_by_unreliability,
+        PreparedLinearSystem,
     };
 
     #[test]
