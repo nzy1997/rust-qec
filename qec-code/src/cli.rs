@@ -5,6 +5,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
+use crate::codes::quantum_tanner::{
+    QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
+};
 use crate::codes::steane::Steane;
 use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::compute_distance;
@@ -88,6 +91,11 @@ pub enum CssCommands {
         code_id: String,
         matrix: CssMatrixKind,
     },
+    QuantumTanner {
+        #[arg(long)]
+        spec: PathBuf,
+        matrix: CssMatrixKind,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -160,6 +168,7 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
     match args.command {
         Some(CssCommands::List) => Ok(run_css_list()),
         Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
+        Some(CssCommands::QuantumTanner { spec, matrix }) => run_css_quantum_tanner(&spec, matrix),
         None => {
             let code_id = args
                 .code_id
@@ -205,6 +214,27 @@ fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
 
     let matrix = SparseRowsMatrix::new(num_cols, rows)?;
     Ok(matrix.to_json_string())
+}
+
+fn run_css_quantum_tanner(spec: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
+    let spec = read_quantum_tanner_spec(spec)?;
+    let checks = quantum_tanner_css_checks(&spec)?;
+    let rows = match matrix {
+        CssMatrixKind::Hx => checks.hx,
+        CssMatrixKind::Hz => checks.hz,
+    };
+
+    let matrix = SparseRowsMatrix::new(checks.num_cols, rows)?;
+    Ok(matrix.to_json_string())
+}
+
+fn read_quantum_tanner_spec(path: &PathBuf) -> Result<QuantumTannerSpec, QecError> {
+    let input = fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
+        path: path.display().to_string(),
+        source: CssMatrixReadSource(err.to_string()),
+    })?;
+
+    quantum_tanner_spec_from_json_str(&input)
 }
 
 fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {
