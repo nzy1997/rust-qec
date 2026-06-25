@@ -344,6 +344,10 @@ mod tests {
         let matrix = vec![vec![1, 0, 1, 0], vec![0, 1, 1, 0]];
         let error =
             try_random_window_kernel_basis_with_width(&matrix, 4, &[0, 1, 1, 3]).unwrap_err();
+        let short_error =
+            try_random_window_kernel_basis_with_width(&matrix, 4, &[0, 1, 2]).unwrap_err();
+        let out_of_range_error =
+            try_random_window_kernel_basis_with_width(&matrix, 4, &[0, 1, 2, 4]).unwrap_err();
 
         assert_eq!(
             error,
@@ -352,6 +356,18 @@ mod tests {
             }
         );
         assert!(error.to_string().contains("invalid column permutation"));
+        assert_eq!(
+            short_error,
+            QecError::InvalidColumnPermutation {
+                reason: "expected length 4, got 3".to_owned(),
+            }
+        );
+        assert_eq!(
+            out_of_range_error,
+            QecError::InvalidColumnPermutation {
+                reason: "column 4 out of range for width 4".to_owned(),
+            }
+        );
     }
 
     #[test]
