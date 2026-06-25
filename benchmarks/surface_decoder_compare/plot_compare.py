@@ -9,6 +9,7 @@ from pathlib import Path
 import argparse
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path("/tmp") / "codex-mpl-cache"))
+os.environ.setdefault("XDG_CACHE_HOME", str(Path("/tmp") / "codex-cache"))
 
 import matplotlib
 

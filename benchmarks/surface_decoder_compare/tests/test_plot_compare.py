@@ -1,10 +1,14 @@
 import csv
 import math
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+os.environ.setdefault("MPLCONFIGDIR", str(Path("/tmp") / "codex-mpl-cache"))
+os.environ.setdefault("XDG_CACHE_HOME", str(Path("/tmp") / "codex-cache"))
 
 import matplotlib.colors as mcolors
 

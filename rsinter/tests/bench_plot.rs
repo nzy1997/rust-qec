@@ -834,11 +834,11 @@ fn surface_compare_fixture_matches_rsinter_plot_semantics() {
         "shared fixture should draw only the nonzero best marker; svg was:\n{default_svg}"
     );
 
-    let default_interval_height = target_interval_pixel_height(&default_svg);
+    let default_interval_height = confidence_band_pixel_height(&default_svg);
     let wide_spec =
         surface_compare_fixture_spec("confidence_interval_likelihood_factor = 25.0");
     let wide_svg = render_plot_svg(&wide_spec, &rows, "surface-compare-wide.svg");
-    let wide_interval_height = target_interval_pixel_height(&wide_svg);
+    let wide_interval_height = confidence_band_pixel_height(&wide_svg);
     assert!(
         wide_interval_height > default_interval_height,
         "wider factor should produce a taller interval; default={default_interval_height}, wide={wide_interval_height}\n\
@@ -1574,48 +1574,80 @@ fn render_plot_svg(spec: &BenchmarkSpec, rows: &[BenchmarkResultRow], file_name:
 }
 
 #[derive(Debug)]
-struct IntervalBandSpan {
+struct VerticalIntervalSegment {
     x: f64,
     height: f64,
 }
 
 fn target_interval_pixel_height(svg: &str) -> f64 {
-    let mut spans: Vec<_> = svg
+    let mut segments: Vec<_> = svg
         .lines()
-        .filter(|line| line.contains("<polygon") || line.contains("<polyline"))
-        .filter(|line| line.contains("points=\""))
-        .filter(|line| line.contains("fill=\"#") || line.contains("stroke=\"#"))
-        .filter(|line| !line.contains("fill=\"#FFFFFF\""))
-        .filter_map(parse_interval_band_span)
+        .filter(|line| line.contains("<polyline"))
+        .filter(|line| line.contains("fill=\"none\""))
+        .filter(|line| line.contains("stroke-width=\"1\""))
+        .filter(|line| line.contains("stroke=\"#") && !line.contains("stroke=\"#000000\""))
+        .filter_map(parse_vertical_interval_segment)
         .collect();
-    spans.sort_by(|left, right| {
+    segments.sort_by(|left, right| {
         left.x
             .partial_cmp(&right.x)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     assert!(
-        !spans.is_empty(),
-        "expected at least one interval band span, got {spans:?}\nsvg:\n{svg}"
+        segments.len() >= 3,
+        "expected at least three single-point interval segments, got {segments:?}\nsvg:\n{svg}"
     );
-    spans[spans.len() / 2].height
+    segments[segments.len() / 2].height
 }
 
-fn parse_interval_band_span(line: &str) -> Option<IntervalBandSpan> {
+fn parse_vertical_interval_segment(line: &str) -> Option<VerticalIntervalSegment> {
     let points = svg_attribute(line, "points")?;
-    let points: Vec<_> = points.split_whitespace().filter_map(parse_svg_point).collect();
-    for window in points.windows(2) {
-        let first = window[0];
-        let second = window[1];
-        if (first.0 - second.0).abs() > 1e-6 {
-            continue;
-        }
-        let x = first.0;
-        let height = (first.1 - second.1).abs();
-        if height > 0.0 {
-            return Some(IntervalBandSpan { x, height });
-        }
+    let mut points = points.split_whitespace().filter_map(parse_svg_point);
+    let first = points.next()?;
+    let second = points.next()?;
+    if points.next().is_some() {
+        return None;
     }
-    None
+    if (first.0 - second.0).abs() > 1e-6 {
+        return None;
+    }
+    let height = (first.1 - second.1).abs();
+    if height <= 0.0 {
+        return None;
+    }
+    Some(VerticalIntervalSegment { x: first.0, height })
+}
+
+fn confidence_band_pixel_height(svg: &str) -> f64 {
+    let polygon = svg
+        .lines()
+        .find(|line| {
+            line.contains("<polygon")
+                && line.contains("fill=\"#")
+                && !line.contains("fill=\"#FFFFFF\"")
+        })
+        .unwrap_or_else(|| panic!("expected one confidence-band polygon; svg was:\n{svg}"));
+    let points: Vec<_> = svg_attribute(polygon, "points")
+        .unwrap()
+        .split_whitespace()
+        .filter_map(parse_svg_point)
+        .collect();
+    let max_x = points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let y_values: Vec<_> = points
+        .iter()
+        .filter(|(x, _)| (*x - max_x).abs() <= 1e-6)
+        .map(|(_, y)| *y)
+        .collect();
+    let min_y = y_values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max_y = y_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        min_y.is_finite() && max_y.is_finite() && max_y > min_y,
+        "confidence-band polygon should have vertical span, got {y_values:?}\nsvg:\n{svg}"
+    );
+    max_y - min_y
 }
 
 fn svg_attribute<'a>(line: &'a str, name: &str) -> Option<&'a str> {
