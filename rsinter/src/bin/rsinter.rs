@@ -8,7 +8,7 @@ use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
-use rsinter::bench::run::run_rust_benchmark;
+use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
 
 #[derive(Parser)]
@@ -56,6 +56,8 @@ enum BenchCommands {
         language: String,
         #[arg(long)]
         out: String,
+        #[arg(long, help = "Resume from existing per-runner test-run/results.jsonl rows under --out")]
+        resume: bool,
     },
     Merge {
         #[arg(long)]
@@ -90,6 +92,7 @@ fn run() -> Result<(), String> {
                 spec,
                 language,
                 out,
+                resume,
             } => {
                 let spec_path = PathBuf::from(&spec);
                 let spec_dir = spec_path
@@ -100,12 +103,13 @@ fn run() -> Result<(), String> {
                 let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
                 bench_spec.validate()?;
                 let registry = build_default_rust_runner_registry();
-                run_rust_benchmark(
+                run_rust_benchmark_with_options(
                     &bench_spec,
                     &language,
                     PathBuf::from(out).as_path(),
                     &registry,
                     &spec_dir,
+                    BenchRunOptions { resume },
                 )?;
             }
             BenchCommands::Merge {

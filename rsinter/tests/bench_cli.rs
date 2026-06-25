@@ -16,6 +16,17 @@ fn rsinter_cli_help_mentions_bench_subcommands() {
 }
 
 #[test]
+fn rsinter_bench_run_help_mentions_resume_flag() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args(["bench", "run", "--help"])
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--resume"), "{stdout}");
+}
+
+#[test]
 fn rsinter_bench_run_writes_artifacts_from_fixture_spec() {
     let dir = tempfile::tempdir().unwrap();
     let spec = "tests/fixtures/bench/minimal_surface_decoder.toml";

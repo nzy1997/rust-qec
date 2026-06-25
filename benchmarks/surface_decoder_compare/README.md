@@ -48,6 +48,12 @@ executed by the `rsinter` CLI, Python runners are executed by the Python
 benchmark entrypoint, and the final merged plot is rendered by `rsinter`.
 Artifacts are written under `benchmarks/out/surface_decoder/`.
 
+To resume an interrupted Rust runner artifact directory, rerun the same command
+with `--resume`. Existing completed row identities in
+`<out>/<runner>/test-run/results.jsonl` are preserved and skipped; missing or
+incomplete identities are rerun and merged through the normal staged
+`test-run.tmp` write.
+
 ## Notes
 
 - Shared workload: `stim gen surface_code:rotated_memory_x`
