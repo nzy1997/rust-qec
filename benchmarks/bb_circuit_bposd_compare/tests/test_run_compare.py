@@ -52,6 +52,28 @@ def fake_export(case):
 
 
 class RunCompareTest(unittest.TestCase):
+    def _run_suite_with_python_failure(
+        self,
+        error: Exception,
+        *,
+        allow_missing_python: bool = False,
+    ) -> tuple[int, list[dict[str, str]]]:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                side_effect=error,
+            ):
+                status = run_suite(
+                    output_dir=output_dir,
+                    allow_missing_python=allow_missing_python,
+                    rust_exporter=fake_export,
+                )
+
+            with (output_dir / "results.csv").open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        return status, rows
+
     def test_python_row_uses_pinned_upstream_settings(self) -> None:
         case = replace(
             SMOKE_CASES[0],
@@ -124,18 +146,10 @@ class RunCompareTest(unittest.TestCase):
             self.assertEqual(decoder.kwargs["input_vector_type"], "syndrome")
 
     def test_run_suite_writes_skipped_python_rows_and_returns_nonzero(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            with mock.patch(
-                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
-                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
-            ):
-                status = run_suite(output_dir=output_dir, rust_exporter=fake_export)
-
-            self.assertNotEqual(status, 0)
-
-            with (output_dir / "results.csv").open(newline="") as handle:
-                rows = list(csv.DictReader(handle))
+        status, rows = self._run_suite_with_python_failure(
+            ModuleNotFoundError("No module named 'ldpc'"),
+        )
+        self.assertNotEqual(status, 0)
 
         python_rows = [row for row in rows if row["decoder_impl"] == "ldpc_bposd"]
         self.assertEqual(len(python_rows), len(SMOKE_CASES))
@@ -146,23 +160,29 @@ class RunCompareTest(unittest.TestCase):
             "\n".join(verify_rows(rows)),
         )
 
+    def test_run_suite_skips_import_error_dependency_failure(self) -> None:
+        status, rows = self._run_suite_with_python_failure(
+            ImportError("cannot import name 'BpOsdDecoder' from 'ldpc'"),
+        )
+        self.assertNotEqual(status, 0)
+
+        python_rows = [row for row in rows if row["decoder_impl"] == "ldpc_bposd"]
+        self.assertEqual(len(python_rows), len(SMOKE_CASES))
+        self.assertTrue(all(row["status"] == "skipped" for row in python_rows))
+        self.assertTrue(
+            all("ldpc" in row["error"] or "BpOsdDecoder" in row["error"] for row in python_rows)
+        )
+        self.assertIn(
+            "no paired Rust/Python diagnostic case is present",
+            "\n".join(verify_rows(rows)),
+        )
+
     def test_run_suite_allows_missing_python_when_requested(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
-            with mock.patch(
-                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
-                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
-            ):
-                status = run_suite(
-                    output_dir=output_dir,
-                    allow_missing_python=True,
-                    rust_exporter=fake_export,
-                )
-
-            self.assertEqual(status, 0)
-
-            with (output_dir / "results.csv").open(newline="") as handle:
-                rows = list(csv.DictReader(handle))
+        status, rows = self._run_suite_with_python_failure(
+            ModuleNotFoundError("No module named 'ldpc'"),
+            allow_missing_python=True,
+        )
+        self.assertEqual(status, 0)
 
         python_rows = [row for row in rows if row["decoder_impl"] == "ldpc_bposd"]
         self.assertEqual(len(python_rows), len(SMOKE_CASES))

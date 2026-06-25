@@ -21,6 +21,7 @@ PYTHON_UPSTREAM_BP_METHOD = "ms"
 PYTHON_UPSTREAM_MAX_ITER = 10000
 PYTHON_UPSTREAM_OSD_METHOD = "osd_cs"
 PYTHON_UPSTREAM_OSD_ORDER = 7
+PYTHON_DEPENDENCY_HINTS = ("ldpc", "bposd", "numpy", "bposddecoder")
 
 
 def _format_value(value: Any) -> str:
@@ -140,8 +141,25 @@ def _rust_error_row(case: CompareCase, error: Exception) -> dict[str, str]:
 def _skipped_python_row(case: CompareCase, error: Exception) -> dict[str, str]:
     row = _base_row(case, "ldpc_bposd")
     row.update(_python_upstream_settings())
-    row.update({"status": "skipped", "error": str(error)})
+    row.update({"status": "skipped", "error": _python_dependency_error_text(error)})
     return row
+
+
+def _python_dependency_error_text(error: Exception) -> str:
+    return f"python dependency unavailable for ldpc_bposd replay: {error}"
+
+
+def _is_missing_python_dependency(error: Exception) -> bool:
+    if not isinstance(error, ImportError):
+        return False
+
+    current: BaseException | None = error
+    while current is not None:
+        message = str(current).lower()
+        if any(hint in message for hint in PYTHON_DEPENDENCY_HINTS):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def _dense_matrix(model: dict[str, Any], np: Any) -> Any:
@@ -253,7 +271,9 @@ def run_suite(
         rows.append(_rust_row(case, export))
         try:
             rows.append(_python_row(case, export))
-        except ModuleNotFoundError as error:
+        except ImportError as error:
+            if not _is_missing_python_dependency(error):
+                raise
             saw_skipped_python = True
             rows.append(_skipped_python_row(case, error))
 

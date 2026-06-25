@@ -125,3 +125,59 @@ OK
 - The fix stays inside the Task 3 runner and its tests.
 - The regression is targeted at the exact mismatch from review: a successful Python row can no longer mirror altered case metadata.
 - The fake-module test avoids a real `ldpc` dependency while still checking the import-time path and constructor arguments.
+
+## Fix Report: Review Finding - Missing Dependency Import Failures
+
+### What Changed
+
+- Updated `benchmarks/bb_circuit_bposd_compare/run_compare.py` so `run_suite(...)` handles import-time dependency failures from `_python_row(...)` for both `ModuleNotFoundError` and dependency-shaped `ImportError`.
+- Added explicit dependency classification via `_is_missing_python_dependency(...)`:
+  - skips rows only for import failures that clearly point at `ldpc`, `bposd`, `numpy`, or `BpOsdDecoder`
+  - re-raises unrelated `ImportError` cases so runtime failures still surface as errors instead of being silently downgraded
+- Improved skipped-row evidence text to say `python dependency unavailable for ldpc_bposd replay: ...`, which makes the CSV failure mode clearer.
+- Added regression coverage in `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py` for a broken `ldpc` import path:
+  - `ImportError("cannot import name 'BpOsdDecoder' from 'ldpc'")` now produces skipped `ldpc_bposd` rows
+  - the suite still returns nonzero without `allow_missing_python`
+  - `verify_rows(...)` still rejects the CSV as not green
+
+### Test Command / Output
+
+```bash
+python3 -m unittest benchmarks.bb_circuit_bposd_compare.tests.test_run_compare
+```
+
+Observed:
+
+```text
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK
+```
+
+```bash
+python3 -m unittest benchmarks.bb_circuit_bposd_compare.tests.test_verify_smoke benchmarks.bb_circuit_bposd_compare.tests.test_run_compare
+```
+
+Observed:
+
+```text
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.002s
+
+OK
+```
+
+### Files Changed
+
+- `benchmarks/bb_circuit_bposd_compare/run_compare.py`
+- `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py`
+- `.sdd/task-3-report.md`
+
+### Self-Review
+
+- The change stays inside the Task 3 runner, its unit tests, and the task report.
+- Missing or broken `ldpc`/`bposd` import-time failures now leave CSV evidence instead of aborting the suite mid-stream.
+- The classification remains narrow enough that non-dependency `ImportError` failures continue to raise instead of being mislabeled as skips.
