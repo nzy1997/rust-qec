@@ -212,6 +212,8 @@ pub enum Commands {
         r#in: Option<String>,
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "highlight_dem_error")]
+        highlight_dem_error: Option<usize>,
     },
     /// Run performance evidence workflows
     Perf {
@@ -538,9 +540,13 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 &mut w,
             )
         }
-        Some(Commands::RenderSvg { r#in, out }) => {
+        Some(Commands::RenderSvg {
+            r#in,
+            out,
+            highlight_dem_error,
+        }) => {
             let text = read_input(r#in.as_deref())?;
-            let svg = run_render_svg_to_string(&text)?;
+            let svg = run_render_svg_to_string(&text, highlight_dem_error)?;
             let mut w = open_output(out.as_deref())?;
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
@@ -1077,49 +1083,8 @@ fn run_export_json(
     w: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = parse_lines(text)?;
-    if seed.is_some() && !sample_shot {
-        return Err("--seed is only supported with --sample_shot".to_string());
-    }
-    if sample_shot && highlight_dem_error.is_some() {
-        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
-    }
-    let doc = match highlight_dem_error {
-        Some(index) => {
-            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs).map_err(|err| {
-                if err.starts_with("tracked DEM does not yet support instruction ") {
-                    format!(
-                        "--highlight_dem_error currently supports a subset of noise instructions: {err}"
-                    )
-                } else {
-                    err
-                }
-            })?;
-            crate::qp101::export_qp101_with_highlighted_dem_error(&instrs, &tracked, index)
-                .map_err(|err| {
-                    if err.starts_with("DEM error index ") && err.contains(" out of range ") {
-                        format!("DEM error index out of range: {err}")
-                    } else {
-                        err
-                    }
-                })?
-        }
-        None if sample_shot => {
-            let mut ex = Executor::from_instrs(instrs.clone())?;
-            let mut rng = make_rng(seed);
-            let (_out, trace) = ex.run_with_trace(&mut rng)?;
-            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace).map_err(|err| {
-                if err.starts_with("sample trace visualization does not yet support instruction ")
-                {
-                    format!(
-                        "--sample_shot currently supports a subset of sample visualization instructions: {err}"
-                    )
-                } else {
-                    err
-                }
-            })?
-        }
-        None => build_plain_qp101_document(&instrs)?,
-    };
+    let doc =
+        build_qp101_document_for_visualization(&instrs, highlight_dem_error, sample_shot, seed)?;
     match format {
         JsonOutputFormat::Pretty => {
             serde_json::to_writer_pretty(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?
@@ -1133,15 +1098,79 @@ fn run_export_json(
     Ok(())
 }
 
+fn build_qp101_document_for_visualization(
+    instrs: &[crate::ir::StimInstr],
+    highlight_dem_error: Option<usize>,
+    sample_shot: bool,
+    seed: Option<u64>,
+) -> Result<crate::qp101::Qp101Document, String> {
+    if seed.is_some() && !sample_shot {
+        return Err("--seed is only supported with --sample_shot".to_string());
+    }
+    if sample_shot && highlight_dem_error.is_some() {
+        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
+    }
+    match highlight_dem_error {
+        Some(index) => build_highlighted_dem_qp101_document(instrs, index),
+        None if sample_shot => build_sample_qp101_document(instrs, seed),
+        None => build_plain_qp101_document(instrs),
+    }
+}
+
+fn build_highlighted_dem_qp101_document(
+    instrs: &[crate::ir::StimInstr],
+    index: usize,
+) -> Result<crate::qp101::Qp101Document, String> {
+    let tracked = ErrorAnalyzer::circuit_to_tracked_dem(instrs).map_err(|err| {
+        if err.starts_with("tracked DEM does not yet support instruction ") {
+            format!(
+                "--highlight_dem_error currently supports a subset of noise instructions: {err}"
+            )
+        } else {
+            err
+        }
+    })?;
+    crate::qp101::export_qp101_with_highlighted_dem_error(instrs, &tracked, index).map_err(
+        |err| {
+            if err.starts_with("DEM error index ") && err.contains(" out of range ") {
+                format!("DEM error index out of range: {err}")
+            } else {
+                err
+            }
+        },
+    )
+}
+
+fn build_sample_qp101_document(
+    instrs: &[crate::ir::StimInstr],
+    seed: Option<u64>,
+) -> Result<crate::qp101::Qp101Document, String> {
+    let mut ex = Executor::from_instrs(instrs.to_vec())?;
+    let mut rng = make_rng(seed);
+    let (_out, trace) = ex.run_with_trace(&mut rng)?;
+    crate::qp101::export_qp101_with_sample_trace(instrs, &trace).map_err(|err| {
+        if err.starts_with("sample trace visualization does not yet support instruction ") {
+            format!(
+                "--sample_shot currently supports a subset of sample visualization instructions: {err}"
+            )
+        } else {
+            err
+        }
+    })
+}
+
 fn build_plain_qp101_document(
     instrs: &[crate::ir::StimInstr],
 ) -> Result<crate::qp101::Qp101Document, String> {
     crate::qp101::export_qp101(instrs)
 }
 
-fn run_render_svg_to_string(text: &str) -> Result<String, String> {
+fn run_render_svg_to_string(
+    text: &str,
+    highlight_dem_error: Option<usize>,
+) -> Result<String, String> {
     let instrs = parse_lines(text)?;
-    let doc = build_plain_qp101_document(&instrs)?;
+    let doc = build_qp101_document_for_visualization(&instrs, highlight_dem_error, false, None)?;
     crate::qp101_svg::render_svg(&doc)
 }
 
