@@ -50,6 +50,17 @@ class VerifySmokeTest(unittest.TestCase):
             "\n".join(verify_rows(no_python_rows)),
         )
 
+    def test_verify_rows_flags_missing_required_smoke_case(self) -> None:
+        rows_missing_bb90 = [
+            make_row("bb72-p0005-c1-t1-seed12345", "rbposd"),
+            make_row("bb72-p0005-c1-t1-seed12345", "ldpc_bposd"),
+        ]
+
+        self.assertIn(
+            "required smoke case is missing: bb90-p0005-c1-t1-seed12345",
+            "\n".join(verify_rows(rows_missing_bb90)),
+        )
+
     def test_verify_rows_flags_unpaired_rows(self) -> None:
         unpaired_rows = [
             make_row("bb72-p0005-c1-t1-seed12345", "rbposd"),

@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -14,6 +14,7 @@ help:
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
 	@echo "  surface-decoder-compare-full  - Run the full surface decoder comparison benchmark"
+	@echo "  bb-circuit-bposd-compare-smoke - Run the BB circuit rbposd vs ldpc/bposd smoke comparison"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -52,6 +53,10 @@ surface-decoder-compare-smoke:
 surface-decoder-compare-full:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier full
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.plot_compare --tier full
+
+bb-circuit-bposd-compare-smoke:
+	python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke
+	python3 -m benchmarks.bb_circuit_bposd_compare.verify_smoke benchmarks/bb_circuit_bposd_compare/results/smoke/results.csv
 
 # Release a new version: make release V=0.2.0
 release:
