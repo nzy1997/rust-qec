@@ -346,6 +346,18 @@ fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
     missing.metrics.remove("decode_call_count");
     assert!(validate_bposd_profile_result_row(&missing).is_err());
 
+    let mut non_finite = bb_circuit_bposd_result_row("bb90", &result);
+    non_finite
+        .metrics
+        .insert("decode_seconds".to_string(), f64::NAN);
+    assert!(validate_bposd_profile_result_row(&non_finite).is_err());
+
+    let mut negative = bb_circuit_bposd_result_row("bb90", &result);
+    negative
+        .metrics
+        .insert("decode_seconds".to_string(), -1.0);
+    assert!(validate_bposd_profile_result_row(&negative).is_err());
+
     result.profile.x_decode_call_count += 1;
     let mismatched = bb_circuit_bposd_result_row("bb90", &result);
     assert!(validate_bposd_profile_result_row(&mismatched).is_err());
