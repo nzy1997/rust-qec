@@ -1,9 +1,10 @@
-use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::css::CssCode;
 use crate::distance::LogicalClass;
 use crate::error::{QecError, Result};
+use crate::gf2;
+use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,6 +271,64 @@ pub fn randomized_css_upper_bound(
     completed_randomized_upper_bound_result(code, witness, options)
 }
 
+pub fn random_window_css_upper_bound(
+    css: &CssCode,
+    options: RandomWindowUpperBoundOptions,
+) -> Result<DistanceBoundResult<RandomWindowUpperBoundOptions>> {
+    options.validate()?;
+
+    let code = css.code();
+    if code.num_logical_qubits() == 0 {
+        return Err(QecError::DistanceWitnessNotFound);
+    }
+
+    let width = code.n();
+    let mut rng = SplitMix64::new(options.seed);
+    let mut best_witness: Option<Pauli> = None;
+
+    for _restart in 0..options.restarts {
+        for _iteration in 0..options.iterations {
+            let permutation = shuffled_columns(width, &mut rng);
+            consider_component_candidates(
+                css.hz(),
+                css.hx(),
+                ComponentKind::XLike,
+                width,
+                &permutation,
+                code,
+                &mut best_witness,
+            )?;
+            if target_reached(&best_witness, options.target_weight) {
+                return completed_random_window_upper_bound_result(
+                    code,
+                    best_witness.unwrap(),
+                    options,
+                );
+            }
+
+            consider_component_candidates(
+                css.hx(),
+                css.hz(),
+                ComponentKind::ZLike,
+                width,
+                &permutation,
+                code,
+                &mut best_witness,
+            )?;
+            if target_reached(&best_witness, options.target_weight) {
+                return completed_random_window_upper_bound_result(
+                    code,
+                    best_witness.unwrap(),
+                    options,
+                );
+            }
+        }
+    }
+
+    let witness = best_witness.ok_or(QecError::RandomizedUpperBoundWitnessNotFound)?;
+    completed_random_window_upper_bound_result(code, witness, options)
+}
+
 fn completed_randomized_upper_bound_result(
     code: &StabilizerCode,
     witness: Pauli,
@@ -282,6 +341,91 @@ fn completed_randomized_upper_bound_result(
         options,
     );
     validate_randomized_upper_bound_result(
+        &result,
+        BoundValidationContext {
+            code,
+            known_exact_distance: None,
+        },
+    )?;
+    Ok(result)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ComponentKind {
+    XLike,
+    ZLike,
+}
+
+fn consider_component_candidates(
+    kernel_checks: &[Vec<u8>],
+    stabilizer_component_rows: &[Vec<u8>],
+    component: ComponentKind,
+    width: usize,
+    permutation: &[usize],
+    code: &StabilizerCode,
+    best_witness: &mut Option<Pauli>,
+) -> Result<()> {
+    let candidates =
+        gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation)?;
+
+    for candidate in candidates {
+        if !candidate.iter().any(|bit| *bit == 1) {
+            continue;
+        }
+        if gf2::try_in_row_span_with_width(stabilizer_component_rows, width, &candidate)? {
+            continue;
+        }
+
+        let witness = component_candidate_to_pauli(component, candidate)?;
+        if validate_witness_against_code(code, &witness).is_err() {
+            continue;
+        }
+        if best_witness
+            .as_ref()
+            .is_none_or(|current| witness.weight() < current.weight())
+        {
+            *best_witness = Some(witness);
+        }
+    }
+
+    Ok(())
+}
+
+fn component_candidate_to_pauli(component: ComponentKind, candidate: Vec<u8>) -> Result<Pauli> {
+    let width = candidate.len();
+    match component {
+        ComponentKind::XLike => Pauli::from_xz_bits(candidate, vec![0; width]),
+        ComponentKind::ZLike => Pauli::from_xz_bits(vec![0; width], candidate),
+    }
+}
+
+fn shuffled_columns(width: usize, rng: &mut SplitMix64) -> Vec<usize> {
+    let mut permutation = (0..width).collect::<Vec<_>>();
+    for i in (1..width).rev() {
+        let j = rng.next_usize(i + 1);
+        permutation.swap(i, j);
+    }
+    permutation
+}
+
+fn target_reached(best_witness: &Option<Pauli>, target_weight: Option<usize>) -> bool {
+    best_witness
+        .as_ref()
+        .is_some_and(|witness| target_weight.is_some_and(|target| witness.weight() <= target))
+}
+
+fn completed_random_window_upper_bound_result(
+    code: &StabilizerCode,
+    witness: Pauli,
+    options: RandomWindowUpperBoundOptions,
+) -> Result<DistanceBoundResult<RandomWindowUpperBoundOptions>> {
+    let result = DistanceBoundResult::completed_random_window_upper_bound(
+        witness.weight(),
+        classify_witness_support(&witness),
+        DistanceBoundWitness::from_pauli(&witness),
+        options,
+    );
+    validate_random_window_upper_bound_result(
         &result,
         BoundValidationContext {
             code,

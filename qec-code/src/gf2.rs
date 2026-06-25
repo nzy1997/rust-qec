@@ -197,7 +197,6 @@ pub(crate) fn try_nullspace_basis_with_width(
     Ok(basis)
 }
 
-#[allow(dead_code)]
 pub(crate) fn try_random_window_kernel_basis_with_width(
     matrix: &[BinaryRow],
     width: usize,
