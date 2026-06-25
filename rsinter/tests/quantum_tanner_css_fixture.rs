@@ -109,6 +109,7 @@ fn quantum_tanner_css_spec(hz_path: &str) -> BenchmarkSpec {
             title: "Quantum Tanner toric_d4 CSS Smoke".into(),
             confidence_interval_likelihood_factor: DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
             logical_rate_unit: LogicalRateUnit::PerShot,
+            fit: Default::default(),
             x: AxisSpec {
                 field: "params.p".into(),
                 scale: "linear".into(),

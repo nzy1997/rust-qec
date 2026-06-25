@@ -1,6 +1,6 @@
 use rsinter::bench::spec::{
     AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
-    LogicalRateUnit, PanelSpec, PlotSpec, SeriesSpec,
+    LogicalRateUnit, PanelSpec, PlotFitKind, PlotSpec, SeriesSpec,
 };
 use std::path::Path;
 
@@ -88,6 +88,141 @@ label = "Logical Error Rate"
 
     let spec: BenchmarkSpec = toml::from_str(text).unwrap();
     assert!(spec.plot.series.group_by.is_empty());
+}
+
+#[test]
+fn benchmark_spec_defaults_plot_fit_to_disabled_log_log() {
+    let text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.002]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
+    assert!(!spec.plot.fit.enabled);
+    assert_eq!(spec.plot.fit.kind, PlotFitKind::LogLog);
+}
+
+#[test]
+fn benchmark_spec_parses_enabled_log_log_plot_fit() {
+    let text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.002]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+
+[plot.fit]
+enabled = true
+kind = "log_log"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
+    assert!(spec.plot.fit.enabled);
+    assert_eq!(spec.plot.fit.kind, PlotFitKind::LogLog);
+}
+
+#[test]
+fn benchmark_spec_rejects_unsupported_plot_fit_kind() {
+    let text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.002]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+
+[plot.fit]
+enabled = true
+kind = "linear"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let err = toml::from_str::<BenchmarkSpec>(text).unwrap_err();
+    assert!(err.to_string().contains("linear"));
 }
 
 #[test]
@@ -251,6 +386,7 @@ fn benchmark_spec_rejects_missing_runners() {
             title: "Surface Decoder".into(),
             confidence_interval_likelihood_factor: DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
             logical_rate_unit: LogicalRateUnit::PerShot,
+            fit: Default::default(),
             x: AxisSpec {
                 field: "params.p".into(),
                 scale: "log".into(),

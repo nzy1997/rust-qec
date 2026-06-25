@@ -56,6 +56,8 @@ pub struct PlotSpec {
     pub confidence_interval_likelihood_factor: f64,
     #[serde(default)]
     pub logical_rate_unit: LogicalRateUnit,
+    #[serde(default)]
+    pub fit: PlotFitSpec,
     pub x: AxisSpec,
     pub series: SeriesSpec,
     #[serde(default, rename = "panel")]
@@ -78,6 +80,35 @@ pub enum LogicalRateUnit {
 impl Default for LogicalRateUnit {
     fn default() -> Self {
         Self::PerShot
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct PlotFitSpec {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub kind: PlotFitKind,
+}
+
+impl Default for PlotFitSpec {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            kind: PlotFitKind::LogLog,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlotFitKind {
+    LogLog,
+}
+
+impl Default for PlotFitKind {
+    fn default() -> Self {
+        Self::LogLog
     }
 }
 
