@@ -233,10 +233,7 @@ pub(crate) fn try_random_window_kernel_basis_with_width(
 fn validate_column_permutation(column_permutation: &[usize], width: usize) -> Result<()> {
     if column_permutation.len() != width {
         return Err(QecError::InvalidColumnPermutation {
-            reason: format!(
-                "expected length {width}, got {}",
-                column_permutation.len()
-            ),
+            reason: format!("expected length {width}, got {}", column_permutation.len()),
         });
     }
 
@@ -328,10 +325,8 @@ mod tests {
         let matrix = vec![vec![1, 1, 0, 0], vec![0, 1, 1, 0]];
         let permutation = vec![3, 0, 2, 1];
 
-        let basis =
-            try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
-        let repeated =
-            try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
+        let basis = try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
+        let repeated = try_random_window_kernel_basis_with_width(&matrix, 4, &permutation).unwrap();
         let original_nullspace = try_nullspace_basis_with_width(&matrix, 4).unwrap();
 
         assert_eq!(basis, vec![vec![0, 0, 0, 1], vec![1, 1, 1, 0]]);
