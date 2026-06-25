@@ -22,6 +22,16 @@ PLACEHOLDER_LIMITS = {"", "tbd", "todo", "n/a", "none"}
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 INLINE_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 REFERENCE_DEF_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)", re.MULTILINE)
+PLACEHOLDER_LIMITS_PREFIXES = (
+    "tbd",
+    "todo",
+    "fixme",
+    "xxx",
+    "to be determined",
+    "to be decided",
+    "fill in later",
+    "coming soon",
+)
 
 
 @dataclass(frozen=True)
@@ -134,7 +144,23 @@ def heading_titles_by_level(text: str, level: int) -> set[str]:
 def limits_is_placeholder(body: str) -> bool:
     normalized = re.sub(r"[\s`*_>-]+", " ", body).strip().lower()
     normalized = normalized.rstrip(".:;")
-    return normalized in PLACEHOLDER_LIMITS
+    if normalized in PLACEHOLDER_LIMITS:
+        return True
+    return any(
+        normalized == prefix or re.match(rf"^{re.escape(prefix)}(?:\W|$)", normalized) is not None
+        for prefix in PLACEHOLDER_LIMITS_PREFIXES
+    )
+
+
+def links_to_planning_docs(text: str) -> bool:
+    for raw_target in markdown_link_targets(text):
+        relative = repo_relative_path(raw_target)
+        if relative is None:
+            continue
+        normalized = relative.lstrip("./")
+        if normalized.startswith("docs/plans/") or normalized.startswith("docs/superpowers/"):
+            return True
+    return False
 
 
 def validate_showcase_page(path: Path, repo_root: Path) -> list[str]:
@@ -166,7 +192,7 @@ def validate_index(path: Path, repo_root: Path) -> list[str]:
         errors.append("showcase index missing Categories section")
     if "Page Contract" not in headings:
         errors.append("showcase index missing Page Contract section")
-    if "docs/plans/" in text or "docs/superpowers/" in text:
+    if links_to_planning_docs(text):
         errors.append("showcase index must not link primary users to planning docs")
     for section in REQUIRED_SHOWCASE_SECTIONS:
         if section not in text:
