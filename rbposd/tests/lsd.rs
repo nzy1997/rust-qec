@@ -137,7 +137,17 @@ fn bplsddecoder_clone_preserves_decoding_behavior_with_fresh_workspaces() {
     let first = decoder.decode(&syndrome).unwrap();
     let second = cloned.decode(&syndrome).unwrap();
 
-    assert_eq!(second, first);
+    assert_eq!(second.correction, first.correction);
+    assert_eq!(second.converged, first.converged);
+    assert_eq!(second.bp_iterations, first.bp_iterations);
+    assert_eq!(second.used_osd, first.used_osd);
+    assert_eq!(
+        second.residual_syndrome_weight,
+        first.residual_syndrome_weight
+    );
+    assert_eq!(second.stats.decode_call_count, 1);
+    assert_eq!(first.stats.decode_call_count, 1);
+    assert_eq!(second.stats.bp_iteration_count, second.bp_iterations);
     assert_eq!(pcm.multiply(&second.correction), syndrome);
 }
 

@@ -7,7 +7,8 @@ mod parity_schema;
 use std::path::PathBuf;
 
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecodeResult, DecodeStats, DecoderConfig,
+    ParityCheckMatrix, Syndrome,
 };
 
 fn parity_fixture_dir() -> PathBuf {
@@ -127,8 +128,39 @@ fn minimum_sum_decoder_clone_preserves_decoding_behavior_with_fresh_workspaces()
     let first = decoder.decode(&syndrome).unwrap();
     let second = cloned.decode(&syndrome).unwrap();
 
-    assert_eq!(second, first);
+    assert_eq!(second.correction, first.correction);
+    assert_eq!(second.converged, first.converged);
+    assert_eq!(second.bp_iterations, first.bp_iterations);
+    assert_eq!(second.used_osd, first.used_osd);
+    assert_eq!(
+        second.residual_syndrome_weight,
+        first.residual_syndrome_weight
+    );
+    assert_eq!(second.stats.decode_call_count, 1);
+    assert_eq!(first.stats.decode_call_count, 1);
+    assert_eq!(second.stats.bp_iteration_count, second.bp_iterations);
     assert_eq!(pcm.multiply(&second.correction), syndrome);
+}
+
+#[test]
+fn decode_result_equality_includes_stats() {
+    let base = DecodeResult {
+        correction: Correction::from(vec![true]),
+        converged: true,
+        bp_iterations: 1,
+        used_osd: false,
+        residual_syndrome_weight: 0,
+        stats: DecodeStats {
+            bp_seconds: 1.0,
+            decode_call_count: 1,
+            bp_iteration_count: 1,
+            ..DecodeStats::default()
+        },
+    };
+    let mut changed_stats = base.clone();
+    changed_stats.stats.bp_seconds = 2.0;
+
+    assert_ne!(base, changed_stats);
 }
 
 #[test]
