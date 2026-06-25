@@ -1,4 +1,5 @@
 import csv
+import re
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 
 README_PATH = Path("benchmarks/surface_decoder_compare/README.md")
 MAKEFILE_PATH = Path("Makefile")
+BENCHMARK_EVIDENCE_SHOWCASE_PATH = Path("docs/showcases/benchmark-evidence.md")
 PERFORMANCE_DOC_PATH = Path(
     "docs/superpowers/specs/2026-06-06-rbposd-core-performance-design.md"
 )
@@ -62,6 +64,33 @@ class DocsContractTest(unittest.TestCase):
         self.assertIn("bench-surface-smoke:", makefile)
         self.assertIn("bench-surface-full:", makefile)
 
+    def test_benchmark_evidence_showcase_links_required_evidence(self) -> None:
+        doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text()
+
+        self.assertIn("benchmarks/surface_decoder_compare/README.md", doc)
+        self.assertIn("docs/bb144_circuit_bposd_reproduction.md", doc)
+        self.assertIn("benchmarks/surface_decoder_compare/results/full/results.csv", doc)
+        self.assertIn(
+            "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+            doc,
+        )
+        self.assertIn("implementation smoke evidence", doc)
+        self.assertIn("not statistical reproduction", doc)
+        self.assertIn("bb-circuit-bposd-memory", doc)
+        assert_valid_bb_circuit_command_keys(doc)
+
+    def test_benchmark_evidence_showcase_rejects_bb_circuit_command_typo(self) -> None:
+        doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text().replace(
+            "cargo run -p rsinter -- bb-circuit-bposd-memory \\",
+            "cargo run -p rsinter -- bb-circuit-bposd-memroy \\",
+            1,
+        )
+
+        with self.assertRaisesRegex(
+            AssertionError, "unknown BB circuit command key: bb-circuit-bposd-memroy"
+        ):
+            assert_valid_bb_circuit_command_keys(doc)
+
     def test_rbposd_performance_doc_matches_tracked_full_csv(self) -> None:
         doc = PERFORMANCE_DOC_PATH.read_text()
         assert_no_stale_rbposd_slower_claim(doc)
@@ -99,7 +128,8 @@ class DocsContractTest(unittest.TestCase):
 
 
 def paired_rbposd_ldpc_results() -> list[PairedResult]:
-    rows = list(csv.DictReader(FULL_RESULTS_PATH.open(newline="")))
+    with FULL_RESULTS_PATH.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
     pairs = []
     for distance, rounds, p in TRACKED_CASES:
         ldpc = result_row(rows, "ldpc", distance, rounds, p)
@@ -114,6 +144,14 @@ def paired_rbposd_ldpc_results() -> list[PairedResult]:
             )
         )
     return pairs
+
+
+def assert_valid_bb_circuit_command_keys(text: str) -> None:
+    known = {"bb-circuit-bposd-memory"}
+    keys = set(re.findall(r"\bbb-circuit-bposd-[A-Za-z0-9_-]+\b", text))
+    unknown = sorted(keys - known)
+    if unknown:
+        raise AssertionError(f"unknown BB circuit command key: {', '.join(unknown)}")
 
 
 def result_row(

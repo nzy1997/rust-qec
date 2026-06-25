@@ -41,6 +41,10 @@ Primary code and docs:
 Showcases in this category should demonstrate decoder integrations, benchmark
 harnesses, smoke runs, and reproducible comparison outputs.
 
+Showcases:
+
+- [`Benchmark And Reproduction Evidence`](docs/showcases/benchmark-evidence.md)
+
 Primary code and docs:
 
 - [`rsinter/`](rsinter/)
