@@ -25,6 +25,7 @@ pub enum ExactCssDistanceStatus {
 pub enum ExactCssDistanceInput {
     CodeId { code_id: String },
     Files { hx: String, hz: String },
+    QuantumTannerSpec { quantum_tanner_spec: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

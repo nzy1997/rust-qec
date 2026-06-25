@@ -119,6 +119,8 @@ pub struct ExactCssDistanceCli {
     #[arg(long)]
     hz: Option<PathBuf>,
     #[arg(long)]
+    quantum_tanner_spec: Option<PathBuf>,
+    #[arg(long)]
     json: bool,
 }
 
@@ -130,6 +132,8 @@ pub struct RandomizedUpperBoundCli {
     hx: Option<PathBuf>,
     #[arg(long)]
     hz: Option<PathBuf>,
+    #[arg(long)]
+    quantum_tanner_spec: Option<PathBuf>,
     #[arg(long)]
     iterations: usize,
     #[arg(long, default_value_t = 1)]
@@ -263,16 +267,16 @@ fn run_css_exact_distance(cli: ExactCssDistanceCli) -> Result<String, QecError> 
 fn css_code_and_exact_options_from_cli(
     cli: &ExactCssDistanceCli,
 ) -> Result<(CssCode, ExactCssDistanceOptions), QecError> {
-    match (&cli.code_id, &cli.hx, &cli.hz) {
-        (Some(code_id), None, None) => Ok((
+    match css_distance_input_selection(&cli.code_id, &cli.hx, &cli.hz, &cli.quantum_tanner_spec)? {
+        CssDistanceInputSelection::CodeId(code_id) => Ok((
             css_code_from_built_in(code_id)?,
             ExactCssDistanceOptions {
                 input: ExactCssDistanceInput::CodeId {
-                    code_id: code_id.clone(),
+                    code_id: code_id.to_owned(),
                 },
             },
         )),
-        (None, Some(hx), Some(hz)) => Ok((
+        CssDistanceInputSelection::Files { hx, hz } => Ok((
             css_code_from_files(hx, hz)?,
             ExactCssDistanceOptions {
                 input: ExactCssDistanceInput::Files {
@@ -281,14 +285,13 @@ fn css_code_and_exact_options_from_cli(
                 },
             },
         )),
-        (Some(_), Some(_), _) | (Some(_), _, Some(_)) => Err(QecError::InvalidCssDistanceInput(
-            "use either --code-id or --hx/--hz, not both".to_owned(),
-        )),
-        (None, Some(_), None) | (None, None, Some(_)) => Err(QecError::InvalidCssDistanceInput(
-            "--hx and --hz must be provided together".to_owned(),
-        )),
-        (None, None, None) => Err(QecError::InvalidCssDistanceInput(
-            "provide --code-id or both --hx and --hz".to_owned(),
+        CssDistanceInputSelection::QuantumTannerSpec(spec) => Ok((
+            css_code_from_quantum_tanner_spec(spec)?,
+            ExactCssDistanceOptions {
+                input: ExactCssDistanceInput::QuantumTannerSpec {
+                    quantum_tanner_spec: spec.display().to_string(),
+                },
+            },
         )),
     }
 }
@@ -315,17 +318,57 @@ fn run_css_randomized_upper_bound(cli: RandomizedUpperBoundCli) -> Result<String
 fn css_code_from_randomized_upper_bound_cli(
     cli: &RandomizedUpperBoundCli,
 ) -> Result<CssCode, QecError> {
-    match (&cli.code_id, &cli.hx, &cli.hz) {
-        (Some(code_id), None, None) => css_code_from_built_in(code_id),
-        (None, Some(hx), Some(hz)) => css_code_from_files(hx, hz),
-        (Some(_), Some(_), _) | (Some(_), _, Some(_)) => Err(QecError::InvalidCssDistanceInput(
-            "use either --code-id or --hx/--hz, not both".to_owned(),
-        )),
-        (None, Some(_), None) | (None, None, Some(_)) => Err(QecError::InvalidCssDistanceInput(
-            "--hx and --hz must be provided together".to_owned(),
-        )),
-        (None, None, None) => Err(QecError::InvalidCssDistanceInput(
-            "provide --code-id or both --hx and --hz".to_owned(),
+    match css_distance_input_selection(&cli.code_id, &cli.hx, &cli.hz, &cli.quantum_tanner_spec)? {
+        CssDistanceInputSelection::CodeId(code_id) => css_code_from_built_in(code_id),
+        CssDistanceInputSelection::Files { hx, hz } => css_code_from_files(hx, hz),
+        CssDistanceInputSelection::QuantumTannerSpec(spec) => {
+            css_code_from_quantum_tanner_spec(spec)
+        }
+    }
+}
+
+enum CssDistanceInputSelection<'a> {
+    CodeId(&'a str),
+    Files { hx: &'a PathBuf, hz: &'a PathBuf },
+    QuantumTannerSpec(&'a PathBuf),
+}
+
+fn css_distance_input_selection<'a>(
+    code_id: &'a Option<String>,
+    hx: &'a Option<PathBuf>,
+    hz: &'a Option<PathBuf>,
+    quantum_tanner_spec: &'a Option<PathBuf>,
+) -> Result<CssDistanceInputSelection<'a>, QecError> {
+    let source_count = usize::from(code_id.is_some())
+        + usize::from(hx.is_some() || hz.is_some())
+        + usize::from(quantum_tanner_spec.is_some());
+
+    if source_count == 0 {
+        return Err(QecError::InvalidCssDistanceInput(
+            "provide --code-id, --quantum-tanner-spec, or both --hx and --hz".to_owned(),
+        ));
+    }
+
+    if source_count > 1 {
+        return Err(QecError::InvalidCssDistanceInput(
+            "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz".to_owned(),
+        ));
+    }
+
+    match (
+        code_id.as_deref(),
+        hx.as_ref(),
+        hz.as_ref(),
+        quantum_tanner_spec.as_ref(),
+    ) {
+        (Some(code_id), None, None, None) => Ok(CssDistanceInputSelection::CodeId(code_id)),
+        (None, Some(hx), Some(hz), None) => Ok(CssDistanceInputSelection::Files { hx, hz }),
+        (None, None, None, Some(spec)) => Ok(CssDistanceInputSelection::QuantumTannerSpec(spec)),
+        (None, Some(_), None, None) | (None, None, Some(_), None) => Err(
+            QecError::InvalidCssDistanceInput("--hx and --hz must be provided together".to_owned()),
+        ),
+        _ => Err(QecError::InvalidCssDistanceInput(
+            "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz".to_owned(),
         )),
     }
 }
@@ -334,6 +377,15 @@ fn css_code_from_built_in(code_id: &str) -> Result<CssCode, QecError> {
     let checks = built_in_css_checks(code_id)?;
     let hx = SparseRowsMatrix::new(checks.num_cols, checks.hx)?.to_dense_rows();
     let hz = SparseRowsMatrix::new(checks.num_cols, checks.hz)?.to_dense_rows();
+    CssCode::from_hx_hz(hx, hz)
+}
+
+fn css_code_from_quantum_tanner_spec(path: &PathBuf) -> Result<CssCode, QecError> {
+    let spec = read_quantum_tanner_spec(path)?;
+    let checks = quantum_tanner_css_checks(&spec)?;
+    let hx = SparseRowsMatrix::new(checks.num_cols, checks.hx)?.to_dense_rows();
+    let hz = SparseRowsMatrix::new(checks.num_cols, checks.hz)?.to_dense_rows();
+
     CssCode::from_hx_hz(hx, hz)
 }
 
