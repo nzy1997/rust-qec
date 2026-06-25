@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crate::bench::merge::merge_result_rows;
 use crate::bench::registry::{
-    expand_runner_points_for_runner, BenchCasePoint, BenchRunContext, RustBenchRunner,
-    RustRunnerRegistry,
+    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
+    expand_runner_points_for_runner,
 };
 use crate::bench::result::{
-    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, RunManifest,
+    BenchmarkResultRow, RunManifest, read_results_jsonl, write_results_jsonl,
 };
 use crate::bench::spec::{BenchmarkSpec, RunnerSpec};
 
@@ -83,14 +83,18 @@ pub fn run_rust_benchmark_with_options(
         let completed = completed_identities(&existing_rows)?;
         let mut fresh_rows = Vec::new();
         for point in &points {
-            let row = runner_impl.run_point(point, &ctx)?;
-            let identity = row.identity()?;
-            if !completed.contains(&identity) {
-                fresh_rows.push(row);
+            match runner_impl.plan_point_identity(point, &ctx) {
+                Ok(identity) if completed.contains(&identity) => continue,
+                Ok(_) | Err(_) => {
+                    fresh_rows.push(runner_impl.run_point(point, &ctx)?);
+                }
             }
         }
         let rows = if options.resume {
-            merge_result_rows(vec![existing_rows, fresh_rows])?
+            merge_result_rows(vec![
+                drop_replaced_incomplete_rows(existing_rows, &fresh_rows)?,
+                fresh_rows,
+            ])?
         } else {
             fresh_rows
         };
@@ -201,4 +205,26 @@ fn completed_identities(rows: &[BenchmarkResultRow]) -> Result<BTreeSet<String>,
         }
     }
     Ok(completed)
+}
+
+fn drop_replaced_incomplete_rows(
+    existing_rows: Vec<BenchmarkResultRow>,
+    fresh_rows: &[BenchmarkResultRow],
+) -> Result<Vec<BenchmarkResultRow>, String> {
+    let rerun_identities = fresh_rows
+        .iter()
+        .map(BenchmarkResultRow::identity)
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let mut kept_rows = Vec::with_capacity(existing_rows.len());
+    for row in existing_rows {
+        if row.status == "ok" {
+            kept_rows.push(row);
+            continue;
+        }
+        let identity = row.identity()?;
+        if !rerun_identities.contains(&identity) {
+            kept_rows.push(row);
+        }
+    }
+    Ok(kept_rows)
 }

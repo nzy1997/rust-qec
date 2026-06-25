@@ -6,7 +6,9 @@ use toml::Value;
 use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
 use crate::bench::result::{BenchmarkResultRow, PairMapExt, ParamMap};
 use crate::bench::runners::params::{optional_bool, optional_string, optional_usize};
-use crate::bench::runners::{DemBuildMode, run_decoder_point_with_dem_mode};
+use crate::bench::runners::{
+    DemBuildMode, plan_decoder_point_identity_with_dem_mode, run_decoder_point_with_dem_mode,
+};
 use crate::decode::{RbposdDemDecoder, RbposdLsdDemDecoder};
 
 pub struct RbposdRunner;
@@ -175,6 +177,22 @@ impl RustBenchRunner for RbposdRunner {
 
     fn preflight_point(&self, point: &BenchCasePoint) -> Result<(), String> {
         RbposdRunnerParams::parse(&point.decoder_params).map(|_| ())
+    }
+
+    fn plan_point_identity(
+        &self,
+        point: &BenchCasePoint,
+        ctx: &BenchRunContext,
+    ) -> Result<String, String> {
+        let params = RbposdRunnerParams::parse(&point.decoder_params)?;
+        let normalized = params.normalized_for_point(point);
+        plan_decoder_point_identity_with_dem_mode(
+            self.name(),
+            point,
+            ctx,
+            &normalized,
+            DemBuildMode::Raw,
+        )
     }
 
     fn run_point(

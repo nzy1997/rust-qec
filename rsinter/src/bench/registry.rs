@@ -44,6 +44,11 @@ pub trait RustBenchRunner: Send + Sync {
     fn preflight_point(&self, _point: &BenchCasePoint) -> Result<(), String> {
         Ok(())
     }
+    fn plan_point_identity(
+        &self,
+        point: &BenchCasePoint,
+        ctx: &BenchRunContext,
+    ) -> Result<String, String>;
     fn run_point(
         &self,
         point: &BenchCasePoint,

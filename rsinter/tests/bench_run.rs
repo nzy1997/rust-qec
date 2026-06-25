@@ -1,6 +1,6 @@
 use rsinter::bench::registry::build_default_rust_runner_registry;
-use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
-use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
+use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
+use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
 use std::fs;
@@ -276,7 +276,12 @@ label = "Logical Error Rate"
     assert_eq!(initial_rows.len(), 2);
 
     let kept = initial_rows[0].clone();
-    write_rows_to_path(std::slice::from_ref(&kept), &results_path);
+    let mut stale = initial_rows[1].clone();
+    stale.status = "error".into();
+    stale.failure_kind = FailureKind::SolverFailure;
+    stale.error = Some("stale solver failure".into());
+    stale.metrics.clear();
+    write_rows_to_path(&[kept.clone(), stale.clone()], &results_path);
 
     let artifact_root = run_rust_benchmark_with_options(
         &spec,
@@ -294,6 +299,19 @@ label = "Logical Error Rate"
         1,
         "completed row identity was duplicated"
     );
+    let stale_identity = stale.identity().unwrap();
+    assert_eq!(
+        identity_count(&resumed_rows, &stale_identity),
+        1,
+        "rerun row identity was duplicated"
+    );
+    let refreshed = resumed_rows
+        .iter()
+        .find(|row| row.identity().unwrap() == stale_identity)
+        .expect("rerun row missing after resume");
+    assert_eq!(refreshed.status, "ok");
+    assert_eq!(refreshed.failure_kind.status(), "ok");
+    assert_eq!(refreshed.error, None);
 
     run_rust_benchmark_with_options(
         &spec,
