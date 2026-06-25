@@ -133,3 +133,8 @@ physical_error_rate must be finite and lie in [0, 1)
 - No surface-code comparison runs were reproduced.
 - No decoder algorithm, schedule, or BB144 default mapping changes are claimed
   here.
+
+## See Also
+
+- [Benchmark Evidence showcase](docs/showcases/benchmark-evidence.md)
+- [Showcase index](docs/showcases/README.md)

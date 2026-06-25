@@ -60,3 +60,8 @@ Artifacts are written under `benchmarks/out/surface_decoder/`.
 - Time metric: decode time only
 - ILP decoders prefer `gurobi` when available and record the actual backend used;
   Python `ilpqec` additionally needs `gurobipy` installed in the benchmark venv
+
+## See Also
+
+- [Benchmark Evidence showcase](docs/showcases/benchmark-evidence.md)
+- [Showcase index](docs/showcases/README.md)

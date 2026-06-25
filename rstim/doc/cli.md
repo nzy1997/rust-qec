@@ -302,3 +302,9 @@ For a typical CLI session:
 4. `rstim m2d` or `rstim explain_errors` when converting or debugging data paths
 5. `rstim render_svg` when you want a static SVG circuit diagram
 6. `rstim export_json` when handing QP101 data to structured tooling
+
+## See Also
+
+- [Showcase index](docs/showcases/README.md)
+- [rstim CLI DEM Pipeline showcase](docs/showcases/rstim-cli-dem-pipeline.md)
+- [rstim Render SVG Atom-Loss showcase](docs/showcases/rstim-render-svg-atom-loss.md)
