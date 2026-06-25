@@ -159,22 +159,24 @@ fn sum_json_numbers(
 }
 
 fn merge_metrics(identity: &str, base: &mut MetricMap, incoming: MetricMap) -> Result<(), String> {
+    for key in base.keys().chain(incoming.keys()) {
+        if !is_merge_metric_allowed(key) {
+            return Err(conflict(identity, &format!("metrics.{key}")));
+        }
+    }
+
     for (key, value) in incoming {
         if ADDITIVE_METRICS.contains(&key.as_str()) {
             *base.entry(key).or_insert(0.0) += value;
         } else if DERIVED_METRICS.contains(&key.as_str()) {
             continue;
-        } else {
-            match base.entry(key) {
-                Entry::Vacant(entry) => {
-                    entry.insert(value);
-                }
-                Entry::Occupied(entry) if *entry.get() == value => {}
-                Entry::Occupied(entry) => return Err(conflict(identity, entry.key())),
-            }
         }
     }
     Ok(())
+}
+
+fn is_merge_metric_allowed(key: &str) -> bool {
+    ADDITIVE_METRICS.contains(&key) || DERIVED_METRICS.contains(&key)
 }
 
 fn recompute_derived_metrics(metrics: &mut MetricMap) {

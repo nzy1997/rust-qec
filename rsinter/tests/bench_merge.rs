@@ -89,6 +89,17 @@ fn benchmark_merge_combines_rows_with_same_identity() {
     assert!(err.contains("conflicting status"), "{err}");
 }
 
+#[test]
+fn benchmark_merge_rejects_unknown_metrics_for_same_identity() {
+    let first = ok_row(serde_json::json!({"a": 1}), 100.0, 1.0, 300.0, 0.5);
+    let mut second = ok_row(serde_json::json!({"a": 1}), 300.0, 5.0, 900.0, 1.5);
+    second.metrics.insert("median_decode_us".into(), 42.0);
+
+    let err = merge_result_rows(vec![vec![first], vec![second]])
+        .expect_err("same identity with unknown metrics must fail");
+    assert!(err.contains("conflicting metrics.median_decode_us"), "{err}");
+}
+
 fn ok_row(
     decoder_options: serde_json::Value,
     shots_used: f64,
