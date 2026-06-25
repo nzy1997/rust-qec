@@ -1,7 +1,8 @@
 use rsinter::bb_circuit_memory::{
-    bb_circuit_bposd_result_row, build_code, build_effective_models, build_syndrome_cycle,
-    build_upstream_code, run_simulation, run_simulation_for_code, sample_seeded_trial,
-    validate_bposd_profile_result_row, OperationKind, SimulationConfig,
+    OperationKind, SimulationConfig, bb_circuit_bposd_result_row, build_code,
+    build_effective_models, build_syndrome_cycle, build_upstream_code,
+    export_comparison_case_for_code, run_simulation, run_simulation_for_code, sample_seeded_trial,
+    validate_bposd_profile_result_row,
 };
 
 #[test]
@@ -39,11 +40,51 @@ fn build_code_supports_bb90_and_preserves_bb144_defaults() {
 }
 
 #[test]
+fn build_code_supports_bb72_smoke_shape() {
+    let bb72 = build_code("bb72").unwrap();
+    assert_eq!(bb72.ell(), 6);
+    assert_eq!(bb72.m(), 6);
+    assert_eq!(bb72.n2(), 36);
+    assert_eq!(bb72.n(), 72);
+    assert_eq!(bb72.k(), 12);
+    assert!(bb72.hx_rows().iter().all(|row| row.len() == 6));
+    assert!(bb72.hz_rows().iter().all(|row| row.len() == 6));
+}
+
+#[test]
 fn build_code_rejects_unknown_code_id_with_supported_values() {
     let error = build_code("bb999").unwrap_err();
     assert!(error.contains("bb999"), "{error}");
+    assert!(error.contains("bb72"), "{error}");
     assert!(error.contains("bb90"), "{error}");
     assert!(error.contains("bb144"), "{error}");
+}
+
+#[test]
+fn comparison_case_export_contains_models_samples_and_profile() {
+    let export = export_comparison_case_for_code(
+        "bb72",
+        SimulationConfig {
+            physical_error_rate: 1.0e-12,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(12345),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(export.code_id, "bb72");
+    assert_eq!(export.num_trials, 1);
+    assert_eq!(export.seed, Some(12345));
+    assert_eq!(export.z_model.num_checks, 36 * 3);
+    assert_eq!(export.x_model.num_checks, 36 * 3);
+    assert_eq!(export.trials.len(), 1);
+    assert_eq!(export.trials[0].z_syndrome.len(), export.z_model.num_checks);
+    assert_eq!(export.trials[0].x_syndrome.len(), export.x_model.num_checks);
+    assert!(export.rust_result.profile.setup_seconds.is_finite());
+    assert!(export.rust_result.profile.decode_seconds.is_finite());
 }
 
 #[test]
@@ -84,12 +125,16 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
 
     assert_eq!(operations.len(), 216 + 5 * 144 + 216 + 288);
 
-    assert!(operations[..72]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::PrepX));
-    assert!(operations[72..144]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::Cnot));
+    assert!(
+        operations[..72]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::PrepX)
+    );
+    assert!(
+        operations[72..144]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::Cnot)
+    );
     assert!(operations[144..216].iter().all(|operation| {
         operation.kind() == OperationKind::Idle
             && operation.qubits().len() == 1
@@ -99,40 +144,54 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
     for round in 0..5 {
         let start = 216 + round * 144;
         let end = start + 144;
-        assert!(operations[start..end]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::Cnot));
+        assert!(
+            operations[start..end]
+                .iter()
+                .all(|operation| operation.kind() == OperationKind::Cnot)
+        );
     }
 
     let round6 = 216 + 5 * 144;
-    assert!(operations[round6..round6 + 72]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::MeasZ));
-    assert!(operations[round6 + 72..round6 + 144]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::Cnot));
-    assert!(operations[round6 + 144..round6 + 216]
-        .iter()
-        .all(|operation| {
-            operation.kind() == OperationKind::Idle
-                && operation.qubits().len() == 1
-                && (data_start..=data_end).contains(&operation.qubits()[0])
-        }));
+    assert!(
+        operations[round6..round6 + 72]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::MeasZ)
+    );
+    assert!(
+        operations[round6 + 72..round6 + 144]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::Cnot)
+    );
+    assert!(
+        operations[round6 + 144..round6 + 216]
+            .iter()
+            .all(|operation| {
+                operation.kind() == OperationKind::Idle
+                    && operation.qubits().len() == 1
+                    && (data_start..=data_end).contains(&operation.qubits()[0])
+            })
+    );
 
     let final_layer = round6 + 216;
-    assert!(operations[final_layer..final_layer + 144]
-        .iter()
-        .all(|operation| {
-            operation.kind() == OperationKind::Idle
-                && operation.qubits().len() == 1
-                && (data_start..=data_end).contains(&operation.qubits()[0])
-        }));
-    assert!(operations[final_layer + 144..final_layer + 216]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::MeasX));
-    assert!(operations[final_layer + 216..final_layer + 288]
-        .iter()
-        .all(|operation| operation.kind() == OperationKind::PrepZ));
+    assert!(
+        operations[final_layer..final_layer + 144]
+            .iter()
+            .all(|operation| {
+                operation.kind() == OperationKind::Idle
+                    && operation.qubits().len() == 1
+                    && (data_start..=data_end).contains(&operation.qubits()[0])
+            })
+    );
+    assert!(
+        operations[final_layer + 144..final_layer + 216]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::MeasX)
+    );
+    assert!(
+        operations[final_layer + 216..final_layer + 288]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::PrepZ)
+    );
 
     assert_eq!(checks, 72);
 }
@@ -247,10 +306,12 @@ fn effective_models_only_use_basis_specific_logical_rows() {
             "expected at least one augmented column with logical support"
         );
         assert!(logical_rows.iter().all(|&row| row < logical_rows_end));
-        assert!(model
-            .augmented_columns
-            .iter()
-            .any(|column| column.iter().any(|&row| row >= first_logical_row)));
+        assert!(
+            model
+                .augmented_columns
+                .iter()
+                .any(|column| column.iter().any(|&row| row >= first_logical_row))
+        );
     }
 }
 

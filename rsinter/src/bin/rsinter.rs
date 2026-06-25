@@ -3,7 +3,9 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use rsinter::bb_circuit_memory::{SimulationConfig, run_simulation_for_code};
+use rsinter::bb_circuit_memory::{
+    SimulationConfig, export_comparison_case_for_code, run_simulation_for_code,
+};
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
@@ -44,6 +46,8 @@ enum Commands {
         max_bp_iterations: usize,
         #[arg(long, default_value_t = 7)]
         osd_order: usize,
+        #[arg(long)]
+        json_compare_case: bool,
     },
 }
 
@@ -56,7 +60,10 @@ enum BenchCommands {
         language: String,
         #[arg(long)]
         out: String,
-        #[arg(long, help = "Resume from existing per-runner test-run/results.jsonl rows under --out")]
+        #[arg(
+            long,
+            help = "Resume from existing per-runner test-run/results.jsonl rows under --out"
+        )]
         resume: bool,
     },
     Merge {
@@ -148,27 +155,33 @@ fn run() -> Result<(), String> {
             seed,
             max_bp_iterations,
             osd_order,
+            json_compare_case,
         } => {
             let num_trials = usize::try_from(num_trials)
                 .map_err(|_| "num_trials exceeds supported platform usize".to_string())?;
-            let result = run_simulation_for_code(
-                &code_id,
-                SimulationConfig {
-                    physical_error_rate,
-                    num_cycles,
-                    num_trials,
-                    seed,
-                    max_bp_iterations,
-                    osd_order,
-                },
-            )?;
-            println!(
-                "{}\t{}\t{}\t{}",
-                result.physical_error_rate,
-                result.num_cycles,
-                result.num_trials,
-                result.num_failed_trials
-            );
+            let config = SimulationConfig {
+                physical_error_rate,
+                num_cycles,
+                num_trials,
+                seed,
+                max_bp_iterations,
+                osd_order,
+            };
+            if json_compare_case {
+                let export = export_comparison_case_for_code(&code_id, config)?;
+                serde_json::to_writer_pretty(std::io::stdout(), &export)
+                    .map_err(|e| e.to_string())?;
+                println!();
+            } else {
+                let result = run_simulation_for_code(&code_id, config)?;
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    result.physical_error_rate,
+                    result.num_cycles,
+                    result.num_trials,
+                    result.num_failed_trials
+                );
+            }
         }
     }
     Ok(())

@@ -194,6 +194,39 @@ fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
 }
 
 #[test]
+fn rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bb-circuit-bposd-memory",
+            "--code-id",
+            "bb72",
+            "--physical-error-rate",
+            "0.000000000001",
+            "--num-cycles",
+            "1",
+            "--num-trials",
+            "1",
+            "--seed",
+            "12345",
+            "--max-bp-iterations",
+            "10",
+            "--osd-order",
+            "0",
+            "--json-compare-case",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["code_id"], "bb72");
+    assert_eq!(json["num_trials"], 1);
+    assert_eq!(json["trials"].as_array().unwrap().len(), 1);
+    assert!(json["rust_result"]["profile"]["setup_seconds"].is_number());
+    assert!(json["z_model"]["sparse_rows"].as_array().unwrap().len() > 0);
+}
+
+#[test]
 fn rsinter_bb_circuit_bposd_memory_rejects_negative_physical_error_rate() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
