@@ -23,6 +23,10 @@ Primary code and docs:
 - [`rstim/doc/cli.md`](rstim/doc/cli.md)
 - [`README.md`](README.md)
 
+Showcases:
+
+- [`rstim CLI DEM Pipeline`](docs/showcases/rstim-cli-dem-pipeline.md)
+
 ### Visualization And QP101 Artifacts
 
 Showcases in this category should demonstrate built-in SVG rendering, seeded
@@ -35,6 +39,10 @@ Primary code and docs:
 - [`qp101-viz/`](qp101-viz/)
 - [`qp101-viz/README.md`](qp101-viz/README.md)
 - [`qp101-viz/examples/`](qp101-viz/examples/)
+
+Showcases:
+
+- [`rstim Render SVG Atom-Loss`](docs/showcases/rstim-render-svg-atom-loss.md)
 
 ### Decoder And Benchmark Workflows
 
