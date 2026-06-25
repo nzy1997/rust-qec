@@ -41,6 +41,10 @@ Primary code and docs:
 Showcases in this category should demonstrate decoder integrations, benchmark
 harnesses, smoke runs, and reproducible comparison outputs.
 
+Showcases:
+
+- [`Benchmark And Reproduction Evidence`](docs/showcases/benchmark-evidence.md)
+
 Primary code and docs:
 
 - [`rsinter/`](rsinter/)
@@ -55,6 +59,10 @@ Primary code and docs:
 Showcases in this category should demonstrate CSS code construction, built-in
 code families, sparse support exports, distance checks, and code-oriented CLI
 flows.
+
+Available showcases:
+
+- [`qec-code CSS construction`](docs/showcases/qec-code-css-construction.md)
 
 Primary code and docs:
 
