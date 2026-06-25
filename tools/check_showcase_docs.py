@@ -21,7 +21,18 @@ REQUIRED_SHOWCASE_SECTIONS = (
     "Limits",
 )
 
+REQUIRED_INDEX_SECTIONS = (
+    "Categories",
+    "Documentation Follow-Up Policy",
+    "Page Contract",
+)
+
 PLACEHOLDER_LIMITS = {"", "tbd", "todo", "n/a", "none"}
+LIMITS_NORMALIZATION_RE = re.compile(r"[\s`*_>.,:;!()\[\]-]+")
+BOILERPLATE_LIMITS = {
+    "state real constraints assumptions cost runtime platform expectations or known gaps do not leave this section empty and do not use placeholder text",
+    "state real constraints assumptions cost runtime platform expectations known gaps and follow up issue links for uncertainties readers should know about do not leave this section empty and do not use placeholder text",
+}
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 INLINE_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 REFERENCE_DEF_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)", re.MULTILINE)
@@ -143,10 +154,13 @@ def heading_titles_by_level(text: str, level: int) -> set[str]:
     return {heading.title for heading in parse_headings(text) if heading.level == level}
 
 
+def normalize_limits_body(body: str) -> str:
+    return LIMITS_NORMALIZATION_RE.sub(" ", body).strip().lower()
+
+
 def limits_is_placeholder(body: str) -> bool:
-    normalized = re.sub(r"[\s`*_>-]+", " ", body).strip().lower()
-    normalized = normalized.rstrip(".:;")
-    if normalized in PLACEHOLDER_LIMITS:
+    normalized = normalize_limits_body(body)
+    if normalized in PLACEHOLDER_LIMITS or normalized in BOILERPLATE_LIMITS:
         return True
     return any(
         normalized == prefix or re.match(rf"^{re.escape(prefix)}(?:\W|$)", normalized) is not None
@@ -190,10 +204,9 @@ def validate_index(path: Path, repo_root: Path) -> list[str]:
     text = read_text(path)
     headings = heading_titles_by_level(text, 2)
     errors = validate_markdown_links(path, repo_root)
-    if "Categories" not in headings:
-        errors.append("showcase index missing Categories section")
-    if "Page Contract" not in headings:
-        errors.append("showcase index missing Page Contract section")
+    for section in REQUIRED_INDEX_SECTIONS:
+        if section not in headings:
+            errors.append(f"showcase index missing {section} section")
     if links_to_planning_docs(text):
         errors.append("showcase index must not link primary users to planning docs")
     for section in REQUIRED_SHOWCASE_SECTIONS:
@@ -330,6 +343,18 @@ def run_self_test() -> list[str]:
                 "TBD",
             ),
         )
+        template_limits_text = (
+            "State real constraints, assumptions, cost, runtime, platform expectations, or\n"
+            "known gaps. Do not leave this section empty, and do not use placeholder text."
+        )
+        boilerplate_limits = write_fixture(
+            root,
+            "docs/showcases/boilerplate-limits.md",
+            VALID_SHOWCASE.replace(
+                "This fixture covers checker structure only, not full documentation prose.",
+                template_limits_text,
+            ),
+        )
         bad_link = write_fixture(
             root,
             "docs/showcases/bad-link.md",
@@ -338,6 +363,17 @@ def run_self_test() -> list[str]:
         index = write_fixture(
             root,
             "docs/showcases/README.md",
+            "# Showcase Index\n\n## Categories\n\n### Example\n\nSee [`README.md`](README.md).\n\n"
+            "## Documentation Follow-Up Policy\n\n"
+            "Write only high-confidence existing behavior. Open follow-up issues for claims "
+            "that need algorithm review, benchmark interpretation, or scientific review.\n\n"
+            "## Page Contract\n\n"
+            + "\n".join(f"- `{section}`" for section in REQUIRED_SHOWCASE_SECTIONS)
+            + "\n",
+        )
+        index_missing_policy = write_fixture(
+            root,
+            "docs/showcases/index-missing-policy.md",
             "# Showcase Index\n\n## Categories\n\n### Example\n\nSee [`README.md`](README.md).\n\n## Page Contract\n\n"
             + "\n".join(f"- `{section}`" for section in REQUIRED_SHOWCASE_SECTIONS)
             + "\n",
@@ -356,12 +392,19 @@ def run_self_test() -> list[str]:
             (missing_expected, "Expected Result"),
             (missing_limits, "Limits"),
             (placeholder_limits, "non-placeholder"),
+            (boilerplate_limits, "non-placeholder"),
             (bad_link, "does not exist"),
         ]
         for fixture, expected_error in expected_failures:
             fixture_errors = validate_showcase_page(fixture, root)
             if not any(expected_error in error for error in fixture_errors):
                 errors.append(f"{fixture.name} did not fail with {expected_error}: {fixture_errors}")
+        missing_policy_errors = validate_index(index_missing_policy, root)
+        if not any("Documentation Follow-Up Policy" in error for error in missing_policy_errors):
+            errors.append(
+                "index without policy did not fail with Documentation Follow-Up Policy: "
+                f"{missing_policy_errors}"
+            )
         if validate_path(index, root):
             errors.append("index fixture should pass index validation")
         if validate_path(template, root):

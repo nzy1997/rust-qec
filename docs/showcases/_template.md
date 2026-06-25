@@ -34,5 +34,6 @@ expected success criteria that are more specific than only "command exits 0".
 
 ## Limits
 
-State real constraints, assumptions, cost, runtime, platform expectations, or
-known gaps. Do not leave this section empty, and do not use placeholder text.
+State real constraints, assumptions, cost, runtime, platform expectations,
+known gaps, and follow-up issue links for uncertainties readers should know
+about. Do not leave this section empty, and do not use placeholder text.

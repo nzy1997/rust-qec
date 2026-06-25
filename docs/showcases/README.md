@@ -63,6 +63,16 @@ Primary code and docs:
 - [`docs/apm_decoder_hierarchy.md`](docs/apm_decoder_hierarchy.md)
 - [`docs/bb144_circuit_bposd_reproduction.md`](docs/bb144_circuit_bposd_reproduction.md)
 
+## Documentation Follow-Up Policy
+
+Write only high-confidence behavior that exists in the repository today. If a
+claim needs algorithm review, benchmark interpretation, or scientific review,
+do not present it as a showcase claim.
+
+Open a follow-up issue for the review question when it matters. Link that
+issue from `Limits` when the uncertainty is a known gap readers should see, or
+omit the uncertain claim entirely.
+
 ## Page Contract
 
 Every individual showcase page must include these sections:
