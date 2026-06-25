@@ -7,6 +7,7 @@ use rsinter::bench::spec::{
 };
 use rsinter::failure::FailureKind;
 use rsinter::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
+use std::path::{Path, PathBuf};
 
 #[test]
 fn render_benchmark_plot_writes_svg_for_ok_rows() {
@@ -821,6 +822,33 @@ fn plot_confidence_interval_factor_is_read_from_toml() {
 }
 
 #[test]
+fn surface_compare_fixture_matches_rsinter_plot_semantics() {
+    let rows = surface_compare_fixture_rows();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].metrics["logical_errors"], 0.0);
+    assert_eq!(rows[1].metrics["logical_errors"], 2.0);
+
+    let default_spec = surface_compare_fixture_spec("");
+    let default_svg = render_plot_svg(&default_spec, &rows, "surface-compare-default.svg");
+    assert_eq!(
+        default_svg.matches("<circle").count(),
+        1,
+        "shared fixture should draw only the nonzero best marker; svg was:\n{default_svg}"
+    );
+
+    let default_interval_height = confidence_band_pixel_height(&default_svg);
+    let wide_spec =
+        surface_compare_fixture_spec("confidence_interval_likelihood_factor = 25.0");
+    let wide_svg = render_plot_svg(&wide_spec, &rows, "surface-compare-wide.svg");
+    let wide_interval_height = confidence_band_pixel_height(&wide_svg);
+    assert!(
+        wide_interval_height > default_interval_height,
+        "wider factor should produce a taller interval; default={default_interval_height}, wide={wide_interval_height}\n\
+         default svg:\n{default_svg}\nwide svg:\n{wide_svg}"
+    );
+}
+
+#[test]
 fn logical_rate_unit_transforms_best_and_interval_bounds() {
     let row = ok_row_with_metadata(
         "rmatching",
@@ -1532,6 +1560,105 @@ fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
     ]
 }
 
+fn surface_compare_fixture_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv")
+}
+
+fn surface_compare_fixture_rows() -> Vec<BenchmarkResultRow> {
+    let mut reader = csv::Reader::from_path(surface_compare_fixture_path()).unwrap();
+    let headers = reader.headers().unwrap().clone();
+    reader
+        .records()
+        .map(|record| {
+            let record = record.unwrap();
+            let field = |name: &str| -> &str {
+                let index = headers.iter().position(|header| header == name).unwrap();
+                record.get(index).unwrap()
+            };
+            let logical_errors: f64 = field("logical_errors").parse().unwrap();
+            BenchmarkResultRow {
+                benchmark: "surface_decoder".into(),
+                runner: field("decoder").into(),
+                language: "rust".into(),
+                status: field("status").into(),
+                failure_kind: if logical_errors > 0.0 {
+                    FailureKind::LogicalFailure
+                } else {
+                    FailureKind::Ok
+                },
+                params: ParamMap::from_pairs([
+                    ("distance", serde_json::json!(field("distance").parse::<u64>().unwrap())),
+                    ("rounds", serde_json::json!(field("rounds").parse::<u64>().unwrap())),
+                    ("p", serde_json::json!(field("p").parse::<f64>().unwrap())),
+                ]),
+                case_summary: CaseSummary::from_pairs([
+                    ("num_dets", serde_json::json!(field("num_dets").parse::<u64>().unwrap())),
+                    ("num_obs", serde_json::json!(field("num_obs").parse::<u64>().unwrap())),
+                ]),
+                metrics: MetricMap::from_pairs([
+                    (
+                        "logical_error_rate",
+                        field("logical_error_rate").parse().unwrap(),
+                    ),
+                    (
+                        "decode_us_per_shot",
+                        field("decode_us_per_shot").parse().unwrap(),
+                    ),
+                    ("shots_used", field("shots_used").parse().unwrap()),
+                    ("logical_errors", logical_errors),
+                ]),
+                artifacts: std::collections::BTreeMap::new(),
+                error: None,
+            }
+        })
+        .collect()
+}
+
+fn surface_compare_fixture_spec(plot_extra: &str) -> BenchmarkSpec {
+    toml::from_str(&format!(
+        r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002, 0.004]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+{plot_extra}
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.distance"]
+label_template = "{{runner}} d={{params.distance}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#
+    ))
+    .unwrap()
+}
+
 fn render_plot_svg(spec: &BenchmarkSpec, rows: &[BenchmarkResultRow], file_name: &str) -> String {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join(file_name);
@@ -1582,6 +1709,38 @@ fn parse_vertical_interval_segment(line: &str) -> Option<VerticalIntervalSegment
         return None;
     }
     Some(VerticalIntervalSegment { x: first.0, height })
+}
+
+fn confidence_band_pixel_height(svg: &str) -> f64 {
+    let polygon = svg
+        .lines()
+        .find(|line| {
+            line.contains("<polygon")
+                && line.contains("fill=\"#")
+                && !line.contains("fill=\"#FFFFFF\"")
+        })
+        .unwrap_or_else(|| panic!("expected one confidence-band polygon; svg was:\n{svg}"));
+    let points: Vec<_> = svg_attribute(polygon, "points")
+        .unwrap()
+        .split_whitespace()
+        .filter_map(parse_svg_point)
+        .collect();
+    let max_x = points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let y_values: Vec<_> = points
+        .iter()
+        .filter(|(x, _)| (*x - max_x).abs() <= 1e-6)
+        .map(|(_, y)| *y)
+        .collect();
+    let min_y = y_values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max_y = y_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        min_y.is_finite() && max_y.is_finite() && max_y > min_y,
+        "confidence-band polygon should have vertical span, got {y_values:?}\nsvg:\n{svg}"
+    );
+    max_y - min_y
 }
 
 fn svg_attribute<'a>(line: &'a str, name: &str) -> Option<&'a str> {

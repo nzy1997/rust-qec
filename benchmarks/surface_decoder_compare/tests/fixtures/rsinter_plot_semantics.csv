@@ -1,0 +1,3 @@
+tier,decoder,backend,distance,rounds,p,seed,num_dets,num_obs,shots_budget,errors_budget,shots_used,logical_errors,logical_error_rate,compile_us,total_decode_us,decode_us_per_shot,status,error
+smoke,rmatching,rust,3,3,0.002,12345,24,1,2000,20,2000,0,0.0,10.0,100.0,0.05,ok,
+smoke,rmatching,rust,3,3,0.004,12345,24,1,2000,20,2000,2,0.001,10.0,120.0,0.06,ok,
