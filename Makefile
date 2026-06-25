@@ -31,9 +31,7 @@ build-site:
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
-	typst compile --format svg --root qp101-viz qp101-viz/examples/basic-site.typ _site/gallery/basic-site.svg
-	typst compile --format svg --root qp101-viz qp101-viz/examples/repeat-detector-site.typ _site/gallery/repeat-detector-site.svg
-	typst compile --format svg --root qp101-viz qp101-viz/examples/atom-loss-sample.typ _site/gallery/atom-loss-sample.svg
+	python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery
 
 bench-surface-smoke:
 	cargo run -p rsinter --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust

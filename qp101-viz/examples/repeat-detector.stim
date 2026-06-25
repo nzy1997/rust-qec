@@ -1,0 +1,12 @@
+QUBIT_COORDS(0, 0) 0
+QUBIT_COORDS(1, 0) 1
+QUBIT_COORDS(2, 0) 2
+TICK
+REPEAT 2 {
+    CX 0 1
+    CX 1 2
+    TICK
+    M 1
+    DETECTOR(1, 0, 0) rec[-1]
+}
+OBSERVABLE_INCLUDE(0) rec[-1]
