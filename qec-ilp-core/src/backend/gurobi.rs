@@ -204,6 +204,22 @@ mod tests {
     }
 
     #[test]
+    fn maps_gurobi_solution_limit_with_incumbent() {
+        assert_eq!(
+            accepted_gurobi_solution_status(Status::SolutionLimit, 1),
+            Some(ModelSolutionStatus::SolutionLimit),
+        );
+    }
+
+    #[test]
+    fn maps_gurobi_suboptimal_with_incumbent() {
+        assert_eq!(
+            accepted_gurobi_solution_status(Status::SubOptimal, 1),
+            Some(ModelSolutionStatus::SubOptimal),
+        );
+    }
+
+    #[test]
     fn rejects_time_limited_run_without_incumbent() {
         assert_eq!(accepted_gurobi_solution_status(Status::TimeLimit, 0), None);
     }

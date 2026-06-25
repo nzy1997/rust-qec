@@ -147,3 +147,67 @@ fn exact_css_distance_result_serializes_time_limited_incumbent_as_upper_bound() 
     assert_eq!(json["solver_status"], "time_limit");
     assert_eq!(json["time_limit_seconds"], 0.001);
 }
+
+#[test]
+fn exact_css_distance_result_serializes_solution_limited_incumbent_as_incomplete_upper_bound() {
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        sample_distance_result(),
+        ExactCssDistanceOptions {
+            input: ExactCssDistanceInput::CodeId {
+                code_id: "steane".to_owned(),
+            },
+            solver: ExactCssDistanceSolverOptions {
+                backend: ExactCssDistanceBackend::Highs,
+                time_limit_seconds: None,
+                mip_gap: Some(0.01),
+                threads: Some(1),
+                verbose_solver: false,
+            },
+        },
+        Some(ExactCssDistanceSolverReport {
+            backend: ExactCssDistanceBackend::Highs,
+            status: ExactCssDistanceSolverStatus::SolutionLimit,
+        }),
+    );
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "incomplete");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["requested_backend"], "highs");
+    assert_eq!(json["backend"], "highs");
+    assert_eq!(json["solver_status"], "solution_limit");
+    assert_eq!(json["mip_gap"], 0.01);
+    assert_eq!(json["threads"], 1);
+}
+
+#[test]
+fn exact_css_distance_result_serializes_suboptimal_incumbent_as_incomplete_upper_bound() {
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        sample_distance_result(),
+        ExactCssDistanceOptions {
+            input: ExactCssDistanceInput::CodeId {
+                code_id: "steane".to_owned(),
+            },
+            solver: ExactCssDistanceSolverOptions {
+                backend: ExactCssDistanceBackend::Highs,
+                time_limit_seconds: None,
+                mip_gap: None,
+                threads: None,
+                verbose_solver: false,
+            },
+        },
+        Some(ExactCssDistanceSolverReport {
+            backend: ExactCssDistanceBackend::Highs,
+            status: ExactCssDistanceSolverStatus::SubOptimal,
+        }),
+    );
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "incomplete");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["requested_backend"], "highs");
+    assert_eq!(json["backend"], "highs");
+    assert_eq!(json["solver_status"], "sub_optimal");
+}
