@@ -1,17 +1,26 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
+use crate::bench::merge::merge_result_rows;
 use crate::bench::registry::{
-    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
-    expand_runner_points_for_runner,
+    expand_runner_points_for_runner, BenchCasePoint, BenchRunContext, RustBenchRunner,
+    RustRunnerRegistry,
 };
-use crate::bench::result::{RunManifest, write_results_jsonl};
+use crate::bench::result::{
+    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, RunManifest,
+};
 use crate::bench::spec::{BenchmarkSpec, RunnerSpec};
 
 struct PlannedRustRun<'a> {
     runner: &'a RunnerSpec,
     runner_impl: &'a dyn RustBenchRunner,
     points: Vec<BenchCasePoint>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BenchRunOptions {
+    pub resume: bool,
 }
 
 pub fn run_rust_benchmark(
@@ -21,10 +30,35 @@ pub fn run_rust_benchmark(
     registry: &RustRunnerRegistry,
     spec_dir: &Path,
 ) -> Result<PathBuf, String> {
+    run_rust_benchmark_with_options(
+        spec,
+        language,
+        out_root,
+        registry,
+        spec_dir,
+        BenchRunOptions::default(),
+    )
+}
+
+pub fn run_rust_benchmark_with_options(
+    spec: &BenchmarkSpec,
+    language: &str,
+    out_root: &Path,
+    registry: &RustRunnerRegistry,
+    spec_dir: &Path,
+    options: BenchRunOptions,
+) -> Result<PathBuf, String> {
     spec.validate()?;
     fs::create_dir_all(out_root).map_err(|e| e.to_string())?;
-    clear_rust_run_artifacts(spec, language, out_root)?;
+    if !options.resume {
+        clear_rust_run_artifacts(spec, language, out_root)?;
+    }
     let planned_runs = plan_rust_runs(spec, language, registry)?;
+    let resume_rows = if options.resume {
+        load_resume_rows(&planned_runs, out_root)?
+    } else {
+        BTreeMap::new()
+    };
 
     for PlannedRustRun {
         runner,
@@ -34,9 +68,6 @@ pub fn run_rust_benchmark(
     {
         let artifact_dir = out_root.join(&runner.name).join("test-run");
         let staging_dir = out_root.join(&runner.name).join("test-run.tmp");
-        if artifact_dir.exists() {
-            fs::remove_dir_all(&artifact_dir).map_err(|e| e.to_string())?;
-        }
         if staging_dir.exists() {
             fs::remove_dir_all(&staging_dir).map_err(|e| e.to_string())?;
         }
@@ -48,10 +79,21 @@ pub fn run_rust_benchmark(
             seed: 12_345,
             spec_dir: spec_dir.to_path_buf(),
         };
-        let mut rows = Vec::new();
+        let existing_rows = resume_rows.get(&runner.name).cloned().unwrap_or_default();
+        let completed = completed_identities(&existing_rows)?;
+        let mut fresh_rows = Vec::new();
         for point in &points {
-            rows.push(runner_impl.run_point(point, &ctx)?);
+            let row = runner_impl.run_point(point, &ctx)?;
+            let identity = row.identity()?;
+            if !completed.contains(&identity) {
+                fresh_rows.push(row);
+            }
         }
+        let rows = if options.resume {
+            merge_result_rows(vec![existing_rows, fresh_rows])?
+        } else {
+            fresh_rows
+        };
 
         fs::create_dir_all(&staging_dir).map_err(|e| e.to_string())?;
         let manifest = RunManifest::new(
@@ -69,6 +111,9 @@ pub fn run_rust_benchmark(
         let mut file =
             File::create(staging_dir.join("results.jsonl")).map_err(|e| e.to_string())?;
         write_results_jsonl(&rows, &mut file)?;
+        if artifact_dir.exists() {
+            fs::remove_dir_all(&artifact_dir).map_err(|e| e.to_string())?;
+        }
         fs::rename(&staging_dir, &artifact_dir).map_err(|e| e.to_string())?;
     }
 
@@ -122,4 +167,38 @@ fn plan_rust_runs<'a>(
         });
     }
     Ok(planned_runs)
+}
+
+fn load_resume_rows(
+    planned_runs: &[PlannedRustRun<'_>],
+    out_root: &Path,
+) -> Result<BTreeMap<String, Vec<BenchmarkResultRow>>, String> {
+    let mut rows_by_runner = BTreeMap::new();
+    for planned in planned_runs {
+        let path = out_root
+            .join(&planned.runner.name)
+            .join("test-run")
+            .join("results.jsonl");
+        if !path.exists() {
+            continue;
+        }
+        let data = fs::read(&path).map_err(|error| {
+            format!("failed to read resume results {}: {error}", path.display())
+        })?;
+        let rows = read_results_jsonl(&data[..]).map_err(|error| {
+            format!("failed to read resume results {}: {error}", path.display())
+        })?;
+        rows_by_runner.insert(planned.runner.name.clone(), rows);
+    }
+    Ok(rows_by_runner)
+}
+
+fn completed_identities(rows: &[BenchmarkResultRow]) -> Result<BTreeSet<String>, String> {
+    let mut completed = BTreeSet::new();
+    for row in rows {
+        if row.status == "ok" {
+            completed.insert(row.identity()?);
+        }
+    }
+    Ok(completed)
 }

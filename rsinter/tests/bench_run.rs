@@ -1,6 +1,6 @@
 use rsinter::bench::registry::build_default_rust_runner_registry;
-use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
-use rsinter::bench::run::run_rust_benchmark;
+use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
+use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
 use std::fs;
@@ -74,6 +74,37 @@ fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
     )
     .unwrap();
     read_results_jsonl(&data[..]).unwrap()
+}
+
+fn read_rows(artifact_root: &Path, runner_name: &str) -> Vec<BenchmarkResultRow> {
+    let data = fs::read(
+        artifact_root
+            .join(runner_name)
+            .join("test-run")
+            .join("results.jsonl"),
+    )
+    .unwrap();
+    read_results_jsonl(&data[..]).unwrap()
+}
+
+fn write_rows_to_path(rows: &[BenchmarkResultRow], path: &Path) {
+    let mut data = Vec::new();
+    rsinter::bench::result::write_results_jsonl(rows, &mut data).unwrap();
+    fs::write(path, data).unwrap();
+}
+
+fn identity_count(rows: &[BenchmarkResultRow], identity: &str) -> usize {
+    rows.iter()
+        .filter(|row| row.identity().unwrap() == identity)
+        .count()
+}
+
+fn assert_same_identities(left: &[BenchmarkResultRow], right: &[BenchmarkResultRow]) {
+    let mut left_ids: Vec<_> = left.iter().map(|row| row.identity().unwrap()).collect();
+    let mut right_ids: Vec<_> = right.iter().map(|row| row.identity().unwrap()).collect();
+    left_ids.sort();
+    right_ids.sort();
+    assert_eq!(left_ids, right_ids);
 }
 
 fn issue96_css_rbposd_spec(schedule: &str, extra_params: &str) -> String {
@@ -182,6 +213,127 @@ label = "Logical Error Rate"
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].runner, "rmatching");
     assert_eq!(rows[0].language, "rust");
+}
+
+#[test]
+fn rust_benchmark_run_resumes_partial_results() {
+    let spec_text = r#"
+name = "resume_predict_zero"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "predict-zero-resume"
+language = "rust"
+impl_key = "predict-zero"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "tests/fixtures/css/steane_hx.json"
+hz = "tests/fixtures/css/steane_hz.json"
+basis = "x"
+rounds = [1]
+p = [0.0, 0.1]
+max_shots = 4
+max_errors = 4
+batch_size = 2
+
+[plot]
+title = "Resume"
+
+[plot.x]
+field = "params.p"
+scale = "linear"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{{runner}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"
+"#;
+    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let registry = build_default_rust_runner_registry();
+
+    let artifact_root = run_rust_benchmark(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let results_path = artifact_root
+        .join("predict-zero-resume")
+        .join("test-run")
+        .join("results.jsonl");
+    let initial_rows = read_results_jsonl(&fs::read(&results_path).unwrap()[..]).unwrap();
+    assert_eq!(initial_rows.len(), 2);
+
+    let kept = initial_rows[0].clone();
+    write_rows_to_path(std::slice::from_ref(&kept), &results_path);
+
+    let artifact_root = run_rust_benchmark_with_options(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        BenchRunOptions { resume: true },
+    )
+    .unwrap();
+    let resumed_rows = read_rows(&artifact_root, "predict-zero-resume");
+    assert_eq!(resumed_rows.len(), 2);
+    assert_eq!(
+        identity_count(&resumed_rows, &kept.identity().unwrap()),
+        1,
+        "completed row identity was duplicated"
+    );
+
+    run_rust_benchmark_with_options(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        BenchRunOptions { resume: true },
+    )
+    .unwrap();
+    let rerun_rows = read_rows(dir.path(), "predict-zero-resume");
+    assert_eq!(rerun_rows.len(), 2);
+    assert_same_identities(&resumed_rows, &rerun_rows);
+
+    let changed_text = spec_text.replace("max_shots = 4", "max_shots = 6");
+    let changed_spec: BenchmarkSpec = toml::from_str(&changed_text).unwrap();
+    run_rust_benchmark_with_options(
+        &changed_spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        BenchRunOptions { resume: true },
+    )
+    .unwrap();
+    let changed_rows = read_rows(dir.path(), "predict-zero-resume");
+    assert_eq!(changed_rows.len(), 4);
+
+    fs::write(&results_path, b"{not valid jsonl\n").unwrap();
+    let err = run_rust_benchmark_with_options(
+        &spec,
+        "rust",
+        dir.path(),
+        &registry,
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        BenchRunOptions { resume: true },
+    )
+    .expect_err("corrupt existing JSONL must fail");
+    assert!(err.contains("failed to read resume results"), "{err}");
+    assert_eq!(fs::read(&results_path).unwrap(), b"{not valid jsonl\n");
 }
 
 #[test]
