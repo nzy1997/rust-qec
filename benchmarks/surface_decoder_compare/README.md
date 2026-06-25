@@ -48,6 +48,19 @@ executed by the `rsinter` CLI, Python runners are executed by the Python
 benchmark entrypoint, and the final merged plot is rendered by `rsinter`.
 Artifacts are written under `benchmarks/out/surface_decoder/`.
 
+For future comparison figures, prefer the `rsinter bench plot` path. The
+framework commands above render through the same plotter, and the direct command
+shape is:
+
+```bash
+cargo run -p rsinter --bin rsinter -- bench plot --spec <benchmark.toml> --input <results.jsonl> --out <figure.svg>
+```
+
+The legacy `plot_compare.py` script is kept as a compatibility path for older
+CSV comparison outputs; new benchmark figures should use `rsinter bench plot`
+so zero-error intervals, interval factors, and series grouping stay aligned
+with the main benchmark plotter.
+
 ## Notes
 
 - Shared workload: `stim gen surface_code:rotated_memory_x`
