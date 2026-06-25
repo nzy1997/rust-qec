@@ -24,7 +24,7 @@ The main entrypoints are:
 | `rilpqec/` | ILP-based decoding path |
 | `qec-code/` | CSS/code construction helpers and `qec-code` CLI |
 | `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness |
-| `qp101-viz/` | Typst renderer for QP101 circuit JSON |
+| `qp101-viz/` | Optional legacy/prototype Typst renderer for QP101 circuit JSON |
 
 ## Quick Start
 
@@ -66,7 +66,8 @@ Then move on to:
 - `sample` for measurements
 - `detect` for detection events and observable flips
 - `analyze_errors` for DEM extraction
-- `export_json` for QP101 export
+- `render_svg` for built-in static SVG circuit diagrams
+- `export_json` for QP101 structured-data export
 
 The full command reference is in
 [`rstim/doc/cli.md`](rstim/doc/cli.md).
@@ -111,11 +112,24 @@ make surface-decoder-compare-smoke
 Benchmark setup details are in
 [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md).
 
-## Atom Loss And QP101 Export
+## Static SVG Diagrams And Atom Loss Overlays
+
+For static circuit visualization, use the built-in SVG renderer first:
+
+```sh
+rstim render_svg --in circuit.stim --out circuit.svg
+```
+
+Omit `--out` to write the SVG document to stdout, which is useful for pipes and
+quick checks:
+
+```sh
+printf 'H 0\nCX 0 1\nTICK\nM 0\n' | rstim render_svg > circuit.svg
+```
 
 Atom loss is a first-class workflow in `rstim`. The simulator can model
 explicit `LOSS` events, propagate loss through later operations, and annotate
-loss-caused measurement outcomes in exported sample traces.
+loss-caused measurement outcomes in seeded sample-shot SVGs.
 
 Example circuit:
 
@@ -128,7 +142,25 @@ MRL 2
 DETECTOR rec[-3]
 ```
 
-Export one seeded sample shot as QP101 JSON:
+Render one seeded sample shot with atom-loss and detector-flip overlays:
+
+```sh
+rstim render_svg --sample_shot --seed 7 \
+  --in qp101-viz/examples/atom-loss-sample.stim \
+  --out atom-loss-sample.svg
+```
+
+Render a selected detector-error-model error as source and symptom highlights:
+
+```sh
+printf 'X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n' > /tmp/rstim-dem-highlight.stim
+rstim render_svg --highlight_dem_error 0 \
+  --in /tmp/rstim-dem-highlight.stim \
+  --out dem-highlight.svg
+```
+
+Use `export_json` when you need QP101 structured data for downstream tooling,
+fixture generation, or the optional legacy/prototype Typst workflow:
 
 ```sh
 cargo run -p rstim --bin rstim -- export_json --sample_shot --seed 7 \
