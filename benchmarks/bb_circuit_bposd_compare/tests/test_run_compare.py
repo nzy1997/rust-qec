@@ -177,6 +177,18 @@ class RunCompareTest(unittest.TestCase):
             "\n".join(verify_rows(rows)),
         )
 
+    def test_run_suite_reraises_unrelated_import_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                side_effect=ImportError("cannot import name 'frobnicate' from 'internal_helpers'"),
+            ):
+                with self.assertRaisesRegex(ImportError, "frobnicate"):
+                    run_suite(output_dir=output_dir, rust_exporter=fake_export)
+
+            self.assertFalse((output_dir / "results.csv").exists())
+
     def test_run_suite_allows_missing_python_when_requested(self) -> None:
         status, rows = self._run_suite_with_python_failure(
             ModuleNotFoundError("No module named 'ldpc'"),

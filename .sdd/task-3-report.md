@@ -181,3 +181,54 @@ OK
 - The change stays inside the Task 3 runner, its unit tests, and the task report.
 - Missing or broken `ldpc`/`bposd` import-time failures now leave CSV evidence instead of aborting the suite mid-stream.
 - The classification remains narrow enough that non-dependency `ImportError` failures continue to raise instead of being mislabeled as skips.
+
+## Fix Report: Review Finding - Unrelated ImportError Boundary
+
+### What Changed
+
+- Added a regression test in `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py` covering the opposite boundary of `_is_missing_python_dependency(...)`.
+- The new test forces `_python_row(...)` to raise `ImportError("cannot import name 'frobnicate' from 'internal_helpers'")` and asserts that:
+  - `run_suite(...)` re-raises that `ImportError`
+  - no `results.csv` file is written, proving the suite aborts instead of converting the failure into skipped `ldpc_bposd` rows
+- Left `benchmarks/bb_circuit_bposd_compare/run_compare.py` unchanged because it already behaved correctly.
+
+### Test Command / Output
+
+```bash
+python3 -m unittest benchmarks.bb_circuit_bposd_compare.tests.test_run_compare
+```
+
+Observed:
+
+```text
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK
+```
+
+```bash
+python3 -m unittest benchmarks.bb_circuit_bposd_compare.tests.test_verify_smoke benchmarks.bb_circuit_bposd_compare.tests.test_run_compare
+```
+
+Observed:
+
+```text
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.002s
+
+OK
+```
+
+### Files Changed
+
+- `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py`
+- `.sdd/task-3-report.md`
+
+### Self-Review
+
+- The regression is narrowly scoped to the review finding and does not broaden ownership into Rust files or Task 4 docs.
+- It proves the intended control-flow boundary directly at `run_suite(...)`, which is where a mistaken dependency classification would silently turn a real failure into skipped rows.
+- The implementation stayed unchanged, which is preferable here because the existing behavior already matched the review requirement.
