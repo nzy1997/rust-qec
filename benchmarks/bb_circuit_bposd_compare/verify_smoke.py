@@ -14,10 +14,20 @@ REQUIRED_OK_FIELDS = (
     "logical_error_rate",
     "status",
 )
+PINNED_UPSTREAM_SETTINGS = {
+    "bp_method": "ms",
+    "max_iter": "10000",
+    "osd_method": "osd_cs",
+    "osd_order": "7",
+    "seed": "12345",
+}
 
 
 def verify_rows(rows: list[dict[str, str]]) -> list[str]:
     errors: list[str] = []
+
+    if not rows:
+        return ["CSV has no data rows"]
 
     missing_columns = [column for column in CSV_HEADER if not all(column in row for row in rows)]
     if missing_columns:
@@ -37,6 +47,17 @@ def verify_rows(rows: list[dict[str, str]]) -> list[str]:
                 "completed row missing required timing/logical/status field"
             )
             break
+        if row.get("decoder_impl") == "ldpc_bposd":
+            for field, expected_value in PINNED_UPSTREAM_SETTINGS.items():
+                if row.get(field) != expected_value:
+                    errors.append(
+                        "completed upstream ldpc/bposd row has mismatched pinned setting"
+                    )
+                    break
+            if errors and errors[-1] == (
+                "completed upstream ldpc/bposd row has mismatched pinned setting"
+            ):
+                break
 
     paired_case_ids = {
         row.get("case_id", "")

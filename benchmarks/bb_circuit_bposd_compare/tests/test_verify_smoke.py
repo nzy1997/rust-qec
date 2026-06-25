@@ -79,6 +79,23 @@ class VerifySmokeTest(unittest.TestCase):
             "\n".join(verify_rows(missing_timing_rows)),
         )
 
+    def test_verify_rows_rejects_mismatched_upstream_pinned_settings(self) -> None:
+        mismatched_upstream_rows = [
+            make_row("bb72-p0005-c1-t1-seed12345", "rbposd"),
+            make_row(
+                "bb72-p0005-c1-t1-seed12345",
+                "ldpc_bposd",
+                osd_order="6",
+            ),
+            make_row("bb90-p0005-c1-t1-seed12345", "rbposd"),
+            make_row("bb90-p0005-c1-t1-seed12345", "ldpc_bposd"),
+        ]
+
+        self.assertIn(
+            "completed upstream ldpc/bposd row has mismatched pinned setting",
+            "\n".join(verify_rows(mismatched_upstream_rows)),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
