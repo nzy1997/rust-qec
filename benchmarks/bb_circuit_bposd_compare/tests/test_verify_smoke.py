@@ -96,6 +96,37 @@ class VerifySmokeTest(unittest.TestCase):
             "\n".join(verify_rows(mismatched_upstream_rows)),
         )
 
+    def test_verify_rows_rejects_skipped_python_rows(self) -> None:
+        skipped_python_rows = [
+            make_row("bb72-p0005-c1-t1-seed12345", "rbposd"),
+            make_row(
+                "bb72-p0005-c1-t1-seed12345",
+                "ldpc_bposd",
+                status="skipped",
+                setup_seconds="",
+                decode_seconds="",
+                run_seconds="",
+                logical_error_rate="",
+                error="No module named 'ldpc'",
+            ),
+            make_row("bb90-p0005-c1-t1-seed12345", "rbposd"),
+            make_row(
+                "bb90-p0005-c1-t1-seed12345",
+                "ldpc_bposd",
+                status="skipped",
+                setup_seconds="",
+                decode_seconds="",
+                run_seconds="",
+                logical_error_rate="",
+                error="No module named 'ldpc'",
+            ),
+        ]
+
+        self.assertIn(
+            "no paired Rust/Python diagnostic case is present",
+            "\n".join(verify_rows(skipped_python_rows)),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
