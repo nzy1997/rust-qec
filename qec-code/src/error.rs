@@ -61,6 +61,8 @@ pub enum QecError {
     },
     #[error("invalid quantum Tanner group element {element}: expected < {order}")]
     InvalidQuantumTannerGroupElement { element: usize, order: usize },
+    #[error("invalid quantum Tanner CSS construction: {reason}")]
+    InvalidQuantumTannerCssConstruction { reason: String },
     #[error("JSON output is required for {command}")]
     JsonOutputRequired { command: &'static str },
     #[error("invalid CSS distance input: {0}")]
