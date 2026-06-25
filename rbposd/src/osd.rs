@@ -1,5 +1,5 @@
 use crate::error::DecodeError;
-use crate::gf2::{DetailedSolution, Gf2SolveStats, PreparedLinearSystem};
+use crate::gf2::{DetailedSolution, Gf2SolveStats, PreparedLinearSystem, ReducedLinearSystem};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
@@ -92,36 +92,31 @@ pub(crate) fn decode_osd_with_workspace(
     let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
     workspace.sort_unreliable_columns(reliability);
     let mut stats = OsdDecodeStats::default();
+    let mut gf2_stats = Gf2SolveStats::default();
+    let reduced = workspace
+        .prepared
+        .reduce_with_column_order_counting(
+            &target_syndrome,
+            &workspace.column_order,
+            &mut gf2_stats,
+        )
+        .map_err(|_| DecodeError::NoOsdSolution)?;
+    accumulate_gf2_stats(&mut stats, gf2_stats);
+
+    let mut gf2_stats = Gf2SolveStats::default();
+    let base = reduced
+        .solve_with_forced_columns_counting(&[], &mut gf2_stats)
+        .map_err(|_| DecodeError::NoOsdSolution)?;
+    accumulate_gf2_stats(&mut stats, gf2_stats);
 
     if osd_order == 0 {
-        let (residual, gf2_stats) = workspace
-            .prepared
-            .solve_with_column_order_detailed_with_stats(
-                &target_syndrome,
-                &workspace.column_order,
-                &[],
-            )
-            .map_err(|_| DecodeError::NoOsdSolution)?;
-        accumulate_gf2_stats(&mut stats, gf2_stats);
         return Ok(OsdDecodeOutcome {
-            correction: xor_correction_bits(base_correction_bits, &residual.correction),
+            correction: xor_correction_bits(base_correction_bits, &base.correction),
             stats,
         });
     }
 
-    let (base, gf2_stats) = workspace
-        .prepared
-        .solve_with_column_order_detailed_with_stats(&target_syndrome, &workspace.column_order, &[])
-        .map_err(|_| DecodeError::NoOsdSolution)?;
-    accumulate_gf2_stats(&mut stats, gf2_stats);
-    let best = best_osd_candidate(
-        &target_syndrome,
-        reliability,
-        workspace,
-        base,
-        osd_order,
-        &mut stats,
-    )?;
+    let best = best_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?;
     Ok(OsdDecodeOutcome {
         correction: xor_correction_bits(base_correction_bits, &best.correction),
         stats,
@@ -166,10 +161,20 @@ pub(crate) fn profile_osd_with_workspace(
     let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
     workspace.sort_unreliable_columns(reliability);
     let mut stats = OsdDecodeStats::default();
-
-    let (base, gf2_stats) = workspace
+    let mut gf2_stats = Gf2SolveStats::default();
+    let reduced = workspace
         .prepared
-        .solve_with_column_order_detailed_with_stats(&target_syndrome, &workspace.column_order, &[])
+        .reduce_with_column_order_counting(
+            &target_syndrome,
+            &workspace.column_order,
+            &mut gf2_stats,
+        )
+        .map_err(|_| DecodeError::NoOsdSolution)?;
+    accumulate_gf2_stats(&mut stats, gf2_stats);
+
+    let mut gf2_stats = Gf2SolveStats::default();
+    let base = reduced
+        .solve_with_forced_columns_counting(&[], &mut gf2_stats)
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
 
@@ -193,14 +198,7 @@ pub(crate) fn profile_osd_with_workspace(
             &mut |columns| {
                 stats.osd_candidate_count += 1;
                 let mut gf2_stats = Gf2SolveStats::default();
-                let _ = workspace
-                    .prepared
-                    .solve_with_column_order_detailed_counting(
-                        &target_syndrome,
-                        &workspace.column_order,
-                        columns,
-                        &mut gf2_stats,
-                    );
+                let _ = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
                 accumulate_gf2_stats(&mut stats, gf2_stats);
             },
         );
@@ -218,9 +216,8 @@ fn accumulate_gf2_stats(stats: &mut OsdDecodeStats, gf2_stats: Gf2SolveStats) {
 }
 
 fn best_osd_candidate(
-    target_syndrome: &Syndrome,
     reliability: &[f64],
-    workspace: &mut OsdWorkspace,
+    reduced: &ReducedLinearSystem,
     base: DetailedSolution,
     osd_order: usize,
     stats: &mut OsdDecodeStats,
@@ -234,14 +231,7 @@ fn best_osd_candidate(
         visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
             stats.osd_candidate_count += 1;
             let mut gf2_stats = Gf2SolveStats::default();
-            let candidate = workspace
-                .prepared
-                .solve_with_column_order_detailed_counting(
-                    target_syndrome,
-                    &workspace.column_order,
-                    columns,
-                    &mut gf2_stats,
-                );
+            let candidate = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
             accumulate_gf2_stats(stats, gf2_stats);
             if let Ok(candidate) = candidate {
                 if is_better_solution(&candidate, &best, reliability) {
@@ -394,7 +384,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{binomial, decode_osd0_with_workspace, OsdWorkspace};
+    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {
