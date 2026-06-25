@@ -5,8 +5,8 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 
 use crate::bench::result::BenchmarkResultRow;
-use crate::bench::spec::{BenchmarkSpec, PanelSpec};
-use crate::stats::fit_binomial;
+use crate::bench::spec::{BenchmarkSpec, LogicalRateUnit, PanelSpec};
+use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
 const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
 const BENCH_PANEL_WIDTH: u32 = 800;
@@ -22,6 +22,14 @@ struct ErrorRatePoint {
     low: f64,
     best: Option<f64>,
     high: f64,
+}
+
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LogicalRateFitForPlot {
+    pub low: f64,
+    pub best: Option<f64>,
+    pub high: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -126,6 +134,98 @@ fn prepare_panel(
     )?))
 }
 
+#[doc(hidden)]
+pub fn logical_rate_fit_for_plot(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<LogicalRateFitForPlot, String> {
+    let shots = required_count_metric(row, "shots_used")?;
+    if shots == 0 {
+        return Err(format!(
+            "shots_used must be positive for {}",
+            row_context(row)
+        ));
+    }
+    let errors = required_count_metric(row, "logical_errors")?;
+    if errors > shots {
+        return Err(format!(
+            "logical_errors must be <= shots_used for {}",
+            row_context(row)
+        ));
+    }
+
+    let pieces = logical_rate_pieces(row, unit)?;
+    let fit = fit_binomial(shots, errors, MAX_LIKELIHOOD_FACTOR);
+    let low = transform_logical_rate(fit.low.unwrap_or(0.0), pieces).max(MIN_LOG_Y);
+    let best = if errors == 0 {
+        None
+    } else {
+        Some(transform_logical_rate(fit.best.unwrap_or(0.0), pieces).max(MIN_LOG_Y))
+    };
+    let high = transform_logical_rate(fit.high.unwrap_or(0.0), pieces).max(MIN_LOG_Y);
+
+    Ok(LogicalRateFitForPlot { low, best, high })
+}
+
+fn logical_rate_pieces(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<Option<f64>, String> {
+    match unit {
+        LogicalRateUnit::PerShot => Ok(None),
+        LogicalRateUnit::PerRound => Ok(Some(required_positive_metadata(
+            row,
+            unit,
+            "params.rounds",
+        )?)),
+        LogicalRateUnit::PerObservable => Ok(Some(required_observable_count(row, unit)?)),
+        LogicalRateUnit::PerRoundPerObservable => {
+            let rounds = required_positive_metadata(row, unit, "params.rounds")?;
+            let observables = required_observable_count(row, unit)?;
+            Ok(Some(rounds * observables))
+        }
+    }
+}
+
+fn required_observable_count(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<f64, String> {
+    resolve_numeric_field(row, "case_summary.logical_observable_count")
+        .or_else(|| resolve_numeric_field(row, "case_summary.num_obs"))
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or_else(|| {
+            format!(
+                "logical_rate_unit = \"{}\" requires positive numeric case_summary.logical_observable_count or case_summary.num_obs for {}",
+                unit.as_str(),
+                row_context(row)
+            )
+        })
+}
+
+fn required_positive_metadata(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+    field: &str,
+) -> Result<f64, String> {
+    resolve_numeric_field(row, field)
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or_else(|| {
+            format!(
+                "logical_rate_unit = \"{}\" requires positive numeric {field} for {}",
+                unit.as_str(),
+                row_context(row)
+            )
+        })
+}
+
+fn transform_logical_rate(shot_rate: f64, pieces: Option<f64>) -> f64 {
+    match pieces {
+        Some(pieces) => shot_error_rate_to_piece_error_rate(shot_rate, pieces),
+        None => shot_rate,
+    }
+}
+
 fn prepare_error_rate_panel(
     spec: &BenchmarkSpec,
     panel: &PanelSpec,
@@ -139,38 +239,18 @@ fn prepare_error_rate_panel(
         let x = resolve_required_numeric_field(row, &spec.plot.x.field)?;
         validate_plot_value(&spec.plot.x.field, x, &spec.plot.x.scale, row)?;
 
-        let shots = required_count_metric(row, "shots_used")?;
-        if shots == 0 {
-            return Err(format!(
-                "shots_used must be positive for {}",
-                row_context(row)
-            ));
-        }
-        let errors = required_count_metric(row, "logical_errors")?;
-        if errors > shots {
-            return Err(format!(
-                "logical_errors must be <= shots_used for {}",
-                row_context(row)
-            ));
-        }
-
-        let fit = fit_binomial(shots, errors, MAX_LIKELIHOOD_FACTOR);
-        let low = fit.low.unwrap_or(0.0).max(MIN_LOG_Y);
-        let best = if errors == 0 {
-            None
-        } else {
-            Some(fit.best.unwrap_or(0.0).max(MIN_LOG_Y))
-        };
-        let high = fit.high.unwrap_or(0.0).max(MIN_LOG_Y);
+        let fit = logical_rate_fit_for_plot(row, spec.plot.logical_rate_unit)?;
         let label = render_series_label(row, spec);
 
-        groups
-            .entry(label)
-            .or_default()
-            .push(ErrorRatePoint { x, low, best, high });
+        groups.entry(label).or_default().push(ErrorRatePoint {
+            x,
+            low: fit.low,
+            best: fit.best,
+            high: fit.high,
+        });
         x_values.push(x);
-        y_values.extend([low, high]);
-        if let Some(best) = best {
+        y_values.extend([fit.low, fit.high]);
+        if let Some(best) = fit.best {
             y_values.push(best);
         }
     }
