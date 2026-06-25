@@ -221,7 +221,13 @@ fn rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle() {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["code_id"], "bb72");
     assert_eq!(json["num_trials"], 1);
+    assert_eq!(json["max_bp_iterations"], 10);
+    assert_eq!(json["osd_order"], 0);
     assert_eq!(json["trials"].as_array().unwrap().len(), 1);
+    assert_eq!(json["z_model"]["first_logical_row"], 36 * 3);
+    assert_eq!(json["x_model"]["first_logical_row"], 36 * 3);
+    assert_eq!(json["trials"][0]["z_logical"].as_array().unwrap().len(), 12);
+    assert_eq!(json["trials"][0]["x_logical"].as_array().unwrap().len(), 12);
     assert!(json["rust_result"]["profile"]["setup_seconds"].is_number());
     assert!(json["z_model"]["sparse_rows"].as_array().unwrap().len() > 0);
 }

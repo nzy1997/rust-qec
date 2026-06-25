@@ -78,13 +78,23 @@ fn comparison_case_export_contains_models_samples_and_profile() {
     assert_eq!(export.code_id, "bb72");
     assert_eq!(export.num_trials, 1);
     assert_eq!(export.seed, Some(12345));
+    assert_eq!(export.max_bp_iterations, 10);
+    assert_eq!(export.osd_order, 0);
     assert_eq!(export.z_model.num_checks, 36 * 3);
     assert_eq!(export.x_model.num_checks, 36 * 3);
+    assert_eq!(export.z_model.first_logical_row, 36 * 3);
+    assert_eq!(export.x_model.first_logical_row, 36 * 3);
     assert_eq!(export.trials.len(), 1);
     assert_eq!(export.trials[0].z_syndrome.len(), export.z_model.num_checks);
     assert_eq!(export.trials[0].x_syndrome.len(), export.x_model.num_checks);
+    assert_eq!(export.trials[0].z_logical.len(), bb72_logical_len());
+    assert_eq!(export.trials[0].x_logical.len(), bb72_logical_len());
     assert!(export.rust_result.profile.setup_seconds.is_finite());
     assert!(export.rust_result.profile.decode_seconds.is_finite());
+}
+
+fn bb72_logical_len() -> usize {
+    build_code("bb72").unwrap().k()
 }
 
 #[test]
