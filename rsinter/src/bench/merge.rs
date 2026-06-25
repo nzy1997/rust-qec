@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
 
 use serde_json::{Number, Value};
 
 use crate::bench::result::{
-    BenchmarkResultRow, MetricMap, case_summary_additive_keys, stable_case_summary,
+    case_summary_additive_keys, stable_case_summary, BenchmarkResultRow, MetricMap,
 };
+use crate::failure::{combine_failure_kind, FailureKind};
 
 const ADDITIVE_METRICS: [&str; 5] = [
     "shots_used",
@@ -75,10 +76,11 @@ fn merge_row_into(
     ensure_same(identity, "runner", base.runner == incoming.runner)?;
     ensure_same(identity, "language", base.language == incoming.language)?;
     ensure_same(identity, "status", base.status == incoming.status)?;
-    ensure_same(
+    let merged_failure_kind = merge_failure_kind(
         identity,
-        "failure_kind",
-        base.failure_kind == incoming.failure_kind,
+        &base.status,
+        base.failure_kind,
+        incoming.failure_kind,
     )?;
     ensure_same(identity, "params", base.params == incoming.params)?;
     ensure_same(identity, "error", base.error == incoming.error)?;
@@ -92,7 +94,27 @@ fn merge_row_into(
     merge_case_summary(identity, &mut base.case_summary, incoming.case_summary)?;
     merge_metrics(identity, &mut base.metrics, incoming.metrics)?;
     recompute_derived_metrics(&mut base.metrics);
+    base.failure_kind = merged_failure_kind;
     Ok(())
+}
+
+fn merge_failure_kind(
+    identity: &str,
+    status: &str,
+    base: FailureKind,
+    incoming: FailureKind,
+) -> Result<FailureKind, String> {
+    if status == "ok" {
+        ensure_same(
+            identity,
+            "failure_kind",
+            base.status() == "ok" && incoming.status() == "ok",
+        )?;
+        Ok(combine_failure_kind(base, incoming))
+    } else {
+        ensure_same(identity, "failure_kind", base == incoming)?;
+        Ok(base)
+    }
 }
 
 fn ensure_same(identity: &str, field: &str, same: bool) -> Result<(), String> {

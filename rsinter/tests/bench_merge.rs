@@ -90,6 +90,27 @@ fn benchmark_merge_combines_rows_with_same_identity() {
 }
 
 #[test]
+fn benchmark_merge_recomputes_completed_failure_kind_from_merged_counters() {
+    let mut clean = ok_row(serde_json::json!({"a": 1}), 100.0, 0.0, 300.0, 0.5);
+    clean.failure_kind = FailureKind::Ok;
+    let logical_failure = ok_row(serde_json::json!({"a": 1}), 300.0, 5.0, 900.0, 1.5);
+    assert_eq!(
+        clean.identity().unwrap(),
+        logical_failure.identity().unwrap()
+    );
+
+    let rows = merge_result_rows(vec![vec![clean], vec![logical_failure]]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "ok");
+    assert_eq!(rows[0].failure_kind, FailureKind::LogicalFailure);
+    let metrics = &rows[0].metrics;
+    assert_eq!(metrics["shots_used"], 400.0);
+    assert_eq!(metrics["logical_errors"], 5.0);
+    assert_eq!(metrics["logical_error_rate"], 0.0125);
+}
+
+#[test]
 fn benchmark_merge_rejects_unknown_metrics_for_same_identity() {
     let first = ok_row(serde_json::json!({"a": 1}), 100.0, 1.0, 300.0, 0.5);
     let mut second = ok_row(serde_json::json!({"a": 1}), 300.0, 5.0, 900.0, 1.5);
@@ -97,7 +118,10 @@ fn benchmark_merge_rejects_unknown_metrics_for_same_identity() {
 
     let err = merge_result_rows(vec![vec![first], vec![second]])
         .expect_err("same identity with unknown metrics must fail");
-    assert!(err.contains("conflicting metrics.median_decode_us"), "{err}");
+    assert!(
+        err.contains("conflicting metrics.median_decode_us"),
+        "{err}"
+    );
 }
 
 fn ok_row(
