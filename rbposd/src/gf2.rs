@@ -48,6 +48,16 @@ pub(crate) struct DetailedSolution {
     pub(crate) free_columns: Vec<usize>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct ReducedLinearSystem {
+    rows: Vec<Vec<bool>>,
+    rhs: Vec<bool>,
+    pivot_columns: Vec<usize>,
+    free_columns: Vec<usize>,
+    is_free: Vec<bool>,
+    num_bits: usize,
+}
+
 #[derive(Debug)]
 pub(crate) struct PreparedLinearSystem {
     base_rows: Vec<Vec<bool>>,
@@ -116,7 +126,16 @@ impl PreparedLinearSystem {
         forced_true_columns: &[usize],
         stats: &mut Gf2SolveStats,
     ) -> Result<DetailedSolution, DecodeError> {
-        stats.solve_count += 1;
+        let reduced = self.reduce_with_column_order_counting(syndrome, column_order, stats)?;
+        reduced.solve_with_forced_columns_counting(forced_true_columns, stats)
+    }
+
+    pub(crate) fn reduce_with_column_order_counting(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+        stats: &mut Gf2SolveStats,
+    ) -> Result<ReducedLinearSystem, DecodeError> {
         stats.full_elimination_count += 1;
         self.scratch_rows.clone_from(&self.base_rows);
         self.scratch_rhs.copy_from_slice(syndrome.as_slice());
@@ -163,6 +182,24 @@ impl PreparedLinearSystem {
             is_free[column] = true;
         }
 
+        Ok(ReducedLinearSystem {
+            rows: self.scratch_rows.clone(),
+            rhs: self.scratch_rhs.clone(),
+            pivot_columns: self.pivot_columns.clone(),
+            free_columns,
+            is_free,
+            num_bits: self.num_bits,
+        })
+    }
+}
+
+impl ReducedLinearSystem {
+    pub(crate) fn solve_with_forced_columns_counting(
+        &self,
+        forced_true_columns: &[usize],
+        stats: &mut Gf2SolveStats,
+    ) -> Result<DetailedSolution, DecodeError> {
+        stats.solve_count += 1;
         let mut solution = vec![false; self.num_bits];
         for &column in forced_true_columns {
             if column >= self.num_bits {
@@ -171,15 +208,15 @@ impl PreparedLinearSystem {
                     num_bits: self.num_bits,
                 });
             }
-            if !is_free[column] {
+            if !self.is_free[column] {
                 return Err(DecodeError::SingularSystem);
             }
             solution[column] = true;
         }
 
         for (pivot_row, &column) in self.pivot_columns.iter().enumerate().rev() {
-            let mut value = self.scratch_rhs[pivot_row];
-            for (physical, &coefficient) in self.scratch_rows[pivot_row].iter().enumerate() {
+            let mut value = self.rhs[pivot_row];
+            for (physical, &coefficient) in self.rows[pivot_row].iter().enumerate() {
                 if physical != column && coefficient && solution[physical] {
                     value ^= true;
                 }
@@ -190,7 +227,7 @@ impl PreparedLinearSystem {
         Ok(DetailedSolution {
             correction: Correction::from(solution),
             pivot_columns: self.pivot_columns.clone(),
-            free_columns,
+            free_columns: self.free_columns.clone(),
         })
     }
 }
@@ -320,6 +357,29 @@ mod tests {
 
         assert_eq!(error, DecodeError::SingularSystem);
         assert_eq!(stats.solve_count, 1);
+        assert_eq!(stats.full_elimination_count, 1);
+    }
+
+    #[test]
+    fn reduced_system_reuses_one_elimination_across_multiple_forced_solves() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+        let forced = reduced
+            .solve_with_forced_columns_counting(&[2], &mut stats)
+            .unwrap();
+
+        assert_eq!(base.correction, Correction::from(vec![true, true, false]));
+        assert_eq!(forced.correction, Correction::from(vec![false, false, true]));
+        assert_eq!(stats.solve_count, 2);
         assert_eq!(stats.full_elimination_count, 1);
     }
 
