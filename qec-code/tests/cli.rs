@@ -105,19 +105,31 @@ fn materialize_css_distance_doc_args(command: &CssDistanceDocCommand) -> Vec<OsS
         .collect()
 }
 
-fn run_css_distance_doc_command(marker: &str) -> Output {
-    let command = css_distance_doc_command(marker);
+fn css_distance_doc_args_contain_sequence(command: &CssDistanceDocCommand, expected: &[&str]) {
+    assert!(
+        command.args.windows(expected.len()).any(|window| window
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied())),
+        "documented command args {:?} should contain sequence {:?}",
+        command.args,
+        expected
+    );
+}
+
+fn run_css_distance_doc_command(command: &CssDistanceDocCommand) -> Output {
     Command::new(qec_code_bin())
         .args(materialize_css_distance_doc_args(&command))
         .output()
         .expect("documented qec-code command should run")
 }
 
-fn assert_random_window_doc_json(marker: &str) -> serde_json::Value {
-    let output = run_css_distance_doc_command(marker);
+fn assert_random_window_doc_json(command: &CssDistanceDocCommand) -> serde_json::Value {
+    let output = run_css_distance_doc_command(command);
     assert!(
         output.status.success(),
-        "documented command {marker} failed with stderr: {}",
+        "documented command {:?} failed with stderr: {}",
+        command.args,
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stderr, b"");
@@ -1877,10 +1889,21 @@ fn random_window_upper_bound_doc_contract() {
         "cargo test -p qec-code issue_225_random_window_upper_bound_full_ladder -- --ignored --nocapture"
     ));
 
-    let built_in = assert_random_window_doc_json("css_distance:random_window_builtin");
+    let built_in_command = css_distance_doc_command("css_distance:random_window_builtin");
+    css_distance_doc_args_contain_sequence(&built_in_command, &["--code-id", "steane"]);
+    let built_in = assert_random_window_doc_json(&built_in_command);
     assert_eq!(built_in["upper_bound"], 3);
     assert_eq!(built_in["witness"]["weight"], 3);
 
+    let file_command = css_distance_doc_command("css_distance:random_window_files");
+    css_distance_doc_args_contain_sequence(
+        &file_command,
+        &["--hx", "qec-code/tests/fixtures/css/steane_hx.json"],
+    );
+    css_distance_doc_args_contain_sequence(
+        &file_command,
+        &["--hz", "qec-code/tests/fixtures/css/steane_hz.json"],
+    );
     let file_block = css_distance_doc_command_block("css_distance:random_window_files");
     assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hx.json"));
     assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hz.json"));
@@ -1891,7 +1914,7 @@ fn random_window_upper_bound_doc_contract() {
         .join("qec-code/tests/fixtures/css/steane_hz.json")
         .exists());
 
-    let files = assert_random_window_doc_json("css_distance:random_window_files");
+    let files = assert_random_window_doc_json(&file_command);
     assert_eq!(files["upper_bound"], 3);
     assert_eq!(files["witness"]["weight"], 3);
 }
