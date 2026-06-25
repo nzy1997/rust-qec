@@ -21,7 +21,7 @@ This first prototype focuses on:
 - assigning renderer-only global measurement anchors such as `m1`, `m2`, `m3`, ... in expanded visual order
 - resolving `detector` and `observable_include` `rec[-k]` sources into those measurement anchors when possible
 
-It does not yet implement a geometry-based layout renderer. The schema and renderer shape are designed so that a future coordinate/layout view can consume the same JSON.
+It renders a timeline view rather than a geometry-based layout.
 
 ## Public API
 
