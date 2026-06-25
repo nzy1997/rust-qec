@@ -43,6 +43,92 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
     run(Cli::parse_from(argv))
 }
 
+const CSS_DISTANCE_DOC: &str = include_str!("../doc/css_distance.md");
+const CSS_DISTANCE_DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code -- ";
+
+#[derive(Debug)]
+struct CssDistanceDocCommand {
+    args: Vec<String>,
+}
+
+fn css_distance_doc_command_block(marker: &str) -> &str {
+    let marker_text = format!("<!-- {marker} -->");
+    let after_marker = CSS_DISTANCE_DOC
+        .split_once(&marker_text)
+        .map(|(_, after)| after)
+        .unwrap_or_else(|| panic!("missing doc marker {marker_text}"));
+    let fence_start = after_marker
+        .find("```bash")
+        .unwrap_or_else(|| panic!("missing bash fence after {marker_text}"));
+    let command_start = fence_start + "```bash".len();
+    let command_tail = &after_marker[command_start..];
+    let fence_end = command_tail
+        .find("```")
+        .unwrap_or_else(|| panic!("missing closing bash fence after {marker_text}"));
+    &command_tail[..fence_end]
+}
+
+fn css_distance_doc_command(marker: &str) -> CssDistanceDocCommand {
+    let commands: Vec<&str> = css_distance_doc_command_block(marker)
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with(CSS_DISTANCE_DOC_COMMAND_PREFIX))
+        .collect();
+    assert_eq!(
+        commands.len(),
+        1,
+        "marker {marker} should contain one qec-code command"
+    );
+
+    let args = commands[0]
+        .strip_prefix(CSS_DISTANCE_DOC_COMMAND_PREFIX)
+        .unwrap()
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
+    CssDistanceDocCommand { args }
+}
+
+fn materialize_css_distance_doc_args(command: &CssDistanceDocCommand) -> Vec<OsString> {
+    command
+        .args
+        .iter()
+        .map(|arg| {
+            if arg.starts_with("qec-code/tests/fixtures/")
+                || arg.starts_with("rsinter/tests/fixtures/")
+            {
+                workspace_root().join(arg).into_os_string()
+            } else {
+                OsString::from(arg)
+            }
+        })
+        .collect()
+}
+
+fn run_css_distance_doc_command(marker: &str) -> Output {
+    let command = css_distance_doc_command(marker);
+    Command::new(qec_code_bin())
+        .args(materialize_css_distance_doc_args(&command))
+        .output()
+        .expect("documented qec-code command should run")
+}
+
+fn assert_random_window_doc_json(marker: &str) -> serde_json::Value {
+    let output = run_css_distance_doc_command(marker);
+    assert!(
+        output.status.success(),
+        "documented command {marker} failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stderr, b"");
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("stdout should be JSON");
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "random-window-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    json
+}
+
 const BB72_PARAMETERIZED_SPEC: &str = "bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
 const BB144_PARAMETERIZED_SPEC: &str = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
 const BB_FAMILY_CATALOG_SPEC: &str =
@@ -1773,6 +1859,41 @@ fn css_distance_random_window_upper_bound_cli_contract() {
         stderr.contains("JSON output is required for code css-distance random-window-upper-bound"),
         "stderr was: {stderr}"
     );
+}
+
+#[test]
+fn random_window_upper_bound_doc_contract() {
+    assert!(CSS_DISTANCE_DOC.contains("random-window-upper-bound"));
+    assert!(CSS_DISTANCE_DOC.contains("randomized-upper-bound"));
+    assert!(CSS_DISTANCE_DOC.contains("bound_type"));
+    assert!(CSS_DISTANCE_DOC.contains("upper"));
+    assert!(CSS_DISTANCE_DOC.contains(
+        "When `bound_type: \"upper\"` appears in this JSON, the value is an upper bound from a randomized search, not a certified exact distance."
+    ), "docs no longer warn users not to treat the randomized result as an exact distance");
+    assert!(CSS_DISTANCE_DOC.contains(
+        "cargo test -p qec-code issue_225_random_window_upper_bound_smoke_ladder -- --nocapture"
+    ));
+    assert!(CSS_DISTANCE_DOC.contains(
+        "cargo test -p qec-code issue_225_random_window_upper_bound_full_ladder -- --ignored --nocapture"
+    ));
+
+    let built_in = assert_random_window_doc_json("css_distance:random_window_builtin");
+    assert_eq!(built_in["upper_bound"], 3);
+    assert_eq!(built_in["witness"]["weight"], 3);
+
+    let file_block = css_distance_doc_command_block("css_distance:random_window_files");
+    assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hx.json"));
+    assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hz.json"));
+    assert!(workspace_root()
+        .join("qec-code/tests/fixtures/css/steane_hx.json")
+        .exists());
+    assert!(workspace_root()
+        .join("qec-code/tests/fixtures/css/steane_hz.json")
+        .exists());
+
+    let files = assert_random_window_doc_json("css_distance:random_window_files");
+    assert_eq!(files["upper_bound"], 3);
+    assert_eq!(files["witness"]["weight"], 3);
 }
 
 #[cfg(feature = "distance-ilp-highs")]
