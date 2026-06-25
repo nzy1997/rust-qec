@@ -13,8 +13,14 @@ const BENCH_PANEL_WIDTH: u32 = 800;
 const BENCH_CANVAS_HEIGHT: u32 = 600;
 const MIN_LOG_Y: f64 = 1e-10;
 
-type NumericGroups = BTreeMap<String, Vec<(f64, f64)>>;
-type ErrorRateGroups = BTreeMap<String, Vec<ErrorRatePoint>>;
+type SeriesKey = Vec<String>;
+type NumericGroups = BTreeMap<SeriesKey, SeriesData<(f64, f64)>>;
+type ErrorRateGroups = BTreeMap<SeriesKey, SeriesData<ErrorRatePoint>>;
+
+struct SeriesData<T> {
+    label: String,
+    points: Vec<T>,
+}
 
 #[derive(Clone, Copy)]
 struct ErrorRatePoint {
@@ -75,7 +81,7 @@ pub fn render_benchmark_plot(
         return Err("plot requires at least one ok row; no ok rows available".into());
     }
 
-    let series_styles = build_series_styles(spec, &ok_rows);
+    let series_styles = build_series_styles(spec, &ok_rows)?;
     let panels = spec
         .plot
         .panels
@@ -162,11 +168,16 @@ fn prepare_error_rate_panel(
             Some(fit.best.unwrap_or(0.0).max(MIN_LOG_Y))
         };
         let high = fit.high.unwrap_or(0.0).max(MIN_LOG_Y);
+        let key = series_key(row, spec)?;
         let label = render_series_label(row, spec);
 
         groups
-            .entry(label)
-            .or_default()
+            .entry(key)
+            .or_insert_with(|| SeriesData {
+                label,
+                points: Vec::new(),
+            })
+            .points
             .push(ErrorRatePoint { x, low, best, high });
         x_values.push(x);
         y_values.extend([low, high]);
@@ -175,8 +186,10 @@ fn prepare_error_rate_panel(
         }
     }
 
-    for points in groups.values_mut() {
-        points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+    for series in groups.values_mut() {
+        series
+            .points
+            .sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     if groups.is_empty() {
@@ -213,14 +226,24 @@ fn prepare_numeric_panel(
         let y = required_metric(row, metric_key)?;
         validate_plot_value(&format!("metrics.{metric_key}"), y, &panel.scale, row)?;
 
+        let key = series_key(row, spec)?;
         let label = render_series_label(row, spec);
-        groups.entry(label).or_default().push((x, y));
+        groups
+            .entry(key)
+            .or_insert_with(|| SeriesData {
+                label,
+                points: Vec::new(),
+            })
+            .points
+            .push((x, y));
         x_values.push(x);
         y_values.push(y);
     }
 
-    for points in groups.values_mut() {
-        points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    for series in groups.values_mut() {
+        series
+            .points
+            .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     if groups.is_empty() {
@@ -244,7 +267,7 @@ fn render_plot_on<DB: DrawingBackend>(
     root: DrawingArea<DB, Shift>,
     spec: &BenchmarkSpec,
     panels: &[PreparedPanel],
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -274,7 +297,7 @@ where
 fn render_error_rate_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &ErrorRatePanelData,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -366,7 +389,7 @@ where
 fn render_numeric_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &NumericPanelData,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -458,7 +481,7 @@ where
 fn draw_error_rate_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &ErrorRateGroups,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -466,11 +489,13 @@ where
     XR: Ranged<ValueType = f64>,
     YR: Ranged<ValueType = f64>,
 {
-    for (index, (label, points)) in groups.iter().enumerate() {
+    for (index, (key, series)) in groups.iter().enumerate() {
         let style = series_styles
-            .get(label)
+            .get(key)
             .copied()
             .unwrap_or_else(|| default_series_style(index));
+        let points = &series.points;
+        let label = &series.label;
 
         if points.len() > 1 {
             chart
@@ -536,7 +561,7 @@ where
 fn draw_numeric_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &NumericGroups,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -544,11 +569,13 @@ where
     XR: Ranged<ValueType = f64>,
     YR: Ranged<ValueType = f64>,
 {
-    for (index, (label, points)) in groups.iter().enumerate() {
+    for (index, (key, series)) in groups.iter().enumerate() {
         let style = series_styles
-            .get(label)
+            .get(key)
             .copied()
             .unwrap_or_else(|| default_series_style(index));
+        let points = &series.points;
+        let label = &series.label;
 
         draw_line_series(chart, label, points, style)?;
         chart
@@ -719,7 +746,7 @@ fn resolve_numeric_field(row: &BenchmarkResultRow, field: &str) -> Option<f64> {
 fn build_series_styles(
     spec: &BenchmarkSpec,
     rows: &[&BenchmarkResultRow],
-) -> BTreeMap<String, SeriesStyle> {
+) -> Result<BTreeMap<SeriesKey, SeriesStyle>, String> {
     let mut runner_order: Vec<String> = spec
         .runners
         .iter()
@@ -752,8 +779,8 @@ fn build_series_styles(
 
     let mut styles = BTreeMap::new();
     for (index, row) in rows.iter().enumerate() {
-        let label = render_series_label(row, spec);
-        styles.entry(label).or_insert_with(|| {
+        let key = series_key(row, spec)?;
+        styles.entry(key).or_insert_with(|| {
             let color_index = runner_index.get(&row.runner).copied().unwrap_or(index);
             let pattern_index = row
                 .params
@@ -767,7 +794,7 @@ fn build_series_styles(
             }
         });
     }
-    styles
+    Ok(styles)
 }
 
 fn line_pattern_for_index(index: usize) -> LinePattern {
@@ -822,6 +849,45 @@ fn render_series_label(row: &BenchmarkResultRow, spec: &BenchmarkSpec) -> String
         row.case_summary.iter().map(|(k, v)| (k.as_str(), v)),
     );
     label
+}
+
+fn series_key(row: &BenchmarkResultRow, spec: &BenchmarkSpec) -> Result<SeriesKey, String> {
+    if spec.plot.series.group_by.is_empty() {
+        return Ok(vec![format!("label={}", render_series_label(row, spec))]);
+    }
+
+    spec.plot
+        .series
+        .group_by
+        .iter()
+        .map(|field| {
+            resolve_series_group_field(row, field)
+                .map(|value| format!("{field}={value}"))
+                .ok_or_else(|| {
+                    format!(
+                        "missing required series group field {field} for {}",
+                        row_context(row)
+                    )
+                })
+        })
+        .collect()
+}
+
+fn resolve_series_group_field(row: &BenchmarkResultRow, field: &str) -> Option<String> {
+    if field == "runner" {
+        return Some(row.runner.clone());
+    }
+    if field == "language" {
+        return Some(row.language.clone());
+    }
+
+    let (scope, key) = field.split_once('.')?;
+    match scope {
+        "params" => row.params.get(key).map(value_to_string),
+        "metrics" => row.metrics.get(key).copied().map(metric_to_string),
+        "case_summary" => row.case_summary.get(key).map(value_to_string),
+        _ => None,
+    }
 }
 
 fn replace_value_placeholders<'a>(
