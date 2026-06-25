@@ -599,6 +599,12 @@ pub struct BbCircuitBposdProfile {
     pub gf2_full_elimination_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProfileReplayBasis {
+    Z,
+    X,
+}
+
 impl BbCircuitBposdProfile {
     fn add_z_stats(&mut self, stats: &DecodeStats) {
         self.z_decode_call_count += stats.decode_call_count;
@@ -619,6 +625,13 @@ impl BbCircuitBposdProfile {
         self.osd_candidate_count += stats.osd_candidate_count;
         self.gf2_solve_count += stats.gf2_solve_count;
         self.gf2_full_elimination_count += stats.gf2_full_elimination_count;
+    }
+
+    fn add_basis_stats(&mut self, basis: ProfileReplayBasis, stats: &DecodeStats) {
+        match basis {
+            ProfileReplayBasis::Z => self.add_z_stats(stats),
+            ProfileReplayBasis::X => self.add_x_stats(stats),
+        }
     }
 }
 
@@ -1010,7 +1023,27 @@ pub fn replay_syndrome_diagnostic(
     })
 }
 
+/// Profile one replay decode using the briefed Z-basis helper surface.
+///
+/// Use [`profile_syndrome_replay_for_basis`] when the caller needs explicit X
+/// or Z decode-call partitioning.
 pub fn profile_syndrome_replay(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+) -> Result<BbCircuitBposdProfile, String> {
+    profile_syndrome_replay_for_basis(
+        ProfileReplayBasis::Z,
+        model,
+        syndrome_bits,
+        max_bp_iterations,
+        osd_order,
+    )
+}
+
+pub fn profile_syndrome_replay_for_basis(
+    basis: ProfileReplayBasis,
     model: &EffectiveDecoderModel,
     syndrome_bits: &[bool],
     max_bp_iterations: usize,
@@ -1037,11 +1070,33 @@ pub fn profile_syndrome_replay(
         decode_seconds: decode_started.elapsed().as_secs_f64(),
         ..BbCircuitBposdProfile::default()
     };
-    profile.add_z_stats(&decode_result.stats);
+    profile.add_basis_stats(basis, &decode_result.stats);
     Ok(profile)
 }
 
+/// Profile a bounded replay decode using the Z-basis helper surface.
+///
+/// Use [`profile_syndrome_replay_with_candidate_limit_for_basis`] when the
+/// caller needs explicit X or Z decode-call partitioning.
 pub fn profile_syndrome_replay_with_candidate_limit(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+    osd_candidate_limit: usize,
+) -> Result<BbCircuitBposdProfile, String> {
+    profile_syndrome_replay_with_candidate_limit_for_basis(
+        ProfileReplayBasis::Z,
+        model,
+        syndrome_bits,
+        max_bp_iterations,
+        osd_order,
+        osd_candidate_limit,
+    )
+}
+
+pub fn profile_syndrome_replay_with_candidate_limit_for_basis(
+    basis: ProfileReplayBasis,
     model: &EffectiveDecoderModel,
     syndrome_bits: &[bool],
     max_bp_iterations: usize,
@@ -1071,7 +1126,7 @@ pub fn profile_syndrome_replay_with_candidate_limit(
         decode_seconds: decode_started.elapsed().as_secs_f64(),
         ..BbCircuitBposdProfile::default()
     };
-    profile.add_z_stats(&stats);
+    profile.add_basis_stats(basis, &stats);
     Ok(profile)
 }
 

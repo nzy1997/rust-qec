@@ -1,8 +1,10 @@
+use rbposd::ParityCheckMatrix;
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
-    EffectiveDecoderModel, SimulationConfig, SyndromeReplayDiagnostic, build_code,
-    build_effective_models, build_syndrome_cycle, profile_syndrome_replay_with_candidate_limit,
+    EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig, SyndromeReplayDiagnostic,
+    build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
+    profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit_for_basis,
     replay_syndrome_diagnostic, sample_seeded_trial,
 };
 
@@ -142,7 +144,8 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 fn bb90_hard_syndrome_reports_osd_profile_counters() {
     let fixture = load_fixture();
     let computed = compute_fixture_replay(&fixture).unwrap();
-    let profile = profile_syndrome_replay_with_candidate_limit(
+    let profile = profile_syndrome_replay_with_candidate_limit_for_basis(
+        profile_replay_basis(fixture.basis),
         &computed.model,
         &computed.sampled_syndrome,
         fixture.max_bp_iterations,
@@ -160,8 +163,72 @@ fn bb90_hard_syndrome_reports_osd_profile_counters() {
     );
 
     assert!(profile.decode_call_count > 0);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    let (expected_z_calls, expected_x_calls) = expected_basis_calls(fixture.basis);
+    assert_eq!(profile.z_decode_call_count, expected_z_calls);
+    assert_eq!(profile.x_decode_call_count, expected_x_calls);
     assert!(profile.osd_use_count > 0);
     assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
+}
+
+#[test]
+fn syndrome_profile_replay_routes_x_basis_counts() {
+    let fixture = load_fixture();
+    let code = build_code(&fixture.code_id).unwrap();
+    let cycle = build_syndrome_cycle(&code);
+    let config = SimulationConfig {
+        physical_error_rate: 1.0e-12,
+        num_cycles: 1,
+        num_trials: 1,
+        seed: Some(1),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    };
+    let models = build_effective_models(&code, &cycle, &config).unwrap();
+    let syndrome = vec![false; models.x_faults.decoder.num_checks()];
+    let profile = profile_syndrome_replay_for_basis(
+        ProfileReplayBasis::X,
+        &models.x_faults,
+        &syndrome,
+        config.max_bp_iterations,
+        config.osd_order,
+    )
+    .unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 0);
+    assert_eq!(profile.x_decode_call_count, 1);
+    assert_eq!(profile.osd_candidate_count, 0);
+}
+
+#[test]
+fn syndrome_profile_replay_reports_nontrivial_osd_counts() {
+    let model = EffectiveDecoderModel {
+        decoder: ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap(),
+        augmented_columns: vec![vec![0], vec![0], vec![0]],
+        channel_probs: vec![0.49, 0.48, 0.47],
+        first_logical_row: 1,
+    };
+    let profile = profile_syndrome_replay(&model, &[true], 0, 2).unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 1);
+    assert_eq!(profile.x_decode_call_count, 0);
+    assert_eq!(profile.osd_use_count, 1);
+    assert!(profile.osd_candidate_count > 0);
     assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
     assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
 }
@@ -169,6 +236,20 @@ fn bb90_hard_syndrome_reports_osd_profile_counters() {
 fn load_fixture() -> HardSyndromeFixture {
     let text = std::fs::read_to_string(FIXTURE_PATH).unwrap();
     serde_json::from_str(&text).unwrap()
+}
+
+fn profile_replay_basis(basis: FixtureBasis) -> ProfileReplayBasis {
+    match basis {
+        FixtureBasis::Z => ProfileReplayBasis::Z,
+        FixtureBasis::X => ProfileReplayBasis::X,
+    }
+}
+
+fn expected_basis_calls(basis: FixtureBasis) -> (usize, usize) {
+    match basis {
+        FixtureBasis::Z => (1, 0),
+        FixtureBasis::X => (0, 1),
+    }
 }
 
 fn validate_fixture(fixture: &HardSyndromeFixture) -> Result<(), String> {
