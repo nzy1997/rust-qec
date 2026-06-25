@@ -10,10 +10,11 @@ use crate::codes::quantum_tanner::{
 };
 use crate::codes::steane::Steane;
 use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
-use crate::distance::compute_distance;
+use crate::distance::{compute_distance, compute_distance_with_solver_options};
 use crate::distance_bound::{RandomizedUpperBoundOptions, randomized_css_upper_bound};
 use crate::distance_exact::{
-    ExactCssDistanceInput, ExactCssDistanceOptions, ExactCssDistanceResult,
+    ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
+    ExactCssDistanceResult, ExactCssDistanceSolverOptions,
 };
 use crate::error::CssMatrixReadSource;
 
@@ -120,6 +121,16 @@ pub struct ExactCssDistanceCli {
     hz: Option<PathBuf>,
     #[arg(long)]
     quantum_tanner_spec: Option<PathBuf>,
+    #[arg(long, value_enum, default_value_t = ExactCssDistanceBackend::Auto)]
+    backend: ExactCssDistanceBackend,
+    #[arg(long, allow_hyphen_values = true)]
+    time_limit_seconds: Option<f64>,
+    #[arg(long, allow_hyphen_values = true)]
+    mip_gap: Option<f64>,
+    #[arg(long)]
+    threads: Option<u32>,
+    #[arg(long)]
+    verbose_solver: bool,
     #[arg(long)]
     json: bool,
 }
@@ -258,8 +269,12 @@ fn run_css_exact_distance(cli: ExactCssDistanceCli) -> Result<String, QecError> 
     }
 
     let (css, options) = css_code_and_exact_options_from_cli(&cli)?;
-    let distance = compute_distance(css.code())?;
-    let result = ExactCssDistanceResult::completed(distance, options);
+    let computation = compute_distance_with_solver_options(css.code(), options.solver)?;
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        computation.distance,
+        options,
+        computation.solver_report,
+    );
 
     serde_json::to_string(&result).map_err(|err| QecError::InvalidCssDistanceInput(err.to_string()))
 }
@@ -267,6 +282,7 @@ fn run_css_exact_distance(cli: ExactCssDistanceCli) -> Result<String, QecError> 
 fn css_code_and_exact_options_from_cli(
     cli: &ExactCssDistanceCli,
 ) -> Result<(CssCode, ExactCssDistanceOptions), QecError> {
+    let solver = validate_exact_css_solver_options(cli)?;
     match css_distance_input_selection(&cli.code_id, &cli.hx, &cli.hz, &cli.quantum_tanner_spec)? {
         CssDistanceInputSelection::CodeId(code_id) => Ok((
             css_code_from_built_in(code_id)?,
@@ -274,6 +290,7 @@ fn css_code_and_exact_options_from_cli(
                 input: ExactCssDistanceInput::CodeId {
                     code_id: code_id.to_owned(),
                 },
+                solver,
             },
         )),
         CssDistanceInputSelection::Files { hx, hz } => Ok((
@@ -283,6 +300,7 @@ fn css_code_and_exact_options_from_cli(
                     hx: hx.display().to_string(),
                     hz: hz.display().to_string(),
                 },
+                solver,
             },
         )),
         CssDistanceInputSelection::QuantumTannerSpec(spec) => Ok((
@@ -291,9 +309,44 @@ fn css_code_and_exact_options_from_cli(
                 input: ExactCssDistanceInput::QuantumTannerSpec {
                     quantum_tanner_spec: spec.display().to_string(),
                 },
+                solver,
             },
         )),
     }
+}
+
+fn validate_exact_css_solver_options(
+    cli: &ExactCssDistanceCli,
+) -> Result<ExactCssDistanceSolverOptions, QecError> {
+    if let Some(value) = cli.time_limit_seconds {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(QecError::InvalidCssDistanceInput(
+                "invalid exact CSS distance solver option time_limit_seconds".to_owned(),
+            ));
+        }
+    }
+    if let Some(value) = cli.mip_gap {
+        if !value.is_finite() || value < 0.0 {
+            return Err(QecError::InvalidCssDistanceInput(
+                "invalid exact CSS distance solver option mip_gap".to_owned(),
+            ));
+        }
+    }
+    if let Some(value) = cli.threads {
+        if value == 0 {
+            return Err(QecError::InvalidCssDistanceInput(
+                "invalid exact CSS distance solver option threads".to_owned(),
+            ));
+        }
+    }
+
+    Ok(ExactCssDistanceSolverOptions {
+        backend: cli.backend,
+        time_limit_seconds: cli.time_limit_seconds,
+        mip_gap: cli.mip_gap,
+        threads: cli.threads,
+        verbose_solver: cli.verbose_solver,
+    })
 }
 
 fn run_css_randomized_upper_bound(cli: RandomizedUpperBoundCli) -> Result<String, QecError> {

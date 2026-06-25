@@ -1,7 +1,12 @@
+use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
+#[cfg(feature = "distance-ilp-highs")]
+use crate::distance_exact::ExactCssDistanceSolverStatus;
+use crate::distance_exact::{
+    ExactCssDistanceBackend, ExactCssDistanceSolverOptions, ExactCssDistanceSolverReport,
+};
 use crate::error::{QecError, Result};
-use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,29 +24,55 @@ pub struct DistanceResult {
     pub logical_class: LogicalClass,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExactCssDistanceComputation {
+    pub distance: DistanceResult,
+    pub solver_report: Option<ExactCssDistanceSolverReport>,
+}
+
 pub fn compute_distance(code: &StabilizerCode) -> Result<DistanceResult> {
+    Ok(
+        compute_distance_with_solver_options(code, ExactCssDistanceSolverOptions::default())?
+            .distance,
+    )
+}
+
+pub fn compute_distance_with_solver_options(
+    code: &StabilizerCode,
+    solver: ExactCssDistanceSolverOptions,
+) -> Result<ExactCssDistanceComputation> {
     if code.num_logical_qubits() == 0 {
         return Err(QecError::DistanceWitnessNotFound);
     }
 
     #[cfg(feature = "distance-ilp-highs")]
     {
-        compute_distance_via_ilp(code)
+        compute_distance_via_ilp(code, solver)
     }
 
     #[cfg(not(feature = "distance-ilp-highs"))]
     {
-        compute_distance_via_exhaustive_search(code)
+        compute_distance_without_ilp(code, solver)
     }
 }
 
 #[cfg(feature = "distance-ilp-highs")]
-fn compute_distance_via_ilp(code: &StabilizerCode) -> Result<DistanceResult> {
+fn compute_distance_via_ilp(
+    code: &StabilizerCode,
+    solver: ExactCssDistanceSolverOptions,
+) -> Result<ExactCssDistanceComputation> {
     let lowered = crate::distance_ilp::lower_distance_problem(code)?;
-    let mut backend = qec_ilp_core::backend::build_binary_backend(
-        &lowered.model,
-        &qec_ilp_core::BinaryIlpConfig::default(),
-    )?;
+    let config = qec_ilp_core::BinaryIlpConfig {
+        backend: qec_ilp_core::BackendConfig {
+            kind: backend_kind_to_ilp(solver.backend),
+            time_limit_seconds: solver.time_limit_seconds,
+            mip_gap: solver.mip_gap,
+            threads: solver.threads,
+            verbose: solver.verbose_solver,
+        },
+    };
+    let mut backend = qec_ilp_core::backend::build_binary_backend(&lowered.model, &config)?;
+    let backend_kind = backend.kind();
     let solution = backend.solve()?;
     let start = lowered.symplectic_var_offset;
     let end = start + code.n() * 2;
@@ -52,10 +83,36 @@ fn compute_distance_via_ilp(code: &StabilizerCode) -> Result<DistanceResult> {
     let witness = Pauli::from_symplectic_row(row)?;
     post_validate_distance_witness(code, &witness)?;
 
-    Ok(DistanceResult {
-        distance: witness.weight(),
-        logical_class: classify_logical(&witness),
-        witness,
+    Ok(ExactCssDistanceComputation {
+        distance: DistanceResult {
+            distance: witness.weight(),
+            logical_class: classify_logical(&witness),
+            witness,
+        },
+        solver_report: Some(ExactCssDistanceSolverReport {
+            backend: backend_kind_from_ilp(backend_kind),
+            status: solver_status_from_ilp(solution.status),
+        }),
+    })
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+fn compute_distance_without_ilp(
+    code: &StabilizerCode,
+    solver: ExactCssDistanceSolverOptions,
+) -> Result<ExactCssDistanceComputation> {
+    if solver != ExactCssDistanceSolverOptions::default() {
+        if solver.backend == ExactCssDistanceBackend::Gurobi {
+            return Err(QecError::IlpBackendUnavailable("Gurobi".into()));
+        }
+        return Err(QecError::DistanceComputationUnsupported {
+            n: code.n(),
+            reason: "solver options require an ILP-enabled build".into(),
+        });
+    }
+    Ok(ExactCssDistanceComputation {
+        distance: compute_distance_via_exhaustive_search(code)?,
+        solver_report: None,
     })
 }
 
@@ -188,6 +245,42 @@ fn classify_logical(pauli: &Pauli) -> LogicalClass {
 }
 
 #[cfg(feature = "distance-ilp-highs")]
+fn backend_kind_to_ilp(kind: ExactCssDistanceBackend) -> qec_ilp_core::BackendKind {
+    match kind {
+        ExactCssDistanceBackend::Auto => qec_ilp_core::BackendKind::Auto,
+        ExactCssDistanceBackend::Highs => qec_ilp_core::BackendKind::Highs,
+        ExactCssDistanceBackend::Gurobi => qec_ilp_core::BackendKind::Gurobi,
+    }
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+fn backend_kind_from_ilp(kind: qec_ilp_core::BackendKind) -> ExactCssDistanceBackend {
+    match kind {
+        qec_ilp_core::BackendKind::Auto => ExactCssDistanceBackend::Auto,
+        qec_ilp_core::BackendKind::Highs => ExactCssDistanceBackend::Highs,
+        qec_ilp_core::BackendKind::Gurobi => ExactCssDistanceBackend::Gurobi,
+    }
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+fn solver_status_from_ilp(
+    status: qec_ilp_core::model::ModelSolutionStatus,
+) -> ExactCssDistanceSolverStatus {
+    match status {
+        qec_ilp_core::model::ModelSolutionStatus::Optimal => ExactCssDistanceSolverStatus::Optimal,
+        qec_ilp_core::model::ModelSolutionStatus::TimeLimit => {
+            ExactCssDistanceSolverStatus::TimeLimit
+        }
+        qec_ilp_core::model::ModelSolutionStatus::SolutionLimit => {
+            ExactCssDistanceSolverStatus::SolutionLimit
+        }
+        qec_ilp_core::model::ModelSolutionStatus::SubOptimal => {
+            ExactCssDistanceSolverStatus::SubOptimal
+        }
+    }
+}
+
+#[cfg(feature = "distance-ilp-highs")]
 fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Result<()> {
     if !code
         .stabilizers()
@@ -214,7 +307,7 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_logical, LogicalClass};
+    use super::{LogicalClass, classify_logical};
     use crate::Pauli;
     #[cfg(feature = "distance-ilp-highs")]
     use crate::{QecError, StabilizerCode};

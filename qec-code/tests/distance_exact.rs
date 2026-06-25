@@ -1,8 +1,9 @@
 use qec_code::Pauli;
 use qec_code::distance::{DistanceResult, LogicalClass};
 use qec_code::distance_exact::{
-    ExactCssDistanceInput, ExactCssDistanceOptions, ExactCssDistanceProvenance,
-    ExactCssDistanceResult,
+    ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
+    ExactCssDistanceProvenance, ExactCssDistanceResult, ExactCssDistanceSolverOptions,
+    ExactCssDistanceSolverReport, ExactCssDistanceSolverStatus,
 };
 
 fn sample_distance_result() -> DistanceResult {
@@ -22,6 +23,7 @@ fn exact_css_distance_result_serializes_completed_contract() {
             input: ExactCssDistanceInput::CodeId {
                 code_id: "surface_rotated:d=3".to_owned(),
             },
+            solver: ExactCssDistanceSolverOptions::default(),
         },
     );
 
@@ -54,6 +56,7 @@ fn exact_css_distance_file_options_serialize_input_paths() {
                 hx: "input/hx.json".to_owned(),
                 hz: "input/hz.json".to_owned(),
             },
+            solver: ExactCssDistanceSolverOptions::default(),
         },
     );
 
@@ -71,4 +74,76 @@ fn exact_css_distance_provenance_uses_current_package_version() {
     assert_eq!(provenance.tool, "qec-code");
     assert_eq!(provenance.tool_version, env!("CARGO_PKG_VERSION"));
     assert_eq!(provenance.method_revision, 1);
+}
+
+#[test]
+fn exact_css_distance_result_serializes_solver_provenance_for_completed_runs() {
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        sample_distance_result(),
+        ExactCssDistanceOptions {
+            input: ExactCssDistanceInput::CodeId {
+                code_id: "steane".to_owned(),
+            },
+            solver: ExactCssDistanceSolverOptions {
+                backend: ExactCssDistanceBackend::Highs,
+                time_limit_seconds: Some(300.0),
+                mip_gap: Some(0.001),
+                threads: Some(2),
+                verbose_solver: true,
+            },
+        },
+        Some(ExactCssDistanceSolverReport {
+            backend: ExactCssDistanceBackend::Highs,
+            status: ExactCssDistanceSolverStatus::Optimal,
+        }),
+    );
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["requested_backend"], "highs");
+    assert_eq!(json["backend"], "highs");
+    assert_eq!(json["solver_status"], "optimal");
+    assert_eq!(json["time_limit_seconds"], 300.0);
+    assert_eq!(json["mip_gap"], 0.001);
+    assert_eq!(json["threads"], 2);
+    assert_eq!(json["verbose_solver"], true);
+    assert_eq!(json["options"]["backend"], "highs");
+    assert_eq!(json["options"]["time_limit_seconds"], 300.0);
+    assert_eq!(json["options"]["mip_gap"], 0.001);
+    assert_eq!(json["options"]["threads"], 2);
+    assert_eq!(json["options"]["verbose_solver"], true);
+}
+
+#[test]
+fn exact_css_distance_result_serializes_time_limited_incumbent_as_upper_bound() {
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        sample_distance_result(),
+        ExactCssDistanceOptions {
+            input: ExactCssDistanceInput::CodeId {
+                code_id: "steane".to_owned(),
+            },
+            solver: ExactCssDistanceSolverOptions {
+                backend: ExactCssDistanceBackend::Highs,
+                time_limit_seconds: Some(0.001),
+                mip_gap: None,
+                threads: None,
+                verbose_solver: false,
+            },
+        },
+        Some(ExactCssDistanceSolverReport {
+            backend: ExactCssDistanceBackend::Highs,
+            status: ExactCssDistanceSolverStatus::TimeLimit,
+        }),
+    );
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "timeout");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["requested_backend"], "highs");
+    assert_eq!(json["backend"], "highs");
+    assert_eq!(json["solver_status"], "time_limit");
+    assert_eq!(json["time_limit_seconds"], 0.001);
 }
