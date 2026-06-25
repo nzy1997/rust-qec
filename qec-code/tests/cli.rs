@@ -1727,6 +1727,36 @@ fn code_css_distance_exact_rejects_gurobi_backend_without_feature() {
     }
 }
 
+#[cfg(not(feature = "distance-ilp-highs"))]
+#[test]
+fn run_code_css_distance_exact_rejects_valid_ilp_options_without_ilp_build() {
+    let result = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--backend",
+        "highs",
+        "--time-limit-seconds",
+        "300",
+        "--mip-gap",
+        "0",
+        "--threads",
+        "1",
+        "--json",
+    ]);
+
+    assert!(
+        matches!(
+            result,
+            Err(QecError::DistanceComputationUnsupported { n: 7, ref reason })
+                if reason == "solver options require an ILP-enabled build"
+        ),
+        "expected unsupported ILP options error, got {result:?}",
+    );
+}
+
 #[test]
 fn run_code_css_distance_exact_rejects_invalid_solver_options() {
     for (flag, value, expected) in [
