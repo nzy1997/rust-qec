@@ -4,9 +4,9 @@ use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
     BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
     DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, Issue225LadderCase,
-    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, randomized_css_upper_bound,
-    validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
-    verify_issue_225_ladder_case,
+    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, random_window_css_upper_bound,
+    randomized_css_upper_bound, validate_random_window_upper_bound_result,
+    validate_randomized_upper_bound_result, verify_issue_225_ladder_case,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 
@@ -93,12 +93,49 @@ fn surface_rotated_d5_result_with_x_support(support: &[usize]) -> DistanceBoundR
     )
 }
 
+fn pinned_random_window_options() -> RandomWindowUpperBoundOptions {
+    RandomWindowUpperBoundOptions {
+        iterations: 5000,
+        restarts: 8,
+        seed: 7,
+        target_weight: Some(5),
+    }
+}
+
 #[test]
 fn css_code_preserves_dense_component_rows_for_search() {
     let css = CssCode::from_hx_hz(vec![vec![1, 1, 0]], vec![vec![0, 0, 1]]).unwrap();
 
     assert_eq!(css.hx(), &[vec![1, 1, 0]]);
     assert_eq!(css.hz(), &[vec![0, 0, 1]]);
+}
+
+#[test]
+fn random_window_upper_bound_finds_surface_and_toric_distance_under_pinned_options() {
+    for code_id in ["surface_rotated:d=5", "toric:d=5"] {
+        let css = css_from_built_in_code_id(code_id);
+        let options = pinned_random_window_options();
+
+        let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
+        let second = random_window_css_upper_bound(&css, options).unwrap();
+
+        assert_eq!(first, second, "{code_id} should be deterministic");
+        assert_eq!(first.method, DistanceBoundMethod::RandomWindowUpperBound);
+        assert_eq!(first.upper_bound, 5, "{code_id}");
+        assert_eq!(first.witness.weight, 5, "{code_id}");
+        assert!(matches!(
+            first.logical_class,
+            LogicalClass::XLike | LogicalClass::ZLike
+        ));
+        validate_random_window_upper_bound_result(
+            &first,
+            BoundValidationContext {
+                code: css.code(),
+                known_exact_distance: Some(5),
+            },
+        )
+        .unwrap();
+    }
 }
 
 #[test]
