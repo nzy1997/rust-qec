@@ -3,20 +3,23 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::quantum_tanner::{
-    QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
+    quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
 };
 use crate::codes::steane::Steane;
-use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
+use crate::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use crate::distance::{compute_distance, compute_distance_with_solver_options};
-use crate::distance_bound::{RandomizedUpperBoundOptions, randomized_css_upper_bound};
+use crate::distance_bound::{
+    random_window_css_upper_bound, randomized_css_upper_bound, RandomWindowUpperBoundOptions,
+    RandomizedUpperBoundOptions,
+};
 use crate::distance_exact::{
     ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
     ExactCssDistanceResult, ExactCssDistanceSolverOptions,
 };
 use crate::error::CssMatrixReadSource;
+use crate::QecError;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -109,6 +112,7 @@ pub enum CssMatrixKind {
 pub enum CssDistanceCommands {
     Exact(ExactCssDistanceCli),
     RandomizedUpperBound(RandomizedUpperBoundCli),
+    RandomWindowUpperBound(RandomWindowUpperBoundCli),
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +141,28 @@ pub struct ExactCssDistanceCli {
 
 #[derive(Debug, Args)]
 pub struct RandomizedUpperBoundCli {
+    #[arg(long)]
+    code_id: Option<String>,
+    #[arg(long)]
+    hx: Option<PathBuf>,
+    #[arg(long)]
+    hz: Option<PathBuf>,
+    #[arg(long)]
+    quantum_tanner_spec: Option<PathBuf>,
+    #[arg(long)]
+    iterations: usize,
+    #[arg(long, default_value_t = 1)]
+    restarts: usize,
+    #[arg(long)]
+    seed: u64,
+    #[arg(long)]
+    target_weight: Option<usize>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct RandomWindowUpperBoundCli {
     #[arg(long)]
     code_id: Option<String>,
     #[arg(long)]
@@ -258,6 +284,9 @@ fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {
         CssDistanceCommands::RandomizedUpperBound(options) => {
             run_css_randomized_upper_bound(options)
         }
+        CssDistanceCommands::RandomWindowUpperBound(options) => {
+            run_css_random_window_upper_bound(options)
+        }
     }
 }
 
@@ -370,6 +399,37 @@ fn run_css_randomized_upper_bound(cli: RandomizedUpperBoundCli) -> Result<String
 
 fn css_code_from_randomized_upper_bound_cli(
     cli: &RandomizedUpperBoundCli,
+) -> Result<CssCode, QecError> {
+    match css_distance_input_selection(&cli.code_id, &cli.hx, &cli.hz, &cli.quantum_tanner_spec)? {
+        CssDistanceInputSelection::CodeId(code_id) => css_code_from_built_in(code_id),
+        CssDistanceInputSelection::Files { hx, hz } => css_code_from_files(hx, hz),
+        CssDistanceInputSelection::QuantumTannerSpec(spec) => {
+            css_code_from_quantum_tanner_spec(spec)
+        }
+    }
+}
+
+fn run_css_random_window_upper_bound(cli: RandomWindowUpperBoundCli) -> Result<String, QecError> {
+    const COMMAND: &str = "code css-distance random-window-upper-bound";
+
+    if !cli.json {
+        return Err(QecError::JsonOutputRequired { command: COMMAND });
+    }
+
+    let css = css_code_from_random_window_upper_bound_cli(&cli)?;
+    let options = RandomWindowUpperBoundOptions {
+        iterations: cli.iterations,
+        restarts: cli.restarts,
+        seed: cli.seed,
+        target_weight: cli.target_weight,
+    };
+    let result = random_window_css_upper_bound(&css, options)?;
+
+    serde_json::to_string(&result).map_err(|err| QecError::InvalidCssDistanceInput(err.to_string()))
+}
+
+fn css_code_from_random_window_upper_bound_cli(
+    cli: &RandomWindowUpperBoundCli,
 ) -> Result<CssCode, QecError> {
     match css_distance_input_selection(&cli.code_id, &cli.hx, &cli.hz, &cli.quantum_tanner_spec)? {
         CssDistanceInputSelection::CodeId(code_id) => css_code_from_built_in(code_id),

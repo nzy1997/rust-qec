@@ -1661,6 +1661,120 @@ fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() 
     );
 }
 
+#[test]
+fn css_distance_random_window_upper_bound_cli_contract() {
+    let built_in = run_qec_code(&[
+        "code",
+        "css-distance",
+        "random-window-upper-bound",
+        "--code-id",
+        "surface_rotated:d=5",
+        "--iterations",
+        "5000",
+        "--restarts",
+        "8",
+        "--seed",
+        "7",
+        "--target-weight",
+        "5",
+        "--json",
+    ]);
+
+    assert!(built_in.status.success());
+    assert_eq!(built_in.stderr, b"");
+    let stdout = String::from_utf8(built_in.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "random-window-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 5);
+    assert_eq!(json["witness"]["weight"], 5);
+
+    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
+    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
+    let files = Command::new(qec_code_bin())
+        .args(["code", "css-distance", "random-window-upper-bound", "--hx"])
+        .arg(&hx)
+        .arg("--hz")
+        .arg(&hz)
+        .args([
+            "--iterations",
+            "500",
+            "--restarts",
+            "4",
+            "--seed",
+            "7",
+            "--target-weight",
+            "3",
+            "--json",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(files.status.success());
+    assert_eq!(files.stderr, b"");
+    let stdout = String::from_utf8(files.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "random-window-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 3);
+    assert_eq!(json["witness"]["weight"], 3);
+
+    let spec = quantum_tanner_fixture_path("toric_d4.json");
+    let quantum_tanner = Command::new(qec_code_bin())
+        .args([
+            "code",
+            "css-distance",
+            "random-window-upper-bound",
+            "--quantum-tanner-spec",
+        ])
+        .arg(&spec)
+        .args([
+            "--iterations",
+            "1000",
+            "--restarts",
+            "8",
+            "--seed",
+            "7",
+            "--target-weight",
+            "4",
+            "--json",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+
+    assert!(quantum_tanner.status.success());
+    assert_eq!(quantum_tanner.stderr, b"");
+    let stdout = String::from_utf8(quantum_tanner.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "random-window-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert!(json["upper_bound"].as_u64().unwrap() <= 4);
+    assert!(json["witness"]["weight"].as_u64().unwrap() <= 4);
+
+    let missing_json = run_qec_code(&[
+        "code",
+        "css-distance",
+        "random-window-upper-bound",
+        "--code-id",
+        "steane",
+        "--iterations",
+        "10",
+        "--seed",
+        "7",
+    ]);
+
+    assert!(!missing_json.status.success());
+    assert_eq!(missing_json.stdout, b"");
+    let stderr = String::from_utf8(missing_json.stderr).unwrap();
+    assert!(
+        stderr.contains("JSON output is required for code css-distance random-window-upper-bound"),
+        "stderr was: {stderr}"
+    );
+}
+
 #[cfg(feature = "distance-ilp-highs")]
 #[test]
 fn code_css_distance_exact_accepts_highs_backend_and_solver_limits() {
