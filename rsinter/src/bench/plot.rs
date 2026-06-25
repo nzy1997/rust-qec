@@ -5,15 +5,23 @@ use plotters::coord::Shift;
 use plotters::prelude::*;
 
 use crate::bench::result::BenchmarkResultRow;
-use crate::bench::spec::{BenchmarkSpec, PanelSpec};
-use crate::stats::fit_binomial;
+use crate::bench::spec::{
+    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit, PanelSpec,
+};
+use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
 const BENCH_PANEL_WIDTH: u32 = 800;
 const BENCH_CANVAS_HEIGHT: u32 = 600;
 const MIN_LOG_Y: f64 = 1e-10;
 
-type NumericGroups = BTreeMap<String, Vec<(f64, f64)>>;
-type ErrorRateGroups = BTreeMap<String, Vec<ErrorRatePoint>>;
+type SeriesKey = Vec<String>;
+type NumericGroups = BTreeMap<SeriesKey, SeriesData<(f64, f64)>>;
+type ErrorRateGroups = BTreeMap<SeriesKey, SeriesData<ErrorRatePoint>>;
+
+struct SeriesData<T> {
+    label: String,
+    points: Vec<T>,
+}
 
 #[derive(Clone, Copy)]
 struct ErrorRatePoint {
@@ -21,6 +29,14 @@ struct ErrorRatePoint {
     low: f64,
     best: Option<f64>,
     high: f64,
+}
+
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LogicalRateFitForPlot {
+    pub low: f64,
+    pub best: Option<f64>,
+    pub high: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -74,7 +90,7 @@ pub fn render_benchmark_plot(
         return Err("plot requires at least one ok row; no ok rows available".into());
     }
 
-    let series_styles = build_series_styles(spec, &ok_rows);
+    let series_styles = build_series_styles(spec, &ok_rows)?;
     let panels = spec
         .plot
         .panels
@@ -125,6 +141,106 @@ fn prepare_panel(
     )?))
 }
 
+#[doc(hidden)]
+pub fn logical_rate_fit_for_plot(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<LogicalRateFitForPlot, String> {
+    logical_rate_fit_for_plot_with_factor(row, unit, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR)
+}
+
+fn logical_rate_fit_for_plot_with_factor(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+    confidence_interval_likelihood_factor: f64,
+) -> Result<LogicalRateFitForPlot, String> {
+    let shots = required_count_metric(row, "shots_used")?;
+    if shots == 0 {
+        return Err(format!(
+            "shots_used must be positive for {}",
+            row_context(row)
+        ));
+    }
+    let errors = required_count_metric(row, "logical_errors")?;
+    if errors > shots {
+        return Err(format!(
+            "logical_errors must be <= shots_used for {}",
+            row_context(row)
+        ));
+    }
+
+    let pieces = logical_rate_pieces(row, unit)?;
+    let fit = fit_binomial(shots, errors, confidence_interval_likelihood_factor);
+    let low = transform_logical_rate(fit.low.unwrap_or(0.0), pieces).max(MIN_LOG_Y);
+    let best = if errors == 0 {
+        None
+    } else {
+        Some(transform_logical_rate(fit.best.unwrap_or(0.0), pieces).max(MIN_LOG_Y))
+    };
+    let high = transform_logical_rate(fit.high.unwrap_or(0.0), pieces).max(MIN_LOG_Y);
+
+    Ok(LogicalRateFitForPlot { low, best, high })
+}
+
+fn logical_rate_pieces(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<Option<f64>, String> {
+    match unit {
+        LogicalRateUnit::PerShot => Ok(None),
+        LogicalRateUnit::PerRound => Ok(Some(required_positive_metadata(
+            row,
+            unit,
+            "params.rounds",
+        )?)),
+        LogicalRateUnit::PerObservable => Ok(Some(required_observable_count(row, unit)?)),
+        LogicalRateUnit::PerRoundPerObservable => {
+            let rounds = required_positive_metadata(row, unit, "params.rounds")?;
+            let observables = required_observable_count(row, unit)?;
+            Ok(Some(rounds * observables))
+        }
+    }
+}
+
+fn required_observable_count(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+) -> Result<f64, String> {
+    resolve_numeric_field(row, "case_summary.logical_observable_count")
+        .or_else(|| resolve_numeric_field(row, "case_summary.num_obs"))
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or_else(|| {
+            format!(
+                "logical_rate_unit = \"{}\" requires positive numeric case_summary.logical_observable_count or case_summary.num_obs for {}",
+                unit.as_str(),
+                row_context(row)
+            )
+        })
+}
+
+fn required_positive_metadata(
+    row: &BenchmarkResultRow,
+    unit: LogicalRateUnit,
+    field: &str,
+) -> Result<f64, String> {
+    resolve_numeric_field(row, field)
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or_else(|| {
+            format!(
+                "logical_rate_unit = \"{}\" requires positive numeric {field} for {}",
+                unit.as_str(),
+                row_context(row)
+            )
+        })
+}
+
+fn transform_logical_rate(shot_rate: f64, pieces: Option<f64>) -> f64 {
+    match pieces {
+        Some(pieces) => shot_error_rate_to_piece_error_rate(shot_rate, pieces),
+        None => shot_rate,
+    }
+}
+
 fn prepare_error_rate_panel(
     spec: &BenchmarkSpec,
     panel: &PanelSpec,
@@ -138,48 +254,38 @@ fn prepare_error_rate_panel(
         let x = resolve_required_numeric_field(row, &spec.plot.x.field)?;
         validate_plot_value(&spec.plot.x.field, x, &spec.plot.x.scale, row)?;
 
-        let shots = required_count_metric(row, "shots_used")?;
-        if shots == 0 {
-            return Err(format!(
-                "shots_used must be positive for {}",
-                row_context(row)
-            ));
-        }
-        let errors = required_count_metric(row, "logical_errors")?;
-        if errors > shots {
-            return Err(format!(
-                "logical_errors must be <= shots_used for {}",
-                row_context(row)
-            ));
-        }
-
-        let fit = fit_binomial(
-            shots,
-            errors,
+        let fit = logical_rate_fit_for_plot_with_factor(
+            row,
+            spec.plot.logical_rate_unit,
             spec.plot.confidence_interval_likelihood_factor,
-        );
-        let low = fit.low.unwrap_or(0.0).max(MIN_LOG_Y);
-        let best = if errors == 0 {
-            None
-        } else {
-            Some(fit.best.unwrap_or(0.0).max(MIN_LOG_Y))
-        };
-        let high = fit.high.unwrap_or(0.0).max(MIN_LOG_Y);
+        )?;
+        let key = series_key(row, spec)?;
         let label = render_series_label(row, spec);
 
         groups
-            .entry(label)
-            .or_default()
-            .push(ErrorRatePoint { x, low, best, high });
+            .entry(key)
+            .or_insert_with(|| SeriesData {
+                label,
+                points: Vec::new(),
+            })
+            .points
+            .push(ErrorRatePoint {
+                x,
+                low: fit.low,
+                best: fit.best,
+                high: fit.high,
+            });
         x_values.push(x);
-        y_values.extend([low, high]);
-        if let Some(best) = best {
+        y_values.extend([fit.low, fit.high]);
+        if let Some(best) = fit.best {
             y_values.push(best);
         }
     }
 
-    for points in groups.values_mut() {
-        points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+    for series in groups.values_mut() {
+        series
+            .points
+            .sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     if groups.is_empty() {
@@ -216,14 +322,24 @@ fn prepare_numeric_panel(
         let y = required_metric(row, metric_key)?;
         validate_plot_value(&format!("metrics.{metric_key}"), y, &panel.scale, row)?;
 
+        let key = series_key(row, spec)?;
         let label = render_series_label(row, spec);
-        groups.entry(label).or_default().push((x, y));
+        groups
+            .entry(key)
+            .or_insert_with(|| SeriesData {
+                label,
+                points: Vec::new(),
+            })
+            .points
+            .push((x, y));
         x_values.push(x);
         y_values.push(y);
     }
 
-    for points in groups.values_mut() {
-        points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    for series in groups.values_mut() {
+        series
+            .points
+            .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     }
 
     if groups.is_empty() {
@@ -247,7 +363,7 @@ fn render_plot_on<DB: DrawingBackend>(
     root: DrawingArea<DB, Shift>,
     spec: &BenchmarkSpec,
     panels: &[PreparedPanel],
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -277,7 +393,7 @@ where
 fn render_error_rate_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &ErrorRatePanelData,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -369,7 +485,7 @@ where
 fn render_numeric_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &NumericPanelData,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -461,7 +577,7 @@ where
 fn draw_error_rate_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &ErrorRateGroups,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -469,11 +585,13 @@ where
     XR: Ranged<ValueType = f64>,
     YR: Ranged<ValueType = f64>,
 {
-    for (index, (label, points)) in groups.iter().enumerate() {
+    for (index, (key, series)) in groups.iter().enumerate() {
         let style = series_styles
-            .get(label)
+            .get(key)
             .copied()
             .unwrap_or_else(|| default_series_style(index));
+        let points = &series.points;
+        let label = &series.label;
 
         if points.len() > 1 {
             chart
@@ -501,38 +619,28 @@ where
         }
 
         if points.len() == 1 {
+            const CAP_FACTOR: f64 = 1.015;
             let point = points[0];
             let x = point.x;
             let low = point.low;
             let high = point.high;
-            let center_y = point.best.unwrap_or((low + high) / 2.0);
-            let (_, center_backend_y) = chart.backend_coord(&(x, center_y));
-            let (_, low_backend_y) = chart.backend_coord(&(x, low));
-            let (_, high_backend_y) = chart.backend_coord(&(x, high));
-            let (low_offset, high_offset) = if low < high && low_backend_y == high_backend_y {
-                (1, -1)
-            } else {
-                (
-                    low_backend_y - center_backend_y,
-                    high_backend_y - center_backend_y,
-                )
-            };
+            let x_lo = x / CAP_FACTOR;
+            let x_hi = x * CAP_FACTOR;
             chart
-                .draw_series(std::iter::once(
-                    EmptyElement::at((x, center_y))
-                        + PathElement::new(
-                            vec![(0, low_offset), (0, high_offset)],
-                            ShapeStyle::from(&style.color).stroke_width(1),
-                        )
-                        + PathElement::new(
-                            vec![(-2, low_offset), (2, low_offset)],
-                            ShapeStyle::from(&style.color).stroke_width(1),
-                        )
-                        + PathElement::new(
-                            vec![(-2, high_offset), (2, high_offset)],
-                            ShapeStyle::from(&style.color).stroke_width(1),
-                        ),
-                ))
+                .draw_series([
+                    PathElement::new(
+                        vec![(x, low), (x, high)],
+                        ShapeStyle::from(&style.color).stroke_width(1),
+                    ),
+                    PathElement::new(
+                        vec![(x_lo, low), (x_hi, low)],
+                        ShapeStyle::from(&style.color).stroke_width(1),
+                    ),
+                    PathElement::new(
+                        vec![(x_lo, high), (x_hi, high)],
+                        ShapeStyle::from(&style.color).stroke_width(1),
+                    ),
+                ])
                 .map_err(|e| e.to_string())?;
         }
     }
@@ -549,7 +657,7 @@ where
 fn draw_numeric_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &NumericGroups,
-    series_styles: &BTreeMap<String, SeriesStyle>,
+    series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -557,11 +665,13 @@ where
     XR: Ranged<ValueType = f64>,
     YR: Ranged<ValueType = f64>,
 {
-    for (index, (label, points)) in groups.iter().enumerate() {
+    for (index, (key, series)) in groups.iter().enumerate() {
         let style = series_styles
-            .get(label)
+            .get(key)
             .copied()
             .unwrap_or_else(|| default_series_style(index));
+        let points = &series.points;
+        let label = &series.label;
 
         draw_line_series(chart, label, points, style)?;
         chart
@@ -732,7 +842,7 @@ fn resolve_numeric_field(row: &BenchmarkResultRow, field: &str) -> Option<f64> {
 fn build_series_styles(
     spec: &BenchmarkSpec,
     rows: &[&BenchmarkResultRow],
-) -> BTreeMap<String, SeriesStyle> {
+) -> Result<BTreeMap<SeriesKey, SeriesStyle>, String> {
     let mut runner_order: Vec<String> = spec
         .runners
         .iter()
@@ -765,8 +875,8 @@ fn build_series_styles(
 
     let mut styles = BTreeMap::new();
     for (index, row) in rows.iter().enumerate() {
-        let label = render_series_label(row, spec);
-        styles.entry(label).or_insert_with(|| {
+        let key = series_key(row, spec)?;
+        styles.entry(key).or_insert_with(|| {
             let color_index = runner_index.get(&row.runner).copied().unwrap_or(index);
             let pattern_index = row
                 .params
@@ -780,7 +890,7 @@ fn build_series_styles(
             }
         });
     }
-    styles
+    Ok(styles)
 }
 
 fn line_pattern_for_index(index: usize) -> LinePattern {
@@ -835,6 +945,45 @@ fn render_series_label(row: &BenchmarkResultRow, spec: &BenchmarkSpec) -> String
         row.case_summary.iter().map(|(k, v)| (k.as_str(), v)),
     );
     label
+}
+
+fn series_key(row: &BenchmarkResultRow, spec: &BenchmarkSpec) -> Result<SeriesKey, String> {
+    if spec.plot.series.group_by.is_empty() {
+        return Ok(vec![format!("label={}", render_series_label(row, spec))]);
+    }
+
+    spec.plot
+        .series
+        .group_by
+        .iter()
+        .map(|field| {
+            resolve_series_group_field(row, field)
+                .map(|value| format!("{field}={value}"))
+                .ok_or_else(|| {
+                    format!(
+                        "missing required series group field {field} for {}",
+                        row_context(row)
+                    )
+                })
+        })
+        .collect()
+}
+
+fn resolve_series_group_field(row: &BenchmarkResultRow, field: &str) -> Option<String> {
+    if field == "runner" {
+        return Some(row.runner.clone());
+    }
+    if field == "language" {
+        return Some(row.language.clone());
+    }
+
+    let (scope, key) = field.split_once('.')?;
+    match scope {
+        "params" => row.params.get(key).map(value_to_string),
+        "metrics" => row.metrics.get(key).copied().map(metric_to_string),
+        "case_summary" => row.case_summary.get(key).map(value_to_string),
+        _ => None,
+    }
 }
 
 fn replace_value_placeholders<'a>(

@@ -1,7 +1,10 @@
-use rsinter::bench::plot::render_benchmark_plot;
+use rsinter::bench::plot::{logical_rate_fit_for_plot, render_benchmark_plot};
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
-use rsinter::bench::spec::{BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR};
+use rsinter::bench::spec::{
+    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit,
+};
 use rsinter::failure::FailureKind;
+use rsinter::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
 #[test]
 fn render_benchmark_plot_writes_svg_for_ok_rows() {
@@ -816,6 +819,244 @@ fn plot_confidence_interval_factor_is_read_from_toml() {
 }
 
 #[test]
+fn logical_rate_unit_transforms_best_and_interval_bounds() {
+    let row = ok_row_with_metadata(
+        "rmatching",
+        3,
+        Some(10),
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        Some(2),
+        None,
+    );
+    let fit = fit_binomial(1000, 10, 9.0);
+    let expected_low = fit.low.unwrap().max(1e-10);
+    let expected_best = fit.best.unwrap().max(1e-10);
+    let expected_high = fit.high.unwrap().max(1e-10);
+
+    let per_shot = logical_rate_fit_for_plot(&row, LogicalRateUnit::PerShot).unwrap();
+    assert_close(per_shot.low, expected_low);
+    assert_close(per_shot.best.unwrap(), 0.01);
+    assert_close(per_shot.best.unwrap(), expected_best);
+    assert_close(per_shot.high, expected_high);
+
+    let per_round = logical_rate_fit_for_plot(&row, LogicalRateUnit::PerRound).unwrap();
+    assert_close(
+        per_round.low,
+        shot_error_rate_to_piece_error_rate(expected_low, 10.0).max(1e-10),
+    );
+    assert_close(
+        per_round.best.unwrap(),
+        shot_error_rate_to_piece_error_rate(0.01, 10.0).max(1e-10),
+    );
+    assert_close(
+        per_round.high,
+        shot_error_rate_to_piece_error_rate(expected_high, 10.0).max(1e-10),
+    );
+
+    let per_observable = logical_rate_fit_for_plot(&row, LogicalRateUnit::PerObservable).unwrap();
+    assert_close(
+        per_observable.low,
+        shot_error_rate_to_piece_error_rate(expected_low, 2.0).max(1e-10),
+    );
+    assert_close(
+        per_observable.best.unwrap(),
+        shot_error_rate_to_piece_error_rate(0.01, 2.0).max(1e-10),
+    );
+    assert_close(
+        per_observable.high,
+        shot_error_rate_to_piece_error_rate(expected_high, 2.0).max(1e-10),
+    );
+
+    let fallback_obs_row = ok_row_with_metadata(
+        "rmatching",
+        3,
+        Some(10),
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        None,
+        Some(2),
+    );
+    let fallback_observable =
+        logical_rate_fit_for_plot(&fallback_obs_row, LogicalRateUnit::PerObservable).unwrap();
+    assert_close(
+        fallback_observable.best.unwrap(),
+        per_observable.best.unwrap(),
+    );
+
+    let per_round_per_observable =
+        logical_rate_fit_for_plot(&row, LogicalRateUnit::PerRoundPerObservable).unwrap();
+    assert_close(
+        per_round_per_observable.low,
+        shot_error_rate_to_piece_error_rate(expected_low, 20.0).max(1e-10),
+    );
+    assert_close(
+        per_round_per_observable.best.unwrap(),
+        shot_error_rate_to_piece_error_rate(0.01, 20.0).max(1e-10),
+    );
+    assert_close(
+        per_round_per_observable.high,
+        shot_error_rate_to_piece_error_rate(expected_high, 20.0).max(1e-10),
+    );
+
+    let zero_error_row = ok_row_with_metadata(
+        "zero",
+        3,
+        Some(10),
+        0.002,
+        0.0,
+        0.0,
+        1000.0,
+        12.0,
+        Some(2),
+        None,
+    );
+    let zero_fit = logical_rate_fit_for_plot(&zero_error_row, LogicalRateUnit::PerRound).unwrap();
+    assert!(
+        zero_fit.best.is_none(),
+        "zero-error best estimate must stay absent after transform"
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    for unit in [
+        "per_shot",
+        "per_round",
+        "per_observable",
+        "per_round_per_observable",
+    ] {
+        let spec = spec_with_logical_rate_unit(unit);
+        let out = dir.path().join(format!("{unit}.svg"));
+        render_benchmark_plot(&spec, std::slice::from_ref(&row), &out).unwrap();
+        assert!(std::fs::read_to_string(out).unwrap().contains("<svg"));
+    }
+
+    let per_round_spec = spec_with_logical_rate_unit("per_round");
+    let missing_rounds_row = ok_row_with_metadata(
+        "missing_rounds",
+        3,
+        None,
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        Some(2),
+        None,
+    );
+    let missing_rounds_err = render_benchmark_plot(
+        &per_round_spec,
+        &[missing_rounds_row],
+        &dir.path().join("missing-rounds.svg"),
+    )
+    .unwrap_err();
+    assert!(missing_rounds_err.contains("logical_rate_unit = \"per_round\""));
+    assert!(missing_rounds_err.contains("params.rounds"));
+
+    let zero_rounds_row = ok_row_with_metadata(
+        "zero_rounds",
+        3,
+        Some(0),
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        Some(2),
+        None,
+    );
+    let zero_rounds_err = render_benchmark_plot(
+        &per_round_spec,
+        &[zero_rounds_row],
+        &dir.path().join("zero-rounds.svg"),
+    )
+    .unwrap_err();
+    assert!(zero_rounds_err.contains("logical_rate_unit = \"per_round\""));
+    assert!(zero_rounds_err.contains("positive numeric params.rounds"));
+
+    let mut nonnumeric_rounds_row = row.clone();
+    nonnumeric_rounds_row
+        .params
+        .insert("rounds".to_string(), serde_json::json!("ten"));
+    let nonnumeric_rounds_err = render_benchmark_plot(
+        &per_round_spec,
+        &[nonnumeric_rounds_row],
+        &dir.path().join("nonnumeric-rounds.svg"),
+    )
+    .unwrap_err();
+    assert!(nonnumeric_rounds_err.contains("logical_rate_unit = \"per_round\""));
+    assert!(nonnumeric_rounds_err.contains("positive numeric params.rounds"));
+
+    let per_observable_spec = spec_with_logical_rate_unit("per_observable");
+    let missing_observable_row = ok_row_with_metadata(
+        "missing_observable",
+        3,
+        Some(10),
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        None,
+        None,
+    );
+    let missing_observable_err = render_benchmark_plot(
+        &per_observable_spec,
+        &[missing_observable_row],
+        &dir.path().join("missing-observable.svg"),
+    )
+    .unwrap_err();
+    assert!(missing_observable_err.contains("logical_rate_unit = \"per_observable\""));
+    assert!(missing_observable_err.contains("case_summary.logical_observable_count"));
+    assert!(missing_observable_err.contains("case_summary.num_obs"));
+
+    let zero_observable_row = ok_row_with_metadata(
+        "zero_observable",
+        3,
+        Some(10),
+        0.002,
+        0.01,
+        10.0,
+        1000.0,
+        12.0,
+        Some(0),
+        None,
+    );
+    let zero_observable_err = render_benchmark_plot(
+        &per_observable_spec,
+        &[zero_observable_row],
+        &dir.path().join("zero-observable.svg"),
+    )
+    .unwrap_err();
+    assert!(zero_observable_err.contains("logical_rate_unit = \"per_observable\""));
+    assert!(zero_observable_err.contains("positive numeric case_summary.logical_observable_count"));
+    assert!(zero_observable_err.contains("case_summary.num_obs"));
+
+    let mut nonnumeric_observable_row = row.clone();
+    nonnumeric_observable_row.case_summary.insert(
+        "logical_observable_count".to_string(),
+        serde_json::json!("two"),
+    );
+    let nonnumeric_observable_err = render_benchmark_plot(
+        &per_observable_spec,
+        &[nonnumeric_observable_row],
+        &dir.path().join("nonnumeric-observable.svg"),
+    )
+    .unwrap_err();
+    assert!(nonnumeric_observable_err.contains("logical_rate_unit = \"per_observable\""));
+    assert!(
+        nonnumeric_observable_err
+            .contains("positive numeric case_summary.logical_observable_count")
+    );
+    assert!(nonnumeric_observable_err.contains("case_summary.num_obs"));
+}
+
+#[test]
 fn render_benchmark_plot_handles_single_linear_point_and_dashed_distance_series() {
     let single_point_spec = spec_with_panels(
         "Surface Decoder",
@@ -875,6 +1116,170 @@ label = "Decode Time Per Shot"
     );
 }
 
+#[test]
+fn plot_series_group_by_is_independent_from_label() {
+    let split_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "shared label"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let split_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("predict_zero", 3, 0.002, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let split_out = dir.path().join("split-same-label.svg");
+    render_benchmark_plot(&split_spec, &split_rows, &split_out).unwrap();
+    let split_svg = std::fs::read_to_string(split_out).unwrap();
+    let split_colors = svg_circle_fill_colors(&split_svg);
+    assert_eq!(
+        split_colors.len(),
+        2,
+        "different runner group keys should remain distinct series even with the same label; svg was:\n{split_svg}"
+    );
+
+    let merge_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let merge_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let merge_out = dir.path().join("merge-different-labels.svg");
+    render_benchmark_plot(&merge_spec, &merge_rows, &merge_out).unwrap();
+    let merge_svg = std::fs::read_to_string(merge_out).unwrap();
+    assert!(
+        merge_svg.contains("rmatching p=0.002"),
+        "merged series should keep the first rendered label; svg was:\n{merge_svg}"
+    );
+    assert!(
+        !merge_svg.contains("rmatching p=0.005"),
+        "a changed label must not split rows with the same configured group key; svg was:\n{merge_svg}"
+    );
+}
+
+#[test]
+fn plot_series_group_by_covers_fallback_field_scopes_and_errors() {
+    let label_fallback_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let fallback_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let fallback_out = dir.path().join("fallback-label-key.svg");
+    render_benchmark_plot(&label_fallback_spec, &fallback_rows, &fallback_out).unwrap();
+    let fallback_svg = std::fs::read_to_string(fallback_out).unwrap();
+    assert!(
+        fallback_svg.contains("rmatching p=0.002"),
+        "omitted group_by should preserve label-based grouping; svg was:\n{fallback_svg}"
+    );
+    assert!(
+        fallback_svg.contains("rmatching p=0.005"),
+        "omitted group_by should split rows when rendered labels differ; svg was:\n{fallback_svg}"
+    );
+
+    let scoped_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["language", "metrics.decode_us_per_shot", "case_summary.num_dets"]
+label_template = "{language} t={metrics.decode_us_per_shot} n={case_summary.num_dets}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let mut python_row = ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0);
+    python_row.language = "python".into();
+    let scoped_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        python_row,
+    ];
+    let scoped_out = dir.path().join("scoped-group-fields.svg");
+    render_benchmark_plot(&scoped_group_spec, &scoped_rows, &scoped_out).unwrap();
+    let scoped_svg = std::fs::read_to_string(scoped_out).unwrap();
+    assert!(
+        scoped_svg.contains("rust t=12 n=24"),
+        "language, metrics, and case_summary group fields should render the first series; svg was:\n{scoped_svg}"
+    );
+    assert!(
+        scoped_svg.contains("python t=14 n=24"),
+        "language, metrics, and case_summary group fields should render the second series; svg was:\n{scoped_svg}"
+    );
+
+    let bad_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["artifacts.path"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let err = render_benchmark_plot(
+        &bad_group_spec,
+        &[ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0)],
+        &dir.path().join("bad-group-field.svg"),
+    )
+    .unwrap_err();
+    assert!(err.contains("missing required series group field artifacts.path"));
+}
+
+fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
+    svg.lines()
+        .filter(|line| line.contains("<circle"))
+        .filter_map(|line| {
+            line.split("fill=\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .map(str::to_string)
+        })
+        .collect()
+}
+
 fn spec_with_panels(
     title: &str,
     x_field: &str,
@@ -912,6 +1317,48 @@ label = "Physical Error Rate"
 {series}
 
 {panels}
+"#
+    ))
+    .unwrap()
+}
+
+fn spec_with_logical_rate_unit(unit: &str) -> BenchmarkSpec {
+    toml::from_str(&format!(
+        r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+logical_rate_unit = "{unit}"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{{runner}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
 "#
     ))
     .unwrap()
@@ -988,7 +1435,7 @@ fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
     vec![
         ok_row("zero-anchor", 3, 0.001, 0.0, 0.0, 2000.0, 12.0),
         ok_row("target", 3, 0.01, 0.01, 10.0, 1000.0, 12.0),
-        ok_row("one-anchor", 3, 0.1, 1.0, 2000.0, 2000.0, 12.0),
+        ok_row("one-anchor", 3, 0.1, 0.05, 100.0, 2000.0, 12.0),
     ]
 }
 
@@ -1090,4 +1537,49 @@ fn ok_row(
         artifacts: std::collections::BTreeMap::new(),
         error: None,
     }
+}
+
+fn ok_row_with_metadata(
+    runner: &str,
+    distance: u64,
+    rounds: Option<u64>,
+    p: f64,
+    logical_error_rate: f64,
+    logical_errors: f64,
+    shots_used: f64,
+    decode_us_per_shot: f64,
+    logical_observable_count: Option<u64>,
+    num_obs: Option<u64>,
+) -> BenchmarkResultRow {
+    let mut row = ok_row(
+        runner,
+        distance,
+        p,
+        logical_error_rate,
+        logical_errors,
+        shots_used,
+        decode_us_per_shot,
+    );
+    if let Some(rounds) = rounds {
+        row.params
+            .insert("rounds".to_string(), serde_json::json!(rounds));
+    }
+    if let Some(count) = logical_observable_count {
+        row.case_summary.insert(
+            "logical_observable_count".to_string(),
+            serde_json::json!(count),
+        );
+    }
+    if let Some(count) = num_obs {
+        row.case_summary
+            .insert("num_obs".to_string(), serde_json::json!(count));
+    }
+    row
+}
+
+fn assert_close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() <= 1e-12,
+        "actual {actual} did not match expected {expected}"
+    );
 }

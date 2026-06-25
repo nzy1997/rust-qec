@@ -2,11 +2,11 @@ use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
-    BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
-    DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, Issue225LadderCase,
-    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, randomized_css_upper_bound,
+    random_window_css_upper_bound, randomized_css_upper_bound,
     validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
-    verify_issue_225_ladder_case,
+    verify_issue_225_ladder_case, BoundType, BoundValidationContext, DistanceBoundMethod,
+    DistanceBoundProvenance, DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness,
+    Issue225LadderCase, RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 
@@ -91,6 +91,151 @@ fn surface_rotated_d5_result_with_x_support(support: &[usize]) -> DistanceBoundR
             target_weight: Some(5),
         },
     )
+}
+
+fn pinned_random_window_options() -> RandomWindowUpperBoundOptions {
+    RandomWindowUpperBoundOptions {
+        iterations: 5000,
+        restarts: 8,
+        seed: 7,
+        target_weight: Some(5),
+    }
+}
+
+#[test]
+fn css_code_preserves_dense_component_rows_for_search() {
+    let css = CssCode::from_hx_hz(vec![vec![1, 1, 0]], vec![vec![0, 0, 1]]).unwrap();
+
+    assert_eq!(css.hx(), &[vec![1, 1, 0]]);
+    assert_eq!(css.hz(), &[vec![0, 0, 1]]);
+}
+
+#[test]
+fn random_window_upper_bound_finds_surface_and_toric_distance_under_pinned_options() {
+    for code_id in ["surface_rotated:d=5", "toric:d=5"] {
+        let css = css_from_built_in_code_id(code_id);
+        let options = pinned_random_window_options();
+
+        let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
+        let second = random_window_css_upper_bound(&css, options).unwrap();
+
+        assert_eq!(first, second, "{code_id} should be deterministic");
+        assert_eq!(first.method, DistanceBoundMethod::RandomWindowUpperBound);
+        assert_eq!(first.upper_bound, 5, "{code_id}");
+        assert_eq!(first.witness.weight, 5, "{code_id}");
+        assert!(matches!(
+            first.logical_class,
+            LogicalClass::XLike | LogicalClass::ZLike
+        ));
+        validate_random_window_upper_bound_result(
+            &first,
+            BoundValidationContext {
+                code: css.code(),
+                known_exact_distance: Some(5),
+            },
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn random_window_upper_bound_rejects_stabilizer_span_component_candidate() {
+    let css = css_from_sparse_rows(3, vec![vec![0, 1], vec![1, 2]], vec![]);
+    let result = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 11,
+            target_weight: Some(1),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 1);
+    assert_eq!(result.logical_class, LogicalClass::XLike);
+    assert_ne!(result.witness.x, vec![1, 1, 0]);
+    assert_ne!(result.witness.x, vec![0, 1, 1]);
+    validate_random_window_upper_bound_result(
+        &result,
+        BoundValidationContext {
+            code: css.code(),
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn random_window_upper_bound_rejects_css_code_without_logicals() {
+    let css = css_from_sparse_rows(1, vec![vec![0]], vec![]);
+
+    assert_eq!(
+        random_window_css_upper_bound(
+            &css,
+            RandomWindowUpperBoundOptions {
+                iterations: 1,
+                restarts: 1,
+                seed: 7,
+                target_weight: None,
+            },
+        ),
+        Err(QecError::DistanceWitnessNotFound)
+    );
+}
+
+#[test]
+fn random_window_upper_bound_rejects_z_stabilizer_span_component_candidate() {
+    let css = css_from_sparse_rows(3, vec![], vec![vec![0, 1], vec![1, 2]]);
+    let result = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 11,
+            target_weight: Some(1),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.upper_bound, 1);
+    assert_eq!(result.logical_class, LogicalClass::ZLike);
+    assert_ne!(result.witness.z, vec![1, 1, 0]);
+    assert_ne!(result.witness.z, vec![0, 1, 1]);
+    validate_random_window_upper_bound_result(
+        &result,
+        BoundValidationContext {
+            code: css.code(),
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn random_window_upper_bound_returns_best_witness_after_exhausting_iterations() {
+    let css = css_from_sparse_rows(3, vec![], vec![vec![0, 1], vec![1, 2]]);
+    let options = RandomWindowUpperBoundOptions {
+        iterations: 3,
+        restarts: 2,
+        seed: 19,
+        target_weight: None,
+    };
+
+    let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
+    let second = random_window_css_upper_bound(&css, options).unwrap();
+
+    assert_eq!(first, second);
+    assert_eq!(first.upper_bound, 1);
+    assert_eq!(first.logical_class, LogicalClass::ZLike);
+    validate_random_window_upper_bound_result(
+        &first,
+        BoundValidationContext {
+            code: css.code(),
+            known_exact_distance: Some(1),
+        },
+    )
+    .unwrap();
 }
 
 #[test]

@@ -7,7 +7,8 @@ mod parity_schema;
 use std::path::PathBuf;
 
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecodeResult, DecodeStats, DecoderConfig,
+    ParityCheckMatrix, Syndrome,
 };
 
 fn parity_fixture_dir() -> PathBuf {
@@ -39,6 +40,12 @@ fn minimum_sum_decodes_a_single_flip_without_osd() {
     assert!(result.converged);
     assert!(!result.used_osd);
     assert_eq!(result.bp_iterations > 0, true);
+    assert_eq!(result.stats.decode_call_count, 1);
+    assert_eq!(result.stats.bp_iteration_count, result.bp_iterations);
+    assert!(result.stats.bp_seconds.is_finite());
+    assert!(result.stats.bp_seconds >= 0.0);
+    assert_eq!(result.stats.osd_seconds, 0.0);
+    assert_eq!(result.stats.osd_use_count, 0);
     assert_eq!(result.residual_syndrome_weight, 0);
     assert_eq!(pcm.multiply(&result.correction), syndrome);
     assert_eq!(
@@ -121,8 +128,43 @@ fn minimum_sum_decoder_clone_preserves_decoding_behavior_with_fresh_workspaces()
     let first = decoder.decode(&syndrome).unwrap();
     let second = cloned.decode(&syndrome).unwrap();
 
-    assert_eq!(second, first);
+    assert_eq!(second.correction, first.correction);
+    assert_eq!(second.converged, first.converged);
+    assert_eq!(second.bp_iterations, first.bp_iterations);
+    assert_eq!(second.used_osd, first.used_osd);
+    assert_eq!(
+        second.residual_syndrome_weight,
+        first.residual_syndrome_weight
+    );
+    assert_eq!(second.stats.decode_call_count, 1);
+    assert_eq!(first.stats.decode_call_count, 1);
+    assert_eq!(second.stats.bp_iteration_count, second.bp_iterations);
     assert_eq!(pcm.multiply(&second.correction), syndrome);
+}
+
+#[test]
+fn decode_result_equality_ignores_timing_but_compares_counters() {
+    let base = DecodeResult {
+        correction: Correction::from(vec![true]),
+        converged: true,
+        bp_iterations: 1,
+        used_osd: false,
+        residual_syndrome_weight: 0,
+        stats: DecodeStats {
+            bp_seconds: 1.0,
+            decode_call_count: 1,
+            bp_iteration_count: 1,
+            ..DecodeStats::default()
+        },
+    };
+    let mut changed_timing = base.clone();
+    changed_timing.stats.bp_seconds = 2.0;
+    changed_timing.stats.osd_seconds = 3.0;
+    assert_eq!(base, changed_timing);
+
+    let mut changed_counters = base.clone();
+    changed_counters.stats.decode_call_count = 2;
+    assert_ne!(base, changed_counters);
 }
 
 #[test]
@@ -259,8 +301,7 @@ fn product_sum_serial_changes_bp_snapshot_on_borrowed_case() {
     let default_mode_report = parity_runner::run_case(&comparison_case);
 
     assert_ne!(
-        sensitive_report.actual,
-        default_mode_report.actual,
+        sensitive_report.actual, default_mode_report.actual,
         "product_sum + serial must differ from minimum_sum + parallel on the sensitive fixture"
     );
 }
@@ -289,13 +330,11 @@ fn product_sum_serial_teeth_cases() {
     let product_sum_parallel = parity_runner::run_case(&product_sum_parallel_case);
 
     assert_ne!(
-        product_sum_serial.actual,
-        minimum_sum_serial.actual,
+        product_sum_serial.actual, minimum_sum_serial.actual,
         "product_sum must change decoder behavior while schedule stays serial"
     );
     assert_ne!(
-        product_sum_serial.actual,
-        product_sum_parallel.actual,
+        product_sum_serial.actual, product_sum_parallel.actual,
         "serial schedule must change decoder behavior while bp method stays product_sum"
     );
 }
@@ -308,7 +347,10 @@ fn minimum_sum_parallel_regression_suite_still_passes() {
         "osd_small_sparse_code.json",
     ] {
         let case = load_parity_case(fixture_name);
-        assert_eq!(case.config.bp_variant, parity_schema::BpVariantSpec::MinimumSum);
+        assert_eq!(
+            case.config.bp_variant,
+            parity_schema::BpVariantSpec::MinimumSum
+        );
         assert_eq!(case.config.schedule, parity_schema::ScheduleSpec::Parallel);
         let report = parity_runner::run_case(&case);
         assert_eq!(

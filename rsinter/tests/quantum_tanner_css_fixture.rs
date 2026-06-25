@@ -7,7 +7,7 @@ use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::{
     AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
-    PanelSpec, PlotSpec, RunnerSpec, SeriesSpec,
+    LogicalRateUnit, PanelSpec, PlotSpec, RunnerSpec, SeriesSpec,
 };
 use rsinter::failure::FailureKind;
 use toml::Value;
@@ -108,6 +108,7 @@ fn quantum_tanner_css_spec(hz_path: &str) -> BenchmarkSpec {
         plot: PlotSpec {
             title: "Quantum Tanner toric_d4 CSS Smoke".into(),
             confidence_interval_likelihood_factor: DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+            logical_rate_unit: LogicalRateUnit::PerShot,
             x: AxisSpec {
                 field: "params.p".into(),
                 scale: "linear".into(),

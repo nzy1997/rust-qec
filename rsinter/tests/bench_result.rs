@@ -1,6 +1,6 @@
 use rsinter::bench::result::{
-    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, CaseSummary, MetricMap,
-    PairMapExt, ParamMap, RunManifest,
+    BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap, RunManifest,
+    read_results_jsonl, write_results_jsonl,
 };
 use rsinter::failure::FailureKind;
 
@@ -29,6 +29,51 @@ fn result_row_serializes_round_trip_as_json() {
     let decoded: BenchmarkResultRow = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded.runner, "rmatching");
     assert_eq!(decoded.metrics["logical_error_rate"], 0.001);
+}
+
+#[test]
+fn result_row_serializes_stable_identity_field() {
+    let row = BenchmarkResultRow {
+        benchmark: "surface_decoder".into(),
+        runner: "rmatching".into(),
+        language: "rust".into(),
+        status: "ok".into(),
+        failure_kind: FailureKind::Ok,
+        params: ParamMap::from_pairs([
+            (
+                "decoder_options",
+                serde_json::from_str(r#"{"b":2,"a":1}"#).unwrap(),
+            ),
+            ("distance", serde_json::json!(3)),
+            ("p", serde_json::json!(0.002)),
+        ]),
+        case_summary: CaseSummary::from_pairs([
+            ("num_dets", serde_json::json!(24)),
+            ("num_obs", serde_json::json!(1)),
+            ("num_shots_generated", serde_json::json!(2000)),
+        ]),
+        metrics: MetricMap::from_pairs([("shots_used", 2000.0)]),
+        artifacts: std::collections::BTreeMap::new(),
+        error: None,
+    };
+
+    let identity = row.identity().unwrap();
+    assert!(identity.starts_with("sha256:"));
+    assert_eq!(identity.len(), "sha256:".len() + 64);
+
+    let encoded = serde_json::to_string(&row).unwrap();
+    let encoded_value: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(encoded_value["identity"], serde_json::json!(identity));
+
+    let mut reordered = row.clone();
+    reordered.params.insert(
+        "decoder_options".into(),
+        serde_json::from_str(r#"{"a":1,"b":2}"#).unwrap(),
+    );
+    assert_eq!(row.identity().unwrap(), reordered.identity().unwrap());
+
+    let decoded: BenchmarkResultRow = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded.identity().unwrap(), identity);
 }
 
 #[test]

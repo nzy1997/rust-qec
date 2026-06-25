@@ -56,7 +56,7 @@ pub use config::{
     BpVariant, ChannelModel, DecoderConfig, LsdConfig, LsdMethod, OsdVariant, Schedule,
 };
 pub use css::CssDecoders;
-pub use decoder::{BpOsdDecoder, DecodeResult, OsdPathDiagnostic};
+pub use decoder::{BpOsdDecoder, DecodeResult, DecodeStats, OsdPathDiagnostic};
 pub use error::DecodeError;
 pub use lsd_decoder::BpLsdDecoder;
 pub use matrix::ParityCheckMatrix;
