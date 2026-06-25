@@ -1,14 +1,19 @@
+use rbposd::ParityCheckMatrix;
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
-    SimulationConfig, SyndromeReplayDiagnostic, build_code, build_effective_models,
-    build_syndrome_cycle, replay_syndrome_diagnostic, sample_seeded_trial,
+    build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
+    profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit,
+    profile_syndrome_replay_with_candidate_limit_for_basis, replay_syndrome_diagnostic,
+    sample_seeded_trial, EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig,
+    SyndromeReplayDiagnostic,
 };
 
 const FIXTURE_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/tests/fixtures/bb_circuit_bposd/bb90_hard_syndrome.json"
 );
+const PROFILE_CANDIDATE_LIMIT: usize = 16;
 
 #[derive(Debug, Clone, Deserialize)]
 struct HardSyndromeFixture {
@@ -43,8 +48,10 @@ enum FixtureBasis {
 }
 
 struct ComputedFixtureReplay {
+    sampled_syndrome: Vec<bool>,
     sampled_support: Vec<usize>,
     sampled_logical: Vec<bool>,
+    model: EffectiveDecoderModel,
     diagnostic: SyndromeReplayDiagnostic,
 }
 
@@ -69,53 +76,41 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 
     let mut low_p = fixture.clone();
     low_p.physical_error_rate = 1.0e-12;
-    assert!(
-        validate_fixture(&low_p)
-            .unwrap_err()
-            .contains("fixture physical_error_rate mismatch")
-    );
+    assert!(validate_fixture(&low_p)
+        .unwrap_err()
+        .contains("fixture physical_error_rate mismatch"));
 
     let mut osd0 = fixture.clone();
     osd0.osd_order = 0;
-    assert!(
-        validate_fixture(&osd0)
-            .unwrap_err()
-            .contains("fixture osd_order mismatch")
-    );
+    assert!(validate_fixture(&osd0)
+        .unwrap_err()
+        .contains("fixture osd_order mismatch"));
 
     let mut wrong_seed = fixture.clone();
     wrong_seed.seed += 1;
-    assert!(
-        validate_fixture(&wrong_seed)
-            .unwrap_err()
-            .contains("fixture seed mismatch")
-    );
+    assert!(validate_fixture(&wrong_seed)
+        .unwrap_err()
+        .contains("fixture seed mismatch"));
 
     let mut wrong_code = fixture.clone();
     wrong_code.code_id = "bb144".to_owned();
-    assert!(
-        validate_fixture(&wrong_code)
-            .unwrap_err()
-            .contains("expected BB90 shape")
-    );
+    assert!(validate_fixture(&wrong_code)
+        .unwrap_err()
+        .contains("expected BB90 shape"));
 
     let computed = compute_fixture_replay(&fixture).unwrap();
 
     let mut wrong_support = fixture.clone();
     wrong_support.syndrome_support[0] += 1;
-    assert!(
-        validate_computed_fixture(&wrong_support, &computed)
-            .unwrap_err()
-            .contains("sampled syndrome support mismatch")
-    );
+    assert!(validate_computed_fixture(&wrong_support, &computed)
+        .unwrap_err()
+        .contains("sampled syndrome support mismatch"));
 
     let mut wrong_prediction = fixture.clone();
     wrong_prediction.expected_osd0_logical_prediction[0] ^= true;
-    assert!(
-        validate_computed_fixture(&wrong_prediction, &computed)
-            .unwrap_err()
-            .contains("OSD-0 logical prediction mismatch")
-    );
+    assert!(validate_computed_fixture(&wrong_prediction, &computed)
+        .unwrap_err()
+        .contains("OSD-0 logical prediction mismatch"));
 
     let mut wrong_prediction_order = fixture.clone();
     wrong_prediction_order.expected_logical_prediction_decode_order = 7;
@@ -127,16 +122,144 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
 
     let mut wrong_frontier = fixture.clone();
     wrong_frontier.expected_candidate_search_frontier_size += 1;
-    assert!(
-        validate_computed_fixture(&wrong_frontier, &computed)
-            .unwrap_err()
-            .contains("candidate_search_frontier_size mismatch")
+    assert!(validate_computed_fixture(&wrong_frontier, &computed)
+        .unwrap_err()
+        .contains("candidate_search_frontier_size mismatch"));
+}
+
+#[test]
+fn bb90_hard_syndrome_reports_osd_profile_counters() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let profile = profile_syndrome_replay_with_candidate_limit_for_basis(
+        profile_replay_basis(fixture.basis),
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        PROFILE_CANDIDATE_LIMIT,
+    )
+    .unwrap();
+
+    println!(
+        "case_id={} basis={:?} syndrome_weight={} candidate_limit={} profile={profile:#?}",
+        fixture.case_id,
+        fixture.basis,
+        computed.sampled_support.len(),
+        PROFILE_CANDIDATE_LIMIT,
     );
+
+    assert!(profile.decode_call_count > 0);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    let (expected_z_calls, expected_x_calls) = expected_basis_calls(fixture.basis);
+    assert_eq!(profile.z_decode_call_count, expected_z_calls);
+    assert_eq!(profile.x_decode_call_count, expected_x_calls);
+    assert!(profile.osd_use_count > 0);
+    assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
+}
+
+#[test]
+fn syndrome_profile_replay_routes_x_basis_counts() {
+    let fixture = load_fixture();
+    let code = build_code(&fixture.code_id).unwrap();
+    let cycle = build_syndrome_cycle(&code);
+    let config = SimulationConfig {
+        physical_error_rate: 1.0e-12,
+        num_cycles: 1,
+        num_trials: 1,
+        seed: Some(1),
+        max_bp_iterations: 10,
+        osd_order: 0,
+    };
+    let models = build_effective_models(&code, &cycle, &config).unwrap();
+    let syndrome = vec![false; models.x_faults.decoder.num_checks()];
+    let profile = profile_syndrome_replay_for_basis(
+        ProfileReplayBasis::X,
+        &models.x_faults,
+        &syndrome,
+        config.max_bp_iterations,
+        config.osd_order,
+    )
+    .unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 0);
+    assert_eq!(profile.x_decode_call_count, 1);
+    assert_eq!(profile.osd_candidate_count, 0);
+}
+
+#[test]
+fn syndrome_profile_replay_reports_nontrivial_osd_counts() {
+    let model = EffectiveDecoderModel {
+        decoder: ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap(),
+        augmented_columns: vec![vec![0], vec![0], vec![0]],
+        channel_probs: vec![0.49, 0.48, 0.47],
+        first_logical_row: 1,
+    };
+    let profile = profile_syndrome_replay(&model, &[true], 0, 2).unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 1);
+    assert_eq!(profile.x_decode_call_count, 0);
+    assert_eq!(profile.osd_use_count, 1);
+    assert!(profile.osd_candidate_count > 0);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
+}
+
+#[test]
+fn syndrome_profile_replay_candidate_limit_wrapper_routes_z_basis_counts() {
+    let model = EffectiveDecoderModel {
+        decoder: ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap(),
+        augmented_columns: vec![vec![0], vec![0], vec![0]],
+        channel_probs: vec![0.49, 0.48, 0.47],
+        first_logical_row: 1,
+    };
+    let profile = profile_syndrome_replay_with_candidate_limit(&model, &[true], 0, 2, 1).unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 1);
+    assert_eq!(profile.x_decode_call_count, 0);
+    assert_eq!(profile.osd_use_count, 1);
+    assert_eq!(profile.osd_candidate_count, 1);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
 }
 
 fn load_fixture() -> HardSyndromeFixture {
     let text = std::fs::read_to_string(FIXTURE_PATH).unwrap();
     serde_json::from_str(&text).unwrap()
+}
+
+fn profile_replay_basis(basis: FixtureBasis) -> ProfileReplayBasis {
+    match basis {
+        FixtureBasis::Z => ProfileReplayBasis::Z,
+        FixtureBasis::X => ProfileReplayBasis::X,
+    }
+}
+
+fn expected_basis_calls(basis: FixtureBasis) -> (usize, usize) {
+    match basis {
+        FixtureBasis::Z => (1, 0),
+        FixtureBasis::X => (0, 1),
+    }
 }
 
 fn validate_fixture(fixture: &HardSyndromeFixture) -> Result<(), String> {
@@ -183,8 +306,10 @@ fn compute_fixture_replay(fixture: &HardSyndromeFixture) -> Result<ComputedFixtu
     };
 
     Ok(ComputedFixtureReplay {
+        sampled_syndrome: sampled_syndrome.clone(),
         sampled_support: syndrome_support(sampled_syndrome),
         sampled_logical: sampled_logical.clone(),
+        model: model.clone(),
         diagnostic: replay_syndrome_diagnostic(
             model,
             sampled_syndrome,

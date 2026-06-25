@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rbposd::{Correction, DecodeError, DecodeResult};
+use rbposd::{Correction, DecodeError, DecodeResult, DecodeStats};
 
 #[path = "../dev/parity_runner.rs"]
 mod parity_runner;
@@ -87,6 +87,7 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
         bp_iterations: 7,
         used_osd: true,
         residual_syndrome_weight: 1,
+        stats: DecodeStats::default(),
     });
 
     assert_eq!(
@@ -248,7 +249,10 @@ fn parity_runner_decodes_bplsd_cases_when_decoder_field_is_set() {
             let pcm = rbposd::ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![1, 2], vec![0]])
                 .unwrap();
             let syndrome = rbposd::Syndrome::from(vec![true, false]);
-            assert_eq!(pcm.multiply(&rbposd::Correction::from(correction)), syndrome);
+            assert_eq!(
+                pcm.multiply(&rbposd::Correction::from(correction)),
+                syndrome
+            );
             assert_eq!(diagnostics.used_osd, Some(false));
             assert_eq!(diagnostics.residual_syndrome_weight, Some(0));
         }
