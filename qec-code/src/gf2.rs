@@ -197,6 +197,7 @@ pub(crate) fn try_nullspace_basis_with_width(
     Ok(basis)
 }
 
+#[allow(dead_code)]
 pub(crate) fn try_random_window_kernel_basis_with_width(
     matrix: &[BinaryRow],
     width: usize,
@@ -228,6 +229,7 @@ pub(crate) fn try_random_window_kernel_basis_with_width(
     Ok(original_basis)
 }
 
+#[allow(dead_code)]
 fn validate_column_permutation(column_permutation: &[usize], width: usize) -> Result<()> {
     if column_permutation.len() != width {
         return Err(QecError::InvalidColumnPermutation {
