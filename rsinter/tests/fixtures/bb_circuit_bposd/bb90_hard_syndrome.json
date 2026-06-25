@@ -1,0 +1,31 @@
+{
+  "case_id": "bb90-p006-c10-seed12345-order7-hard-syndrome",
+  "code_id": "bb90",
+  "physical_error_rate": 0.006,
+  "num_cycles": 10,
+  "seed": 12345,
+  "max_bp_iterations": 10000,
+  "osd_order": 7,
+  "basis": "Z",
+  "syndrome_support": [
+    5, 8, 14, 18, 22, 23, 25, 26, 40, 50, 64, 69, 71, 72, 74, 83, 89, 93,
+    99, 101, 113, 116, 122, 130, 148, 156, 158, 179, 186, 192, 193, 194,
+    201, 216, 224, 228, 232, 236, 237, 239, 242, 246, 247, 249, 252, 253,
+    254, 257, 260, 261, 269, 274, 278, 279, 280, 293, 295, 299, 304, 310,
+    316, 324, 340, 345, 347, 355, 366, 367, 378, 385, 386, 390, 392, 401,
+    413, 414, 429, 430, 435, 439, 444, 446
+  ],
+  "expected_sampled_logical": [false, true, false, true, false, false, false, true],
+  "syndrome_weight": 82,
+  "expected_osd0_logical_prediction": [false, true, true, true, true, false, false, false],
+  "expected_logical_prediction_decode_order": 0,
+  "expected_osd_use": true,
+  "expected_bp_converged": false,
+  "expected_bp_iterations": 10000,
+  "expected_residual_syndrome_weight": 30,
+  "expected_free_column_count": 4100,
+  "expected_candidate_search_frontier_size": 16,
+  "expected_max_candidate_order": 7,
+  "expected_planned_candidate_count": 26332,
+  "why_hard": "BP stops after 10000 iterations with residual syndrome weight 30, so the order-7 diagnostic escalates to OSD and reaches the capped 16-column candidate frontier. The stored logical prediction is the deterministic OSD-0 base-solution baseline; full order-7 candidate enumeration is intentionally not run by this fixture test."
+}

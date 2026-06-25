@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use rsinter::bb_circuit_memory::{run_simulation, SimulationConfig};
+use rsinter::bb_circuit_memory::{SimulationConfig, run_simulation_for_code};
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
@@ -30,6 +30,8 @@ enum Commands {
         command: BenchCommands,
     },
     BbCircuitBposdMemory {
+        #[arg(long, default_value = "bb144")]
+        code_id: String,
         #[arg(long, default_value_t = 0.003, allow_hyphen_values = true)]
         physical_error_rate: f64,
         #[arg(long, default_value_t = 12)]
@@ -134,6 +136,7 @@ fn run() -> Result<(), String> {
             }
         },
         Commands::BbCircuitBposdMemory {
+            code_id,
             physical_error_rate,
             num_cycles,
             num_trials,
@@ -143,14 +146,17 @@ fn run() -> Result<(), String> {
         } => {
             let num_trials = usize::try_from(num_trials)
                 .map_err(|_| "num_trials exceeds supported platform usize".to_string())?;
-            let result = run_simulation(SimulationConfig {
-                physical_error_rate,
-                num_cycles,
-                num_trials,
-                seed,
-                max_bp_iterations,
-                osd_order,
-            })?;
+            let result = run_simulation_for_code(
+                &code_id,
+                SimulationConfig {
+                    physical_error_rate,
+                    num_cycles,
+                    num_trials,
+                    seed,
+                    max_bp_iterations,
+                    osd_order,
+                },
+            )?;
             println!(
                 "{}\t{}\t{}\t{}",
                 result.physical_error_rate,

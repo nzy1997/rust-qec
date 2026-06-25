@@ -3,7 +3,15 @@ use crate::gf2::{DetailedSolution, PreparedLinearSystem};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
-const OSD_FREE_COLUMN_FRONTIER: usize = 16;
+pub(crate) const OSD_FREE_COLUMN_FRONTIER: usize = 16;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OsdCandidateSearchPlan {
+    pub(crate) free_column_count: usize,
+    pub(crate) candidate_search_frontier_size: usize,
+    pub(crate) max_candidate_order: usize,
+    pub(crate) planned_candidate_count: u128,
+}
 
 #[derive(Debug)]
 pub(crate) struct OsdWorkspace {
@@ -86,6 +94,28 @@ pub(crate) fn decode_osd_with_workspace(
     Ok(xor_correction_bits(base_correction_bits, &best.correction))
 }
 
+pub(crate) fn diagnose_osd_candidate_search_with_workspace(
+    pcm: &ParityCheckMatrix,
+    syndrome: &Syndrome,
+    base_correction_bits: &[bool],
+    reliability: &[f64],
+    workspace: &mut OsdWorkspace,
+    osd_order: usize,
+) -> Result<OsdCandidateSearchPlan, DecodeError> {
+    debug_assert_eq!(workspace.num_checks, pcm.num_checks());
+    debug_assert_eq!(workspace.num_bits, pcm.num_bits());
+    debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
+    debug_assert_eq!(reliability.len(), pcm.num_bits());
+    let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
+    workspace.sort_unreliable_columns(reliability);
+    let base = workspace
+        .prepared
+        .solve_with_column_order_detailed(&target_syndrome, &workspace.column_order, &[])
+        .map_err(|_| DecodeError::NoOsdSolution)?;
+
+    Ok(candidate_search_plan(&base, osd_order))
+}
+
 fn best_osd_candidate(
     target_syndrome: &Syndrome,
     reliability: &[f64],
@@ -112,6 +142,33 @@ fn best_osd_candidate(
         });
     }
     Ok(best)
+}
+
+fn candidate_search_plan(base: &DetailedSolution, osd_order: usize) -> OsdCandidateSearchPlan {
+    let candidate_search_frontier_size = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
+    let max_candidate_order = osd_order.min(candidate_search_frontier_size);
+    let planned_candidate_count = (1..=max_candidate_order)
+        .map(|order| binomial(candidate_search_frontier_size, order))
+        .sum();
+
+    OsdCandidateSearchPlan {
+        free_column_count: base.free_columns.len(),
+        candidate_search_frontier_size,
+        max_candidate_order,
+        planned_candidate_count,
+    }
+}
+
+fn binomial(n: usize, k: usize) -> u128 {
+    if k > n {
+        return 0;
+    }
+    let k = k.min(n - k);
+    let mut result = 1u128;
+    for step in 0..k {
+        result = result * (n - step) as u128 / (step + 1) as u128;
+    }
+    result
 }
 
 fn visit_combinations(
@@ -192,7 +249,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{OsdWorkspace, decode_osd0_with_workspace};
+    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {
@@ -222,5 +279,10 @@ mod tests {
         let order = workspace.sort_unreliable_columns(&[1.0, 1.0, 0.4]);
 
         assert_eq!(order, &[2, 0, 1]);
+    }
+
+    #[test]
+    fn binomial_returns_zero_for_oversized_selection() {
+        assert_eq!(binomial(3, 4), 0);
     }
 }
