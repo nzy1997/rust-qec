@@ -1,4 +1,6 @@
-use rsinter::bench::plot::{logical_rate_fit_for_plot, render_benchmark_plot};
+use rsinter::bench::plot::{
+    log_log_fit_for_plot, logical_rate_fit_for_plot, render_benchmark_plot,
+};
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use rsinter::bench::spec::{
     BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit,
@@ -1145,6 +1147,69 @@ label = "Decode Time Per Shot"
 }
 
 #[test]
+fn plot_fit_ignores_zero_error_floor_points() {
+    let spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "log",
+        r#"[plot.fit]
+enabled = true
+kind = "log_log"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#,
+    );
+    let nonzero_rows = vec![
+        ok_row("rmatching", 3, 0.001, 0.001, 1.0, 1000.0, 12.0),
+        ok_row("rmatching", 3, 0.002, 0.004, 4.0, 1000.0, 12.0),
+        ok_row("rmatching", 3, 0.004, 0.016, 16.0, 1000.0, 12.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let fit_out = dir.path().join("fit.svg");
+    render_benchmark_plot(&spec, &nonzero_rows, &fit_out).unwrap();
+    let fit_svg = std::fs::read_to_string(fit_out).unwrap();
+    assert!(
+        fit_svg.contains("rmatching fit"),
+        "three finite nonzero points should draw a fit overlay legend entry; svg was:\n{fit_svg}"
+    );
+
+    let nonzero_points = fit_points_from_rows(&nonzero_rows);
+    let nonzero_fit = log_log_fit_for_plot(&nonzero_points).unwrap();
+    assert_close(nonzero_fit.slope, 2.0);
+
+    let zero_row = ok_row("rmatching", 3, 0.0025, 0.0, 0.0, 1000.0, 12.0);
+    let mut rows_with_zero = nonzero_rows.clone();
+    rows_with_zero.push(zero_row.clone());
+    let rows_with_zero_points = fit_points_from_rows(&rows_with_zero);
+    let fit_with_zero = log_log_fit_for_plot(&rows_with_zero_points).unwrap();
+    assert_close(fit_with_zero.slope, nonzero_fit.slope);
+
+    let mut fake_floor_points = nonzero_points.clone();
+    fake_floor_points.push((0.0025, Some(1e-10)));
+    let fake_floor_fit = log_log_fit_for_plot(&fake_floor_points).unwrap();
+    assert!(
+        (fake_floor_fit.slope - nonzero_fit.slope).abs() > 0.1,
+        "a fake floor point should materially change the slope"
+    );
+
+    let skip_out = dir.path().join("skip.svg");
+    render_benchmark_plot(&spec, &[nonzero_rows[0].clone(), zero_row], &skip_out).unwrap();
+    let skip_svg = std::fs::read_to_string(skip_out).unwrap();
+    assert!(
+        !skip_svg.contains("rmatching fit"),
+        "fewer than two finite nonzero best points should skip the fit; svg was:\n{skip_svg}"
+    );
+}
+
+#[test]
 fn plot_series_group_by_is_independent_from_label() {
     let split_spec = spec_with_panels(
         "Surface Decoder",
@@ -1205,6 +1270,20 @@ label = "Decode Time Per Shot"
     assert!(
         !merge_svg.contains("rmatching p=0.005"),
         "a changed label must not split rows with the same configured group key; svg was:\n{merge_svg}"
+    );
+}
+
+#[test]
+fn log_log_fit_rejects_invalid_degenerate_and_overflowing_inputs() {
+    assert!(log_log_fit_for_plot(&[(0.1, Some(f64::NAN)), (0.2, Some(0.04))]).is_none());
+    assert!(log_log_fit_for_plot(&[(0.1, Some(0.01)), (0.1, Some(0.02))]).is_none());
+    assert!(
+        log_log_fit_for_plot(&[
+            (1.49e-304, Some(2.09e304)),
+            (3.96e-44, Some(6.7e-322)),
+            (3.11e43, Some(1.06e-217)),
+        ])
+        .is_none()
     );
 }
 
@@ -1294,6 +1373,20 @@ label = "Decode Time Per Shot"
     )
     .unwrap_err();
     assert!(err.contains("missing required series group field artifacts.path"));
+}
+
+fn fit_points_from_rows(rows: &[BenchmarkResultRow]) -> Vec<(f64, Option<f64>)> {
+    rows.iter()
+        .map(|row| {
+            let x = row
+                .params
+                .get("p")
+                .and_then(|value| value.as_f64())
+                .unwrap();
+            let fit = logical_rate_fit_for_plot(row, LogicalRateUnit::PerShot).unwrap();
+            (x, fit.best)
+        })
+        .collect()
 }
 
 fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {

@@ -7,6 +7,7 @@ use plotters::prelude::*;
 use crate::bench::result::BenchmarkResultRow;
 use crate::bench::spec::{
     BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit, PanelSpec,
+    PlotFitKind,
 };
 use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
@@ -21,6 +22,7 @@ type ErrorRateGroups = BTreeMap<SeriesKey, SeriesData<ErrorRatePoint>>;
 struct SeriesData<T> {
     label: String,
     points: Vec<T>,
+    fit: Option<LogLogFitForPlot>,
 }
 
 #[derive(Clone, Copy)]
@@ -37,6 +39,17 @@ pub struct LogicalRateFitForPlot {
     pub low: f64,
     pub best: Option<f64>,
     pub high: f64,
+}
+
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LogLogFitForPlot {
+    pub slope: f64,
+    pub intercept: f64,
+    pub x_min: f64,
+    pub x_max: f64,
+    pub y_min: f64,
+    pub y_max: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -182,6 +195,67 @@ fn logical_rate_fit_for_plot_with_factor(
     Ok(LogicalRateFitForPlot { low, best, high })
 }
 
+#[doc(hidden)]
+pub fn log_log_fit_for_plot(points: &[(f64, Option<f64>)]) -> Option<LogLogFitForPlot> {
+    let valid_points: Vec<(f64, f64)> = points
+        .iter()
+        .filter_map(|(x, y)| {
+            let y = (*y)?;
+            if x.is_finite() && y.is_finite() && *x > 0.0 && y > 0.0 {
+                Some((*x, y))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if valid_points.len() < 2 {
+        return None;
+    }
+
+    let n = valid_points.len() as f64;
+    let sum_x = valid_points.iter().map(|(x, _)| x.ln()).sum::<f64>();
+    let sum_y = valid_points.iter().map(|(_, y)| y.ln()).sum::<f64>();
+    let sum_xx = valid_points
+        .iter()
+        .map(|(x, _)| x.ln() * x.ln())
+        .sum::<f64>();
+    let sum_xy = valid_points
+        .iter()
+        .map(|(x, y)| x.ln() * y.ln())
+        .sum::<f64>();
+    let denominator = n * sum_xx - sum_x * sum_x;
+    if !denominator.is_finite() || denominator == 0.0 {
+        return None;
+    }
+
+    let slope = (n * sum_xy - sum_x * sum_y) / denominator;
+    let intercept = (sum_y - slope * sum_x) / n;
+
+    let x_min = valid_points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::INFINITY, f64::min);
+    let x_max = valid_points
+        .iter()
+        .map(|(x, _)| *x)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    let y_min = (intercept + slope * x_min.ln()).exp();
+    let y_max = (intercept + slope * x_max.ln()).exp();
+    if !y_min.is_finite() || !y_max.is_finite() || y_min <= 0.0 || y_max <= 0.0 {
+        return None;
+    }
+
+    Some(LogLogFitForPlot {
+        slope,
+        intercept,
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+    })
+}
+
 fn logical_rate_pieces(
     row: &BenchmarkResultRow,
     unit: LogicalRateUnit,
@@ -267,6 +341,7 @@ fn prepare_error_rate_panel(
             .or_insert_with(|| SeriesData {
                 label,
                 points: Vec::new(),
+                fit: None,
             })
             .points
             .push(ErrorRatePoint {
@@ -282,10 +357,25 @@ fn prepare_error_rate_panel(
         }
     }
 
+    let fit_enabled = spec.plot.fit.enabled
+        && spec.plot.fit.kind == PlotFitKind::LogLog
+        && spec.plot.x.scale == "log"
+        && panel.scale == "log";
     for series in groups.values_mut() {
         series
             .points
             .sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+        if fit_enabled {
+            let fit_points: Vec<(f64, Option<f64>)> = series
+                .points
+                .iter()
+                .map(|point| (point.x, point.best))
+                .collect();
+            series.fit = log_log_fit_for_plot(&fit_points);
+            if let Some(fit) = series.fit {
+                y_values.extend([fit.y_min, fit.y_max]);
+            }
+        }
     }
 
     if groups.is_empty() {
@@ -329,6 +419,7 @@ fn prepare_numeric_panel(
             .or_insert_with(|| SeriesData {
                 label,
                 points: Vec::new(),
+                fit: None,
             })
             .points
             .push((x, y));
@@ -618,6 +709,10 @@ where
                 .map_err(|e| e.to_string())?;
         }
 
+        if let Some(fit) = series.fit {
+            draw_fit_line_series(chart, label, fit, style)?;
+        }
+
         if points.len() == 1 {
             const CAP_FACTOR: f64 = 1.015;
             let point = points[0];
@@ -738,6 +833,39 @@ where
                 });
         }
     }
+    Ok(())
+}
+
+fn draw_fit_line_series<'a, DB, XR, YR>(
+    chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
+    label: &str,
+    fit: LogLogFitForPlot,
+    style: SeriesStyle,
+) -> Result<(), String>
+where
+    DB: DrawingBackend + 'a,
+    DB::ErrorType: 'static,
+    XR: Ranged<ValueType = f64>,
+    YR: Ranged<ValueType = f64>,
+{
+    let line_color = style.color.mix(0.55);
+    let line_style = ShapeStyle::from(&line_color).stroke_width(2);
+    let legend_color = line_color;
+    chart
+        .draw_series(DashedLineSeries::new(
+            [(fit.x_min, fit.y_min), (fit.x_max, fit.y_max)],
+            4,
+            4,
+            line_style,
+        ))
+        .map_err(|e| e.to_string())?
+        .label(format!("{label} fit"))
+        .legend(move |(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                ShapeStyle::from(&legend_color).stroke_width(2),
+            )
+        });
     Ok(())
 }
 

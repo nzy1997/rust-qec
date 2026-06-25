@@ -149,6 +149,39 @@ pub(crate) fn run_decoder_point_with_dem_mode(
     )
 }
 
+pub(crate) fn plan_decoder_point_identity(
+    runner_name: &'static str,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+) -> Result<String, String> {
+    plan_decoder_point_identity_with_dem_mode(
+        runner_name,
+        point,
+        ctx,
+        decoder_params,
+        DemBuildMode::Decomposed,
+    )
+}
+
+pub(crate) fn plan_decoder_point_identity_with_dem_mode(
+    runner_name: &'static str,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<String, String> {
+    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
+    plan_built_decoder_point_identity_with_dem_mode(
+        runner_name,
+        built,
+        point,
+        ctx,
+        decoder_params,
+        dem_mode,
+    )
+}
+
 #[cfg(test)]
 fn run_built_decoder_point(
     runner_name: &'static str,
@@ -167,6 +200,39 @@ fn run_built_decoder_point(
         decoder_params,
         DemBuildMode::Decomposed,
     )
+}
+
+fn plan_built_decoder_point_identity_with_dem_mode(
+    runner_name: &'static str,
+    built: BuiltCircuit,
+    point: &BenchCasePoint,
+    ctx: &BenchRunContext,
+    decoder_params: &crate::bench::result::ParamMap,
+    dem_mode: DemBuildMode,
+) -> Result<String, String> {
+    let circuit = built.circuit;
+    let mut result_params = merge_decoder_params(built.params, decoder_params);
+    result_params.insert("decoder_impl".into(), serde_json::json!(runner_name));
+    result_params.insert("seed".into(), serde_json::json!(point.seed));
+    let base_case_summary = built.case_summary;
+    let dem = match dem_mode {
+        DemBuildMode::Decomposed => ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?,
+        DemBuildMode::Raw => ErrorAnalyzer::circuit_to_dem(&circuit)?,
+    };
+    let row = benchmark_result_row(
+        ctx,
+        FailureKind::Ok,
+        result_params,
+        case_summary_with_progress(
+            base_case_summary,
+            dem.effective_num_detectors(),
+            dem.num_observables(),
+            0,
+        ),
+        MetricMap::new(),
+        None,
+    );
+    row.identity()
 }
 
 fn run_built_decoder_point_with_dem_mode(

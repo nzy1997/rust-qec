@@ -8,7 +8,7 @@ use crate::bench::result::{BenchmarkResultRow, ParamMap};
 use crate::bench::runners::params::{
     optional_bool, optional_f64, optional_positive_u32, optional_string,
 };
-use crate::bench::runners::run_decoder_point;
+use crate::bench::runners::{plan_decoder_point_identity, run_decoder_point};
 use crate::decode::IlpDemDecoder;
 
 pub struct RilpqecRunner;
@@ -70,6 +70,15 @@ impl RustBenchRunner for RilpqecRunner {
 
     fn preflight_point(&self, point: &BenchCasePoint) -> Result<(), String> {
         RilpqecRunnerParams::parse(&point.decoder_params).map(|_| ())
+    }
+
+    fn plan_point_identity(
+        &self,
+        point: &BenchCasePoint,
+        ctx: &BenchRunContext,
+    ) -> Result<String, String> {
+        let params = RilpqecRunnerParams::parse(&point.decoder_params)?;
+        plan_decoder_point_identity(self.name(), point, ctx, &params.normalized)
     }
 
     fn run_point(

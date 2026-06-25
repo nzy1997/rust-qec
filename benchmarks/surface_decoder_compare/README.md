@@ -61,6 +61,12 @@ CSV comparison outputs; new benchmark figures should use `rsinter bench plot`
 so zero-error intervals, interval factors, and series grouping stay aligned
 with the main benchmark plotter.
 
+To resume an interrupted Rust runner artifact directory, rerun the same command
+with `--resume`. Existing completed row identities in
+`<out>/<runner>/test-run/results.jsonl` are preserved and skipped; missing or
+incomplete identities are rerun and merged through the normal staged
+`test-run.tmp` write.
+
 ## Notes
 
 - Shared workload: `stim gen surface_code:rotated_memory_x`
