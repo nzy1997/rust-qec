@@ -100,14 +100,14 @@ fn osd_order_one_can_improve_over_osd0() {
 
 #[test]
 fn diagnose_osd_path_reports_candidate_search_planning() {
-    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 4, vec![vec![0, 2], vec![1, 3]]).unwrap();
     let mut config = DecoderConfig::default();
     config.max_bp_iterations = 0;
     config.osd_order = 2;
 
     let decoder = BpOsdDecoder::new(
         pcm,
-        ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3]),
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.2, 0.3, 0.4]),
         config,
     )
     .unwrap();
@@ -116,14 +116,13 @@ fn diagnose_osd_path_reports_candidate_search_planning() {
     let diagnostic = decoder.diagnose_osd_path(&syndrome).unwrap();
 
     assert_eq!(diagnostic.syndrome_weight, syndrome.weight());
+    assert!(!diagnostic.bp_converged);
+    assert_eq!(diagnostic.bp_iterations, 0);
     assert!(diagnostic.used_osd);
+    assert_eq!(diagnostic.residual_syndrome_weight, syndrome.weight());
     assert_eq!(diagnostic.osd_order, 2);
-    assert!(diagnostic.free_column_count >= diagnostic.candidate_search_frontier_size);
-    assert_eq!(
-        diagnostic.max_candidate_order,
-        diagnostic
-            .osd_order
-            .min(diagnostic.candidate_search_frontier_size)
-    );
-    assert!(diagnostic.planned_candidate_count > 0);
+    assert_eq!(diagnostic.free_column_count, 2);
+    assert_eq!(diagnostic.candidate_search_frontier_size, 2);
+    assert_eq!(diagnostic.max_candidate_order, 2);
+    assert_eq!(diagnostic.planned_candidate_count, 3);
 }
