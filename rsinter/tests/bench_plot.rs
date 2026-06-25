@@ -999,8 +999,10 @@ fn logical_rate_unit_transforms_best_and_interval_bounds() {
     )
     .unwrap_err();
     assert!(nonnumeric_observable_err.contains("logical_rate_unit = \"per_observable\""));
-    assert!(nonnumeric_observable_err
-        .contains("positive numeric case_summary.logical_observable_count"));
+    assert!(
+        nonnumeric_observable_err
+            .contains("positive numeric case_summary.logical_observable_count")
+    );
     assert!(nonnumeric_observable_err.contains("case_summary.num_obs"));
 }
 
@@ -1062,6 +1064,170 @@ label = "Decode Time Per Shot"
             .unwrap()
             .contains("rmatching d=5")
     );
+}
+
+#[test]
+fn plot_series_group_by_is_independent_from_label() {
+    let split_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "shared label"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let split_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("predict_zero", 3, 0.002, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let split_out = dir.path().join("split-same-label.svg");
+    render_benchmark_plot(&split_spec, &split_rows, &split_out).unwrap();
+    let split_svg = std::fs::read_to_string(split_out).unwrap();
+    let split_colors = svg_circle_fill_colors(&split_svg);
+    assert_eq!(
+        split_colors.len(),
+        2,
+        "different runner group keys should remain distinct series even with the same label; svg was:\n{split_svg}"
+    );
+
+    let merge_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let merge_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let merge_out = dir.path().join("merge-different-labels.svg");
+    render_benchmark_plot(&merge_spec, &merge_rows, &merge_out).unwrap();
+    let merge_svg = std::fs::read_to_string(merge_out).unwrap();
+    assert!(
+        merge_svg.contains("rmatching p=0.002"),
+        "merged series should keep the first rendered label; svg was:\n{merge_svg}"
+    );
+    assert!(
+        !merge_svg.contains("rmatching p=0.005"),
+        "a changed label must not split rows with the same configured group key; svg was:\n{merge_svg}"
+    );
+}
+
+#[test]
+fn plot_series_group_by_covers_fallback_field_scopes_and_errors() {
+    let label_fallback_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let fallback_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let fallback_out = dir.path().join("fallback-label-key.svg");
+    render_benchmark_plot(&label_fallback_spec, &fallback_rows, &fallback_out).unwrap();
+    let fallback_svg = std::fs::read_to_string(fallback_out).unwrap();
+    assert!(
+        fallback_svg.contains("rmatching p=0.002"),
+        "omitted group_by should preserve label-based grouping; svg was:\n{fallback_svg}"
+    );
+    assert!(
+        fallback_svg.contains("rmatching p=0.005"),
+        "omitted group_by should split rows when rendered labels differ; svg was:\n{fallback_svg}"
+    );
+
+    let scoped_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["language", "metrics.decode_us_per_shot", "case_summary.num_dets"]
+label_template = "{language} t={metrics.decode_us_per_shot} n={case_summary.num_dets}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let mut python_row = ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0);
+    python_row.language = "python".into();
+    let scoped_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        python_row,
+    ];
+    let scoped_out = dir.path().join("scoped-group-fields.svg");
+    render_benchmark_plot(&scoped_group_spec, &scoped_rows, &scoped_out).unwrap();
+    let scoped_svg = std::fs::read_to_string(scoped_out).unwrap();
+    assert!(
+        scoped_svg.contains("rust t=12 n=24"),
+        "language, metrics, and case_summary group fields should render the first series; svg was:\n{scoped_svg}"
+    );
+    assert!(
+        scoped_svg.contains("python t=14 n=24"),
+        "language, metrics, and case_summary group fields should render the second series; svg was:\n{scoped_svg}"
+    );
+
+    let bad_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["artifacts.path"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let err = render_benchmark_plot(
+        &bad_group_spec,
+        &[ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0)],
+        &dir.path().join("bad-group-field.svg"),
+    )
+    .unwrap_err();
+    assert!(err.contains("missing required series group field artifacts.path"));
+}
+
+fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
+    svg.lines()
+        .filter(|line| line.contains("<circle"))
+        .filter_map(|line| {
+            line.split("fill=\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .map(str::to_string)
+        })
+        .collect()
 }
 
 fn spec_with_panels(

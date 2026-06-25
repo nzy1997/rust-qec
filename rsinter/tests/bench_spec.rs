@@ -49,6 +49,47 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn benchmark_spec_allows_omitted_plot_series_group_by() {
+    let text = r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rmatching"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.002]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#;
+
+    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
+    assert!(spec.plot.series.group_by.is_empty());
+}
+
+#[test]
 fn benchmark_spec_loads_from_toml_fixture() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/bench/minimal_surface_decoder.toml");

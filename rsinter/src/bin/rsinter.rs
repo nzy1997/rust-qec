@@ -118,7 +118,7 @@ fn run() -> Result<(), String> {
                     let data = std::fs::read(path).map_err(|e| e.to_string())?;
                     row_sets.push(read_results_jsonl(&data[..])?);
                 }
-                let merged = merge_result_rows(row_sets);
+                let merged = merge_result_rows(row_sets)?;
                 ensure_parent_dir(PathBuf::from(&out).as_path())?;
                 let mut file = File::create(out).map_err(|e| e.to_string())?;
                 write_results_jsonl(&merged, &mut file)?;

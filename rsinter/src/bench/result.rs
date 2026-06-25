@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
 
+use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
-use crate::failure::{classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_error};
 
 pub type ArtifactMap = BTreeMap<String, String>;
 pub type CaseSummary = BTreeMap<String, Value>;
@@ -54,7 +56,7 @@ impl RunManifest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BenchmarkResultRow {
     pub benchmark: String,
     pub runner: String,
@@ -66,6 +68,79 @@ pub struct BenchmarkResultRow {
     pub metrics: MetricMap,
     pub artifacts: ArtifactMap,
     pub error: Option<String>,
+}
+
+const ROW_IDENTITY_SCHEMA: &str = "rsinter.benchmark_result_row.v1";
+const CASE_SUMMARY_ADDITIVE_KEYS: [&str; 1] = ["num_shots_generated"];
+
+#[derive(Serialize)]
+struct BenchmarkResultRowIdentityInput<'a> {
+    schema: &'static str,
+    benchmark: &'a str,
+    runner: &'a str,
+    language: &'a str,
+    params: &'a ParamMap,
+    case_summary: CaseSummary,
+}
+
+impl BenchmarkResultRow {
+    pub fn identity(&self) -> Result<String, String> {
+        let input = BenchmarkResultRowIdentityInput {
+            schema: ROW_IDENTITY_SCHEMA,
+            benchmark: &self.benchmark,
+            runner: &self.runner,
+            language: &self.language,
+            params: &self.params,
+            case_summary: stable_case_summary(&self.case_summary),
+        };
+        let bytes = serde_json::to_vec(&input).map_err(|error| error.to_string())?;
+        let digest = Sha256::digest(bytes);
+        Ok(format!("sha256:{}", lower_hex(&digest)))
+    }
+}
+
+pub(crate) fn stable_case_summary(case_summary: &CaseSummary) -> CaseSummary {
+    case_summary
+        .iter()
+        .filter(|(key, _)| !case_summary_additive_keys().contains(&key.as_str()))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+pub(crate) fn case_summary_additive_keys() -> &'static [&'static str] {
+    &CASE_SUMMARY_ADDITIVE_KEYS
+}
+
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+impl Serialize for BenchmarkResultRow {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let identity = self.identity().map_err(serde::ser::Error::custom)?;
+        let mut row = serializer.serialize_struct("BenchmarkResultRow", 11)?;
+        row.serialize_field("identity", &identity)?;
+        row.serialize_field("benchmark", &self.benchmark)?;
+        row.serialize_field("runner", &self.runner)?;
+        row.serialize_field("language", &self.language)?;
+        row.serialize_field("status", &self.status)?;
+        row.serialize_field("failure_kind", &self.failure_kind)?;
+        row.serialize_field("params", &self.params)?;
+        row.serialize_field("case_summary", &self.case_summary)?;
+        row.serialize_field("metrics", &self.metrics)?;
+        row.serialize_field("artifacts", &self.artifacts)?;
+        row.serialize_field("error", &self.error)?;
+        row.end()
+    }
 }
 
 #[derive(Deserialize)]
