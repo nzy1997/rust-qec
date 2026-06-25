@@ -1130,15 +1130,13 @@ fn build_highlighted_dem_qp101_document(
             err
         }
     })?;
-    crate::qp101::export_qp101_with_highlighted_dem_error(instrs, &tracked, index).map_err(
-        |err| {
-            if err.starts_with("DEM error index ") && err.contains(" out of range ") {
-                format!("DEM error index out of range: {err}")
-            } else {
-                err
-            }
-        },
-    )
+    crate::qp101::export_qp101_with_highlighted_dem_error(instrs, &tracked, index).map_err(|err| {
+        if err.starts_with("DEM error index ") && err.contains(" out of range ") {
+            format!("DEM error index out of range: {err}")
+        } else {
+            err
+        }
+    })
 }
 
 fn build_sample_qp101_document(
