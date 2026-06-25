@@ -9,6 +9,7 @@ use qec_code::distance_bound::{
     Issue225LadderCase, RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
+use std::time::{Duration, Instant};
 
 fn css_from_sparse_rows(num_cols: usize, hx: Vec<Vec<usize>>, hz: Vec<Vec<usize>>) -> CssCode {
     let hx = SparseRowsMatrix::new(num_cols, hx).unwrap().to_dense_rows();
@@ -100,6 +101,100 @@ fn pinned_random_window_options() -> RandomWindowUpperBoundOptions {
         seed: 7,
         target_weight: Some(5),
     }
+}
+
+const ISSUE_225_RANDOM_WINDOW_SEED: u64 = 7;
+const ISSUE_225_RANDOMIZED_NEGATIVE_CONTROL_SEED: u64 = 225;
+const ISSUE_225_PER_CASE_CAP: Duration = Duration::from_secs(300);
+
+#[derive(Debug)]
+struct Issue225LadderEvidenceRow {
+    case_id: String,
+    expected_upper_bound: usize,
+    observed_upper_bound: usize,
+    method: DistanceBoundMethod,
+    seed: u64,
+    elapsed: Duration,
+}
+
+fn issue_225_random_window_options(case: &Issue225LadderCase) -> RandomWindowUpperBoundOptions {
+    RandomWindowUpperBoundOptions {
+        iterations: 5000,
+        restarts: 8,
+        seed: ISSUE_225_RANDOM_WINDOW_SEED,
+        target_weight: Some(case.target_weight),
+    }
+}
+
+fn issue_225_randomized_negative_control_options(
+    case: &Issue225LadderCase,
+) -> RandomizedUpperBoundOptions {
+    RandomizedUpperBoundOptions {
+        iterations: 5000,
+        restarts: 8,
+        seed: ISSUE_225_RANDOMIZED_NEGATIVE_CONTROL_SEED,
+        target_weight: Some(case.target_weight),
+    }
+}
+
+fn run_issue_225_random_window_case(case: &Issue225LadderCase) -> Issue225LadderEvidenceRow {
+    let css = css_from_built_in_code_id(&case.code_id);
+    let options = issue_225_random_window_options(case);
+    let started = Instant::now();
+    let result = random_window_css_upper_bound(&css, options).unwrap_or_else(|error| {
+        panic!("{} random-window-upper-bound failed: {error}", case.case_id)
+    });
+    let elapsed = started.elapsed();
+
+    verify_issue_225_ladder_case(
+        case,
+        &result,
+        &css,
+        DistanceBoundMethod::RandomWindowUpperBound,
+    )
+    .unwrap_or_else(|error| {
+        panic!(
+            "{} random-window ladder verifier rejected result: {error}",
+            case.case_id
+        )
+    });
+
+    assert!(
+        elapsed <= ISSUE_225_PER_CASE_CAP,
+        "{} exceeded issue-225 per-case cap: elapsed {:.3}s > 300s",
+        case.case_id,
+        elapsed.as_secs_f64()
+    );
+
+    Issue225LadderEvidenceRow {
+        case_id: case.case_id.clone(),
+        expected_upper_bound: case.expected_upper_bound,
+        observed_upper_bound: result.upper_bound,
+        method: result.method,
+        seed: ISSUE_225_RANDOM_WINDOW_SEED,
+        elapsed,
+    }
+}
+
+fn run_issue_225_random_window_ladder<'a>(
+    cases: impl IntoIterator<Item = &'a Issue225LadderCase>,
+) -> Vec<Issue225LadderEvidenceRow> {
+    println!("case_id\texpected\tobserved\tmethod\tseed\telapsed_s");
+    let mut rows = Vec::new();
+    for case in cases {
+        let row = run_issue_225_random_window_case(case);
+        println!(
+            "{}\t{}\t{}\t{}\t{}\t{:.3}",
+            row.case_id,
+            row.expected_upper_bound,
+            row.observed_upper_bound,
+            row.method.label(),
+            row.seed,
+            row.elapsed.as_secs_f64()
+        );
+        rows.push(row);
+    }
+    rows
 }
 
 #[test]
@@ -760,6 +855,76 @@ fn issue_225_ladder_verifier_rejects_wrong_method_label() {
             "surface_rotated_d5 expected method random-window-upper-bound, got randomized-upper-bound"
                 .to_owned(),
         )
+    );
+}
+
+#[test]
+fn issue_225_random_window_upper_bound_smoke_ladder() {
+    let cases = issue_225_ladder_cases();
+    let smoke_cases = cases
+        .iter()
+        .filter(|case| case.tier == "smoke")
+        .collect::<Vec<_>>();
+    let smoke_ids = smoke_cases
+        .iter()
+        .map(|case| case.case_id.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        smoke_ids,
+        ["surface_rotated_d5", "toric_d5", "bb72"],
+        "issue-225 smoke tier changed: {smoke_ids:?}"
+    );
+
+    let rows = run_issue_225_random_window_ladder(smoke_cases.into_iter());
+    assert_eq!(rows.len(), 3, "issue-225 smoke ladder checked row count");
+}
+
+#[test]
+#[ignore = "full issue-225 ladder: cargo test -p qec-code issue_225_random_window_upper_bound_full_ladder -- --ignored --nocapture"]
+fn issue_225_random_window_upper_bound_full_ladder() {
+    let cases = issue_225_ladder_cases();
+    assert_eq!(
+        cases.len(),
+        8,
+        "issue-225 full ladder must include all eight cases"
+    );
+
+    let rows = run_issue_225_random_window_ladder(cases.iter());
+    assert_eq!(rows.len(), 8, "issue-225 full ladder checked row count");
+}
+
+#[test]
+fn issue_225_current_randomized_upper_bound_ladder_negative_control() {
+    let case = issue_225_case("surface_rotated_d5");
+    let css = css_from_built_in_code_id(&case.code_id);
+    let result =
+        randomized_css_upper_bound(&css, issue_225_randomized_negative_control_options(&case))
+            .unwrap();
+
+    assert_eq!(result.method, DistanceBoundMethod::RandomizedUpperBound);
+    assert!(
+        result.upper_bound > case.expected_upper_bound,
+        "{} negative control is no longer loose: expected upper_bound > {}, got {}",
+        case.case_id,
+        case.expected_upper_bound,
+        result.upper_bound
+    );
+
+    let error = verify_issue_225_ladder_case(
+        &case,
+        &result,
+        &css,
+        DistanceBoundMethod::RandomizedUpperBound,
+    )
+    .expect_err("expected current randomized baseline to fail issue-225 ladder target");
+
+    assert_eq!(
+        error,
+        QecError::DistanceBoundValidationFailed(format!(
+            "{} expected upper_bound <= {}, got {}",
+            case.case_id, case.expected_upper_bound, result.upper_bound
+        ))
     );
 }
 

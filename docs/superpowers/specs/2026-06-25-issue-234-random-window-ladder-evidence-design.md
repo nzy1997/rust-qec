@@ -28,6 +28,8 @@ The smoke test selects rows by `tier == "smoke"`, so it follows the manifest rat
 
 The negative control runs the existing `randomized_css_upper_bound` baseline on `surface_rotated_d5` with the issue-225 options and `target_weight = 5`. It passes only if the baseline result is loose and the ladder verifier rejects it against the expected upper bound.
 
+The full ladder also depends on row-span checks inside the random-window candidate loop. To keep the evidence command within the issue-225 cap, reuse reduced row-echelon forms for repeated row-span membership checks instead of recomputing row reduction for every candidate. This is a performance-only change to the same GF(2) membership semantics.
+
 ## Error Handling
 
 Every assertion that can fail for a case includes the case ID. Random-window ladder failures report the verifier error with the case prefix. The full test also checks that no individual case exceeds the 300 second issue-225 cap and reports the case ID if that happens.

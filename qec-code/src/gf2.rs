@@ -150,10 +150,30 @@ pub(crate) fn try_in_row_span_with_width(
         return Ok(!target.iter().any(|bit| *bit != 0));
     }
 
-    let rank = try_rref_with_width(matrix, width)?.pivot_cols.len();
-    let mut augmented = matrix.to_vec();
-    augmented.push(target.to_vec());
-    Ok(try_rref_with_width(&augmented, width)?.pivot_cols.len() == rank)
+    let reduced = try_rref_with_width(matrix, width)?;
+    try_in_reduced_row_span(&reduced, target)
+}
+
+pub(crate) fn try_in_reduced_row_span(reduced: &ReducedRows, target: &[u8]) -> Result<bool> {
+    validate_target(target)?;
+
+    if target.len() != reduced.width {
+        return Err(QecError::RowWidthMismatch {
+            expected: reduced.width,
+            actual: target.len(),
+        });
+    }
+
+    let mut remainder = target.to_vec();
+    for (pivot_row, pivot_col) in reduced.pivot_cols.iter().copied().enumerate() {
+        if remainder[pivot_col] == 1 {
+            for col in pivot_col..reduced.width {
+                remainder[col] ^= reduced.rows[pivot_row][col];
+            }
+        }
+    }
+
+    Ok(!remainder.iter().any(|bit| *bit != 0))
 }
 
 pub(crate) fn try_select_independent_rows(matrix: &[BinaryRow]) -> Result<Vec<BinaryRow>> {
@@ -259,7 +279,7 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_row_span_with_width, try_nullspace_basis_with_width,
+        try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
         try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
     };
 
@@ -311,6 +331,14 @@ mod tests {
                 actual: 2,
             })
         );
+    }
+
+    #[test]
+    fn reduced_row_span_membership_reuses_rref() {
+        let reduced = super::try_rref_with_width(&[vec![1, 1, 0], vec![0, 1, 1]], 3).unwrap();
+
+        assert_eq!(try_in_reduced_row_span(&reduced, &[1, 0, 1]), Ok(true));
+        assert_eq!(try_in_reduced_row_span(&reduced, &[1, 0, 0]), Ok(false));
     }
 
     fn assert_kernel_vector(matrix: &[Vec<u8>], vector: &[u8]) {
