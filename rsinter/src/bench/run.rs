@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crate::bench::merge::merge_result_rows;
 use crate::bench::registry::{
-    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
-    expand_runner_points_for_runner,
+    expand_runner_points_for_runner, BenchCasePoint, BenchRunContext, RustBenchRunner,
+    RustRunnerRegistry,
 };
 use crate::bench::result::{
-    BenchmarkResultRow, RunManifest, read_results_jsonl, write_results_jsonl,
+    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, RunManifest,
 };
 use crate::bench::spec::{BenchmarkSpec, RunnerSpec};
 
@@ -79,7 +79,9 @@ pub fn run_rust_benchmark_with_options(
             seed: 12_345,
             spec_dir: spec_dir.to_path_buf(),
         };
-        let existing_rows = resume_rows.get(&runner.name).cloned().unwrap_or_default();
+        let existing_rows = prune_completed_identity_failures(
+            resume_rows.get(&runner.name).cloned().unwrap_or_default(),
+        )?;
         let completed = completed_identities(&existing_rows)?;
         let mut fresh_rows = Vec::new();
         for point in &points {
@@ -205,6 +207,24 @@ fn completed_identities(rows: &[BenchmarkResultRow]) -> Result<BTreeSet<String>,
         }
     }
     Ok(completed)
+}
+
+fn prune_completed_identity_failures(
+    existing_rows: Vec<BenchmarkResultRow>,
+) -> Result<Vec<BenchmarkResultRow>, String> {
+    let completed = completed_identities(&existing_rows)?;
+    let mut kept_rows = Vec::with_capacity(existing_rows.len());
+    for row in existing_rows {
+        if row.status == "ok" {
+            kept_rows.push(row);
+            continue;
+        }
+        let identity = row.identity()?;
+        if !completed.contains(&identity) {
+            kept_rows.push(row);
+        }
+    }
+    Ok(kept_rows)
 }
 
 fn drop_replaced_incomplete_rows(

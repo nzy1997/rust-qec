@@ -46,9 +46,11 @@ pub trait RustBenchRunner: Send + Sync {
     }
     fn plan_point_identity(
         &self,
-        point: &BenchCasePoint,
-        ctx: &BenchRunContext,
-    ) -> Result<String, String>;
+        _point: &BenchCasePoint,
+        _ctx: &BenchRunContext,
+    ) -> Result<String, String> {
+        Err("pre-run identity planning is unsupported for this runner".into())
+    }
     fn run_point(
         &self,
         point: &BenchCasePoint,
