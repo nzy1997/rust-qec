@@ -28,3 +28,12 @@ Missing Python dependencies are an expected local failure mode. In that case `ru
 `results.csv` and `summary.md`, marks the Python `ldpc_bposd` rows as `status=skipped`, and exits nonzero with
 an explicit dependency error. The follow-up verifier then rejects that CSV because the smoke contract requires
 completed paired Rust/Python rows.
+
+If you want the compare step to complete successfully while still recording skipped Python rows, run:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke --allow-missing-python
+```
+
+`--allow-missing-python` is only an escape hatch for local environments without the upstream Python decoder stack.
+The emitted CSV still contains skipped `ldpc_bposd` rows, so `verify_smoke` continues to reject that output.

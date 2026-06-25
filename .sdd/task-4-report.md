@@ -164,3 +164,46 @@ Result: PASS.
 - Spec coverage: met for Make target, README, smoke artifact paths, missing-dependency behavior, verifier behavior, negative controls, and broad Rust verification.
 - Scope control: edits stayed within the requested task boundary.
 - Remaining risk: the only non-green command is the smoke verifier path under missing Python deps, which is expected and documented above.
+
+---
+
+## Review Fix Addendum
+
+### What changed
+
+1. Updated `benchmarks/bb_circuit_bposd_compare/run_compare.py` so the CLI prints skipped `ldpc_bposd` dependency errors to stderr before exiting nonzero. The emitted text reuses the existing row message format, including `python dependency unavailable for ldpc_bposd replay: ...`.
+2. Added CLI-facing tests in `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py` covering:
+   - default behavior: missing Python dependencies return nonzero and print the dependency message to stderr
+   - allowed behavior: `--allow-missing-python` returns zero and does not print the fatal dependency message
+3. Updated `benchmarks/bb_circuit_bposd_compare/README.md` to document the `--allow-missing-python` escape hatch and clarify that `verify_smoke` still rejects outputs with skipped Python rows.
+
+### Test command/output
+
+Commands run:
+
+```bash
+python3 -m unittest benchmarks.bb_circuit_bposd_compare.tests.test_run_compare benchmarks.bb_circuit_bposd_compare.tests.test_verify_smoke benchmarks.bb_circuit_bposd_compare.tests.test_summary
+make bb-circuit-bposd-compare-smoke
+```
+
+Observed results:
+
+- `python3 -m unittest ...`: PASS (`Ran 15 tests`, `OK`)
+- `make bb-circuit-bposd-compare-smoke`: FAIL as expected in this environment because `ldpc` is not installed, and stderr now includes:
+
+```text
+python dependency unavailable for ldpc_bposd replay: No module named 'ldpc'
+```
+
+### Files changed
+
+- `benchmarks/bb_circuit_bposd_compare/run_compare.py`
+- `benchmarks/bb_circuit_bposd_compare/tests/test_run_compare.py`
+- `benchmarks/bb_circuit_bposd_compare/README.md`
+- `.sdd/task-4-report.md`
+
+### Self-review
+
+- The fix stays inside the allowed Task 4 ownership boundary and does not touch Rust sources.
+- The new tests exercise the user-visible stderr behavior directly instead of only inferring it from CSV contents.
+- The CLI now surfaces the missing dependency reason in the same command output path that `make bb-circuit-bposd-compare-smoke` exposes, which closes the reported usability gap.

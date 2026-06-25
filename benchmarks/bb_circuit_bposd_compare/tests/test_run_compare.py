@@ -1,4 +1,5 @@
 import csv
+import io
 import tempfile
 import unittest
 from dataclasses import replace
@@ -7,7 +8,7 @@ from types import ModuleType
 from unittest import mock
 
 from benchmarks.bb_circuit_bposd_compare.cases import SMOKE_CASES
-from benchmarks.bb_circuit_bposd_compare.run_compare import _python_row, run_suite
+from benchmarks.bb_circuit_bposd_compare.run_compare import _python_row, main, run_suite
 from benchmarks.bb_circuit_bposd_compare.verify_smoke import verify_rows
 
 
@@ -203,6 +204,43 @@ class RunCompareTest(unittest.TestCase):
             "no paired Rust/Python diagnostic case is present",
             "\n".join(verify_rows(rows)),
         )
+
+    def test_main_prints_missing_dependency_error_to_stderr(self) -> None:
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+            ):
+                with mock.patch("sys.stderr", stderr):
+                    status = main(["--tier", "smoke", "--output-dir", tmpdir])
+
+        self.assertNotEqual(status, 0)
+        self.assertIn(
+            "python dependency unavailable for ldpc_bposd replay: No module named 'ldpc'",
+            stderr.getvalue(),
+        )
+
+    def test_main_does_not_print_missing_dependency_error_when_allowed(self) -> None:
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+            ):
+                with mock.patch("sys.stderr", stderr):
+                    status = main(
+                        [
+                            "--tier",
+                            "smoke",
+                            "--output-dir",
+                            tmpdir,
+                            "--allow-missing-python",
+                        ]
+                    )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr.getvalue(), "")
 
 
 if __name__ == "__main__":

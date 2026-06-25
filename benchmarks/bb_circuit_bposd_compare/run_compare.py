@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 import subprocess
 import time
 from pathlib import Path
@@ -59,6 +60,11 @@ def _write_rows(rows: list[dict[str, str]], out_path: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in CSV_HEADER})
+
+
+def _read_rows(in_path: Path) -> list[dict[str, str]]:
+    with in_path.open(newline="") as handle:
+        return list(csv.DictReader(handle))
 
 
 def _python_upstream_settings() -> dict[str, str]:
@@ -147,6 +153,22 @@ def _skipped_python_row(case: CompareCase, error: Exception) -> dict[str, str]:
 
 def _python_dependency_error_text(error: Exception) -> str:
     return f"python dependency unavailable for ldpc_bposd replay: {error}"
+
+
+def _missing_python_dependency_messages(rows: Sequence[dict[str, str]]) -> list[str]:
+    messages: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        if row.get("decoder_impl") != "ldpc_bposd":
+            continue
+        if row.get("status") != "skipped":
+            continue
+        message = row.get("error", "")
+        if not message or message in seen:
+            continue
+        seen.add(message)
+        messages.append(message)
+    return messages
 
 
 def _is_missing_python_dependency(error: Exception) -> bool:
@@ -294,11 +316,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-missing-python", action="store_true")
     args = parser.parse_args(argv)
 
-    return run_suite(
+    status = run_suite(
         output_dir=args.output_dir,
         allow_missing_python=args.allow_missing_python,
         cases=SMOKE_CASES,
     )
+    if status != 0 and not args.allow_missing_python:
+        for message in _missing_python_dependency_messages(
+            _read_rows(args.output_dir / "results.csv")
+        ):
+            print(message, file=sys.stderr)
+    return status
 
 
 if __name__ == "__main__":
