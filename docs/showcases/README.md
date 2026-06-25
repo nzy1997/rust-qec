@@ -6,7 +6,7 @@ how to run it, where the result appears, which code owns it, how to verify it,
 and what its limits are.
 
 Individual showcase pages will be added by follow-up issues. Use
-[`_template.md`](_template.md) for new pages.
+[`_template.md`](docs/showcases/_template.md) for new pages.
 
 ## Categories
 

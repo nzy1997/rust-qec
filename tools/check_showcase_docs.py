@@ -131,14 +131,10 @@ def validate_markdown_links(path: Path, repo_root: Path) -> list[str]:
         if not relative:
             continue
         repo_candidate = (repo_root / relative).resolve()
-        file_candidate = (path.parent / relative).resolve()
-        candidates = [repo_candidate]
-        if file_candidate != repo_candidate:
-            candidates.append(file_candidate)
-        if any(not candidate.is_relative_to(resolved_repo_root) for candidate in candidates):
+        if not repo_candidate.is_relative_to(resolved_repo_root):
             errors.append(f"link escapes repository root: {raw_target}")
             continue
-        if not any(candidate.exists() for candidate in candidates):
+        if not repo_candidate.exists():
             errors.append(f"link target does not exist: {raw_target}")
     return errors
 
