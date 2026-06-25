@@ -6,6 +6,7 @@ edition = "2024"
 [features]
 default = []
 distance-ilp-highs = ["dep:qec-ilp-core"]
+distance-ilp-gurobi = ["distance-ilp-highs", "qec-ilp-core/gurobi"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
