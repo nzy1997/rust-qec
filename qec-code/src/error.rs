@@ -12,6 +12,8 @@ pub enum QecError {
     InvalidSymplecticRowWidth { width: usize },
     #[error("non-binary matrix entry {value} at row {row}, column {col}")]
     InvalidBinaryEntry { row: usize, col: usize, value: u8 },
+    #[error("invalid column permutation: {reason}")]
+    InvalidColumnPermutation { reason: String },
     #[error("invalid sparse-rows width: {num_cols}")]
     InvalidSparseRowsWidth { num_cols: usize },
     #[error("duplicate sparse-row support {support} in row {row}")]
