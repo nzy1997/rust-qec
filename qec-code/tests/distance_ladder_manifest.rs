@@ -169,9 +169,7 @@ fn validate_issue_225_distance_ladder_manifest(
             ));
         }
 
-        if case.case_id == "bb144"
-            && case.code_id != "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"
-        {
+        if case.case_id == "bb144" && case.code_id != "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0" {
             return Err(format!(
                 "case {:?} must use the exact bb144 code_id",
                 case.case_id
@@ -187,12 +185,7 @@ fn validate_issue_225_distance_ladder_manifest(
     for required in required_cases.iter() {
         let actual = manifest_index
             .get(required.case_id.as_str())
-            .ok_or_else(|| {
-                format!(
-                    "manifest missing required case {:?}",
-                    required.case_id
-                )
-            })?;
+            .ok_or_else(|| format!("manifest missing required case {:?}", required.case_id))?;
 
         if **actual != *required {
             return Err(format!(
@@ -230,6 +223,7 @@ fn issue_225_distance_ladder_manifest_rejects_missing_required_case() {
     let mut manifest = issue_225_distance_ladder_manifest();
     manifest.retain(|case| case.case_id != "toric_d13");
 
-    let error = validate_issue_225_distance_ladder_manifest(&manifest).expect_err("expected rejection");
+    let error =
+        validate_issue_225_distance_ladder_manifest(&manifest).expect_err("expected rejection");
     assert!(error.contains("toric_d13"));
 }
