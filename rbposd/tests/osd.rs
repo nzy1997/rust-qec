@@ -291,8 +291,11 @@ fn osd_order7_reuses_factorization_without_changing_correction() {
     );
     assert!(result.used_osd);
     assert!(result.stats.osd_candidate_count > 1);
-    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
-    assert!(result.stats.gf2_full_elimination_count <= 1);
+    assert_eq!(
+        result.stats.gf2_solve_count,
+        result.stats.osd_candidate_count + 1
+    );
+    assert_eq!(result.stats.gf2_full_elimination_count, 1);
 }
 
 #[test]
