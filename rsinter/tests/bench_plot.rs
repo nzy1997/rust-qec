@@ -1,6 +1,6 @@
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
-use rsinter::bench::spec::BenchmarkSpec;
+use rsinter::bench::spec::{BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR};
 use rsinter::failure::FailureKind;
 
 #[test]
@@ -768,6 +768,54 @@ label = "Logical Error Rate"
 }
 
 #[test]
+fn plot_confidence_interval_factor_is_read_from_toml() {
+    let default_spec: BenchmarkSpec =
+        toml::from_str(&confidence_interval_factor_spec_text("")).unwrap();
+    default_spec.validate().unwrap();
+    assert_eq!(
+        default_spec.plot.confidence_interval_likelihood_factor,
+        DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR
+    );
+
+    let wide_spec: BenchmarkSpec = toml::from_str(&confidence_interval_factor_spec_text(
+        "confidence_interval_likelihood_factor = 25.0",
+    ))
+    .unwrap();
+    wide_spec.validate().unwrap();
+    assert_eq!(wide_spec.plot.confidence_interval_likelihood_factor, 25.0);
+
+    let rows = confidence_interval_probe_rows();
+    let default_svg = render_plot_svg(&default_spec, &rows, "default-factor.svg");
+    let wide_svg = render_plot_svg(&wide_spec, &rows, "wide-factor.svg");
+    let default_interval_height = target_interval_pixel_height(&default_svg);
+    let wide_interval_height = target_interval_pixel_height(&wide_svg);
+    assert!(
+        wide_interval_height > default_interval_height,
+        "factor 25.0 should produce a wider target interval than the default; \
+         default={default_interval_height}, wide={wide_interval_height}\n\
+         default svg:\n{default_svg}\nwide svg:\n{wide_svg}"
+    );
+
+    for invalid in ["0.0", "nan", "-2.0"] {
+        let spec: BenchmarkSpec = toml::from_str(&confidence_interval_factor_spec_text(&format!(
+            "confidence_interval_likelihood_factor = {invalid}"
+        )))
+        .unwrap();
+        let err = spec
+            .validate()
+            .expect_err("invalid confidence interval factor should fail validation");
+        assert!(
+            err.contains("confidence_interval_likelihood_factor"),
+            "error should name the invalid field, got: {err}"
+        );
+        assert!(
+            err.contains("finite") && err.contains(">= 1.0"),
+            "error should explain the finite >= 1.0 constraint, got: {err}"
+        );
+    }
+}
+
+#[test]
 fn render_benchmark_plot_handles_single_linear_point_and_dashed_distance_series() {
     let single_point_spec = spec_with_panels(
         "Surface Decoder",
@@ -867,6 +915,146 @@ label = "Physical Error Rate"
 "#
     ))
     .unwrap()
+}
+
+fn confidence_interval_factor_spec_text(plot_extra: &str) -> String {
+    format!(
+        r#"
+name = "surface_decoder"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "zero-anchor"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.001]
+rounds = [3]
+max_shots = 2000
+max_errors = 20
+batch_size = 256
+
+[[runner]]
+name = "target"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.01]
+rounds = [3]
+max_shots = 1000
+max_errors = 10
+batch_size = 256
+
+[[runner]]
+name = "one-anchor"
+language = "rust"
+impl_key = "rmatching"
+
+[runner.params]
+distance = [3]
+p = [0.1]
+rounds = [3]
+max_shots = 2000
+max_errors = 2000
+batch_size = 256
+
+[plot]
+title = "Surface Decoder"
+{plot_extra}
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{{runner}}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+"#
+    )
+}
+
+fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
+    vec![
+        ok_row("zero-anchor", 3, 0.001, 0.0, 0.0, 2000.0, 12.0),
+        ok_row("target", 3, 0.01, 0.01, 10.0, 1000.0, 12.0),
+        ok_row("one-anchor", 3, 0.1, 1.0, 2000.0, 2000.0, 12.0),
+    ]
+}
+
+fn render_plot_svg(spec: &BenchmarkSpec, rows: &[BenchmarkResultRow], file_name: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join(file_name);
+    render_benchmark_plot(spec, rows, &out).unwrap();
+    std::fs::read_to_string(out).unwrap()
+}
+
+#[derive(Debug)]
+struct VerticalIntervalSegment {
+    x: f64,
+    height: f64,
+}
+
+fn target_interval_pixel_height(svg: &str) -> f64 {
+    let mut segments: Vec<_> = svg
+        .lines()
+        .filter(|line| line.contains("<polyline"))
+        .filter(|line| line.contains("fill=\"none\""))
+        .filter(|line| line.contains("stroke-width=\"1\""))
+        .filter(|line| line.contains("stroke=\"#") && !line.contains("stroke=\"#000000\""))
+        .filter_map(parse_vertical_interval_segment)
+        .collect();
+    segments.sort_by(|left, right| {
+        left.x
+            .partial_cmp(&right.x)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    assert!(
+        segments.len() >= 3,
+        "expected at least three single-point interval segments, got {segments:?}\nsvg:\n{svg}"
+    );
+    segments[segments.len() / 2].height
+}
+
+fn parse_vertical_interval_segment(line: &str) -> Option<VerticalIntervalSegment> {
+    let points = svg_attribute(line, "points")?;
+    let mut points = points.split_whitespace().filter_map(parse_svg_point);
+    let first = points.next()?;
+    let second = points.next()?;
+    if points.next().is_some() {
+        return None;
+    }
+    if (first.0 - second.0).abs() > 1e-6 {
+        return None;
+    }
+    let height = (first.1 - second.1).abs();
+    if height <= 0.0 {
+        return None;
+    }
+    Some(VerticalIntervalSegment { x: first.0, height })
+}
+
+fn svg_attribute<'a>(line: &'a str, name: &str) -> Option<&'a str> {
+    let prefix = format!("{name}=\"");
+    let start = line.find(&prefix)? + prefix.len();
+    let rest = &line[start..];
+    let end = rest.find('"')?;
+    Some(&rest[..end])
+}
+
+fn parse_svg_point(point: &str) -> Option<(f64, f64)> {
+    let (x, y) = point.split_once(',')?;
+    Some((x.parse().ok()?, y.parse().ok()?))
 }
 
 fn ok_row(

@@ -112,6 +112,8 @@ batch_size = 256
 
 [plot]
 title = "Surface Decoder"
+# Likelihood factor used for logical-error-rate confidence intervals.
+confidence_interval_likelihood_factor = 9.0
 
 [plot.x]
 field = "params.p"

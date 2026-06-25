@@ -6,7 +6,8 @@ use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::{
-    AxisSpec, BenchmarkMode, BenchmarkSpec, PanelSpec, PlotSpec, RunnerSpec, SeriesSpec,
+    AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    PanelSpec, PlotSpec, RunnerSpec, SeriesSpec,
 };
 use rsinter::failure::FailureKind;
 use toml::Value;
@@ -106,6 +107,7 @@ fn quantum_tanner_css_spec(hz_path: &str) -> BenchmarkSpec {
         }],
         plot: PlotSpec {
             title: "Quantum Tanner toric_d4 CSS Smoke".into(),
+            confidence_interval_likelihood_factor: DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
             x: AxisSpec {
                 field: "params.p".into(),
                 scale: "linear".into(),
@@ -126,8 +128,7 @@ fn quantum_tanner_css_spec(hz_path: &str) -> BenchmarkSpec {
 
 fn write_non_orthogonal_hz_fixture(dir: &Path) -> PathBuf {
     let mut hz: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/css/quantum_tanner_toric_d4_hz.json"))
-            .unwrap();
+        serde_json::from_str(include_str!("fixtures/css/quantum_tanner_toric_d4_hz.json")).unwrap();
     hz["rows"][0] = serde_json::json!([1, 4, 5, 6]);
     let path = dir.join("quantum_tanner_toric_d4_non_orthogonal_hz.json");
     fs::write(&path, serde_json::to_string(&hz).unwrap()).unwrap();

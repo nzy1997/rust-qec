@@ -8,7 +8,6 @@ use crate::bench::result::BenchmarkResultRow;
 use crate::bench::spec::{BenchmarkSpec, PanelSpec};
 use crate::stats::fit_binomial;
 
-const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
 const BENCH_PANEL_WIDTH: u32 = 800;
 const BENCH_CANVAS_HEIGHT: u32 = 600;
 const MIN_LOG_Y: f64 = 1e-10;
@@ -154,7 +153,11 @@ fn prepare_error_rate_panel(
             ));
         }
 
-        let fit = fit_binomial(shots, errors, MAX_LIKELIHOOD_FACTOR);
+        let fit = fit_binomial(
+            shots,
+            errors,
+            spec.plot.confidence_interval_likelihood_factor,
+        );
         let low = fit.low.unwrap_or(0.0).max(MIN_LOG_Y);
         let best = if errors == 0 {
             None
@@ -498,28 +501,38 @@ where
         }
 
         if points.len() == 1 {
-            const CAP_FACTOR: f64 = 1.015;
             let point = points[0];
             let x = point.x;
             let low = point.low;
             let high = point.high;
-            let x_lo = x / CAP_FACTOR;
-            let x_hi = x * CAP_FACTOR;
+            let center_y = point.best.unwrap_or((low + high) / 2.0);
+            let (_, center_backend_y) = chart.backend_coord(&(x, center_y));
+            let (_, low_backend_y) = chart.backend_coord(&(x, low));
+            let (_, high_backend_y) = chart.backend_coord(&(x, high));
+            let (low_offset, high_offset) = if low < high && low_backend_y == high_backend_y {
+                (1, -1)
+            } else {
+                (
+                    low_backend_y - center_backend_y,
+                    high_backend_y - center_backend_y,
+                )
+            };
             chart
-                .draw_series([
-                    PathElement::new(
-                        vec![(x, low), (x, high)],
-                        ShapeStyle::from(&style.color).stroke_width(1),
-                    ),
-                    PathElement::new(
-                        vec![(x_lo, low), (x_hi, low)],
-                        ShapeStyle::from(&style.color).stroke_width(1),
-                    ),
-                    PathElement::new(
-                        vec![(x_lo, high), (x_hi, high)],
-                        ShapeStyle::from(&style.color).stroke_width(1),
-                    ),
-                ])
+                .draw_series(std::iter::once(
+                    EmptyElement::at((x, center_y))
+                        + PathElement::new(
+                            vec![(0, low_offset), (0, high_offset)],
+                            ShapeStyle::from(&style.color).stroke_width(1),
+                        )
+                        + PathElement::new(
+                            vec![(-2, low_offset), (2, low_offset)],
+                            ShapeStyle::from(&style.color).stroke_width(1),
+                        )
+                        + PathElement::new(
+                            vec![(-2, high_offset), (2, high_offset)],
+                            ShapeStyle::from(&style.color).stroke_width(1),
+                        ),
+                ))
                 .map_err(|e| e.to_string())?;
         }
     }

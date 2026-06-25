@@ -126,6 +126,7 @@ fn run() -> Result<(), String> {
             BenchCommands::Plot { spec, input, out } => {
                 let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
                 let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+                bench_spec.validate()?;
                 let mut rows = Vec::new();
                 for path in input {
                     let data = std::fs::read(path).map_err(|e| e.to_string())?;
