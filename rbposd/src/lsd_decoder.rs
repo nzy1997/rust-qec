@@ -1,8 +1,9 @@
 use std::sync::Mutex;
+use std::time::Instant;
 
 use crate::bp::BpWorkspace;
 use crate::config::{ChannelModel, DecoderConfig, LsdConfig, LsdMethod};
-use crate::decoder::DecodeResult;
+use crate::decoder::{DecodeResult, DecodeStats};
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::lsd::{LsdWorkspace, decode_lsd_with_workspace};
@@ -88,14 +89,20 @@ impl BpLsdDecoder {
                     bp_iterations: 0,
                     used_osd: false,
                     residual_syndrome_weight: 0,
+                    stats: DecodeStats {
+                        decode_call_count: 1,
+                        ..DecodeStats::default()
+                    },
                 });
             }
         }
 
+        let bp_start = Instant::now();
         let mut bp_workspace = self.bp_workspace.lock().unwrap();
         let bp_info =
             self.core
                 .run_bp_in_place(syndrome, &self.bp_config, &mut bp_workspace);
+        let bp_seconds = bp_start.elapsed().as_secs_f64();
         if bp_info.residual_weight == 0 {
             return Ok(DecodeResult {
                 correction: Correction::from(bp_workspace.hard_decision_bits.clone()),
@@ -103,6 +110,12 @@ impl BpLsdDecoder {
                 bp_iterations: bp_info.iterations,
                 used_osd: false,
                 residual_syndrome_weight: 0,
+                stats: DecodeStats {
+                    bp_seconds,
+                    decode_call_count: 1,
+                    bp_iteration_count: bp_info.iterations,
+                    ..DecodeStats::default()
+                },
             });
         }
 
@@ -131,6 +144,12 @@ impl BpLsdDecoder {
             bp_iterations: bp_info.iterations,
             used_osd: false,
             residual_syndrome_weight: 0,
+            stats: DecodeStats {
+                bp_seconds,
+                decode_call_count: 1,
+                bp_iteration_count: bp_info.iterations,
+                ..DecodeStats::default()
+            },
         })
     }
 }

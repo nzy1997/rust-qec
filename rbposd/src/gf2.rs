@@ -2,6 +2,12 @@ use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Gf2SolveStats {
+    pub(crate) solve_count: usize,
+    pub(crate) full_elimination_count: usize,
+}
+
 #[cfg(test)]
 pub(crate) fn sort_columns_by_reliability(scores: &[f64]) -> Vec<usize> {
     let mut order: Vec<usize> = (0..scores.len()).collect();
@@ -69,8 +75,8 @@ impl PreparedLinearSystem {
         syndrome: &Syndrome,
         column_order: &[usize],
     ) -> Result<Correction, DecodeError> {
-        self.solve_with_column_order_detailed(syndrome, column_order, &[])
-            .map(|solution| solution.correction)
+        self.solve_with_column_order_detailed_with_stats(syndrome, column_order, &[])
+            .map(|(solution, _)| solution.correction)
     }
 
     pub(crate) fn solve_with_column_order_detailed(
@@ -79,10 +85,28 @@ impl PreparedLinearSystem {
         column_order: &[usize],
         forced_true_columns: &[usize],
     ) -> Result<DetailedSolution, DecodeError> {
+        self.solve_with_column_order_detailed_with_stats(
+            syndrome,
+            column_order,
+            forced_true_columns,
+        )
+        .map(|(solution, _)| solution)
+    }
+
+    pub(crate) fn solve_with_column_order_detailed_with_stats(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+        forced_true_columns: &[usize],
+    ) -> Result<(DetailedSolution, Gf2SolveStats), DecodeError> {
         self.scratch_rows.clone_from(&self.base_rows);
         self.scratch_rhs.copy_from_slice(syndrome.as_slice());
         self.pivot_columns.clear();
         let mut row = 0usize;
+        let stats = Gf2SolveStats {
+            solve_count: 1,
+            full_elimination_count: 1,
+        };
 
         for (pivot_position, &column) in column_order.iter().enumerate() {
             if row == self.scratch_rows.len() {
@@ -148,11 +172,14 @@ impl PreparedLinearSystem {
             solution[column] = value;
         }
 
-        Ok(DetailedSolution {
-            correction: Correction::from(solution),
-            pivot_columns: self.pivot_columns.clone(),
-            free_columns,
-        })
+        Ok((
+            DetailedSolution {
+                correction: Correction::from(solution),
+                pivot_columns: self.pivot_columns.clone(),
+                free_columns,
+            },
+            stats,
+        ))
     }
 }
 

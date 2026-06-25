@@ -1,5 +1,5 @@
 use crate::error::DecodeError;
-use crate::gf2::{DetailedSolution, PreparedLinearSystem};
+use crate::gf2::{DetailedSolution, Gf2SolveStats, PreparedLinearSystem};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
@@ -19,6 +19,19 @@ pub(crate) struct OsdWorkspace {
     prepared: PreparedLinearSystem,
     num_checks: usize,
     num_bits: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct OsdDecodeStats {
+    pub(crate) osd_candidate_count: usize,
+    pub(crate) gf2_solve_count: usize,
+    pub(crate) gf2_full_elimination_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OsdDecodeOutcome {
+    pub(crate) correction: Correction,
+    pub(crate) stats: OsdDecodeStats,
 }
 
 impl OsdWorkspace {
@@ -61,6 +74,7 @@ pub(crate) fn decode_osd0_with_workspace(
         workspace,
         0,
     )
+    .map(|outcome| outcome.correction)
 }
 
 pub(crate) fn decode_osd_with_workspace(
@@ -70,28 +84,52 @@ pub(crate) fn decode_osd_with_workspace(
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
     osd_order: usize,
-) -> Result<Correction, DecodeError> {
+) -> Result<OsdDecodeOutcome, DecodeError> {
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
     debug_assert_eq!(workspace.num_bits, pcm.num_bits());
     debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
     debug_assert_eq!(reliability.len(), pcm.num_bits());
     let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
     workspace.sort_unreliable_columns(reliability);
+    let mut stats = OsdDecodeStats::default();
 
     if osd_order == 0 {
-        let residual = workspace
+        let (residual, gf2_stats) = workspace
             .prepared
-            .solve_with_column_order(&target_syndrome, &workspace.column_order)
+            .solve_with_column_order_detailed_with_stats(
+                &target_syndrome,
+                &workspace.column_order,
+                &[],
+            )
             .map_err(|_| DecodeError::NoOsdSolution)?;
-        return Ok(xor_correction_bits(base_correction_bits, &residual));
+        accumulate_gf2_stats(&mut stats, gf2_stats);
+        return Ok(OsdDecodeOutcome {
+            correction: xor_correction_bits(base_correction_bits, &residual.correction),
+            stats,
+        });
     }
 
-    let base = workspace
+    let (base, gf2_stats) = workspace
         .prepared
-        .solve_with_column_order_detailed(&target_syndrome, &workspace.column_order, &[])
+        .solve_with_column_order_detailed_with_stats(
+            &target_syndrome,
+            &workspace.column_order,
+            &[],
+        )
         .map_err(|_| DecodeError::NoOsdSolution)?;
-    let best = best_osd_candidate(&target_syndrome, reliability, workspace, base, osd_order)?;
-    Ok(xor_correction_bits(base_correction_bits, &best.correction))
+    accumulate_gf2_stats(&mut stats, gf2_stats);
+    let best = best_osd_candidate(
+        &target_syndrome,
+        reliability,
+        workspace,
+        base,
+        osd_order,
+        &mut stats,
+    )?;
+    Ok(OsdDecodeOutcome {
+        correction: xor_correction_bits(base_correction_bits, &best.correction),
+        stats,
+    })
 }
 
 pub(crate) fn diagnose_osd_candidate_search_with_workspace(
@@ -116,12 +154,18 @@ pub(crate) fn diagnose_osd_candidate_search_with_workspace(
     Ok(candidate_search_plan(&base, osd_order))
 }
 
+fn accumulate_gf2_stats(stats: &mut OsdDecodeStats, gf2_stats: Gf2SolveStats) {
+    stats.gf2_solve_count += gf2_stats.solve_count;
+    stats.gf2_full_elimination_count += gf2_stats.full_elimination_count;
+}
+
 fn best_osd_candidate(
     target_syndrome: &Syndrome,
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
     base: DetailedSolution,
     osd_order: usize,
+    stats: &mut OsdDecodeStats,
 ) -> Result<DetailedSolution, DecodeError> {
     let frontier_len = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
     let frontier = base.free_columns[..frontier_len].to_vec();
@@ -130,11 +174,16 @@ fn best_osd_candidate(
     let mut forced = Vec::new();
     for order in 1..=max_order {
         visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
-            if let Ok(candidate) = workspace.prepared.solve_with_column_order_detailed(
-                target_syndrome,
-                &workspace.column_order,
-                columns,
-            ) {
+            stats.osd_candidate_count += 1;
+            if let Ok((candidate, gf2_stats)) = workspace
+                .prepared
+                .solve_with_column_order_detailed_with_stats(
+                    target_syndrome,
+                    &workspace.column_order,
+                    columns,
+                )
+            {
+                accumulate_gf2_stats(stats, gf2_stats);
                 if is_better_solution(&candidate, &best, reliability) {
                     best = candidate;
                 }

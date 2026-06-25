@@ -198,3 +198,55 @@ fn diagnose_osd_path_reports_bp_convergence_without_osd() {
     assert_eq!(diagnostic.max_candidate_order, 0);
     assert_eq!(diagnostic.planned_candidate_count, 0);
 }
+
+#[test]
+fn osd0_decode_reports_zero_candidate_and_one_gf2_solve() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.1, 0.9]),
+        DecoderConfig {
+            max_bp_iterations: 1,
+            osd_order: 0,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let result = decoder.decode(&Syndrome::from(vec![true, true])).unwrap();
+
+    assert_eq!(result.stats.decode_call_count, 1);
+    assert_eq!(result.stats.osd_use_count, usize::from(result.used_osd));
+    assert_eq!(result.stats.osd_candidate_count, 0);
+    if result.used_osd {
+        assert_eq!(result.stats.gf2_solve_count, 1);
+        assert_eq!(result.stats.gf2_full_elimination_count, 1);
+    }
+}
+
+#[test]
+fn osd_order_two_decode_reports_candidate_and_gf2_counters() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.49, 0.48, 0.47]),
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let result = decoder.decode(&Syndrome::from(vec![true])).unwrap();
+
+    assert_eq!(result.stats.decode_call_count, 1);
+    assert!(result.used_osd);
+    assert_eq!(result.stats.osd_use_count, 1);
+    assert!(result.stats.osd_candidate_count > 0);
+    assert_eq!(
+        result.stats.gf2_solve_count,
+        result.stats.gf2_full_elimination_count
+    );
+    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
+}
