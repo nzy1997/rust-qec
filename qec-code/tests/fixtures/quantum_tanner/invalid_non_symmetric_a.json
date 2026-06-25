@@ -30,7 +30,7 @@
   "local_codes": {
     "matrix_role": "parity_check",
     "field": "GF(2)",
-    "h_a": [[1, 1]],
+    "h_a": [[1]],
     "h_b": [[1, 1]]
   }
 }
