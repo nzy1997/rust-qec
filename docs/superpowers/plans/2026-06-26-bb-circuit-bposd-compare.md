@@ -136,9 +136,15 @@ fn rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle() {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cargo test -p rsinter build_code_supports_bb72_smoke_shape comparison_case_export_contains_models_samples_and_profile rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q`
+Run:
 
-Expected: FAIL with unknown `export_comparison_case_for_code`, missing CLI flag, or unsupported `bb72`.
+```bash
+cargo test -p rsinter build_code_supports_bb72_smoke_shape -q
+cargo test -p rsinter comparison_case_export_contains_models_samples_and_profile -q
+cargo test -p rsinter rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q
+```
+
+Expected: FAIL across the focused commands with unknown `export_comparison_case_for_code`, missing CLI flag, or unsupported `bb72`.
 
 - [ ] **Step 3: Implement BB72 support and export structs**
 
@@ -260,7 +266,13 @@ if json_compare_case {
 
 - [ ] **Step 5: Run focused Rust tests**
 
-Run: `cargo test -p rsinter build_code_supports_bb72_smoke_shape comparison_case_export_contains_models_samples_and_profile rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q`
+Run:
+
+```bash
+cargo test -p rsinter build_code_supports_bb72_smoke_shape -q
+cargo test -p rsinter comparison_case_export_contains_models_samples_and_profile -q
+cargo test -p rsinter rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q
+```
 
 Expected: PASS.
 
@@ -545,7 +557,13 @@ Expected: PASS.
 
 - [ ] **Step 3: Run focused Rust tests**
 
-Run: `cargo test -p rsinter build_code_supports_bb72_smoke_shape comparison_case_export_contains_models_samples_and_profile rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q`
+Run:
+
+```bash
+cargo test -p rsinter build_code_supports_bb72_smoke_shape -q
+cargo test -p rsinter comparison_case_export_contains_models_samples_and_profile -q
+cargo test -p rsinter rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle -q
+```
 
 Expected: PASS.
 
