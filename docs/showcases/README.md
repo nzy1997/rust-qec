@@ -60,6 +60,10 @@ Showcases in this category should demonstrate CSS code construction, built-in
 code families, sparse support exports, distance checks, and code-oriented CLI
 flows.
 
+Available showcases:
+
+- [`qec-code CSS construction`](docs/showcases/qec-code-css-construction.md)
+
 Primary code and docs:
 
 - [`qec-code/`](qec-code/)
