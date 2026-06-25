@@ -1,24 +1,24 @@
 use std::io::{self, Read, Write};
 
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
-use crate::codegen::NoiseParams;
 use crate::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
+use crate::codegen::NoiseParams;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8,
+    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
+    write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
-use crate::sampler::{SampleOptions, sample_batch, sample_batch_with_options};
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -212,6 +212,10 @@ pub enum Commands {
         r#in: Option<String>,
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "sample_shot")]
+        sample_shot: bool,
+        #[arg(long)]
+        seed: Option<u64>,
     },
     /// Run performance evidence workflows
     Perf {
@@ -271,6 +275,13 @@ enum JsonOutputFormat {
     Compact,
 }
 
+#[derive(Clone, Copy)]
+struct Qp101BuildOptions {
+    highlight_dem_error: Option<usize>,
+    sample_shot: bool,
+    seed: Option<u64>,
+}
+
 enum PerfCiError {
     Infrastructure(String),
     Gate(String),
@@ -281,6 +292,14 @@ fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
         "pretty" => Ok(JsonOutputFormat::Pretty),
         "compact" => Ok(JsonOutputFormat::Compact),
         other => Err(format!("unknown json format: {other}")),
+    }
+}
+
+fn plain_qp101_build_options() -> Qp101BuildOptions {
+    Qp101BuildOptions {
+        highlight_dem_error: None,
+        sample_shot: false,
+        seed: None,
     }
 }
 
@@ -538,9 +557,21 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 &mut w,
             )
         }
-        Some(Commands::RenderSvg { r#in, out }) => {
+        Some(Commands::RenderSvg {
+            r#in,
+            out,
+            sample_shot,
+            seed,
+        }) => {
             let text = read_input(r#in.as_deref())?;
-            let svg = run_render_svg_to_string(&text)?;
+            let svg = run_render_svg_to_string(
+                &text,
+                Qp101BuildOptions {
+                    sample_shot,
+                    seed,
+                    ..plain_qp101_build_options()
+                },
+            )?;
             let mut w = open_output(out.as_deref())?;
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
@@ -1077,49 +1108,14 @@ fn run_export_json(
     w: &mut dyn Write,
 ) -> Result<(), String> {
     let instrs = parse_lines(text)?;
-    if seed.is_some() && !sample_shot {
-        return Err("--seed is only supported with --sample_shot".to_string());
-    }
-    if sample_shot && highlight_dem_error.is_some() {
-        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
-    }
-    let doc = match highlight_dem_error {
-        Some(index) => {
-            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&instrs).map_err(|err| {
-                if err.starts_with("tracked DEM does not yet support instruction ") {
-                    format!(
-                        "--highlight_dem_error currently supports a subset of noise instructions: {err}"
-                    )
-                } else {
-                    err
-                }
-            })?;
-            crate::qp101::export_qp101_with_highlighted_dem_error(&instrs, &tracked, index)
-                .map_err(|err| {
-                    if err.starts_with("DEM error index ") && err.contains(" out of range ") {
-                        format!("DEM error index out of range: {err}")
-                    } else {
-                        err
-                    }
-                })?
-        }
-        None if sample_shot => {
-            let mut ex = Executor::from_instrs(instrs.clone())?;
-            let mut rng = make_rng(seed);
-            let (_out, trace) = ex.run_with_trace(&mut rng)?;
-            crate::qp101::export_qp101_with_sample_trace(&instrs, &trace).map_err(|err| {
-                if err.starts_with("sample trace visualization does not yet support instruction ")
-                {
-                    format!(
-                        "--sample_shot currently supports a subset of sample visualization instructions: {err}"
-                    )
-                } else {
-                    err
-                }
-            })?
-        }
-        None => build_plain_qp101_document(&instrs)?,
-    };
+    let doc = build_qp101_document(
+        &instrs,
+        Qp101BuildOptions {
+            highlight_dem_error,
+            sample_shot,
+            seed,
+        },
+    )?;
     match format {
         JsonOutputFormat::Pretty => {
             serde_json::to_writer_pretty(&mut *w, &doc).map_err(|e| format!("write error: {e}"))?
@@ -1133,15 +1129,66 @@ fn run_export_json(
     Ok(())
 }
 
+fn build_qp101_document(
+    instrs: &[crate::ir::StimInstr],
+    options: Qp101BuildOptions,
+) -> Result<crate::qp101::Qp101Document, String> {
+    if options.seed.is_some() && !options.sample_shot {
+        return Err("--seed is only supported with --sample_shot".to_string());
+    }
+    if options.sample_shot && options.highlight_dem_error.is_some() {
+        return Err("--sample_shot cannot be combined with --highlight_dem_error".to_string());
+    }
+
+    match options.highlight_dem_error {
+        Some(index) => {
+            let tracked = ErrorAnalyzer::circuit_to_tracked_dem(instrs).map_err(|err| {
+                if err.starts_with("tracked DEM does not yet support instruction ") {
+                    format!(
+                        "--highlight_dem_error currently supports a subset of noise instructions: {err}"
+                    )
+                } else {
+                    err
+                }
+            })?;
+            crate::qp101::export_qp101_with_highlighted_dem_error(instrs, &tracked, index).map_err(
+                |err| {
+                    if err.starts_with("DEM error index ") && err.contains(" out of range ") {
+                        format!("DEM error index out of range: {err}")
+                    } else {
+                        err
+                    }
+                },
+            )
+        }
+        None if options.sample_shot => {
+            let mut ex = Executor::from_instrs(instrs.to_vec())?;
+            let mut rng = make_rng(options.seed);
+            let (_out, trace) = ex.run_with_trace(&mut rng)?;
+            crate::qp101::export_qp101_with_sample_trace(instrs, &trace).map_err(|err| {
+                if err.starts_with("sample trace visualization does not yet support instruction ")
+                {
+                    format!(
+                        "--sample_shot currently supports a subset of sample visualization instructions: {err}"
+                    )
+                } else {
+                    err
+                }
+            })
+        }
+        None => build_plain_qp101_document(instrs),
+    }
+}
+
 fn build_plain_qp101_document(
     instrs: &[crate::ir::StimInstr],
 ) -> Result<crate::qp101::Qp101Document, String> {
     crate::qp101::export_qp101(instrs)
 }
 
-fn run_render_svg_to_string(text: &str) -> Result<String, String> {
+fn run_render_svg_to_string(text: &str, options: Qp101BuildOptions) -> Result<String, String> {
     let instrs = parse_lines(text)?;
-    let doc = build_plain_qp101_document(&instrs)?;
+    let doc = build_qp101_document(&instrs, options)?;
     crate::qp101_svg::render_svg(&doc)
 }
 
@@ -1555,11 +1602,9 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(
-            std::fs::read_to_string(gate_out_dir.join("summary.json"))
-                .unwrap()
-                .contains("\"cases\"")
-        );
+        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
+            .unwrap()
+            .contains("\"cases\""));
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -1663,11 +1708,9 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(
-                generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                    .unwrap()
-                    .contains("QUBIT_COORDS")
-            );
+            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                .unwrap()
+                .contains("QUBIT_COORDS"));
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
