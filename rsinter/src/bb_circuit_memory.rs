@@ -1007,6 +1007,57 @@ pub fn replay_syndrome_diagnostic(
     })
 }
 
+pub fn profile_syndrome_replay(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+) -> Result<BbCircuitBposdProfile, String> {
+    let syndrome = Syndrome::from(syndrome_bits.to_vec());
+    let decoder = BpOsdDecoder::new(
+        model.decoder.clone(),
+        ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
+        DecoderConfig {
+            max_bp_iterations,
+            osd_order,
+            ..DecoderConfig::default()
+        },
+    )
+    .map_err(|error| format!("failed to compile replay profile decoder: {error}"))?;
+
+    let decode_started = Instant::now();
+    let diagnostic = decoder
+        .diagnose_osd_path(&syndrome)
+        .map_err(|error| format!("failed to diagnose replay syndrome: {error}"))?;
+    let decode_seconds = decode_started.elapsed().as_secs_f64();
+
+    let osd_candidate_count = usize::try_from(diagnostic.planned_candidate_count)
+        .unwrap_or(usize::MAX);
+    let gf2_count = if diagnostic.used_osd {
+        osd_candidate_count.saturating_add(1)
+    } else {
+        0
+    };
+    let stats = DecodeStats {
+        decode_call_count: 1,
+        bp_iteration_count: diagnostic.bp_iterations,
+        osd_use_count: usize::from(diagnostic.used_osd),
+        osd_candidate_count,
+        gf2_solve_count: gf2_count,
+        gf2_full_elimination_count: gf2_count,
+        ..DecodeStats::default()
+    };
+
+    let mut profile = BbCircuitBposdProfile {
+        setup_seconds: 0.0,
+        sample_seconds: 0.0,
+        decode_seconds,
+        ..BbCircuitBposdProfile::default()
+    };
+    profile.add_z_stats(&stats);
+    Ok(profile)
+}
+
 fn validate_model_config(config: &SimulationConfig) -> Result<(), String> {
     validate_physical_error_rate(config.physical_error_rate)?;
     if config.num_cycles == 0 {

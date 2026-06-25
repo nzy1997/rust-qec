@@ -1,8 +1,9 @@
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
-    SimulationConfig, SyndromeReplayDiagnostic, build_code, build_effective_models,
-    build_syndrome_cycle, replay_syndrome_diagnostic, sample_seeded_trial,
+    EffectiveDecoderModel, SimulationConfig, SyndromeReplayDiagnostic, build_code,
+    build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
+    replay_syndrome_diagnostic, sample_seeded_trial,
 };
 
 const FIXTURE_PATH: &str = concat!(
@@ -43,8 +44,10 @@ enum FixtureBasis {
 }
 
 struct ComputedFixtureReplay {
+    sampled_syndrome: Vec<bool>,
     sampled_support: Vec<usize>,
     sampled_logical: Vec<bool>,
+    model: EffectiveDecoderModel,
     diagnostic: SyndromeReplayDiagnostic,
 }
 
@@ -134,6 +137,32 @@ fn bb90_hard_syndrome_fixture_rejects_low_p_control() {
     );
 }
 
+#[test]
+fn bb90_hard_syndrome_reports_osd_profile_counters() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let profile = profile_syndrome_replay(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+    )
+    .unwrap();
+
+    println!(
+        "case_id={} basis={:?} syndrome_weight={} profile={profile:#?}",
+        fixture.case_id,
+        fixture.basis,
+        computed.sampled_support.len(),
+    );
+
+    assert!(profile.decode_call_count > 0);
+    assert!(profile.osd_use_count > 0);
+    assert!(profile.osd_candidate_count > 0);
+    assert!(profile.gf2_solve_count > 0);
+    assert!(profile.gf2_full_elimination_count > 0);
+}
+
 fn load_fixture() -> HardSyndromeFixture {
     let text = std::fs::read_to_string(FIXTURE_PATH).unwrap();
     serde_json::from_str(&text).unwrap()
@@ -183,8 +212,10 @@ fn compute_fixture_replay(fixture: &HardSyndromeFixture) -> Result<ComputedFixtu
     };
 
     Ok(ComputedFixtureReplay {
+        sampled_syndrome: sampled_syndrome.clone(),
         sampled_support: syndrome_support(sampled_syndrome),
         sampled_logical: sampled_logical.clone(),
+        model: model.clone(),
         diagnostic: replay_syndrome_diagnostic(
             model,
             sampled_syndrome,
