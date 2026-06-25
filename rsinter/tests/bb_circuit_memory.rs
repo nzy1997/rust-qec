@@ -1,6 +1,6 @@
 use rsinter::bb_circuit_memory::{
     OperationKind, SimulationConfig, build_code, build_effective_models, build_syndrome_cycle,
-    build_upstream_code, run_simulation,
+    build_upstream_code, run_simulation, sample_seeded_trial,
 };
 
 #[test]
@@ -43,6 +43,16 @@ fn build_code_rejects_unknown_code_id_with_supported_values() {
     assert!(error.contains("bb999"), "{error}");
     assert!(error.contains("bb90"), "{error}");
     assert!(error.contains("bb144"), "{error}");
+}
+
+#[test]
+fn sample_seeded_trial_rejects_zero_cycles() {
+    let code = build_code("bb90").unwrap();
+    let cycle = build_syndrome_cycle(&code);
+
+    let error = sample_seeded_trial(&code, &cycle, 0, 0.006, 12345).unwrap_err();
+
+    assert_eq!(error, "num_cycles must be greater than zero");
 }
 
 #[test]

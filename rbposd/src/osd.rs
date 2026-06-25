@@ -249,7 +249,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{OsdWorkspace, decode_osd0_with_workspace};
+    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {
@@ -279,5 +279,10 @@ mod tests {
         let order = workspace.sort_unreliable_columns(&[1.0, 1.0, 0.4]);
 
         assert_eq!(order, &[2, 0, 1]);
+    }
+
+    #[test]
+    fn binomial_returns_zero_for_oversized_selection() {
+        assert_eq!(binomial(3, 4), 0);
     }
 }
