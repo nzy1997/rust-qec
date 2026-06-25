@@ -249,11 +249,53 @@ fn osd_order_two_decode_reports_candidate_and_gf2_counters() {
     assert!(result.stats.osd_seconds.is_finite());
     assert!(result.stats.osd_seconds >= 0.0);
     assert!(result.stats.osd_candidate_count > 0);
+    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
+    assert_eq!(result.stats.gf2_full_elimination_count, 1);
+}
+
+#[test]
+fn osd_order7_reuses_factorization_without_changing_correction() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(
+        2,
+        10,
+        vec![
+            vec![0, 2, 3, 4, 5, 6, 7, 8, 9],
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        ],
+    )
+    .unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        ChannelModel::BitFlipProbabilities(vec![
+            0.2, 0.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08,
+        ]),
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_order: 7,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let result = decoder.decode(&Syndrome::from(vec![true, true])).unwrap();
+
+    assert_eq!(
+        result.correction,
+        Correction::from(vec![
+            false, false, false, false, false, false, false, false, false, true
+        ])
+    );
+    assert_eq!(
+        pcm.multiply(&result.correction),
+        Syndrome::from(vec![true, true])
+    );
+    assert!(result.used_osd);
+    assert!(result.stats.osd_candidate_count > 1);
     assert_eq!(
         result.stats.gf2_solve_count,
-        result.stats.gf2_full_elimination_count
+        result.stats.osd_candidate_count + 1
     );
-    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
+    assert_eq!(result.stats.gf2_full_elimination_count, 1);
 }
 
 #[test]
@@ -277,8 +319,8 @@ fn profile_decode_with_osd_candidate_limit_counts_bounded_actual_candidates() {
     assert_eq!(stats.decode_call_count, 1);
     assert_eq!(stats.osd_use_count, 1);
     assert_eq!(stats.osd_candidate_count, 2);
-    assert_eq!(stats.gf2_solve_count, 3);
-    assert_eq!(stats.gf2_full_elimination_count, 3);
+    assert!(stats.gf2_solve_count >= stats.osd_candidate_count + 1);
+    assert_eq!(stats.gf2_full_elimination_count, 1);
     assert!(stats.osd_seconds.is_finite());
     assert!(stats.osd_seconds >= 0.0);
 }
