@@ -599,11 +599,7 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) {
-        "!"
-    } else {
-        ""
-    }
+    if inverted.unwrap_or(false) { "!" } else { "" }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1360,54 +1356,81 @@ fn render_annotations_with_line_offset(
             parts.push(text.to_string());
         }
         let content = escape_xml(&parts.join(": "));
-        let class = annotation_class(annotation);
-        let fill = annotation_fill(annotation);
-        let attrs = annotation_style_attrs(annotation);
+        let attrs = annotation_svg_attrs(annotation);
         out.push_str(&format!(
-            "<text class=\"{class}\" x=\"{x}\" y=\"{}\" fill=\"{}\" text-anchor=\"middle\" font-size=\"11\"{attrs}>{content}</text>\n",
-            base_y + idx as i32 * ANNOTATION_LINE_GAP,
-            escape_xml(fill),
+            "<text {attrs} x=\"{x}\" y=\"{}\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
+            base_y + idx as i32 * ANNOTATION_LINE_GAP
         ));
     }
 }
 
-fn annotation_class(annotation: &Qp101Annotation) -> String {
-    let mut class = "annotation".to_string();
-    if let Some(preset) = annotation
-        .style
-        .as_ref()
-        .and_then(|style| style.preset.as_deref())
-    {
-        class.push_str(" annotation-preset-");
-        class.push_str(&escape_xml(preset));
+fn annotation_svg_attrs(annotation: &Qp101Annotation) -> String {
+    let mut classes = vec!["annotation".to_string()];
+    let mut attrs = Vec::new();
+    if let Some(style) = annotation.style.as_ref() {
+        if let Some(preset) = style.preset.as_deref() {
+            classes.push(format!("annotation-preset-{}", css_token(preset)));
+            attrs.push(format!("data-style-preset=\"{}\"", escape_xml(preset)));
+        }
+        if let Some(highlight) = style.highlight {
+            attrs.push(format!("data-style-highlight=\"{highlight}\""));
+        }
     }
-    class
+    if !annotation.tags.is_empty() {
+        attrs.push(format!(
+            "data-annotation-tags=\"{}\"",
+            escape_xml(&annotation.tags.join(" "))
+        ));
+    }
+    attrs.insert(0, format!("class=\"{}\"", classes.join(" ")));
+    attrs.push(format!(
+        "fill=\"{}\"",
+        escape_xml(&annotation_fill(annotation))
+    ));
+    attrs.join(" ")
 }
 
-fn annotation_fill(annotation: &Qp101Annotation) -> &str {
+fn annotation_fill(annotation: &Qp101Annotation) -> String {
     annotation
         .style
         .as_ref()
         .and_then(|style| style.color.as_deref())
+        .map(annotation_color)
+        .or_else(|| {
+            annotation
+                .style
+                .as_ref()
+                .and_then(|style| style.preset.as_deref())
+                .map(annotation_color)
+        })
         .unwrap_or("#7a5af8")
+        .to_string()
 }
 
-fn annotation_style_attrs(annotation: &Qp101Annotation) -> String {
-    let Some(style) = annotation.style.as_ref() else {
-        return String::new();
-    };
-    let mut attrs = String::new();
-    if let Some(preset) = style.preset.as_deref() {
-        attrs.push_str(" data-style-preset=\"");
-        attrs.push_str(&escape_xml(preset));
-        attrs.push('"');
+fn annotation_color(value: &str) -> &str {
+    match value {
+        "danger" | "red" => "#dc2626",
+        "info" | "blue" => "#2563eb",
+        "warning" | "yellow" => "#ca8a04",
+        "success" | "green" => "#16a34a",
+        other => other,
     }
-    if let Some(highlight) = style.highlight {
-        attrs.push_str(" data-style-highlight=\"");
-        attrs.push_str(if highlight { "true" } else { "false" });
-        attrs.push('"');
+}
+
+fn css_token(value: &str) -> String {
+    let mut token = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+            token.push(ch);
+        } else {
+            token.push('-');
+        }
     }
-    attrs
+    if token.is_empty() {
+        "custom".to_string()
+    } else {
+        token
+    }
 }
 
 fn measurement_annotation_line_offset(targets: &[MeasurementTarget]) -> usize {

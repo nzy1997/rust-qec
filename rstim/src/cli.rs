@@ -1,24 +1,24 @@
 use std::io::{self, Read, Write};
 
 use clap::{Parser, Subcommand};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
-use crate::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
-};
 use crate::codegen::NoiseParams;
+use crate::codegen::css::{
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
+};
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::output::{
-    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
-    write_shots_r8, OutputFormat,
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
+    write_shots_ptb64, write_shots_r8,
 };
 use crate::parser::parse_lines;
-use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
+use crate::sampler::{SampleOptions, sample_batch, sample_batch_with_options};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -212,6 +212,8 @@ pub enum Commands {
         r#in: Option<String>,
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "highlight_dem_error")]
+        highlight_dem_error: Option<usize>,
         #[arg(long = "sample_shot")]
         sample_shot: bool,
         #[arg(long)]
@@ -292,14 +294,6 @@ fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
         "pretty" => Ok(JsonOutputFormat::Pretty),
         "compact" => Ok(JsonOutputFormat::Compact),
         other => Err(format!("unknown json format: {other}")),
-    }
-}
-
-fn plain_qp101_build_options() -> Qp101BuildOptions {
-    Qp101BuildOptions {
-        highlight_dem_error: None,
-        sample_shot: false,
-        seed: None,
     }
 }
 
@@ -560,6 +554,7 @@ pub fn run(cli: Cli) -> Result<(), String> {
         Some(Commands::RenderSvg {
             r#in,
             out,
+            highlight_dem_error,
             sample_shot,
             seed,
         }) => {
@@ -567,9 +562,9 @@ pub fn run(cli: Cli) -> Result<(), String> {
             let svg = run_render_svg_to_string(
                 &text,
                 Qp101BuildOptions {
+                    highlight_dem_error,
                     sample_shot,
                     seed,
-                    ..plain_qp101_build_options()
                 },
             )?;
             let mut w = open_output(out.as_deref())?;
@@ -1602,9 +1597,11 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
-            .unwrap()
-            .contains("\"cases\""));
+        assert!(
+            std::fs::read_to_string(gate_out_dir.join("summary.json"))
+                .unwrap()
+                .contains("\"cases\"")
+        );
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -1708,9 +1705,11 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                .unwrap()
-                .contains("QUBIT_COORDS"));
+            assert!(
+                generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                    .unwrap()
+                    .contains("QUBIT_COORDS")
+            );
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
