@@ -1,6 +1,7 @@
 use rsinter::bb_circuit_memory::{
-    OperationKind, SimulationConfig, build_code, build_effective_models, build_syndrome_cycle,
-    build_upstream_code, run_simulation, sample_seeded_trial,
+    OperationKind, SimulationConfig, bb_circuit_bposd_result_row, build_code,
+    build_effective_models, build_syndrome_cycle, build_upstream_code, run_simulation,
+    run_simulation_for_code, sample_seeded_trial, validate_bposd_profile_result_row,
 };
 
 #[test]
@@ -271,4 +272,74 @@ fn effective_models_only_use_basis_specific_logical_rows() {
                 .any(|column| column.iter().any(|&row| row >= first_logical_row))
         );
     }
+}
+
+#[test]
+fn bb_circuit_bposd_timing_counters_partition_decode_work() {
+    let result = run_simulation_for_code(
+        "bb90",
+        SimulationConfig {
+            physical_error_rate: 1.0e-12,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(1),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        },
+    )
+    .unwrap();
+
+    let profile = &result.profile;
+    assert!(profile.setup_seconds.is_finite());
+    assert!(profile.sample_seconds.is_finite());
+    assert!(profile.decode_seconds.is_finite());
+    assert!(profile.decode_call_count > 0);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.osd_candidate_count, 0);
+    assert!(profile.bp_iteration_count >= profile.decode_call_count);
+
+    let row = bb_circuit_bposd_result_row("bb90", &result);
+    validate_bposd_profile_result_row(&row).unwrap();
+    for key in [
+        "setup_seconds",
+        "sample_seconds",
+        "decode_seconds",
+        "bp_seconds",
+        "osd_seconds",
+        "decode_call_count",
+        "bp_iteration_count",
+        "osd_use_count",
+        "osd_candidate_count",
+        "gf2_solve_count",
+        "gf2_full_elimination_count",
+    ] {
+        assert!(row.metrics.contains_key(key), "missing metric {key}");
+    }
+}
+
+#[test]
+fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
+    let mut result = run_simulation_for_code(
+        "bb90",
+        SimulationConfig {
+            physical_error_rate: 1.0e-12,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(1),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        },
+    )
+    .unwrap();
+
+    let mut missing = bb_circuit_bposd_result_row("bb90", &result);
+    missing.metrics.remove("decode_call_count");
+    assert!(validate_bposd_profile_result_row(&missing).is_err());
+
+    result.profile.x_decode_call_count += 1;
+    let mismatched = bb_circuit_bposd_result_row("bb90", &result);
+    assert!(validate_bposd_profile_result_row(&mismatched).is_err());
 }
