@@ -281,16 +281,30 @@ mod tests {
     }
 
     #[test]
-    fn prepared_system_rejects_forced_pivot_columns() {
+    fn osd_forced_pivot_columns_are_rejected_after_optimization() {
         let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
         let syndrome = Syndrome::from(vec![true, true]);
         let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
 
-        let error = prepared
+        let pivot_error = prepared
             .solve_with_column_order_detailed(&syndrome, &[0, 1, 2], &[0])
             .unwrap_err();
+        let out_of_range_error = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1, 2], &[3])
+            .unwrap_err();
+        let outside_ordered_free_error = prepared
+            .solve_with_column_order_detailed(&syndrome, &[0, 1], &[2])
+            .unwrap_err();
 
-        assert_eq!(error, DecodeError::SingularSystem);
+        assert_eq!(pivot_error, DecodeError::SingularSystem);
+        assert_eq!(
+            out_of_range_error,
+            DecodeError::InvalidColumnIndex {
+                column: 3,
+                num_bits: 3,
+            }
+        );
+        assert_eq!(outside_ordered_free_error, DecodeError::SingularSystem);
     }
 
     #[test]
@@ -307,19 +321,6 @@ mod tests {
         assert_eq!(error, DecodeError::SingularSystem);
         assert_eq!(stats.solve_count, 1);
         assert_eq!(stats.full_elimination_count, 1);
-    }
-
-    #[test]
-    fn prepared_system_rejects_forced_columns_outside_column_order() {
-        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
-        let syndrome = Syndrome::from(vec![true, true]);
-        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
-
-        let error = prepared
-            .solve_with_column_order_detailed(&syndrome, &[0, 1], &[2])
-            .unwrap_err();
-
-        assert_eq!(error, DecodeError::SingularSystem);
     }
 
     #[test]

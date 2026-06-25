@@ -72,7 +72,7 @@ fn osd_order7_reuses_factorization_without_changing_correction() {
 
     let result = decoder.decode(&Syndrome::from(vec![true, true])).unwrap();
 
-    assert_eq!(result.correction, Correction::from(vec![false, false, true, false, false, false, false, false, false, false]));
+    assert_eq!(result.correction, Correction::from(vec![false, false, false, false, false, false, false, false, false, true]));
     assert_eq!(pcm.multiply(&result.correction), Syndrome::from(vec![true, true]));
     assert!(result.used_osd);
     assert!(result.stats.osd_candidate_count > 1);
