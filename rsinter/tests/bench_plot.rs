@@ -891,6 +891,94 @@ label = "Decode Time Per Shot"
     );
 }
 
+#[test]
+fn plot_series_group_by_covers_fallback_field_scopes_and_errors() {
+    let label_fallback_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let fallback_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let fallback_out = dir.path().join("fallback-label-key.svg");
+    render_benchmark_plot(&label_fallback_spec, &fallback_rows, &fallback_out).unwrap();
+    let fallback_svg = std::fs::read_to_string(fallback_out).unwrap();
+    assert!(
+        fallback_svg.contains("rmatching p=0.002"),
+        "omitted group_by should preserve label-based grouping; svg was:\n{fallback_svg}"
+    );
+    assert!(
+        fallback_svg.contains("rmatching p=0.005"),
+        "omitted group_by should split rows when rendered labels differ; svg was:\n{fallback_svg}"
+    );
+
+    let scoped_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["language", "metrics.decode_us_per_shot", "case_summary.num_dets"]
+label_template = "{language} t={metrics.decode_us_per_shot} n={case_summary.num_dets}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let mut python_row = ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0);
+    python_row.language = "python".into();
+    let scoped_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        python_row,
+    ];
+    let scoped_out = dir.path().join("scoped-group-fields.svg");
+    render_benchmark_plot(&scoped_group_spec, &scoped_rows, &scoped_out).unwrap();
+    let scoped_svg = std::fs::read_to_string(scoped_out).unwrap();
+    assert!(
+        scoped_svg.contains("rust t=12 n=24"),
+        "language, metrics, and case_summary group fields should render the first series; svg was:\n{scoped_svg}"
+    );
+    assert!(
+        scoped_svg.contains("python t=14 n=24"),
+        "language, metrics, and case_summary group fields should render the second series; svg was:\n{scoped_svg}"
+    );
+
+    let bad_group_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["artifacts.path"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let err = render_benchmark_plot(
+        &bad_group_spec,
+        &[ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0)],
+        &dir.path().join("bad-group-field.svg"),
+    )
+    .unwrap_err();
+    assert!(err.contains("missing required series group field artifacts.path"));
+}
+
 fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
     svg.lines()
         .filter(|line| line.contains("<circle"))
