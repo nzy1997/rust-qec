@@ -749,6 +749,17 @@ label = "Logical Error Rate"
     render_benchmark_plot(&spec, &[zero_error_row], &zero_only_out).unwrap();
     let zero_only_svg = std::fs::read_to_string(zero_only_out).unwrap();
     assert!(zero_only_svg.contains("<svg"));
+    let zero_only_interval_polylines = zero_only_svg
+        .lines()
+        .filter(|line| line.contains("<polyline"))
+        .filter(|line| line.contains("fill=\"none\""))
+        .filter(|line| line.contains("stroke-width=\"1\""))
+        .filter(|line| line.contains("stroke=\"#") && !line.contains("stroke=\"#000000\""))
+        .count();
+    assert!(
+        zero_only_interval_polylines >= 3,
+        "zero-error interval should render error-bar primitives; svg was:\n{zero_only_svg}"
+    );
     assert_eq!(
         zero_only_svg.matches("<circle").count(),
         0,
