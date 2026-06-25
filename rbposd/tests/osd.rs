@@ -1,4 +1,6 @@
-use rbposd::{BpOsdDecoder, ChannelModel, Correction, DecoderConfig, ParityCheckMatrix, Syndrome};
+use rbposd::{
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
+};
 
 #[test]
 fn osd0_recovers_a_valid_solution_when_bp_is_disabled() {
@@ -277,6 +279,109 @@ fn profile_decode_with_osd_candidate_limit_counts_bounded_actual_candidates() {
     assert_eq!(stats.osd_candidate_count, 2);
     assert_eq!(stats.gf2_solve_count, 3);
     assert_eq!(stats.gf2_full_elimination_count, 3);
+    assert!(stats.osd_seconds.is_finite());
+    assert!(stats.osd_seconds >= 0.0);
+}
+
+#[test]
+fn profile_decode_with_candidate_limit_rejects_syndrome_dimension_mismatch() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::Bsc { error_rate: 0.05 },
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let error = decoder
+        .profile_decode_with_osd_candidate_limit(&Syndrome::from(vec![true]), 1)
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        DecodeError::DimensionMismatch {
+            what: "syndrome",
+            expected: 2,
+            actual: 1,
+        }
+    );
+}
+
+#[test]
+fn profile_decode_with_candidate_limit_reports_zero_syndrome_prior_fast_path() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.1]),
+        DecoderConfig::default(),
+    )
+    .unwrap();
+
+    let stats = decoder
+        .profile_decode_with_osd_candidate_limit(&Syndrome::from(vec![false]), 4)
+        .unwrap();
+
+    assert_eq!(stats.decode_call_count, 1);
+    assert_eq!(stats.bp_iteration_count, 0);
+    assert_eq!(stats.osd_use_count, 0);
+    assert_eq!(stats.osd_candidate_count, 0);
+    assert_eq!(stats.gf2_solve_count, 0);
+    assert_eq!(stats.gf2_full_elimination_count, 0);
+}
+
+#[test]
+fn profile_decode_with_candidate_limit_reports_bp_convergence_without_osd() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 1, vec![vec![0]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.9]),
+        DecoderConfig {
+            max_bp_iterations: 4,
+            osd_order: 3,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let stats = decoder
+        .profile_decode_with_osd_candidate_limit(&Syndrome::from(vec![true]), 4)
+        .unwrap();
+
+    assert_eq!(stats.decode_call_count, 1);
+    assert_eq!(stats.bp_iteration_count, 1);
+    assert_eq!(stats.osd_use_count, 0);
+    assert_eq!(stats.osd_candidate_count, 0);
+    assert_eq!(stats.gf2_solve_count, 0);
+    assert_eq!(stats.gf2_full_elimination_count, 0);
+    assert!(stats.bp_seconds.is_finite());
+    assert!(stats.bp_seconds >= 0.0);
+    assert_eq!(stats.osd_seconds, 0.0);
+}
+
+#[test]
+fn profile_decode_with_zero_candidate_limit_counts_only_base_gf2_solve() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+    let decoder = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.49, 0.48, 0.47]),
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let stats = decoder
+        .profile_decode_with_osd_candidate_limit(&Syndrome::from(vec![true]), 0)
+        .unwrap();
+
+    assert_eq!(stats.decode_call_count, 1);
+    assert_eq!(stats.bp_iteration_count, 0);
+    assert_eq!(stats.osd_use_count, 1);
+    assert_eq!(stats.osd_candidate_count, 0);
+    assert_eq!(stats.gf2_solve_count, 1);
+    assert_eq!(stats.gf2_full_elimination_count, 1);
     assert!(stats.osd_seconds.is_finite());
     assert!(stats.osd_seconds >= 0.0);
 }

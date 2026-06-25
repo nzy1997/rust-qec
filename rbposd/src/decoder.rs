@@ -12,7 +12,7 @@ use crate::osd::{
 };
 use crate::vector::{Correction, Syndrome};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default)]
 pub struct DecodeStats {
     pub bp_seconds: f64,
     pub osd_seconds: f64,
@@ -24,7 +24,28 @@ pub struct DecodeStats {
     pub gf2_full_elimination_count: usize,
 }
 
-#[derive(Debug, Clone)]
+impl DecodeStats {
+    fn counters(&self) -> [usize; 6] {
+        [
+            self.decode_call_count,
+            self.bp_iteration_count,
+            self.osd_use_count,
+            self.osd_candidate_count,
+            self.gf2_solve_count,
+            self.gf2_full_elimination_count,
+        ]
+    }
+}
+
+impl PartialEq for DecodeStats {
+    fn eq(&self, other: &Self) -> bool {
+        self.counters() == other.counters()
+    }
+}
+
+impl Eq for DecodeStats {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodeResult {
     pub correction: Correction,
     pub converged: bool,
@@ -33,24 +54,6 @@ pub struct DecodeResult {
     pub residual_syndrome_weight: usize,
     pub stats: DecodeStats,
 }
-
-impl PartialEq for DecodeResult {
-    fn eq(&self, other: &Self) -> bool {
-        self.correction == other.correction
-            && self.converged == other.converged
-            && self.bp_iterations == other.bp_iterations
-            && self.used_osd == other.used_osd
-            && self.residual_syndrome_weight == other.residual_syndrome_weight
-            && self.stats.decode_call_count == other.stats.decode_call_count
-            && self.stats.bp_iteration_count == other.stats.bp_iteration_count
-            && self.stats.osd_use_count == other.stats.osd_use_count
-            && self.stats.osd_candidate_count == other.stats.osd_candidate_count
-            && self.stats.gf2_solve_count == other.stats.gf2_solve_count
-            && self.stats.gf2_full_elimination_count == other.stats.gf2_full_elimination_count
-    }
-}
-
-impl Eq for DecodeResult {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OsdPathDiagnostic {

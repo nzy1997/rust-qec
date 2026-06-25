@@ -3,9 +3,10 @@ use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
     build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
-    profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit_for_basis,
-    replay_syndrome_diagnostic, sample_seeded_trial, EffectiveDecoderModel, ProfileReplayBasis,
-    SimulationConfig, SyndromeReplayDiagnostic,
+    profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit,
+    profile_syndrome_replay_with_candidate_limit_for_basis, replay_syndrome_diagnostic,
+    sample_seeded_trial, EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig,
+    SyndromeReplayDiagnostic,
 };
 
 const FIXTURE_PATH: &str = concat!(
@@ -215,6 +216,29 @@ fn syndrome_profile_replay_reports_nontrivial_osd_counts() {
     assert_eq!(profile.x_decode_call_count, 0);
     assert_eq!(profile.osd_use_count, 1);
     assert!(profile.osd_candidate_count > 0);
+    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
+}
+
+#[test]
+fn syndrome_profile_replay_candidate_limit_wrapper_routes_z_basis_counts() {
+    let model = EffectiveDecoderModel {
+        decoder: ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap(),
+        augmented_columns: vec![vec![0], vec![0], vec![0]],
+        channel_probs: vec![0.49, 0.48, 0.47],
+        first_logical_row: 1,
+    };
+    let profile = profile_syndrome_replay_with_candidate_limit(&model, &[true], 0, 2, 1).unwrap();
+
+    assert_eq!(profile.decode_call_count, 1);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.z_decode_call_count, 1);
+    assert_eq!(profile.x_decode_call_count, 0);
+    assert_eq!(profile.osd_use_count, 1);
+    assert_eq!(profile.osd_candidate_count, 1);
     assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
     assert!(profile.gf2_full_elimination_count >= profile.osd_candidate_count + 1);
 }
