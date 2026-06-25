@@ -78,6 +78,8 @@ def main() -> int:
             render_entry(repo_root, out_dir, rstim_prefix, entry)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
+        if isinstance(exc, subprocess.CalledProcessError):
+            return exc.returncode
         return 1
     return 0
 

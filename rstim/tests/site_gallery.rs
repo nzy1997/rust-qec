@@ -47,6 +47,38 @@ fn create_failing_typst(bin_dir: &Path) {
     fs::set_permissions(&typst, perms).unwrap();
 }
 
+#[cfg(not(unix))]
+fn create_failing_typst(_: &Path) {}
+
+fn create_failing_rstim(bin_dir: &Path, exit_code: i32) -> PathBuf {
+    fs::create_dir_all(bin_dir).unwrap();
+    let rstim = bin_dir.join("fake_rstim");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::write(
+            &rstim,
+            format!(
+                "#!/bin/sh\nprintf 'fake rstim should fail with code {exit_code}\\n' >&2\nexit {exit_code}\n"
+            ),
+        )
+        .unwrap();
+        let mut perms = fs::metadata(&rstim).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&rstim, perms).unwrap();
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(
+            &rstim,
+            format!("@echo off\n@echo fake rstim should fail with code {exit_code}\nexit {exit_code}\n"),
+        )
+        .unwrap();
+    }
+    rstim
+}
+
 #[test]
 fn qp101_gallery_builds_without_typst() {
     let temp = tempfile::tempdir().unwrap();
@@ -129,4 +161,27 @@ fn qp101_gallery_invalid_fixture_does_not_replace_existing_svg() {
         fs::read_to_string(protected_svg).unwrap(),
         "existing gallery output should remain"
     );
+}
+
+#[test]
+fn qp101_gallery_propagates_renderer_exit_code() {
+    let temp = tempfile::tempdir().unwrap();
+    let temp_root = temp.path().join("repo");
+    copy_gallery_inputs(&temp_root);
+    let gallery_dir = temp_root.join("_site/gallery");
+    let fake_bin = temp.path().join("fake-rstim-bin");
+    let fake_rstim = create_failing_rstim(&fake_bin, 37);
+
+    let output = Command::new("python3")
+        .arg(temp_root.join("tools/build_qp101_gallery.py"))
+        .arg("--repo-root")
+        .arg(&temp_root)
+        .arg("--out-dir")
+        .arg(&gallery_dir)
+        .arg("--rstim-cmd")
+        .arg(fake_rstim)
+        .output()
+        .unwrap();
+    assert!(!output.status.success(), "fake renderer failure should fail gallery build");
+    assert_eq!(output.status.code(), Some(37));
 }
