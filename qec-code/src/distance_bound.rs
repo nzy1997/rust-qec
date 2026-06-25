@@ -1,4 +1,3 @@
-use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::css::CssCode;
 use crate::distance::LogicalClass;
@@ -283,6 +282,9 @@ pub fn random_window_css_upper_bound(
     }
 
     let width = code.n();
+    let stabilizer_span = gf2::try_rref_with_width(&code.stabilizer_rows(), width * 2)?;
+    let hx_span = gf2::try_rref_with_width(css.hx(), width)?;
+    let hz_span = gf2::try_rref_with_width(css.hz(), width)?;
     let mut rng = SplitMix64::new(options.seed);
     let mut best_witness: Option<Pauli> = None;
 
@@ -291,11 +293,12 @@ pub fn random_window_css_upper_bound(
             let permutation = shuffled_columns(width, &mut rng);
             consider_component_candidates(
                 css.hz(),
-                css.hx(),
+                &hx_span,
                 ComponentKind::XLike,
                 width,
                 &permutation,
                 code,
+                &stabilizer_span,
                 &mut best_witness,
             )?;
             if target_reached(&best_witness, options.target_weight) {
@@ -308,11 +311,12 @@ pub fn random_window_css_upper_bound(
 
             consider_component_candidates(
                 css.hx(),
-                css.hz(),
+                &hz_span,
                 ComponentKind::ZLike,
                 width,
                 &permutation,
                 code,
+                &stabilizer_span,
                 &mut best_witness,
             )?;
             if target_reached(&best_witness, options.target_weight) {
@@ -358,11 +362,12 @@ enum ComponentKind {
 
 fn consider_component_candidates(
     kernel_checks: &[Vec<u8>],
-    stabilizer_component_rows: &[Vec<u8>],
+    stabilizer_component_span: &gf2::ReducedRows,
     component: ComponentKind,
     width: usize,
     permutation: &[usize],
     code: &StabilizerCode,
+    stabilizer_span: &gf2::ReducedRows,
     best_witness: &mut Option<Pauli>,
 ) -> Result<()> {
     let candidates =
@@ -372,12 +377,12 @@ fn consider_component_candidates(
         if !candidate.iter().any(|bit| *bit == 1) {
             continue;
         }
-        if gf2::try_in_row_span_with_width(stabilizer_component_rows, width, &candidate)? {
+        if gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate)? {
             continue;
         }
 
         let witness = component_candidate_to_pauli(component, candidate)?;
-        if validate_witness_against_code(code, &witness).is_err() {
+        if validate_witness_against_code_with_span(code, stabilizer_span, &witness).is_err() {
             continue;
         }
         if best_witness
@@ -674,6 +679,16 @@ fn classify_witness_support(witness: &Pauli) -> LogicalClass {
 }
 
 fn validate_witness_against_code(code: &StabilizerCode, witness: &Pauli) -> Result<()> {
+    let stabilizer_rows = code.stabilizer_rows();
+    let stabilizer_span = gf2::try_rref_with_width(&stabilizer_rows, code.n() * 2)?;
+    validate_witness_against_code_with_span(code, &stabilizer_span, witness)
+}
+
+fn validate_witness_against_code_with_span(
+    code: &StabilizerCode,
+    stabilizer_span: &gf2::ReducedRows,
+    witness: &Pauli,
+) -> Result<()> {
     if witness.weight() == 0 {
         return Err(QecError::DistanceBoundValidationFailed(
             "witness must be non-identity".to_owned(),
@@ -686,7 +701,7 @@ fn validate_witness_against_code(code: &StabilizerCode, witness: &Pauli) -> Resu
             ));
         }
     }
-    if try_in_row_span(&code.stabilizer_rows(), &witness.to_symplectic_row())? {
+    if gf2::try_in_reduced_row_span(stabilizer_span, &witness.to_symplectic_row())? {
         return Err(QecError::DistanceBoundValidationFailed(
             "witness lies in stabilizer span".to_owned(),
         ));
