@@ -154,10 +154,12 @@ fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
 }
 
 #[test]
-fn rsinter_bb_circuit_bposd_memory_prints_four_column_result_line() {
+fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
             "bb-circuit-bposd-memory",
+            "--code-id",
+            "bb90",
             "--physical-error-rate",
             "0.000000000001",
             "--num-cycles",
@@ -231,6 +233,9 @@ fn bb144_reproduction_evidence_note_records_required_context() {
         "--osd-order 7",
         "physical_error_rate must be finite and lie in [0, 1)",
     ] {
-        assert!(note.contains(required), "missing evidence token: {required}");
+        assert!(
+            note.contains(required),
+            "missing evidence token: {required}"
+        );
     }
 }

@@ -20,6 +20,10 @@ pub struct BivariateBicycleParams {
 
 impl BivariateBicycleParams {
     pub fn upstream_default() -> Self {
+        Self::bb144()
+    }
+
+    pub fn bb144() -> Self {
         Self {
             ell: 12,
             m: 6,
@@ -29,6 +33,19 @@ impl BivariateBicycleParams {
             b1: 3,
             b2: 1,
             b3: 2,
+        }
+    }
+
+    pub fn bb90() -> Self {
+        Self {
+            ell: 15,
+            m: 3,
+            a1: 9,
+            a2: 1,
+            a3: 2,
+            b1: 0,
+            b2: 2,
+            b3: 7,
         }
     }
 }
@@ -162,7 +179,23 @@ impl SyndromeCycle {
 }
 
 pub fn build_upstream_code() -> Result<BbCode, String> {
-    let params = BivariateBicycleParams::upstream_default();
+    build_code_from_params(BivariateBicycleParams::upstream_default())
+}
+
+pub fn build_code(code_id: &str) -> Result<BbCode, String> {
+    let params = match code_id {
+        "bb90" => BivariateBicycleParams::bb90(),
+        "bb144" => BivariateBicycleParams::bb144(),
+        _ => {
+            return Err(format!(
+                "unknown bb code id {code_id:?}; supported ids: bb90, bb144"
+            ));
+        }
+    };
+    build_code_from_params(params)
+}
+
+fn build_code_from_params(params: BivariateBicycleParams) -> Result<BbCode, String> {
     let n2 = params.ell * params.m;
     let width = 2 * n2;
     let x_checks = (0..n2).collect::<Vec<_>>();
@@ -195,7 +228,7 @@ pub fn build_upstream_code() -> Result<BbCode, String> {
     let hz_rank = rank(&dense_hz);
     let k = width
         .checked_sub(hx_rank + hz_rank)
-        .ok_or_else(|| "bb144 rank computation underflowed".to_owned())?;
+        .ok_or_else(|| format!("bb code rank computation underflowed for n={width}"))?;
 
     let logical_x_rows = select_logical_rows(nullspace(&dense_hz, width), &dense_hx, k)
         .into_iter()
@@ -614,11 +647,26 @@ struct EffectiveFaultCandidate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TrialSample {
-    z_syndrome: Vec<bool>,
-    x_syndrome: Vec<bool>,
-    z_logical: Vec<bool>,
-    x_logical: Vec<bool>,
+pub struct SampledTrial {
+    pub z_syndrome: Vec<bool>,
+    pub x_syndrome: Vec<bool>,
+    pub z_logical: Vec<bool>,
+    pub x_logical: Vec<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyndromeReplayDiagnostic {
+    pub syndrome_weight: usize,
+    pub bp_converged: bool,
+    pub bp_iterations: usize,
+    pub used_osd: bool,
+    pub residual_syndrome_weight: usize,
+    pub osd_order: usize,
+    pub free_column_count: usize,
+    pub candidate_search_frontier_size: usize,
+    pub max_candidate_order: usize,
+    pub planned_candidate_count: u128,
+    pub osd0_logical_prediction: Vec<bool>,
 }
 
 pub fn build_effective_models(
@@ -634,9 +682,16 @@ pub fn build_effective_models(
 }
 
 pub fn run_simulation(config: SimulationConfig) -> Result<SimulationResult, String> {
+    run_simulation_for_code("bb144", config)
+}
+
+pub fn run_simulation_for_code(
+    code_id: &str,
+    config: SimulationConfig,
+) -> Result<SimulationResult, String> {
     validate_simulation_config(&config)?;
 
-    let code = build_upstream_code()?;
+    let code = build_code(code_id)?;
     let cycle = build_syndrome_cycle(&code);
     let models = build_effective_models(&code, &cycle, &config)?;
 
@@ -699,6 +754,83 @@ pub fn run_simulation(config: SimulationConfig) -> Result<SimulationResult, Stri
         num_cycles: config.num_cycles,
         num_trials: config.num_trials,
         num_failed_trials,
+    })
+}
+
+pub fn sample_seeded_trial(
+    code: &BbCode,
+    cycle: &SyndromeCycle,
+    num_cycles: usize,
+    physical_error_rate: f64,
+    seed: u64,
+) -> Result<SampledTrial, String> {
+    validate_physical_error_rate(physical_error_rate)?;
+    if num_cycles == 0 {
+        return Err("num_cycles must be greater than zero".into());
+    }
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    Ok(simulate_trial(
+        code,
+        cycle,
+        num_cycles,
+        physical_error_rate,
+        &mut rng,
+    ))
+}
+
+pub fn replay_syndrome_diagnostic(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    num_logicals: usize,
+    max_bp_iterations: usize,
+    osd_order: usize,
+) -> Result<SyndromeReplayDiagnostic, String> {
+    let syndrome = Syndrome::from(syndrome_bits.to_vec());
+    let diagnostic_decoder = BpOsdDecoder::new(
+        model.decoder.clone(),
+        ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
+        DecoderConfig {
+            max_bp_iterations,
+            osd_order,
+            ..DecoderConfig::default()
+        },
+    )
+    .map_err(|error| format!("failed to compile replay diagnostic decoder: {error}"))?;
+    let diagnostic = diagnostic_decoder
+        .diagnose_osd_path(&syndrome)
+        .map_err(|error| format!("rbposd diagnostic failed: {error}"))?;
+
+    let osd0_decoder = BpOsdDecoder::new(
+        model.decoder.clone(),
+        ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
+        DecoderConfig {
+            max_bp_iterations,
+            osd_order: 0,
+            ..DecoderConfig::default()
+        },
+    )
+    .map_err(|error| format!("failed to compile replay OSD-0 logical decoder: {error}"))?;
+    let osd0_correction = osd0_decoder
+        .decode(&syndrome)
+        .map_err(|error| format!("rbposd OSD-0 logical replay decode failed: {error}"))?;
+
+    Ok(SyndromeReplayDiagnostic {
+        syndrome_weight: diagnostic.syndrome_weight,
+        bp_converged: diagnostic.bp_converged,
+        bp_iterations: diagnostic.bp_iterations,
+        used_osd: diagnostic.used_osd,
+        residual_syndrome_weight: diagnostic.residual_syndrome_weight,
+        osd_order: diagnostic.osd_order,
+        free_column_count: diagnostic.free_column_count,
+        candidate_search_frontier_size: diagnostic.candidate_search_frontier_size,
+        max_candidate_order: diagnostic.max_candidate_order,
+        planned_candidate_count: diagnostic.planned_candidate_count,
+        osd0_logical_prediction: correction_to_logicals(
+            &osd0_correction.correction,
+            model,
+            num_logicals,
+        ),
     })
 }
 
@@ -1024,7 +1156,7 @@ fn simulate_trial<R: Rng + ?Sized>(
     num_cycles: usize,
     physical_error_rate: f64,
     rng: &mut R,
-) -> TrialSample {
+) -> SampledTrial {
     let total_cycles = num_cycles + 2;
     let mut z_state = vec![false; code.num_circuit_qubits()];
     let mut x_state = vec![false; code.num_circuit_qubits()];
@@ -1074,7 +1206,7 @@ fn simulate_trial<R: Rng + ?Sized>(
         }
     }
 
-    TrialSample {
+    SampledTrial {
         z_syndrome: flatten_syndrome_bits(&x_check_measurements),
         x_syndrome: flatten_syndrome_bits(&z_check_measurements),
         z_logical: extract_logical_vector(code, code.logical_x_rows(), &z_state),
