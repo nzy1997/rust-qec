@@ -179,14 +179,6 @@ fn validate_issue_225_distance_ladder_manifest(
         }
     }
 
-    if manifest.len() != required_cases.len() {
-        return Err(format!(
-            "manifest has {} cases, but {} required",
-            manifest.len(),
-            required_cases.len()
-        ));
-    }
-
     let manifest_index: HashMap<&str, &Issue225DistanceLadderCase> = manifest
         .iter()
         .map(|case| (case.case_id.as_str(), case))
@@ -210,6 +202,14 @@ fn validate_issue_225_distance_ladder_manifest(
         }
     }
 
+    if manifest.len() != required_cases.len() {
+        return Err(format!(
+            "manifest has {} cases, but {} required",
+            manifest.len(),
+            required_cases.len()
+        ));
+    }
+
     Ok(())
 }
 
@@ -228,8 +228,8 @@ fn issue_225_distance_ladder_manifest_has_expected_cases() {
 #[test]
 fn issue_225_distance_ladder_manifest_rejects_missing_required_case() {
     let mut manifest = issue_225_distance_ladder_manifest();
-    manifest.retain(|case| case.case_id != "bb144");
+    manifest.retain(|case| case.case_id != "toric_d13");
 
     let error = validate_issue_225_distance_ladder_manifest(&manifest).expect_err("expected rejection");
-    assert!(error.contains("required"));
+    assert!(error.contains("toric_d13"));
 }
