@@ -48,6 +48,17 @@ pub enum QecError {
         element: usize,
         order: usize,
     },
+    #[error("invalid quantum Tanner generator set {set}: {reason}")]
+    InvalidQuantumTannerGeneratorSet { set: &'static str, reason: String },
+    #[error(
+        "degenerate quantum Tanner face at root {root} with a={a}, b={b}: vertices {vertices:?}"
+    )]
+    DegenerateQuantumTannerFace {
+        root: usize,
+        a: usize,
+        b: usize,
+        vertices: Vec<usize>,
+    },
     #[error("invalid quantum Tanner group element {element}: expected < {order}")]
     InvalidQuantumTannerGroupElement { element: usize, order: usize },
     #[error("JSON output is required for {command}")]

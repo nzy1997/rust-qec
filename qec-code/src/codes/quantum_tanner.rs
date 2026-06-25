@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::Deserialize;
 
 use crate::error::{QecError, Result};
@@ -59,6 +61,41 @@ pub struct QuantumTannerLocalCodeTensorDual {
     pub code_b: QuantumTannerLocalBinaryCode,
     pub x_sector_rows: Vec<Vec<u8>>,
     pub z_sector_rows: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuantumTannerCayleyComplex {
+    pub faces: Vec<QuantumTannerCayleyFace>,
+    pub oriented_faces: Vec<QuantumTannerOrientedFace>,
+    pub x_incidence: Vec<QuantumTannerLocalIncidence>,
+    pub z_incidence: Vec<QuantumTannerLocalIncidence>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuantumTannerCayleyFace {
+    pub id: usize,
+    pub vertices: [usize; 4],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuantumTannerOrientedFace {
+    pub root_vertex: usize,
+    pub a_index: usize,
+    pub b_index: usize,
+    pub a_generator: usize,
+    pub b_generator: usize,
+    pub vertices: [usize; 4],
+    pub face_id: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct QuantumTannerLocalIncidence {
+    pub source_vertex: usize,
+    pub a_index: usize,
+    pub b_index: usize,
+    pub a_generator: usize,
+    pub b_generator: usize,
+    pub face_id: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -243,6 +280,96 @@ pub fn quantum_tanner_local_code_tensor_dual(
     })
 }
 
+pub fn enumerate_quantum_tanner_cayley_faces(
+    construction_mode: QuantumTannerConstructionMode,
+    group: &ValidatedFiniteGroup,
+) -> Result<QuantumTannerCayleyComplex> {
+    match construction_mode {
+        QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1 => {}
+    }
+
+    validate_construction_generators("A", group.a_generators(), group)?;
+    validate_construction_generators("B", group.b_generators(), group)?;
+
+    let mut face_keys = BTreeSet::new();
+    let mut pending_oriented = Vec::new();
+    for root_vertex in 0..group.order() {
+        for (a_index, &a_generator) in group.a_generators().iter().enumerate() {
+            for (b_index, &b_generator) in group.b_generators().iter().enumerate() {
+                let vertices =
+                    oriented_face_vertices(group, root_vertex, a_generator, b_generator)?;
+                face_keys.insert(vertices);
+                pending_oriented.push((
+                    root_vertex,
+                    a_index,
+                    b_index,
+                    a_generator,
+                    b_generator,
+                    vertices,
+                ));
+            }
+        }
+    }
+
+    let faces = face_keys
+        .iter()
+        .enumerate()
+        .map(|(id, &vertices)| QuantumTannerCayleyFace { id, vertices })
+        .collect::<Vec<_>>();
+    let face_ids = faces
+        .iter()
+        .map(|face| (face.vertices, face.id))
+        .collect::<BTreeMap<_, _>>();
+
+    let inverse_a_indices = inverse_generator_indices(group.a_generators(), group)?;
+    let mut oriented_faces = Vec::with_capacity(pending_oriented.len());
+    let mut x_incidence = Vec::with_capacity(pending_oriented.len());
+    let mut z_incidence = Vec::with_capacity(pending_oriented.len());
+
+    for (root_vertex, a_index, b_index, a_generator, b_generator, vertices) in pending_oriented {
+        let face_id = face_ids[&vertices];
+        oriented_faces.push(QuantumTannerOrientedFace {
+            root_vertex,
+            a_index,
+            b_index,
+            a_generator,
+            b_generator,
+            vertices,
+            face_id,
+        });
+        x_incidence.push(QuantumTannerLocalIncidence {
+            source_vertex: root_vertex,
+            a_index,
+            b_index,
+            a_generator,
+            b_generator,
+            face_id,
+        });
+
+        let z_source_vertex = group.multiply(a_generator, root_vertex)?;
+        let z_a_generator = group.inv(a_generator)?;
+        let z_a_index = inverse_a_indices[&a_generator];
+        z_incidence.push(QuantumTannerLocalIncidence {
+            source_vertex: z_source_vertex,
+            a_index: z_a_index,
+            b_index,
+            a_generator: z_a_generator,
+            b_generator,
+            face_id,
+        });
+    }
+
+    x_incidence.sort();
+    z_incidence.sort();
+
+    Ok(QuantumTannerCayleyComplex {
+        faces,
+        oriented_faces,
+        x_incidence,
+        z_incidence,
+    })
+}
+
 fn parse_construction_mode(input: &str) -> Result<QuantumTannerConstructionMode> {
     match input {
         LR_CAYLEY_NO_COVER_V1 => Ok(QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1),
@@ -261,6 +388,81 @@ fn validate_group_table(order: usize, identity: usize, table: &[Vec<usize>]) -> 
     }
 
     Ok(())
+}
+
+fn validate_construction_generators(
+    set: &'static str,
+    generators: &[usize],
+    group: &ValidatedFiniteGroup,
+) -> Result<()> {
+    if generators.is_empty() {
+        return Err(QecError::InvalidQuantumTannerGeneratorSet {
+            set,
+            reason: "generator set must be nonempty".to_owned(),
+        });
+    }
+
+    let mut seen = BTreeSet::new();
+    for (index, &generator) in generators.iter().enumerate() {
+        if !seen.insert(generator) {
+            return Err(QecError::InvalidQuantumTannerGeneratorSet {
+                set,
+                reason: format!("duplicate generator {generator} at coordinate {index}"),
+            });
+        }
+    }
+
+    for &generator in generators {
+        let inverse = group.inv(generator)?;
+        if !seen.contains(&inverse) {
+            return Err(QecError::InvalidQuantumTannerGeneratorSet {
+                set,
+                reason: format!("generator {generator} is missing inverse {inverse}"),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn oriented_face_vertices(
+    group: &ValidatedFiniteGroup,
+    root: usize,
+    a: usize,
+    b: usize,
+) -> Result<[usize; 4]> {
+    let ag = group.multiply(a, root)?;
+    let gb = group.multiply(root, b)?;
+    let agb = group.multiply(ag, b)?;
+    let mut vertices = [root, ag, gb, agb];
+    vertices.sort_unstable();
+    if vertices.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(QecError::DegenerateQuantumTannerFace {
+            root,
+            a,
+            b,
+            vertices: vertices.to_vec(),
+        });
+    }
+    Ok(vertices)
+}
+
+fn inverse_generator_indices(
+    generators: &[usize],
+    group: &ValidatedFiniteGroup,
+) -> Result<BTreeMap<usize, usize>> {
+    let generator_indices = generators
+        .iter()
+        .enumerate()
+        .map(|(index, &generator)| (generator, index))
+        .collect::<BTreeMap<_, _>>();
+    generators
+        .iter()
+        .map(|&generator| {
+            let inverse = group.inv(generator)?;
+            Ok((generator, generator_indices[&inverse]))
+        })
+        .collect()
 }
 
 fn parse_local_codes(
