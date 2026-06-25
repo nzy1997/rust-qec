@@ -43,10 +43,38 @@ pub struct RunnerSpec {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct PlotSpec {
     pub title: String,
+    #[serde(default)]
+    pub logical_rate_unit: LogicalRateUnit,
     pub x: AxisSpec,
     pub series: SeriesSpec,
     #[serde(default, rename = "panel")]
     pub panels: Vec<PanelSpec>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LogicalRateUnit {
+    PerShot,
+    PerRound,
+    PerObservable,
+    PerRoundPerObservable,
+}
+
+impl Default for LogicalRateUnit {
+    fn default() -> Self {
+        Self::PerShot
+    }
+}
+
+impl LogicalRateUnit {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::PerShot => "per_shot",
+            Self::PerRound => "per_round",
+            Self::PerObservable => "per_observable",
+            Self::PerRoundPerObservable => "per_round_per_observable",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

@@ -1,6 +1,7 @@
 use rsinter::bb_circuit_memory::{
-    OperationKind, SimulationConfig, build_code, build_effective_models, build_syndrome_cycle,
-    build_upstream_code, run_simulation, sample_seeded_trial,
+    bb_circuit_bposd_result_row, build_code, build_effective_models, build_syndrome_cycle,
+    build_upstream_code, run_simulation, run_simulation_for_code, sample_seeded_trial,
+    validate_bposd_profile_result_row, OperationKind, SimulationConfig,
 };
 
 #[test]
@@ -83,16 +84,12 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
 
     assert_eq!(operations.len(), 216 + 5 * 144 + 216 + 288);
 
-    assert!(
-        operations[..72]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::PrepX)
-    );
-    assert!(
-        operations[72..144]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::Cnot)
-    );
+    assert!(operations[..72]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::PrepX));
+    assert!(operations[72..144]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::Cnot));
     assert!(operations[144..216].iter().all(|operation| {
         operation.kind() == OperationKind::Idle
             && operation.qubits().len() == 1
@@ -102,54 +99,40 @@ fn upstream_syndrome_cycle_has_expected_layer_order() {
     for round in 0..5 {
         let start = 216 + round * 144;
         let end = start + 144;
-        assert!(
-            operations[start..end]
-                .iter()
-                .all(|operation| operation.kind() == OperationKind::Cnot)
-        );
+        assert!(operations[start..end]
+            .iter()
+            .all(|operation| operation.kind() == OperationKind::Cnot));
     }
 
     let round6 = 216 + 5 * 144;
-    assert!(
-        operations[round6..round6 + 72]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::MeasZ)
-    );
-    assert!(
-        operations[round6 + 72..round6 + 144]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::Cnot)
-    );
-    assert!(
-        operations[round6 + 144..round6 + 216]
-            .iter()
-            .all(|operation| {
-                operation.kind() == OperationKind::Idle
-                    && operation.qubits().len() == 1
-                    && (data_start..=data_end).contains(&operation.qubits()[0])
-            })
-    );
+    assert!(operations[round6..round6 + 72]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::MeasZ));
+    assert!(operations[round6 + 72..round6 + 144]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::Cnot));
+    assert!(operations[round6 + 144..round6 + 216]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
 
     let final_layer = round6 + 216;
-    assert!(
-        operations[final_layer..final_layer + 144]
-            .iter()
-            .all(|operation| {
-                operation.kind() == OperationKind::Idle
-                    && operation.qubits().len() == 1
-                    && (data_start..=data_end).contains(&operation.qubits()[0])
-            })
-    );
-    assert!(
-        operations[final_layer + 144..final_layer + 216]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::MeasX)
-    );
-    assert!(
-        operations[final_layer + 216..final_layer + 288]
-            .iter()
-            .all(|operation| operation.kind() == OperationKind::PrepZ)
-    );
+    assert!(operations[final_layer..final_layer + 144]
+        .iter()
+        .all(|operation| {
+            operation.kind() == OperationKind::Idle
+                && operation.qubits().len() == 1
+                && (data_start..=data_end).contains(&operation.qubits()[0])
+        }));
+    assert!(operations[final_layer + 144..final_layer + 216]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::MeasX));
+    assert!(operations[final_layer + 216..final_layer + 288]
+        .iter()
+        .all(|operation| operation.kind() == OperationKind::PrepZ));
 
     assert_eq!(checks, 72);
 }
@@ -264,11 +247,102 @@ fn effective_models_only_use_basis_specific_logical_rows() {
             "expected at least one augmented column with logical support"
         );
         assert!(logical_rows.iter().all(|&row| row < logical_rows_end));
-        assert!(
-            model
-                .augmented_columns
-                .iter()
-                .any(|column| column.iter().any(|&row| row >= first_logical_row))
-        );
+        assert!(model
+            .augmented_columns
+            .iter()
+            .any(|column| column.iter().any(|&row| row >= first_logical_row)));
     }
+}
+
+#[test]
+fn bb_circuit_bposd_timing_counters_partition_decode_work() {
+    let result = run_simulation_for_code(
+        "bb90",
+        SimulationConfig {
+            physical_error_rate: 0.003,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(1),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        },
+    )
+    .unwrap();
+
+    let profile = &result.profile;
+    assert!(profile.setup_seconds.is_finite());
+    assert!(profile.sample_seconds.is_finite());
+    assert!(profile.decode_seconds.is_finite());
+    assert!(profile.decode_call_count > 0);
+    assert_eq!(
+        profile.decode_call_count,
+        profile.z_decode_call_count + profile.x_decode_call_count
+    );
+    assert_eq!(profile.osd_candidate_count, 0);
+    assert!(
+        profile.bp_iteration_count >= profile.decode_call_count,
+        "bp iterations {} should cover decode calls {} for this nontrivial sampled trial",
+        profile.bp_iteration_count,
+        profile.decode_call_count
+    );
+
+    let row = bb_circuit_bposd_result_row("bb90", &result);
+    validate_bposd_profile_result_row(&row).unwrap();
+    for key in [
+        "setup_seconds",
+        "sample_seconds",
+        "decode_seconds",
+        "bp_seconds",
+        "osd_seconds",
+        "decode_call_count",
+        "z_decode_call_count",
+        "x_decode_call_count",
+        "bp_iteration_count",
+        "osd_use_count",
+        "osd_candidate_count",
+        "gf2_solve_count",
+        "gf2_full_elimination_count",
+    ] {
+        assert!(row.metrics.contains_key(key), "missing metric {key}");
+    }
+}
+
+#[test]
+fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
+    let mut result = run_simulation_for_code(
+        "bb90",
+        SimulationConfig {
+            physical_error_rate: 1.0e-12,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(1),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        },
+    )
+    .unwrap();
+
+    let mut missing = bb_circuit_bposd_result_row("bb90", &result);
+    missing.metrics.remove("decode_call_count");
+    assert!(validate_bposd_profile_result_row(&missing).is_err());
+
+    let mut non_finite = bb_circuit_bposd_result_row("bb90", &result);
+    non_finite
+        .metrics
+        .insert("decode_seconds".to_string(), f64::NAN);
+    assert!(validate_bposd_profile_result_row(&non_finite).is_err());
+
+    let mut negative = bb_circuit_bposd_result_row("bb90", &result);
+    negative.metrics.insert("decode_seconds".to_string(), -1.0);
+    assert!(validate_bposd_profile_result_row(&negative).is_err());
+
+    let mut fractional_counter = bb_circuit_bposd_result_row("bb90", &result);
+    fractional_counter
+        .metrics
+        .insert("osd_candidate_count".to_string(), 1.5);
+    assert!(validate_bposd_profile_result_row(&fractional_counter).is_err());
+
+    result.profile.x_decode_call_count += 1;
+    let mismatched = bb_circuit_bposd_result_row("bb90", &result);
+    assert!(validate_bposd_profile_result_row(&mismatched).is_err());
 }

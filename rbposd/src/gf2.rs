@@ -2,6 +2,12 @@ use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Gf2SolveStats {
+    pub(crate) solve_count: usize,
+    pub(crate) full_elimination_count: usize,
+}
+
 #[cfg(test)]
 pub(crate) fn sort_columns_by_reliability(scores: &[f64]) -> Vec<usize> {
     let mut order: Vec<usize> = (0..scores.len()).collect();
@@ -69,8 +75,8 @@ impl PreparedLinearSystem {
         syndrome: &Syndrome,
         column_order: &[usize],
     ) -> Result<Correction, DecodeError> {
-        self.solve_with_column_order_detailed(syndrome, column_order, &[])
-            .map(|solution| solution.correction)
+        self.solve_with_column_order_detailed_with_stats(syndrome, column_order, &[])
+            .map(|(solution, _)| solution.correction)
     }
 
     pub(crate) fn solve_with_column_order_detailed(
@@ -79,6 +85,39 @@ impl PreparedLinearSystem {
         column_order: &[usize],
         forced_true_columns: &[usize],
     ) -> Result<DetailedSolution, DecodeError> {
+        self.solve_with_column_order_detailed_with_stats(
+            syndrome,
+            column_order,
+            forced_true_columns,
+        )
+        .map(|(solution, _)| solution)
+    }
+
+    pub(crate) fn solve_with_column_order_detailed_with_stats(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+        forced_true_columns: &[usize],
+    ) -> Result<(DetailedSolution, Gf2SolveStats), DecodeError> {
+        let mut stats = Gf2SolveStats::default();
+        let solution = self.solve_with_column_order_detailed_counting(
+            syndrome,
+            column_order,
+            forced_true_columns,
+            &mut stats,
+        )?;
+        Ok((solution, stats))
+    }
+
+    pub(crate) fn solve_with_column_order_detailed_counting(
+        &mut self,
+        syndrome: &Syndrome,
+        column_order: &[usize],
+        forced_true_columns: &[usize],
+        stats: &mut Gf2SolveStats,
+    ) -> Result<DetailedSolution, DecodeError> {
+        stats.solve_count += 1;
+        stats.full_elimination_count += 1;
         self.scratch_rows.clone_from(&self.base_rows);
         self.scratch_rhs.copy_from_slice(syndrome.as_slice());
         self.pivot_columns.clear();
@@ -163,8 +202,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
-        sort_columns_by_unreliability,
+        solve_with_column_order, sort_columns_by_reliability, sort_columns_by_unreliability,
+        PreparedLinearSystem,
     };
 
     #[test]
@@ -252,6 +291,22 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error, DecodeError::SingularSystem);
+    }
+
+    #[test]
+    fn prepared_system_counts_failed_detailed_solve_attempts() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+
+        let error = prepared
+            .solve_with_column_order_detailed_counting(&syndrome, &[0, 1, 2], &[0], &mut stats)
+            .unwrap_err();
+
+        assert_eq!(error, DecodeError::SingularSystem);
+        assert_eq!(stats.solve_count, 1);
+        assert_eq!(stats.full_elimination_count, 1);
     }
 
     #[test]
