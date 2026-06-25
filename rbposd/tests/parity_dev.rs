@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rbposd::{Correction, DecodeError, DecodeResult};
+use rbposd::{Correction, DecodeError, DecodeResult, DecodeStats};
 
 #[path = "../dev/parity_runner.rs"]
 mod parity_runner;
@@ -87,6 +87,7 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
         bp_iterations: 7,
         used_osd: true,
         residual_syndrome_weight: 1,
+        stats: DecodeStats::default(),
     });
 
     assert_eq!(
