@@ -19,7 +19,7 @@ The main command families are:
 - sampling: `sample`, `detect`, `sample_dem`
 - transforms: `convert`, `m2d`
 - analysis: `analyze_errors`, `explain_errors`
-- generation and export: `gen`, `export_json`
+- generation and export: `gen`, `render_svg`, `export_json`
 
 ## Inspect Circuits with `stats`
 
@@ -234,6 +234,47 @@ span; invalid rows fail before a circuit is written.
 This command is a convenient front door to the circuit generation APIs in
 `rstim::codegen`.
 
+## Render SVG diagrams with `render_svg`
+
+`render_svg` is the primary static circuit visualization path. It parses a
+Stim-like circuit, builds the repository's QP101 document internally, and emits
+an SVG diagram without requiring Typst:
+
+```sh
+rstim render_svg --in circuit.stim --out circuit.svg
+```
+
+The command follows the common CLI I/O convention. `--in <path>` reads a circuit
+from a file; omitting `--in` reads from stdin. `--out <path>` writes the SVG to a
+file; omitting `--out` writes SVG to stdout:
+
+```sh
+printf 'H 0\nCX 0 1\nTICK\nM 0\n' | rstim render_svg > circuit.svg
+```
+
+For seeded sample-shot overlays, pass `--sample_shot` and an optional
+deterministic seed:
+
+```sh
+rstim render_svg --sample_shot --seed 7 --in circuit.stim --out sample.svg
+```
+
+The sample-shot SVG includes visible QP101 annotations for supported sampled
+events such as fired noise branches, loss-caused measurement information,
+measurement outcomes, and detector flips. `--seed` is only supported with
+`--sample_shot`; running `rstim render_svg --seed 7` without `--sample_shot`
+fails with `--seed is only supported with --sample_shot`.
+
+For detector-error-model debugging, render one DEM error term as source and
+symptom highlights:
+
+```sh
+rstim render_svg --highlight_dem_error 0 --in circuit.stim --out highlight.svg
+```
+
+`--sample_shot` and `--highlight_dem_error` are mutually exclusive. Use one
+overlay mode per render.
+
 ## Export QP101 JSON with `export_json`
 
 `export_json` converts a circuit into the repository's QP101 JSON document:
@@ -247,7 +288,9 @@ Formats:
 - `--format pretty` default
 - `--format compact`
 
-This is useful for external visualization or structured downstream processing.
+Use `export_json` when you need QP101 structured data for downstream
+processing, fixture generation, or the optional legacy/prototype Typst
+`qp101-viz` workflow. For ordinary static SVG diagrams, prefer `render_svg`.
 
 ## Suggested Workflow
 
@@ -257,4 +300,5 @@ For a typical CLI session:
 2. `rstim sample` or `rstim detect` to generate shot data
 3. `rstim analyze_errors` to derive a DEM
 4. `rstim m2d` or `rstim explain_errors` when converting or debugging data paths
-5. `rstim export_json` when handing the circuit to structured tooling
+5. `rstim render_svg` when you want a static SVG circuit diagram
+6. `rstim export_json` when handing QP101 data to structured tooling

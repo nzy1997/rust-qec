@@ -1,6 +1,15 @@
 # qp101-viz
 
-`qp101-viz` is a local Typst package prototype for rendering QP101-ZY circuit JSON as a timeline view.
+`qp101-viz` is a local Typst package prototype for rendering QP101-ZY circuit
+JSON as a timeline view. For normal static SVG output, prefer the built-in
+`rstim render_svg` CLI:
+
+```sh
+rstim render_svg --in circuit.stim --out circuit.svg
+```
+
+This package remains useful as optional legacy/prototype infrastructure for
+Typst-specific workflows and direct QP101 JSON experiments.
 
 ## Scope
 

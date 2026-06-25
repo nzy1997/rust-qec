@@ -406,3 +406,90 @@ fn render_svg_sample_export_errors_preserve_existing_output() {
     let protected_text = std::fs::read_to_string(protected_output.path()).unwrap();
     assert_eq!(protected_text, "existing svg should remain");
 }
+
+#[test]
+fn render_svg_documented_workflow_matches_cli() {
+    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("rstim crate should live under repository root");
+    let read_doc = |path: &str| -> String {
+        std::fs::read_to_string(repo_root.join(path))
+            .unwrap_or_else(|err| panic!("failed to read {path}: {err}"))
+    };
+    let readme = read_doc("README.md");
+    let cli_doc = read_doc("rstim/doc/cli.md");
+
+    for (name, doc) in [("README.md", &readme), ("rstim/doc/cli.md", &cli_doc)] {
+        assert!(doc.contains("render_svg"), "{name} should document render_svg");
+        assert!(
+            doc.contains("export_json"),
+            "{name} should still document export_json for QP101 data export"
+        );
+        assert!(
+            !doc.contains("rstim svg_render"),
+            "{name} should not contain stale svg_render command spelling"
+        );
+    }
+
+    for required in [
+        "rstim render_svg --in circuit.stim --out circuit.svg",
+        "--sample_shot --seed 7",
+        "--highlight_dem_error 0",
+        "--seed is only supported with --sample_shot",
+    ] {
+        assert!(
+            cli_doc.contains(required),
+            "CLI docs missing documented render_svg workflow marker {required}"
+        );
+    }
+
+    let circuit = "H 0\nCX 0 1\nTICK\nM 0\n";
+    let input = tempfile::NamedTempFile::new().unwrap();
+    let output = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(input.path(), circuit).unwrap();
+
+    let plain_output = rstim_cmd()
+        .arg("render_svg")
+        .arg("--in")
+        .arg(input.path())
+        .arg("--out")
+        .arg(output.path())
+        .output()
+        .unwrap();
+    assert!(
+        plain_output.status.success(),
+        "documented plain render command should succeed, stderr: {}",
+        String::from_utf8_lossy(&plain_output.stderr)
+    );
+    assert!(
+        plain_output.stdout.is_empty(),
+        "documented file-output render should not write stdout: {}",
+        String::from_utf8_lossy(&plain_output.stdout)
+    );
+    let svg = std::fs::read_to_string(output.path()).unwrap();
+    assert!(svg.starts_with("<svg"), "documented command produced non-SVG: {svg}");
+    for marker in ["q0", "H", "M"] {
+        assert!(
+            svg.contains(marker),
+            "documented command SVG missing marker {marker}: {svg}"
+        );
+    }
+
+    let protected_output = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(protected_output.path(), "existing svg should remain").unwrap();
+    let bad_output = run_render_svg_with_stdin_args(
+        &["--seed", "7", "--out", protected_output.path().to_str().unwrap()],
+        "M 0\n",
+    );
+    assert!(
+        !bad_output.status.success(),
+        "documented --seed without --sample_shot failure should fail"
+    );
+    let stderr = String::from_utf8_lossy(&bad_output.stderr);
+    assert!(
+        stderr.contains("--seed is only supported with --sample_shot"),
+        "stderr should match documented seed compatibility error: {stderr}"
+    );
+    let protected_text = std::fs::read_to_string(protected_output.path()).unwrap();
+    assert_eq!(protected_text, "existing svg should remain");
+}
