@@ -126,8 +126,9 @@ impl PreparedLinearSystem {
         forced_true_columns: &[usize],
         stats: &mut Gf2SolveStats,
     ) -> Result<DetailedSolution, DecodeError> {
+        stats.solve_count += 1;
         let reduced = self.reduce_with_column_order_counting(syndrome, column_order, stats)?;
-        reduced.solve_with_forced_columns_counting(forced_true_columns, stats)
+        reduced.solve_with_forced_columns(forced_true_columns)
     }
 
     pub(crate) fn reduce_with_column_order_counting(
@@ -194,12 +195,10 @@ impl PreparedLinearSystem {
 }
 
 impl ReducedLinearSystem {
-    pub(crate) fn solve_with_forced_columns_counting(
+    fn solve_with_forced_columns(
         &self,
         forced_true_columns: &[usize],
-        stats: &mut Gf2SolveStats,
     ) -> Result<DetailedSolution, DecodeError> {
-        stats.solve_count += 1;
         let mut solution = vec![false; self.num_bits];
         for &column in forced_true_columns {
             if column >= self.num_bits {
@@ -229,6 +228,15 @@ impl ReducedLinearSystem {
             pivot_columns: self.pivot_columns.clone(),
             free_columns: self.free_columns.clone(),
         })
+    }
+
+    pub(crate) fn solve_with_forced_columns_counting(
+        &self,
+        forced_true_columns: &[usize],
+        stats: &mut Gf2SolveStats,
+    ) -> Result<DetailedSolution, DecodeError> {
+        stats.solve_count += 1;
+        self.solve_with_forced_columns(forced_true_columns)
     }
 }
 
@@ -353,6 +361,22 @@ mod tests {
 
         let error = prepared
             .solve_with_column_order_detailed_counting(&syndrome, &[0, 1, 2], &[0], &mut stats)
+            .unwrap_err();
+
+        assert_eq!(error, DecodeError::SingularSystem);
+        assert_eq!(stats.solve_count, 1);
+        assert_eq!(stats.full_elimination_count, 1);
+    }
+
+    #[test]
+    fn prepared_system_counts_reduction_time_singular_solve_attempts() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 1, vec![vec![0], vec![0]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+
+        let error = prepared
+            .solve_with_column_order_detailed_counting(&syndrome, &[0], &[], &mut stats)
             .unwrap_err();
 
         assert_eq!(error, DecodeError::SingularSystem);
