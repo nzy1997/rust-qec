@@ -10,7 +10,18 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum DistanceBoundMethod {
     RandomizedUpperBound,
+    RandomWindowUpperBound,
     Exact,
+}
+
+impl DistanceBoundMethod {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::RandomizedUpperBound => "randomized-upper-bound",
+            Self::RandomWindowUpperBound => "random-window-upper-bound",
+            Self::Exact => "exact",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,20 +290,54 @@ pub struct BoundValidationContext<'a> {
     pub known_exact_distance: Option<usize>,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Issue225LadderCase {
+    pub case_id: String,
+    pub source_issue: u64,
+    pub code_id: String,
+    pub expected_upper_bound: usize,
+    pub target_weight: usize,
+    pub tier: String,
+    pub run_mode: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MethodAwareBoundValidationContext<'a> {
+    pub code: &'a StabilizerCode,
+    pub expected_method: DistanceBoundMethod,
+    pub known_exact_distance: Option<usize>,
+}
+
 pub fn validate_randomized_upper_bound_result(
     result: &DistanceBoundResult,
     context: BoundValidationContext<'_>,
 ) -> Result<()> {
+    validate_distance_bound_result(
+        result,
+        MethodAwareBoundValidationContext {
+            code: context.code,
+            expected_method: DistanceBoundMethod::RandomizedUpperBound,
+            known_exact_distance: context.known_exact_distance,
+        },
+    )
+}
+
+pub fn validate_distance_bound_result(
+    result: &DistanceBoundResult,
+    context: MethodAwareBoundValidationContext<'_>,
+) -> Result<()> {
     result.options.validate()?;
 
-    if result.method != DistanceBoundMethod::RandomizedUpperBound {
-        return Err(QecError::DistanceBoundValidationFailed(
-            "distance bound method must be randomized-upper-bound".to_owned(),
-        ));
+    if result.method != context.expected_method {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "expected method {}, got {}",
+            context.expected_method.label(),
+            result.method.label()
+        )));
     }
     if result.bound_type != BoundType::Upper {
         return Err(QecError::DistanceBoundValidationFailed(
-            "randomized-upper-bound results must use bound_type upper".to_owned(),
+            "distance bound results must use bound_type upper".to_owned(),
         ));
     }
     if result.upper_bound == 0 {
@@ -339,6 +384,50 @@ pub fn validate_randomized_upper_bound_result(
     }
 
     Ok(())
+}
+
+pub fn verify_issue_225_ladder_case(
+    case: &Issue225LadderCase,
+    result: &DistanceBoundResult,
+    css: &CssCode,
+    expected_method: DistanceBoundMethod,
+) -> Result<()> {
+    if result.method != expected_method {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "{} expected method {}, got {}",
+            case.case_id,
+            expected_method.label(),
+            result.method.label()
+        )));
+    }
+
+    validate_distance_bound_result(
+        result,
+        MethodAwareBoundValidationContext {
+            code: css.code(),
+            expected_method,
+            known_exact_distance: None,
+        },
+    )
+    .map_err(|error| prefix_ladder_case_error(&case.case_id, error))?;
+
+    if result.upper_bound > case.expected_upper_bound {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "{} expected upper_bound <= {}, got {}",
+            case.case_id, case.expected_upper_bound, result.upper_bound
+        )));
+    }
+
+    Ok(())
+}
+
+fn prefix_ladder_case_error(case_id: &str, error: QecError) -> QecError {
+    match error {
+        QecError::DistanceBoundValidationFailed(message) => {
+            QecError::DistanceBoundValidationFailed(format!("{case_id} {message}"))
+        }
+        other => QecError::DistanceBoundValidationFailed(format!("{case_id} {other}")),
+    }
 }
 
 fn classify_witness_support(witness: &Pauli) -> LogicalClass {

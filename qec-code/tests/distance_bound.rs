@@ -3,8 +3,9 @@ use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
     BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
-    DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, RandomizedUpperBoundOptions,
-    randomized_css_upper_bound, validate_randomized_upper_bound_result,
+    DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, Issue225LadderCase,
+    RandomizedUpperBoundOptions, randomized_css_upper_bound,
+    validate_randomized_upper_bound_result, verify_issue_225_ladder_case,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 
@@ -33,6 +34,46 @@ fn valid_result() -> DistanceBoundResult {
             restarts: 1,
             seed: 7,
             target_weight: None,
+        },
+    )
+}
+
+fn issue_225_ladder_cases() -> Vec<Issue225LadderCase> {
+    serde_json::from_str(include_str!("fixtures/distance/issue_225_ladder.json"))
+        .expect("issue-225 ladder fixture should deserialize")
+}
+
+fn issue_225_case(case_id: &str) -> Issue225LadderCase {
+    issue_225_ladder_cases()
+        .into_iter()
+        .find(|case| case.case_id == case_id)
+        .expect("requested issue-225 ladder case should exist")
+}
+
+fn css_from_built_in_code_id(code_id: &str) -> CssCode {
+    let checks = built_in_css_checks(code_id).unwrap();
+    css_from_sparse_rows(checks.num_cols, checks.hx, checks.hz)
+}
+
+fn x_only_witness(num_qubits: usize, support: &[usize]) -> DistanceBoundWitness {
+    let mut x = vec![0; num_qubits];
+    for &qubit in support {
+        x[qubit] = 1;
+    }
+    let pauli = Pauli::from_xz_bits(x, vec![0; num_qubits]).unwrap();
+    DistanceBoundWitness::from_pauli(&pauli)
+}
+
+fn surface_rotated_d5_result_with_x_support(support: &[usize]) -> DistanceBoundResult {
+    DistanceBoundResult::completed(
+        support.len(),
+        LogicalClass::XLike,
+        x_only_witness(25, support),
+        RandomizedUpperBoundOptions {
+            iterations: 5000,
+            restarts: 8,
+            seed: 225,
+            target_weight: Some(5),
         },
     )
 }
@@ -134,7 +175,7 @@ fn validator_rejects_exact_labeled_randomized_result() {
             },
         ),
         Err(QecError::DistanceBoundValidationFailed(
-            "randomized-upper-bound results must use bound_type upper".to_owned(),
+            "distance bound results must use bound_type upper".to_owned(),
         ))
     );
 }
@@ -154,7 +195,7 @@ fn validator_rejects_wrong_method() {
             },
         ),
         Err(QecError::DistanceBoundValidationFailed(
-            "distance bound method must be randomized-upper-bound".to_owned(),
+            "expected method randomized-upper-bound, got exact".to_owned(),
         ))
     );
 }
@@ -406,6 +447,97 @@ fn validator_rejects_stabilizer_span_witness() {
         Err(QecError::DistanceBoundValidationFailed(
             "witness lies in stabilizer span".to_owned(),
         ))
+    );
+}
+
+#[test]
+fn issue_225_ladder_verifier_accepts_exact_upper_bounds_and_rejects_loose_bounds() {
+    let case = issue_225_case("surface_rotated_d5");
+    let css = css_from_built_in_code_id(&case.code_id);
+    let exact = surface_rotated_d5_result_with_x_support(&[0, 1, 2, 3, 4]);
+
+    verify_issue_225_ladder_case(
+        &case,
+        &exact,
+        &css,
+        DistanceBoundMethod::RandomizedUpperBound,
+    )
+    .unwrap();
+
+    let loose = surface_rotated_d5_result_with_x_support(&[0, 1, 2, 3, 4, 9, 14]);
+    let error = verify_issue_225_ladder_case(
+        &case,
+        &loose,
+        &css,
+        DistanceBoundMethod::RandomizedUpperBound,
+    )
+    .expect_err("expected loose bound rejection");
+
+    assert_eq!(
+        error,
+        QecError::DistanceBoundValidationFailed(
+            "surface_rotated_d5 expected upper_bound <= 5, got 7".to_owned(),
+        )
+    );
+}
+
+#[test]
+fn issue_225_ladder_verifier_rejects_unvalidated_witness() {
+    let case = issue_225_case("surface_rotated_d5");
+    let css = css_from_built_in_code_id(&case.code_id);
+
+    let stabilizer_span = surface_rotated_d5_result_with_x_support(&[0, 5]);
+    let span_error = verify_issue_225_ladder_case(
+        &case,
+        &stabilizer_span,
+        &css,
+        DistanceBoundMethod::RandomizedUpperBound,
+    )
+    .expect_err("expected stabilizer-span witness rejection");
+    assert_eq!(
+        span_error,
+        QecError::DistanceBoundValidationFailed(
+            "surface_rotated_d5 witness lies in stabilizer span".to_owned(),
+        )
+    );
+
+    let mut mismatched_weight = surface_rotated_d5_result_with_x_support(&[0, 1, 2, 3, 4]);
+    mismatched_weight.witness.weight = 4;
+    let weight_error = verify_issue_225_ladder_case(
+        &case,
+        &mismatched_weight,
+        &css,
+        DistanceBoundMethod::RandomizedUpperBound,
+    )
+    .expect_err("expected serialized witness weight rejection");
+    assert_eq!(
+        weight_error,
+        QecError::DistanceBoundValidationFailed(
+            "surface_rotated_d5 upper_bound must equal witness weight".to_owned(),
+        )
+    );
+}
+
+#[test]
+fn issue_225_ladder_verifier_rejects_wrong_method_label() {
+    let case = issue_225_case("surface_rotated_d5");
+    let css = css_from_built_in_code_id(&case.code_id);
+    let result = surface_rotated_d5_result_with_x_support(&[0, 1, 2, 3, 4]);
+
+    let error = verify_issue_225_ladder_case(
+        &case,
+        &result,
+        &css,
+        DistanceBoundMethod::RandomWindowUpperBound,
+    )
+    .expect_err("expected method mismatch rejection");
+
+    assert_eq!(
+        error,
+        QecError::DistanceBoundValidationFailed(
+            "surface_rotated_d5 expected method random-window-upper-bound, got randomized-upper-bound"
+                .to_owned(),
+        )
     );
 }
 
