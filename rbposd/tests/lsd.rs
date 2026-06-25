@@ -109,6 +109,15 @@ fn bplsddecoder_public_api_matches_reference_contract() {
     let result = decoder.decode(&syndrome).unwrap();
 
     assert!(!result.used_osd);
+    assert_eq!(result.stats.decode_call_count, 1);
+    assert_eq!(result.stats.bp_iteration_count, result.bp_iterations);
+    assert!(result.stats.bp_seconds.is_finite());
+    assert!(result.stats.bp_seconds >= 0.0);
+    assert_eq!(result.stats.osd_seconds, 0.0);
+    assert_eq!(result.stats.osd_use_count, 0);
+    assert_eq!(result.stats.osd_candidate_count, 0);
+    assert_eq!(result.stats.gf2_solve_count, 0);
+    assert_eq!(result.stats.gf2_full_elimination_count, 0);
     assert_eq!(result.residual_syndrome_weight, 0);
     assert_eq!(pcm.multiply(&result.correction), syndrome);
 }

@@ -39,6 +39,12 @@ fn minimum_sum_decodes_a_single_flip_without_osd() {
     assert!(result.converged);
     assert!(!result.used_osd);
     assert_eq!(result.bp_iterations > 0, true);
+    assert_eq!(result.stats.decode_call_count, 1);
+    assert_eq!(result.stats.bp_iteration_count, result.bp_iterations);
+    assert!(result.stats.bp_seconds.is_finite());
+    assert!(result.stats.bp_seconds >= 0.0);
+    assert_eq!(result.stats.osd_seconds, 0.0);
+    assert_eq!(result.stats.osd_use_count, 0);
     assert_eq!(result.residual_syndrome_weight, 0);
     assert_eq!(pcm.multiply(&result.correction), syndrome);
     assert_eq!(

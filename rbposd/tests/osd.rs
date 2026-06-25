@@ -204,9 +204,9 @@ fn osd0_decode_reports_zero_candidate_and_one_gf2_solve() {
     let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
     let decoder = BpOsdDecoder::new(
         pcm,
-        ChannelModel::BitFlipProbabilities(vec![0.1, 0.1, 0.9]),
+        ChannelModel::BitFlipProbabilities(vec![0.1, 0.1, 0.1]),
         DecoderConfig {
-            max_bp_iterations: 1,
+            max_bp_iterations: 0,
             osd_order: 0,
             ..DecoderConfig::default()
         },
@@ -216,12 +216,11 @@ fn osd0_decode_reports_zero_candidate_and_one_gf2_solve() {
     let result = decoder.decode(&Syndrome::from(vec![true, true])).unwrap();
 
     assert_eq!(result.stats.decode_call_count, 1);
-    assert_eq!(result.stats.osd_use_count, usize::from(result.used_osd));
+    assert!(result.used_osd);
+    assert_eq!(result.stats.osd_use_count, 1);
     assert_eq!(result.stats.osd_candidate_count, 0);
-    if result.used_osd {
-        assert_eq!(result.stats.gf2_solve_count, 1);
-        assert_eq!(result.stats.gf2_full_elimination_count, 1);
-    }
+    assert_eq!(result.stats.gf2_solve_count, 1);
+    assert_eq!(result.stats.gf2_full_elimination_count, 1);
 }
 
 #[test]
@@ -243,6 +242,10 @@ fn osd_order_two_decode_reports_candidate_and_gf2_counters() {
     assert_eq!(result.stats.decode_call_count, 1);
     assert!(result.used_osd);
     assert_eq!(result.stats.osd_use_count, 1);
+    assert!(result.stats.bp_seconds.is_finite());
+    assert!(result.stats.bp_seconds >= 0.0);
+    assert!(result.stats.osd_seconds.is_finite());
+    assert!(result.stats.osd_seconds >= 0.0);
     assert!(result.stats.osd_candidate_count > 0);
     assert_eq!(
         result.stats.gf2_solve_count,

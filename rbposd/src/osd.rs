@@ -175,15 +175,15 @@ fn best_osd_candidate(
     for order in 1..=max_order {
         visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
             stats.osd_candidate_count += 1;
-            if let Ok((candidate, gf2_stats)) = workspace
-                .prepared
-                .solve_with_column_order_detailed_with_stats(
-                    target_syndrome,
-                    &workspace.column_order,
-                    columns,
-                )
-            {
-                accumulate_gf2_stats(stats, gf2_stats);
+            let mut gf2_stats = Gf2SolveStats::default();
+            let candidate = workspace.prepared.solve_with_column_order_detailed_counting(
+                target_syndrome,
+                &workspace.column_order,
+                columns,
+                &mut gf2_stats,
+            );
+            accumulate_gf2_stats(stats, gf2_stats);
+            if let Ok(candidate) = candidate {
                 if is_better_solution(&candidate, &best, reliability) {
                     best = candidate;
                 }
