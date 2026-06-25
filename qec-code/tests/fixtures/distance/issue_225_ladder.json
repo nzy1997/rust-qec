@@ -1,0 +1,10 @@
+[
+  {"case_id":"surface_rotated_d5","source_issue":225,"code_id":"surface_rotated:d=5","expected_upper_bound":5,"target_weight":5,"tier":"smoke","run_mode":"default_ci"},
+  {"case_id":"surface_rotated_d9","source_issue":225,"code_id":"surface_rotated:d=9","expected_upper_bound":9,"target_weight":9,"tier":"full","run_mode":"ignored_full"},
+  {"case_id":"surface_rotated_d13","source_issue":225,"code_id":"surface_rotated:d=13","expected_upper_bound":13,"target_weight":13,"tier":"full","run_mode":"ignored_full"},
+  {"case_id":"toric_d5","source_issue":225,"code_id":"toric:d=5","expected_upper_bound":5,"target_weight":5,"tier":"smoke","run_mode":"default_ci"},
+  {"case_id":"toric_d9","source_issue":225,"code_id":"toric:d=9","expected_upper_bound":9,"target_weight":9,"tier":"full","run_mode":"ignored_full"},
+  {"case_id":"toric_d13","source_issue":225,"code_id":"toric:d=13","expected_upper_bound":13,"target_weight":13,"tier":"full","run_mode":"ignored_full"},
+  {"case_id":"bb72","source_issue":225,"code_id":"bb72","expected_upper_bound":6,"target_weight":6,"tier":"smoke","run_mode":"default_ci"},
+  {"case_id":"bb144","source_issue":225,"code_id":"bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0","expected_upper_bound":12,"target_weight":12,"tier":"full","run_mode":"ignored_full"}
+]
