@@ -16,6 +16,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT / "benchmarks" / "bb_circuit_bposd_compare" / "results"
 )
+PYTHON_UPSTREAM_SEED = 12345
+PYTHON_UPSTREAM_BP_METHOD = "ms"
+PYTHON_UPSTREAM_MAX_ITER = 10000
+PYTHON_UPSTREAM_OSD_METHOD = "osd_cs"
+PYTHON_UPSTREAM_OSD_ORDER = 7
 
 
 def _format_value(value: Any) -> str:
@@ -53,6 +58,16 @@ def _write_rows(rows: list[dict[str, str]], out_path: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in CSV_HEADER})
+
+
+def _python_upstream_settings() -> dict[str, str]:
+    return {
+        "seed": _format_value(PYTHON_UPSTREAM_SEED),
+        "bp_method": PYTHON_UPSTREAM_BP_METHOD,
+        "max_iter": _format_value(PYTHON_UPSTREAM_MAX_ITER),
+        "osd_method": PYTHON_UPSTREAM_OSD_METHOD,
+        "osd_order": _format_value(PYTHON_UPSTREAM_OSD_ORDER),
+    }
 
 
 def _run_rust_export(case: CompareCase) -> dict[str, Any]:
@@ -124,6 +139,7 @@ def _rust_error_row(case: CompareCase, error: Exception) -> dict[str, str]:
 
 def _skipped_python_row(case: CompareCase, error: Exception) -> dict[str, str]:
     row = _base_row(case, "ldpc_bposd")
+    row.update(_python_upstream_settings())
     row.update({"status": "skipped", "error": str(error)})
     return row
 
@@ -159,19 +175,19 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
     z_decoder = BpOsdDecoder(
         _dense_matrix(export["z_model"], np),
         error_channel=export["z_model"]["channel_probs"],
-        max_iter=case.max_iter,
-        bp_method="ms",
-        osd_method="osd_cs",
-        osd_order=case.osd_order,
+        max_iter=PYTHON_UPSTREAM_MAX_ITER,
+        bp_method=PYTHON_UPSTREAM_BP_METHOD,
+        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
+        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
         input_vector_type="syndrome",
     )
     x_decoder = BpOsdDecoder(
         _dense_matrix(export["x_model"], np),
         error_channel=export["x_model"]["channel_probs"],
-        max_iter=case.max_iter,
-        bp_method="ms",
-        osd_method="osd_cs",
-        osd_order=case.osd_order,
+        max_iter=PYTHON_UPSTREAM_MAX_ITER,
+        bp_method=PYTHON_UPSTREAM_BP_METHOD,
+        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
+        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
         input_vector_type="syndrome",
     )
     setup_seconds = time.perf_counter() - setup_started
@@ -200,6 +216,7 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
     decode_seconds = time.perf_counter() - decode_started
 
     row = _base_row(case, "ldpc_bposd")
+    row.update(_python_upstream_settings())
     row.update(
         {
             "setup_seconds": _format_value(setup_seconds),
