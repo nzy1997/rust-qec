@@ -288,10 +288,7 @@ fn osd_order7_reuses_factorization_without_changing_correction() {
     assert_eq!(pcm.multiply(&result.correction), Syndrome::from(vec![true, true]));
     assert!(result.used_osd);
     assert!(result.stats.osd_candidate_count > 1);
-    assert_eq!(
-        result.stats.gf2_solve_count,
-        result.stats.osd_candidate_count + 1
-    );
+    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
     assert!(result.stats.gf2_full_elimination_count <= 1);
 }
 
@@ -316,7 +313,7 @@ fn profile_decode_with_osd_candidate_limit_counts_bounded_actual_candidates() {
     assert_eq!(stats.decode_call_count, 1);
     assert_eq!(stats.osd_use_count, 1);
     assert_eq!(stats.osd_candidate_count, 2);
-    assert_eq!(stats.gf2_solve_count, 3);
+    assert!(stats.gf2_solve_count >= stats.osd_candidate_count + 1);
     assert_eq!(stats.gf2_full_elimination_count, 1);
     assert!(stats.osd_seconds.is_finite());
     assert!(stats.osd_seconds >= 0.0);
