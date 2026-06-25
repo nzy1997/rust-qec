@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
-    export_qp101,
+    Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document, Qp101Operation,
+    Qp101PauliBasis, Qp101TargetRef, export_qp101,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -337,6 +337,82 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
                 .expect("repeat annotation should be present"),
         "repeat annotations should render in the foreground buffer after wires: {svg}"
     );
+}
+
+#[test]
+fn svg_renderer_renders_annotation_styles_as_deterministic_svg_attrs() {
+    let doc = qp101_doc(
+        1,
+        vec![Qp101Operation::Tick {
+            annotations: vec![
+                styled_annotation(
+                    "warn",
+                    Some("source"),
+                    Some("only preset"),
+                    Some("warning"),
+                    None,
+                    Some(false),
+                    &["alpha", "tag<beta"],
+                ),
+                styled_annotation(
+                    "success",
+                    Some("preset"),
+                    Some("green branch"),
+                    Some("success"),
+                    None,
+                    None,
+                    &[],
+                ),
+                styled_annotation(
+                    "info-color",
+                    Some("color"),
+                    Some("blue branch"),
+                    None,
+                    Some("blue"),
+                    None,
+                    &[],
+                ),
+                styled_annotation(
+                    "custom",
+                    Some("preset"),
+                    Some("literal color"),
+                    Some("custom/value"),
+                    Some("literal&color"),
+                    None,
+                    &[],
+                ),
+                styled_annotation(
+                    "empty",
+                    Some("preset"),
+                    Some("red color"),
+                    Some(""),
+                    Some("red"),
+                    Some(true),
+                    &[],
+                ),
+            ],
+        }],
+    );
+
+    let svg = render_svg(&doc).expect("styled annotations should render");
+
+    for marker in [
+        "class=\"annotation annotation-preset-warning\" data-style-preset=\"warning\" data-style-highlight=\"false\" data-annotation-tags=\"alpha tag&lt;beta\" fill=\"#ca8a04\"",
+        ">warn: source: only preset</text>",
+        "class=\"annotation annotation-preset-success\" data-style-preset=\"success\" fill=\"#16a34a\"",
+        ">success: preset: green branch</text>",
+        "class=\"annotation\" fill=\"#2563eb\"",
+        ">info-color: color: blue branch</text>",
+        "class=\"annotation annotation-preset-custom-value\" data-style-preset=\"custom/value\" fill=\"literal&amp;color\"",
+        ">custom: preset: literal color</text>",
+        "class=\"annotation annotation-preset-custom\" data-style-preset=\"\" data-style-highlight=\"true\" fill=\"#dc2626\"",
+        ">empty: preset: red color</text>",
+    ] {
+        assert!(
+            svg.contains(marker),
+            "styled annotation SVG should contain {marker}: {svg}"
+        );
+    }
 }
 
 #[test]
@@ -1428,6 +1504,30 @@ fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annot
         text: text.map(str::to_string),
         style: None,
         tags: Vec::new(),
+        context: None,
+    }
+}
+
+fn styled_annotation(
+    kind: &str,
+    label: Option<&str>,
+    text: Option<&str>,
+    preset: Option<&str>,
+    color: Option<&str>,
+    highlight: Option<bool>,
+    tags: &[&str],
+) -> Qp101Annotation {
+    Qp101Annotation {
+        kind: kind.to_string(),
+        target_slots: Vec::new(),
+        label: label.map(str::to_string),
+        text: text.map(str::to_string),
+        style: Some(Qp101AnnotationStyle {
+            preset: preset.map(str::to_string),
+            color: color.map(str::to_string),
+            highlight,
+        }),
+        tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
         context: None,
     }
 }
