@@ -1,4 +1,5 @@
 import csv
+import math
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ import matplotlib.colors as mcolors
 
 from benchmarks.surface_decoder_compare.plot_compare import (
     _logical_error_display_rate,
+    _logical_error_rate_fit_for_plot,
     _load_ok_rows,
     _decoder_family,
     _line_style_for_decoder,
@@ -16,6 +18,14 @@ from benchmarks.surface_decoder_compare.plot_compare import (
     render_axes,
     render_plot,
 )
+
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "rsinter_plot_semantics.csv"
+
+
+def _fixture_rows() -> list[dict[str, str]]:
+    with FIXTURE_PATH.open(newline="") as handle:
+        return list(csv.DictReader(handle))
 
 
 class PlotCompareTest(unittest.TestCase):
@@ -51,6 +61,36 @@ class PlotCompareTest(unittest.TestCase):
             }
         )
         self.assertGreater(display, 0.0)
+
+    def test_surface_compare_fixture_matches_rsinter_plot_semantics(self) -> None:
+        rows = _fixture_rows()
+        zero_fit = _logical_error_rate_fit_for_plot(rows[0])
+        nonzero_fit = _logical_error_rate_fit_for_plot(rows[1])
+
+        self.assertIsNone(zero_fit.best)
+        self.assertGreater(zero_fit.high, 0.0)
+        self.assertEqual(nonzero_fit.best, 0.001)
+
+        wide_fit = _logical_error_rate_fit_for_plot(
+            rows[1],
+            confidence_interval_likelihood_factor=25.0,
+        )
+        self.assertGreater(
+            wide_fit.high - wide_fit.low,
+            nonzero_fit.high - nonzero_fit.low,
+        )
+
+        import matplotlib.pyplot as plt
+
+        fig, (ax_left, ax_right) = plt.subplots(1, 2)
+        try:
+            render_axes(ax_left, ax_right, rows)
+            logical_line = ax_left.get_lines()[0]
+            ydata = list(logical_line.get_ydata())
+            self.assertTrue(math.isnan(ydata[0]))
+            self.assertEqual(ydata[1], 0.001)
+        finally:
+            plt.close(fig)
 
     def test_render_axes_uses_log_scaled_x_axis(self) -> None:
         import matplotlib.pyplot as plt
