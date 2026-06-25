@@ -812,6 +812,9 @@ pub fn run_simulation_for_code(
         profile.add_z_stats(&z_result.stats);
         let predicted_z = correction_to_logicals(&z_result.correction, &models.z_faults, code.k());
         if predicted_z != sample.z_logical {
+            // A Z logical failure already determines the trial outcome. The X
+            // decoder is intentionally skipped and contributes zero to
+            // x_decode_call_count for this trial.
             num_failed_trials += 1;
             continue;
         }
@@ -906,7 +909,7 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         return Ok(());
     }
 
-    for key in [
+    let required_metric_keys = [
         "setup_seconds",
         "sample_seconds",
         "decode_seconds",
@@ -920,7 +923,18 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         "osd_candidate_count",
         "gf2_solve_count",
         "gf2_full_elimination_count",
-    ] {
+    ];
+    let counter_metric_keys = [
+        "decode_call_count",
+        "z_decode_call_count",
+        "x_decode_call_count",
+        "bp_iteration_count",
+        "osd_use_count",
+        "osd_candidate_count",
+        "gf2_solve_count",
+        "gf2_full_elimination_count",
+    ];
+    for key in required_metric_keys {
         let value = row
             .metrics
             .get(key)
@@ -931,6 +945,9 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         }
         if value < 0.0 {
             return Err(format!("metric {key} must be non-negative"));
+        }
+        if counter_metric_keys.contains(&key) && value.fract() != 0.0 {
+            return Err(format!("counter metric {key} must be an integer"));
         }
     }
 

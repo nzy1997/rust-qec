@@ -143,7 +143,7 @@ fn minimum_sum_decoder_clone_preserves_decoding_behavior_with_fresh_workspaces()
 }
 
 #[test]
-fn decode_result_equality_includes_stats() {
+fn decode_result_equality_ignores_timing_but_compares_counters() {
     let base = DecodeResult {
         correction: Correction::from(vec![true]),
         converged: true,
@@ -157,10 +157,14 @@ fn decode_result_equality_includes_stats() {
             ..DecodeStats::default()
         },
     };
-    let mut changed_stats = base.clone();
-    changed_stats.stats.bp_seconds = 2.0;
+    let mut changed_timing = base.clone();
+    changed_timing.stats.bp_seconds = 2.0;
+    changed_timing.stats.osd_seconds = 3.0;
+    assert_eq!(base, changed_timing);
 
-    assert_ne!(base, changed_stats);
+    let mut changed_counters = base.clone();
+    changed_counters.stats.decode_call_count = 2;
+    assert_ne!(base, changed_counters);
 }
 
 #[test]

@@ -336,6 +336,12 @@ fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
     negative.metrics.insert("decode_seconds".to_string(), -1.0);
     assert!(validate_bposd_profile_result_row(&negative).is_err());
 
+    let mut fractional_counter = bb_circuit_bposd_result_row("bb90", &result);
+    fractional_counter
+        .metrics
+        .insert("osd_candidate_count".to_string(), 1.5);
+    assert!(validate_bposd_profile_result_row(&fractional_counter).is_err());
+
     result.profile.x_decode_call_count += 1;
     let mismatched = bb_circuit_bposd_result_row("bb90", &result);
     assert!(validate_bposd_profile_result_row(&mismatched).is_err());
