@@ -1,7 +1,7 @@
-use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
 use crate::gf2;
+use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

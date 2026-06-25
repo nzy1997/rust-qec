@@ -1,10 +1,10 @@
-use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::css::CssCode;
 use crate::distance::LogicalClass;
 use crate::error::{QecError, Result};
 use crate::gf2;
+use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

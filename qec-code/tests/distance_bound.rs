@@ -2,11 +2,11 @@ use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
-    BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
-    DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, Issue225LadderCase,
-    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, random_window_css_upper_bound,
-    randomized_css_upper_bound, validate_random_window_upper_bound_result,
-    validate_randomized_upper_bound_result, verify_issue_225_ladder_case,
+    random_window_css_upper_bound, randomized_css_upper_bound,
+    validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
+    verify_issue_225_ladder_case, BoundType, BoundValidationContext, DistanceBoundMethod,
+    DistanceBoundProvenance, DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness,
+    Issue225LadderCase, RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 
