@@ -8,12 +8,14 @@ use qec_code::codes::built_in_css::{
     BuiltInCssFamily, BuiltInCssParams,
 };
 use qec_code::codes::quantum_tanner::{
-    enumerate_quantum_tanner_cayley_faces, quantum_tanner_local_code_tensor_dual,
-    quantum_tanner_spec_from_json_str, validate_quantum_tanner_group_table, ExplicitFiniteGroup,
-    QuantumTannerConstructionMode, QuantumTannerLocalCodes, QuantumTannerSpec,
+    enumerate_quantum_tanner_cayley_faces, quantum_tanner_css_checks,
+    quantum_tanner_local_code_tensor_dual, quantum_tanner_spec_from_json_str,
+    validate_quantum_tanner_group_table, ExplicitFiniteGroup, QuantumTannerConstructionMode,
+    QuantumTannerLocalCodes, QuantumTannerSpec,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
+use qec_code::distance::compute_distance;
 use qec_code::{Pauli, QecError, StabilizerCode};
 use serde_json::Value;
 use support::apm_verifier::{
@@ -1283,13 +1285,21 @@ fn validate_quantum_tanner_local_codes(
         required_field(local_codes, &local_path, "h_b")?,
         &format!("{local_path}.h_b"),
     );
-    if h_a != vec![vec![1, 1]] {
-        return Err(format!("{local_path}.h_a: expected [[1, 1]], got {h_a:?}"));
+    if h_a.is_empty() || h_a.iter().any(Vec::is_empty) {
+        return Err(format!("{local_path}.h_a: expected nonempty rows"));
     }
-    if h_b != vec![vec![1, 1]] {
-        return Err(format!("{local_path}.h_b: expected [[1, 1]], got {h_b:?}"));
+    if h_b.is_empty() || h_b.iter().any(Vec::is_empty) {
+        return Err(format!("{local_path}.h_b: expected nonempty rows"));
     }
     if let Some((a_width, b_width)) = expected_widths {
+        if (a_width, b_width) == (2, 2) {
+            if h_a != vec![vec![1, 1]] {
+                return Err(format!("{local_path}.h_a: expected [[1, 1]], got {h_a:?}"));
+            }
+            if h_b != vec![vec![1, 1]] {
+                return Err(format!("{local_path}.h_b: expected [[1, 1]], got {h_b:?}"));
+            }
+        }
         if h_a.iter().any(|row| row.len() != a_width) {
             return Err(format!("{local_path}.h_a: expected row width {a_width}"));
         }
@@ -2112,6 +2122,71 @@ fn toric_d4_json_with(mutator: impl FnOnce(&mut Value)) -> String {
         serde_json::from_str(include_str!("fixtures/quantum_tanner/toric_d4.json")).unwrap();
     mutator(&mut fixture);
     serde_json::to_string(&fixture).unwrap()
+}
+
+fn assert_sparse_css_orthogonal(num_cols: usize, hx: &[Vec<usize>], hz: &[Vec<usize>]) {
+    for (x_index, x_row) in hx.iter().enumerate() {
+        let x_support = x_row
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        for (z_index, z_row) in hz.iter().enumerate() {
+            let overlap = z_row
+                .iter()
+                .filter(|support| x_support.contains(support))
+                .count();
+            assert_eq!(
+                overlap % 2,
+                0,
+                "Hx row {x_index} and Hz row {z_index} have odd overlap in width {num_cols}"
+            );
+        }
+    }
+}
+
+#[test]
+fn quantum_tanner_toric_d4_generates_css_checks() {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+
+    let checks = quantum_tanner_css_checks(&spec).unwrap();
+
+    assert_eq!(checks.num_cols, 16);
+    assert!(!checks.hx.is_empty());
+    assert!(!checks.hz.is_empty());
+    for row in checks.hx.iter().chain(checks.hz.iter()) {
+        if !row.is_empty() {
+            assert_eq!(
+                row.len(),
+                4,
+                "expected weight-4 stabilizer row, got {row:?}"
+            );
+        }
+    }
+    assert_sparse_css_orthogonal(checks.num_cols, &checks.hx, &checks.hz);
+
+    let hx = SparseRowsMatrix::new(checks.num_cols, checks.hx.clone())
+        .unwrap()
+        .to_dense_rows();
+    let hz = SparseRowsMatrix::new(checks.num_cols, checks.hz.clone())
+        .unwrap()
+        .to_dense_rows();
+    let css = CssCode::from_hx_hz(hx, hz).unwrap();
+    assert_eq!(css.code().num_logical_qubits(), 2);
+
+    let distance = compute_distance(css.code()).unwrap();
+    assert_eq!(distance.distance, 4);
+    assert_eq!(distance.witness.weight(), 4);
+
+    let invalid_non_symmetric_a = quantum_tanner_spec_from_json_str(include_str!(
+        "fixtures/quantum_tanner/invalid_non_symmetric_a.json"
+    ))
+    .unwrap();
+    assert!(matches!(
+        quantum_tanner_css_checks(&invalid_non_symmetric_a).unwrap_err(),
+        QecError::InvalidQuantumTannerGeneratorSet { set: "A", .. }
+    ));
 }
 
 fn expect_quantum_tanner_group_table_error(input: &str, expected_reason_part: &str) {

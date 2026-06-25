@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Deserialize;
 
+use crate::css::{CssCode, SparseRowsMatrix};
 use crate::error::{QecError, Result};
 use crate::gf2;
 
@@ -96,6 +97,13 @@ pub struct QuantumTannerLocalIncidence {
     pub a_generator: usize,
     pub b_generator: usize,
     pub face_id: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuantumTannerCssChecks {
+    pub num_cols: usize,
+    pub hx: Vec<Vec<usize>>,
+    pub hz: Vec<Vec<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -368,6 +376,258 @@ pub fn enumerate_quantum_tanner_cayley_faces(
         x_incidence,
         z_incidence,
     })
+}
+
+pub fn quantum_tanner_css_checks(spec: &QuantumTannerSpec) -> Result<QuantumTannerCssChecks> {
+    let group = validate_quantum_tanner_group_table(spec)?;
+    let complex = enumerate_quantum_tanner_cayley_faces(spec.construction_mode, &group)?;
+    let local = quantum_tanner_local_code_tensor_dual(spec)?;
+    quantum_tanner_css_checks_from_validated_parts(spec, &group, &complex, &local)
+}
+
+pub fn quantum_tanner_css_checks_from_validated_parts(
+    spec: &QuantumTannerSpec,
+    group: &ValidatedFiniteGroup,
+    complex: &QuantumTannerCayleyComplex,
+    local: &QuantumTannerLocalCodeTensorDual,
+) -> Result<QuantumTannerCssChecks> {
+    match spec.construction_mode {
+        QuantumTannerConstructionMode::LeftRightCayleyNoCoverV1 => {}
+    }
+
+    if spec.a_generator_indices.as_slice() != group.a_generators() {
+        return Err(css_construction_error(
+            "spec A generator indices do not match validated group",
+        ));
+    }
+    if spec.b_generator_indices.as_slice() != group.b_generators() {
+        return Err(css_construction_error(
+            "spec B generator indices do not match validated group",
+        ));
+    }
+
+    let a_width = group.a_generators().len();
+    let b_width = group.b_generators().len();
+    if local.code_a.width != a_width {
+        return Err(css_construction_error(format!(
+            "local code A width {} does not match |A| {a_width}",
+            local.code_a.width
+        )));
+    }
+    if local.code_b.width != b_width {
+        return Err(css_construction_error(format!(
+            "local code B width {} does not match |B| {b_width}",
+            local.code_b.width
+        )));
+    }
+
+    let local_width = a_width.checked_mul(b_width).ok_or_else(|| {
+        css_construction_error(format!(
+            "local coordinate width overflow for |A|={a_width}, |B|={b_width}"
+        ))
+    })?;
+    validate_local_tensor_rows("X", &local.x_sector_rows, local_width)?;
+    validate_local_tensor_rows("Z", &local.z_sector_rows, local_width)?;
+
+    let num_cols = complex.faces.len();
+    let (x_source_vertices, z_source_vertices) = quantum_tanner_source_vertex_partitions(group)?;
+    let hx = sparse_rows_from_local_incidence(
+        "X",
+        group,
+        &local.x_sector_rows,
+        &complex.x_incidence,
+        &x_source_vertices,
+        num_cols,
+    )?;
+    let hz = sparse_rows_from_local_incidence(
+        "Z",
+        group,
+        &local.z_sector_rows,
+        &complex.z_incidence,
+        &z_source_vertices,
+        num_cols,
+    )?;
+
+    let hx_matrix = SparseRowsMatrix::new(num_cols, hx.clone())?;
+    let hz_matrix = SparseRowsMatrix::new(num_cols, hz.clone())?;
+    CssCode::from_hx_hz(hx_matrix.to_dense_rows(), hz_matrix.to_dense_rows())?;
+
+    Ok(QuantumTannerCssChecks { num_cols, hx, hz })
+}
+
+fn sparse_rows_from_local_incidence(
+    sector: &'static str,
+    group: &ValidatedFiniteGroup,
+    local_rows: &[Vec<u8>],
+    incidence: &[QuantumTannerLocalIncidence],
+    source_vertices: &[usize],
+    num_cols: usize,
+) -> Result<Vec<Vec<usize>>> {
+    let mut rows = Vec::with_capacity(source_vertices.len() * local_rows.len());
+    for &source_vertex in source_vertices {
+        let local_faces =
+            local_incidence_grid_for_source(sector, group, incidence, source_vertex, num_cols)?;
+        for local_row in local_rows {
+            let mut support = BTreeSet::new();
+            for (coordinate, &bit) in local_row.iter().enumerate() {
+                if bit == 0 {
+                    continue;
+                }
+                let face_id = local_faces[coordinate].ok_or_else(|| {
+                    css_construction_error(format!(
+                        "{sector} incidence source {source_vertex} is missing local coordinate {coordinate}"
+                    ))
+                })?;
+                if !support.insert(face_id) {
+                    support.remove(&face_id);
+                }
+            }
+            rows.push(support.into_iter().collect());
+        }
+    }
+    Ok(rows)
+}
+
+fn quantum_tanner_source_vertex_partitions(
+    group: &ValidatedFiniteGroup,
+) -> Result<(Vec<usize>, Vec<usize>)> {
+    let mut colors: Vec<Option<u8>> = vec![None; group.order()];
+    for start in 0..group.order() {
+        if colors[start].is_some() {
+            continue;
+        }
+        colors[start] = Some(0);
+        let mut queue = std::collections::VecDeque::from([start]);
+        while let Some(vertex) = queue.pop_front() {
+            let color = colors[vertex].expect("queued vertices are colored");
+            for neighbor in quantum_tanner_cayley_neighbors(group, vertex)? {
+                match colors[neighbor] {
+                    Some(neighbor_color) if neighbor_color == color => {
+                        return Err(css_construction_error(format!(
+                            "Cayley graph is not bipartite: adjacent vertices {vertex} and {neighbor} have the same source color"
+                        )));
+                    }
+                    Some(_) => {}
+                    None => {
+                        colors[neighbor] = Some(color ^ 1);
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut x_source_vertices = Vec::new();
+    let mut z_source_vertices = Vec::new();
+    for (vertex, color) in colors.into_iter().enumerate() {
+        match color {
+            Some(0) => x_source_vertices.push(vertex),
+            Some(1) => z_source_vertices.push(vertex),
+            _ => unreachable!("all vertices are colored"),
+        }
+    }
+    Ok((x_source_vertices, z_source_vertices))
+}
+
+fn quantum_tanner_cayley_neighbors(
+    group: &ValidatedFiniteGroup,
+    vertex: usize,
+) -> Result<Vec<usize>> {
+    let mut neighbors = Vec::with_capacity(group.a_generators().len() + group.b_generators().len());
+    for &a_generator in group.a_generators() {
+        neighbors.push(group.multiply(a_generator, vertex)?);
+    }
+    for &b_generator in group.b_generators() {
+        neighbors.push(group.multiply(vertex, b_generator)?);
+    }
+    Ok(neighbors)
+}
+
+fn local_incidence_grid_for_source(
+    sector: &'static str,
+    group: &ValidatedFiniteGroup,
+    incidence: &[QuantumTannerLocalIncidence],
+    source_vertex: usize,
+    num_cols: usize,
+) -> Result<Vec<Option<usize>>> {
+    let b_width = group.b_generators().len();
+    let local_width = group.a_generators().len() * b_width;
+    let mut local_faces = vec![None; local_width];
+    for record in incidence
+        .iter()
+        .filter(|record| record.source_vertex == source_vertex)
+    {
+        if record.face_id >= num_cols {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} references face {} outside 0..{num_cols}",
+                record.face_id
+            )));
+        }
+        let Some(expected_a) = group.a_generator(record.a_index) else {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} has out-of-range A coordinate {}",
+                record.a_index
+            )));
+        };
+        if record.a_generator != expected_a {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} A coordinate {} uses generator {}, expected {expected_a}",
+                record.a_index, record.a_generator
+            )));
+        }
+        let Some(expected_b) = group.b_generator(record.b_index) else {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} has out-of-range B coordinate {}",
+                record.b_index
+            )));
+        };
+        if record.b_generator != expected_b {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} B coordinate {} uses generator {}, expected {expected_b}",
+                record.b_index, record.b_generator
+            )));
+        }
+
+        let coordinate = record.a_index * b_width + record.b_index;
+        if local_faces[coordinate].replace(record.face_id).is_some() {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} has duplicate local coordinate {coordinate}"
+            )));
+        }
+    }
+
+    for (coordinate, face_id) in local_faces.iter().enumerate() {
+        if face_id.is_none() {
+            return Err(css_construction_error(format!(
+                "{sector} incidence source {source_vertex} is missing local coordinate {coordinate}"
+            )));
+        }
+    }
+
+    Ok(local_faces)
+}
+
+fn validate_local_tensor_rows(
+    sector: &'static str,
+    rows: &[Vec<u8>],
+    expected_width: usize,
+) -> Result<()> {
+    for (row_index, row) in rows.iter().enumerate() {
+        if row.len() != expected_width {
+            return Err(css_construction_error(format!(
+                "{sector} local tensor row {row_index} has width {}, expected {expected_width}",
+                row.len()
+            )));
+        }
+        for (col_index, &bit) in row.iter().enumerate() {
+            if bit > 1 {
+                return Err(css_construction_error(format!(
+                    "{sector} local tensor row {row_index}, column {col_index} is {bit}, expected 0 or 1"
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn parse_construction_mode(input: &str) -> Result<QuantumTannerConstructionMode> {
@@ -759,4 +1019,10 @@ fn tensor_product_rows(lhs: &[Vec<u8>], rhs: &[Vec<u8>]) -> Vec<Vec<u8>> {
 
 fn local_code_error(matrix: &'static str, reason: String) -> QecError {
     QecError::InvalidQuantumTannerLocalCodeMatrix { matrix, reason }
+}
+
+fn css_construction_error(reason: impl Into<String>) -> QecError {
+    QecError::InvalidQuantumTannerCssConstruction {
+        reason: reason.into(),
+    }
 }

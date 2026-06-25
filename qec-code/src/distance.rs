@@ -1,7 +1,7 @@
-use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
+use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,69 +61,118 @@ fn compute_distance_via_ilp(code: &StabilizerCode) -> Result<DistanceResult> {
 
 #[cfg(not(feature = "distance-ilp-highs"))]
 fn compute_distance_via_exhaustive_search(code: &StabilizerCode) -> Result<DistanceResult> {
-    let mut best_witness: Option<Pauli> = None;
-
-    for candidate in all_normalizer_candidates(code)? {
-        let replace = match &best_witness {
-            Some(current) => candidate.weight() < current.weight(),
-            None => true,
-        };
-
-        if replace {
-            best_witness = Some(candidate);
+    validate_exhaustive_search_width(code.n())?;
+    for weight in 1..=code.n() {
+        if let Some(witness) = find_normalizer_witness_of_weight(code, weight)? {
+            return Ok(DistanceResult {
+                distance: weight,
+                logical_class: classify_logical(&witness),
+                witness,
+            });
         }
     }
-
-    let witness = best_witness.ok_or(QecError::DistanceWitnessNotFound)?;
-
-    Ok(DistanceResult {
-        distance: witness.weight(),
-        logical_class: classify_logical(&witness),
-        witness,
-    })
+    Err(QecError::DistanceWitnessNotFound)
 }
 
 #[cfg(not(feature = "distance-ilp-highs"))]
-fn all_normalizer_candidates(code: &StabilizerCode) -> Result<Vec<Pauli>> {
-    let n = code.n();
+fn validate_exhaustive_search_width(n: usize) -> Result<()> {
     let symplectic_bits = n
         .checked_mul(2)
         .ok_or(QecError::DistanceComputationUnsupported {
             n,
             reason: "enable a distance ILP feature or use a smaller code".into(),
         })?;
-    let total = 1usize.checked_shl(symplectic_bits as u32).ok_or(
+    let _ = 1usize.checked_shl(symplectic_bits as u32).ok_or(
         QecError::DistanceComputationUnsupported {
             n,
             reason: "enable a distance ILP feature or use a smaller code".into(),
         },
     )?;
+    Ok(())
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+fn find_normalizer_witness_of_weight(
+    code: &StabilizerCode,
+    weight: usize,
+) -> Result<Option<Pauli>> {
     let stabilizer_rows = code.stabilizer_rows();
-    let mut candidates = Vec::new();
+    let mut support = Vec::with_capacity(weight);
+    search_supports(code, &stabilizer_rows, weight, 0, &mut support)
+}
 
-    for mask in 1..total {
-        let mut x = vec![0; n];
-        let mut z = vec![0; n];
-
-        for qubit in 0..n {
-            x[qubit] = ((mask >> qubit) & 1) as u8;
-            z[qubit] = ((mask >> (n + qubit)) & 1) as u8;
-        }
-
-        let candidate =
-            Pauli::from_xz_bits(x, z).expect("generated Pauli supports must be valid binary rows");
-
-        if code
-            .stabilizers()
-            .iter()
-            .all(|stabilizer| candidate.commutes_with(stabilizer))
-            && !try_in_row_span(&stabilizer_rows, &candidate.to_symplectic_row())?
-        {
-            candidates.push(candidate);
-        }
+#[cfg(not(feature = "distance-ilp-highs"))]
+fn search_supports(
+    code: &StabilizerCode,
+    stabilizer_rows: &[Vec<u8>],
+    target_weight: usize,
+    next_qubit: usize,
+    support: &mut Vec<usize>,
+) -> Result<Option<Pauli>> {
+    if support.len() == target_weight {
+        let mut x = vec![0; code.n()];
+        let mut z = vec![0; code.n()];
+        return search_pauli_assignments(code, stabilizer_rows, support, 0, &mut x, &mut z);
     }
 
-    Ok(candidates)
+    let remaining = target_weight - support.len();
+    let max_qubit = code.n() - remaining;
+    for qubit in next_qubit..=max_qubit {
+        support.push(qubit);
+        if let Some(witness) =
+            search_supports(code, stabilizer_rows, target_weight, qubit + 1, support)?
+        {
+            return Ok(Some(witness));
+        }
+        support.pop();
+    }
+    Ok(None)
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+fn search_pauli_assignments(
+    code: &StabilizerCode,
+    stabilizer_rows: &[Vec<u8>],
+    support: &[usize],
+    support_index: usize,
+    x: &mut [u8],
+    z: &mut [u8],
+) -> Result<Option<Pauli>> {
+    if support_index == support.len() {
+        let candidate = Pauli::from_xz_bits(x.to_vec(), z.to_vec())?;
+        return if is_nontrivial_normalizer_witness(code, stabilizer_rows, &candidate)? {
+            Ok(Some(candidate))
+        } else {
+            Ok(None)
+        };
+    }
+
+    let qubit = support[support_index];
+    for (x_bit, z_bit) in [(1, 0), (0, 1), (1, 1)] {
+        x[qubit] = x_bit;
+        z[qubit] = z_bit;
+        if let Some(witness) =
+            search_pauli_assignments(code, stabilizer_rows, support, support_index + 1, x, z)?
+        {
+            return Ok(Some(witness));
+        }
+    }
+    x[qubit] = 0;
+    z[qubit] = 0;
+    Ok(None)
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+fn is_nontrivial_normalizer_witness(
+    code: &StabilizerCode,
+    stabilizer_rows: &[Vec<u8>],
+    candidate: &Pauli,
+) -> Result<bool> {
+    Ok(code
+        .stabilizers()
+        .iter()
+        .all(|stabilizer| candidate.commutes_with(stabilizer))
+        && !try_in_row_span(stabilizer_rows, &candidate.to_symplectic_row())?)
 }
 
 fn classify_logical(pauli: &Pauli) -> LogicalClass {
@@ -165,7 +214,7 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 
 #[cfg(test)]
 mod tests {
-    use super::{LogicalClass, classify_logical};
+    use super::{classify_logical, LogicalClass};
     use crate::Pauli;
     #[cfg(feature = "distance-ilp-highs")]
     use crate::{QecError, StabilizerCode};
