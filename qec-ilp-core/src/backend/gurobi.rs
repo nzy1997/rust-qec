@@ -1,4 +1,4 @@
-use gurobi::{Constr, ConstrSense, Env, Model, Status, Var, VarType, attr, param};
+use gurobi::{attr, param, Constr, ConstrSense, Env, Model, Status, Var, VarType};
 
 use crate::backend::BinaryBackend;
 use crate::config::{BackendKind, BinaryIlpConfig};
@@ -19,7 +19,7 @@ impl GurobiBinaryBackend {
             env.set(param::OutputFlag, 0).map_err(gurobi_error)?;
         }
         if let Some(threads) = config.backend.threads {
-            env.set(param::Threads, threads as i32)
+            env.set(param::Threads, gurobi_threads_parameter(threads)?)
                 .map_err(gurobi_error)?;
         }
         if let Some(limit) = config.backend.time_limit_seconds {
@@ -180,11 +180,20 @@ fn gurobi_error(err: gurobi::Error) -> BinaryIlpError {
     BinaryIlpError::Gurobi(err.to_string())
 }
 
+fn gurobi_threads_parameter(threads: u32) -> Result<i32, BinaryIlpError> {
+    i32::try_from(threads).map_err(|_| {
+        BinaryIlpError::Gurobi(format!(
+            "threads value {threads} exceeds Gurobi parameter range"
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use gurobi::Status;
 
-    use super::accepted_gurobi_solution_status;
+    use super::{accepted_gurobi_solution_status, gurobi_threads_parameter};
+    use crate::error::BinaryIlpError;
     use crate::model::ModelSolutionStatus;
 
     #[test]
@@ -222,5 +231,15 @@ mod tests {
     #[test]
     fn rejects_time_limited_run_without_incumbent() {
         assert_eq!(accepted_gurobi_solution_status(Status::TimeLimit, 0), None);
+    }
+
+    #[test]
+    fn rejects_gurobi_thread_count_outside_parameter_range() {
+        assert_eq!(gurobi_threads_parameter(i32::MAX as u32).unwrap(), i32::MAX);
+        assert!(matches!(
+            gurobi_threads_parameter(i32::MAX as u32 + 1),
+            Err(BinaryIlpError::Gurobi(message))
+                if message.contains("exceeds Gurobi parameter range")
+        ));
     }
 }

@@ -1,10 +1,11 @@
-use qec_code::Pauli;
 use qec_code::distance::{DistanceResult, LogicalClass};
 use qec_code::distance_exact::{
     ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
     ExactCssDistanceProvenance, ExactCssDistanceResult, ExactCssDistanceSolverOptions,
-    ExactCssDistanceSolverReport, ExactCssDistanceSolverStatus,
+    ExactCssDistanceSolverReport, ExactCssDistanceSolverStatus, ExactCssDistanceStatus,
+    ExactDistanceBoundType,
 };
+use qec_code::Pauli;
 
 fn sample_distance_result() -> DistanceResult {
     let witness = Pauli::from_xz_bits(vec![1, 0, 1], vec![0, 0, 0]).unwrap();
@@ -87,7 +88,7 @@ fn exact_css_distance_result_serializes_solver_provenance_for_completed_runs() {
             solver: ExactCssDistanceSolverOptions {
                 backend: ExactCssDistanceBackend::Highs,
                 time_limit_seconds: Some(300.0),
-                mip_gap: Some(0.001),
+                mip_gap: Some(0.0),
                 threads: Some(2),
                 verbose_solver: true,
             },
@@ -106,14 +107,44 @@ fn exact_css_distance_result_serializes_solver_provenance_for_completed_runs() {
     assert_eq!(json["backend"], "highs");
     assert_eq!(json["solver_status"], "optimal");
     assert_eq!(json["time_limit_seconds"], 300.0);
-    assert_eq!(json["mip_gap"], 0.001);
+    assert_eq!(json["mip_gap"], 0.0);
     assert_eq!(json["threads"], 2);
     assert_eq!(json["verbose_solver"], true);
     assert_eq!(json["options"]["backend"], "highs");
     assert_eq!(json["options"]["time_limit_seconds"], 300.0);
-    assert_eq!(json["options"]["mip_gap"], 0.001);
+    assert_eq!(json["options"]["mip_gap"], 0.0);
     assert_eq!(json["options"]["threads"], 2);
     assert_eq!(json["options"]["verbose_solver"], true);
+}
+
+#[test]
+fn exact_css_distance_result_serializes_positive_mip_gap_optimal_as_incomplete_upper_bound() {
+    let result = ExactCssDistanceResult::completed_with_solver_report(
+        sample_distance_result(),
+        ExactCssDistanceOptions {
+            input: ExactCssDistanceInput::CodeId {
+                code_id: "steane".to_owned(),
+            },
+            solver: ExactCssDistanceSolverOptions {
+                backend: ExactCssDistanceBackend::Highs,
+                time_limit_seconds: None,
+                mip_gap: Some(0.001),
+                threads: None,
+                verbose_solver: false,
+            },
+        },
+        Some(ExactCssDistanceSolverReport {
+            backend: ExactCssDistanceBackend::Highs,
+            status: ExactCssDistanceSolverStatus::Optimal,
+        }),
+    );
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "incomplete");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["solver_status"], "optimal");
+    assert_eq!(json["mip_gap"], 0.001);
 }
 
 #[test]
@@ -210,4 +241,44 @@ fn exact_css_distance_result_serializes_suboptimal_incumbent_as_incomplete_upper
     assert_eq!(json["requested_backend"], "highs");
     assert_eq!(json["backend"], "highs");
     assert_eq!(json["solver_status"], "sub_optimal");
+}
+
+#[test]
+fn exact_css_distance_result_deserializes_legacy_json_with_default_solver_options() {
+    let legacy_json = serde_json::json!({
+        "status": "completed",
+        "distance": 2,
+        "method": "rstim-ilp-exact",
+        "bound_type": "exact",
+        "logical_class": "x_like",
+        "witness": {
+            "x": [1, 0, 1],
+            "z": [0, 0, 0],
+            "weight": 2
+        },
+        "options": {
+            "input": "code_id",
+            "code_id": "surface_rotated:d=3"
+        },
+        "provenance": {
+            "tool": "qec-code",
+            "tool_version": "0.1.0",
+            "method_revision": 1
+        }
+    });
+
+    let result: ExactCssDistanceResult = serde_json::from_value(legacy_json).unwrap();
+
+    assert_eq!(result.status, ExactCssDistanceStatus::Completed);
+    assert_eq!(result.bound_type, ExactDistanceBoundType::Exact);
+    assert_eq!(result.requested_backend, ExactCssDistanceBackend::Auto);
+    assert_eq!(result.backend, None);
+    assert_eq!(result.solver_status, None);
+    assert_eq!(result.time_limit_seconds, None);
+    assert_eq!(result.mip_gap, None);
+    assert_eq!(result.threads, None);
+    assert_eq!(
+        result.options.solver,
+        ExactCssDistanceSolverOptions::default()
+    );
 }

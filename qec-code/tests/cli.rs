@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -1688,8 +1688,8 @@ fn code_css_distance_exact_accepts_highs_backend_and_solver_limits() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["status"], "incomplete");
+    assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["requested_backend"], "highs");
     assert_eq!(json["backend"], "highs");
     assert_eq!(json["solver_status"], "optimal");

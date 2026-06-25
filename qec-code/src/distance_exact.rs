@@ -36,6 +36,7 @@ pub enum ExactCssDistanceBackend {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub struct ExactCssDistanceSolverOptions {
+    #[serde(default)]
     pub backend: ExactCssDistanceBackend,
     pub time_limit_seconds: Option<f64>,
     pub mip_gap: Option<f64>,
@@ -106,6 +107,7 @@ pub struct ExactCssDistanceResult {
     pub bound_type: ExactDistanceBoundType,
     pub logical_class: LogicalClass,
     pub witness: DistanceBoundWitness,
+    #[serde(default)]
     pub requested_backend: ExactCssDistanceBackend,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backend: Option<ExactCssDistanceBackend>,
@@ -135,12 +137,14 @@ impl ExactCssDistanceResult {
     ) -> Self {
         let solver_status = solver_report.map(|report| report.status);
         let backend = solver_report.map(|report| report.backend);
-        let is_exact = solver_status
+        let solver_certifies_exact = solver_status
             .map(ExactCssDistanceSolverStatus::is_exact)
             .unwrap_or(true);
+        let options_allow_exact = !has_positive_mip_gap(&options.solver);
+        let is_exact = solver_certifies_exact && options_allow_exact;
         let status = match solver_status {
             Some(ExactCssDistanceSolverStatus::TimeLimit) => ExactCssDistanceStatus::Timeout,
-            Some(status) if !status.is_exact() => ExactCssDistanceStatus::Incomplete,
+            _ if !is_exact => ExactCssDistanceStatus::Incomplete,
             _ => ExactCssDistanceStatus::Completed,
         };
         let bound_type = if is_exact {
@@ -171,4 +175,8 @@ impl ExactCssDistanceResult {
 
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+fn has_positive_mip_gap(options: &ExactCssDistanceSolverOptions) -> bool {
+    options.mip_gap.map(|gap| gap > 0.0).unwrap_or(false)
 }
