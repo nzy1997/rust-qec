@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import math
 import csv
 import os
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 import argparse
 
@@ -12,7 +14,102 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sinter import fit_binomial
+
+
+DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR = 9.0
+MIN_LOG_Y = 1e-10
+
+
+@dataclass(frozen=True)
+class BinomialFit:
+    low: float
+    best: float
+    high: float
+
+
+@dataclass(frozen=True)
+class LogicalRateFitForPlot:
+    low: float
+    best: float | None
+    high: float
+
+
+def _log_binomial(p: float, n: int, hits: int) -> float:
+    p = min(max(p, 0.0), 1.0)
+    misses = n - hits
+    if hits > 0 and p == 0.0:
+        return float("-inf")
+    if misses > 0 and p == 1.0:
+        return float("-inf")
+    result = 0.0
+    if p > 0.0:
+        result += math.log(p) * hits
+    if p < 1.0:
+        result += math.log(1.0 - p) * misses
+    return (
+        result
+        + math.lgamma(n + 1.0)
+        - math.lgamma(misses + 1.0)
+        - math.lgamma(hits + 1.0)
+    )
+
+
+def _binary_search(func, min_x: int, max_x: int, target: float) -> int:
+    lo = min_x
+    hi = max_x
+    while hi > lo + 1:
+        mid = lo + (hi - lo) // 2
+        value = func(mid)
+        if value < target:
+            lo = mid
+        elif value > target:
+            hi = mid
+        else:
+            return mid
+    hi_value = func(hi)
+    lo_value = func(lo)
+    hi_delta = 0.0 if hi_value == target else abs(hi_value - target)
+    lo_delta = 0.0 if lo_value == target else abs(lo_value - target)
+    return hi if hi_delta < lo_delta else lo
+
+
+def _fit_binomial(
+    num_shots: int,
+    num_hits: int,
+    max_likelihood_factor: float,
+) -> BinomialFit:
+    if num_shots == 0:
+        return BinomialFit(low=0.0, best=0.5, high=1.0)
+    best_p = num_hits / num_shots
+    log_ml = _log_binomial(best_p, num_shots, num_hits)
+    target = log_ml - math.log(max_likelihood_factor)
+    accuracy = 100
+    denominator = accuracy * num_shots
+    low = _binary_search(
+        lambda expected_errors: _log_binomial(
+            expected_errors / denominator,
+            num_shots,
+            num_hits,
+        ),
+        0,
+        num_hits * accuracy,
+        target,
+    )
+    high = _binary_search(
+        lambda expected_errors: -_log_binomial(
+            expected_errors / denominator,
+            num_shots,
+            num_hits,
+        ),
+        num_hits * accuracy,
+        num_shots * accuracy,
+        -target,
+    )
+    return BinomialFit(
+        low=low / denominator,
+        best=best_p,
+        high=high / denominator,
+    )
 
 
 def _decoder_family(decoder: str) -> str:
@@ -38,21 +135,29 @@ def _load_ok_rows(results_path: Path) -> list[dict[str, str]]:
     return [row for row in rows if row["status"] == "ok"]
 
 
-def _logical_error_display_rate(row: dict[str, str]) -> float:
-    logical_error_rate = float(row["logical_error_rate"])
-    if logical_error_rate > 0:
-        return logical_error_rate
-
+def _logical_error_rate_fit_for_plot(
+    row: dict[str, str],
+    confidence_interval_likelihood_factor: float = DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+) -> LogicalRateFitForPlot:
     shots_used = int(row["shots_used"])
+    if shots_used <= 0:
+        raise ValueError("shots_used must be positive")
     logical_errors = int(row["logical_errors"])
-    fit = fit_binomial(
+    if logical_errors < 0:
+        raise ValueError("logical_errors must be non-negative")
+    if logical_errors > shots_used:
+        raise ValueError("logical_errors must be <= shots_used")
+
+    fit = _fit_binomial(
         num_shots=shots_used,
         num_hits=logical_errors,
-        max_likelihood_factor=1e3,
+        max_likelihood_factor=confidence_interval_likelihood_factor,
     )
-    if fit.high is not None and fit.high > 0:
-        return fit.high
-    return 1 / max(shots_used, 1)
+    return LogicalRateFitForPlot(
+        low=max(fit.low, MIN_LOG_Y),
+        best=None if logical_errors == 0 else max(fit.best, MIN_LOG_Y),
+        high=max(fit.high, MIN_LOG_Y),
+    )
 
 
 def render_axes(ax_left, ax_right, rows: list[dict[str, str]]) -> None:
@@ -73,13 +178,22 @@ def render_axes(ax_left, ax_right, rows: list[dict[str, str]]) -> None:
 
     for (decoder, distance), items in grouped.items():
         items = sorted(items, key=lambda row: float(row["p"]))
+        fits = [_logical_error_rate_fit_for_plot(row) for row in items]
         x = [float(row["p"]) for row in items]
-        y_left = [_logical_error_display_rate(row) for row in items]
+        y_left = [fit.best if fit.best is not None else math.nan for fit in fits]
         y_right = [float(row["decode_us_per_shot"]) for row in items]
         label = f"{decoder} d={distance}"
         family = _decoder_family(decoder)
         color = colors[(family, distance)]
         line_style = _line_style_for_decoder(decoder)
+        ax_left.vlines(
+            x,
+            [fit.low for fit in fits],
+            [fit.high for fit in fits],
+            color=color,
+            linestyle=line_style,
+            linewidth=1.0,
+        )
         ax_left.plot(
             x,
             y_left,

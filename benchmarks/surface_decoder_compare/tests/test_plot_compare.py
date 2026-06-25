@@ -9,7 +9,6 @@ from unittest import mock
 import matplotlib.colors as mcolors
 
 from benchmarks.surface_decoder_compare.plot_compare import (
-    _logical_error_display_rate,
     _logical_error_rate_fit_for_plot,
     _load_ok_rows,
     _decoder_family,
@@ -52,15 +51,16 @@ class PlotCompareTest(unittest.TestCase):
         self.assertIn("--input", completed.stdout)
         self.assertIn("--out", completed.stdout)
 
-    def test_zero_logical_error_rate_uses_positive_sinter_upper_bound(self) -> None:
-        display = _logical_error_display_rate(
+    def test_zero_logical_error_rate_uses_positive_upper_bound(self) -> None:
+        fit = _logical_error_rate_fit_for_plot(
             {
                 "shots_used": "2000",
                 "logical_errors": "0",
                 "logical_error_rate": "0.0",
             }
         )
-        self.assertGreater(display, 0.0)
+        self.assertIsNone(fit.best)
+        self.assertGreater(fit.high, 0.0)
 
     def test_surface_compare_fixture_matches_rsinter_plot_semantics(self) -> None:
         rows = _fixture_rows()
