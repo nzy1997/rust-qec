@@ -7,6 +7,7 @@ use crate::error::BinaryIlpError;
 use crate::model::{BinaryIlpModel, ModelSolution};
 
 pub trait BinaryBackend {
+    fn kind(&self) -> BackendKind;
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError>;
     fn set_rhs(&mut self, row: usize, rhs: f64) -> Result<(), BinaryIlpError>;
 }

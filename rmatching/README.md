@@ -46,12 +46,13 @@ let prediction = m.decode(&[1, 0]);
 ## Benchmark Snapshot
 
 Snapshot date: 2026-03-14. These numbers come from a fresh local rerun of
-[benchmarks/minimal_results.csv](benchmarks/minimal_results.csv)
-and
-[benchmarks/surface_dem_results.csv](benchmarks/surface_dem_results.csv)
-at commit `33faf6c`.
+`benchmarks/minimal_results.csv` and `benchmarks/surface_dem_results.csv` at
+commit `33faf6c`.
 The CSV files are overwritten on each benchmark run, so treat this section as a
 point-in-time snapshot instead of a stable baseline.
+
+For the full benchmark evidence and reproduction context, see the
+[`benchmark evidence showcase`](docs/showcases/benchmark-evidence.md).
 
 ### Minimal DEM Cases
 

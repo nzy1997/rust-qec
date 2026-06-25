@@ -10,7 +10,18 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum DistanceBoundMethod {
     RandomizedUpperBound,
+    RandomWindowUpperBound,
     Exact,
+}
+
+impl DistanceBoundMethod {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::RandomizedUpperBound => "randomized-upper-bound",
+            Self::RandomWindowUpperBound => "random-window-upper-bound",
+            Self::Exact => "exact",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,6 +37,10 @@ pub enum DistanceBoundStatus {
     Completed,
 }
 
+pub trait DistanceBoundOptions {
+    fn validate(&self) -> Result<()>;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RandomizedUpperBoundOptions {
     pub iterations: usize,
@@ -36,26 +51,60 @@ pub struct RandomizedUpperBoundOptions {
 
 impl RandomizedUpperBoundOptions {
     pub fn validate(&self) -> Result<()> {
-        if self.iterations == 0 {
-            return Err(QecError::InvalidDistanceBoundOption {
-                option: "iterations",
-                reason: "must be greater than zero".to_owned(),
-            });
-        }
-        if self.restarts == 0 {
-            return Err(QecError::InvalidDistanceBoundOption {
-                option: "restarts",
-                reason: "must be greater than zero".to_owned(),
-            });
-        }
-        if self.target_weight == Some(0) {
-            return Err(QecError::InvalidDistanceBoundOption {
-                option: "target_weight",
-                reason: "must be greater than zero when provided".to_owned(),
-            });
-        }
-        Ok(())
+        validate_upper_bound_options(self.iterations, self.restarts, self.target_weight)
     }
+}
+
+impl DistanceBoundOptions for RandomizedUpperBoundOptions {
+    fn validate(&self) -> Result<()> {
+        RandomizedUpperBoundOptions::validate(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomWindowUpperBoundOptions {
+    pub iterations: usize,
+    pub restarts: usize,
+    pub seed: u64,
+    pub target_weight: Option<usize>,
+}
+
+impl RandomWindowUpperBoundOptions {
+    pub fn validate(&self) -> Result<()> {
+        validate_upper_bound_options(self.iterations, self.restarts, self.target_weight)
+    }
+}
+
+impl DistanceBoundOptions for RandomWindowUpperBoundOptions {
+    fn validate(&self) -> Result<()> {
+        RandomWindowUpperBoundOptions::validate(self)
+    }
+}
+
+fn validate_upper_bound_options(
+    iterations: usize,
+    restarts: usize,
+    target_weight: Option<usize>,
+) -> Result<()> {
+    if iterations == 0 {
+        return Err(QecError::InvalidDistanceBoundOption {
+            option: "iterations",
+            reason: "must be greater than zero".to_owned(),
+        });
+    }
+    if restarts == 0 {
+        return Err(QecError::InvalidDistanceBoundOption {
+            option: "restarts",
+            reason: "must be greater than zero".to_owned(),
+        });
+    }
+    if target_weight == Some(0) {
+        return Err(QecError::InvalidDistanceBoundOption {
+            option: "target_weight",
+            reason: "must be greater than zero when provided".to_owned(),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,27 +146,28 @@ impl DistanceBoundProvenance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DistanceBoundResult {
+pub struct DistanceBoundResult<Options = RandomizedUpperBoundOptions> {
     pub status: DistanceBoundStatus,
     pub method: DistanceBoundMethod,
     pub bound_type: BoundType,
     pub upper_bound: usize,
     pub logical_class: LogicalClass,
     pub witness: DistanceBoundWitness,
-    pub options: RandomizedUpperBoundOptions,
+    pub options: Options,
     pub provenance: DistanceBoundProvenance,
 }
 
-impl DistanceBoundResult {
-    pub fn completed(
+impl<Options> DistanceBoundResult<Options> {
+    fn completed_with_method(
+        method: DistanceBoundMethod,
         upper_bound: usize,
         logical_class: LogicalClass,
         witness: DistanceBoundWitness,
-        options: RandomizedUpperBoundOptions,
+        options: Options,
     ) -> Self {
         Self {
             status: DistanceBoundStatus::Completed,
-            method: DistanceBoundMethod::RandomizedUpperBound,
+            method,
             bound_type: BoundType::Upper,
             upper_bound,
             logical_class,
@@ -125,6 +175,40 @@ impl DistanceBoundResult {
             options,
             provenance: DistanceBoundProvenance::current(),
         }
+    }
+}
+
+impl DistanceBoundResult<RandomizedUpperBoundOptions> {
+    pub fn completed(
+        upper_bound: usize,
+        logical_class: LogicalClass,
+        witness: DistanceBoundWitness,
+        options: RandomizedUpperBoundOptions,
+    ) -> Self {
+        Self::completed_with_method(
+            DistanceBoundMethod::RandomizedUpperBound,
+            upper_bound,
+            logical_class,
+            witness,
+            options,
+        )
+    }
+}
+
+impl DistanceBoundResult<RandomWindowUpperBoundOptions> {
+    pub fn completed_random_window_upper_bound(
+        upper_bound: usize,
+        logical_class: LogicalClass,
+        witness: DistanceBoundWitness,
+        options: RandomWindowUpperBoundOptions,
+    ) -> Self {
+        Self::completed_with_method(
+            DistanceBoundMethod::RandomWindowUpperBound,
+            upper_bound,
+            logical_class,
+            witness,
+            options,
+        )
     }
 }
 
@@ -279,20 +363,68 @@ pub struct BoundValidationContext<'a> {
     pub known_exact_distance: Option<usize>,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct Issue225LadderCase {
+    pub case_id: String,
+    pub source_issue: u64,
+    pub code_id: String,
+    pub expected_upper_bound: usize,
+    pub target_weight: usize,
+    pub tier: String,
+    pub run_mode: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MethodAwareBoundValidationContext<'a> {
+    pub code: &'a StabilizerCode,
+    pub expected_method: DistanceBoundMethod,
+    pub known_exact_distance: Option<usize>,
+}
+
 pub fn validate_randomized_upper_bound_result(
     result: &DistanceBoundResult,
     context: BoundValidationContext<'_>,
 ) -> Result<()> {
+    validate_distance_bound_result(
+        result,
+        MethodAwareBoundValidationContext {
+            code: context.code,
+            expected_method: DistanceBoundMethod::RandomizedUpperBound,
+            known_exact_distance: context.known_exact_distance,
+        },
+    )
+}
+
+pub fn validate_random_window_upper_bound_result(
+    result: &DistanceBoundResult<RandomWindowUpperBoundOptions>,
+    context: BoundValidationContext<'_>,
+) -> Result<()> {
+    validate_distance_bound_result(
+        result,
+        MethodAwareBoundValidationContext {
+            code: context.code,
+            expected_method: DistanceBoundMethod::RandomWindowUpperBound,
+            known_exact_distance: context.known_exact_distance,
+        },
+    )
+}
+
+pub fn validate_distance_bound_result<Options: DistanceBoundOptions>(
+    result: &DistanceBoundResult<Options>,
+    context: MethodAwareBoundValidationContext<'_>,
+) -> Result<()> {
     result.options.validate()?;
 
-    if result.method != DistanceBoundMethod::RandomizedUpperBound {
-        return Err(QecError::DistanceBoundValidationFailed(
-            "distance bound method must be randomized-upper-bound".to_owned(),
-        ));
+    if result.method != context.expected_method {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "expected method {}, got {}",
+            context.expected_method.label(),
+            result.method.label()
+        )));
     }
     if result.bound_type != BoundType::Upper {
         return Err(QecError::DistanceBoundValidationFailed(
-            "randomized-upper-bound results must use bound_type upper".to_owned(),
+            "distance bound results must use bound_type upper".to_owned(),
         ));
     }
     if result.upper_bound == 0 {
@@ -339,6 +471,50 @@ pub fn validate_randomized_upper_bound_result(
     }
 
     Ok(())
+}
+
+pub fn verify_issue_225_ladder_case<Options: DistanceBoundOptions>(
+    case: &Issue225LadderCase,
+    result: &DistanceBoundResult<Options>,
+    css: &CssCode,
+    expected_method: DistanceBoundMethod,
+) -> Result<()> {
+    if result.method != expected_method {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "{} expected method {}, got {}",
+            case.case_id,
+            expected_method.label(),
+            result.method.label()
+        )));
+    }
+
+    validate_distance_bound_result(
+        result,
+        MethodAwareBoundValidationContext {
+            code: css.code(),
+            expected_method,
+            known_exact_distance: None,
+        },
+    )
+    .map_err(|error| prefix_ladder_case_error(&case.case_id, error))?;
+
+    if result.upper_bound > case.expected_upper_bound {
+        return Err(QecError::DistanceBoundValidationFailed(format!(
+            "{} expected upper_bound <= {}, got {}",
+            case.case_id, case.expected_upper_bound, result.upper_bound
+        )));
+    }
+
+    Ok(())
+}
+
+fn prefix_ladder_case_error(case_id: &str, error: QecError) -> QecError {
+    match error {
+        QecError::DistanceBoundValidationFailed(message) => {
+            QecError::DistanceBoundValidationFailed(format!("{case_id} {message}"))
+        }
+        other => QecError::DistanceBoundValidationFailed(format!("{case_id} {other}")),
+    }
 }
 
 fn classify_witness_support(witness: &Pauli) -> LogicalClass {

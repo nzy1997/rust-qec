@@ -45,6 +45,8 @@ fn highs_solves_a_single_binary_parity_problem() {
     )
     .unwrap();
 
+    assert_eq!(backend.kind(), BackendKind::Highs);
+
     let solution = backend.solve().unwrap();
 
     assert_eq!(solution.binary_values, vec![true]);

@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
+use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
-use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -1659,4 +1659,129 @@ fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() 
         stderr.contains("invalid distance bound option iterations"),
         "stderr was: {stderr}"
     );
+}
+
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn code_css_distance_exact_accepts_highs_backend_and_solver_limits() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--backend",
+        "highs",
+        "--time-limit-seconds",
+        "300",
+        "--mip-gap",
+        "0.001",
+        "--threads",
+        "1",
+        "--verbose-solver",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["status"], "incomplete");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["requested_backend"], "highs");
+    assert_eq!(json["backend"], "highs");
+    assert_eq!(json["solver_status"], "optimal");
+    assert_eq!(json["time_limit_seconds"], 300.0);
+    assert_eq!(json["mip_gap"], 0.001);
+    assert_eq!(json["threads"], 1);
+    assert_eq!(json["verbose_solver"], true);
+    assert_eq!(json["options"]["backend"], "highs");
+}
+
+#[test]
+fn code_css_distance_exact_rejects_gurobi_backend_without_feature() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--backend",
+        "gurobi",
+        "--json",
+    ]);
+
+    if cfg!(feature = "distance-ilp-gurobi") {
+        assert!(output.status.success());
+    } else {
+        assert!(!output.status.success());
+        assert_eq!(output.stdout, b"");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("ILP backend is unavailable"),
+            "stderr was: {stderr}"
+        );
+        assert!(stderr.contains("Gurobi"), "stderr was: {stderr}");
+    }
+}
+
+#[cfg(not(feature = "distance-ilp-highs"))]
+#[test]
+fn run_code_css_distance_exact_rejects_valid_ilp_options_without_ilp_build() {
+    let result = run_qec_code_in_process(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--backend",
+        "highs",
+        "--time-limit-seconds",
+        "300",
+        "--mip-gap",
+        "0",
+        "--threads",
+        "1",
+        "--json",
+    ]);
+
+    assert!(
+        matches!(
+            result,
+            Err(QecError::DistanceComputationUnsupported { n: 7, ref reason })
+                if reason == "solver options require an ILP-enabled build"
+        ),
+        "expected unsupported ILP options error, got {result:?}",
+    );
+}
+
+#[test]
+fn run_code_css_distance_exact_rejects_invalid_solver_options() {
+    for (flag, value, expected) in [
+        ("--time-limit-seconds", "0", "time_limit_seconds"),
+        ("--time-limit-seconds", "NaN", "time_limit_seconds"),
+        ("--mip-gap", "-0.1", "mip_gap"),
+        ("--mip-gap", "NaN", "mip_gap"),
+        ("--threads", "0", "threads"),
+    ] {
+        let result = run_qec_code_in_process(&[
+            "code",
+            "css-distance",
+            "exact",
+            "--code-id",
+            "steane",
+            flag,
+            value,
+            "--json",
+        ]);
+        assert!(
+            matches!(
+                result,
+                Err(QecError::InvalidCssDistanceInput(ref message)) if message.contains(expected)
+            ),
+            "expected invalid {expected} error for {flag} {value}, got {result:?}",
+        );
+    }
 }

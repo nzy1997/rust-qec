@@ -8,6 +8,9 @@ JSON as a timeline view. For normal static SVG output, prefer the built-in
 rstim render_svg --in circuit.stim --out circuit.svg
 ```
 
+For a committed atom-loss SVG workflow reference, see
+[`rstim Render SVG Atom-Loss showcase`](docs/showcases/rstim-render-svg-atom-loss.md).
+
 This package remains useful as optional legacy/prototype infrastructure for
 Typst-specific workflows and direct QP101 JSON experiments.
 
@@ -49,9 +52,9 @@ typst compile --root qp101-viz qp101-viz/examples/atom-loss-sample.typ /tmp/atom
 ```
 
 The source circuit is
-[`examples/atom-loss-sample.stim`](examples/atom-loss-sample.stim), and the
-exported sample result is
-[`examples/atom-loss-sample.qp101.json`](examples/atom-loss-sample.qp101.json).
+[`qp101-viz/examples/atom-loss-sample.stim`](qp101-viz/examples/atom-loss-sample.stim),
+and the exported sample result is
+[`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json).
 
 For a denser end-to-end example, compile:
 

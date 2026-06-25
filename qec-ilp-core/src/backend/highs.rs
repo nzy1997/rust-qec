@@ -5,9 +5,9 @@ use std::os::raw::c_int;
 use highs::{ColProblem, HighsModelStatus, HighsSolutionStatus, HighsStatus, Model};
 
 use crate::backend::BinaryBackend;
-use crate::config::BinaryIlpConfig;
+use crate::config::{BackendKind, BinaryIlpConfig};
 use crate::error::BinaryIlpError;
-use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution};
+use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution, ModelSolutionStatus};
 
 #[derive(Debug)]
 pub struct HighsBinaryBackend {
@@ -89,6 +89,10 @@ impl HighsBinaryBackend {
 }
 
 impl BinaryBackend for HighsBinaryBackend {
+    fn kind(&self) -> BackendKind {
+        BackendKind::Highs
+    }
+
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError> {
         let model = self
             .model
@@ -98,11 +102,12 @@ impl BinaryBackend for HighsBinaryBackend {
         accept_call_status(status, "solve failed")?;
         let model_status = read_model_status(model)?;
         let primal_status = read_primal_solution_status(model)?;
-        if !accept_solved_model_status(model_status, primal_status) {
-            return Err(BinaryIlpError::Highs(format!(
-                "unexpected HiGHS solve status: model={model_status:?}, primal={primal_status:?}"
-            )));
-        }
+        let solution_status =
+            accepted_model_solution_status(model_status, primal_status).ok_or_else(|| {
+                BinaryIlpError::Highs(format!(
+                    "unexpected HiGHS solve status: model={model_status:?}, primal={primal_status:?}"
+                ))
+            })?;
 
         let columns = read_solution_columns(model)?;
 
@@ -119,6 +124,7 @@ impl BinaryBackend for HighsBinaryBackend {
                 .iter()
                 .map(|&value| value > 0.5)
                 .collect(),
+            status: solution_status,
         })
     }
 
@@ -175,9 +181,8 @@ fn accept_call_status(status: c_int, context: &str) -> Result<(), BinaryIlpError
 
 fn read_model_status(model: &mut Model) -> Result<HighsModelStatus, BinaryIlpError> {
     let status = unsafe { highs_sys::Highs_getModelStatus(model.as_mut_ptr()) };
-    HighsModelStatus::try_from(status).map_err(|_| {
-        BinaryIlpError::Highs(format!("unexpected HiGHS model status value {status}"))
-    })
+    HighsModelStatus::try_from(status)
+        .map_err(|_| BinaryIlpError::Highs(format!("unexpected HiGHS model status value {status}")))
 }
 
 fn read_primal_solution_status(model: &mut Model) -> Result<HighsSolutionStatus, BinaryIlpError> {
@@ -214,14 +219,16 @@ fn read_solution_columns(model: &mut Model) -> Result<Vec<f64>, BinaryIlpError> 
     Ok(colvalue)
 }
 
-fn accept_solved_model_status(
+fn accepted_model_solution_status(
     model_status: HighsModelStatus,
     primal_status: HighsSolutionStatus,
-) -> bool {
+) -> Option<ModelSolutionStatus> {
     match model_status {
-        HighsModelStatus::Optimal => true,
-        HighsModelStatus::ReachedTimeLimit => primal_status == HighsSolutionStatus::Feasible,
-        _ => false,
+        HighsModelStatus::Optimal => Some(ModelSolutionStatus::Optimal),
+        HighsModelStatus::ReachedTimeLimit if primal_status == HighsSolutionStatus::Feasible => {
+            Some(ModelSolutionStatus::TimeLimit)
+        }
+        _ => None,
     }
 }
 
@@ -229,37 +236,50 @@ fn accept_solved_model_status(
 mod tests {
     use highs::{HighsModelStatus, HighsSolutionStatus};
 
-    use super::accept_solved_model_status;
+    use super::accepted_model_solution_status;
+    use crate::model::ModelSolutionStatus;
 
     #[test]
-    fn accepts_optimal_solution() {
-        assert!(accept_solved_model_status(
-            HighsModelStatus::Optimal,
-            HighsSolutionStatus::Feasible,
-        ));
+    fn maps_optimal_solution_status() {
+        assert_eq!(
+            accepted_model_solution_status(
+                HighsModelStatus::Optimal,
+                HighsSolutionStatus::Feasible
+            ),
+            Some(ModelSolutionStatus::Optimal),
+        );
     }
 
     #[test]
-    fn accepts_time_limited_feasible_solution() {
-        assert!(accept_solved_model_status(
-            HighsModelStatus::ReachedTimeLimit,
-            HighsSolutionStatus::Feasible,
-        ));
+    fn maps_time_limited_feasible_solution_status() {
+        assert_eq!(
+            accepted_model_solution_status(
+                HighsModelStatus::ReachedTimeLimit,
+                HighsSolutionStatus::Feasible,
+            ),
+            Some(ModelSolutionStatus::TimeLimit),
+        );
     }
 
     #[test]
     fn rejects_time_limited_run_without_feasible_solution() {
-        assert!(!accept_solved_model_status(
-            HighsModelStatus::ReachedTimeLimit,
-            HighsSolutionStatus::None,
-        ));
+        assert_eq!(
+            accepted_model_solution_status(
+                HighsModelStatus::ReachedTimeLimit,
+                HighsSolutionStatus::None,
+            ),
+            None,
+        );
     }
 
     #[test]
     fn rejects_other_non_optimal_statuses_even_with_feasible_solution() {
-        assert!(!accept_solved_model_status(
-            HighsModelStatus::ReachedInterrupt,
-            HighsSolutionStatus::Feasible,
-        ));
+        assert_eq!(
+            accepted_model_solution_status(
+                HighsModelStatus::ReachedInterrupt,
+                HighsSolutionStatus::Feasible,
+            ),
+            None,
+        );
     }
 }

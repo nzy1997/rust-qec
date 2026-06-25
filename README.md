@@ -58,7 +58,11 @@ cargo test --workspace
 ## Primary Next Steps
 
 - [Showcase index](docs/showcases/README.md): runnable workflow categories and
-  the template used for future examples.
+  the template used for future examples, including
+  [rstim CLI DEM Pipeline](docs/showcases/rstim-cli-dem-pipeline.md),
+  [rstim Render SVG Atom-Loss](docs/showcases/rstim-render-svg-atom-loss.md),
+  [QEC-Code CSS Construction](docs/showcases/qec-code-css-construction.md), and
+  [Benchmark Evidence](docs/showcases/benchmark-evidence.md).
 - [Getting started with `rstim`](rstim/doc/getting_started.md): simulator and
   Rust API orientation.
 - [`rstim` CLI reference](rstim/doc/cli.md): `stats`, `sample`, `detect`,

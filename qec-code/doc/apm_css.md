@@ -20,7 +20,7 @@ vocabulary into the data model used by `qec-code`.
 ## Searcher Integration
 
 Future APM searcher work is tracked separately in
-[`apm_searcher_integration.md`](apm_searcher_integration.md). The searcher
+[`apm_searcher_integration.md`](qec-code/doc/apm_searcher_integration.md). The searcher
 roadmap preserves the fixed Table A1 built-ins as the production path and starts
 future integration with manifest import validation before any wrapper or native
 searcher work.
@@ -99,6 +99,11 @@ The maps commute iff `residual == 0`.
 For the P=96 manifest entry, `required_commuting_pairs[0]` is a Gamma pair
 checked modulo `32` and has residual zero. A documented noncommuting control is
 `f0` against `g3` over modulus `96`; its residual is nonzero.
+
+## See Also
+
+- [QEC-Code CSS Construction showcase](docs/showcases/qec-code-css-construction.md)
+- [Showcase index](docs/showcases/README.md)
 
 ## Sparse-Row Output Contract
 

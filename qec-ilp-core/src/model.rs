@@ -35,6 +35,15 @@ pub struct BinaryIlpModel {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelSolution {
     pub binary_values: Vec<bool>,
+    pub status: ModelSolutionStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelSolutionStatus {
+    Optimal,
+    TimeLimit,
+    SolutionLimit,
+    SubOptimal,
 }
 
 impl BinaryIlpModel {

@@ -81,3 +81,48 @@ fn sample_invalid_format_fails() {
     );
     assert!(!output.status.success());
 }
+
+fn extract_marked_stim_block(markdown: &str, start_marker: &str, end_marker: &str) -> String {
+    let after_start = markdown
+        .split(start_marker)
+        .nth(1)
+        .unwrap_or_else(|| panic!("missing start marker {start_marker}"));
+    let marked = after_start
+        .split(end_marker)
+        .next()
+        .unwrap_or_else(|| panic!("missing end marker {end_marker}"));
+    let fence_start = marked
+        .find("```stim")
+        .unwrap_or_else(|| panic!("missing stim fence after {start_marker}"));
+    let after_fence = &marked[fence_start + "```stim".len()..];
+    let fence_end = after_fence
+        .find("```")
+        .unwrap_or_else(|| panic!("missing closing stim fence after {start_marker}"));
+    let mut block = after_fence[..fence_end].trim().to_owned();
+    block.push('\n');
+    block
+}
+
+#[test]
+fn showcase_documented_bad_stats_input_still_fails() {
+    let doc_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../docs/showcases/rstim-cli-dem-pipeline.md");
+    let markdown = std::fs::read_to_string(&doc_path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", doc_path.display()));
+    let input = extract_marked_stim_block(
+        &markdown,
+        "<!-- rstim-cli-dem-pipeline-bad-input-start -->",
+        "<!-- rstim-cli-dem-pipeline-bad-input-end -->",
+    );
+
+    let output = run_with_stdin(&["stats"], &input);
+
+    assert!(
+        !output.status.success(),
+        "documented bad stats input unexpectedly succeeded with stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("bad repeat count"), "stderr: {stderr}");
+    assert!(!stderr.contains("panicked"), "stderr: {stderr}");
+}
