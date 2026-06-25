@@ -92,3 +92,22 @@ fn code_css_quantum_tanner_invalid_spec_fails_without_stdout() {
         "stderr should not be valid sparse-row JSON: {stderr}"
     );
 }
+
+#[test]
+fn code_css_quantum_tanner_missing_spec_fails_without_stdout() {
+    let output = run_quantum_tanner("hx", "qec-code/tests/fixtures/quantum_tanner/missing.json");
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        stderr.contains("failed to read CSS matrix"),
+        "stderr was: {stderr}"
+    );
+    assert!(stderr.contains("missing.json"), "stderr was: {stderr}");
+    assert!(
+        serde_json::from_str::<serde_json::Value>(&stderr).is_err(),
+        "stderr should not be valid sparse-row JSON: {stderr}"
+    );
+}
