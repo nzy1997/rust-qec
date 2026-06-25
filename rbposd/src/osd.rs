@@ -95,7 +95,11 @@ pub(crate) fn decode_osd_with_workspace(
     let mut gf2_stats = Gf2SolveStats::default();
     let reduced = workspace
         .prepared
-        .reduce_with_column_order_counting(&target_syndrome, &workspace.column_order, &mut gf2_stats)
+        .reduce_with_column_order_counting(
+            &target_syndrome,
+            &workspace.column_order,
+            &mut gf2_stats,
+        )
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
 
@@ -160,7 +164,11 @@ pub(crate) fn profile_osd_with_workspace(
     let mut gf2_stats = Gf2SolveStats::default();
     let reduced = workspace
         .prepared
-        .reduce_with_column_order_counting(&target_syndrome, &workspace.column_order, &mut gf2_stats)
+        .reduce_with_column_order_counting(
+            &target_syndrome,
+            &workspace.column_order,
+            &mut gf2_stats,
+        )
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
 
@@ -376,7 +384,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{binomial, decode_osd0_with_workspace, OsdWorkspace};
+    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {

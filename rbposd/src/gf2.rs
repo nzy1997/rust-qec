@@ -247,8 +247,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        solve_with_column_order, sort_columns_by_reliability, sort_columns_by_unreliability,
-        PreparedLinearSystem,
+        PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
+        sort_columns_by_unreliability,
     };
 
     #[test]
@@ -402,7 +402,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(base.correction, Correction::from(vec![true, true, false]));
-        assert_eq!(forced.correction, Correction::from(vec![false, false, true]));
+        assert_eq!(
+            forced.correction,
+            Correction::from(vec![false, false, true])
+        );
         assert_eq!(stats.solve_count, 2);
         assert_eq!(stats.full_elimination_count, 1);
     }
