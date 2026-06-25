@@ -128,7 +128,8 @@ class DocsContractTest(unittest.TestCase):
 
 
 def paired_rbposd_ldpc_results() -> list[PairedResult]:
-    rows = list(csv.DictReader(FULL_RESULTS_PATH.open(newline="")))
+    with FULL_RESULTS_PATH.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
     pairs = []
     for distance, rounds, p in TRACKED_CASES:
         ldpc = result_row(rows, "ldpc", distance, rounds, p)
@@ -147,7 +148,7 @@ def paired_rbposd_ldpc_results() -> list[PairedResult]:
 
 def assert_valid_bb_circuit_command_keys(text: str) -> None:
     known = {"bb-circuit-bposd-memory"}
-    keys = set(re.findall(r"`(bb-circuit-bposd-[^`\\s]+)`", text))
+    keys = set(re.findall(r"`(bb-circuit-bposd-[^`\s]+)`", text))
     unknown = sorted(keys - known)
     if unknown:
         raise AssertionError(f"unknown BB circuit command key: {', '.join(unknown)}")
