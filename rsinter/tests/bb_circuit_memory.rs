@@ -279,7 +279,7 @@ fn bb_circuit_bposd_timing_counters_partition_decode_work() {
     let result = run_simulation_for_code(
         "bb90",
         SimulationConfig {
-            physical_error_rate: 1.0e-12,
+            physical_error_rate: 0.003,
             num_cycles: 1,
             num_trials: 1,
             seed: Some(1),
@@ -299,7 +299,12 @@ fn bb_circuit_bposd_timing_counters_partition_decode_work() {
         profile.z_decode_call_count + profile.x_decode_call_count
     );
     assert_eq!(profile.osd_candidate_count, 0);
-    assert!(profile.bp_iteration_count >= profile.decode_call_count);
+    assert!(
+        profile.bp_iteration_count >= profile.decode_call_count,
+        "bp iterations {} should cover decode calls {} for this nontrivial sampled trial",
+        profile.bp_iteration_count,
+        profile.decode_call_count
+    );
 
     let row = bb_circuit_bposd_result_row("bb90", &result);
     validate_bposd_profile_result_row(&row).unwrap();
@@ -310,6 +315,8 @@ fn bb_circuit_bposd_timing_counters_partition_decode_work() {
         "bp_seconds",
         "osd_seconds",
         "decode_call_count",
+        "z_decode_call_count",
+        "x_decode_call_count",
         "bp_iteration_count",
         "osd_use_count",
         "osd_candidate_count",

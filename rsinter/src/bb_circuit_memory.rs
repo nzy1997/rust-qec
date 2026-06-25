@@ -614,7 +614,7 @@ impl BbCircuitBposdProfile {
         self.bp_seconds += stats.bp_seconds;
         self.osd_seconds += stats.osd_seconds;
         self.decode_call_count += stats.decode_call_count;
-        self.bp_iteration_count += stats.bp_iteration_count.max(stats.decode_call_count);
+        self.bp_iteration_count += stats.bp_iteration_count;
         self.osd_use_count += stats.osd_use_count;
         self.osd_candidate_count += stats.osd_candidate_count;
         self.gf2_solve_count += stats.gf2_solve_count;
