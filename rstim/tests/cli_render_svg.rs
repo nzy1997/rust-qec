@@ -229,3 +229,45 @@ fn render_svg_sample_shot_draws_seeded_annotations() {
     let protected_text = std::fs::read_to_string(protected_output.path()).unwrap();
     assert_eq!(protected_text, "existing svg should remain");
 }
+
+#[test]
+fn render_svg_sample_export_errors_preserve_existing_output() {
+    let protected_output = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(protected_output.path(), "existing svg should remain").unwrap();
+
+    let output = run_render_svg_with_stdin_args(
+        &[
+            "--sample_shot",
+            "--seed",
+            "7",
+            "--out",
+            protected_output.path().to_str().unwrap(),
+        ],
+        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
+    );
+
+    assert!(
+        !output.status.success(),
+        "unsupported sample visualization instruction should fail"
+    );
+    assert!(
+        output.stdout.is_empty(),
+        "failing sample-shot export should not write stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(
+            "--sample_shot currently supports a subset of sample visualization instructions"
+        ),
+        "stderr should explain sample-shot instruction support limits: {stderr}"
+    );
+    assert!(
+        stderr.contains("HERALDED_ERASE"),
+        "stderr should name the unsupported instruction: {stderr}"
+    );
+
+    let protected_text = std::fs::read_to_string(protected_output.path()).unwrap();
+    assert_eq!(protected_text, "existing svg should remain");
+}
