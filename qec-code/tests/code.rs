@@ -9,9 +9,11 @@ use qec_code::codes::built_in_css::{
 };
 use qec_code::codes::quantum_tanner::{
     enumerate_quantum_tanner_cayley_faces, quantum_tanner_css_checks,
-    quantum_tanner_local_code_tensor_dual, quantum_tanner_spec_from_json_str,
-    validate_quantum_tanner_group_table, ExplicitFiniteGroup, QuantumTannerConstructionMode,
-    QuantumTannerLocalCodes, QuantumTannerSpec,
+    quantum_tanner_css_checks_from_validated_parts, quantum_tanner_local_code_tensor_dual,
+    quantum_tanner_spec_from_json_str, validate_quantum_tanner_group_table, ExplicitFiniteGroup,
+    QuantumTannerCayleyComplex, QuantumTannerConstructionMode,
+    QuantumTannerLocalCodeTensorDual, QuantumTannerLocalCodes, QuantumTannerSpec,
+    ValidatedFiniteGroup,
 };
 use qec_code::codes::steane::Steane;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
@@ -2144,6 +2146,35 @@ fn assert_sparse_css_orthogonal(num_cols: usize, hx: &[Vec<usize>], hz: &[Vec<us
     }
 }
 
+fn quantum_tanner_toric_d4_validated_parts() -> (
+    QuantumTannerSpec,
+    ValidatedFiniteGroup,
+    QuantumTannerCayleyComplex,
+    QuantumTannerLocalCodeTensorDual,
+) {
+    let spec =
+        quantum_tanner_spec_from_json_str(include_str!("fixtures/quantum_tanner/toric_d4.json"))
+            .unwrap();
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+    let complex = enumerate_quantum_tanner_cayley_faces(spec.construction_mode, &group).unwrap();
+    let local = quantum_tanner_local_code_tensor_dual(&spec).unwrap();
+    (spec, group, complex, local)
+}
+
+fn expect_quantum_tanner_css_error(
+    result: Result<qec_code::codes::quantum_tanner::QuantumTannerCssChecks, QecError>,
+    expected_reason: &str,
+) {
+    let error = result.unwrap_err();
+    let QecError::InvalidQuantumTannerCssConstruction { reason } = error else {
+        panic!("expected quantum Tanner CSS construction error, got {error:?}");
+    };
+    assert!(
+        reason.contains(expected_reason),
+        "expected error containing {expected_reason:?}, got {reason:?}"
+    );
+}
+
 #[test]
 fn quantum_tanner_toric_d4_generates_css_checks() {
     let spec =
@@ -2187,6 +2218,173 @@ fn quantum_tanner_toric_d4_generates_css_checks() {
         quantum_tanner_css_checks(&invalid_non_symmetric_a).unwrap_err(),
         QecError::InvalidQuantumTannerGeneratorSet { set: "A", .. }
     ));
+}
+
+#[test]
+fn quantum_tanner_css_constructor_rejects_inconsistent_validated_parts() {
+    let (spec, group, complex, local) = quantum_tanner_toric_d4_validated_parts();
+
+    let mut mismatched_spec = spec.clone();
+    mismatched_spec.a_generator_indices.swap(0, 1);
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(
+            &mismatched_spec,
+            &group,
+            &complex,
+            &local,
+        ),
+        "spec A generator indices",
+    );
+
+    let mut mismatched_spec = spec.clone();
+    mismatched_spec.b_generator_indices.swap(0, 1);
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(
+            &mismatched_spec,
+            &group,
+            &complex,
+            &local,
+        ),
+        "spec B generator indices",
+    );
+
+    let mut bad_local = local.clone();
+    bad_local.code_a.width += 1;
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &complex, &bad_local),
+        "local code A width",
+    );
+
+    let mut bad_local = local.clone();
+    bad_local.code_b.width += 1;
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &complex, &bad_local),
+        "local code B width",
+    );
+
+    let mut bad_local = local.clone();
+    bad_local.x_sector_rows[0].pop();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &complex, &bad_local),
+        "X local tensor row 0 has width",
+    );
+
+    let mut bad_local = local.clone();
+    bad_local.z_sector_rows[0][0] = 2;
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &complex, &bad_local),
+        "Z local tensor row 0, column 0 is 2",
+    );
+
+    let mut sparse_local = local.clone();
+    sparse_local.x_sector_rows[0] = vec![1, 0, 0, 0];
+    assert!(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &complex, &sparse_local)
+            .is_err()
+    );
+}
+
+#[test]
+fn quantum_tanner_css_constructor_rejects_bad_incidence_records() {
+    let (spec, group, complex, local) = quantum_tanner_toric_d4_validated_parts();
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence[0].face_id = bad_complex.faces.len();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "outside",
+    );
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence[0].a_index = group.a_generators().len();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "out-of-range A coordinate",
+    );
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence[0].a_generator = group.identity();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "A coordinate",
+    );
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence[0].b_index = group.b_generators().len();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "out-of-range B coordinate",
+    );
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence[0].b_generator = group.identity();
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "B coordinate",
+    );
+
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence.push(bad_complex.x_incidence[0]);
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "duplicate local coordinate",
+    );
+
+    let missing = complex.x_incidence[0];
+    let mut bad_complex = complex.clone();
+    bad_complex.x_incidence.retain(|record| {
+        !(record.source_vertex == missing.source_vertex
+            && record.a_index == missing.a_index
+            && record.b_index == missing.b_index)
+    });
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &bad_complex, &local),
+        "missing local coordinate",
+    );
+
+    let mut folded_complex = complex.clone();
+    let first = folded_complex.x_incidence[0];
+    let same_source_second = folded_complex
+        .x_incidence
+        .iter()
+        .position(|record| {
+            record.source_vertex == first.source_vertex
+                && (record.a_index != first.a_index || record.b_index != first.b_index)
+        })
+        .unwrap();
+    folded_complex.x_incidence[same_source_second].face_id = first.face_id;
+    assert!(
+        matches!(
+            quantum_tanner_css_checks_from_validated_parts(&spec, &group, &folded_complex, &local)
+                .unwrap_err(),
+            QecError::InvalidCssOrthogonality
+        ),
+        "duplicate face incidence should cancel one local support modulo 2 and fail CSS validation"
+    );
+}
+
+#[test]
+fn quantum_tanner_css_constructor_rejects_non_bipartite_cayley_sources() {
+    let spec = quantum_tanner_group_table_validator_spec(
+        3,
+        0,
+        vec![vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]],
+        vec![1, 2],
+        vec![1, 2],
+    );
+    let group = validate_quantum_tanner_group_table(&spec).unwrap();
+    let local = quantum_tanner_local_code_tensor_dual(&spec).unwrap();
+    let empty_complex = QuantumTannerCayleyComplex {
+        faces: vec![],
+        oriented_faces: vec![],
+        x_incidence: vec![],
+        z_incidence: vec![],
+    };
+
+    expect_quantum_tanner_css_error(
+        quantum_tanner_css_checks_from_validated_parts(&spec, &group, &empty_complex, &local),
+        "not bipartite",
+    );
 }
 
 fn expect_quantum_tanner_group_table_error(input: &str, expected_reason_part: &str) {
