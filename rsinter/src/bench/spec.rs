@@ -58,6 +58,7 @@ pub struct AxisSpec {
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct SeriesSpec {
+    #[serde(default)]
     pub group_by: Vec<String>,
     pub label_template: String,
 }

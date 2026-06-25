@@ -827,6 +827,82 @@ label = "Decode Time Per Shot"
     );
 }
 
+#[test]
+fn plot_series_group_by_is_independent_from_label() {
+    let split_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "shared label"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let split_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("predict_zero", 3, 0.002, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let dir = tempfile::tempdir().unwrap();
+    let split_out = dir.path().join("split-same-label.svg");
+    render_benchmark_plot(&split_spec, &split_rows, &split_out).unwrap();
+    let split_svg = std::fs::read_to_string(split_out).unwrap();
+    let split_colors = svg_circle_fill_colors(&split_svg);
+    assert_eq!(
+        split_colors.len(),
+        2,
+        "different runner group keys should remain distinct series even with the same label; svg was:\n{split_svg}"
+    );
+
+    let merge_spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "{runner} p={params.p}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let merge_rows = vec![
+        ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
+        ok_row("rmatching", 3, 0.005, 0.001, 2.0, 2000.0, 14.0),
+    ];
+
+    let merge_out = dir.path().join("merge-different-labels.svg");
+    render_benchmark_plot(&merge_spec, &merge_rows, &merge_out).unwrap();
+    let merge_svg = std::fs::read_to_string(merge_out).unwrap();
+    assert!(
+        merge_svg.contains("rmatching p=0.002"),
+        "merged series should keep the first rendered label; svg was:\n{merge_svg}"
+    );
+    assert!(
+        !merge_svg.contains("rmatching p=0.005"),
+        "a changed label must not split rows with the same configured group key; svg was:\n{merge_svg}"
+    );
+}
+
+fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
+    svg.lines()
+        .filter(|line| line.contains("<circle"))
+        .filter_map(|line| {
+            line.split("fill=\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .map(str::to_string)
+        })
+        .collect()
+}
+
 fn spec_with_panels(
     title: &str,
     x_field: &str,
