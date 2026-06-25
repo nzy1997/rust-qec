@@ -4,8 +4,9 @@ use qec_code::distance::LogicalClass;
 use qec_code::distance_bound::{
     BoundType, BoundValidationContext, DistanceBoundMethod, DistanceBoundProvenance,
     DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness, Issue225LadderCase,
-    RandomizedUpperBoundOptions, randomized_css_upper_bound,
-    validate_randomized_upper_bound_result, verify_issue_225_ladder_case,
+    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, randomized_css_upper_bound,
+    validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
+    verify_issue_225_ladder_case,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 
@@ -34,6 +35,20 @@ fn valid_result() -> DistanceBoundResult {
             restarts: 1,
             seed: 7,
             target_weight: None,
+        },
+    )
+}
+
+fn random_window_result() -> DistanceBoundResult<RandomWindowUpperBoundOptions> {
+    DistanceBoundResult::completed_random_window_upper_bound(
+        1,
+        LogicalClass::XLike,
+        one_qubit_x_witness(),
+        RandomWindowUpperBoundOptions {
+            iterations: 12,
+            restarts: 2,
+            seed: 99,
+            target_weight: Some(1),
         },
     )
 }
@@ -101,6 +116,28 @@ fn completed_bound_result_serializes_with_upper_bound_contract() {
 }
 
 #[test]
+fn random_window_upper_bound_result_serializes_contract() {
+    let result = random_window_result();
+
+    let json = serde_json::to_value(&result).unwrap();
+
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["method"], "random-window-upper-bound");
+    assert_eq!(json["bound_type"], "upper");
+    assert_eq!(json["upper_bound"], 1);
+    assert_eq!(json["logical_class"], "x_like");
+    assert_eq!(json["witness"]["x"], serde_json::json!([1]));
+    assert_eq!(json["witness"]["z"], serde_json::json!([0]));
+    assert_eq!(json["witness"]["weight"], 1);
+    assert_eq!(json["options"]["iterations"], 12);
+    assert_eq!(json["options"]["restarts"], 2);
+    assert_eq!(json["options"]["seed"], 99);
+    assert_eq!(json["options"]["target_weight"], 1);
+    assert_eq!(json["provenance"]["tool"], "qec-code");
+    assert_eq!(json["provenance"]["method_revision"], 1);
+}
+
+#[test]
 fn randomized_upper_bound_options_reject_zero_iterations_restarts_and_target() {
     assert_eq!(
         RandomizedUpperBoundOptions {
@@ -142,6 +179,46 @@ fn randomized_upper_bound_options_reject_zero_iterations_restarts_and_target() {
             option: "target_weight",
             reason: "must be greater than zero when provided".to_owned(),
         })
+    );
+}
+
+#[test]
+fn random_window_upper_bound_validator_rejects_wrong_method_label() {
+    let code = trivial_one_qubit_code();
+    let mut result = random_window_result();
+    result.method = DistanceBoundMethod::RandomizedUpperBound;
+
+    assert_eq!(
+        validate_random_window_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: Some(1),
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "expected method random-window-upper-bound, got randomized-upper-bound".to_owned(),
+        ))
+    );
+}
+
+#[test]
+fn randomized_upper_bound_validator_rejects_random_window_method_label() {
+    let code = trivial_one_qubit_code();
+    let mut result = valid_result();
+    result.method = DistanceBoundMethod::RandomWindowUpperBound;
+
+    assert_eq!(
+        validate_randomized_upper_bound_result(
+            &result,
+            BoundValidationContext {
+                code: &code,
+                known_exact_distance: Some(1),
+            },
+        ),
+        Err(QecError::DistanceBoundValidationFailed(
+            "expected method randomized-upper-bound, got random-window-upper-bound".to_owned(),
+        ))
     );
 }
 
