@@ -599,7 +599,11 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) { "!" } else { "" }
+    if inverted.unwrap_or(false) {
+        "!"
+    } else {
+        ""
+    }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1356,11 +1360,54 @@ fn render_annotations_with_line_offset(
             parts.push(text.to_string());
         }
         let content = escape_xml(&parts.join(": "));
+        let class = annotation_class(annotation);
+        let fill = annotation_fill(annotation);
+        let attrs = annotation_style_attrs(annotation);
         out.push_str(&format!(
-            "<text x=\"{x}\" y=\"{}\" fill=\"#7a5af8\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
-            base_y + idx as i32 * ANNOTATION_LINE_GAP
+            "<text class=\"{class}\" x=\"{x}\" y=\"{}\" fill=\"{}\" text-anchor=\"middle\" font-size=\"11\"{attrs}>{content}</text>\n",
+            base_y + idx as i32 * ANNOTATION_LINE_GAP,
+            escape_xml(fill),
         ));
     }
+}
+
+fn annotation_class(annotation: &Qp101Annotation) -> String {
+    let mut class = "annotation".to_string();
+    if let Some(preset) = annotation
+        .style
+        .as_ref()
+        .and_then(|style| style.preset.as_deref())
+    {
+        class.push_str(" annotation-preset-");
+        class.push_str(&escape_xml(preset));
+    }
+    class
+}
+
+fn annotation_fill(annotation: &Qp101Annotation) -> &str {
+    annotation
+        .style
+        .as_ref()
+        .and_then(|style| style.color.as_deref())
+        .unwrap_or("#7a5af8")
+}
+
+fn annotation_style_attrs(annotation: &Qp101Annotation) -> String {
+    let Some(style) = annotation.style.as_ref() else {
+        return String::new();
+    };
+    let mut attrs = String::new();
+    if let Some(preset) = style.preset.as_deref() {
+        attrs.push_str(" data-style-preset=\"");
+        attrs.push_str(&escape_xml(preset));
+        attrs.push('"');
+    }
+    if let Some(highlight) = style.highlight {
+        attrs.push_str(" data-style-highlight=\"");
+        attrs.push_str(if highlight { "true" } else { "false" });
+        attrs.push('"');
+    }
+    attrs
 }
 
 fn measurement_annotation_line_offset(targets: &[MeasurementTarget]) -> usize {
