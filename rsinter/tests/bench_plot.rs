@@ -1246,6 +1246,20 @@ label = "Decode Time Per Shot"
 }
 
 #[test]
+fn log_log_fit_rejects_invalid_degenerate_and_overflowing_inputs() {
+    assert!(log_log_fit_for_plot(&[(0.1, Some(f64::NAN)), (0.2, Some(0.04))]).is_none());
+    assert!(log_log_fit_for_plot(&[(0.1, Some(0.01)), (0.1, Some(0.02))]).is_none());
+    assert!(
+        log_log_fit_for_plot(&[
+            (1.49e-304, Some(2.09e304)),
+            (3.96e-44, Some(6.7e-322)),
+            (3.11e43, Some(1.06e-217)),
+        ])
+        .is_none()
+    );
+}
+
+#[test]
 fn plot_series_group_by_covers_fallback_field_scopes_and_errors() {
     let label_fallback_spec = spec_with_panels(
         "Surface Decoder",

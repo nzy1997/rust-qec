@@ -230,9 +230,6 @@ pub fn log_log_fit_for_plot(points: &[(f64, Option<f64>)]) -> Option<LogLogFitFo
 
     let slope = (n * sum_xy - sum_x * sum_y) / denominator;
     let intercept = (sum_y - slope * sum_x) / n;
-    if !slope.is_finite() || !intercept.is_finite() {
-        return None;
-    }
 
     let x_min = valid_points
         .iter()
@@ -242,9 +239,6 @@ pub fn log_log_fit_for_plot(points: &[(f64, Option<f64>)]) -> Option<LogLogFitFo
         .iter()
         .map(|(x, _)| *x)
         .fold(f64::NEG_INFINITY, f64::max);
-    if !x_min.is_finite() || !x_max.is_finite() || x_min <= 0.0 || x_max <= 0.0 || x_min == x_max {
-        return None;
-    }
 
     let y_min = (intercept + slope * x_min.ln()).exp();
     let y_max = (intercept + slope * x_max.ln()).exp();
