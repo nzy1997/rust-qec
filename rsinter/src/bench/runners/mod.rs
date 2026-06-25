@@ -850,9 +850,10 @@ mod tests {
             case_summary: CaseSummary::new(),
         };
         let decoder_params = crate::bench::result::ParamMap::new();
-        let mut unused_batcher = |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
-            panic!("raw DEM analysis should fail before sampling")
-        };
+        let mut unused_batcher =
+            |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+                panic!("raw DEM analysis should fail before sampling")
+            };
 
         let row = run_built_decoder_point_with_batcher(
             "fake",

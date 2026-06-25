@@ -79,9 +79,8 @@ pub fn run_rust_benchmark_with_options(
             seed: 12_345,
             spec_dir: spec_dir.to_path_buf(),
         };
-        let existing_rows = prune_completed_identity_failures(
-            resume_rows.get(&runner.name).cloned().unwrap_or_default(),
-        )?;
+        let runner_resume_rows = resume_rows.get(&runner.name).cloned().unwrap_or_default();
+        let existing_rows = prune_completed_identity_failures(runner_resume_rows)?;
         let completed = completed_identities(&existing_rows)?;
         let mut fresh_rows = Vec::new();
         for point in &points {
@@ -93,10 +92,8 @@ pub fn run_rust_benchmark_with_options(
             }
         }
         let rows = if options.resume {
-            merge_result_rows(vec![
-                drop_replaced_incomplete_rows(existing_rows, &fresh_rows)?,
-                fresh_rows,
-            ])?
+            let retained_rows = drop_replaced_incomplete_rows(existing_rows, &fresh_rows)?;
+            merge_result_rows(vec![retained_rows, fresh_rows])?
         } else {
             fresh_rows
         };
