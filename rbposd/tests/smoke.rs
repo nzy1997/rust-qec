@@ -79,6 +79,49 @@ fn decode_error_contract() {
 }
 
 #[test]
+fn unsupported_osd_method_is_rejected_without_fallback() {
+    let error = OsdVariant::from_method_name("osd_cs_typo").unwrap_err();
+
+    assert_eq!(
+        error,
+        DecodeError::UnsupportedOsdMethod {
+            method: "osd_cs_typo".to_string()
+        }
+    );
+    assert!(error.to_string().contains("osd_cs_typo"));
+}
+
+#[test]
+fn osd_method_aliases_map_to_explicit_planners() {
+    assert_eq!(
+        OsdVariant::from_method_name("combination_sweep").unwrap(),
+        OsdVariant::LegacyCombinationSweep
+    );
+    assert_eq!(
+        OsdVariant::from_method_name("legacy_combination_sweep").unwrap(),
+        OsdVariant::LegacyCombinationSweep
+    );
+    assert_eq!(
+        OsdVariant::from_method_name("ldpc_osd_cs").unwrap(),
+        OsdVariant::LdpcCombinationSweep
+    );
+    assert_eq!(
+        OsdVariant::from_method_name("osd_cs").unwrap(),
+        OsdVariant::LdpcCombinationSweep
+    );
+
+    assert_eq!(OsdVariant::Osd0.planner_name(), "osd0");
+    assert_eq!(
+        OsdVariant::LegacyCombinationSweep.planner_name(),
+        "legacy_combination_sweep"
+    );
+    assert_eq!(
+        OsdVariant::LdpcCombinationSweep.planner_name(),
+        "ldpc_osd_cs"
+    );
+}
+
+#[test]
 fn correction_helpers_and_error_display_cover_remaining_contracts() {
     let zero = Correction::zero(3);
     assert_eq!(zero.len(), 3);
@@ -116,6 +159,13 @@ fn correction_helpers_and_error_display_cover_remaining_contracts() {
     assert_eq!(
         DecodeError::NoLsdSolution.to_string(),
         "no LSD solution found"
+    );
+    assert_eq!(
+        DecodeError::UnsupportedOsdMethod {
+            method: "bad".to_string()
+        }
+        .to_string(),
+        "unsupported OSD method \"bad\"; supported methods are combination_sweep, legacy_combination_sweep, ldpc_osd_cs, osd_cs"
     );
     assert_eq!(
         DecodeError::UnsupportedLsdOrder { order: 2 }.to_string(),

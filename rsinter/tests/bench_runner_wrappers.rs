@@ -62,6 +62,46 @@ fn rbposd_runner_preflight_accepts_lsd_params() {
 }
 
 #[test]
+fn rbposd_runner_preflight_accepts_ldpc_osd_cs_method() {
+    let runner = RbposdRunner;
+    let point = rbposd_point_with_decoder_params(BTreeMap::from([
+        (
+            "osd_method".into(),
+            toml::Value::String("ldpc_osd_cs".into()),
+        ),
+        ("osd_order".into(), toml::Value::Integer(7)),
+    ]));
+
+    runner.preflight_point(&point).unwrap();
+}
+
+#[test]
+fn rbposd_runner_runs_ldpc_osd_cs_method() {
+    let runner = RbposdRunner;
+    let point = rbposd_point_with_decoder_params(BTreeMap::from([
+        (
+            "osd_method".into(),
+            toml::Value::String("ldpc_osd_cs".into()),
+        ),
+        ("osd_order".into(), toml::Value::Integer(7)),
+    ]));
+    let ctx = BenchRunContext {
+        benchmark_name: "surface_decoder".into(),
+        runner_name: "rbposd_ldpc".into(),
+        language: "rust".into(),
+        seed: 12_345,
+        spec_dir: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+    };
+
+    let row = runner.run_point(&point, &ctx).unwrap();
+
+    assert_eq!(row.runner, "rbposd_ldpc");
+    assert_eq!(row.failure_kind, rsinter::failure::FailureKind::Ok);
+    assert_eq!(row.params["osd_method"], serde_json::json!("ldpc_osd_cs"));
+    assert_eq!(row.params["osd_order"], serde_json::json!(7));
+}
+
+#[test]
 fn rbposd_runner_preflight_defaults_lsd_method_when_order_is_set() {
     let runner = RbposdRunner;
     let point = rbposd_point_with_decoder_params(BTreeMap::from([(

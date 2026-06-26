@@ -13,6 +13,8 @@ pub enum Schedule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OsdVariant {
     Osd0,
+    LegacyCombinationSweep,
+    LdpcCombinationSweep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +42,26 @@ pub struct DecoderConfig {
 pub struct LsdConfig {
     pub method: LsdMethod,
     pub lsd_order: usize,
+}
+
+impl OsdVariant {
+    pub fn from_method_name(method: &str) -> Result<Self, crate::error::DecodeError> {
+        match method {
+            "combination_sweep" | "legacy_combination_sweep" => Ok(Self::LegacyCombinationSweep),
+            "ldpc_osd_cs" | "osd_cs" => Ok(Self::LdpcCombinationSweep),
+            other => Err(crate::error::DecodeError::UnsupportedOsdMethod {
+                method: other.to_string(),
+            }),
+        }
+    }
+
+    pub fn planner_name(self) -> &'static str {
+        match self {
+            Self::Osd0 => "osd0",
+            Self::LegacyCombinationSweep => "legacy_combination_sweep",
+            Self::LdpcCombinationSweep => "ldpc_osd_cs",
+        }
+    }
 }
 
 impl Default for DecoderConfig {

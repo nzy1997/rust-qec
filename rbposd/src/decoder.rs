@@ -7,8 +7,8 @@ use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{
-    decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
-    profile_osd_with_workspace, OsdWorkspace,
+    OsdWorkspace, decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
+    effective_osd_variant, profile_osd_with_workspace,
 };
 use crate::vector::{Correction, Syndrome};
 
@@ -62,6 +62,7 @@ pub struct OsdPathDiagnostic {
     pub bp_iterations: usize,
     pub used_osd: bool,
     pub residual_syndrome_weight: usize,
+    pub osd_planner: &'static str,
     pub osd_order: usize,
     pub free_column_count: usize,
     pub candidate_search_frontier_size: usize,
@@ -109,6 +110,7 @@ impl BpOsdDecoder {
     }
 
     pub fn decode(&self, syndrome: &Syndrome) -> Result<DecodeResult, DecodeError> {
+        let effective_planner = effective_osd_variant(self.config);
         if syndrome.len() != self.pcm.num_checks() {
             return Err(DecodeError::DimensionMismatch {
                 what: "syndrome",
@@ -165,6 +167,7 @@ impl BpOsdDecoder {
                 &bp_workspace.hard_decision_bits,
                 &bp_workspace.reliability,
                 &mut osd_workspace,
+                effective_planner,
                 self.config.osd_order,
             )?
         };
@@ -191,6 +194,7 @@ impl BpOsdDecoder {
     }
 
     pub fn diagnose_osd_path(&self, syndrome: &Syndrome) -> Result<OsdPathDiagnostic, DecodeError> {
+        let effective_planner = effective_osd_variant(self.config);
         if syndrome.len() != self.pcm.num_checks() {
             return Err(DecodeError::DimensionMismatch {
                 what: "syndrome",
@@ -208,6 +212,7 @@ impl BpOsdDecoder {
                     bp_iterations: 0,
                     used_osd: false,
                     residual_syndrome_weight: 0,
+                    osd_planner: effective_planner.planner_name(),
                     osd_order: self.config.osd_order,
                     free_column_count: 0,
                     candidate_search_frontier_size: 0,
@@ -228,6 +233,7 @@ impl BpOsdDecoder {
                 bp_iterations: bp_info.iterations,
                 used_osd: false,
                 residual_syndrome_weight: 0,
+                osd_planner: effective_planner.planner_name(),
                 osd_order: self.config.osd_order,
                 free_column_count: 0,
                 candidate_search_frontier_size: 0,
@@ -244,6 +250,7 @@ impl BpOsdDecoder {
                 &bp_workspace.hard_decision_bits,
                 &bp_workspace.reliability,
                 &mut osd_workspace,
+                effective_planner,
                 self.config.osd_order,
             )?
         };
@@ -254,6 +261,7 @@ impl BpOsdDecoder {
             bp_iterations: bp_info.iterations,
             used_osd: true,
             residual_syndrome_weight: bp_info.residual_weight,
+            osd_planner: effective_planner.planner_name(),
             osd_order: self.config.osd_order,
             free_column_count: plan.free_column_count,
             candidate_search_frontier_size: plan.candidate_search_frontier_size,
@@ -267,6 +275,7 @@ impl BpOsdDecoder {
         syndrome: &Syndrome,
         osd_candidate_limit: usize,
     ) -> Result<DecodeStats, DecodeError> {
+        let effective_planner = effective_osd_variant(self.config);
         if syndrome.len() != self.pcm.num_checks() {
             return Err(DecodeError::DimensionMismatch {
                 what: "syndrome",
@@ -309,6 +318,7 @@ impl BpOsdDecoder {
                 &bp_workspace.hard_decision_bits,
                 &bp_workspace.reliability,
                 &mut osd_workspace,
+                effective_planner,
                 self.config.osd_order,
                 osd_candidate_limit,
             )?

@@ -1,9 +1,9 @@
 use rsinter::bench::registry::{
-    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
-    build_default_rust_runner_registry,
+    BenchCasePoint, BenchRunContext, RustBenchRunner, build_default_rust_runner_registry,
+    RustRunnerRegistry,
 };
-use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
-use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
+use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
+use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
 use std::collections::BTreeMap;
@@ -518,11 +518,9 @@ fn rust_benchmark_resume_falls_back_when_runner_cannot_plan_identity() {
 
     assert_eq!(resumed_rows.len(), 2);
     assert_eq!(identity_count(&resumed_rows, &stale_identity), 1);
-    assert!(
-        resumed_rows
-            .iter()
-            .any(|row| row.status == "ok" && row.params["p"] == serde_json::json!(0.1))
-    );
+    assert!(resumed_rows
+        .iter()
+        .any(|row| row.status == "ok" && row.params["p"] == serde_json::json!(0.1)));
 }
 
 #[test]
@@ -1092,7 +1090,7 @@ label = "Logical Error Rate"
 }
 
 #[test]
-fn rbposd_benchmark_rejects_unsupported_osd_method() {
+fn unsupported_osd_method_is_rejected_without_fallback() {
     let spec_text = r#"
 name = "surface_decoder"
 version = 1
@@ -1110,7 +1108,7 @@ p = [0.002]
 max_shots = 0
 max_errors = 5
 batch_size = 4
-osd_method = "unknown_method"
+osd_method = "osd_cs_typo"
 
 [plot]
 title = "Surface Decoder"
@@ -1145,7 +1143,7 @@ label = "Logical Error Rate"
 
     assert_eq!(
         err,
-        "rbposd osd_method must be \"combination_sweep\", got \"unknown_method\""
+        "unsupported OSD method \"osd_cs_typo\"; supported methods are combination_sweep, legacy_combination_sweep, ldpc_osd_cs, osd_cs"
     );
     assert!(!dir.path().join("rbposd_bad").exists());
 }

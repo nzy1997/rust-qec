@@ -19,6 +19,9 @@ pub enum DecodeError {
     BpDidNotConverge,
     NoOsdSolution,
     NoLsdSolution,
+    UnsupportedOsdMethod {
+        method: String,
+    },
     UnsupportedLsdOrder {
         order: usize,
     },
@@ -53,6 +56,10 @@ impl core::fmt::Display for DecodeError {
             Self::BpDidNotConverge => write!(f, "belief propagation did not converge"),
             Self::NoOsdSolution => write!(f, "no OSD solution found"),
             Self::NoLsdSolution => write!(f, "no LSD solution found"),
+            Self::UnsupportedOsdMethod { method } => write!(
+                f,
+                "unsupported OSD method \"{method}\"; supported methods are combination_sweep, legacy_combination_sweep, ldpc_osd_cs, osd_cs"
+            ),
             Self::UnsupportedLsdOrder { order } => {
                 write!(
                     f,
