@@ -1,12 +1,13 @@
-use rbposd::ParityCheckMatrix;
+use rbposd::{OsdVariant, ParityCheckMatrix};
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
     EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig, SyndromeReplayDiagnostic,
     build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
     profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit,
-    profile_syndrome_replay_with_candidate_limit_for_basis, replay_syndrome_diagnostic,
-    sample_seeded_trial,
+    profile_syndrome_replay_with_candidate_limit_for_basis,
+    profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant,
+    replay_syndrome_diagnostic, replay_syndrome_diagnostic_with_osd_variant, sample_seeded_trial,
 };
 
 const FIXTURE_PATH: &str = concat!(
@@ -175,6 +176,87 @@ fn bb90_hard_syndrome_reports_osd_profile_counters() {
     assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
     assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
     assert_eq!(profile.gf2_full_elimination_count, 1);
+}
+
+#[test]
+fn bb90_hard_syndrome_ldpc_cs_candidate_count_is_bounded() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let diagnostic = replay_syndrome_diagnostic_with_osd_variant(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+
+    let expected_pair_count = 21u128;
+    println!(
+        "case_id={} planner={} free_columns={} planned_candidates={} legacy_candidates={}",
+        fixture.case_id,
+        diagnostic.osd_planner,
+        diagnostic.free_column_count,
+        diagnostic.planned_candidate_count,
+        fixture.expected_planned_candidate_count
+    );
+
+    assert_eq!(diagnostic.osd_planner, "ldpc_osd_cs");
+    assert_eq!(diagnostic.osd_order, 7);
+    assert!(diagnostic.free_column_count > 0);
+    assert_eq!(diagnostic.candidate_search_frontier_size, 7);
+    assert_eq!(diagnostic.max_candidate_order, 2);
+    assert_eq!(
+        diagnostic.planned_candidate_count,
+        diagnostic.free_column_count as u128 + expected_pair_count
+    );
+    assert!(diagnostic.planned_candidate_count < fixture.expected_planned_candidate_count);
+
+    let profile = profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
+        profile_replay_basis(fixture.basis),
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        PROFILE_CANDIDATE_LIMIT,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+    assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
+    assert_eq!(profile.gf2_solve_count, PROFILE_CANDIDATE_LIMIT + 1);
+}
+
+#[test]
+fn bb90_hard_syndrome_legacy_osd_plan_still_reports_exhaustive_frontier() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let legacy = replay_syndrome_diagnostic(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+    )
+    .unwrap();
+    let ldpc = replay_syndrome_diagnostic_with_osd_variant(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+
+    assert_eq!(legacy.osd_planner, "legacy_combination_sweep");
+    assert_eq!(
+        legacy.planned_candidate_count,
+        fixture.expected_planned_candidate_count
+    );
+    assert_eq!(legacy.planned_candidate_count, 26_332);
+    assert_ne!(legacy.osd_planner, ldpc.osd_planner);
+    assert_ne!(legacy.planned_candidate_count, ldpc.planned_candidate_count);
 }
 
 #[test]
