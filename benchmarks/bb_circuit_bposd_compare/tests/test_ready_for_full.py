@@ -305,3 +305,101 @@ def test_ready_for_full_fails_stale_setup_run_sample_count(tmp_path, capsys) -> 
     assert status == 1
     assert "FAIL setup-run-separation" in output
     assert "sample_count" in output
+
+
+def test_ready_for_full_fails_stale_catalog_manifest(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    manifest_path = tmp_path / "small-ldpc-catalog" / "manifest.csv"
+    rows = small_ldpc_manifest_rows()
+    rows[0] = {**rows[0], "p": "0.0099"}
+    _write_csv(manifest_path, CATALOG_HEADER, rows)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL catalog-coverage" in output
+    assert "small-ldpc-catalog/manifest.csv" in output
+    assert "unexpected target" in output
+
+
+def test_ready_for_full_fails_malformed_catalog_csv(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    manifest_path = tmp_path / "small-ldpc-catalog" / "manifest.csv"
+    manifest_path.write_text("case_id,code_id,p\nonly,three,columns\n")
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL catalog-coverage" in output
+    assert "missing required CSV column(s)" in output
+    assert "small-ldpc-catalog/manifest.csv" in output
+
+
+def test_ready_for_full_fails_hard_profile_counter_regression(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    profile = _hard_profile()
+    profile["gf2_solve_count"] = 4101
+    _write_json(tmp_path / "hard-profile" / "profile.json", profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "gf2_solve_count" in output
+    assert "hard-profile/profile.json" in output
+
+
+def test_ready_for_full_fails_skipped_diagnostic_python_row(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    rows = []
+    for case in DIAGNOSTIC_CASES:
+        rows.append(_diagnostic_row(case, "rbposd"))
+        rows.append(
+            _diagnostic_row(
+                case,
+                "ldpc_bposd",
+                status="skipped",
+                setup_seconds="",
+                decode_seconds="",
+                run_seconds="",
+                logical_error_rate="",
+                error=(
+                    "python dependency unavailable for ldpc_bposd replay: "
+                    "No module named 'ldpc'"
+                ),
+            )
+        )
+    _write_csv(tmp_path / "diagnostic" / "results.csv", CSV_HEADER, rows)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL diagnostic-compare" in output
+    assert "Python ldpc_bposd diagnostic row is skipped" in output
+
+
+def test_ready_for_full_warns_without_optional_provenance(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path, provenance=False)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 0
+    assert "WARN provenance" in output
+    assert "provenance.json" in output
+    assert "WARN readiness verdict" in output
