@@ -387,6 +387,7 @@ def test_ready_for_full_fails_skipped_diagnostic_python_row(
     output = captured.out + captured.err
     assert status == 1
     assert "FAIL diagnostic-compare" in output
+    assert "diagnostic/results.csv" in output
     assert "Python ldpc_bposd diagnostic row is skipped" in output
 
 
@@ -401,5 +402,22 @@ def test_ready_for_full_warns_without_optional_provenance(
     output = captured.out + captured.err
     assert status == 0
     assert "WARN provenance" in output
+    assert "provenance.json" in output
+    assert "WARN readiness verdict" in output
+
+
+def test_ready_for_full_warns_without_recognized_provenance_fields(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    _write_json(tmp_path / "provenance.json", {"note": "unrecognized"})
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 0
+    assert "WARN provenance" in output
+    assert "no recognized provenance fields" in output
     assert "provenance.json" in output
     assert "WARN readiness verdict" in output
