@@ -37,3 +37,26 @@ python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output
 
 `--allow-missing-python` is only an escape hatch for local environments without the upstream Python decoder stack.
 The emitted CSV still contains skipped `ldpc_bposd` rows, so `verify_smoke` continues to reject that output.
+
+## Small-LDPC Catalog Dry Run
+
+The complete #209 `small_ldpc.png` target catalog is checked in as
+`SMALL_LDPC_CASES`. It contains 31 manifest cases and does not run the
+50,000-trial campaign by default.
+
+Write the dry-run manifest with:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier small_ldpc_catalog --output-dir /tmp/rstim-small-ldpc-catalog
+```
+
+The command validates the catalog and writes
+`/tmp/rstim-small-ldpc-catalog/manifest.csv`.
+
+| code_id | cycles | p points | catalog status |
+| --- | ---: | ---: | --- |
+| `bb72` | 6 | 7 | supported |
+| `bb90` | 10 | 7 | supported |
+| `bb108` | 10 | 7 | unsupported Rust constructor |
+| `bb144` | 12 | 6 | supported |
+| `bb288` | 18 | 4 | unsupported Rust constructor |

@@ -9,7 +9,15 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from benchmarks.bb_circuit_bposd_compare.cases import CSV_HEADER, CompareCase, SMOKE_CASES
+from benchmarks.bb_circuit_bposd_compare.cases import (
+    CATALOG_HEADER,
+    CSV_HEADER,
+    SMALL_LDPC_CASES,
+    CompareCase,
+    SMOKE_CASES,
+    small_ldpc_manifest_rows,
+    validate_small_ldpc_catalog,
+)
 from benchmarks.bb_circuit_bposd_compare.summary import write_summary
 
 
@@ -60,6 +68,14 @@ def _write_rows(rows: list[dict[str, str]], out_path: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow({column: row.get(column, "") for column in CSV_HEADER})
+
+
+def _write_manifest(rows: list[dict[str, str]], out_path: Path) -> None:
+    with out_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=CATALOG_HEADER)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in CATALOG_HEADER})
 
 
 def _read_rows(in_path: Path) -> list[dict[str, str]]:
@@ -309,12 +325,25 @@ def run_suite(
     return 0
 
 
+def run_small_ldpc_catalog_dry_run(
+    output_dir: Path,
+    cases: Sequence[CompareCase] = SMALL_LDPC_CASES,
+) -> int:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    errors = validate_small_ldpc_catalog(cases)
+    _write_manifest(small_ldpc_manifest_rows(cases), output_dir / "manifest.csv")
+    return 1 if errors else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tier", choices=("smoke",), required=True)
+    parser.add_argument("--tier", choices=("smoke", "small_ldpc_catalog"), required=True)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--allow-missing-python", action="store_true")
     args = parser.parse_args(argv)
+
+    if args.tier == "small_ldpc_catalog":
+        return run_small_ldpc_catalog_dry_run(args.output_dir)
 
     status = run_suite(
         output_dir=args.output_dir,
