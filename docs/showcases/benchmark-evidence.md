@@ -57,12 +57,14 @@ cargo run --release -p rsinter -- bb-circuit-bposd-memory \
 `benchmarks/surface_decoder_compare/results/smoke/`; that directory is ignored
 and is for iteration only.
 
-`make surface-decoder-compare-full` writes `results.csv` and
+`make surface-decoder-compare-full` writes `results.csv` and a Rust-rendered
 `surface_decoder_compare.png` under
 [`benchmarks/surface_decoder_compare/results/full/`](benchmarks/surface_decoder_compare/results/full/).
 The committed full-tier evidence currently includes
 [`results.csv`](benchmarks/surface_decoder_compare/results/full/results.csv) and
 [`surface_decoder_compare.png`](benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png).
+The PNG is generated from the comparison CSV by `rsinter bench
+plot-surface-compare-csv`.
 
 `make bench-surface-smoke` and `make bench-surface-full` route through the
 `rsinter` benchmark framework and write artifacts under

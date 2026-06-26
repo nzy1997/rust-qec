@@ -12,13 +12,14 @@ use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
 use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
+use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
 
 #[derive(Parser)]
 #[command(
     name = "rsinter",
     version,
     about = "Rust benchmark and sampling harness",
-    after_help = "bench subcommands: run, merge, plot"
+    after_help = "bench subcommands: run, merge, plot, plot-surface-compare-csv"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -79,6 +80,14 @@ enum BenchCommands {
         spec: String,
         #[arg(long = "input")]
         input: Vec<String>,
+        #[arg(long)]
+        out: String,
+    },
+    PlotSurfaceCompareCsv {
+        #[arg(long)]
+        spec: String,
+        #[arg(long)]
+        input: String,
         #[arg(long)]
         out: String,
     },
@@ -143,6 +152,15 @@ fn run() -> Result<(), String> {
                     let data = std::fs::read(path).map_err(|e| e.to_string())?;
                     rows.extend(read_results_jsonl(&data[..])?);
                 }
+                ensure_parent_dir(PathBuf::from(&out).as_path())?;
+                render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
+            }
+            BenchCommands::PlotSurfaceCompareCsv { spec, input, out } => {
+                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+                let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+                bench_spec.validate()?;
+                let rows =
+                    read_surface_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
                 ensure_parent_dir(PathBuf::from(&out).as_path())?;
                 render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
             }

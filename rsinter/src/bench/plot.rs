@@ -1,13 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use plotters::coord::Shift;
+use plotters::element::DashedPathElement;
 use plotters::prelude::*;
 
 use crate::bench::result::BenchmarkResultRow;
 use crate::bench::spec::{
-    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit, PanelSpec,
-    PlotFitKind,
+    BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotFitKind,
+    DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
 };
 use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 
@@ -469,12 +470,15 @@ where
     };
     let areas = content.split_evenly((1, panels.len()));
 
-    for (area, panel) in areas.into_iter().zip(panels.iter()) {
+    for (index, (area, panel)) in areas.into_iter().zip(panels.iter()).enumerate() {
+        let show_legend = index == 0;
         match panel {
             PreparedPanel::ErrorRate(data) => {
-                render_error_rate_panel_on(area, data, series_styles)?
+                render_error_rate_panel_on(area, data, series_styles, show_legend)?
             }
-            PreparedPanel::Numeric(data) => render_numeric_panel_on(area, data, series_styles)?,
+            PreparedPanel::Numeric(data) => {
+                render_numeric_panel_on(area, data, series_styles, show_legend)?
+            }
         }
     }
 
@@ -485,6 +489,7 @@ fn render_error_rate_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &ErrorRatePanelData,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -506,7 +511,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
             let mut chart = ChartBuilder::on(&area)
@@ -524,7 +529,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -542,7 +547,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -560,7 +565,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
             return Err(format!(
@@ -577,6 +582,7 @@ fn render_numeric_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &NumericPanelData,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -598,7 +604,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
             let mut chart = ChartBuilder::on(&area)
@@ -616,7 +622,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -634,7 +640,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -652,7 +658,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
             return Err(format!(
@@ -669,6 +675,7 @@ fn draw_error_rate_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &ErrorRateGroups,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -740,19 +747,14 @@ where
         }
     }
 
-    chart
-        .configure_series_labels()
-        .position(SeriesLabelPosition::UpperLeft)
-        .background_style(WHITE.mix(0.8))
-        .border_style(BLACK)
-        .draw()
-        .map_err(|e| e.to_string())
+    draw_series_legend(chart, show_legend)
 }
 
 fn draw_numeric_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &NumericGroups,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -779,9 +781,25 @@ where
             .map_err(|e| e.to_string())?;
     }
 
+    draw_series_legend(chart, show_legend)
+}
+
+fn draw_series_legend<'a, DB, XR, YR>(
+    chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
+    show_legend: bool,
+) -> Result<(), String>
+where
+    DB: DrawingBackend + 'a,
+    DB::ErrorType: 'static,
+    XR: Ranged<ValueType = f64>,
+    YR: Ranged<ValueType = f64>,
+{
+    if !show_legend {
+        return Ok(());
+    }
     chart
         .configure_series_labels()
-        .position(SeriesLabelPosition::UpperLeft)
+        .position(SeriesLabelPosition::LowerRight)
         .background_style(WHITE.mix(0.8))
         .border_style(BLACK)
         .draw()
@@ -826,8 +844,10 @@ where
                 .map_err(|e| e.to_string())?
                 .label(label.to_string())
                 .legend(move |(x, y)| {
-                    PathElement::new(
-                        vec![(x, y), (x + 20, y)],
+                    DashedPathElement::new(
+                        [(x, y), (x + 28, y)],
+                        size,
+                        spacing,
                         ShapeStyle::from(&legend_color).stroke_width(2),
                     )
                 });
@@ -861,8 +881,10 @@ where
         .map_err(|e| e.to_string())?
         .label(format!("{label} fit"))
         .legend(move |(x, y)| {
-            PathElement::new(
-                vec![(x, y), (x + 20, y)],
+            DashedPathElement::new(
+                [(x, y), (x + 28, y)],
+                4,
+                4,
                 ShapeStyle::from(&legend_color).stroke_width(2),
             )
         });
@@ -971,22 +993,17 @@ fn build_series_styles(
     spec: &BenchmarkSpec,
     rows: &[&BenchmarkResultRow],
 ) -> Result<BTreeMap<SeriesKey, SeriesStyle>, String> {
-    let mut runner_order: Vec<String> = spec
-        .runners
+    let mut family_values: Vec<String> = rows
         .iter()
-        .map(|runner| runner.name.clone())
+        .map(|row| decoder_family_for_style(&row.runner).to_string())
         .collect();
-    let existing_runners: BTreeSet<String> = runner_order.iter().cloned().collect();
-    for runner in rows.iter().map(|row| row.runner.clone()) {
-        if !existing_runners.contains(&runner) && !runner_order.contains(&runner) {
-            runner_order.push(runner);
-        }
-    }
+    family_values.sort();
+    family_values.dedup();
 
-    let runner_index: BTreeMap<String, usize> = runner_order
+    let family_index: BTreeMap<String, usize> = family_values
         .into_iter()
         .enumerate()
-        .map(|(index, runner)| (runner, index))
+        .map(|(index, family)| (family, index))
         .collect();
 
     let mut distance_values: Vec<String> = rows
@@ -1000,46 +1017,62 @@ fn build_series_styles(
         .enumerate()
         .map(|(index, value)| (value, index))
         .collect();
+    let distance_count = distance_index.len().max(1);
 
     let mut styles = BTreeMap::new();
-    for (index, row) in rows.iter().enumerate() {
+    for row in rows.iter() {
         let key = series_key(row, spec)?;
         styles.entry(key).or_insert_with(|| {
-            let color_index = runner_index.get(&row.runner).copied().unwrap_or(index);
-            let pattern_index = row
+            let family = decoder_family_for_style(&row.runner);
+            let family_offset = family_index.get(family).copied().unwrap_or(0);
+            let distance_offset = row
                 .params
                 .get("distance")
                 .map(value_to_string)
                 .and_then(|value| distance_index.get(&value).copied())
                 .unwrap_or(0);
+            let color_index = family_offset * distance_count + distance_offset;
             SeriesStyle {
-                color: Palette99::pick(color_index).mix(0.9),
-                pattern: line_pattern_for_index(pattern_index),
+                color: legacy_matplotlib_color(color_index),
+                pattern: line_pattern_for_runner(&row.runner),
             }
         });
     }
     Ok(styles)
 }
 
-fn line_pattern_for_index(index: usize) -> LinePattern {
-    match index % 5 {
-        0 => LinePattern::Solid,
-        1 => LinePattern::Dashed {
+fn legacy_matplotlib_color(index: usize) -> RGBAColor {
+    const COLORS: [RGBColor; 10] = [
+        RGBColor(0x1f, 0x77, 0xb4),
+        RGBColor(0xff, 0x7f, 0x0e),
+        RGBColor(0x2c, 0xa0, 0x2c),
+        RGBColor(0xd6, 0x27, 0x28),
+        RGBColor(0x94, 0x67, 0xbd),
+        RGBColor(0x8c, 0x56, 0x4b),
+        RGBColor(0xe3, 0x77, 0xc2),
+        RGBColor(0x7f, 0x7f, 0x7f),
+        RGBColor(0xbc, 0xbd, 0x22),
+        RGBColor(0x17, 0xbe, 0xcf),
+    ];
+    COLORS[index % COLORS.len()].to_rgba()
+}
+
+fn decoder_family_for_style(runner: &str) -> &str {
+    match runner {
+        "pymatching" | "rmatching" => "mwpm",
+        "ilpqec" | "rilpqec" => "ilp",
+        "ldpc" | "rbposd" => "bp",
+        other => other,
+    }
+}
+
+fn line_pattern_for_runner(runner: &str) -> LinePattern {
+    match runner {
+        "rmatching" | "rilpqec" | "rbposd" => LinePattern::Dashed {
             size: 12,
             spacing: 8,
         },
-        2 => LinePattern::Dashed {
-            size: 6,
-            spacing: 6,
-        },
-        3 => LinePattern::Dashed {
-            size: 2,
-            spacing: 6,
-        },
-        _ => LinePattern::Dashed {
-            size: 16,
-            spacing: 6,
-        },
+        _ => LinePattern::Solid,
     }
 }
 

@@ -48,11 +48,11 @@ bench-surface-full:
 
 surface-decoder-compare-smoke:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier smoke
-	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.plot_compare --tier smoke
+	cargo run -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/spec.toml --input benchmarks/surface_decoder_compare/results/smoke/results.csv --out benchmarks/surface_decoder_compare/results/smoke/surface_decoder_compare.png
 
 surface-decoder-compare-full:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier full
-	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.plot_compare --tier full
+	cargo run -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/full.toml --input benchmarks/surface_decoder_compare/results/full/results.csv --out benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png
 
 bb-circuit-bposd-compare-smoke:
 	python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke

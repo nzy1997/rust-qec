@@ -165,6 +165,30 @@ fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
 }
 
 #[test]
+fn rsinter_bench_plot_surface_compare_csv_writes_png_from_legacy_csv() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("plots").join("surface_decoder_compare.png");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "plot-surface-compare-csv",
+            "--spec",
+            "../benchmarks/surface_decoder/spec.toml",
+            "--input",
+            "../benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let png = fs::read(out).unwrap();
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
+
+#[test]
 fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
