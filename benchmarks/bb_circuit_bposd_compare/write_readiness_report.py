@@ -23,8 +23,11 @@ def _artifact_hash(path: Path) -> str:
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
-    with path.open(newline="") as handle:
-        return [dict(row) for row in csv.DictReader(handle)]
+    try:
+        with path.open(newline="") as handle:
+            return [dict(row) for row in csv.DictReader(handle)]
+    except (OSError, UnicodeDecodeError, csv.Error):
+        return []
 
 
 def _read_json_object(path: Path) -> dict[str, object]:
@@ -32,7 +35,7 @@ def _read_json_object(path: Path) -> dict[str, object]:
         return {}
     try:
         data = json.loads(path.read_text())
-    except json.JSONDecodeError:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -215,13 +218,24 @@ def snapshot_model(model: dict[str, object]) -> dict[str, object]:
     return json.loads(json.dumps(snapshot, sort_keys=True))
 
 
+def _escape_markdown_cell(value: object) -> str:
+    text = _stringify(value).replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = text.replace("|", r"\|")
+    return text.replace("\n", "<br>")
+
+
 def _markdown_table(headers: Sequence[str], rows: Sequence[dict[str, str]]) -> list[str]:
     lines = [
-        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(_escape_markdown_cell(header) for header in headers) + " |",
         "| " + " | ".join("---" for _ in headers) + " |",
     ]
     for row in rows:
-        lines.append("| " + " | ".join(row.get(header, "") for header in headers) + " |")
+        lines.append(
+            "| "
+            + " | ".join(_escape_markdown_cell(row.get(header, "")) for header in headers)
+            + " |"
+        )
     return lines
 
 

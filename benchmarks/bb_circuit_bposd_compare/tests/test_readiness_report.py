@@ -3,6 +3,7 @@ from benchmarks.bb_circuit_bposd_compare import (
     write_readiness_report,
 )
 from benchmarks.bb_circuit_bposd_compare.tests.test_ready_for_full import (
+    _write_json,
     write_ready_tree,
 )
 
@@ -279,6 +280,128 @@ def test_validate_readiness_report_rejects_visible_section_after_snapshot(
     captured = capsys.readouterr()
     assert status == 1
     assert "report-body" in captured.err
+
+
+def test_validate_readiness_report_rejects_visible_content_on_snapshot_line(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+
+    snapshot_line = next(
+        line
+        for line in report_path.read_text().splitlines()
+        if write_readiness_report.SNAPSHOT_PREFIX in line
+    )
+    report_path.write_text(
+        report_path.read_text().replace(
+            snapshot_line,
+            snapshot_line + " **visible tamper after snapshot**",
+            1,
+        )
+    )
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert (
+        "report-body" in captured.err
+        or "snapshot" in captured.err
+        or "document-structure" in captured.err
+    )
+
+
+def test_validate_readiness_report_rejects_visible_source_results_dir_tampering(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+
+    report_path.write_text(
+        report_path.read_text().replace(
+            f"**Source results directory:** {results_dir}",
+            "**Source results directory:** /tmp/forged-results-dir",
+            1,
+        )
+    )
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "report preamble" in captured.err or "Source results directory" in captured.err
+
+
+def test_write_readiness_report_escapes_markdown_table_cells(tmp_path) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir, provenance=False)
+    _write_json(
+        results_dir / "provenance.json",
+        {
+            "artifact_hash": "sha256:example",
+            "command": "collect | verify\nclose --> reopen",
+            "timestamp": "2026-06-27T00:00:00+08:00",
+        },
+    )
+
+    status = write_readiness_report.main(
+        ["--results-dir", str(results_dir), "--out", str(report_path)]
+    )
+
+    report = report_path.read_text()
+    assert status == 0
+    assert "collect \\| verify<br>close" in report
+    assert "-->" not in "\n".join(
+        line
+        for line in report.splitlines()
+        if write_readiness_report.SNAPSHOT_PREFIX not in line
+    )
+
+
+def test_write_readiness_report_handles_unreadable_detail_artifacts(tmp_path) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+
+    hard_replay_path = results_dir / "hard-replay" / "results.csv"
+    hard_replay_path.unlink()
+    hard_replay_path.mkdir()
+
+    setup_profile_path = results_dir / "setup-run" / "profile.json"
+    setup_profile_path.unlink()
+    setup_profile_path.mkdir()
+
+    status = write_readiness_report.main(
+        ["--results-dir", str(results_dir), "--out", str(report_path)]
+    )
+
+    report = report_path.read_text()
+    assert status == 0
+    assert "**Final readiness verdict:** FAIL" in report
+    assert "semantic-replay" in report
+    assert "setup-run-separation" in report
+    assert "cannot read hard-replay/results.csv" in report
+    assert "cannot read setup-run/profile.json" in report
 
 
 def test_validate_readiness_report_rejects_placeholder_report(

@@ -30,7 +30,6 @@ VISIBLE_SECTIONS = (
 FINAL_VERDICT_PATTERN = re.compile(
     r"^\*\*Final readiness verdict:\*\*\s+(PASS|WARN|FAIL)\s*$"
 )
-SOURCE_RESULTS_DIR_PATTERN = re.compile(r"^\*\*Source results directory:\*\*\s+.*$")
 GENERATED_AT_PATTERN = re.compile(r"^\*\*Generated at:\*\*\s+.*$")
 
 
@@ -90,13 +89,21 @@ def _visible_verdict(report: str, errors: list[str]) -> str | None:
 
 
 def _report_snapshot(report: str, errors: list[str]) -> dict[str, object] | None:
-    prefix = re.escape(write_readiness_report.SNAPSHOT_PREFIX)
-    match = re.search(rf"<!--\s*{prefix}\s*(\{{.*\}})\s*-->", report)
-    if match is None:
+    snapshot_matches = [
+        match
+        for line in report.splitlines()
+        if (match := _snapshot_line_match(line)) is not None
+    ]
+    if not snapshot_matches:
         errors.append("missing snapshot: rstim-bb-readiness-snapshot comment not found")
         return None
+    if len(snapshot_matches) > 1:
+        errors.append(
+            "malformed snapshot: rstim-bb-readiness-snapshot comment must appear exactly once"
+        )
+        return None
     try:
-        snapshot = json.loads(match.group(1))
+        snapshot = json.loads(snapshot_matches[0].group(1))
     except json.JSONDecodeError as error:
         errors.append(f"malformed snapshot: {error}")
         return None
@@ -205,6 +212,17 @@ def _document_structure_errors(report: str) -> list[str]:
                 "document-structure mismatch: unexpected visible content before report title"
             )
 
+    malformed_snapshot_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if write_readiness_report.SNAPSHOT_PREFIX in line
+        and _snapshot_line_match(line) is None
+    ]
+    if malformed_snapshot_indexes:
+        errors.append(
+            "document-structure mismatch: snapshot metadata comment must occupy its own line"
+        )
+
     snapshot_index = _snapshot_start_index(lines)
     if snapshot_index < len(lines) and any(
         line.strip() for line in lines[snapshot_index + 1 :]
@@ -268,9 +286,8 @@ def _first_visible_section_index(lines: list[str]) -> int | None:
 
 
 def _snapshot_start_index(lines: list[str]) -> int:
-    snapshot_prefix = f"<!-- {write_readiness_report.SNAPSHOT_PREFIX}"
     for index, line in enumerate(lines):
-        if line.startswith(snapshot_prefix):
+        if _snapshot_line_match(line) is not None:
             return index
     return len(lines)
 
@@ -289,12 +306,8 @@ def _normalize_visible_body(report: str) -> str:
 
 def _normalize_visible_lines(lines: list[str]) -> str:
     normalized_lines: list[str] = []
-    snapshot_prefix = f"<!-- {write_readiness_report.SNAPSHOT_PREFIX}"
     for line in lines:
-        if line.startswith(snapshot_prefix):
-            continue
-        if SOURCE_RESULTS_DIR_PATTERN.fullmatch(line):
-            normalized_lines.append("**Source results directory:** <volatile>")
+        if _snapshot_line_match(line) is not None:
             continue
         if GENERATED_AT_PATTERN.fullmatch(line):
             normalized_lines.append("**Generated at:** <volatile>")
@@ -307,6 +320,11 @@ def _normalize_visible_lines(lines: list[str]) -> str:
 
 def _normalize_visible_section(section: str) -> str:
     return _normalize_visible_lines(section.splitlines())
+
+
+def _snapshot_line_match(line: str) -> re.Match[str] | None:
+    prefix = re.escape(write_readiness_report.SNAPSHOT_PREFIX)
+    return re.fullmatch(rf"<!--\s*{prefix}\s*(\{{.*\}})\s*-->", line)
 
 
 def main(argv: list[str] | None = None) -> int:
