@@ -278,12 +278,12 @@ fn best_ldpc_osd_candidate(
     for &column in &free_columns {
         stats.osd_candidate_count += 1;
         let mut gf2_stats = Gf2SolveStats::default();
-        let candidate = reduced.solve_with_forced_columns_counting(&[column], &mut gf2_stats);
+        let candidate = reduced
+            .solve_with_forced_columns_counting(&[column], &mut gf2_stats)
+            .expect("LDPC OSD-CS single-column candidates are selected from free columns");
         accumulate_gf2_stats(stats, gf2_stats);
-        if let Ok(candidate) = candidate {
-            if is_better_solution(&candidate, &best, reliability) {
-                best = candidate;
-            }
+        if is_better_solution(&candidate, &best, reliability) {
+            best = candidate;
         }
     }
 
@@ -297,12 +297,12 @@ fn best_ldpc_osd_candidate(
     visit_combinations(&frontier, 2, 0, &mut forced, &mut |columns| {
         stats.osd_candidate_count += 1;
         let mut gf2_stats = Gf2SolveStats::default();
-        let candidate = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
+        let candidate = reduced
+            .solve_with_forced_columns_counting(columns, &mut gf2_stats)
+            .expect("LDPC OSD-CS pair candidates are selected from free columns");
         accumulate_gf2_stats(stats, gf2_stats);
-        if let Ok(candidate) = candidate {
-            if is_better_solution(&candidate, &best, reliability) {
-                best = candidate;
-            }
+        if is_better_solution(&candidate, &best, reliability) {
+            best = candidate;
         }
     });
 
@@ -573,8 +573,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        OsdWorkspace, binomial, decode_osd0_with_workspace,
-        ldpc_osd_cs_candidate_plan_for_free_columns,
+        binomial, decode_osd0_with_workspace, ldpc_osd_cs_candidate_plan_for_free_columns,
+        OsdWorkspace,
     };
 
     const LDPC_OSD_CS_CONTRACT_PATH: &str = "rbposd/doc/osd_cs_contract.md";
