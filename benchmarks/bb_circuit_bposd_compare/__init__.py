@@ -1,6 +1,7 @@
 from benchmarks.bb_circuit_bposd_compare.cases import (
     CATALOG_HEADER,
     CSV_HEADER,
+    HARD_REPLAY_CASES,
     SMALL_LDPC_CASES,
     SMOKE_CASES,
 )
@@ -8,6 +9,7 @@ from benchmarks.bb_circuit_bposd_compare.cases import (
 __all__ = [
     "CATALOG_HEADER",
     "CSV_HEADER",
+    "HARD_REPLAY_CASES",
     "SMALL_LDPC_CASES",
     "SMOKE_CASES",
     "verify_rows",

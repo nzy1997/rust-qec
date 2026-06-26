@@ -2,9 +2,12 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use rbposd::OsdVariant;
 
 use rsinter::bb_circuit_memory::{
-    SimulationConfig, export_comparison_case_for_code, run_simulation_for_code,
+    SimulationConfig, export_comparison_case_for_code,
+    export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
+    run_simulation_for_code_with_osd_variant,
 };
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
@@ -47,6 +50,8 @@ enum Commands {
         max_bp_iterations: usize,
         #[arg(long, default_value_t = 7)]
         osd_order: usize,
+        #[arg(long)]
+        osd_method: Option<String>,
         #[arg(long)]
         json_compare_case: bool,
     },
@@ -173,6 +178,7 @@ fn run() -> Result<(), String> {
             seed,
             max_bp_iterations,
             osd_order,
+            osd_method,
             json_compare_case,
         } => {
             let num_trials = usize::try_from(num_trials)
@@ -185,13 +191,31 @@ fn run() -> Result<(), String> {
                 max_bp_iterations,
                 osd_order,
             };
+            let osd_variant = match osd_method.as_deref() {
+                Some(method) => {
+                    Some(OsdVariant::from_method_name(method).map_err(|e| e.to_string())?)
+                }
+                None => None,
+            };
             if json_compare_case {
-                let export = export_comparison_case_for_code(&code_id, config)?;
+                let export = match osd_variant {
+                    Some(osd_variant) => export_comparison_case_for_code_with_osd_variant(
+                        &code_id,
+                        config,
+                        osd_variant,
+                    )?,
+                    None => export_comparison_case_for_code(&code_id, config)?,
+                };
                 serde_json::to_writer_pretty(std::io::stdout(), &export)
                     .map_err(|e| e.to_string())?;
                 println!();
             } else {
-                let result = run_simulation_for_code(&code_id, config)?;
+                let result = match osd_variant {
+                    Some(osd_variant) => {
+                        run_simulation_for_code_with_osd_variant(&code_id, config, osd_variant)?
+                    }
+                    None => run_simulation_for_code(&code_id, config)?,
+                };
                 println!(
                     "{}\t{}\t{}\t{}",
                     result.physical_error_rate,
