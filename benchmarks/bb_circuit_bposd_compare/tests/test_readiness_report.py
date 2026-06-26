@@ -140,6 +140,71 @@ def test_validate_readiness_report_rejects_visible_hard_profile_tampering(
     assert "hard-profile" in captured.err
 
 
+def test_validate_readiness_report_rejects_duplicate_spoofed_hard_profile_section(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+
+    report = report_path.read_text()
+    hard_profile_heading = "## BB90 Hard-Profile Counters"
+    next_heading = "## Setup/Run Split Evidence"
+    start = report.index(hard_profile_heading)
+    end = report.index(next_heading)
+    hard_profile_section = report[start:end]
+    tampered_section = hard_profile_section.replace(
+        "| planned_candidate_count | 4100 |",
+        "| planned_candidate_count | 9999 |",
+    )
+    assert tampered_section != hard_profile_section
+    report_path.write_text(report[:start] + hard_profile_section + tampered_section + report[end:])
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "hard-profile" in captured.err
+
+
+def test_validate_readiness_report_rejects_duplicate_final_verdict_lines(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+
+    report_path.write_text(
+        report_path.read_text().replace(
+            "**Final readiness verdict:** PASS",
+            "**Final readiness verdict:** PASS\n**Final readiness verdict:** FAIL",
+            1,
+        )
+    )
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "final readiness verdict" in captured.err
+
+
 def test_validate_readiness_report_requires_visible_final_verdict_line(
     tmp_path, capsys
 ) -> None:
