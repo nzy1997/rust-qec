@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use rbposd::{BpVariant, DecoderConfig, LsdConfig, LsdMethod, Schedule};
+use rbposd::{BpVariant, DecoderConfig, LsdConfig, LsdMethod, OsdVariant, Schedule};
 use toml::Value;
 
 use crate::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
@@ -116,11 +116,8 @@ impl RbposdRunnerParams {
 
         let osd_method = optional_string(params, "osd_method")?
             .unwrap_or_else(|| "combination_sweep".to_string());
-        if osd_method != "combination_sweep" {
-            return Err(format!(
-                "rbposd osd_method must be \"combination_sweep\", got \"{osd_method}\""
-            ));
-        }
+        bp_config.osd_variant =
+            OsdVariant::from_method_name(&osd_method).map_err(|error| error.to_string())?;
         bp_config.osd_order = optional_usize(params, "osd_order")?.unwrap_or(bp_config.osd_order);
 
         Ok(Self {

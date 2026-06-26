@@ -1,5 +1,6 @@
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, ParityCheckMatrix, Syndrome,
+    BpOsdDecoder, ChannelModel, Correction, DecodeError, DecoderConfig, OsdVariant,
+    ParityCheckMatrix, Syndrome,
 };
 
 #[test]
@@ -127,6 +128,81 @@ fn diagnose_osd_path_reports_candidate_search_planning() {
     assert_eq!(diagnostic.candidate_search_frontier_size, 2);
     assert_eq!(diagnostic.max_candidate_order, 2);
     assert_eq!(diagnostic.planned_candidate_count, 3);
+}
+
+#[test]
+fn ldpc_osd_cs_candidate_plan_counts_singles_and_order_pairs() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(
+        2,
+        10,
+        vec![
+            vec![0, 2, 3, 4, 5, 6, 7, 8, 9],
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        ],
+    )
+    .unwrap();
+    let channel = ChannelModel::BitFlipProbabilities(vec![
+        0.2, 0.2, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08,
+    ]);
+    let syndrome = Syndrome::from(vec![true, true]);
+
+    let ldpc = BpOsdDecoder::new(
+        pcm.clone(),
+        channel.clone(),
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_variant: OsdVariant::LdpcCombinationSweep,
+            osd_order: 7,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+    let ldpc_diagnostic = ldpc.diagnose_osd_path(&syndrome).unwrap();
+
+    assert_eq!(ldpc_diagnostic.osd_planner, "ldpc_osd_cs");
+    assert!(ldpc_diagnostic.free_column_count >= 7);
+    assert_eq!(ldpc_diagnostic.candidate_search_frontier_size, 7);
+    assert_eq!(ldpc_diagnostic.max_candidate_order, 2);
+    assert_eq!(
+        ldpc_diagnostic.planned_candidate_count,
+        ldpc_diagnostic.free_column_count as u128 + 21
+    );
+    let ldpc_decode = ldpc.decode(&syndrome).unwrap();
+    assert_eq!(
+        ldpc_decode.stats.osd_candidate_count as u128,
+        ldpc_diagnostic.planned_candidate_count
+    );
+    assert_eq!(
+        ldpc_decode.stats.gf2_solve_count,
+        ldpc_decode.stats.osd_candidate_count + 1
+    );
+    assert_eq!(pcm.multiply(&ldpc_decode.correction), syndrome);
+    let ldpc_profile = ldpc
+        .profile_decode_with_osd_candidate_limit(&syndrome, usize::MAX)
+        .unwrap();
+    assert_eq!(
+        ldpc_profile.osd_candidate_count as u128,
+        ldpc_diagnostic.planned_candidate_count
+    );
+
+    let legacy = BpOsdDecoder::new(
+        pcm,
+        channel,
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_order: 7,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+    let legacy_diagnostic = legacy.diagnose_osd_path(&syndrome).unwrap();
+
+    assert_eq!(legacy_diagnostic.osd_planner, "legacy_combination_sweep");
+    assert_ne!(legacy_diagnostic.osd_planner, ldpc_diagnostic.osd_planner);
+    assert_ne!(
+        legacy_diagnostic.planned_candidate_count,
+        ldpc_diagnostic.planned_candidate_count
+    );
 }
 
 #[test]

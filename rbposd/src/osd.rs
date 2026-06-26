@@ -1,3 +1,4 @@
+use crate::config::{DecoderConfig, OsdVariant};
 use crate::error::DecodeError;
 use crate::gf2::{DetailedSolution, Gf2SolveStats, PreparedLinearSystem, ReducedLinearSystem};
 use crate::matrix::ParityCheckMatrix;
@@ -81,9 +82,17 @@ pub(crate) fn decode_osd0_with_workspace(
         base_correction_bits,
         reliability,
         workspace,
+        OsdVariant::Osd0,
         0,
     )
     .map(|outcome| outcome.correction)
+}
+
+pub(crate) fn effective_osd_variant(config: DecoderConfig) -> OsdVariant {
+    match config.osd_variant {
+        OsdVariant::Osd0 if config.osd_order > 0 => OsdVariant::LegacyCombinationSweep,
+        other => other,
+    }
 }
 
 pub(crate) fn decode_osd_with_workspace(
@@ -92,6 +101,7 @@ pub(crate) fn decode_osd_with_workspace(
     base_correction_bits: &[bool],
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
+    planner: OsdVariant,
     osd_order: usize,
 ) -> Result<OsdDecodeOutcome, DecodeError> {
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
@@ -118,14 +128,19 @@ pub(crate) fn decode_osd_with_workspace(
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
 
-    if osd_order == 0 {
-        return Ok(OsdDecodeOutcome {
-            correction: xor_correction_bits(base_correction_bits, &base.correction),
-            stats,
-        });
-    }
-
-    let best = best_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?;
+    let best = match planner {
+        OsdVariant::Osd0 => base,
+        OsdVariant::LegacyCombinationSweep => {
+            if osd_order == 0 {
+                base
+            } else {
+                best_legacy_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?
+            }
+        }
+        OsdVariant::LdpcCombinationSweep => {
+            best_ldpc_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?
+        }
+    };
     Ok(OsdDecodeOutcome {
         correction: xor_correction_bits(base_correction_bits, &best.correction),
         stats,
@@ -138,6 +153,7 @@ pub(crate) fn diagnose_osd_candidate_search_with_workspace(
     base_correction_bits: &[bool],
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
+    planner: OsdVariant,
     osd_order: usize,
 ) -> Result<OsdCandidateSearchPlan, DecodeError> {
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
@@ -151,7 +167,11 @@ pub(crate) fn diagnose_osd_candidate_search_with_workspace(
         .solve_with_column_order_detailed(&target_syndrome, &workspace.column_order, &[])
         .map_err(|_| DecodeError::NoOsdSolution)?;
 
-    Ok(candidate_search_plan(&base, osd_order))
+    Ok(match planner {
+        OsdVariant::Osd0 => candidate_search_plan_for_osd0(&base),
+        OsdVariant::LegacyCombinationSweep => legacy_candidate_search_plan(&base, osd_order),
+        OsdVariant::LdpcCombinationSweep => ldpc_candidate_search_plan(&base, osd_order),
+    })
 }
 
 pub(crate) fn profile_osd_with_workspace(
@@ -160,6 +180,7 @@ pub(crate) fn profile_osd_with_workspace(
     base_correction_bits: &[bool],
     reliability: &[f64],
     workspace: &mut OsdWorkspace,
+    planner: OsdVariant,
     osd_order: usize,
     candidate_limit: usize,
 ) -> Result<OsdDecodeStats, DecodeError> {
@@ -187,32 +208,25 @@ pub(crate) fn profile_osd_with_workspace(
         .map_err(|_| DecodeError::NoOsdSolution)?;
     accumulate_gf2_stats(&mut stats, gf2_stats);
 
-    if osd_order == 0 || candidate_limit == 0 {
+    if candidate_limit == 0 {
         return Ok(stats);
     }
 
-    let frontier_len = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
-    let frontier = base.free_columns[..frontier_len].to_vec();
-    let max_order = osd_order.min(frontier.len());
-    let mut forced = Vec::new();
-    let mut visited = 0usize;
-    for order in 1..=max_order {
-        visit_combinations_until(
-            &frontier,
-            order,
-            0,
-            &mut forced,
-            &mut visited,
-            candidate_limit,
-            &mut |columns| {
-                stats.osd_candidate_count += 1;
-                let mut gf2_stats = Gf2SolveStats::default();
-                let _ = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
-                accumulate_gf2_stats(&mut stats, gf2_stats);
-            },
-        );
-        if visited >= candidate_limit {
-            break;
+    match planner {
+        OsdVariant::Osd0 => {}
+        OsdVariant::LegacyCombinationSweep => {
+            if osd_order > 0 {
+                profile_legacy_osd_candidates(
+                    &reduced,
+                    &base,
+                    osd_order,
+                    candidate_limit,
+                    &mut stats,
+                );
+            }
+        }
+        OsdVariant::LdpcCombinationSweep => {
+            profile_ldpc_osd_candidates(&reduced, &base, osd_order, candidate_limit, &mut stats);
         }
     }
 
@@ -224,7 +238,7 @@ fn accumulate_gf2_stats(stats: &mut OsdDecodeStats, gf2_stats: Gf2SolveStats) {
     stats.gf2_full_elimination_count += gf2_stats.full_elimination_count;
 }
 
-fn best_osd_candidate(
+fn best_legacy_osd_candidate(
     reliability: &[f64],
     reduced: &ReducedLinearSystem,
     base: DetailedSolution,
@@ -252,7 +266,62 @@ fn best_osd_candidate(
     Ok(best)
 }
 
-fn candidate_search_plan(base: &DetailedSolution, osd_order: usize) -> OsdCandidateSearchPlan {
+fn best_ldpc_osd_candidate(
+    reliability: &[f64],
+    reduced: &ReducedLinearSystem,
+    base: DetailedSolution,
+    osd_order: usize,
+    stats: &mut OsdDecodeStats,
+) -> Result<DetailedSolution, DecodeError> {
+    let free_columns = base.free_columns.clone();
+    let mut best = base;
+    for &column in &free_columns {
+        stats.osd_candidate_count += 1;
+        let mut gf2_stats = Gf2SolveStats::default();
+        let candidate = reduced.solve_with_forced_columns_counting(&[column], &mut gf2_stats);
+        accumulate_gf2_stats(stats, gf2_stats);
+        if let Ok(candidate) = candidate {
+            if is_better_solution(&candidate, &best, reliability) {
+                best = candidate;
+            }
+        }
+    }
+
+    let frontier_len = free_columns.len().min(osd_order);
+    let frontier = free_columns[..frontier_len].to_vec();
+    if frontier.len() < 2 {
+        return Ok(best);
+    }
+
+    let mut forced = Vec::new();
+    visit_combinations(&frontier, 2, 0, &mut forced, &mut |columns| {
+        stats.osd_candidate_count += 1;
+        let mut gf2_stats = Gf2SolveStats::default();
+        let candidate = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
+        accumulate_gf2_stats(stats, gf2_stats);
+        if let Ok(candidate) = candidate {
+            if is_better_solution(&candidate, &best, reliability) {
+                best = candidate;
+            }
+        }
+    });
+
+    Ok(best)
+}
+
+fn candidate_search_plan_for_osd0(base: &DetailedSolution) -> OsdCandidateSearchPlan {
+    OsdCandidateSearchPlan {
+        free_column_count: base.free_columns.len(),
+        candidate_search_frontier_size: 0,
+        max_candidate_order: 0,
+        planned_candidate_count: 0,
+    }
+}
+
+fn legacy_candidate_search_plan(
+    base: &DetailedSolution,
+    osd_order: usize,
+) -> OsdCandidateSearchPlan {
     let candidate_search_frontier_size = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
     let max_candidate_order = osd_order.min(candidate_search_frontier_size);
     let planned_candidate_count = (1..=max_candidate_order)
@@ -264,6 +333,24 @@ fn candidate_search_plan(base: &DetailedSolution, osd_order: usize) -> OsdCandid
         candidate_search_frontier_size,
         max_candidate_order,
         planned_candidate_count,
+    }
+}
+
+fn ldpc_candidate_search_plan(base: &DetailedSolution, osd_order: usize) -> OsdCandidateSearchPlan {
+    let plan = ldpc_osd_cs_candidate_plan_for_free_columns(base.free_columns.len(), osd_order);
+    let max_candidate_order = if plan.free_column_count == 0 {
+        0
+    } else if plan.pair_candidate_frontier_size >= 2 {
+        2
+    } else {
+        1
+    };
+
+    OsdCandidateSearchPlan {
+        free_column_count: plan.free_column_count,
+        candidate_search_frontier_size: plan.pair_candidate_frontier_size,
+        max_candidate_order,
+        planned_candidate_count: plan.planned_candidate_count,
     }
 }
 
@@ -282,6 +369,81 @@ pub(crate) fn ldpc_osd_cs_candidate_plan_for_free_columns(
         osd_order,
         planned_candidate_count,
     }
+}
+
+fn profile_legacy_osd_candidates(
+    reduced: &ReducedLinearSystem,
+    base: &DetailedSolution,
+    osd_order: usize,
+    candidate_limit: usize,
+    stats: &mut OsdDecodeStats,
+) {
+    let frontier_len = base.free_columns.len().min(OSD_FREE_COLUMN_FRONTIER);
+    let frontier = base.free_columns[..frontier_len].to_vec();
+    let max_order = osd_order.min(frontier.len());
+    let mut forced = Vec::new();
+    let mut visited = 0usize;
+    for order in 1..=max_order {
+        visit_combinations_until(
+            &frontier,
+            order,
+            0,
+            &mut forced,
+            &mut visited,
+            candidate_limit,
+            &mut |columns| {
+                stats.osd_candidate_count += 1;
+                let mut gf2_stats = Gf2SolveStats::default();
+                let _ = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
+                accumulate_gf2_stats(stats, gf2_stats);
+            },
+        );
+        if visited >= candidate_limit {
+            break;
+        }
+    }
+}
+
+fn profile_ldpc_osd_candidates(
+    reduced: &ReducedLinearSystem,
+    base: &DetailedSolution,
+    osd_order: usize,
+    candidate_limit: usize,
+    stats: &mut OsdDecodeStats,
+) {
+    let mut visited = 0usize;
+    for &column in &base.free_columns {
+        if visited >= candidate_limit {
+            return;
+        }
+        visited += 1;
+        stats.osd_candidate_count += 1;
+        let mut gf2_stats = Gf2SolveStats::default();
+        let _ = reduced.solve_with_forced_columns_counting(&[column], &mut gf2_stats);
+        accumulate_gf2_stats(stats, gf2_stats);
+    }
+
+    let frontier_len = base.free_columns.len().min(osd_order);
+    if frontier_len < 2 {
+        return;
+    }
+
+    let frontier = base.free_columns[..frontier_len].to_vec();
+    let mut forced = Vec::new();
+    visit_combinations_until(
+        &frontier,
+        2,
+        0,
+        &mut forced,
+        &mut visited,
+        candidate_limit,
+        &mut |columns| {
+            stats.osd_candidate_count += 1;
+            let mut gf2_stats = Gf2SolveStats::default();
+            let _ = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
+            accumulate_gf2_stats(stats, gf2_stats);
+        },
+    );
 }
 
 fn binomial(n: usize, k: usize) -> u128 {
