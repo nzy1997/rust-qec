@@ -174,7 +174,7 @@ fn bb90_hard_syndrome_reports_osd_profile_counters() {
     assert_eq!(profile.x_decode_call_count, expected_x_calls);
     assert!(profile.osd_use_count > 0);
     assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
-    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert_eq!(profile.gf2_solve_count, 1);
     assert_eq!(profile.gf2_full_elimination_count, 1);
 }
 
@@ -312,7 +312,7 @@ fn syndrome_profile_replay_reports_nontrivial_osd_counts() {
     assert_eq!(profile.x_decode_call_count, 0);
     assert_eq!(profile.osd_use_count, 1);
     assert!(profile.osd_candidate_count > 0);
-    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert_eq!(profile.gf2_solve_count, 1);
     assert_eq!(profile.gf2_full_elimination_count, 1);
 }
 
@@ -335,7 +335,7 @@ fn syndrome_profile_replay_candidate_limit_wrapper_routes_z_basis_counts() {
     assert_eq!(profile.x_decode_call_count, 0);
     assert_eq!(profile.osd_use_count, 1);
     assert_eq!(profile.osd_candidate_count, 1);
-    assert!(profile.gf2_solve_count >= profile.osd_candidate_count + 1);
+    assert_eq!(profile.gf2_solve_count, 1);
     assert_eq!(profile.gf2_full_elimination_count, 1);
 }
 

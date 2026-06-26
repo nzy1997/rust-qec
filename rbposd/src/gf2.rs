@@ -240,6 +240,105 @@ impl ReducedLinearSystem {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FreeColumnInfluenceVectors {
+    base_correction: Correction,
+    ordered_free_columns: Vec<usize>,
+    influence_toggles: Vec<Vec<usize>>,
+    influence_by_column: Vec<Option<usize>>,
+    num_bits: usize,
+}
+
+impl ReducedLinearSystem {
+    pub(crate) fn free_column_influence_vectors(
+        &self,
+        base: &DetailedSolution,
+        ordered_free_columns: &[usize],
+    ) -> Result<FreeColumnInfluenceVectors, DecodeError> {
+        if base.correction.len() != self.num_bits {
+            return Err(DecodeError::DimensionMismatch {
+                what: "OSD base correction",
+                expected: self.num_bits,
+                actual: base.correction.len(),
+            });
+        }
+        for &column in &self.free_columns {
+            if base.correction.as_slice()[column] {
+                return Err(DecodeError::SingularSystem);
+            }
+        }
+
+        let mut influence_by_column = vec![None; self.num_bits];
+        let mut influence_toggles = Vec::with_capacity(ordered_free_columns.len());
+        for &free_column in ordered_free_columns {
+            if free_column >= self.num_bits {
+                return Err(DecodeError::InvalidColumnIndex {
+                    column: free_column,
+                    num_bits: self.num_bits,
+                });
+            }
+            if !self.is_free[free_column] || influence_by_column[free_column].is_some() {
+                return Err(DecodeError::SingularSystem);
+            }
+
+            let influence_index = influence_toggles.len();
+            influence_by_column[free_column] = Some(influence_index);
+            let mut toggles = vec![free_column];
+            for (pivot_row, &pivot_column) in self.pivot_columns.iter().enumerate() {
+                if self.rows[pivot_row][free_column] {
+                    toggles.push(pivot_column);
+                }
+            }
+            influence_toggles.push(toggles);
+        }
+
+        Ok(FreeColumnInfluenceVectors {
+            base_correction: base.correction.clone(),
+            ordered_free_columns: ordered_free_columns.to_vec(),
+            influence_toggles,
+            influence_by_column,
+            num_bits: self.num_bits,
+        })
+    }
+}
+
+impl FreeColumnInfluenceVectors {
+    pub(crate) fn correction_for_forced_columns(
+        &self,
+        forced_true_columns: &[usize],
+    ) -> Result<Correction, DecodeError> {
+        let mut correction = self.base_correction.as_slice().to_vec();
+        let mut forced = vec![false; self.num_bits];
+        for &column in forced_true_columns {
+            if column >= self.num_bits {
+                return Err(DecodeError::InvalidColumnIndex {
+                    column,
+                    num_bits: self.num_bits,
+                });
+            }
+            if self.influence_by_column[column].is_none() {
+                return Err(DecodeError::SingularSystem);
+            }
+            if forced[column] {
+                continue;
+            }
+            forced[column] = true;
+        }
+
+        for &column in &self.ordered_free_columns {
+            if let Some(influence_index) = self.influence_by_column[column] {
+                if forced[column] {
+                    for &toggle_column in &self.influence_toggles[influence_index] {
+                        correction[toggle_column] ^= true;
+                    }
+                }
+            }
+        }
+
+        Ok(Correction::from(correction))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::DecodeError;
@@ -250,6 +349,25 @@ mod tests {
         PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
         sort_columns_by_unreliability,
     };
+
+    fn visit_test_combinations(
+        columns: &[usize],
+        target_len: usize,
+        start: usize,
+        forced: &mut Vec<usize>,
+        visit: &mut impl FnMut(&[usize]),
+    ) {
+        if forced.len() == target_len {
+            visit(forced);
+            return;
+        }
+        let remaining = target_len - forced.len();
+        for index in start..=columns.len() - remaining {
+            forced.push(columns[index]);
+            visit_test_combinations(columns, target_len, index + 1, forced, visit);
+            forced.pop();
+        }
+    }
 
     #[test]
     fn reliability_sort_is_stable_for_equal_scores() {
@@ -408,6 +526,104 @@ mod tests {
         );
         assert_eq!(stats.solve_count, 2);
         assert_eq!(stats.full_elimination_count, 1);
+    }
+
+    #[test]
+    fn osd_candidate_influence_vectors_match_back_substitution() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 5, vec![vec![0, 2, 3], vec![1, 3, 4]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2, 3, 4], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+        let influences = reduced
+            .free_column_influence_vectors(&base, &base.free_columns)
+            .unwrap();
+
+        let mut checked = 0usize;
+        for order in 0..=2 {
+            let mut forced = Vec::new();
+            visit_test_combinations(&base.free_columns, order, 0, &mut forced, &mut |columns| {
+                let expected = reduced
+                    .solve_with_forced_columns_counting(
+                        columns,
+                        &mut super::Gf2SolveStats::default(),
+                    )
+                    .unwrap();
+                let assembled = influences.correction_for_forced_columns(columns).unwrap();
+
+                assert_eq!(assembled, expected.correction);
+                assert_eq!(pcm.multiply(&assembled), syndrome);
+                checked += 1;
+            });
+        }
+
+        println!("candidate sets checked: {checked}");
+        assert_eq!(checked, 7);
+    }
+
+    #[test]
+    fn osd_influence_vectors_reject_invalid_forced_columns() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 5, vec![vec![0, 2, 3], vec![1, 3, 4]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2, 3, 4], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+        let influences = reduced
+            .free_column_influence_vectors(&base, &[2, 3])
+            .unwrap();
+
+        assert_eq!(
+            influences.correction_for_forced_columns(&[0]).unwrap_err(),
+            DecodeError::SingularSystem
+        );
+        assert_eq!(
+            influences.correction_for_forced_columns(&[5]).unwrap_err(),
+            DecodeError::InvalidColumnIndex {
+                column: 5,
+                num_bits: 5,
+            }
+        );
+        assert_eq!(
+            influences.correction_for_forced_columns(&[4]).unwrap_err(),
+            DecodeError::SingularSystem
+        );
+    }
+
+    #[test]
+    fn osd_influence_vectors_treat_duplicate_forced_columns_as_a_set() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 5, vec![vec![0, 2, 3], vec![1, 3, 4]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2, 3, 4], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+        let influences = reduced
+            .free_column_influence_vectors(&base, &base.free_columns)
+            .unwrap();
+
+        let expected = reduced
+            .solve_with_forced_columns_counting(&[2, 2], &mut super::Gf2SolveStats::default())
+            .unwrap();
+        let assembled = influences.correction_for_forced_columns(&[2, 2]).unwrap();
+
+        assert_eq!(assembled, expected.correction);
     }
 
     #[test]

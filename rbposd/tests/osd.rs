@@ -180,10 +180,7 @@ fn ldpc_osd_cs_candidate_plan_counts_singles_and_order_pairs() {
         ldpc_decode.stats.osd_candidate_count as u128,
         ldpc_diagnostic.planned_candidate_count
     );
-    assert_eq!(
-        ldpc_decode.stats.gf2_solve_count,
-        ldpc_decode.stats.osd_candidate_count + 1
-    );
+    assert_eq!(ldpc_decode.stats.gf2_solve_count, 1);
     assert_eq!(pcm.multiply(&ldpc_decode.correction), syndrome);
     let ldpc_profile = ldpc
         .profile_decode_with_osd_candidate_limit(&syndrome, usize::MAX)
@@ -536,7 +533,7 @@ fn osd_order_two_decode_reports_candidate_and_gf2_counters() {
     assert!(result.stats.osd_seconds.is_finite());
     assert!(result.stats.osd_seconds >= 0.0);
     assert!(result.stats.osd_candidate_count > 0);
-    assert!(result.stats.gf2_solve_count >= result.stats.osd_candidate_count + 1);
+    assert_eq!(result.stats.gf2_solve_count, 1);
     assert_eq!(result.stats.gf2_full_elimination_count, 1);
 }
 
@@ -578,10 +575,7 @@ fn osd_order7_reuses_factorization_without_changing_correction() {
     );
     assert!(result.used_osd);
     assert!(result.stats.osd_candidate_count > 1);
-    assert_eq!(
-        result.stats.gf2_solve_count,
-        result.stats.osd_candidate_count + 1
-    );
+    assert_eq!(result.stats.gf2_solve_count, 1);
     assert_eq!(result.stats.gf2_full_elimination_count, 1);
 }
 
@@ -607,7 +601,7 @@ fn profile_decode_with_osd_candidate_limit_counts_bounded_actual_candidates() {
     assert_eq!(stats.decode_call_count, 1);
     assert_eq!(stats.osd_use_count, 1);
     assert_eq!(stats.osd_candidate_count, 3);
-    assert!(stats.gf2_solve_count >= stats.osd_candidate_count + 1);
+    assert_eq!(stats.gf2_solve_count, 1);
     assert_eq!(stats.gf2_full_elimination_count, 1);
     assert!(stats.osd_seconds.is_finite());
     assert!(stats.osd_seconds >= 0.0);
@@ -648,7 +642,7 @@ fn ldpc_osd_cs_profile_limit_can_stop_during_single_column_sweep() {
         .unwrap();
 
     assert_eq!(stats.osd_candidate_count, 1);
-    assert_eq!(stats.gf2_solve_count, 2);
+    assert_eq!(stats.gf2_solve_count, 1);
 }
 
 #[test]
