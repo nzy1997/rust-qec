@@ -17,10 +17,23 @@ CSV_HEADER = [
     "max_iter",
     "osd_method",
     "osd_order",
+    "basis",
+    "syndrome_weight",
+    "syndrome_support",
+    "logical_prediction",
+    "expected_logical",
     "setup_seconds",
     "decode_seconds",
     "run_seconds",
     "logical_error_rate",
+    "bp_seconds",
+    "osd_seconds",
+    "decode_call_count",
+    "bp_iteration_count",
+    "osd_use_count",
+    "osd_candidate_count",
+    "gf2_solve_count",
+    "gf2_full_elimination_count",
     "status",
     "error",
 ]
@@ -150,6 +163,21 @@ SMALL_LDPC_CASES = tuple(
 SMOKE_CASES = (
     CompareCase("bb72-p0005-c1-t1-seed12345", "bb72", 0.0005, 1, 1),
     CompareCase("bb90-p0005-c1-t1-seed12345", "bb90", 0.0005, 1, 1),
+)
+
+HARD_REPLAY_CASES = (
+    CompareCase(
+        "bb90-p006-c10-seed12345-order7-hard-syndrome",
+        "bb90",
+        0.006,
+        10,
+        1,
+        seed=12345,
+        bp_method="ms",
+        max_iter=10000,
+        osd_method="osd_cs",
+        osd_order=7,
+    ),
 )
 
 

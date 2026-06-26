@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import tempfile
 import unittest
 from dataclasses import replace
@@ -7,8 +8,13 @@ from pathlib import Path
 from types import ModuleType
 from unittest import mock
 
-from benchmarks.bb_circuit_bposd_compare.cases import SMOKE_CASES
-from benchmarks.bb_circuit_bposd_compare.run_compare import _python_row, main, run_suite
+from benchmarks.bb_circuit_bposd_compare.cases import HARD_REPLAY_CASES, SMOKE_CASES
+from benchmarks.bb_circuit_bposd_compare.run_compare import (
+    _python_row,
+    main,
+    run_hard_replay_suite,
+    run_suite,
+)
 from benchmarks.bb_circuit_bposd_compare.verify_smoke import verify_rows
 
 
@@ -50,6 +56,115 @@ def fake_export(case):
             }
         ],
     }
+
+
+FAKE_HARD_LOGICAL = [False, True, False, True, False, False, False, True]
+
+
+def fake_hard_fixture():
+    return {
+        "case_id": HARD_REPLAY_CASES[0].case_id,
+        "basis": "Z",
+        "syndrome_support": [0, 2, 3],
+        "expected_sampled_logical": FAKE_HARD_LOGICAL,
+    }
+
+
+def fake_hard_export(case):
+    return {
+        "code_id": "bb90",
+        "physical_error_rate": 0.006,
+        "num_cycles": 10,
+        "num_trials": 1,
+        "seed": 12345,
+        "max_bp_iterations": 10000,
+        "osd_order": 7,
+        "rust_result": {
+            "num_failed_trials": 0,
+            "profile": {"setup_seconds": 0.11, "decode_seconds": 0.22},
+        },
+        "z_model": {
+            "num_checks": 4,
+            "num_bits": 4,
+            "sparse_rows": [[0], [1], [2], [3]],
+            "augmented_columns": [[], [], [5], [7, 11]],
+            "channel_probs": [0.1, 0.1, 0.1, 0.1],
+            "first_logical_row": 4,
+        },
+        "x_model": {
+            "num_checks": 1,
+            "num_bits": 1,
+            "sparse_rows": [[]],
+            "augmented_columns": [[]],
+            "channel_probs": [0.1],
+            "first_logical_row": 1,
+        },
+        "trials": [
+            {
+                "z_syndrome": [True, False, True, True],
+                "x_syndrome": [False],
+                "z_logical": FAKE_HARD_LOGICAL,
+                "x_logical": [False],
+                "z_logical_prediction": FAKE_HARD_LOGICAL,
+                "x_logical_prediction": [False],
+                "z_profile": {
+                    "setup_seconds": 0.0,
+                    "sample_seconds": 0.0,
+                    "decode_seconds": 0.22,
+                    "bp_seconds": 0.12,
+                    "osd_seconds": 0.10,
+                    "decode_call_count": 1,
+                    "z_decode_call_count": 1,
+                    "x_decode_call_count": 0,
+                    "bp_iteration_count": 10000,
+                    "osd_use_count": 1,
+                    "osd_candidate_count": 4100,
+                    "gf2_solve_count": 4101,
+                    "gf2_full_elimination_count": 1,
+                },
+                "x_profile": None,
+            }
+        ],
+    }
+
+
+class FakeHardMatrix:
+    def __init__(self, shape):
+        rows, cols = shape
+        self.rows = [[0 for _ in range(cols)] for _ in range(rows)]
+
+    def __setitem__(self, key, value):
+        row_index, column_index = key
+        self.rows[row_index][column_index] = value
+
+
+class FakeHardNumpy(ModuleType):
+    uint8 = "uint8"
+
+    def __init__(self):
+        super().__init__("numpy")
+
+    def zeros(self, shape, dtype=None):
+        return FakeHardMatrix(shape)
+
+    def asarray(self, values, dtype=None):
+        return list(values)
+
+
+class FakeHardVector:
+    def __init__(self, values):
+        self._values = list(values)
+
+    def tolist(self):
+        return list(self._values)
+
+
+class FakeHardDecoder:
+    def __init__(self, matrix, **kwargs):
+        self.kwargs = kwargs
+
+    def decode(self, syndrome):
+        return FakeHardVector([True, False, True, True])
 
 
 class RunCompareTest(unittest.TestCase):
@@ -241,6 +356,56 @@ class RunCompareTest(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr.getvalue(), "")
+
+    def test_hard_replay_suite_writes_paired_prediction_rows(self) -> None:
+        fake_ldpc = ModuleType("ldpc")
+        fake_ldpc.BpOsdDecoder = FakeHardDecoder
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict("sys.modules", {"numpy": FakeHardNumpy(), "ldpc": fake_ldpc}):
+                with mock.patch(
+                    "benchmarks.bb_circuit_bposd_compare.run_compare._load_hard_replay_fixture",
+                    side_effect=fake_hard_fixture,
+                ):
+                    status = run_hard_replay_suite(
+                        Path(tmpdir),
+                        rust_exporter=fake_hard_export,
+                    )
+            with (Path(tmpdir) / "results.csv").open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertEqual(status, 0)
+        self.assertEqual([row["decoder_impl"] for row in rows], ["rbposd", "ldpc_bposd"])
+        self.assertEqual(rows[0]["case_id"], HARD_REPLAY_CASES[0].case_id)
+        self.assertEqual(rows[0]["basis"], "Z")
+        self.assertEqual(rows[0]["osd_method"], "osd_cs")
+        self.assertEqual(rows[0]["logical_prediction"], rows[1]["logical_prediction"])
+        self.assertEqual(json.loads(rows[0]["logical_prediction"]), FAKE_HARD_LOGICAL)
+        self.assertEqual(rows[0]["syndrome_support"], "[0,2,3]")
+        self.assertEqual(rows[0]["osd_candidate_count"], "4100")
+        self.assertEqual(rows[0]["gf2_solve_count"], "4101")
+
+    def test_hard_replay_suite_records_skipped_python_dependency_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_hard_replay_row",
+                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+            ):
+                with mock.patch(
+                    "benchmarks.bb_circuit_bposd_compare.run_compare._load_hard_replay_fixture",
+                    side_effect=fake_hard_fixture,
+                ):
+                    status = run_hard_replay_suite(
+                        Path(tmpdir),
+                        rust_exporter=fake_hard_export,
+                    )
+            with (Path(tmpdir) / "results.csv").open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertNotEqual(status, 0)
+        self.assertEqual(rows[1]["decoder_impl"], "ldpc_bposd")
+        self.assertEqual(rows[1]["status"], "skipped")
+        self.assertIn("No module named 'ldpc'", rows[1]["error"])
 
 
 if __name__ == "__main__":
