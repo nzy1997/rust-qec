@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from benchmarks.bb_circuit_bposd_compare import write_readiness_report
 from benchmarks.bb_circuit_bposd_compare.tests.test_ready_for_full import (
     write_ready_tree,
@@ -15,8 +13,8 @@ def test_write_readiness_report_includes_required_reviewer_sections(tmp_path) ->
         ["--results-dir", str(results_dir), "--out", str(report_path)]
     )
 
-    report = report_path.read_text()
     assert status == 0
+    report = report_path.read_text()
     assert "# BB BP-OSD Full-Campaign Readiness Report" in report
     assert "**Final readiness verdict:** PASS" in report
     assert "## Gate Summary" in report
