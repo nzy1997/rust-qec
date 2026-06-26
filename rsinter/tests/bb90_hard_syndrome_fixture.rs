@@ -224,7 +224,7 @@ fn bb90_hard_syndrome_ldpc_cs_candidate_count_is_bounded() {
     )
     .unwrap();
     assert_eq!(profile.osd_candidate_count, PROFILE_CANDIDATE_LIMIT);
-    assert_eq!(profile.gf2_solve_count, PROFILE_CANDIDATE_LIMIT + 1);
+    assert_eq!(profile.gf2_solve_count, 1);
 }
 
 #[test]
