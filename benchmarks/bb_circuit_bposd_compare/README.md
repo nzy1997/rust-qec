@@ -93,3 +93,28 @@ Missing Python decoder dependencies remain explicit: `run_compare` records a
 skipped Python row and exits nonzero unless `--allow-missing-python` is passed.
 `verify_replay` also rejects skipped Python rows unless its own
 `--allow-missing-python` diagnostic flag is used.
+
+### Counter-Bounded Release Smoke
+
+The hard-syndrome performance smoke is intentionally counter-gated rather than
+wall-clock-gated. Run the positive release profile with:
+
+```bash
+cargo test --release -p rsinter bb90_hard_syndrome_release_profile_is_counter_bounded -- --nocapture
+```
+
+The test prints profile JSON with `decode_seconds`, `bp_seconds`,
+`osd_seconds`, `osd_candidate_count`, `gf2_solve_count`, and
+`gf2_full_elimination_count`. The timing fields are evidence only; the pass/fail
+checks assert that the BB90 fixture uses the bounded `ldpc_osd_cs` candidate
+plan, one GF(2) full elimination, one optimized GF(2) solve, and consistent
+per-basis decode-call counters.
+
+The legacy exhaustive/frontier negative control is:
+
+```bash
+cargo test --release -p rsinter bb90_hard_syndrome_legacy_profile_fails_ldpc_cs_bounds -q
+```
+
+It verifies that the same validator rejects the legacy profile and names the
+violating counter.
