@@ -5,9 +5,9 @@ use rbposd::{
 
 fn channel_prior_scoring_fixture() -> (ParityCheckMatrix, ChannelModel, Syndrome) {
     (
-        ParityCheckMatrix::from_sparse_rows(2, 4, vec![vec![1, 2], vec![0, 2, 3]]).unwrap(),
-        ChannelModel::BitFlipProbabilities(vec![0.18, 0.4, 0.3, 0.12]),
-        Syndrome::from(vec![false, true]),
+        ParityCheckMatrix::from_sparse_rows(2, 4, vec![vec![0, 1, 3], vec![1, 2, 3]]).unwrap(),
+        ChannelModel::BitFlipProbabilities(vec![0.05, 0.15, 0.12, 0.08]),
+        Syndrome::from(vec![true, true]),
     )
 }
 
@@ -233,7 +233,7 @@ fn ldpc_osd_cs_uses_channel_prior_candidate_weight() {
     assert!(result.used_osd);
     assert_eq!(
         result.correction,
-        Correction::from(vec![false, true, false, false])
+        Correction::from(vec![false, false, false, true])
     );
     assert_eq!(pcm.multiply(&result.correction), syndrome);
     assert_eq!(result.stats.osd_candidate_count, 3);
@@ -259,13 +259,13 @@ fn legacy_osd_candidate_scoring_keeps_existing_reliability_behavior() {
     assert!(result.used_osd);
     assert_eq!(
         result.correction,
-        Correction::from(vec![true, false, true, false])
+        Correction::from(vec![false, true, false, false])
     );
     assert_eq!(pcm.multiply(&result.correction), syndrome);
 
     let invalid = BpOsdDecoder::new(
         pcm,
-        ChannelModel::BitFlipProbabilities(vec![0.18, f64::NAN, 0.3, 0.12]),
+        ChannelModel::BitFlipProbabilities(vec![0.05, f64::NAN, 0.12, 0.08]),
         DecoderConfig {
             osd_variant: OsdVariant::LdpcCombinationSweep,
             osd_order: 2,
