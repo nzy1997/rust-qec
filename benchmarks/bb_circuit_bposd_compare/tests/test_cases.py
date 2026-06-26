@@ -79,6 +79,16 @@ def test_small_ldpc_catalog_negative_control_names_wrong_bb288_p_value() -> None
     assert "unexpected target: bb288 p=0.0036 cycles=18" in errors
 
 
+def test_small_ldpc_catalog_negative_control_rejects_near_miss_bb288_p_value() -> None:
+    copied = list(SMALL_LDPC_CASES)
+    index = next(i for i, case in enumerate(copied) if case.code_id == "bb288")
+    copied[index] = replace(copied[index], p=0.00351)
+
+    errors = "\n".join(validate_small_ldpc_catalog(tuple(copied)))
+    assert "missing target: bb288 p=0.0035 cycles=18" in errors
+    assert "unexpected target: bb288 p=0.00351 cycles=18" in errors
+
+
 def test_small_ldpc_catalog_dry_run_surfaces_errors_and_skips_decoders(
     monkeypatch, tmp_path, capsys
 ) -> None:

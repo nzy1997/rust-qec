@@ -53,6 +53,13 @@ python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier small_ldpc_cat
 The command validates the catalog and writes
 `/tmp/rstim-small-ldpc-catalog/manifest.csv`.
 
+The dry run is pinned to the upstream decoder settings recorded in
+`SMALL_LDPC_CASES`: `num_trials=50000`, `seed=12345`, `bp_method=ms`,
+`max_iter=10000`, `osd_method=osd_cs`, `osd_order=7`, and `scaling=0`.
+This branch documents `osd_cs` in the manifest because that is the
+upstream `ldpc` package spelling equivalent to the older `ldpc_cs`
+label still accepted by the validator.
+
 | code_id | cycles | p points | catalog status |
 | --- | ---: | ---: | --- |
 | `bb72` | 6 | 7 | supported |

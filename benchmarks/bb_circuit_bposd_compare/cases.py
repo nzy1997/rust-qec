@@ -76,6 +76,10 @@ def _decimal(value: float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.0001"))
 
 
+def _exact_decimal(value: float) -> Decimal:
+    return Decimal(str(value))
+
+
 def _format_p_value(value: float) -> str:
     return format(_decimal(value).normalize(), "f")
 
@@ -149,13 +153,13 @@ SMOKE_CASES = (
 )
 
 
-def _target_key(case: CompareCase) -> tuple[str, str, int]:
-    return (case.code_id, _format_p_value(case.p), case.num_cycles)
+def _target_key(case: CompareCase) -> tuple[str, Decimal, int]:
+    return (case.code_id, _exact_decimal(case.p), case.num_cycles)
 
 
-def _target_label(key: tuple[str, str, int]) -> str:
+def _target_label(key: tuple[str, Decimal, int]) -> str:
     code_id, p_value, cycles = key
-    return f"{code_id} p={p_value} cycles={cycles}"
+    return f"{code_id} p={format(p_value.normalize(), 'f')} cycles={cycles}"
 
 
 def small_ldpc_manifest_rows(
@@ -188,7 +192,7 @@ def validate_small_ldpc_catalog(
 ) -> list[str]:
     errors: list[str] = []
     expected_keys = {
-        (code_id, _format_p_value(p), cycles)
+        (code_id, _exact_decimal(p), cycles)
         for code_id, (cycles, p_values) in SMALL_LDPC_TARGETS.items()
         for p in p_values
     }
