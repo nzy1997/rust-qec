@@ -11,10 +11,12 @@ covered by `qec-code` tests. It demonstrates the CLI-facing workflow for:
 
 - listing built-in CSS code identifiers
 - exporting `Hx` and `Hz` matrices for fixed built-ins and APM/Kasai presets
+- exporting `Hx` and `Hz` matrices from an explicit quantum Tanner spec
 - checking a small exact distance through the same CLI family
 
-The examples use `steane`, `bb72`, and `apm_kasai:p=96` because those fixtures
-are pinned in the repository today.
+The examples use `steane`, `bb72`, `apm_kasai:p=96`, and the committed
+`toric_d4` quantum Tanner fixture because those fixtures are pinned in the
+repository today.
 
 ## Run It
 
@@ -28,6 +30,8 @@ cargo run -q -p qec-code -- code css export bb72 hx
 cargo run -q -p qec-code -- code css export bb72 hz
 cargo run -q -p qec-code -- code css export apm_kasai:p=96 hx > /tmp/apm_p96_hx.json
 cargo run -q -p qec-code -- code css export apm_kasai:p=96 hz > /tmp/apm_p96_hz.json
+cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
+cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
 cargo run -q -p qec-code -- code css-distance exact --code-id steane --json
 ```
 
@@ -48,6 +52,23 @@ Built-in CSS codes:
   repetition_z:d=<distance>                                       Z-check chain, distance >= 2
   surface_rotated:d=<distance>                                    rotated surface CSS code, distance >= 2
   toric:d=<distance>                                              periodic square-lattice toric CSS code, distance >= 2
+```
+
+Quantum Tanner is a separate file-driven generation path, not a named built-in
+catalog entry. Given an explicit spec such as
+`qec-code/tests/fixtures/quantum_tanner/toric_d4.json`, `qec-code` can generate
+ordinary `sparse_rows` `Hx` and `Hz` matrices with:
+
+```sh
+cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
+cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz
+```
+
+The committed `toric_d4` fixture has `num_cols` 16 and exact distance 4 through
+the direct spec path:
+
+```sh
+cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
 ```
 
 Each export command prints a JSON object with `"format":"sparse_rows"`.
@@ -72,6 +93,7 @@ Construction notes and contracts:
 
 - [`qec-code/doc/apm_css.md`](qec-code/doc/apm_css.md)
 - [`qec-code/doc/quantum_tanner.md`](qec-code/doc/quantum_tanner.md)
+- [`qec-code/doc/quantum_tanner_cli.md`](qec-code/doc/quantum_tanner_cli.md)
 
 Fixtures used by the documented examples and focused tests:
 
@@ -82,6 +104,7 @@ Fixtures used by the documented examples and focused tests:
 - [`qec-code/tests/fixtures/apm/table_a1_manifest.json`](qec-code/tests/fixtures/apm/table_a1_manifest.json)
 - [`qec-code/tests/fixtures/apm/p96_hx.json`](qec-code/tests/fixtures/apm/p96_hx.json)
 - [`qec-code/tests/fixtures/apm/p96_hz.json`](qec-code/tests/fixtures/apm/p96_hz.json)
+- [`qec-code/tests/fixtures/quantum_tanner/toric_d4.json`](qec-code/tests/fixtures/quantum_tanner/toric_d4.json)
 
 ## Verification
 
@@ -100,7 +123,9 @@ cargo test -p qec-code --test cli -q
 That integration test covers the documented list/export/distance-facing command
 family, including `code css list`, `steane` and `bb72` sparse-row exports,
 `apm_kasai:p=96` exports, Steane exact-distance JSON, and the unsupported
-`apm_kasai:p=128` rejection path.
+`apm_kasai:p=128` rejection path. It also covers quantum Tanner exact,
+randomized-upper-bound, and random-window-upper-bound paths from the committed
+`toric_d4` spec.
 
 Run the focused APM contract checks:
 
@@ -120,8 +145,10 @@ claim new distances for `bb72` or APM/Kasai codes, and it treats APM Table A1
 distance values as fixture metadata rather than as newly verified exact
 minimum-distance results.
 
-Quantum Tanner construction details are intentionally linked through the
-existing contract document instead of being explained here. Use
+Quantum Tanner generation is limited to explicit finite-data specs accepted by
+the current contract. It does not search for groups, call GAP or Oscar, or
+import qLDPC/qTanner/Julia construction code at runtime. Use
 [`qec-code/doc/quantum_tanner.md`](qec-code/doc/quantum_tanner.md) for the
-current explicit-data contract and open a follow-up issue before adding new
-algorithm claims to this showcase.
+accepted input contract and
+[`qec-code/doc/quantum_tanner_cli.md`](qec-code/doc/quantum_tanner_cli.md) for
+the focused CLI workflow.
