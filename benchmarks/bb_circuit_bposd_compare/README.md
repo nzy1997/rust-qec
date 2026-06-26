@@ -94,6 +94,36 @@ Both rows use `bp_method=ms`, `max_iter=10000`, `osd_method=osd_cs`, and
 and Rust OSD/GF(2) counters. Missing Python dependencies produce skipped rows
 and verifier failure unless `verify_diagnostic --allow-missing-python` is used.
 
+## Full-Campaign Readiness Gate
+
+Before launching the full BB small-LDPC campaign, collect the prerequisite
+artifacts under one results directory and run:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.ready_for_full --results-dir /tmp/rstim-bb-ready
+```
+
+The gate validates these required artifacts:
+
+- `hard-replay/results.csv`: paired BB90 hard-syndrome replay rows accepted by
+  `verify_replay`.
+- `hard-profile/profile.json`: release hard-profile JSON with
+  `osd_planner=ldpc_osd_cs`, `candidate_limit=16`, bounded OSD candidates, one
+  optimized GF(2) solve, one full elimination, and consistent basis decode
+  counters.
+- `setup-run/profile.json`: BB p-point profile evidence with one code,
+  syndrome-cycle, effective-model, and decoder build; `sample_count` equal to
+  `num_trials`; and consistent Z/X decode-call counters.
+- `small-ldpc-catalog/manifest.csv`: the complete 31-row small-LDPC manifest
+  accepted by `validate_small_ldpc_catalog`.
+- `diagnostic/results.csv`: paired high-p BB90 and BB144 diagnostic rows
+  accepted by `verify_diagnostic`.
+
+Optional `provenance.json` may include `artifact_hash`, `command`, or
+`timestamp`. Missing provenance produces `WARN`, but missing, stale, malformed,
+skipped, or failing required artifacts produce `FAIL` and a nonzero exit. The
+gate does not use wall-clock age thresholds and does not run the full campaign.
+
 ## BB90 Hard-Syndrome Replay
 
 After building `rsinter`, replay the checked-in BB90 hard-syndrome fixture with:

@@ -206,6 +206,20 @@ def test_ready_for_full_passes_complete_artifact_tree(tmp_path, capsys) -> None:
     assert "PASS readiness verdict" in output
 
 
+def test_ready_for_full_verification_command_accepts_named_tmp_fixture(
+    tmp_path, capsys
+) -> None:
+    fixture_dir = tmp_path / "rstim-bb-ready"
+    write_ready_tree(fixture_dir)
+
+    status = ready_for_full.main(["--results-dir", str(fixture_dir)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 0
+    assert "PASS readiness verdict" in output
+
+
 def test_ready_for_full_fails_missing_hard_replay(tmp_path, capsys) -> None:
     write_ready_tree(tmp_path)
     (tmp_path / "hard-replay" / "results.csv").unlink()
