@@ -328,14 +328,23 @@ def _check_provenance(results_dir: Path) -> CheckResult:
     data, errors = _load_json_object(results_dir, PROVENANCE_PATH)
     if data is None:
         return _warn("provenance", PROVENANCE_PATH, "; ".join(errors))
-    recognized = [
-        f"{field}={data[field]}"
-        for field in ("artifact_hash", "command", "timestamp")
-        if data.get(field)
-    ]
-    if not recognized:
-        return _warn("provenance", PROVENANCE_PATH, "no recognized provenance fields")
-    return _pass("provenance", PROVENANCE_PATH, ", ".join(recognized))
+    fields = ("artifact_hash", "command", "timestamp")
+    recognized = [f"{field}={data[field]}" for field in fields if data.get(field)]
+    if len(recognized) == len(fields):
+        return _pass("provenance", PROVENANCE_PATH, ", ".join(recognized))
+    missing = [field for field in fields if not data.get(field)]
+    if recognized:
+        return _warn(
+            "provenance",
+            PROVENANCE_PATH,
+            "incomplete provenance: missing " + ", ".join(missing),
+        )
+    return _warn(
+        "provenance",
+        PROVENANCE_PATH,
+        "incomplete provenance: no recognized provenance fields; missing "
+        + ", ".join(missing),
+    )
 
 
 def check_results_dir(results_dir: Path) -> list[CheckResult]:

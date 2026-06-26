@@ -421,3 +421,23 @@ def test_ready_for_full_warns_without_recognized_provenance_fields(
     assert "no recognized provenance fields" in output
     assert "provenance.json" in output
     assert "WARN readiness verdict" in output
+
+
+def test_ready_for_full_warns_on_partial_provenance(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path, provenance=False)
+    _write_json(
+        tmp_path / "provenance.json",
+        {"timestamp": "2026-06-27T00:00:00+08:00"},
+    )
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 0
+    assert "WARN provenance" in output
+    assert "provenance.json" in output
+    assert "incomplete" in output or "artifact_hash" in output or "command" in output
+    assert "WARN readiness verdict" in output
