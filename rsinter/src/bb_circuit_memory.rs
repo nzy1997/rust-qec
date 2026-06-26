@@ -1982,6 +1982,34 @@ mod tests {
     }
 
     #[test]
+    fn simulation_case_export_records_z_failure_without_x_decode() {
+        let config = SimulationConfig {
+            physical_error_rate: 0.05,
+            num_cycles: 1,
+            num_trials: 1,
+            seed: Some(1),
+            max_bp_iterations: 10,
+            osd_order: 0,
+        };
+
+        let exported = run_simulation_case_for_code("bb72", config, true).unwrap();
+        assert_eq!(exported.result.num_failed_trials, 1);
+        assert_eq!(exported.result.profile.z_decode_call_count, 1);
+        assert_eq!(exported.result.profile.x_decode_call_count, 0);
+
+        let trials = exported.trials.unwrap();
+        assert_eq!(trials.len(), 1);
+        let trial = &trials[0];
+        assert_ne!(
+            trial.z_logical_prediction.as_ref().unwrap(),
+            &trial.z_logical
+        );
+        assert!(trial.z_profile.is_some());
+        assert!(trial.x_logical_prediction.is_none());
+        assert!(trial.x_profile.is_none());
+    }
+
+    #[test]
     fn linear_algebra_helpers_handle_degenerate_inputs() {
         assert_eq!(parse_schedule_slot("idle"), None);
 
