@@ -123,6 +123,7 @@ Optional `provenance.json` may include `artifact_hash`, `command`, or
 `timestamp`. Missing provenance produces `WARN`, but missing, stale, malformed,
 skipped, or failing required artifacts produce `FAIL` and a nonzero exit. The
 gate does not use wall-clock age thresholds and does not run the full campaign.
+`PASS` and `WARN` both exit 0; only `FAIL` exits nonzero.
 
 ## BB90 Hard-Syndrome Replay
 
