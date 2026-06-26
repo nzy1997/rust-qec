@@ -3,6 +3,14 @@ use rbposd::{
     ParityCheckMatrix, Syndrome,
 };
 
+fn channel_prior_scoring_fixture() -> (ParityCheckMatrix, ChannelModel, Syndrome) {
+    (
+        ParityCheckMatrix::from_sparse_rows(2, 4, vec![vec![1, 2], vec![0, 2, 3]]).unwrap(),
+        ChannelModel::BitFlipProbabilities(vec![0.18, 0.4, 0.3, 0.12]),
+        Syndrome::from(vec![false, true]),
+    )
+}
+
 #[test]
 fn osd0_recovers_a_valid_solution_when_bp_is_disabled() {
     let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![1, 2]]).unwrap();
@@ -203,6 +211,69 @@ fn ldpc_osd_cs_candidate_plan_counts_singles_and_order_pairs() {
         legacy_diagnostic.planned_candidate_count,
         ldpc_diagnostic.planned_candidate_count
     );
+}
+
+#[test]
+fn ldpc_osd_cs_uses_channel_prior_candidate_weight() {
+    let (pcm, channel, syndrome) = channel_prior_scoring_fixture();
+    let decoder = BpOsdDecoder::new(
+        pcm.clone(),
+        channel,
+        DecoderConfig {
+            max_bp_iterations: 1,
+            osd_variant: OsdVariant::LdpcCombinationSweep,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let result = decoder.decode(&syndrome).unwrap();
+
+    assert!(result.used_osd);
+    assert_eq!(
+        result.correction,
+        Correction::from(vec![false, true, false, false])
+    );
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+    assert_eq!(result.stats.osd_candidate_count, 3);
+}
+
+#[test]
+fn legacy_osd_candidate_scoring_keeps_existing_reliability_behavior() {
+    let (pcm, channel, syndrome) = channel_prior_scoring_fixture();
+    let legacy = BpOsdDecoder::new(
+        pcm.clone(),
+        channel,
+        DecoderConfig {
+            max_bp_iterations: 1,
+            osd_variant: OsdVariant::LegacyCombinationSweep,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap();
+
+    let result = legacy.decode(&syndrome).unwrap();
+
+    assert!(result.used_osd);
+    assert_eq!(
+        result.correction,
+        Correction::from(vec![true, false, true, false])
+    );
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+
+    let invalid = BpOsdDecoder::new(
+        pcm,
+        ChannelModel::BitFlipProbabilities(vec![0.18, f64::NAN, 0.3, 0.12]),
+        DecoderConfig {
+            osd_variant: OsdVariant::LdpcCombinationSweep,
+            osd_order: 2,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(invalid, DecodeError::InvalidProbability);
 }
 
 #[test]
