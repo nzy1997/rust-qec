@@ -169,6 +169,22 @@ label = "Decode Time Per Shot"
     render_benchmark_plot(&spec, &rows, &out).unwrap();
     let svg = std::fs::read_to_string(out).unwrap();
     assert!(svg.contains("<svg"));
+    assert_eq!(
+        svg.matches("\nrmatching d=3\n").count(),
+        1,
+        "multi-panel plots should render a single shared legend; svg was:\n{svg}"
+    );
+    let legend_rects = legend_background_rects(&svg);
+    assert_eq!(
+        legend_rects.len(),
+        1,
+        "multi-panel plots should render a single legend box; svg was:\n{svg}"
+    );
+    let legend_rect = legend_rects[0];
+    assert!(
+        legend_rect.0 > 450.0 && legend_rect.0 + legend_rect.2 < 800.0 && legend_rect.1 > 350.0,
+        "the shared legend should sit in the lower-right of the left panel, got {legend_rect:?}; svg was:\n{svg}"
+    );
 }
 
 #[test]
@@ -1516,6 +1532,22 @@ fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
         .collect()
 }
 
+fn legend_background_rects(svg: &str) -> Vec<(f64, f64, f64, f64)> {
+    svg.lines()
+        .filter(|line| line.contains("<rect"))
+        .filter(|line| line.contains("opacity=\"0.8\""))
+        .filter(|line| line.contains("fill=\"#FFFFFF\""))
+        .filter_map(|line| {
+            Some((
+                svg_attribute(line, "x")?.parse().ok()?,
+                svg_attribute(line, "y")?.parse().ok()?,
+                svg_attribute(line, "width")?.parse().ok()?,
+                svg_attribute(line, "height")?.parse().ok()?,
+            ))
+        })
+        .collect()
+}
+
 fn legend_color_for_label(svg: &str, label: &str) -> String {
     let samples = legend_sample_lines(svg, label);
     svg_attribute(samples[0], "stroke")
@@ -1560,7 +1592,21 @@ fn legend_labels(svg: &str) -> Vec<String> {
 fn legend_sample_groups(svg: &str) -> Vec<Vec<&str>> {
     let mut groups = Vec::new();
     let mut current_y = None;
-    for line in svg.lines().filter(|line| is_legend_sample_line(line)) {
+    let lines: Vec<_> = svg.lines().collect();
+    let sample_start = lines
+        .windows(2)
+        .enumerate()
+        .filter(|(_, window)| {
+            window[0].contains("<text") && window[0].contains("text-anchor=\"start\"")
+        })
+        .map(|(index, _)| index + 2)
+        .last()
+        .unwrap_or(0);
+    for line in lines[sample_start..]
+        .iter()
+        .copied()
+        .filter(|line| is_legend_sample_line(line))
+    {
         let y = first_polyline_point(line)
             .unwrap_or_else(|| panic!("legend sample should have points; svg line was:\n{line}"))
             .1;
@@ -1583,14 +1629,7 @@ fn is_legend_sample_line(line: &str) -> bool {
     {
         return false;
     }
-    let Some(points) = svg_attribute(line, "points") else {
-        return false;
-    };
-    let points: Vec<_> = points
-        .split_whitespace()
-        .filter_map(parse_svg_point)
-        .collect();
-    !points.is_empty() && points.iter().all(|(x, _)| (90.0..=160.0).contains(x))
+    svg_attribute(line, "points").is_some()
 }
 
 fn first_polyline_point(line: &str) -> Option<(f64, f64)> {

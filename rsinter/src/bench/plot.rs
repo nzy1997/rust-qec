@@ -470,12 +470,15 @@ where
     };
     let areas = content.split_evenly((1, panels.len()));
 
-    for (area, panel) in areas.into_iter().zip(panels.iter()) {
+    for (index, (area, panel)) in areas.into_iter().zip(panels.iter()).enumerate() {
+        let show_legend = index == 0;
         match panel {
             PreparedPanel::ErrorRate(data) => {
-                render_error_rate_panel_on(area, data, series_styles)?
+                render_error_rate_panel_on(area, data, series_styles, show_legend)?
             }
-            PreparedPanel::Numeric(data) => render_numeric_panel_on(area, data, series_styles)?,
+            PreparedPanel::Numeric(data) => {
+                render_numeric_panel_on(area, data, series_styles, show_legend)?
+            }
         }
     }
 
@@ -486,6 +489,7 @@ fn render_error_rate_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &ErrorRatePanelData,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -507,7 +511,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
             let mut chart = ChartBuilder::on(&area)
@@ -525,7 +529,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -543,7 +547,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -561,7 +565,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_error_rate_series(&mut chart, &data.groups, series_styles)?;
+            draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
             return Err(format!(
@@ -578,6 +582,7 @@ fn render_numeric_panel_on<DB: DrawingBackend>(
     area: DrawingArea<DB, Shift>,
     data: &NumericPanelData,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB::ErrorType: 'static,
@@ -599,7 +604,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
             let mut chart = ChartBuilder::on(&area)
@@ -617,7 +622,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -635,7 +640,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
             let mut chart = ChartBuilder::on(&area)
@@ -653,7 +658,7 @@ where
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
-            draw_numeric_series(&mut chart, &data.groups, series_styles)?;
+            draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
             return Err(format!(
@@ -670,6 +675,7 @@ fn draw_error_rate_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &ErrorRateGroups,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -741,19 +747,14 @@ where
         }
     }
 
-    chart
-        .configure_series_labels()
-        .position(SeriesLabelPosition::UpperLeft)
-        .background_style(WHITE.mix(0.8))
-        .border_style(BLACK)
-        .draw()
-        .map_err(|e| e.to_string())
+    draw_series_legend(chart, show_legend)
 }
 
 fn draw_numeric_series<'a, DB, XR, YR>(
     chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
     groups: &NumericGroups,
     series_styles: &BTreeMap<SeriesKey, SeriesStyle>,
+    show_legend: bool,
 ) -> Result<(), String>
 where
     DB: DrawingBackend + 'a,
@@ -780,9 +781,25 @@ where
             .map_err(|e| e.to_string())?;
     }
 
+    draw_series_legend(chart, show_legend)
+}
+
+fn draw_series_legend<'a, DB, XR, YR>(
+    chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
+    show_legend: bool,
+) -> Result<(), String>
+where
+    DB: DrawingBackend + 'a,
+    DB::ErrorType: 'static,
+    XR: Ranged<ValueType = f64>,
+    YR: Ranged<ValueType = f64>,
+{
+    if !show_legend {
+        return Ok(());
+    }
     chart
         .configure_series_labels()
-        .position(SeriesLabelPosition::UpperLeft)
+        .position(SeriesLabelPosition::LowerRight)
         .background_style(WHITE.mix(0.8))
         .border_style(BLACK)
         .draw()
