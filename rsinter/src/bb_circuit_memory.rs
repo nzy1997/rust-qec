@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig,
+    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Syndrome,
 };
 use serde::Serialize;
@@ -780,6 +780,7 @@ pub struct SyndromeReplayDiagnostic {
     pub bp_iterations: usize,
     pub used_osd: bool,
     pub residual_syndrome_weight: usize,
+    pub osd_planner: &'static str,
     pub osd_order: usize,
     pub free_column_count: usize,
     pub candidate_search_frontier_size: usize,
@@ -1106,12 +1107,31 @@ pub fn replay_syndrome_diagnostic(
     max_bp_iterations: usize,
     osd_order: usize,
 ) -> Result<SyndromeReplayDiagnostic, String> {
+    replay_syndrome_diagnostic_with_osd_variant(
+        model,
+        syndrome_bits,
+        num_logicals,
+        max_bp_iterations,
+        osd_order,
+        OsdVariant::Osd0,
+    )
+}
+
+pub fn replay_syndrome_diagnostic_with_osd_variant(
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    num_logicals: usize,
+    max_bp_iterations: usize,
+    osd_order: usize,
+    osd_variant: OsdVariant,
+) -> Result<SyndromeReplayDiagnostic, String> {
     let syndrome = Syndrome::from(syndrome_bits.to_vec());
     let diagnostic_decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
+            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
@@ -1141,6 +1161,7 @@ pub fn replay_syndrome_diagnostic(
         bp_iterations: diagnostic.bp_iterations,
         used_osd: diagnostic.used_osd,
         residual_syndrome_weight: diagnostic.residual_syndrome_weight,
+        osd_planner: diagnostic.osd_planner,
         osd_order: diagnostic.osd_order,
         free_column_count: diagnostic.free_column_count,
         candidate_search_frontier_size: diagnostic.candidate_search_frontier_size,
@@ -1180,11 +1201,30 @@ pub fn profile_syndrome_replay_for_basis(
     max_bp_iterations: usize,
     osd_order: usize,
 ) -> Result<BbCircuitBposdProfile, String> {
+    profile_syndrome_replay_for_basis_with_osd_variant(
+        basis,
+        model,
+        syndrome_bits,
+        max_bp_iterations,
+        osd_order,
+        OsdVariant::Osd0,
+    )
+}
+
+pub fn profile_syndrome_replay_for_basis_with_osd_variant(
+    basis: ProfileReplayBasis,
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+    osd_variant: OsdVariant,
+) -> Result<BbCircuitBposdProfile, String> {
     let decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
+            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
@@ -1234,12 +1274,33 @@ pub fn profile_syndrome_replay_with_candidate_limit_for_basis(
     osd_order: usize,
     osd_candidate_limit: usize,
 ) -> Result<BbCircuitBposdProfile, String> {
+    profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
+        basis,
+        model,
+        syndrome_bits,
+        max_bp_iterations,
+        osd_order,
+        osd_candidate_limit,
+        OsdVariant::Osd0,
+    )
+}
+
+pub fn profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
+    basis: ProfileReplayBasis,
+    model: &EffectiveDecoderModel,
+    syndrome_bits: &[bool],
+    max_bp_iterations: usize,
+    osd_order: usize,
+    osd_candidate_limit: usize,
+    osd_variant: OsdVariant,
+) -> Result<BbCircuitBposdProfile, String> {
     let syndrome = Syndrome::from(syndrome_bits.to_vec());
     let decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
+            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
