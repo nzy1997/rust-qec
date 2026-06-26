@@ -8,12 +8,20 @@ from pathlib import Path
 from types import ModuleType
 from unittest import mock
 
-from benchmarks.bb_circuit_bposd_compare.cases import HARD_REPLAY_CASES, SMOKE_CASES
+from benchmarks.bb_circuit_bposd_compare.cases import (
+    DIAGNOSTIC_CASES,
+    HARD_REPLAY_CASES,
+    SMOKE_CASES,
+)
 from benchmarks.bb_circuit_bposd_compare.run_compare import (
     _python_row,
     main,
+    run_diagnostic_suite,
     run_hard_replay_suite,
     run_suite,
+)
+from benchmarks.bb_circuit_bposd_compare.verify_diagnostic import (
+    verify_rows as verify_diagnostic_rows,
 )
 from benchmarks.bb_circuit_bposd_compare.verify_smoke import verify_rows
 
@@ -56,6 +64,27 @@ def fake_export(case):
             }
         ],
     }
+
+
+def fake_diagnostic_export(case):
+    export = fake_export(case)
+    export["rust_result"]["profile"].update(
+        {
+            "bp_seconds": 0.12,
+            "osd_seconds": 0.10,
+            "decode_call_count": 2,
+            "bp_iteration_count": 20000,
+            "osd_use_count": 1,
+            "osd_candidate_count": 16,
+            "gf2_solve_count": 1,
+            "gf2_full_elimination_count": 1,
+        }
+    )
+    return export
+
+
+def fake_run_rust_export(case, rust_binary=None, osd_method=None):
+    return fake_export(case)
 
 
 FAKE_HARD_LOGICAL = [False, True, False, True, False, False, False, True]
@@ -165,6 +194,14 @@ class FakeHardDecoder:
 
     def decode(self, syndrome):
         return FakeHardVector([True, False, True, True])
+
+
+class FakeDiagnosticDecoder:
+    def __init__(self, matrix, **kwargs):
+        self.kwargs = kwargs
+
+    def decode(self, syndrome):
+        return FakeHardVector([False])
 
 
 class RunCompareTest(unittest.TestCase):
@@ -324,11 +361,15 @@ class RunCompareTest(unittest.TestCase):
         stderr = io.StringIO()
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch(
-                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
-                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+                "benchmarks.bb_circuit_bposd_compare.run_compare._run_rust_export",
+                new=fake_run_rust_export,
             ):
-                with mock.patch("sys.stderr", stderr):
-                    status = main(["--tier", "smoke", "--output-dir", tmpdir])
+                with mock.patch(
+                    "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                    side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+                ):
+                    with mock.patch("sys.stderr", stderr):
+                        status = main(["--tier", "smoke", "--output-dir", tmpdir])
 
         self.assertNotEqual(status, 0)
         self.assertIn(
@@ -340,22 +381,117 @@ class RunCompareTest(unittest.TestCase):
         stderr = io.StringIO()
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch(
-                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
-                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+                "benchmarks.bb_circuit_bposd_compare.run_compare._run_rust_export",
+                new=fake_run_rust_export,
             ):
-                with mock.patch("sys.stderr", stderr):
-                    status = main(
-                        [
-                            "--tier",
-                            "smoke",
-                            "--output-dir",
-                            tmpdir,
-                            "--allow-missing-python",
-                        ]
-                    )
+                with mock.patch(
+                    "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                    side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+                ):
+                    with mock.patch("sys.stderr", stderr):
+                        status = main(
+                            [
+                                "--tier",
+                                "smoke",
+                                "--output-dir",
+                                tmpdir,
+                                "--allow-missing-python",
+                            ]
+                        )
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr.getvalue(), "")
+
+    def test_diagnostic_suite_writes_paired_high_p_rows(self) -> None:
+        fake_ldpc = ModuleType("ldpc")
+        fake_ldpc.BpOsdDecoder = FakeDiagnosticDecoder
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                "sys.modules",
+                {"numpy": FakeHardNumpy(), "ldpc": fake_ldpc},
+            ):
+                status = run_diagnostic_suite(
+                    Path(tmpdir),
+                    rust_exporter=fake_diagnostic_export,
+                )
+            with (Path(tmpdir) / "results.csv").open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertEqual(status, 0)
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(
+            [case.case_id for case in DIAGNOSTIC_CASES],
+            [rows[0]["case_id"], rows[2]["case_id"]],
+        )
+        self.assertEqual(verify_diagnostic_rows(rows), [])
+        rust_rows = [row for row in rows if row["decoder_impl"] == "rbposd"]
+        self.assertTrue(all(row["gf2_solve_count"] == "1" for row in rust_rows))
+
+    def test_diagnostic_suite_records_skipped_python_dependency_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_row",
+                side_effect=ModuleNotFoundError("No module named 'ldpc'"),
+            ):
+                status = run_diagnostic_suite(
+                    Path(tmpdir),
+                    rust_exporter=fake_diagnostic_export,
+                )
+            with (Path(tmpdir) / "results.csv").open(newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+        self.assertNotEqual(status, 0)
+        python_rows = [row for row in rows if row["decoder_impl"] == "ldpc_bposd"]
+        self.assertEqual(len(python_rows), len(DIAGNOSTIC_CASES))
+        self.assertTrue(all(row["status"] == "skipped" for row in python_rows))
+        self.assertIn(
+            "Python ldpc_bposd diagnostic row is skipped",
+            "\n".join(verify_diagnostic_rows(rows)),
+        )
+
+    def test_main_accepts_diagnostic_tier(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare.run_diagnostic_suite",
+                return_value=0,
+            ) as run_diagnostic:
+                status = main(["--tier", "diagnostic", "--output-dir", tmpdir])
+
+        self.assertEqual(status, 0)
+        run_diagnostic.assert_called_once()
+
+    def test_main_diagnostic_validation_failure_does_not_read_missing_csv(self) -> None:
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare.validate_diagnostic_cases",
+                return_value=["broken diagnostic catalog"],
+            ):
+                with mock.patch("sys.stderr", stderr):
+                    status = main(["--tier", "diagnostic", "--output-dir", tmpdir])
+
+        self.assertEqual(status, 1)
+        self.assertIn("broken diagnostic catalog", stderr.getvalue())
+
+    def test_main_diagnostic_validation_failure_ignores_stale_results_csv(self) -> None:
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results_path = Path(tmpdir) / "results.csv"
+            results_path.write_text(
+                "decoder_impl,status,error\n"
+                "ldpc_bposd,skipped,python dependency unavailable for ldpc_bposd replay: stale\n"
+            )
+            with mock.patch(
+                "benchmarks.bb_circuit_bposd_compare.run_compare.validate_diagnostic_cases",
+                return_value=["broken diagnostic catalog"],
+            ):
+                with mock.patch("sys.stderr", stderr):
+                    status = main(["--tier", "diagnostic", "--output-dir", tmpdir])
+
+        self.assertEqual(status, 1)
+        self.assertIn("broken diagnostic catalog", stderr.getvalue())
+        self.assertNotIn("stale", stderr.getvalue())
 
     def test_hard_replay_suite_writes_paired_prediction_rows(self) -> None:
         fake_ldpc = ModuleType("ldpc")

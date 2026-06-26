@@ -68,6 +68,32 @@ label still accepted by the validator.
 | `bb144` | 12 | 6 | supported |
 | `bb288` | 18 | 4 | unsupported Rust constructor |
 
+## Diagnostic Tier
+
+The diagnostic tier runs selected high-p BB points with one trial per case. It
+is meant to exercise harder syndromes without launching the full 50,000-trial
+campaign.
+
+```bash
+cargo build --release -p rsinter
+.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare \
+  --tier diagnostic \
+  --output-dir /tmp/rstim-bb-diagnostic \
+  --rust-binary target/release/rsinter
+.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.verify_diagnostic \
+  /tmp/rstim-bb-diagnostic/results.csv
+```
+
+| code_id | p | cycles | trials | seed |
+| --- | ---: | ---: | ---: | ---: |
+| `bb90` | 0.006 | 10 | 1 | 12345 |
+| `bb144` | 0.006 | 12 | 1 | 12345 |
+
+Both rows use `bp_method=ms`, `max_iter=10000`, `osd_method=osd_cs`, and
+`osd_order=7`. The verifier requires paired Rust/Python rows for both cases
+and Rust OSD/GF(2) counters. Missing Python dependencies produce skipped rows
+and verifier failure unless `verify_diagnostic --allow-missing-python` is used.
+
 ## BB90 Hard-Syndrome Replay
 
 After building `rsinter`, replay the checked-in BB90 hard-syndrome fixture with:

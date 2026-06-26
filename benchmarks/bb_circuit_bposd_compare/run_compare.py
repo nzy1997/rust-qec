@@ -12,11 +12,13 @@ from typing import Any, Callable, Sequence
 from benchmarks.bb_circuit_bposd_compare.cases import (
     CATALOG_HEADER,
     CSV_HEADER,
+    DIAGNOSTIC_CASES,
     HARD_REPLAY_CASES,
     SMALL_LDPC_CASES,
     CompareCase,
     SMOKE_CASES,
     small_ldpc_manifest_rows,
+    validate_diagnostic_cases,
     validate_small_ldpc_catalog,
 )
 from benchmarks.bb_circuit_bposd_compare.summary import write_summary
@@ -40,6 +42,16 @@ PYTHON_UPSTREAM_MAX_ITER = 10000
 PYTHON_UPSTREAM_OSD_METHOD = "osd_cs"
 PYTHON_UPSTREAM_OSD_ORDER = 7
 PYTHON_DEPENDENCY_HINTS = ("ldpc", "bposd", "numpy", "bposddecoder")
+RUST_PROFILE_COUNTER_FIELDS = (
+    "bp_seconds",
+    "osd_seconds",
+    "decode_call_count",
+    "bp_iteration_count",
+    "osd_use_count",
+    "osd_candidate_count",
+    "gf2_solve_count",
+    "gf2_full_elimination_count",
+)
 
 
 def _format_value(value: Any) -> str:
@@ -187,6 +199,9 @@ def _rust_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
             "status": "ok",
         }
     )
+    for field in RUST_PROFILE_COUNTER_FIELDS:
+        if field in profile:
+            row[field] = _format_value(profile[field])
     return row
 
 
@@ -221,6 +236,30 @@ def _missing_python_dependency_messages(rows: Sequence[dict[str, str]]) -> list[
         seen.add(message)
         messages.append(message)
     return messages
+
+
+def _results_signature(output_dir: Path) -> tuple[int, int] | None:
+    results_path = output_dir / "results.csv"
+    try:
+        stat = results_path.stat()
+    except FileNotFoundError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+def _print_missing_python_dependency_messages(
+    output_dir: Path,
+    previous_results_signature: tuple[int, int] | None = None,
+) -> None:
+    current_results_signature = _results_signature(output_dir)
+    if (
+        current_results_signature is None
+        or current_results_signature == previous_results_signature
+    ):
+        return
+    results_path = output_dir / "results.csv"
+    for message in _missing_python_dependency_messages(_read_rows(results_path)):
+        print(message, file=sys.stderr)
 
 
 def _is_missing_python_dependency(error: Exception) -> bool:
@@ -549,6 +588,26 @@ def run_hard_replay_suite(
     return 0
 
 
+def run_diagnostic_suite(
+    output_dir: Path,
+    allow_missing_python: bool = False,
+    rust_binary: Path | None = None,
+    rust_exporter: Callable[..., dict[str, Any]] | None = None,
+) -> int:
+    errors = validate_diagnostic_cases(DIAGNOSTIC_CASES)
+    for error in errors:
+        print(error, file=sys.stderr)
+    if errors:
+        return 1
+    return run_suite(
+        output_dir=output_dir,
+        allow_missing_python=allow_missing_python,
+        cases=DIAGNOSTIC_CASES,
+        rust_binary=rust_binary,
+        rust_exporter=rust_exporter,
+    )
+
+
 def run_small_ldpc_catalog_dry_run(
     output_dir: Path,
     cases: Sequence[CompareCase] = SMALL_LDPC_CASES,
@@ -565,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--tier",
-        choices=("smoke", "small_ldpc_catalog", "hard-replay"),
+        choices=("smoke", "small_ldpc_catalog", "hard-replay", "diagnostic"),
         required=True,
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -577,18 +636,34 @@ def main(argv: list[str] | None = None) -> int:
         return run_small_ldpc_catalog_dry_run(args.output_dir)
 
     if args.tier == "hard-replay":
+        previous_results_signature = _results_signature(args.output_dir)
         status = run_hard_replay_suite(
             output_dir=args.output_dir,
             allow_missing_python=args.allow_missing_python,
             rust_binary=args.rust_binary,
         )
         if status != 0 and not args.allow_missing_python:
-            for message in _missing_python_dependency_messages(
-                _read_rows(args.output_dir / "results.csv")
-            ):
-                print(message, file=sys.stderr)
+            _print_missing_python_dependency_messages(
+                args.output_dir,
+                previous_results_signature,
+            )
         return status
 
+    if args.tier == "diagnostic":
+        previous_results_signature = _results_signature(args.output_dir)
+        status = run_diagnostic_suite(
+            output_dir=args.output_dir,
+            allow_missing_python=args.allow_missing_python,
+            rust_binary=args.rust_binary,
+        )
+        if status != 0 and not args.allow_missing_python:
+            _print_missing_python_dependency_messages(
+                args.output_dir,
+                previous_results_signature,
+            )
+        return status
+
+    previous_results_signature = _results_signature(args.output_dir)
     status = run_suite(
         output_dir=args.output_dir,
         allow_missing_python=args.allow_missing_python,
@@ -596,10 +671,10 @@ def main(argv: list[str] | None = None) -> int:
         rust_binary=args.rust_binary,
     )
     if status != 0 and not args.allow_missing_python:
-        for message in _missing_python_dependency_messages(
-            _read_rows(args.output_dir / "results.csv")
-        ):
-            print(message, file=sys.stderr)
+        _print_missing_python_dependency_messages(
+            args.output_dir,
+            previous_results_signature,
+        )
     return status
 
 
