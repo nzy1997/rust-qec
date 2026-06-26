@@ -1274,6 +1274,121 @@ label = "Decode Time Per Shot"
 }
 
 #[test]
+fn surface_compare_styles_match_legacy_family_colors_and_rust_dashes() {
+    let spec = spec_with_panels(
+        "Surface Decoder",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner", "params.distance"]
+label_template = "{runner} d={params.distance}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let mut rows = Vec::new();
+    for (runner, base_decode_us) in [
+        ("pymatching", 10.0),
+        ("rmatching", 12.0),
+        ("ilpqec", 20.0),
+        ("rilpqec", 22.0),
+        ("ldpc", 30.0),
+        ("rbposd", 32.0),
+    ] {
+        for (distance, distance_offset) in [(3, 0.0), (5, 100.0)] {
+            rows.push(ok_row(
+                runner,
+                distance,
+                0.002,
+                0.001,
+                2.0,
+                2000.0,
+                base_decode_us + distance_offset,
+            ));
+            rows.push(ok_row(
+                runner,
+                distance,
+                0.004,
+                0.001,
+                2.0,
+                2000.0,
+                base_decode_us + distance_offset + 1.0,
+            ));
+        }
+    }
+
+    let svg = render_plot_svg(&spec, &rows, "surface-compare-style.svg");
+    for distance in [3, 5] {
+        assert_eq!(
+            legend_color_for_label(&svg, &format!("pymatching d={distance}")),
+            legend_color_for_label(&svg, &format!("rmatching d={distance}")),
+            "paired MWPM implementations should share a color; svg was:\n{svg}"
+        );
+        assert_eq!(
+            legend_color_for_label(&svg, &format!("ilpqec d={distance}")),
+            legend_color_for_label(&svg, &format!("rilpqec d={distance}")),
+            "paired ILP implementations should share a color; svg was:\n{svg}"
+        );
+        assert_eq!(
+            legend_color_for_label(&svg, &format!("ldpc d={distance}")),
+            legend_color_for_label(&svg, &format!("rbposd d={distance}")),
+            "paired BP implementations should share a color; svg was:\n{svg}"
+        );
+    }
+    for (label, color) in [
+        ("ldpc d=3", "#1F77B4"),
+        ("rbposd d=3", "#1F77B4"),
+        ("ldpc d=5", "#FF7F0E"),
+        ("rbposd d=5", "#FF7F0E"),
+        ("ilpqec d=3", "#2CA02C"),
+        ("rilpqec d=3", "#2CA02C"),
+        ("ilpqec d=5", "#D62728"),
+        ("rilpqec d=5", "#D62728"),
+        ("pymatching d=3", "#9467BD"),
+        ("rmatching d=3", "#9467BD"),
+        ("pymatching d=5", "#8C564B"),
+        ("rmatching d=5", "#8C564B"),
+    ] {
+        assert_eq!(
+            legend_color_for_label(&svg, label),
+            color,
+            "{label} should use the legacy Matplotlib tab10 color; svg was:\n{svg}"
+        );
+    }
+
+    for label in [
+        "pymatching d=3",
+        "pymatching d=5",
+        "ilpqec d=3",
+        "ilpqec d=5",
+        "ldpc d=3",
+        "ldpc d=5",
+    ] {
+        assert_eq!(
+            legend_sample_segment_count(&svg, label),
+            1,
+            "{label} should have a solid legend sample; svg was:\n{svg}"
+        );
+    }
+    for label in [
+        "rmatching d=3",
+        "rmatching d=5",
+        "rilpqec d=3",
+        "rilpqec d=5",
+        "rbposd d=3",
+        "rbposd d=5",
+    ] {
+        assert!(
+            legend_sample_segment_count(&svg, label) > 1,
+            "{label} should have a dashed legend sample; svg was:\n{svg}"
+        );
+    }
+}
+
+#[test]
 fn log_log_fit_rejects_invalid_degenerate_and_overflowing_inputs() {
     assert!(log_log_fit_for_plot(&[(0.1, Some(f64::NAN)), (0.2, Some(0.04))]).is_none());
     assert!(log_log_fit_for_plot(&[(0.1, Some(0.01)), (0.1, Some(0.02))]).is_none());
@@ -1399,6 +1514,90 @@ fn svg_circle_fill_colors(svg: &str) -> std::collections::BTreeSet<String> {
                 .map(str::to_string)
         })
         .collect()
+}
+
+fn legend_color_for_label(svg: &str, label: &str) -> String {
+    let samples = legend_sample_lines(svg, label);
+    svg_attribute(samples[0], "stroke")
+        .unwrap_or_else(|| {
+            panic!("legend sample for {label} should have a stroke; svg was:\n{svg}")
+        })
+        .to_string()
+}
+
+fn legend_sample_segment_count(svg: &str, label: &str) -> usize {
+    legend_sample_lines(svg, label).len()
+}
+
+fn legend_sample_lines<'a>(svg: &'a str, label: &str) -> Vec<&'a str> {
+    let labels = legend_labels(svg);
+    let label_index = labels
+        .iter()
+        .position(|entry| entry == label)
+        .unwrap_or_else(|| panic!("missing legend label {label}; svg was:\n{svg}"));
+    let sample_groups = legend_sample_groups(svg);
+    sample_groups
+        .get(label_index)
+        .unwrap_or_else(|| panic!("missing legend sample for {label}; svg was:\n{svg}"))
+        .clone()
+}
+
+fn legend_labels(svg: &str) -> Vec<String> {
+    let lines: Vec<_> = svg.lines().collect();
+    lines
+        .windows(2)
+        .filter_map(|window| {
+            if window[0].contains("<text") && window[0].contains("text-anchor=\"start\"") {
+                let label = window[1].trim();
+                (!label.is_empty() && !label.starts_with('<')).then(|| label.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn legend_sample_groups(svg: &str) -> Vec<Vec<&str>> {
+    let mut groups = Vec::new();
+    let mut current_y = None;
+    for line in svg.lines().filter(|line| is_legend_sample_line(line)) {
+        let y = first_polyline_point(line)
+            .unwrap_or_else(|| panic!("legend sample should have points; svg line was:\n{line}"))
+            .1;
+        if current_y
+            .map(|existing: f64| (existing - y).abs() > 0.5)
+            .unwrap_or(true)
+        {
+            groups.push(Vec::new());
+            current_y = Some(y);
+        }
+        groups.last_mut().unwrap().push(line);
+    }
+    groups
+}
+
+fn is_legend_sample_line(line: &str) -> bool {
+    if !line.contains("<polyline")
+        || !line.contains("stroke=\"#")
+        || line.contains("stroke=\"#000000\"")
+    {
+        return false;
+    }
+    let Some(points) = svg_attribute(line, "points") else {
+        return false;
+    };
+    let points: Vec<_> = points
+        .split_whitespace()
+        .filter_map(parse_svg_point)
+        .collect();
+    !points.is_empty() && points.iter().all(|(x, _)| (90.0..=160.0).contains(x))
+}
+
+fn first_polyline_point(line: &str) -> Option<(f64, f64)> {
+    svg_attribute(line, "points")?
+        .split_whitespace()
+        .next()
+        .and_then(parse_svg_point)
 }
 
 fn spec_with_panels(
