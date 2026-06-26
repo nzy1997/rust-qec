@@ -137,13 +137,7 @@ pub(crate) fn decode_osd_with_workspace(
             if osd_order == 0 {
                 base
             } else {
-                best_legacy_osd_candidate(
-                    objective_weights,
-                    &reduced,
-                    base,
-                    osd_order,
-                    &mut stats,
-                )?
+                best_legacy_osd_candidate(objective_weights, &reduced, base, osd_order, &mut stats)?
             }
         }
         OsdVariant::LdpcCombinationSweep => {
@@ -592,12 +586,13 @@ fn xor_correction_bits(lhs: &[bool], rhs: &Correction) -> Correction {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::DecodeError;
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
     use super::{
         binomial, decode_osd0_with_workspace, ldpc_osd_cs_candidate_plan_for_free_columns,
-        OsdWorkspace,
+        validate_objective_weights, OsdWorkspace,
     };
 
     const LDPC_OSD_CS_CONTRACT_PATH: &str = "rbposd/doc/osd_cs_contract.md";
@@ -635,6 +630,27 @@ mod tests {
         let order = workspace.sort_unreliable_columns(&[1.0, 1.0, 0.4]);
 
         assert_eq!(order, &[2, 0, 1]);
+    }
+
+    #[test]
+    fn osd_objective_weight_validation_rejects_length_mismatch() {
+        let error = validate_objective_weights(&[1.0, 2.0], 3).unwrap_err();
+
+        assert_eq!(
+            error,
+            DecodeError::DimensionMismatch {
+                what: "OSD objective weights",
+                expected: 3,
+                actual: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn osd_objective_weight_validation_rejects_non_finite_weights() {
+        let error = validate_objective_weights(&[1.0, f64::NAN], 2).unwrap_err();
+
+        assert_eq!(error, DecodeError::InvalidProbability);
     }
 
     #[test]
