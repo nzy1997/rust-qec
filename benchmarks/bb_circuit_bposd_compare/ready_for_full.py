@@ -136,6 +136,26 @@ def _as_int(data: dict[str, object], field: str, errors: list[str]) -> int | Non
     return None
 
 
+def _require_nonnegative_int(
+    data: dict[str, object], field: str, errors: list[str]
+) -> int | None:
+    value = _as_int(data, field, errors)
+    if value is not None and value < 0:
+        errors.append(f"{field} must be non-negative")
+        return None
+    return value
+
+
+def _require_positive_int(
+    data: dict[str, object], field: str, errors: list[str]
+) -> int | None:
+    value = _as_int(data, field, errors)
+    if value is not None and value <= 0:
+        errors.append(f"{field} must be positive")
+        return None
+    return value
+
+
 def _as_seconds(data: dict[str, object], field: str, errors: list[str]) -> float | None:
     value = _require_field(data, field, errors)
     if value is None:
@@ -170,18 +190,20 @@ def _check_hard_profile(results_dir: Path) -> CheckResult:
     case_id = _require_nonempty_string(data, "case_id", errors)
     basis = _require_nonempty_string(data, "basis", errors)
     osd_planner = _require_nonempty_string(data, "osd_planner", errors)
-    osd_order = _as_int(data, "osd_order", errors)
-    candidate_limit = _as_int(data, "candidate_limit", errors)
-    planned = _as_int(data, "planned_candidate_count", errors)
-    bound = _as_int(data, "ldpc_cs_candidate_bound", errors)
-    osd_candidates = _as_int(data, "osd_candidate_count", errors)
-    bp_iterations = _as_int(data, "bp_iteration_count", errors)
-    osd_uses = _as_int(data, "osd_use_count", errors)
-    gf2_solves = _as_int(data, "gf2_solve_count", errors)
-    gf2_eliminations = _as_int(data, "gf2_full_elimination_count", errors)
-    decode_calls = _as_int(data, "decode_call_count", errors)
-    z_calls = _as_int(data, "z_decode_call_count", errors)
-    x_calls = _as_int(data, "x_decode_call_count", errors)
+    osd_order = _require_positive_int(data, "osd_order", errors)
+    candidate_limit = _require_positive_int(data, "candidate_limit", errors)
+    planned = _require_positive_int(data, "planned_candidate_count", errors)
+    bound = _require_positive_int(data, "ldpc_cs_candidate_bound", errors)
+    osd_candidates = _require_positive_int(data, "osd_candidate_count", errors)
+    bp_iterations = _require_positive_int(data, "bp_iteration_count", errors)
+    osd_uses = _require_positive_int(data, "osd_use_count", errors)
+    gf2_solves = _require_nonnegative_int(data, "gf2_solve_count", errors)
+    gf2_eliminations = _require_nonnegative_int(
+        data, "gf2_full_elimination_count", errors
+    )
+    decode_calls = _require_positive_int(data, "decode_call_count", errors)
+    z_calls = _require_nonnegative_int(data, "z_decode_call_count", errors)
+    x_calls = _require_nonnegative_int(data, "x_decode_call_count", errors)
     for field in ("decode_seconds", "bp_seconds", "osd_seconds"):
         _as_seconds(data, field, errors)
     if case_id is not None and case_id != "bb90-p006-c10-seed12345-order7-hard-syndrome":
@@ -194,18 +216,10 @@ def _check_hard_profile(results_dir: Path) -> CheckResult:
         errors.append("osd_planner must be ldpc_osd_cs")
     if osd_order is not None and osd_order != 7:
         errors.append("osd_order must be 7")
-    if candidate_limit != 16:
+    if candidate_limit is not None and candidate_limit != 16:
         errors.append(f"candidate_limit must be 16, got {candidate_limit}")
-    if planned is not None and planned <= 0:
-        errors.append("planned_candidate_count must be positive")
     if bound is not None and planned is not None and bound != planned:
         errors.append("ldpc_cs_candidate_bound must match planned_candidate_count")
-    if osd_candidates is not None and osd_candidates <= 0:
-        errors.append("osd_candidate_count must be positive")
-    if bp_iterations is not None and bp_iterations <= 0:
-        errors.append("bp_iteration_count must be positive")
-    if osd_uses is not None and osd_uses <= 0:
-        errors.append("osd_use_count must be positive")
     if (
         osd_candidates is not None
         and candidate_limit is not None
@@ -215,9 +229,9 @@ def _check_hard_profile(results_dir: Path) -> CheckResult:
         errors.append(
             "osd_candidate_count exceeds candidate_limit/planned_candidate_count"
         )
-    if gf2_solves != 1:
+    if gf2_solves is not None and gf2_solves != 1:
         errors.append(f"gf2_solve_count must be 1, got {gf2_solves}")
-    if gf2_eliminations != 1:
+    if gf2_eliminations is not None and gf2_eliminations != 1:
         errors.append(
             f"gf2_full_elimination_count must be 1, got {gf2_eliminations}"
         )
@@ -246,13 +260,14 @@ def _check_setup_run(results_dir: Path) -> CheckResult:
         "effective_model_build_count",
         "decoder_build_count",
     ):
-        if _as_int(data, field, errors) != 1:
+        value = _require_nonnegative_int(data, field, errors)
+        if value is not None and value != 1:
             errors.append(f"{field} must be 1")
-    num_trials = _as_int(data, "num_trials", errors)
-    sample_count = _as_int(data, "sample_count", errors)
-    decode_calls = _as_int(data, "decode_call_count", errors)
-    z_calls = _as_int(data, "z_decode_call_count", errors)
-    x_calls = _as_int(data, "x_decode_call_count", errors)
+    num_trials = _require_positive_int(data, "num_trials", errors)
+    sample_count = _require_positive_int(data, "sample_count", errors)
+    decode_calls = _require_positive_int(data, "decode_call_count", errors)
+    z_calls = _require_nonnegative_int(data, "z_decode_call_count", errors)
+    x_calls = _require_nonnegative_int(data, "x_decode_call_count", errors)
     for field in ("setup_seconds", "sample_seconds", "decode_seconds"):
         _as_seconds(data, field, errors)
     if num_trials is not None and sample_count is not None and sample_count != num_trials:

@@ -371,6 +371,91 @@ def test_ready_for_full_fails_hard_profile_counter_regression(
     assert "hard-profile/profile.json" in output
 
 
+def test_ready_for_full_fails_negative_hard_profile_decode_counters(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    profile = _hard_profile_fields()
+    profile["decode_call_count"] = -1
+    profile["z_decode_call_count"] = -1
+    profile["x_decode_call_count"] = 0
+    _write_json(tmp_path / "hard-profile" / "profile.json", profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "decode_call_count" in output
+    assert "z_decode_call_count" in output
+
+
+def test_ready_for_full_fails_zero_hard_profile_decode_count(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    profile = _hard_profile_fields()
+    profile["decode_call_count"] = 0
+    profile["z_decode_call_count"] = 0
+    profile["x_decode_call_count"] = 0
+    _write_json(tmp_path / "hard-profile" / "profile.json", profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "decode_call_count" in output
+
+
+def test_ready_for_full_fails_negative_setup_run_counters(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    profile = _setup_profile_fields()
+    profile["num_trials"] = -8
+    profile["sample_count"] = -8
+    profile["decode_call_count"] = -16
+    profile["z_decode_call_count"] = -8
+    profile["x_decode_call_count"] = -8
+    _write_json(tmp_path / "setup-run" / "profile.json", profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL setup-run-separation" in output
+    assert "num_trials" in output
+    assert "sample_count" in output
+    assert "decode_call_count" in output
+    assert "z_decode_call_count" in output
+    assert "x_decode_call_count" in output
+
+
+def test_ready_for_full_fails_zero_setup_run_evidence_counters(
+    tmp_path, capsys
+) -> None:
+    write_ready_tree(tmp_path)
+    profile = _setup_profile_fields()
+    profile["num_trials"] = 0
+    profile["sample_count"] = 0
+    profile["decode_call_count"] = 0
+    profile["z_decode_call_count"] = 0
+    profile["x_decode_call_count"] = 0
+    _write_json(tmp_path / "setup-run" / "profile.json", profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL setup-run-separation" in output
+    assert "num_trials" in output
+    assert "sample_count" in output
+    assert "decode_call_count" in output
+
+
 def test_ready_for_full_fails_skipped_diagnostic_python_row(
     tmp_path, capsys
 ) -> None:
