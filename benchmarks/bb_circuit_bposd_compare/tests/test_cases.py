@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+from benchmarks.bb_circuit_bposd_compare import run_compare
 from benchmarks.bb_circuit_bposd_compare.cases import (
     SMALL_LDPC_CASES,
     format_case_id,
@@ -76,3 +77,51 @@ def test_small_ldpc_catalog_negative_control_names_wrong_bb288_p_value() -> None
     errors = "\n".join(validate_small_ldpc_catalog(tuple(copied)))
     assert "missing target: bb288 p=0.0035 cycles=18" in errors
     assert "unexpected target: bb288 p=0.0036 cycles=18" in errors
+
+
+def test_small_ldpc_catalog_dry_run_surfaces_errors_and_skips_decoders(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    def _fail(*_args, **_kwargs):
+        raise AssertionError("decoder path should not be reached")
+
+    monkeypatch.setattr(
+        run_compare,
+        "validate_small_ldpc_catalog",
+        lambda _cases: ["missing target: bb108 p=0.0005 cycles=10"],
+    )
+    monkeypatch.setattr(
+        run_compare,
+        "small_ldpc_manifest_rows",
+        lambda _cases: [
+            {
+                "case_id": "bb72-p0002-c6-t50000-seed12345",
+                "code_id": "bb72",
+                "p": "0.0002",
+                "num_cycles": "6",
+                "num_trials": "50000",
+                "seed": "12345",
+                "bp_method": "ms",
+                "max_iter": "10000",
+                "osd_method": "osd_cs",
+                "osd_order": "7",
+                "scaling": "0",
+                "catalog_status": "supported",
+                "catalog_note": "",
+            }
+        ],
+    )
+    monkeypatch.setattr(run_compare, "run_suite", _fail)
+    monkeypatch.setattr(run_compare, "_run_rust_export", _fail)
+    monkeypatch.setattr(run_compare, "_python_row", _fail)
+
+    status = run_compare.main(
+        ["--tier", "small_ldpc_catalog", "--output-dir", str(tmp_path)]
+    )
+
+    captured = capsys.readouterr()
+    manifest_path = tmp_path / "manifest.csv"
+    assert status == 1
+    assert "missing target: bb108 p=0.0005 cycles=10" in captured.err
+    assert manifest_path.exists()
+    assert "case_id,code_id,p,num_cycles" in manifest_path.read_text()

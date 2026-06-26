@@ -332,6 +332,8 @@ def run_small_ldpc_catalog_dry_run(
     output_dir.mkdir(parents=True, exist_ok=True)
     errors = validate_small_ldpc_catalog(cases)
     _write_manifest(small_ldpc_manifest_rows(cases), output_dir / "manifest.csv")
+    for error in errors:
+        print(error, file=sys.stderr)
     return 1 if errors else 0
 
 
