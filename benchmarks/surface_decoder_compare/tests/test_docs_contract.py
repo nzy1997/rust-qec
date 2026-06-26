@@ -54,6 +54,13 @@ class DocsContractTest(unittest.TestCase):
         self.assertIn("make surface-decoder-compare-full", readme)
         self.assertIn("surface-decoder-compare-smoke:", makefile)
         self.assertIn("surface-decoder-compare-full:", makefile)
+        compare_targets = makefile_targets(
+            makefile,
+            "surface-decoder-compare-smoke",
+            "surface-decoder-compare-full",
+        )
+        self.assertIn("bench plot-surface-compare-csv", compare_targets)
+        self.assertNotIn("benchmarks.surface_decoder_compare.plot_compare", compare_targets)
 
     def test_readme_and_makefile_document_rsinter_surface_benchmark_flow(self) -> None:
         readme = README_PATH.read_text()
@@ -144,6 +151,21 @@ def paired_rbposd_ldpc_results() -> list[PairedResult]:
             )
         )
     return pairs
+
+
+def makefile_targets(makefile: str, *target_names: str) -> str:
+    lines = makefile.splitlines()
+    blocks: list[str] = []
+    for index, line in enumerate(lines):
+        if not any(line == f"{target}:" for target in target_names):
+            continue
+        block = [line]
+        for next_line in lines[index + 1 :]:
+            if next_line and not next_line.startswith(("\t", " ")):
+                break
+            block.append(next_line)
+        blocks.append("\n".join(block))
+    return "\n".join(blocks)
 
 
 def assert_valid_bb_circuit_command_keys(text: str) -> None:

@@ -30,8 +30,11 @@ make surface-decoder-compare-smoke
 make surface-decoder-compare-full
 ```
 
-Both commands write `results.csv` and `surface_decoder_compare.png` under
-`benchmarks/surface_decoder_compare/results/<tier>/`.
+Both commands write `results.csv` and a Rust-rendered
+`surface_decoder_compare.png` under
+`benchmarks/surface_decoder_compare/results/<tier>/`. The comparison runner
+still owns the legacy CSV table; the figure is rendered from that table by
+`rsinter bench plot-surface-compare-csv`.
 
 Only the `full` tier artifacts are tracked in git. The `smoke` tier is for
 local iteration and is ignored.
@@ -56,10 +59,17 @@ shape is:
 cargo run -p rsinter --bin rsinter -- bench plot --spec <benchmark.toml> --input <results.jsonl> --out <figure.svg>
 ```
 
-The legacy `plot_compare.py` script is kept as a compatibility path for older
-CSV comparison outputs; new benchmark figures should use `rsinter bench plot`
-so zero-error intervals, interval factors, and series grouping stay aligned
-with the main benchmark plotter.
+For existing surface-comparison CSV outputs, use the Rust CSV compatibility
+plot command:
+
+```bash
+cargo run -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec <benchmark.toml> --input <results.csv> --out <figure.png>
+```
+
+The legacy `plot_compare.py` script is kept as a manual compatibility path for
+older CSV comparison outputs. The Makefile targets no longer use it; benchmark
+figures should use `rsinter` so zero-error intervals, interval factors, logical
+rate units, and series grouping stay aligned with the main benchmark plotter.
 
 To resume an interrupted Rust runner artifact directory, rerun the same command
 with `--resume`. Existing completed row identities in
