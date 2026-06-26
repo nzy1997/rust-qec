@@ -112,7 +112,7 @@ def _write_json(path: Path, data: dict[str, object]) -> None:
     path.write_text(json.dumps(data, sort_keys=True))
 
 
-def _hard_profile() -> dict[str, object]:
+def _hard_profile_fields() -> dict[str, object]:
     return {
         "case_id": HARD_CASE_ID,
         "basis": "Z",
@@ -135,7 +135,11 @@ def _hard_profile() -> dict[str, object]:
     }
 
 
-def _setup_profile() -> dict[str, object]:
+def _hard_profile() -> dict[str, object]:
+    return _hard_profile_fields()
+
+
+def _setup_profile_fields() -> dict[str, object]:
     return {
         "code_id": "bb72",
         "num_trials": 8,
@@ -151,6 +155,10 @@ def _setup_profile() -> dict[str, object]:
         "z_decode_call_count": 8,
         "x_decode_call_count": 8,
     }
+
+
+def _setup_profile() -> dict[str, object]:
+    return _setup_profile_fields()
 
 
 def write_ready_tree(results_dir: Path, *, provenance: bool = True) -> None:
@@ -223,3 +231,33 @@ def test_ready_for_full_fails_without_setup_run_artifact(tmp_path, capsys) -> No
     assert status == 1
     assert "FAIL setup-run-separation" in output
     assert "setup-run/profile.json" in output
+
+
+def test_ready_for_full_fails_missing_hard_profile_field(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    hard_profile = _hard_profile_fields()
+    hard_profile.pop("bp_iteration_count")
+    _write_json(tmp_path / "hard-profile" / "profile.json", hard_profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "bp_iteration_count" in output
+
+
+def test_ready_for_full_fails_missing_setup_run_code_id(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    setup_profile = _setup_profile_fields()
+    setup_profile.pop("code_id")
+    _write_json(tmp_path / "setup-run" / "profile.json", setup_profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL setup-run-separation" in output
+    assert "code_id" in output

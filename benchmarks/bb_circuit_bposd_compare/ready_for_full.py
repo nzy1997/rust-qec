@@ -94,8 +94,29 @@ def _load_json_object(
     return data, []
 
 
+def _require_field(data: dict[str, object], field: str, errors: list[str]) -> object | None:
+    if field not in data:
+        errors.append(f"{field} is required")
+        return None
+    return data[field]
+
+
+def _require_nonempty_string(
+    data: dict[str, object], field: str, errors: list[str]
+) -> str | None:
+    value = _require_field(data, field, errors)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"{field} must be a nonempty string")
+        return None
+    return value
+
+
 def _as_int(data: dict[str, object], field: str, errors: list[str]) -> int | None:
-    value = data.get(field)
+    value = _require_field(data, field, errors)
+    if value is None:
+        return None
     if isinstance(value, bool) or value is None:
         errors.append(f"{field} must be an integer")
         return None
@@ -116,7 +137,9 @@ def _as_int(data: dict[str, object], field: str, errors: list[str]) -> int | Non
 
 
 def _as_seconds(data: dict[str, object], field: str, errors: list[str]) -> float | None:
-    value = data.get(field)
+    value = _require_field(data, field, errors)
+    if value is None:
+        return None
     if isinstance(value, bool) or value is None:
         errors.append(f"{field} must be finite and non-negative")
         return None
@@ -144,19 +167,16 @@ def _check_hard_profile(results_dir: Path) -> CheckResult:
     data, errors = _load_json_object(results_dir, HARD_PROFILE_PATH)
     if data is None:
         return _fail("hard-profile", HARD_PROFILE_PATH, "; ".join(errors))
-    if data.get("osd_planner") != "ldpc_osd_cs":
-        errors.append(
-            "osd_planner must be ldpc_osd_cs, got "
-            + str(data.get("osd_planner", ""))
-        )
+    case_id = _require_nonempty_string(data, "case_id", errors)
+    basis = _require_nonempty_string(data, "basis", errors)
+    osd_planner = _require_nonempty_string(data, "osd_planner", errors)
+    osd_order = _as_int(data, "osd_order", errors)
     candidate_limit = _as_int(data, "candidate_limit", errors)
     planned = _as_int(data, "planned_candidate_count", errors)
-    bound = data.get("ldpc_cs_candidate_bound")
-    if bound is not None:
-        parsed_bound = _as_int(data, "ldpc_cs_candidate_bound", errors)
-        if parsed_bound is not None and planned is not None and parsed_bound != planned:
-            errors.append("ldpc_cs_candidate_bound must match planned_candidate_count")
+    bound = _as_int(data, "ldpc_cs_candidate_bound", errors)
     osd_candidates = _as_int(data, "osd_candidate_count", errors)
+    bp_iterations = _as_int(data, "bp_iteration_count", errors)
+    osd_uses = _as_int(data, "osd_use_count", errors)
     gf2_solves = _as_int(data, "gf2_solve_count", errors)
     gf2_eliminations = _as_int(data, "gf2_full_elimination_count", errors)
     decode_calls = _as_int(data, "decode_call_count", errors)
@@ -164,12 +184,28 @@ def _check_hard_profile(results_dir: Path) -> CheckResult:
     x_calls = _as_int(data, "x_decode_call_count", errors)
     for field in ("decode_seconds", "bp_seconds", "osd_seconds"):
         _as_seconds(data, field, errors)
+    if case_id is not None and case_id != "bb90-p006-c10-seed12345-order7-hard-syndrome":
+        errors.append(
+            "case_id must be bb90-p006-c10-seed12345-order7-hard-syndrome"
+        )
+    if basis is not None and basis != "Z":
+        errors.append("basis must be Z")
+    if osd_planner is not None and osd_planner != "ldpc_osd_cs":
+        errors.append("osd_planner must be ldpc_osd_cs")
+    if osd_order is not None and osd_order != 7:
+        errors.append("osd_order must be 7")
     if candidate_limit != 16:
         errors.append(f"candidate_limit must be 16, got {candidate_limit}")
     if planned is not None and planned <= 0:
         errors.append("planned_candidate_count must be positive")
+    if bound is not None and planned is not None and bound != planned:
+        errors.append("ldpc_cs_candidate_bound must match planned_candidate_count")
     if osd_candidates is not None and osd_candidates <= 0:
         errors.append("osd_candidate_count must be positive")
+    if bp_iterations is not None and bp_iterations <= 0:
+        errors.append("bp_iteration_count must be positive")
+    if osd_uses is not None and osd_uses <= 0:
+        errors.append("osd_use_count must be positive")
     if (
         osd_candidates is not None
         and candidate_limit is not None
@@ -203,6 +239,7 @@ def _check_setup_run(results_dir: Path) -> CheckResult:
     data, errors = _load_json_object(results_dir, SETUP_RUN_PATH)
     if data is None:
         return _fail("setup-run-separation", SETUP_RUN_PATH, "; ".join(errors))
+    _require_nonempty_string(data, "code_id", errors)
     for field in (
         "code_build_count",
         "syndrome_cycle_build_count",
