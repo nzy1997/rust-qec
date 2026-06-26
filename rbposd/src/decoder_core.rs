@@ -15,9 +15,11 @@ impl BpCore {
         pcm: &ParityCheckMatrix,
         channel: &ChannelModel,
     ) -> Result<Self, DecodeError> {
+        let prior_llrs = compute_prior_llrs(pcm, channel)?;
+        validate_objective_weights(&prior_llrs)?;
         Ok(Self {
             graph: CompiledGraph::from_pcm(pcm),
-            prior_llrs: compute_prior_llrs(pcm, channel)?,
+            prior_llrs,
         })
     }
 
@@ -27,6 +29,10 @@ impl BpCore {
 
     pub(crate) fn hard_decision_from_prior(&self) -> Correction {
         prior_hard_decision(&self.prior_llrs)
+    }
+
+    pub(crate) fn channel_prior_objective_weights(&self) -> &[f64] {
+        &self.prior_llrs
     }
 
     pub(crate) fn run_bp_in_place(
@@ -69,6 +75,14 @@ pub(crate) fn compute_prior_llrs(
                 .map(|&probability| validate_probability(probability).map(probability_to_llr))
                 .collect()
         }
+    }
+}
+
+fn validate_objective_weights(weights: &[f64]) -> Result<(), DecodeError> {
+    if weights.iter().all(|weight| weight.is_finite()) {
+        Ok(())
+    } else {
+        Err(DecodeError::InvalidProbability)
     }
 }
 
