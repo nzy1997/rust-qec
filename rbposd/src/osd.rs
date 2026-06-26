@@ -13,6 +13,15 @@ pub(crate) struct OsdCandidateSearchPlan {
     pub(crate) planned_candidate_count: u128,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LdpcOsdCsCandidatePlan {
+    pub(crate) free_column_count: usize,
+    pub(crate) pair_candidate_frontier_size: usize,
+    pub(crate) osd_order: usize,
+    pub(crate) planned_candidate_count: u128,
+}
+
 #[derive(Debug)]
 pub(crate) struct OsdWorkspace {
     column_order: Vec<usize>,
@@ -258,6 +267,23 @@ fn candidate_search_plan(base: &DetailedSolution, osd_order: usize) -> OsdCandid
     }
 }
 
+#[allow(dead_code)]
+pub(crate) fn ldpc_osd_cs_candidate_plan_for_free_columns(
+    free_column_count: usize,
+    osd_order: usize,
+) -> LdpcOsdCsCandidatePlan {
+    let pair_candidate_frontier_size = free_column_count.min(osd_order);
+    let planned_candidate_count =
+        free_column_count as u128 + binomial(pair_candidate_frontier_size, 2);
+
+    LdpcOsdCsCandidatePlan {
+        free_column_count,
+        pair_candidate_frontier_size,
+        osd_order,
+        planned_candidate_count,
+    }
+}
+
 fn binomial(n: usize, k: usize) -> u128 {
     if k > n {
         return 0;
@@ -384,7 +410,17 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
-    use super::{OsdWorkspace, binomial, decode_osd0_with_workspace};
+    use super::{
+        OsdWorkspace, binomial, decode_osd0_with_workspace,
+        ldpc_osd_cs_candidate_plan_for_free_columns,
+    };
+
+    const LDPC_OSD_CS_CONTRACT_PATH: &str = "rbposd/doc/osd_cs_contract.md";
+    const LDPC_OSD_CS_CONTRACT: &str = include_str!("../doc/osd_cs_contract.md");
+    const REQUIRED_UPSTREAM_SHAPE: &str =
+        "singles over all non-pivot columns + pairs among the first osd_order non-pivot columns";
+    const REQUIRED_SCORING_BOUNDARY: &str =
+        "Candidate ordering/selection is separate from candidate scoring/objective weights";
 
     #[test]
     fn decode_osd0_with_workspace_prefers_the_lower_reliability_pivot_basis() {
@@ -419,5 +455,51 @@ mod tests {
     #[test]
     fn binomial_returns_zero_for_oversized_selection() {
         assert_eq!(binomial(3, 4), 0);
+    }
+
+    #[test]
+    fn ldpc_osd_cs_contract_matches_reference_candidate_plan() {
+        println!("contract document: {LDPC_OSD_CS_CONTRACT_PATH}");
+        assert_contract_text_is_complete();
+
+        let free_column_count = 20;
+        let osd_order = 7;
+        let plan = ldpc_osd_cs_candidate_plan_for_free_columns(free_column_count, osd_order);
+
+        assert_eq!(plan.free_column_count, free_column_count);
+        assert_eq!(plan.pair_candidate_frontier_size, osd_order);
+        assert_eq!(plan.osd_order, osd_order);
+        assert_eq!(
+            plan.planned_candidate_count,
+            free_column_count as u128 + binomial(osd_order, 2)
+        );
+        assert_eq!(plan.planned_candidate_count, 41);
+    }
+
+    #[test]
+    fn ldpc_osd_cs_contract_rejects_exhaustive_frontier_plan() {
+        assert_contract_text_is_complete();
+
+        let plan = ldpc_osd_cs_candidate_plan_for_free_columns(20, 7);
+        let legacy_exhaustive_frontier_count: u128 = (1..=7).map(|order| binomial(16, order)).sum();
+
+        assert_eq!(legacy_exhaustive_frontier_count, 26_332);
+        assert_ne!(
+            plan.planned_candidate_count, legacy_exhaustive_frontier_count,
+            "exhaustive/frontier search remains a separate legacy/internal mode, \
+             not the upstream ldpc osd_cs contract"
+        );
+    }
+
+    fn assert_contract_text_is_complete() {
+        assert!(
+            LDPC_OSD_CS_CONTRACT.contains(REQUIRED_UPSTREAM_SHAPE),
+            "contract document {LDPC_OSD_CS_CONTRACT_PATH} must state `{REQUIRED_UPSTREAM_SHAPE}`"
+        );
+        assert!(
+            LDPC_OSD_CS_CONTRACT.contains(REQUIRED_SCORING_BOUNDARY),
+            "contract document {LDPC_OSD_CS_CONTRACT_PATH} must separate ordering/selection \
+             from scoring/objective weights"
+        );
     }
 }
