@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig,
+    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Syndrome,
 };
 use serde::Serialize;
@@ -764,6 +764,10 @@ pub struct ComparisonTrialExport {
     pub x_syndrome: Vec<bool>,
     pub z_logical: Vec<bool>,
     pub x_logical: Vec<bool>,
+    pub z_logical_prediction: Option<Vec<bool>>,
+    pub x_logical_prediction: Option<Vec<bool>>,
+    pub z_profile: Option<BbCircuitBposdProfile>,
+    pub x_profile: Option<BbCircuitBposdProfile>,
 }
 
 #[derive(Debug, Clone)]
@@ -808,14 +812,34 @@ pub fn run_simulation_for_code(
     code_id: &str,
     config: SimulationConfig,
 ) -> Result<SimulationResult, String> {
-    Ok(run_simulation_case_for_code(code_id, config, false)?.result)
+    Ok(
+        run_simulation_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0, false)?
+            .result,
+    )
+}
+
+pub fn run_simulation_for_code_with_osd_variant(
+    code_id: &str,
+    config: SimulationConfig,
+    osd_variant: OsdVariant,
+) -> Result<SimulationResult, String> {
+    Ok(run_simulation_case_for_code_with_osd_variant(code_id, config, osd_variant, false)?.result)
 }
 
 pub fn export_comparison_case_for_code(
     code_id: &str,
     config: SimulationConfig,
 ) -> Result<BbCircuitBposdComparisonExport, String> {
-    let run = run_simulation_case_for_code(code_id, config.clone(), true)?;
+    export_comparison_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0)
+}
+
+pub fn export_comparison_case_for_code_with_osd_variant(
+    code_id: &str,
+    config: SimulationConfig,
+    osd_variant: OsdVariant,
+) -> Result<BbCircuitBposdComparisonExport, String> {
+    let run =
+        run_simulation_case_for_code_with_osd_variant(code_id, config.clone(), osd_variant, true)?;
 
     Ok(BbCircuitBposdComparisonExport {
         code_id: code_id.to_owned(),
@@ -832,9 +856,19 @@ pub fn export_comparison_case_for_code(
     })
 }
 
+#[cfg(test)]
 fn run_simulation_case_for_code(
     code_id: &str,
     config: SimulationConfig,
+    collect_trials: bool,
+) -> Result<SimulationCaseRun, String> {
+    run_simulation_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0, collect_trials)
+}
+
+fn run_simulation_case_for_code_with_osd_variant(
+    code_id: &str,
+    config: SimulationConfig,
+    osd_variant: OsdVariant,
     collect_trials: bool,
 ) -> Result<SimulationCaseRun, String> {
     validate_simulation_config(&config)?;
@@ -850,6 +884,7 @@ fn run_simulation_case_for_code(
 
     let decoder_config = DecoderConfig {
         max_bp_iterations: config.max_bp_iterations,
+        osd_variant,
         osd_order: config.osd_order,
         ..DecoderConfig::default()
     };
@@ -889,20 +924,30 @@ fn run_simulation_case_for_code(
             &mut rng,
         );
         profile.sample_seconds += sample_started.elapsed().as_secs_f64();
-        if let Some(trials) = trials.as_mut() {
-            trials.push(comparison_trial_export(&sample));
-        }
+        let mut trial_export = collect_trials.then(|| comparison_trial_export(&sample));
 
         let decode_started = Instant::now();
         let z_result = decode_logicals(&z_decoder, &sample.z_syndrome)
             .map_err(|error| format!("failed to decode Z faults: {error}"))?;
-        profile.decode_seconds += decode_started.elapsed().as_secs_f64();
+        let z_decode_seconds = decode_started.elapsed().as_secs_f64();
+        profile.decode_seconds += z_decode_seconds;
         profile.add_z_stats(&z_result.stats);
         let predicted_z = correction_to_logicals(&z_result.correction, &models.z_faults, code.k());
+        if let Some(trial) = trial_export.as_mut() {
+            trial.z_logical_prediction = Some(predicted_z.clone());
+            trial.z_profile = Some(profile_from_decode_stats(
+                ProfileReplayBasis::Z,
+                z_decode_seconds,
+                &z_result.stats,
+            ));
+        }
         if predicted_z != sample.z_logical {
             // A Z logical failure already determines the trial outcome. The X
             // decoder is intentionally skipped and contributes zero to
             // x_decode_call_count for this trial.
+            if let (Some(trials), Some(trial)) = (trials.as_mut(), trial_export.take()) {
+                trials.push(trial);
+            }
             num_failed_trials += 1;
             continue;
         }
@@ -910,11 +955,23 @@ fn run_simulation_case_for_code(
         let decode_started = Instant::now();
         let x_result = decode_logicals(&x_decoder, &sample.x_syndrome)
             .map_err(|error| format!("failed to decode X faults: {error}"))?;
-        profile.decode_seconds += decode_started.elapsed().as_secs_f64();
+        let x_decode_seconds = decode_started.elapsed().as_secs_f64();
+        profile.decode_seconds += x_decode_seconds;
         profile.add_x_stats(&x_result.stats);
         let predicted_x = correction_to_logicals(&x_result.correction, &models.x_faults, code.k());
+        if let Some(trial) = trial_export.as_mut() {
+            trial.x_logical_prediction = Some(predicted_x.clone());
+            trial.x_profile = Some(profile_from_decode_stats(
+                ProfileReplayBasis::X,
+                x_decode_seconds,
+                &x_result.stats,
+            ));
+        }
         if predicted_x != sample.x_logical {
             num_failed_trials += 1;
+        }
+        if let (Some(trials), Some(trial)) = (trials.as_mut(), trial_export.take()) {
+            trials.push(trial);
         }
     }
 
@@ -950,7 +1007,24 @@ fn comparison_trial_export(sample: &SampledTrial) -> ComparisonTrialExport {
         x_syndrome: sample.x_syndrome.clone(),
         z_logical: sample.z_logical.clone(),
         x_logical: sample.x_logical.clone(),
+        z_logical_prediction: None,
+        x_logical_prediction: None,
+        z_profile: None,
+        x_profile: None,
     }
+}
+
+fn profile_from_decode_stats(
+    basis: ProfileReplayBasis,
+    decode_seconds: f64,
+    stats: &DecodeStats,
+) -> BbCircuitBposdProfile {
+    let mut profile = BbCircuitBposdProfile {
+        decode_seconds,
+        ..BbCircuitBposdProfile::default()
+    };
+    profile.add_basis_stats(basis, stats);
+    profile
 }
 
 pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> BenchmarkResultRow {
