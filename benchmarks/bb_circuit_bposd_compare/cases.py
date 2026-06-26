@@ -61,6 +61,16 @@ SMALL_LDPC_MAX_ITER = 10000
 SMALL_LDPC_OSD_METHOD = "osd_cs"
 SMALL_LDPC_OSD_ORDER = 7
 SMALL_LDPC_SCALING = 0
+DIAGNOSTIC_TRIALS = 1
+DIAGNOSTIC_SEED = 12345
+DIAGNOSTIC_BP_METHOD = "ms"
+DIAGNOSTIC_MAX_ITER = 10000
+DIAGNOSTIC_OSD_METHOD = "osd_cs"
+DIAGNOSTIC_OSD_ORDER = 7
+DIAGNOSTIC_TARGETS = {
+    "bb90": (10, 0.006),
+    "bb144": (12, 0.006),
+}
 SUPPORTED_RUST_CONSTRUCTORS = {"bb72", "bb90", "bb144"}
 UNSUPPORTED_RUST_CONSTRUCTOR_STATUS = "unsupported_rust_constructor"
 UNSUPPORTED_RUST_CONSTRUCTOR_NOTE = (
@@ -146,6 +156,33 @@ def _small_ldpc_case(code_id: str, p: float, cycles: int) -> CompareCase:
     )
 
 
+def _diagnostic_case(code_id: str, cycles: int, p: float) -> CompareCase:
+    case = CompareCase(
+        case_id="",
+        code_id=code_id,
+        p=p,
+        num_cycles=cycles,
+        num_trials=DIAGNOSTIC_TRIALS,
+        seed=DIAGNOSTIC_SEED,
+        bp_method=DIAGNOSTIC_BP_METHOD,
+        max_iter=DIAGNOSTIC_MAX_ITER,
+        osd_method=DIAGNOSTIC_OSD_METHOD,
+        osd_order=DIAGNOSTIC_OSD_ORDER,
+    )
+    return CompareCase(
+        case_id=format_case_id(case),
+        code_id=code_id,
+        p=p,
+        num_cycles=cycles,
+        num_trials=DIAGNOSTIC_TRIALS,
+        seed=DIAGNOSTIC_SEED,
+        bp_method=DIAGNOSTIC_BP_METHOD,
+        max_iter=DIAGNOSTIC_MAX_ITER,
+        osd_method=DIAGNOSTIC_OSD_METHOD,
+        osd_order=DIAGNOSTIC_OSD_ORDER,
+    )
+
+
 SMALL_LDPC_TARGETS = {
     "bb72": (6, (0.0002, 0.0005, 0.001, 0.002, 0.003, 0.004, 0.005)),
     "bb90": (10, (0.0005, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006)),
@@ -158,6 +195,11 @@ SMALL_LDPC_CASES = tuple(
     _small_ldpc_case(code_id, p, cycles)
     for code_id, (cycles, p_values) in SMALL_LDPC_TARGETS.items()
     for p in p_values
+)
+
+DIAGNOSTIC_CASES = tuple(
+    _diagnostic_case(code_id, cycles, p)
+    for code_id, (cycles, p) in DIAGNOSTIC_TARGETS.items()
 )
 
 SMOKE_CASES = (
@@ -308,6 +350,78 @@ def validate_small_ldpc_catalog(
             errors.append(
                 "unsupported target note is missing constructor explanation for "
                 f"{_target_label(_target_key(case))}: {case.catalog_note}"
+            )
+
+    return errors
+
+
+def validate_diagnostic_cases(
+    cases: Sequence[CompareCase] = DIAGNOSTIC_CASES,
+) -> list[str]:
+    errors: list[str] = []
+    expected_keys = {
+        (code_id, _exact_decimal(p), cycles)
+        for code_id, (cycles, p) in DIAGNOSTIC_TARGETS.items()
+    }
+    actual_keys = {_target_key(case) for case in cases}
+
+    if len(cases) != 2:
+        errors.append(
+            f"diagnostic catalog must contain exactly 2 cases, got {len(cases)}"
+        )
+    for key in sorted(expected_keys - actual_keys):
+        errors.append(f"missing diagnostic target: {_target_label(key)}")
+    for key in sorted(actual_keys - expected_keys):
+        errors.append(f"unexpected diagnostic target: {_target_label(key)}")
+
+    seen_case_ids: set[str] = set()
+    for case in cases:
+        if case.case_id in seen_case_ids:
+            errors.append(f"duplicate diagnostic case_id: {case.case_id}")
+        seen_case_ids.add(case.case_id)
+
+        expected_case_id = format_case_id(case)
+        if case.case_id != expected_case_id:
+            errors.append(
+                "diagnostic case_id mismatch for "
+                f"{_target_label(_target_key(case))}: expected {expected_case_id}, "
+                f"got {case.case_id}"
+            )
+        if case.num_trials != DIAGNOSTIC_TRIALS:
+            errors.append(
+                "diagnostic trial budget mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_TRIALS}, "
+                f"got {case.num_trials}"
+            )
+        if case.seed != DIAGNOSTIC_SEED:
+            errors.append(
+                "diagnostic seed mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_SEED}, "
+                f"got {case.seed}"
+            )
+        if case.bp_method != DIAGNOSTIC_BP_METHOD:
+            errors.append(
+                "diagnostic BP method mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_BP_METHOD}, "
+                f"got {case.bp_method}"
+            )
+        if case.max_iter != DIAGNOSTIC_MAX_ITER:
+            errors.append(
+                "diagnostic max_iter mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_MAX_ITER}, "
+                f"got {case.max_iter}"
+            )
+        if case.osd_method != DIAGNOSTIC_OSD_METHOD:
+            errors.append(
+                "diagnostic OSD method mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_OSD_METHOD}, "
+                f"got {case.osd_method}"
+            )
+        if case.osd_order != DIAGNOSTIC_OSD_ORDER:
+            errors.append(
+                "diagnostic OSD order mismatch for "
+                f"{_target_label(_target_key(case))}: expected {DIAGNOSTIC_OSD_ORDER}, "
+                f"got {case.osd_order}"
             )
 
     return errors

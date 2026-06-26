@@ -2,8 +2,11 @@ from dataclasses import replace
 
 from benchmarks.bb_circuit_bposd_compare import run_compare
 from benchmarks.bb_circuit_bposd_compare.cases import (
+    DIAGNOSTIC_CASES,
+    DIAGNOSTIC_TRIALS,
     SMALL_LDPC_CASES,
     format_case_id,
+    validate_diagnostic_cases,
     validate_small_ldpc_catalog,
 )
 
@@ -19,6 +22,58 @@ EXPECTED_SWEEPS = {
 
 def _cases_for(code_id: str):
     return [case for case in SMALL_LDPC_CASES if case.code_id == code_id]
+
+
+def _diagnostic_case(code_id: str):
+    return next(case for case in DIAGNOSTIC_CASES if case.code_id == code_id)
+
+
+def test_diagnostic_catalog_has_exact_high_p_points() -> None:
+    assert DIAGNOSTIC_TRIALS == 1
+    assert validate_diagnostic_cases(DIAGNOSTIC_CASES) == []
+    assert len(DIAGNOSTIC_CASES) == 2
+
+    bb90 = _diagnostic_case("bb90")
+    assert bb90.p == 0.006
+    assert bb90.num_cycles == 10
+    assert bb90.num_trials == 1
+    assert bb90.seed == 12345
+
+    bb144 = _diagnostic_case("bb144")
+    assert bb144.p == 0.006
+    assert bb144.num_cycles == 12
+    assert bb144.num_trials == 1
+    assert bb144.seed == 12345
+
+
+def test_diagnostic_catalog_case_ids_and_decoder_settings_are_pinned() -> None:
+    assert tuple(case.case_id for case in DIAGNOSTIC_CASES) == (
+        "bb90-p0060-c10-t1-seed12345",
+        "bb144-p0060-c12-t1-seed12345",
+    )
+    for case in DIAGNOSTIC_CASES:
+        assert case.case_id == format_case_id(case)
+        assert case.bp_method == "ms"
+        assert case.max_iter == 10000
+        assert case.osd_method == "osd_cs"
+        assert case.osd_order == 7
+
+
+def test_diagnostic_catalog_negative_control_rejects_missing_bb144() -> None:
+    copied = tuple(case for case in DIAGNOSTIC_CASES if case.code_id != "bb144")
+    errors = "\n".join(validate_diagnostic_cases(copied))
+    assert "diagnostic catalog must contain exactly 2 cases" in errors
+    assert "missing diagnostic target: bb144 p=0.006 cycles=12" in errors
+
+
+def test_diagnostic_catalog_negative_control_rejects_wrong_bb144_config() -> None:
+    copied = list(DIAGNOSTIC_CASES)
+    index = next(i for i, case in enumerate(copied) if case.code_id == "bb144")
+    copied[index] = replace(copied[index], p=0.005, num_cycles=10)
+
+    errors = "\n".join(validate_diagnostic_cases(tuple(copied)))
+    assert "missing diagnostic target: bb144 p=0.006 cycles=12" in errors
+    assert "unexpected diagnostic target: bb144 p=0.005 cycles=10" in errors
 
 
 def test_small_ldpc_catalog_has_complete_issue_209_targets() -> None:
