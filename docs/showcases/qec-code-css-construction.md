@@ -33,8 +33,22 @@ cargo run -q -p qec-code -- code css-distance exact --code-id steane --json
 
 ## Expected Result
 
-The list command prints `Built-in CSS codes:` and includes the stable entries
-`steane`, `bb72`, `apm_kasai:p=96`, and `apm_kasai:p=192`.
+The list command prints the current built-in CSS catalog. This is the set of
+code IDs and parameterized family shapes that `qec-code` can generate through
+`code css export` today:
+
+```text
+Built-in CSS codes:
+  steane                                                          fixed [[7,1,3]] CSS code
+  bb72                                                            fixed [[72,12,6]] bivariate-bicycle CSS code
+  apm_kasai:p=96                                                  fixed Table A1 P=96 APM-CSS code
+  apm_kasai:p=192                                                 fixed Table A1 P=192 APM-CSS code
+  bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...  bivariate-bicycle CSS family over periodic lattice
+  repetition_x:d=<distance>                                       X-check chain, distance >= 2
+  repetition_z:d=<distance>                                       Z-check chain, distance >= 2
+  surface_rotated:d=<distance>                                    rotated surface CSS code, distance >= 2
+  toric:d=<distance>                                              periodic square-lattice toric CSS code, distance >= 2
+```
 
 Each export command prints a JSON object with `"format":"sparse_rows"`.
 The Steane exports use `num_cols` 7, the `bb72` exports use `num_cols` 72, and
