@@ -125,6 +125,29 @@ skipped, or failing required artifacts produce `FAIL` and a nonzero exit. The
 gate does not use wall-clock age thresholds and does not run the full campaign.
 `PASS` and `WARN` both exit 0; only `FAIL` exits nonzero.
 
+## Reviewer Readiness Report
+
+After collecting a `/tmp/rstim-bb-ready` artifact tree accepted by the
+readiness gate, generate the reviewer-readable Markdown report with:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.write_readiness_report \
+  --results-dir /tmp/rstim-bb-ready \
+  --out /tmp/bb-bposd-readiness.md
+python3 -m benchmarks.bb_circuit_bposd_compare.validate_readiness_report \
+  --results-dir /tmp/rstim-bb-ready \
+  --report /tmp/bb-bposd-readiness.md
+```
+
+The report includes semantic parity replay status, BB90 hard-profile counters,
+setup/run split evidence, high-p diagnostic Rust/Python compare rows, complete
+small-LDPC catalog coverage, and the final verdict from `ready_for_full`.
+
+The validator rebuilds the same readiness model from source artifacts and
+compares it to the report snapshot and visible section content. It rejects
+stale reports, missing source sections, placeholder headings, and reports whose
+visible final verdict does not match the #286 readiness gate.
+
 ## BB90 Hard-Syndrome Replay
 
 After building `rsinter`, replay the checked-in BB90 hard-syndrome fixture with:
