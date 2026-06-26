@@ -257,11 +257,10 @@ fn best_legacy_osd_candidate(
     for order in 1..=max_order {
         visit_combinations(&frontier, order, 0, &mut forced, &mut |columns| {
             stats.osd_candidate_count += 1;
-            let candidate = assemble_candidate_solution(&best, &influences, columns);
-            if let Ok(candidate) = candidate {
-                if is_better_solution(&candidate, &best, objective_weights) {
-                    best = candidate;
-                }
+            let candidate = assemble_candidate_solution(&best, &influences, columns)
+                .expect("legacy OSD candidates are selected from the precomputed free frontier");
+            if is_better_solution(&candidate, &best, objective_weights) {
+                best = candidate;
             }
         });
     }
@@ -591,12 +590,14 @@ fn xor_correction_bits(lhs: &[bool], rhs: &Correction) -> Correction {
 #[cfg(test)]
 mod tests {
     use crate::error::DecodeError;
+    use crate::gf2::{Gf2SolveStats, PreparedLinearSystem};
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        OsdWorkspace, binomial, decode_osd0_with_workspace,
-        ldpc_osd_cs_candidate_plan_for_free_columns, validate_objective_weights,
+        OsdVariant, OsdWorkspace, assemble_candidate_solution, binomial,
+        decode_osd0_with_workspace, ldpc_osd_cs_candidate_plan_for_free_columns,
+        profile_osd_with_workspace, validate_objective_weights,
     };
 
     const LDPC_OSD_CS_CONTRACT_PATH: &str = "rbposd/doc/osd_cs_contract.md";
@@ -660,6 +661,53 @@ mod tests {
     #[test]
     fn binomial_returns_zero_for_oversized_selection() {
         assert_eq!(binomial(3, 4), 0);
+    }
+
+    #[test]
+    fn assemble_candidate_solution_rejects_columns_outside_precomputed_influences() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 5, vec![vec![0, 2, 3], vec![1, 3, 4]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = Gf2SolveStats::default();
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2, 3, 4], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+        let influences = reduced
+            .free_column_influence_vectors(&base, &[base.free_columns[0]])
+            .unwrap();
+
+        let error =
+            assemble_candidate_solution(&base, &influences, &[base.free_columns[1]]).unwrap_err();
+
+        assert_eq!(error, DecodeError::SingularSystem);
+    }
+
+    #[test]
+    fn profile_legacy_osd_candidates_uses_influence_vectors() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 2], vec![1, 2]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, true]);
+        let base = Correction::from(vec![false, false, false]);
+        let reliability = vec![0.1, 0.2, 0.3];
+        let mut workspace = OsdWorkspace::new(&pcm);
+
+        let stats = profile_osd_with_workspace(
+            &pcm,
+            &syndrome,
+            base.as_slice(),
+            &reliability,
+            &mut workspace,
+            OsdVariant::LegacyCombinationSweep,
+            1,
+            1,
+        )
+        .unwrap();
+
+        assert_eq!(stats.osd_candidate_count, 1);
+        assert_eq!(stats.gf2_solve_count, 1);
     }
 
     #[test]

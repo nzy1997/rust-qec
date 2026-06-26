@@ -326,11 +326,11 @@ impl FreeColumnInfluenceVectors {
         }
 
         for &column in &self.ordered_free_columns {
-            if let Some(influence_index) = self.influence_by_column[column] {
-                if forced[column] {
-                    for &toggle_column in &self.influence_toggles[influence_index] {
-                        correction[toggle_column] ^= true;
-                    }
+            let influence_index = self.influence_by_column[column]
+                .expect("ordered free columns have precomputed influence indices");
+            if forced[column] {
+                for &toggle_column in &self.influence_toggles[influence_index] {
+                    correction[toggle_column] ^= true;
                 }
             }
         }
@@ -346,8 +346,8 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        PreparedLinearSystem, solve_with_column_order, sort_columns_by_reliability,
-        sort_columns_by_unreliability,
+        DetailedSolution, PreparedLinearSystem, solve_with_column_order,
+        sort_columns_by_reliability, sort_columns_by_unreliability,
     };
 
     fn visit_test_combinations(
@@ -597,6 +597,73 @@ mod tests {
         );
         assert_eq!(
             influences.correction_for_forced_columns(&[4]).unwrap_err(),
+            DecodeError::SingularSystem
+        );
+    }
+
+    #[test]
+    fn osd_influence_vector_construction_rejects_invalid_inputs() {
+        let pcm =
+            ParityCheckMatrix::from_sparse_rows(2, 5, vec![vec![0, 2, 3], vec![1, 3, 4]]).unwrap();
+        let syndrome = Syndrome::from(vec![true, false]);
+        let mut prepared = PreparedLinearSystem::from_pcm(&pcm);
+        let mut stats = super::Gf2SolveStats::default();
+        let reduced = prepared
+            .reduce_with_column_order_counting(&syndrome, &[0, 1, 2, 3, 4], &mut stats)
+            .unwrap();
+        let base = reduced
+            .solve_with_forced_columns_counting(&[], &mut stats)
+            .unwrap();
+
+        let short_base = DetailedSolution {
+            correction: Correction::from(vec![false; 4]),
+            pivot_columns: base.pivot_columns.clone(),
+            free_columns: base.free_columns.clone(),
+        };
+        assert_eq!(
+            reduced
+                .free_column_influence_vectors(&short_base, &base.free_columns)
+                .unwrap_err(),
+            DecodeError::DimensionMismatch {
+                what: "OSD base correction",
+                expected: 5,
+                actual: 4,
+            }
+        );
+
+        let mut non_osd0_base_bits = base.correction.as_slice().to_vec();
+        non_osd0_base_bits[base.free_columns[0]] = true;
+        let non_osd0_base = DetailedSolution {
+            correction: Correction::from(non_osd0_base_bits),
+            pivot_columns: base.pivot_columns.clone(),
+            free_columns: base.free_columns.clone(),
+        };
+        assert_eq!(
+            reduced
+                .free_column_influence_vectors(&non_osd0_base, &base.free_columns)
+                .unwrap_err(),
+            DecodeError::SingularSystem
+        );
+
+        assert_eq!(
+            reduced
+                .free_column_influence_vectors(&base, &[5])
+                .unwrap_err(),
+            DecodeError::InvalidColumnIndex {
+                column: 5,
+                num_bits: 5,
+            }
+        );
+        assert_eq!(
+            reduced
+                .free_column_influence_vectors(&base, &[base.pivot_columns[0]])
+                .unwrap_err(),
+            DecodeError::SingularSystem
+        );
+        assert_eq!(
+            reduced
+                .free_column_influence_vectors(&base, &[base.free_columns[0], base.free_columns[0]])
+                .unwrap_err(),
             DecodeError::SingularSystem
         );
     }
