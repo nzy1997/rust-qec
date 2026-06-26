@@ -67,3 +67,29 @@ label still accepted by the validator.
 | `bb108` | 10 | 7 | unsupported Rust constructor |
 | `bb144` | 12 | 6 | supported |
 | `bb288` | 18 | 4 | unsupported Rust constructor |
+
+## BB90 Hard-Syndrome Replay
+
+After building `rsinter`, replay the checked-in BB90 hard-syndrome fixture with:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.run_compare \
+  --tier hard-replay \
+  --output-dir /tmp/rstim-bb90-hard-replay \
+  --rust-binary target/release/rsinter
+
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_replay \
+  /tmp/rstim-bb90-hard-replay/results.csv
+```
+
+The replay writes one Rust `rbposd` row and one Python `ldpc_bposd` row for
+`bb90-p006-c10-seed12345-order7-hard-syndrome`. Both rows use
+`bp_method=ms`, `max_iter=10000`, `osd_method=osd_cs`, and `osd_order=7`.
+The verifier checks that the rows are paired on the fixture basis/syndrome and
+that Rust and Python logical predictions match. Rust rows also carry the OSD
+and GF(2) counters from the replay decode.
+
+Missing Python decoder dependencies remain explicit: `run_compare` records a
+skipped Python row and exits nonzero unless `--allow-missing-python` is passed.
+`verify_replay` also rejects skipped Python rows unless its own
+`--allow-missing-python` diagnostic flag is used.
