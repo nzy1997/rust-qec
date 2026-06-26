@@ -230,6 +230,57 @@ def test_validate_readiness_report_requires_visible_final_verdict_line(
     assert "final readiness verdict line in report preamble" in captured.err
 
 
+def test_validate_readiness_report_rejects_visible_prose_before_title(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+    report_path.write_text(
+        "Reviewer note: manual approval pending.\n\n" + report_path.read_text()
+    )
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "document-structure" in captured.err
+
+
+def test_validate_readiness_report_rejects_visible_section_after_snapshot(
+    tmp_path, capsys
+) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+    assert (
+        write_readiness_report.main(
+            ["--results-dir", str(results_dir), "--out", str(report_path)]
+        )
+        == 0
+    )
+    report_path.write_text(
+        report_path.read_text()
+        + "\n## Reviewer Notes\n\nManual summary: everything looks good here.\n"
+    )
+
+    status = validate_readiness_report.main(
+        ["--results-dir", str(results_dir), "--report", str(report_path)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "report-body" in captured.err
+
+
 def test_validate_readiness_report_rejects_placeholder_report(
     tmp_path, capsys
 ) -> None:

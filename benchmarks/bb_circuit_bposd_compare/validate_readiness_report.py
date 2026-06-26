@@ -30,6 +30,8 @@ VISIBLE_SECTIONS = (
 FINAL_VERDICT_PATTERN = re.compile(
     r"^\*\*Final readiness verdict:\*\*\s+(PASS|WARN|FAIL)\s*$"
 )
+SOURCE_RESULTS_DIR_PATTERN = re.compile(r"^\*\*Source results directory:\*\*\s+.*$")
+GENERATED_AT_PATTERN = re.compile(r"^\*\*Generated at:\*\*\s+.*$")
 
 
 def validate_report(results_dir: Path, report_path: Path) -> list[str]:
@@ -58,7 +60,7 @@ def validate_report(results_dir: Path, report_path: Path) -> list[str]:
     if snapshot is not None and snapshot != expected:
         _append_snapshot_errors(snapshot, expected, errors)
 
-    _check_visible_sections(report, expected_report, errors)
+    _check_visible_report_body(report, expected_report, errors)
     return errors
 
 
@@ -137,13 +139,41 @@ def _append_snapshot_errors(
             if snapshot_sections.get(name) != value:
                 flag(str(name))
 
-    if not flagged and snapshot != expected:
-        errors.append("stale or missing snapshot metadata")
+    handled_keys = {"verdict", "gate_checks", "artifact_hashes", "sections"}
+    for key in sorted(set(snapshot) | set(expected)):
+        if key in handled_keys:
+            continue
+        if snapshot.get(key) != expected.get(key):
+            errors.append(f"stale or missing snapshot metadata: {key}")
+
+    if not flagged and snapshot != expected and not any(
+        "snapshot metadata" in error for error in errors
+    ):
+        errors.append(
+            "stale or missing snapshot metadata: snapshot payload differs from source artifacts"
+        )
 
 
-def _check_visible_sections(report: str, expected_report: str, errors: list[str]) -> None:
+def _check_visible_report_body(report: str, expected_report: str, errors: list[str]) -> None:
+    if _normalize_visible_body(report) == _normalize_visible_body(expected_report):
+        return
+
+    structure_errors = _document_structure_errors(report)
+    errors.extend(structure_errors)
+    if structure_errors:
+        return
+
+    body_errors_start = len(errors)
     actual_sections = _extract_visible_sections(report, errors)
     expected_sections = _extract_visible_sections(expected_report, [])
+    if errors[body_errors_start:]:
+        return
+
+    if _extract_visible_preamble(report) != _extract_visible_preamble(expected_report):
+        errors.append(
+            "stale or fabricated report-body: report preamble does not match source artifacts"
+        )
+
     for section_name, heading in VISIBLE_SECTIONS:
         actual = actual_sections.get(section_name)
         expected = expected_sections.get(section_name)
@@ -154,6 +184,36 @@ def _check_visible_sections(report: str, expected_report: str, errors: list[str]
             continue
         if _normalize_visible_section(actual) != _normalize_visible_section(expected):
             errors.append(f"stale or fabricated visible section: {section_name}")
+
+    if errors[body_errors_start:]:
+        return
+
+    errors.append(
+        "stale or fabricated report-body: visible report body does not match source artifacts"
+    )
+
+
+def _document_structure_errors(report: str) -> list[str]:
+    errors: list[str] = []
+    lines = report.splitlines()
+
+    title_indexes = [index for index, line in enumerate(lines) if line == REQUIRED_HEADINGS[0]]
+    if title_indexes:
+        title_index = title_indexes[0]
+        if any(line.strip() for line in lines[:title_index]):
+            errors.append(
+                "document-structure mismatch: unexpected visible content before report title"
+            )
+
+    snapshot_index = _snapshot_start_index(lines)
+    if snapshot_index < len(lines) and any(
+        line.strip() for line in lines[snapshot_index + 1 :]
+    ):
+        errors.append(
+            "report-body mismatch: unexpected visible content after snapshot metadata"
+        )
+
+    return errors
 
 
 def _extract_visible_sections(report: str, errors: list[str]) -> dict[str, str]:
@@ -215,11 +275,38 @@ def _snapshot_start_index(lines: list[str]) -> int:
     return len(lines)
 
 
-def _normalize_visible_section(section: str) -> str:
-    normalized_lines = [line.rstrip() for line in section.splitlines()]
+def _extract_visible_preamble(report: str) -> str:
+    lines = report.splitlines()
+    first_section_index = _first_visible_section_index(lines)
+    if first_section_index is None:
+        return _normalize_visible_lines(lines)
+    return _normalize_visible_lines(lines[:first_section_index])
+
+
+def _normalize_visible_body(report: str) -> str:
+    return _normalize_visible_lines(report.splitlines())
+
+
+def _normalize_visible_lines(lines: list[str]) -> str:
+    normalized_lines: list[str] = []
+    snapshot_prefix = f"<!-- {write_readiness_report.SNAPSHOT_PREFIX}"
+    for line in lines:
+        if line.startswith(snapshot_prefix):
+            continue
+        if SOURCE_RESULTS_DIR_PATTERN.fullmatch(line):
+            normalized_lines.append("**Source results directory:** <volatile>")
+            continue
+        if GENERATED_AT_PATTERN.fullmatch(line):
+            normalized_lines.append("**Generated at:** <volatile>")
+            continue
+        normalized_lines.append(line.rstrip())
     while normalized_lines and normalized_lines[-1] == "":
         normalized_lines.pop()
     return "\n".join(normalized_lines)
+
+
+def _normalize_visible_section(section: str) -> str:
+    return _normalize_visible_lines(section.splitlines())
 
 
 def main(argv: list[str] | None = None) -> int:
