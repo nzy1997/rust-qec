@@ -18,6 +18,15 @@ REQUIRED_HEADINGS = (
     "## Small-LDPC Case Coverage",
 )
 
+VISIBLE_SECTIONS = (
+    ("gate-summary", "## Gate Summary"),
+    ("semantic-replay", "## Semantic Parity Replay"),
+    ("hard-profile", "## BB90 Hard-Profile Counters"),
+    ("setup-run-separation", "## Setup/Run Split Evidence"),
+    ("diagnostic-compare", "## Diagnostic Rust/Python Compare Rows"),
+    ("catalog-coverage", "## Small-LDPC Case Coverage"),
+)
+
 
 def validate_report(results_dir: Path, report_path: Path) -> list[str]:
     errors: list[str] = []
@@ -30,12 +39,13 @@ def validate_report(results_dir: Path, report_path: Path) -> list[str]:
         if heading not in report:
             errors.append(f"missing report section: {heading}")
 
-    expected = write_readiness_report.snapshot_model(
-        write_readiness_report.build_report_model(results_dir)
-    )
+    expected_model = write_readiness_report.build_report_model(results_dir)
+    expected = write_readiness_report.snapshot_model(expected_model)
+    expected_report = write_readiness_report.render_markdown(expected_model)
+
     visible_verdict = _visible_verdict(report)
     if visible_verdict is None:
-        errors.append("missing final readiness verdict")
+        errors.append("missing final readiness verdict line in report preamble")
     elif visible_verdict != expected["verdict"]:
         errors.append(
             "final readiness verdict mismatch: "
@@ -46,7 +56,7 @@ def validate_report(results_dir: Path, report_path: Path) -> list[str]:
     if snapshot is not None and snapshot != expected:
         _append_snapshot_errors(snapshot, expected, errors)
 
-    _check_visible_tokens(report, expected, errors)
+    _check_visible_sections(report, expected_report, errors)
     return errors
 
 
@@ -115,88 +125,45 @@ def _append_snapshot_errors(
         errors.append("stale or missing snapshot metadata")
 
 
-def _check_visible_tokens(
-    report: str, expected: dict[str, object], errors: list[str]
-) -> None:
-    gate_checks = expected.get("gate_checks")
-    if isinstance(gate_checks, list) and gate_checks:
-        first_check = gate_checks[0]
-        if isinstance(first_check, dict):
-            _require_visible_tokens(
-                report,
-                "gate-summary",
-                [first_check.get("name"), first_check.get("artifact")],
-                errors,
-            )
-
-    sections = expected.get("sections")
-    if not isinstance(sections, dict):
-        return
-
-    semantic_rows = sections.get("semantic-replay")
-    if isinstance(semantic_rows, list) and semantic_rows:
-        first_row = semantic_rows[0]
-        if isinstance(first_row, dict):
-            _require_visible_tokens(
-                report,
-                "semantic-replay",
-                [first_row.get("case_id"), first_row.get("logical_prediction")],
-                errors,
-            )
-
-    hard_profile = sections.get("hard-profile")
-    if isinstance(hard_profile, dict) and hard_profile:
-        _require_visible_tokens(
-            report,
-            "hard-profile",
-            [
-                "planned_candidate_count",
-                hard_profile.get("planned_candidate_count"),
-                hard_profile.get("case_id"),
-            ],
-            errors,
-        )
-
-    setup_run = sections.get("setup-run-separation")
-    if isinstance(setup_run, dict) and setup_run:
-        _require_visible_tokens(
-            report,
-            "setup-run-separation",
-            ["decoder_build_count", setup_run.get("code_id"), setup_run.get("sample_count")],
-            errors,
-        )
-
-    diagnostic_rows = sections.get("diagnostic-compare")
-    if isinstance(diagnostic_rows, list) and diagnostic_rows:
-        first_row = diagnostic_rows[0]
-        if isinstance(first_row, dict):
-            _require_visible_tokens(
-                report,
-                "diagnostic-compare",
-                [first_row.get("case_id"), first_row.get("decoder_impl")],
-                errors,
-            )
-
-    catalog_rows = sections.get("catalog-coverage")
-    if isinstance(catalog_rows, list) and catalog_rows:
-        first_row = catalog_rows[0]
-        if isinstance(first_row, dict):
-            _require_visible_tokens(
-                report,
-                "catalog-coverage",
-                [first_row.get("code_id"), first_row.get("catalog_status")],
-                errors,
-            )
+def _check_visible_sections(report: str, expected_report: str, errors: list[str]) -> None:
+    for section_name, heading in VISIBLE_SECTIONS:
+        actual = _extract_visible_section(report, heading)
+        expected = _extract_visible_section(expected_report, heading)
+        if expected is None:
+            errors.append(f"validator error: expected rendered section missing: {section_name}")
+            continue
+        if actual is None:
+            errors.append(f"missing visible section: {section_name}")
+            continue
+        if _normalize_visible_section(actual) != _normalize_visible_section(expected):
+            errors.append(f"stale or fabricated visible section: {section_name}")
 
 
-def _require_visible_tokens(
-    report: str, section: str, tokens: list[object], errors: list[str]
-) -> None:
-    visible_tokens = [str(token) for token in tokens if token not in (None, "")]
-    if not visible_tokens:
-        return
-    if any(token not in report for token in visible_tokens):
-        errors.append(f"placeholder section: {section}")
+def _extract_visible_section(report: str, heading: str) -> str | None:
+    lines = report.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if line == heading:
+            start = index
+            break
+    if start is None:
+        return None
+
+    end = len(lines)
+    snapshot_prefix = f"<!-- {write_readiness_report.SNAPSHOT_PREFIX}"
+    for index in range(start + 1, len(lines)):
+        line = lines[index]
+        if line.startswith("## ") or line.startswith(snapshot_prefix):
+            end = index
+            break
+    return "\n".join(lines[start:end])
+
+
+def _normalize_visible_section(section: str) -> str:
+    normalized_lines = [line.rstrip() for line in section.splitlines()]
+    while normalized_lines and normalized_lines[-1] == "":
+        normalized_lines.pop()
+    return "\n".join(normalized_lines)
 
 
 def main(argv: list[str] | None = None) -> int:
