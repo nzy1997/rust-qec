@@ -588,6 +588,58 @@ impl Default for SimulationConfig {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct BbPPointConfig {
+    pub code_id: String,
+    pub physical_error_rate: f64,
+    pub num_cycles: usize,
+    pub num_trials: usize,
+    pub seed: Option<u64>,
+    pub max_bp_iterations: usize,
+    pub osd_order: usize,
+    pub osd_variant: OsdVariant,
+}
+
+impl BbPPointConfig {
+    pub fn from_simulation_config(code_id: impl Into<String>, config: SimulationConfig) -> Self {
+        Self::from_simulation_config_with_osd_variant(code_id, config, OsdVariant::Osd0)
+    }
+
+    pub fn from_simulation_config_with_osd_variant(
+        code_id: impl Into<String>,
+        config: SimulationConfig,
+        osd_variant: OsdVariant,
+    ) -> Self {
+        Self {
+            code_id: code_id.into(),
+            physical_error_rate: config.physical_error_rate,
+            num_cycles: config.num_cycles,
+            num_trials: config.num_trials,
+            seed: config.seed,
+            max_bp_iterations: config.max_bp_iterations,
+            osd_order: config.osd_order,
+            osd_variant,
+        }
+    }
+
+    fn simulation_config(&self) -> SimulationConfig {
+        SimulationConfig {
+            physical_error_rate: self.physical_error_rate,
+            num_cycles: self.num_cycles,
+            num_trials: self.num_trials,
+            seed: self.seed,
+            max_bp_iterations: self.max_bp_iterations,
+            osd_order: self.osd_order,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BbPPointResult {
+    pub code_id: String,
+    pub result: SimulationResult,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimulationResult {
     pub physical_error_rate: f64,
@@ -602,6 +654,11 @@ pub struct BbCircuitBposdProfile {
     pub setup_seconds: f64,
     pub sample_seconds: f64,
     pub decode_seconds: f64,
+    pub code_build_count: usize,
+    pub syndrome_cycle_build_count: usize,
+    pub effective_model_build_count: usize,
+    pub decoder_build_count: usize,
+    pub sample_count: usize,
     pub bp_seconds: f64,
     pub osd_seconds: f64,
     pub decode_call_count: usize,
@@ -648,6 +705,38 @@ impl BbCircuitBposdProfile {
             ProfileReplayBasis::X => self.add_x_stats(stats),
         }
     }
+}
+
+pub fn validate_bb_p_point_result(result: &BbPPointResult) -> Result<(), String> {
+    let profile = &result.result.profile;
+    if profile.code_build_count != 1
+        || profile.syndrome_cycle_build_count != 1
+        || profile.effective_model_build_count != 1
+        || profile.decoder_build_count != 1
+    {
+        return Err(format!(
+            "setup/model rebuild count mismatch: code_build_count={}, syndrome_cycle_build_count={}, effective_model_build_count={}, decoder_build_count={}, expected all counters to be 1 for one p-point",
+            profile.code_build_count,
+            profile.syndrome_cycle_build_count,
+            profile.effective_model_build_count,
+            profile.decoder_build_count
+        ));
+    }
+
+    if profile.sample_count != result.result.num_trials {
+        return Err(format!(
+            "sample_count mismatch: sample_count={} num_trials={}",
+            profile.sample_count, result.result.num_trials
+        ));
+    }
+
+    if profile.decode_call_count != profile.z_decode_call_count + profile.x_decode_call_count {
+        return Err(
+            "decode_call_count must equal z_decode_call_count + x_decode_call_count".into(),
+        );
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -777,6 +866,15 @@ struct SimulationCaseRun {
     trials: Option<Vec<ComparisonTrialExport>>,
 }
 
+struct BbPPointSetup {
+    code: BbCode,
+    cycle: SyndromeCycle,
+    models: EffectiveModels,
+    z_decoder: BpOsdDecoder,
+    x_decoder: BpOsdDecoder,
+    setup_profile: BbCircuitBposdProfile,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyndromeReplayDiagnostic {
     pub syndrome_weight: usize,
@@ -802,6 +900,15 @@ pub fn build_effective_models(
     Ok(EffectiveModels {
         z_faults: build_effective_model_for_basis(code, cycle, config, FaultBasis::Z)?,
         x_faults: build_effective_model_for_basis(code, cycle, config, FaultBasis::X)?,
+    })
+}
+
+pub fn run_bb_p_point(config: BbPPointConfig) -> Result<BbPPointResult, String> {
+    let code_id = config.code_id.clone();
+    let run = run_bb_p_point_case(config, false)?;
+    Ok(BbPPointResult {
+        code_id,
+        result: run.result,
     })
 }
 
@@ -872,12 +979,27 @@ fn run_simulation_case_for_code_with_osd_variant(
     osd_variant: OsdVariant,
     collect_trials: bool,
 ) -> Result<SimulationCaseRun, String> {
-    validate_simulation_config(&config)?;
+    run_bb_p_point_case(
+        BbPPointConfig::from_simulation_config_with_osd_variant(code_id, config, osd_variant),
+        collect_trials,
+    )
+}
+
+fn build_bb_p_point_setup(config: &BbPPointConfig) -> Result<BbPPointSetup, String> {
+    let simulation_config = config.simulation_config();
+    validate_simulation_config(&simulation_config)?;
 
     let setup_started = Instant::now();
-    let code = build_code(code_id)?;
+    let mut setup_profile = BbCircuitBposdProfile::default();
+
+    let code = build_code(&config.code_id)?;
+    setup_profile.code_build_count = 1;
+
     let cycle = build_syndrome_cycle(&code);
-    let models = build_effective_models(&code, &cycle, &config)?;
+    setup_profile.syndrome_cycle_build_count = 1;
+
+    let models = build_effective_models(&code, &cycle, &simulation_config)?;
+    setup_profile.effective_model_build_count = 1;
 
     if models.z_faults.channel_probs.is_empty() || models.x_faults.channel_probs.is_empty() {
         return Err("effective decoder models must contain at least one probability column".into());
@@ -885,7 +1007,7 @@ fn run_simulation_case_for_code_with_osd_variant(
 
     let decoder_config = DecoderConfig {
         max_bp_iterations: config.max_bp_iterations,
-        osd_variant,
+        osd_variant: config.osd_variant,
         osd_order: config.osd_order,
         ..DecoderConfig::default()
     };
@@ -904,15 +1026,38 @@ fn run_simulation_case_for_code_with_osd_variant(
     )
     .map_err(|error| format!("failed to compile X-fault rbposd decoder: {error}"))?;
 
+    setup_profile.decoder_build_count = 1;
+    setup_profile.setup_seconds = setup_started.elapsed().as_secs_f64();
+
+    Ok(BbPPointSetup {
+        code,
+        cycle,
+        models,
+        z_decoder,
+        x_decoder,
+        setup_profile,
+    })
+}
+
+fn run_bb_p_point_case(
+    config: BbPPointConfig,
+    collect_trials: bool,
+) -> Result<SimulationCaseRun, String> {
+    let BbPPointSetup {
+        code,
+        cycle,
+        models,
+        z_decoder,
+        x_decoder,
+        setup_profile,
+    } = build_bb_p_point_setup(&config)?;
+
     let mut rng = match config.seed {
         Some(seed) => StdRng::seed_from_u64(seed),
         None => StdRng::from_entropy(),
     };
 
-    let mut profile = BbCircuitBposdProfile {
-        setup_seconds: setup_started.elapsed().as_secs_f64(),
-        ..BbCircuitBposdProfile::default()
-    };
+    let mut profile = setup_profile;
     let mut num_failed_trials = 0usize;
     let mut trials = collect_trials.then(|| Vec::with_capacity(config.num_trials));
     for _ in 0..config.num_trials {
@@ -925,6 +1070,7 @@ fn run_simulation_case_for_code_with_osd_variant(
             &mut rng,
         );
         profile.sample_seconds += sample_started.elapsed().as_secs_f64();
+        profile.sample_count += 1;
         let mut trial_export = collect_trials.then(|| comparison_trial_export(&sample));
 
         let decode_started = Instant::now();
@@ -1059,6 +1205,20 @@ pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> 
             ("setup_seconds", result.profile.setup_seconds),
             ("sample_seconds", result.profile.sample_seconds),
             ("decode_seconds", result.profile.decode_seconds),
+            ("code_build_count", result.profile.code_build_count as f64),
+            (
+                "syndrome_cycle_build_count",
+                result.profile.syndrome_cycle_build_count as f64,
+            ),
+            (
+                "effective_model_build_count",
+                result.profile.effective_model_build_count as f64,
+            ),
+            (
+                "decoder_build_count",
+                result.profile.decoder_build_count as f64,
+            ),
+            ("sample_count", result.profile.sample_count as f64),
             ("bp_seconds", result.profile.bp_seconds),
             ("osd_seconds", result.profile.osd_seconds),
             ("decode_call_count", result.profile.decode_call_count as f64),
@@ -1102,6 +1262,11 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         "setup_seconds",
         "sample_seconds",
         "decode_seconds",
+        "code_build_count",
+        "syndrome_cycle_build_count",
+        "effective_model_build_count",
+        "decoder_build_count",
+        "sample_count",
         "bp_seconds",
         "osd_seconds",
         "decode_call_count",
@@ -1114,6 +1279,11 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         "gf2_full_elimination_count",
     ];
     let counter_metric_keys = [
+        "code_build_count",
+        "syndrome_cycle_build_count",
+        "effective_model_build_count",
+        "decoder_build_count",
+        "sample_count",
         "decode_call_count",
         "z_decode_call_count",
         "x_decode_call_count",
@@ -1138,6 +1308,32 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         if counter_metric_keys.contains(&key) && value.fract() != 0.0 {
             return Err(format!("counter metric {key} must be an integer"));
         }
+    }
+
+    let code_build_count = row.metrics["code_build_count"];
+    let syndrome_cycle_build_count = row.metrics["syndrome_cycle_build_count"];
+    let effective_model_build_count = row.metrics["effective_model_build_count"];
+    let decoder_build_count = row.metrics["decoder_build_count"];
+    if code_build_count != 1.0
+        || syndrome_cycle_build_count != 1.0
+        || effective_model_build_count != 1.0
+        || decoder_build_count != 1.0
+    {
+        return Err(format!(
+            "setup/model rebuild count mismatch: code_build_count={code_build_count:.0}, syndrome_cycle_build_count={syndrome_cycle_build_count:.0}, effective_model_build_count={effective_model_build_count:.0}, decoder_build_count={decoder_build_count:.0}, expected all counters to be 1 for one p-point"
+        ));
+    }
+
+    let num_trials = row
+        .params
+        .get("num_trials")
+        .and_then(|value| value.as_u64())
+        .ok_or_else(|| "missing or invalid num_trials parameter".to_string())?;
+    let sample_count = row.metrics["sample_count"];
+    if sample_count != num_trials as f64 {
+        return Err(format!(
+            "sample_count mismatch: sample_count={sample_count:.0} num_trials={num_trials}"
+        ));
     }
 
     let decode_call_count = row.metrics["decode_call_count"];
