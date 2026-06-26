@@ -2,9 +2,10 @@ use rbposd::{OsdVariant, ParityCheckMatrix};
 use serde::Deserialize;
 
 use rsinter::bb_circuit_memory::{
-    EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig, SyndromeReplayDiagnostic,
-    build_code, build_effective_models, build_syndrome_cycle, profile_syndrome_replay,
-    profile_syndrome_replay_for_basis, profile_syndrome_replay_with_candidate_limit,
+    BbCircuitBposdProfile, EffectiveDecoderModel, ProfileReplayBasis, SimulationConfig,
+    SyndromeReplayDiagnostic, build_code, build_effective_models, build_syndrome_cycle,
+    profile_syndrome_replay, profile_syndrome_replay_for_basis,
+    profile_syndrome_replay_with_candidate_limit,
     profile_syndrome_replay_with_candidate_limit_for_basis,
     profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant,
     replay_syndrome_diagnostic, replay_syndrome_diagnostic_with_osd_variant, sample_seeded_trial,
@@ -228,6 +229,82 @@ fn bb90_hard_syndrome_ldpc_cs_candidate_count_is_bounded() {
 }
 
 #[test]
+fn bb90_hard_syndrome_release_profile_is_counter_bounded() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let diagnostic = replay_syndrome_diagnostic_with_osd_variant(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+    let profile = profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
+        profile_replay_basis(fixture.basis),
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        PROFILE_CANDIDATE_LIMIT,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+    let bounds = LdpcCsCounterBounds::from_ldpc_diagnostic(&diagnostic, PROFILE_CANDIDATE_LIMIT);
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&profile_json(&fixture, &diagnostic, &profile, &bounds))
+            .unwrap()
+    );
+
+    validate_ldpc_cs_counter_bounds(&profile, &diagnostic, &bounds).unwrap();
+}
+
+#[test]
+fn bb90_hard_syndrome_legacy_profile_fails_ldpc_cs_bounds() {
+    let fixture = load_fixture();
+    let computed = compute_fixture_replay(&fixture).unwrap();
+    let ldpc_diagnostic = replay_syndrome_diagnostic_with_osd_variant(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        OsdVariant::LdpcCombinationSweep,
+    )
+    .unwrap();
+    let legacy_diagnostic = replay_syndrome_diagnostic(
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.expected_sampled_logical.len(),
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+    )
+    .unwrap();
+    let legacy_profile = profile_syndrome_replay_with_candidate_limit_for_basis(
+        profile_replay_basis(fixture.basis),
+        &computed.model,
+        &computed.sampled_syndrome,
+        fixture.max_bp_iterations,
+        fixture.osd_order,
+        PROFILE_CANDIDATE_LIMIT,
+    )
+    .unwrap();
+    let bounds =
+        LdpcCsCounterBounds::from_ldpc_diagnostic(&ldpc_diagnostic, PROFILE_CANDIDATE_LIMIT);
+
+    let error =
+        validate_ldpc_cs_counter_bounds(&legacy_profile, &legacy_diagnostic, &bounds).unwrap_err();
+
+    assert!(
+        error.contains("planned_candidate_count"),
+        "error should name the violating counter: {error}"
+    );
+}
+
+#[test]
 fn bb90_hard_syndrome_legacy_osd_plan_still_reports_exhaustive_frontier() {
     let fixture = load_fixture();
     let computed = compute_fixture_replay(&fixture).unwrap();
@@ -337,6 +414,114 @@ fn syndrome_profile_replay_candidate_limit_wrapper_routes_z_basis_counts() {
     assert_eq!(profile.osd_candidate_count, 1);
     assert_eq!(profile.gf2_solve_count, 1);
     assert_eq!(profile.gf2_full_elimination_count, 1);
+}
+
+struct LdpcCsCounterBounds {
+    planned_candidate_count: u128,
+    candidate_limit: usize,
+}
+
+impl LdpcCsCounterBounds {
+    fn from_ldpc_diagnostic(diagnostic: &SyndromeReplayDiagnostic, candidate_limit: usize) -> Self {
+        Self {
+            planned_candidate_count: diagnostic.planned_candidate_count,
+            candidate_limit,
+        }
+    }
+}
+
+fn profile_json(
+    fixture: &HardSyndromeFixture,
+    diagnostic: &SyndromeReplayDiagnostic,
+    profile: &BbCircuitBposdProfile,
+    bounds: &LdpcCsCounterBounds,
+) -> serde_json::Value {
+    serde_json::json!({
+        "case_id": fixture.case_id,
+        "basis": format!("{:?}", fixture.basis),
+        "osd_planner": diagnostic.osd_planner,
+        "osd_order": diagnostic.osd_order,
+        "candidate_limit": bounds.candidate_limit,
+        "planned_candidate_count": diagnostic.planned_candidate_count,
+        "ldpc_cs_candidate_bound": bounds.planned_candidate_count,
+        "decode_seconds": profile.decode_seconds,
+        "bp_seconds": profile.bp_seconds,
+        "osd_seconds": profile.osd_seconds,
+        "decode_call_count": profile.decode_call_count,
+        "z_decode_call_count": profile.z_decode_call_count,
+        "x_decode_call_count": profile.x_decode_call_count,
+        "bp_iteration_count": profile.bp_iteration_count,
+        "osd_use_count": profile.osd_use_count,
+        "osd_candidate_count": profile.osd_candidate_count,
+        "gf2_solve_count": profile.gf2_solve_count,
+        "gf2_full_elimination_count": profile.gf2_full_elimination_count,
+    })
+}
+
+fn expect_finite_nonnegative_seconds(label: &str, seconds: f64) -> Result<(), String> {
+    if !seconds.is_finite() || seconds < 0.0 {
+        return Err(format!(
+            "{label} must be finite and non-negative, got {seconds}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_ldpc_cs_counter_bounds(
+    profile: &BbCircuitBposdProfile,
+    diagnostic: &SyndromeReplayDiagnostic,
+    bounds: &LdpcCsCounterBounds,
+) -> Result<(), String> {
+    expect_finite_nonnegative_seconds("decode_seconds", profile.decode_seconds)?;
+    expect_finite_nonnegative_seconds("bp_seconds", profile.bp_seconds)?;
+    expect_finite_nonnegative_seconds("osd_seconds", profile.osd_seconds)?;
+
+    if diagnostic.planned_candidate_count > bounds.planned_candidate_count {
+        return Err(format!(
+            "planned_candidate_count violates ldpc_cs bound: expected <= {}, got {}",
+            bounds.planned_candidate_count, diagnostic.planned_candidate_count
+        ));
+    }
+    if diagnostic.osd_planner != "ldpc_osd_cs" {
+        return Err(format!(
+            "osd_planner violates ldpc_cs bound: expected ldpc_osd_cs, got {}",
+            diagnostic.osd_planner
+        ));
+    }
+
+    let planned_bound = usize::try_from(bounds.planned_candidate_count).unwrap_or(usize::MAX);
+    let candidate_bound = bounds.candidate_limit.min(planned_bound);
+    if profile.osd_candidate_count == 0 {
+        return Err("osd_candidate_count violates ldpc_cs bound: expected > 0, got 0".into());
+    }
+    if profile.osd_candidate_count > candidate_bound {
+        return Err(format!(
+            "osd_candidate_count violates ldpc_cs bound: expected <= {candidate_bound}, got {}",
+            profile.osd_candidate_count
+        ));
+    }
+    if profile.gf2_solve_count != 1 {
+        return Err(format!(
+            "gf2_solve_count violates optimized OSD bound: expected 1, got {}",
+            profile.gf2_solve_count
+        ));
+    }
+    if profile.gf2_full_elimination_count != 1 {
+        return Err(format!(
+            "gf2_full_elimination_count violates GF(2) elimination bound: expected 1, got {}",
+            profile.gf2_full_elimination_count
+        ));
+    }
+    if profile.decode_call_count != profile.z_decode_call_count + profile.x_decode_call_count {
+        return Err(format!(
+            "decode_call_count violates basis sum bound: expected {} + {} = {}, got {}",
+            profile.z_decode_call_count,
+            profile.x_decode_call_count,
+            profile.z_decode_call_count + profile.x_decode_call_count,
+            profile.decode_call_count
+        ));
+    }
+    Ok(())
 }
 
 fn load_fixture() -> HardSyndromeFixture {
