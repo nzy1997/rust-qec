@@ -261,3 +261,47 @@ def test_ready_for_full_fails_missing_setup_run_code_id(tmp_path, capsys) -> Non
     assert status == 1
     assert "FAIL setup-run-separation" in output
     assert "code_id" in output
+
+
+def test_ready_for_full_fails_malformed_hard_profile_json(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    (tmp_path / "hard-profile" / "profile.json").write_text("{not-json")
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "malformed JSON" in output
+    assert "hard-profile/profile.json" in output
+
+
+def test_ready_for_full_fails_stale_hard_profile_basis(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    hard_profile = _hard_profile_fields()
+    hard_profile["basis"] = "X"
+    _write_json(tmp_path / "hard-profile" / "profile.json", hard_profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL hard-profile" in output
+    assert "basis" in output
+
+
+def test_ready_for_full_fails_stale_setup_run_sample_count(tmp_path, capsys) -> None:
+    write_ready_tree(tmp_path)
+    setup_profile = _setup_profile_fields()
+    setup_profile["sample_count"] = 7
+    _write_json(tmp_path / "setup-run" / "profile.json", setup_profile)
+
+    status = ready_for_full.main(["--results-dir", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert status == 1
+    assert "FAIL setup-run-separation" in output
+    assert "sample_count" in output
