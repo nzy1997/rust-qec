@@ -160,7 +160,6 @@ CSV_HEADER = [
     "max_iter",
     "osd_method",
     "osd_order",
-    "scaling",
     "setup_seconds",
     "decode_seconds",
     "run_seconds",
@@ -432,12 +431,6 @@ and route:
 ```
 
 before the existing smoke `run_suite(...)` call.
-
-Update `_base_row()` to include:
-
-```python
-        "scaling": _format_value(case.scaling),
-```
 
 - [ ] **Step 5: Export catalog helpers from package**
 
