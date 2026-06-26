@@ -1,0 +1,35 @@
+from pathlib import Path
+
+from benchmarks.bb_circuit_bposd_compare import write_readiness_report
+from benchmarks.bb_circuit_bposd_compare.tests.test_ready_for_full import (
+    write_ready_tree,
+)
+
+
+def test_write_readiness_report_includes_required_reviewer_sections(tmp_path) -> None:
+    results_dir = tmp_path / "rstim-bb-ready"
+    report_path = tmp_path / "bb-bposd-readiness.md"
+    write_ready_tree(results_dir)
+
+    status = write_readiness_report.main(
+        ["--results-dir", str(results_dir), "--out", str(report_path)]
+    )
+
+    report = report_path.read_text()
+    assert status == 0
+    assert "# BB BP-OSD Full-Campaign Readiness Report" in report
+    assert "**Final readiness verdict:** PASS" in report
+    assert "## Gate Summary" in report
+    assert "## Semantic Parity Replay" in report
+    assert "bb90-p006-c10-seed12345-order7-hard-syndrome" in report
+    assert "## BB90 Hard-Profile Counters" in report
+    assert "planned_candidate_count" in report
+    assert "4100" in report
+    assert "## Setup/Run Split Evidence" in report
+    assert "decoder_build_count" in report
+    assert "## Diagnostic Rust/Python Compare Rows" in report
+    assert "bb144-p0060-c12-t1-seed12345" in report
+    assert "## Small-LDPC Case Coverage" in report
+    assert "bb288" in report
+    assert "unsupported_rust_constructor" in report
+    assert "rstim-bb-readiness-snapshot" in report
