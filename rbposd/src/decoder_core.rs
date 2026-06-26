@@ -1,4 +1,4 @@
-use crate::bp::{BpRunInfo, BpWorkspace, CompiledGraph, run_bp_compiled_in_place};
+use crate::bp::{run_bp_compiled_in_place, BpRunInfo, BpWorkspace, CompiledGraph};
 use crate::config::{ChannelModel, DecoderConfig};
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
@@ -29,19 +29,17 @@ impl BpCore {
         prior_hard_decision(&self.prior_llrs)
     }
 
+    pub(crate) fn channel_prior_objective_weights(&self) -> &[f64] {
+        &self.prior_llrs
+    }
+
     pub(crate) fn run_bp_in_place(
         &self,
         syndrome: &Syndrome,
         config: &DecoderConfig,
         workspace: &mut BpWorkspace,
     ) -> BpRunInfo {
-        run_bp_compiled_in_place(
-            &self.graph,
-            syndrome,
-            &self.prior_llrs,
-            config,
-            workspace,
-        )
+        run_bp_compiled_in_place(&self.graph, syndrome, &self.prior_llrs, config, workspace)
     }
 }
 
@@ -94,7 +92,7 @@ mod tests {
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::Correction;
 
-    use super::{BpCore, compute_prior_llrs, prior_hard_decision};
+    use super::{compute_prior_llrs, prior_hard_decision, BpCore};
 
     #[test]
     fn computes_uniform_prior_llrs_from_bsc() {
@@ -140,5 +138,23 @@ mod tests {
 
         assert_eq!(workspace.hard_decision_bits.len(), 3);
         assert_eq!(workspace.unsatisfied_checks.len(), 2);
+    }
+
+    #[test]
+    fn bp_core_exposes_channel_prior_objective_weights() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+        let core = BpCore::new(
+            &pcm,
+            &ChannelModel::BitFlipProbabilities(vec![0.2, 0.3, 0.4]),
+        )
+        .unwrap();
+
+        let expected = compute_prior_llrs(
+            &pcm,
+            &ChannelModel::BitFlipProbabilities(vec![0.2, 0.3, 0.4]),
+        )
+        .unwrap();
+
+        assert_eq!(core.channel_prior_objective_weights(), expected.as_slice());
     }
 }

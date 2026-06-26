@@ -81,6 +81,7 @@ pub(crate) fn decode_osd0_with_workspace(
         syndrome,
         base_correction_bits,
         reliability,
+        reliability,
         workspace,
         OsdVariant::Osd0,
         0,
@@ -99,7 +100,8 @@ pub(crate) fn decode_osd_with_workspace(
     pcm: &ParityCheckMatrix,
     syndrome: &Syndrome,
     base_correction_bits: &[bool],
-    reliability: &[f64],
+    ordering_reliability: &[f64],
+    objective_weights: &[f64],
     workspace: &mut OsdWorkspace,
     planner: OsdVariant,
     osd_order: usize,
@@ -107,9 +109,10 @@ pub(crate) fn decode_osd_with_workspace(
     debug_assert_eq!(workspace.num_checks, pcm.num_checks());
     debug_assert_eq!(workspace.num_bits, pcm.num_bits());
     debug_assert_eq!(base_correction_bits.len(), pcm.num_bits());
-    debug_assert_eq!(reliability.len(), pcm.num_bits());
+    debug_assert_eq!(ordering_reliability.len(), pcm.num_bits());
+    validate_objective_weights(objective_weights, pcm.num_bits())?;
     let target_syndrome = xor_syndromes(&multiply_bits(pcm, base_correction_bits), syndrome);
-    workspace.sort_unreliable_columns(reliability);
+    workspace.sort_unreliable_columns(ordering_reliability);
     let mut stats = OsdDecodeStats::default();
     let mut gf2_stats = Gf2SolveStats::default();
     let reduced = workspace
@@ -134,11 +137,11 @@ pub(crate) fn decode_osd_with_workspace(
             if osd_order == 0 {
                 base
             } else {
-                best_legacy_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?
+                best_legacy_osd_candidate(objective_weights, &reduced, base, osd_order, &mut stats)?
             }
         }
         OsdVariant::LdpcCombinationSweep => {
-            best_ldpc_osd_candidate(reliability, &reduced, base, osd_order, &mut stats)?
+            best_ldpc_osd_candidate(objective_weights, &reduced, base, osd_order, &mut stats)?
         }
     };
     Ok(OsdDecodeOutcome {
@@ -239,7 +242,7 @@ fn accumulate_gf2_stats(stats: &mut OsdDecodeStats, gf2_stats: Gf2SolveStats) {
 }
 
 fn best_legacy_osd_candidate(
-    reliability: &[f64],
+    objective_weights: &[f64],
     reduced: &ReducedLinearSystem,
     base: DetailedSolution,
     osd_order: usize,
@@ -257,7 +260,7 @@ fn best_legacy_osd_candidate(
             let candidate = reduced.solve_with_forced_columns_counting(columns, &mut gf2_stats);
             accumulate_gf2_stats(stats, gf2_stats);
             if let Ok(candidate) = candidate {
-                if is_better_solution(&candidate, &best, reliability) {
+                if is_better_solution(&candidate, &best, objective_weights) {
                     best = candidate;
                 }
             }
@@ -267,7 +270,7 @@ fn best_legacy_osd_candidate(
 }
 
 fn best_ldpc_osd_candidate(
-    reliability: &[f64],
+    objective_weights: &[f64],
     reduced: &ReducedLinearSystem,
     base: DetailedSolution,
     osd_order: usize,
@@ -282,7 +285,7 @@ fn best_ldpc_osd_candidate(
             .solve_with_forced_columns_counting(&[column], &mut gf2_stats)
             .expect("LDPC OSD-CS single-column candidates are selected from free columns");
         accumulate_gf2_stats(stats, gf2_stats);
-        if is_better_solution(&candidate, &best, reliability) {
+        if is_better_solution(&candidate, &best, objective_weights) {
             best = candidate;
         }
     }
@@ -301,7 +304,7 @@ fn best_ldpc_osd_candidate(
             .solve_with_forced_columns_counting(columns, &mut gf2_stats)
             .expect("LDPC OSD-CS pair candidates are selected from free columns");
         accumulate_gf2_stats(stats, gf2_stats);
-        if is_better_solution(&candidate, &best, reliability) {
+        if is_better_solution(&candidate, &best, objective_weights) {
             best = candidate;
         }
     });
@@ -516,10 +519,10 @@ fn visit_combinations_until(
 fn is_better_solution(
     candidate: &DetailedSolution,
     best: &DetailedSolution,
-    reliability: &[f64],
+    objective_weights: &[f64],
 ) -> bool {
-    let candidate_cost = residual_cost(candidate.correction.as_slice(), reliability);
-    let best_cost = residual_cost(best.correction.as_slice(), reliability);
+    let candidate_cost = residual_cost(candidate.correction.as_slice(), objective_weights);
+    let best_cost = residual_cost(best.correction.as_slice(), objective_weights);
     if candidate_cost < best_cost - f64::EPSILON {
         return true;
     }
@@ -529,10 +532,24 @@ fn is_better_solution(
     false
 }
 
-fn residual_cost(bits: &[bool], reliability: &[f64]) -> f64 {
+fn validate_objective_weights(weights: &[f64], expected: usize) -> Result<(), DecodeError> {
+    if weights.len() != expected {
+        return Err(DecodeError::DimensionMismatch {
+            what: "OSD objective weights",
+            expected,
+            actual: weights.len(),
+        });
+    }
+    if !weights.iter().all(|weight| weight.is_finite()) {
+        return Err(DecodeError::InvalidProbability);
+    }
+    Ok(())
+}
+
+fn residual_cost(bits: &[bool], weights: &[f64]) -> f64 {
     bits.iter()
-        .zip(reliability.iter())
-        .filter_map(|(&bit, &cost)| bit.then_some(cost))
+        .zip(weights.iter())
+        .filter_map(|(&bit, &weight)| bit.then_some(weight.abs()))
         .sum()
 }
 
@@ -569,12 +586,13 @@ fn xor_correction_bits(lhs: &[bool], rhs: &Correction) -> Correction {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::DecodeError;
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
     use super::{
         binomial, decode_osd0_with_workspace, ldpc_osd_cs_candidate_plan_for_free_columns,
-        OsdWorkspace,
+        validate_objective_weights, OsdWorkspace,
     };
 
     const LDPC_OSD_CS_CONTRACT_PATH: &str = "rbposd/doc/osd_cs_contract.md";
@@ -612,6 +630,27 @@ mod tests {
         let order = workspace.sort_unreliable_columns(&[1.0, 1.0, 0.4]);
 
         assert_eq!(order, &[2, 0, 1]);
+    }
+
+    #[test]
+    fn osd_objective_weight_validation_rejects_length_mismatch() {
+        let error = validate_objective_weights(&[1.0, 2.0], 3).unwrap_err();
+
+        assert_eq!(
+            error,
+            DecodeError::DimensionMismatch {
+                what: "OSD objective weights",
+                expected: 3,
+                actual: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn osd_objective_weight_validation_rejects_non_finite_weights() {
+        let error = validate_objective_weights(&[1.0, f64::NAN], 2).unwrap_err();
+
+        assert_eq!(error, DecodeError::InvalidProbability);
     }
 
     #[test]

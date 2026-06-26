@@ -161,11 +161,19 @@ impl BpOsdDecoder {
         let osd_start = Instant::now();
         let osd_outcome = {
             let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            let objective_weights = match effective_planner {
+                crate::config::OsdVariant::LdpcCombinationSweep => {
+                    self.core.channel_prior_objective_weights()
+                }
+                crate::config::OsdVariant::Osd0
+                | crate::config::OsdVariant::LegacyCombinationSweep => &bp_workspace.reliability,
+            };
             decode_osd_with_workspace(
                 &self.pcm,
                 syndrome,
                 &bp_workspace.hard_decision_bits,
                 &bp_workspace.reliability,
+                objective_weights,
                 &mut osd_workspace,
                 effective_planner,
                 self.config.osd_order,
