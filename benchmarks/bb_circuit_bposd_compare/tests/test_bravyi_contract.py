@@ -8,6 +8,7 @@ from types import ModuleType
 from unittest import mock
 
 from benchmarks.bb_circuit_bposd_compare import run_compare
+from benchmarks.bb_circuit_bposd_compare import verify_bravyi_contract
 from benchmarks.bb_circuit_bposd_compare.cases import SMOKE_CASES
 from benchmarks.bb_circuit_bposd_compare.run_compare import _python_row
 from benchmarks.bb_circuit_bposd_compare.verify_bravyi_contract import (
@@ -39,6 +40,27 @@ def test_contract_negative_controls_name_mismatched_fields() -> None:
     mutated = json.loads(json.dumps(contract))
     mutated["decoder"]["ms_scaling_factor"] = 1
     assert any("decoder.ms_scaling_factor" in err for err in validate_contract(mutated))
+
+
+def test_contract_validator_checks_rust_tail_cycle_source(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source_path = tmp_path / "bb_circuit_memory.rs"
+    source_path.write_text(
+        "pub const BRAVYI_NOISELESS_TAIL_CYCLES: usize = 1;\n"
+        "let total_cycles = config.num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;\n"
+        "let total_cycles = num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;\n"
+    )
+    monkeypatch.setattr(
+        verify_bravyi_contract,
+        "RUST_BB_CIRCUIT_MEMORY_PATH",
+        source_path,
+    )
+
+    errors = validate_contract(_load_contract(CONTRACT_PATH))
+
+    assert any("BRAVYI_NOISELESS_TAIL_CYCLES" in err for err in errors)
 
 
 def test_verify_bravyi_contract_cli_prints_required_pass_line() -> None:

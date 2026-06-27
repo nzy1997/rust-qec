@@ -43,6 +43,10 @@ EXPECTED_RESULT_COLUMNS = [
     "num_monte_carlo_trials",
     "num_failed_trials",
 ]
+RUST_BB_CIRCUIT_MEMORY_PATH = (
+    Path(__file__).resolve().parents[2] / "rsinter" / "src" / "bb_circuit_memory.rs"
+)
+RUST_TAIL_CYCLES_CONST = "BRAVYI_NOISELESS_TAIL_CYCLES"
 EXPECTED_SOURCES = [
     {
         "file": "README.md",
@@ -137,6 +141,7 @@ def validate_contract(contract: dict[str, object]) -> list[str]:
     _validate_manifest_scaling(contract, errors)
     _validate_python_decoder_kwargs(contract, errors)
     _validate_failure_contract(errors)
+    _validate_rust_tail_cycle_source(contract, errors)
     return errors
 
 
@@ -237,6 +242,39 @@ def _validate_failure_contract(errors: list[str]) -> None:
             "'z_first_x_only_if_z_succeeds', "
             f"got {PYTHON_FAILURE_PREDICATE!r}"
         )
+
+
+def _validate_rust_tail_cycle_source(
+    contract: dict[str, object],
+    errors: list[str],
+) -> None:
+    expected = _get(contract, ("cycle_convention", "noiseless_tail_cycles"))
+    try:
+        source = RUST_BB_CIRCUIT_MEMORY_PATH.read_text()
+    except OSError as error:
+        errors.append(f"rsinter.bb_circuit_memory: failed to read source: {error}")
+        return
+
+    expected_declaration = f"pub const {RUST_TAIL_CYCLES_CONST}: usize = {expected};"
+    if expected_declaration not in source:
+        errors.append(
+            "rsinter.bb_circuit_memory."
+            f"{RUST_TAIL_CYCLES_CONST}: expected declaration "
+            f"{expected_declaration!r}"
+        )
+
+    expected_usages = {
+        "effective_model_total_cycles": (
+            "config.num_cycles + " f"{RUST_TAIL_CYCLES_CONST}"
+        ),
+        "trial_total_cycles": "num_cycles + " f"{RUST_TAIL_CYCLES_CONST}",
+    }
+    for usage_name, snippet in expected_usages.items():
+        if snippet not in source:
+            errors.append(
+                f"rsinter.bb_circuit_memory.{usage_name}: "
+                f"expected source usage {snippet!r}"
+            )
 
 
 def _expect(
