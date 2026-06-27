@@ -72,12 +72,70 @@ struct RenderState {
     repeat_depth: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct LaneSpan {
+    min: usize,
+    max: usize,
+}
+
+impl LaneSpan {
+    fn from_lanes(lanes: &[usize], num_qubits: usize) -> Self {
+        if lanes.is_empty() {
+            return LaneSpan {
+                min: 0,
+                max: num_qubits.saturating_sub(1),
+            };
+        }
+        LaneSpan {
+            min: *lanes.iter().min().expect("checked non-empty"),
+            max: *lanes.iter().max().expect("checked non-empty"),
+        }
+    }
+
+    fn conflicts(self, other: LaneSpan) -> bool {
+        self.min <= other.max && other.min <= self.max
+    }
+}
+
+enum LayerItem<'a> {
+    Operation(&'a Qp101Operation),
+    ControlledPair {
+        gate: &'a str,
+        control_lane: usize,
+        target_lane: usize,
+    },
+    SwapPair {
+        lane_a: usize,
+        lane_b: usize,
+    },
+}
+
+impl LayerItem<'_> {
+    fn span(&self, num_qubits: usize) -> Result<LaneSpan, String> {
+        match self {
+            LayerItem::Operation(op) => operation_lane_span(op, num_qubits),
+            LayerItem::ControlledPair {
+                control_lane,
+                target_lane,
+                ..
+            } => Ok(LaneSpan {
+                min: (*control_lane).min(*target_lane),
+                max: (*control_lane).max(*target_lane),
+            }),
+            LayerItem::SwapPair { lane_a, lane_b } => Ok(LaneSpan {
+                min: (*lane_a).min(*lane_b),
+                max: (*lane_a).max(*lane_b),
+            }),
+        }
+    }
+}
+
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     if doc.num_qubits == 0 {
         return Err("cannot render QP101 SVG with num_qubits = 0".to_string());
     }
 
-    let visible_columns = count_visible_columns(&doc.operations).max(1);
+    let visible_columns = count_visible_columns(&doc.operations, doc.num_qubits)?.max(1);
     let width = LEFT_MARGIN + RIGHT_MARGIN + (visible_columns as i32 + 1) * COLUMN_GAP;
     let top_reserve = repeat_label_top_reserve(&doc.operations);
     let height = svg_height(doc)? + top_reserve;
@@ -126,18 +184,50 @@ fn repeat_label_top_reserve(ops: &[Qp101Operation]) -> i32 {
     }
 }
 
-fn count_visible_columns(ops: &[Qp101Operation]) -> usize {
-    ops.iter().fold(0usize, |total, op| {
-        let columns = match op {
-            Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => 0,
-            Qp101Operation::Repeat { count, body, .. } => {
-                let count = usize::try_from(*count).unwrap_or(usize::MAX);
-                count_visible_columns(body).saturating_mul(count)
+fn count_visible_columns(ops: &[Qp101Operation], num_qubits: usize) -> Result<usize, String> {
+    let mut total = 0usize;
+    let mut layer = Vec::new();
+    for op in ops {
+        match op {
+            Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
+            Qp101Operation::Tick { .. }
+            | Qp101Operation::Detector { .. }
+            | Qp101Operation::ObservableInclude { .. }
+            | Qp101Operation::Annotation { .. } => {
+                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
+                layer.clear();
+                total = total.saturating_add(1);
             }
-            _ => 1,
-        };
-        total.saturating_add(columns)
-    })
+            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => layer.push(op),
+            Qp101Operation::Repeat { count, body, .. } => {
+                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
+                layer.clear();
+                let count = usize::try_from(*count).unwrap_or(usize::MAX);
+                total = total
+                    .saturating_add(count_visible_columns(body, num_qubits)?.saturating_mul(count));
+            }
+        }
+    }
+    total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
+    Ok(total)
+}
+
+fn count_operation_layer_columns(
+    layer: &[&Qp101Operation],
+    num_qubits: usize,
+) -> Result<usize, String> {
+    let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    for op in layer {
+        for item in operation_layer_items(op, num_qubits)? {
+            let span = item.span(num_qubits)?;
+            let assigned_column = first_non_conflicting_column(&column_spans, span);
+            if assigned_column == column_spans.len() {
+                column_spans.push(Vec::new());
+            }
+            column_spans[assigned_column].push(span);
+        }
+    }
+    Ok(column_spans.len())
 }
 
 fn svg_height(doc: &Qp101Document) -> Result<i32, String> {
@@ -319,69 +409,29 @@ fn render_wires(out: &mut String, num_qubits: usize, width: i32) {
     }
 }
 
-fn render_operations(
+fn render_operations<'a>(
     out: &mut String,
-    ops: &[Qp101Operation],
+    ops: &'a [Qp101Operation],
     num_qubits: usize,
     column: &mut usize,
     state: &mut RenderState,
 ) -> Result<(), String> {
+    let mut layer = Vec::new();
     for op in ops {
         match op {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
             Qp101Operation::Tick { annotations } => {
+                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
                 render_tick(out, x_for_column(*column), num_qubits, annotations);
                 *column += 1;
             }
-            Qp101Operation::Gate {
-                gate,
-                targets,
-                controls,
-                raw_targets,
-                display,
-                annotations,
-                ..
-            } => {
-                let x = x_for_column(*column);
-                render_gate(
-                    out,
-                    x,
-                    num_qubits,
-                    gate,
-                    targets,
-                    controls,
-                    raw_targets.as_deref(),
-                    display.as_ref(),
-                    annotations,
-                    state,
-                )?;
-                *column += 1;
-            }
-            Qp101Operation::Noise {
-                gate,
-                params,
-                raw_targets,
-                annotations,
-                ..
-            } => {
-                let x = x_for_column(*column);
-                render_noise(
-                    out,
-                    x,
-                    num_qubits,
-                    gate,
-                    params,
-                    raw_targets,
-                    annotations,
-                    state,
-                )?;
-                *column += 1;
-            }
+            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => layer.push(op),
             Qp101Operation::Repeat {
                 count,
                 body,
                 annotations,
             } => {
+                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
                 let start_column = *column;
                 let mut iteration_starts = Vec::new();
                 let depth = state.repeat_depth;
@@ -408,6 +458,7 @@ fn render_operations(
                 annotations,
                 ..
             } => {
+                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
                 let x = x_for_column(*column);
                 let detector_index = state.next_detector_index;
                 state.next_detector_index += 1;
@@ -428,6 +479,7 @@ fn render_operations(
                 annotations,
                 ..
             } => {
+                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
                 let x = x_for_column(*column);
                 let source = source_label(sources, &state.measurements, num_qubits);
                 render_source_operation(
@@ -445,6 +497,7 @@ fn render_operations(
                 text,
                 annotations,
             } => {
+                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
                 let x = x_for_column(*column);
                 let label = format!("{kind}: {text}");
                 render_top_note(out, x, &label);
@@ -453,7 +506,168 @@ fn render_operations(
             }
         }
     }
+    flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
     Ok(())
+}
+
+fn flush_operation_layer(
+    out: &mut String,
+    layer: &mut Vec<&Qp101Operation>,
+    num_qubits: usize,
+    column: &mut usize,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    if layer.is_empty() {
+        return Ok(());
+    }
+
+    let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    for op in layer.drain(..) {
+        for item in operation_layer_items(op, num_qubits)? {
+            let span = item.span(num_qubits)?;
+            let assigned_column = first_non_conflicting_column(&column_spans, span);
+            if assigned_column == column_spans.len() {
+                column_spans.push(Vec::new());
+            }
+            column_spans[assigned_column].push(span);
+            render_layer_item(
+                out,
+                x_for_column(*column + assigned_column),
+                num_qubits,
+                &item,
+                state,
+            )?;
+        }
+    }
+    *column += column_spans.len();
+    Ok(())
+}
+
+fn first_non_conflicting_column(column_spans: &[Vec<LaneSpan>], span: LaneSpan) -> usize {
+    column_spans
+        .iter()
+        .position(|spans| spans.iter().all(|existing| !existing.conflicts(span)))
+        .unwrap_or(column_spans.len())
+}
+
+fn operation_lane_span(op: &Qp101Operation, num_qubits: usize) -> Result<LaneSpan, String> {
+    let lanes = match op {
+        Qp101Operation::Gate {
+            gate,
+            targets,
+            controls,
+            raw_targets,
+            ..
+        } => {
+            if let Some(raw_targets) = raw_targets {
+                raw_target_lanes(raw_targets, num_qubits, gate)?
+            } else {
+                gate_lanes(targets, controls, num_qubits, gate)?
+            }
+        }
+        Qp101Operation::Noise {
+            gate, raw_targets, ..
+        } => raw_target_lanes(raw_targets, num_qubits, gate)?,
+        _ => Vec::new(),
+    };
+    Ok(LaneSpan::from_lanes(&lanes, num_qubits))
+}
+
+fn operation_layer_items<'a>(
+    op: &'a Qp101Operation,
+    num_qubits: usize,
+) -> Result<Vec<LayerItem<'a>>, String> {
+    match op {
+        Qp101Operation::Gate {
+            gate,
+            targets,
+            controls,
+            ..
+        } if gate == "CX" || gate == "CZ" => {
+            if let Some(pairs) = controlled_pairs(targets, controls, num_qubits, gate)? {
+                return Ok(pairs
+                    .into_iter()
+                    .map(|(control_lane, target_lane)| LayerItem::ControlledPair {
+                        gate,
+                        control_lane,
+                        target_lane,
+                    })
+                    .collect());
+            }
+        }
+        Qp101Operation::Gate { gate, targets, .. } if gate == "SWAP" => {
+            if let Some(pairs) = target_pairs(targets, num_qubits, gate)? {
+                return Ok(pairs
+                    .into_iter()
+                    .map(|(lane_a, lane_b)| LayerItem::SwapPair { lane_a, lane_b })
+                    .collect());
+            }
+        }
+        _ => {}
+    }
+    Ok(vec![LayerItem::Operation(op)])
+}
+
+fn render_layer_item(
+    out: &mut String,
+    x: i32,
+    num_qubits: usize,
+    item: &LayerItem<'_>,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    match item {
+        LayerItem::ControlledPair {
+            gate,
+            control_lane,
+            target_lane,
+        } => {
+            render_controlled_pair(out, x, *control_lane, *target_lane, gate);
+            Ok(())
+        }
+        LayerItem::SwapPair { lane_a, lane_b } => {
+            render_swap_pair(out, x, *lane_a, *lane_b);
+            Ok(())
+        }
+        LayerItem::Operation(op) => match op {
+            Qp101Operation::Gate {
+                gate,
+                targets,
+                controls,
+                raw_targets,
+                display,
+                annotations,
+                ..
+            } => render_gate(
+                out,
+                x,
+                num_qubits,
+                gate,
+                targets,
+                controls,
+                raw_targets.as_deref(),
+                display.as_ref(),
+                annotations,
+                state,
+            ),
+            Qp101Operation::Noise {
+                gate,
+                params,
+                raw_targets,
+                annotations,
+                ..
+            } => render_noise(
+                out,
+                x,
+                num_qubits,
+                gate,
+                params,
+                raw_targets,
+                annotations,
+                state,
+            ),
+            _ => Ok(()),
+        },
+    }
 }
 
 fn lane_y(q: usize) -> i32 {
@@ -599,7 +813,11 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) { "!" } else { "" }
+    if inverted.unwrap_or(false) {
+        "!"
+    } else {
+        ""
+    }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1008,7 +1226,7 @@ fn noise_param_note(params: &[f64]) -> Option<String> {
         .map(|value| value.to_string())
         .collect::<Vec<_>>()
         .join(", ");
-    Some(format!("p={values}"))
+    Some(values)
 }
 
 fn render_noise(
@@ -1027,18 +1245,18 @@ fn render_noise(
 
     match noise_policy(gate) {
         NoisePolicy::Single if !lanes.is_empty() => {
-            if let Some(note) = note.as_deref() {
-                render_param_note(out, x, &lanes, note);
-            }
             for &lane in &lanes {
+                if let Some(note) = note.as_deref() {
+                    render_param_note(out, x, &[lane], note);
+                }
                 render_noise_box(out, x, lane_y(lane), noise_label(gate));
             }
         }
         NoisePolicy::Pair if !lanes.is_empty() && lanes.len() % 2 == 0 => {
-            if let Some(note) = note.as_deref() {
-                render_param_note(out, x, &lanes, note);
-            }
             for pair in lanes.chunks_exact(2) {
+                if let Some(note) = note.as_deref() {
+                    render_param_note(out, x, pair, note);
+                }
                 render_noise_pair(out, x, pair[0], pair[1], noise_label(gate));
             }
         }
