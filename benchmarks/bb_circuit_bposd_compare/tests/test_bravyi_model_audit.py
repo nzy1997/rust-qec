@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from types import SimpleNamespace
 from pathlib import Path
 
 from benchmarks.bb_circuit_bposd_compare import bravyi_model_audit
+from benchmarks.bb_circuit_bposd_compare import verify_model_audit
 
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "reference"
@@ -216,3 +219,136 @@ def test_checked_in_expected_fixture_has_required_provenance() -> None:
     assert fixture["provenance"]["contract_path"] == (
         "benchmarks/bb_circuit_bposd_compare/reference/bravyi_contract.json"
     )
+
+
+def test_verify_model_audit_accepts_good_artifact(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+
+    assert verify_model_audit.verify_audit_artifact(artifact) == []
+
+
+def test_verify_model_audit_rejects_tail_cycle_drift(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+    artifact["observed"]["syndrome_tail"]["noiseless_tail_cycles"] = 1
+
+    errors = verify_model_audit.verify_audit_artifact(artifact)
+
+    assert any(
+        "syndrome_tail.noiseless_tail_cycles" in error for error in errors
+    )
+
+
+def test_verify_model_audit_rejects_schedule_label_drift(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+    artifact["observed"]["schedule"]["sx_labels"][0] = "changed"
+
+    errors = verify_model_audit.verify_audit_artifact(artifact)
+
+    assert any("schedule.sx_labels" in error for error in errors)
+
+
+def test_verify_model_audit_rejects_model_summary_drift(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+    artifact["expected"]["models"]["Z"]["decoder_columns"] = -1
+    artifact["observed"]["models"]["Z"]["decoder_columns"] = 999
+
+    errors = verify_model_audit.verify_audit_artifact(artifact)
+
+    assert any("models.Z.decoder_columns" in error for error in errors)
+
+
+def test_verify_model_audit_cli_reports_pass(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+    artifact_path = tmp_path / "artifact.json"
+    artifact_path.write_text(json.dumps(artifact))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "benchmarks.bb_circuit_bposd_compare.verify_model_audit",
+            str(artifact_path),
+        ],
+        cwd=REFERENCE_DIR.parents[2],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **__import__("os").environ,
+            "BRAVYI_MODEL_AUDIT_EXPECTED_PATH": str(expected_path),
+        },
+    )
+
+    assert result.returncode == 0
+    assert "PASS Bravyi model audit bb72 [[72,12]]" in result.stdout
+    assert "num_cycles_plus_tail=8" in result.stdout
+    assert result.stderr == ""
+
+
+def test_verify_model_audit_cli_reports_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_path = tmp_path / "expected.json"
+    expected_path.write_text(json.dumps(_expected_fixture()))
+    monkeypatch.setattr(bravyi_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+    monkeypatch.setattr(verify_model_audit, "EXPECTED_AUDIT_PATH", expected_path)
+
+    artifact = bravyi_model_audit.build_audit_artifact(FAKE_RUST_EXPORT)
+    artifact["observed"]["schedule"]["operation_count"] = 721
+    artifact_path = tmp_path / "artifact_bad.json"
+    artifact_path.write_text(json.dumps(artifact))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "benchmarks.bb_circuit_bposd_compare.verify_model_audit",
+            str(artifact_path),
+        ],
+        cwd=REFERENCE_DIR.parents[2],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **__import__("os").environ,
+            "BRAVYI_MODEL_AUDIT_EXPECTED_PATH": str(expected_path),
+        },
+    )
+
+    assert result.returncode != 0
+    assert "schedule.operation_count" in result.stderr
