@@ -1,0 +1,59 @@
+{
+  "contract_version": 1,
+  "upstream": {
+    "repository": "sbravyi/BivariateBicycleCodes",
+    "commit": "fa77e3333d3ec44c79d8f914dd24c040d1da471b",
+    "tree_url": "https://github.com/sbravyi/BivariateBicycleCodes/tree/fa77e3333d3ec44c79d8f914dd24c040d1da471b"
+  },
+  "result_row": {
+    "columns": [
+      "physical_error_rate",
+      "num_syndrome_cycles",
+      "num_monte_carlo_trials",
+      "num_failed_trials"
+    ],
+    "failure_unit": "monte_carlo_trial"
+  },
+  "decoder": {
+    "bp_method": "ms",
+    "max_iter": 10000,
+    "osd_method": "osd_cs",
+    "osd_order": 7,
+    "ms_scaling_factor": 0
+  },
+  "cycle_convention": {
+    "configured_noisy_cycles_field": "num_cycles",
+    "noiseless_tail_cycles": 2
+  },
+  "failure_predicate": {
+    "decode_order": ["Z", "X"],
+    "x_decode_condition": "only_if_z_succeeds",
+    "failed_trial_condition": "z_fails_or_x_fails_after_z_succeeds"
+  },
+  "sources": [
+    {
+      "file": "README.md",
+      "lines": "16-21",
+      "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/README.md#L16-L21",
+      "supports": ["result_row", "failure_unit"]
+    },
+    {
+      "file": "decoder_setup.py",
+      "lines": "511-618",
+      "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_setup.py#L511-L618",
+      "supports": ["noiseless_tail_cycles", "effective_decoder_histories"]
+    },
+    {
+      "file": "decoder_run.py",
+      "lines": "67-72,329-349",
+      "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L67-L72",
+      "supports": ["decoder"]
+    },
+    {
+      "file": "decoder_run.py",
+      "lines": "364-415",
+      "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L364-L415",
+      "supports": ["failure_predicate"]
+    }
+  ]
+}
