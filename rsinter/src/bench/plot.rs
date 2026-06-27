@@ -4,6 +4,7 @@ use std::path::Path;
 use plotters::coord::Shift;
 use plotters::element::DashedPathElement;
 use plotters::prelude::*;
+use plotters::style::text_anchor::{HPos, Pos, VPos};
 
 use crate::bench::result::BenchmarkResultRow;
 use crate::bench::spec::{
@@ -77,6 +78,7 @@ struct ErrorRatePanelData {
     y_scale: String,
     x_range: (f64, f64),
     y_range: (f64, f64),
+    x_ticks: Vec<f64>,
     groups: ErrorRateGroups,
 }
 
@@ -87,6 +89,7 @@ struct NumericPanelData {
     y_scale: String,
     x_range: (f64, f64),
     y_range: (f64, f64),
+    x_ticks: Vec<f64>,
     groups: NumericGroups,
 }
 
@@ -392,6 +395,7 @@ fn prepare_error_rate_panel(
         y_scale: panel.scale.clone(),
         x_range,
         y_range,
+        x_ticks: sorted_unique_f64(&x_values),
         groups,
     })
 }
@@ -447,6 +451,7 @@ fn prepare_numeric_panel(
         y_scale: panel.scale.clone(),
         x_range,
         y_range,
+        x_ticks: sorted_unique_f64(&x_values),
         groups,
     })
 }
@@ -507,10 +512,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
@@ -525,10 +533,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
@@ -543,10 +554,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
@@ -561,10 +575,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_error_rate_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
@@ -600,10 +617,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "log") => {
@@ -618,10 +638,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("log", "linear") => {
@@ -636,10 +659,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         ("linear", "linear") => {
@@ -654,10 +680,13 @@ where
                 .map_err(|e| e.to_string())?;
             chart
                 .configure_mesh()
+                .x_labels(8)
+                .x_label_formatter(&|value| format_axis_tick(*value))
                 .x_desc(data.x_label.as_str())
                 .y_desc(data.y_label.as_str())
                 .draw()
                 .map_err(|e| e.to_string())?;
+            draw_manual_x_tick_labels(&mut chart, &data.x_ticks, data.y_range, &data.y_scale)?;
             draw_numeric_series(&mut chart, &data.groups, series_styles, show_legend)?;
         }
         _ => {
@@ -782,6 +811,37 @@ where
     }
 
     draw_series_legend(chart, show_legend)
+}
+
+fn draw_manual_x_tick_labels<'a, DB, XR, YR>(
+    chart: &mut ChartContext<'a, DB, Cartesian2d<XR, YR>>,
+    x_ticks: &[f64],
+    y_range: (f64, f64),
+    y_scale: &str,
+) -> Result<(), String>
+where
+    DB: DrawingBackend + 'a,
+    DB::ErrorType: 'static,
+    XR: Ranged<ValueType = f64>,
+    YR: Ranged<ValueType = f64>,
+{
+    let y = manual_x_tick_label_y(y_range, y_scale);
+    chart
+        .draw_series(x_ticks.iter().copied().map(|x| {
+            let style = TextStyle::from(("sans-serif", 12).into_font())
+                .pos(Pos::new(HPos::Center, VPos::Top));
+            EmptyElement::at((x, y)) + Text::new(format_axis_tick(x), (0, 16), style)
+        }))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn manual_x_tick_label_y(y_range: (f64, f64), y_scale: &str) -> f64 {
+    if y_scale == "log" {
+        y_range.0 * (y_range.1 / y_range.0).powf(0.02)
+    } else {
+        y_range.0 + (y_range.1 - y_range.0) * 0.02
+    }
 }
 
 fn draw_series_legend<'a, DB, XR, YR>(
@@ -922,6 +982,13 @@ fn padded_range(values: &[f64], scale: &str, field_name: &str) -> Result<(f64, f
     Ok((min - span * 0.1, max + span * 0.1))
 }
 
+fn sorted_unique_f64(values: &[f64]) -> Vec<f64> {
+    let mut values = values.to_vec();
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    values.dedup_by(|left, right| (*left - *right).abs() <= 1e-12);
+    values
+}
+
 fn validate_plot_value(
     field_name: &str,
     value: f64,
@@ -993,6 +1060,32 @@ fn build_series_styles(
     spec: &BenchmarkSpec,
     rows: &[&BenchmarkResultRow],
 ) -> Result<BTreeMap<SeriesKey, SeriesStyle>, String> {
+    if rows.iter().any(|row| row.params.contains_key("code_id")) {
+        let mut series_keys = Vec::new();
+        for row in rows.iter() {
+            let key = series_key(row, spec)?;
+            if !series_keys.contains(&key) {
+                series_keys.push(key);
+            }
+        }
+        series_keys.sort();
+        let series_index: BTreeMap<SeriesKey, usize> = series_keys
+            .into_iter()
+            .enumerate()
+            .map(|(index, key)| (key, index))
+            .collect();
+        let mut styles = BTreeMap::new();
+        for row in rows.iter() {
+            let key = series_key(row, spec)?;
+            let color_index = series_index.get(&key).copied().unwrap_or(0);
+            styles.entry(key).or_insert_with(|| SeriesStyle {
+                color: legacy_matplotlib_color(color_index),
+                pattern: line_pattern_for_runner(&row.runner),
+            });
+        }
+        return Ok(styles);
+    }
+
     let mut family_values: Vec<String> = rows
         .iter()
         .map(|row| decoder_family_for_style(&row.runner).to_string())
@@ -1081,6 +1174,35 @@ fn default_series_style(index: usize) -> SeriesStyle {
         color: Palette99::pick(index).mix(0.9),
         pattern: LinePattern::Solid,
     }
+}
+
+fn format_axis_tick(value: f64) -> String {
+    if !value.is_finite() {
+        return value.to_string();
+    }
+    if value == 0.0 {
+        return "0".into();
+    }
+    let abs = value.abs();
+    if (0.001..1.0).contains(&abs) {
+        trim_decimal(format!("{value:.4}"))
+    } else if (1.0..10_000.0).contains(&abs) {
+        trim_decimal(format!("{value:.3}"))
+    } else {
+        format!("{value:.1e}")
+    }
+}
+
+fn trim_decimal(mut value: String) -> String {
+    if value.contains('.') {
+        while value.ends_with('0') {
+            value.pop();
+        }
+        if value.ends_with('.') {
+            value.pop();
+        }
+    }
+    value
 }
 
 fn confidence_band_polygon(points: &[ErrorRatePoint]) -> Vec<(f64, f64)> {
@@ -1199,5 +1321,25 @@ fn value_to_string(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(value) => value.clone(),
         _ => value.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn style_and_axis_tick_helpers_cover_fallback_edges() {
+        let style = default_series_style(3);
+        match style.pattern {
+            LinePattern::Solid => {}
+            LinePattern::Dashed { .. } => panic!("default series style should be solid"),
+        }
+
+        assert_eq!(format_axis_tick(f64::INFINITY), "inf");
+        assert_eq!(format_axis_tick(0.0), "0");
+        assert_eq!(format_axis_tick(0.0012), "0.0012");
+        assert_eq!(format_axis_tick(1.0), "1");
+        assert_eq!(format_axis_tick(10_000.0), "1.0e4");
     }
 }

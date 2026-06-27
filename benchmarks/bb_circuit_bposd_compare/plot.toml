@@ -1,0 +1,46 @@
+name = "bb_circuit_bposd_compare"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+code_id = ["bb72", "bb144"]
+
+[[runner]]
+name = "ldpc_bposd"
+language = "python"
+impl_key = "ldpc_bposd"
+
+[runner.params]
+code_id = ["bb72", "bb144"]
+
+[plot]
+title = "BB Circuit rbposd vs ldpc/bposd"
+confidence_interval_likelihood_factor = 9.0
+
+[plot.fit]
+enabled = false
+kind = "log_log"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["params.code_id", "runner"]
+label_template = "{params.code_id} {runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"
+
+[[plot.panel]]
+metric = "metrics.run_seconds_per_shot"
+scale = "log"
+label = "Run Time Per Shot"

@@ -3,7 +3,7 @@ use rsinter::bench::plot::{
 };
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use rsinter::bench::spec::{
-    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit,
+    BenchmarkSpec, LogicalRateUnit, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
 };
 use rsinter::failure::FailureKind;
 use rsinter::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
@@ -853,8 +853,7 @@ fn surface_compare_fixture_matches_rsinter_plot_semantics() {
     );
 
     let default_interval_height = confidence_band_pixel_height(&default_svg);
-    let wide_spec =
-        surface_compare_fixture_spec("confidence_interval_likelihood_factor = 25.0");
+    let wide_spec = surface_compare_fixture_spec("confidence_interval_likelihood_factor = 25.0");
     let wide_svg = render_plot_svg(&wide_spec, &rows, "surface-compare-wide.svg");
     let wide_interval_height = confidence_band_pixel_height(&wide_svg);
     assert!(
@@ -1095,10 +1094,8 @@ fn logical_rate_unit_transforms_best_and_interval_bounds() {
     )
     .unwrap_err();
     assert!(nonnumeric_observable_err.contains("logical_rate_unit = \"per_observable\""));
-    assert!(
-        nonnumeric_observable_err
-            .contains("positive numeric case_summary.logical_observable_count")
-    );
+    assert!(nonnumeric_observable_err
+        .contains("positive numeric case_summary.logical_observable_count"));
     assert!(nonnumeric_observable_err.contains("case_summary.num_obs"));
 }
 
@@ -1141,11 +1138,9 @@ label = "Decode Time Per Shot"
         &single_out,
     )
     .unwrap();
-    assert!(
-        std::fs::read_to_string(single_out)
-            .unwrap()
-            .contains("<svg")
-    );
+    assert!(std::fs::read_to_string(single_out)
+        .unwrap()
+        .contains("<svg"));
 
     let dashed_rows = vec![
         ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
@@ -1155,11 +1150,9 @@ label = "Decode Time Per Shot"
     ];
     let dashed_out = dir.path().join("dashed.svg");
     render_benchmark_plot(&dashed_series_spec, &dashed_rows, &dashed_out).unwrap();
-    assert!(
-        std::fs::read_to_string(dashed_out)
-            .unwrap()
-            .contains("rmatching d=5")
-    );
+    assert!(std::fs::read_to_string(dashed_out)
+        .unwrap()
+        .contains("rmatching d=5"));
 }
 
 #[test]
@@ -1405,17 +1398,116 @@ label = "Decode Time Per Shot"
 }
 
 #[test]
+fn bb_compare_styles_use_four_series_colors_decoder_dashes_and_readable_p_ticks() {
+    let spec = spec_with_panels(
+        "BB Circuit rbposd vs ldpc/bposd",
+        "params.p",
+        "log",
+        r#"[plot.series]
+group_by = ["params.code_id", "runner"]
+label_template = "{params.code_id} {runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "log"
+label = "Run Time Per Shot"
+"#,
+    );
+    let mut rows = Vec::new();
+    for (code_id, base_time) in [("bb72", 0.01), ("bb144", 0.1)] {
+        for (runner, runner_offset) in [("ldpc_bposd", 0.0), ("rbposd", 0.005)] {
+            for (p, p_offset) in [(0.003, 0.0), (0.004, 0.01), (0.005, 0.02), (0.006, 0.03)] {
+                rows.push(bb_compare_row(
+                    runner,
+                    code_id,
+                    p,
+                    base_time + runner_offset + p_offset,
+                ));
+            }
+        }
+    }
+
+    let svg = render_plot_svg(&spec, &rows, "bb-compare-style.svg");
+    let labels = [
+        "bb72 ldpc_bposd",
+        "bb72 rbposd",
+        "bb144 ldpc_bposd",
+        "bb144 rbposd",
+    ];
+    let colors: std::collections::BTreeSet<_> = labels
+        .iter()
+        .map(|label| legend_color_for_label(&svg, label))
+        .collect();
+    assert_eq!(
+        colors.len(),
+        labels.len(),
+        "BB compare should give each of the four visible series a distinct color; svg was:\n{svg}"
+    );
+    for label in ["bb72 ldpc_bposd", "bb144 ldpc_bposd"] {
+        assert_eq!(
+            legend_sample_segment_count(&svg, label),
+            1,
+            "{label} should have a solid legend sample; svg was:\n{svg}"
+        );
+    }
+    for label in ["bb72 rbposd", "bb144 rbposd"] {
+        assert!(
+            legend_sample_segment_count(&svg, label) > 1,
+            "{label} should have a dashed legend sample; svg was:\n{svg}"
+        );
+    }
+    for tick in ["0.003", "0.004", "0.005", "0.006"] {
+        assert!(
+            svg.contains(tick),
+            "p-axis should label {tick}; svg was:\n{svg}"
+        );
+    }
+}
+
+#[test]
+fn manual_x_ticks_format_linear_zero_decimal_and_scientific_values() {
+    let spec = spec_with_panels(
+        "Manual Tick Formats",
+        "params.p",
+        "linear",
+        r#"[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+"#,
+        r#"[[plot.panel]]
+metric = "metrics.decode_us_per_shot"
+scale = "linear"
+label = "Decode Time Per Shot"
+"#,
+    );
+    let rows = vec![
+        ok_row("ldpc", 3, 0.0, 0.1, 1.0, 1000.0, 0.1),
+        ok_row("ldpc", 3, 1.25, 0.2, 2.0, 1000.0, 0.2),
+        ok_row("ldpc", 3, 10_000.0, 0.3, 3.0, 1000.0, 0.3),
+    ];
+
+    let svg = render_plot_svg(&spec, &rows, "manual-linear-tick-formats.svg");
+
+    assert!(
+        svg.contains("1.25"),
+        "linear p-axis should trim ordinary decimal tick labels; svg was:\n{svg}"
+    );
+    assert!(
+        svg.contains("1.0e4"),
+        "linear p-axis should use scientific notation for large tick labels; svg was:\n{svg}"
+    );
+}
+
+#[test]
 fn log_log_fit_rejects_invalid_degenerate_and_overflowing_inputs() {
     assert!(log_log_fit_for_plot(&[(0.1, Some(f64::NAN)), (0.2, Some(0.04))]).is_none());
     assert!(log_log_fit_for_plot(&[(0.1, Some(0.01)), (0.1, Some(0.02))]).is_none());
-    assert!(
-        log_log_fit_for_plot(&[
-            (1.49e-304, Some(2.09e304)),
-            (3.96e-44, Some(6.7e-322)),
-            (3.11e43, Some(1.06e-217)),
-        ])
-        .is_none()
-    );
+    assert!(log_log_fit_for_plot(&[
+        (1.49e-304, Some(2.09e304)),
+        (3.96e-44, Some(6.7e-322)),
+        (3.11e43, Some(1.06e-217)),
+    ])
+    .is_none());
 }
 
 #[test]
@@ -1828,13 +1920,25 @@ fn surface_compare_fixture_rows() -> Vec<BenchmarkResultRow> {
                     FailureKind::Ok
                 },
                 params: ParamMap::from_pairs([
-                    ("distance", serde_json::json!(field("distance").parse::<u64>().unwrap())),
-                    ("rounds", serde_json::json!(field("rounds").parse::<u64>().unwrap())),
+                    (
+                        "distance",
+                        serde_json::json!(field("distance").parse::<u64>().unwrap()),
+                    ),
+                    (
+                        "rounds",
+                        serde_json::json!(field("rounds").parse::<u64>().unwrap()),
+                    ),
                     ("p", serde_json::json!(field("p").parse::<f64>().unwrap())),
                 ]),
                 case_summary: CaseSummary::from_pairs([
-                    ("num_dets", serde_json::json!(field("num_dets").parse::<u64>().unwrap())),
-                    ("num_obs", serde_json::json!(field("num_obs").parse::<u64>().unwrap())),
+                    (
+                        "num_dets",
+                        serde_json::json!(field("num_dets").parse::<u64>().unwrap()),
+                    ),
+                    (
+                        "num_obs",
+                        serde_json::json!(field("num_obs").parse::<u64>().unwrap()),
+                    ),
                 ]),
                 metrics: MetricMap::from_pairs([
                     (
@@ -2023,6 +2127,39 @@ fn ok_row(
             ("decode_us_per_shot", decode_us_per_shot),
             ("shots_used", shots_used),
             ("logical_errors", logical_errors),
+        ]),
+        artifacts: std::collections::BTreeMap::new(),
+        error: None,
+    }
+}
+
+fn bb_compare_row(
+    runner: &str,
+    code_id: &str,
+    p: f64,
+    run_seconds_per_shot: f64,
+) -> BenchmarkResultRow {
+    BenchmarkResultRow {
+        benchmark: "bb_circuit_bposd_compare".into(),
+        runner: runner.into(),
+        language: if runner == "rbposd" {
+            "rust".into()
+        } else {
+            "python".into()
+        },
+        status: "ok".into(),
+        failure_kind: FailureKind::LogicalFailure,
+        params: ParamMap::from_pairs([
+            ("code_id", serde_json::json!(code_id)),
+            ("p", serde_json::json!(p)),
+        ]),
+        case_summary: CaseSummary::from_pairs([("num_obs", serde_json::json!(1))]),
+        metrics: MetricMap::from_pairs([
+            ("logical_error_rate", 0.1),
+            ("decode_us_per_shot", run_seconds_per_shot),
+            ("run_seconds_per_shot", run_seconds_per_shot),
+            ("shots_used", 1000.0),
+            ("logical_errors", 100.0),
         ]),
         artifacts: std::collections::BTreeMap::new(),
         error: None,

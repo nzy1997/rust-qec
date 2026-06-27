@@ -2,6 +2,8 @@ from dataclasses import replace
 
 from benchmarks.bb_circuit_bposd_compare import run_compare
 from benchmarks.bb_circuit_bposd_compare.cases import (
+    BB72_BB144_FULL_CASES,
+    BB72_BB144_PLOT_SMOKE_CASES,
     DIAGNOSTIC_CASES,
     DIAGNOSTIC_TRIALS,
     SMALL_LDPC_CASES,
@@ -28,6 +30,21 @@ def _diagnostic_case(code_id: str):
     return next(case for case in DIAGNOSTIC_CASES if case.code_id == code_id)
 
 
+def _supported_bb72_bb144_sweep():
+    return {
+        code_id: (cycles, p_values)
+        for code_id, (cycles, p_values) in EXPECTED_SWEEPS.items()
+        if code_id in {"bb72", "bb144"}
+    }
+
+
+def _bb72_bb144_full_sweep():
+    return {
+        "bb72": (6, (0.003, 0.004, 0.005, 0.006)),
+        "bb144": (12, (0.003, 0.004, 0.005, 0.006)),
+    }
+
+
 def test_diagnostic_catalog_has_exact_high_p_points() -> None:
     assert DIAGNOSTIC_TRIALS == 1
     assert validate_diagnostic_cases(DIAGNOSTIC_CASES) == []
@@ -44,6 +61,43 @@ def test_diagnostic_catalog_has_exact_high_p_points() -> None:
     assert bb144.num_cycles == 12
     assert bb144.num_trials == 1
     assert bb144.seed == 12345
+
+
+def test_bb72_bb144_plot_smoke_uses_full_physical_p_grid_with_small_trials() -> None:
+    assert len(BB72_BB144_PLOT_SMOKE_CASES) == 8
+    for code_id, (cycles, p_values) in _bb72_bb144_full_sweep().items():
+        cases = [
+            case for case in BB72_BB144_PLOT_SMOKE_CASES if case.code_id == code_id
+        ]
+        assert tuple(case.p for case in cases) == p_values
+        assert {case.num_cycles for case in cases} == {cycles}
+        assert {case.num_trials for case in cases} == {10}
+        assert {case.max_errors for case in cases} == {200}
+        assert all(case.case_id == format_case_id(case) for case in cases)
+
+
+def test_bb72_bb144_full_suite_uses_same_physical_p_grid_with_shared_budgets() -> None:
+    assert len(BB72_BB144_FULL_CASES) == 8
+    for code_id, (cycles, p_values) in _bb72_bb144_full_sweep().items():
+        cases = [case for case in BB72_BB144_FULL_CASES if case.code_id == code_id]
+        assert tuple(case.p for case in cases) == p_values
+        assert {case.num_cycles for case in cases} == {cycles}
+        assert {case.num_trials for case in cases} == {1_000_000}
+        assert {case.max_errors for case in cases} == {200}
+        assert all(case.case_id == format_case_id(case) for case in cases)
+
+    assert {
+        (case.code_id, case.p): case.num_trials for case in BB72_BB144_FULL_CASES
+    } == {
+        ("bb72", 0.003): 1_000_000,
+        ("bb72", 0.004): 1_000_000,
+        ("bb72", 0.005): 1_000_000,
+        ("bb72", 0.006): 1_000_000,
+        ("bb144", 0.003): 1_000_000,
+        ("bb144", 0.004): 1_000_000,
+        ("bb144", 0.005): 1_000_000,
+        ("bb144", 0.006): 1_000_000,
+    }
 
 
 def test_diagnostic_catalog_case_ids_and_decoder_settings_are_pinned() -> None:

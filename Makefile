@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full
 
 DEFAULT_BRANCH ?= master
 
@@ -15,6 +15,8 @@ help:
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
 	@echo "  surface-decoder-compare-full  - Run the full surface decoder comparison benchmark"
 	@echo "  bb-circuit-bposd-compare-smoke - Run the BB circuit rbposd vs ldpc/bposd smoke comparison"
+	@echo "  bb-circuit-bposd-compare-plot-smoke - Run tiny BB72/BB144 batched compare and plot smoke"
+	@echo "  bb-circuit-bposd-compare-full - Run the full BB72/BB144 batched compare suite"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -57,6 +59,14 @@ surface-decoder-compare-full:
 bb-circuit-bposd-compare-smoke:
 	python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke
 	python3 -m benchmarks.bb_circuit_bposd_compare.verify_smoke benchmarks/bb_circuit_bposd_compare/results/smoke/results.csv
+
+bb-circuit-bposd-compare-plot-smoke:
+	cargo build --release -p rsinter
+	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/plot-smoke --rust-binary target/release/rsinter --batch-size 10
+
+bb-circuit-bposd-compare-full:
+	cargo build --release -p rsinter
+	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier full --output-dir benchmarks/bb_circuit_bposd_compare/results/full --rust-binary target/release/rsinter --batch-size 500
 
 # Release a new version: make release V=0.2.0
 release:
