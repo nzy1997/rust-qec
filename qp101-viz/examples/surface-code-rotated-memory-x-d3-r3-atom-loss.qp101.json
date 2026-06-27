@@ -324,272 +324,28 @@
       ]
     },
     {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        4,
-        7,
-        6,
-        9,
-        10,
-        14,
-        3,
-        0,
-        8,
-        5,
-        15,
-        11
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        4,
-        1,
-        6,
-        3,
-        10,
-        8,
-        2,
-        0,
-        7,
-        5,
-        14,
-        11
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        8,
-        10,
-        13,
-        12,
-        15,
-        2,
-        5,
-        9,
-        11,
-        14,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        2,
-        10,
-        7,
-        12,
-        9,
-        1,
-        5,
-        8,
-        11,
-        13,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        0
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        5
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        11
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        16
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        0.0,
-        0.0
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
       ],
-      "sources": [
+      "raw_targets": [
         {
-          "kind": "rec",
-          "offset": -7
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
+          "kind": "qubit",
+          "index": 4
+        },
         {
-          "kind": "rec",
-          "offset": -5
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
+          "kind": "qubit",
+          "index": 6
+        },
         {
-          "kind": "rec",
-          "offset": -4
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        6.0,
-        0.0
-      ],
-      "sources": [
+          "kind": "qubit",
+          "index": 10
+        },
         {
-          "kind": "rec",
-          "offset": -2
+          "kind": "qubit",
+          "index": 12
         }
-      ]
-    },
-    {
-      "type": "shift_coords",
-      "delta": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        12
       ]
     },
     {
@@ -612,663 +368,6 @@
         15,
         11
       ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        4,
-        1,
-        6,
-        3,
-        10,
-        8,
-        2,
-        0,
-        7,
-        5,
-        14,
-        11
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        8,
-        10,
-        13,
-        12,
-        15,
-        2,
-        5,
-        9,
-        11,
-        14,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        2,
-        10,
-        7,
-        12,
-        9,
-        1,
-        5,
-        8,
-        11,
-        13,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        0
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        5
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        11
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        16
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        0.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -8
-        },
-        {
-          "kind": "rec",
-          "offset": -16
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        0.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -7
-        },
-        {
-          "kind": "rec",
-          "offset": -15
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -6
-        },
-        {
-          "kind": "rec",
-          "offset": -14
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -5
-        },
-        {
-          "kind": "rec",
-          "offset": -13
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -4
-        },
-        {
-          "kind": "rec",
-          "offset": -12
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -3
-        },
-        {
-          "kind": "rec",
-          "offset": -11
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        6.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -2
-        },
-        {
-          "kind": "rec",
-          "offset": -10
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        6.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -1
-        },
-        {
-          "kind": "rec",
-          "offset": -9
-        }
-      ]
-    },
-    {
-      "type": "shift_coords",
-      "delta": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        4,
-        7,
-        6,
-        9,
-        10,
-        14,
-        3,
-        0,
-        8,
-        5,
-        15,
-        11
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        4,
-        1,
-        6,
-        3,
-        10,
-        8,
-        2,
-        0,
-        7,
-        5,
-        14,
-        11
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        8,
-        10,
-        13,
-        12,
-        15,
-        2,
-        5,
-        9,
-        11,
-        14,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "CX",
-      "targets": [
-        6,
-        2,
-        10,
-        7,
-        12,
-        9,
-        1,
-        5,
-        8,
-        11,
-        13,
-        16
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "H",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "tick"
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        0
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        4
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        5
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        6
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        10
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        11
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        12
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MR",
-      "targets": [
-        16
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        0.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -8
-        },
-        {
-          "kind": "rec",
-          "offset": -16
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        0.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -7
-        },
-        {
-          "kind": "rec",
-          "offset": -15
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -6
-        },
-        {
-          "kind": "rec",
-          "offset": -14
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        2.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -5
-        },
-        {
-          "kind": "rec",
-          "offset": -13
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -4
-        },
-        {
-          "kind": "rec",
-          "offset": -12
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        4.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -3
-        },
-        {
-          "kind": "rec",
-          "offset": -11
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        4.0,
-        6.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -2
-        },
-        {
-          "kind": "rec",
-          "offset": -10
-        }
-      ]
-    },
-    {
-      "type": "detector",
-      "coords": [
-        6.0,
-        2.0,
-        0.0
-      ],
-      "sources": [
-        {
-          "kind": "rec",
-          "offset": -1
-        },
-        {
-          "kind": "rec",
-          "offset": -9
-        }
-      ]
-    },
-    {
-      "type": "tick"
     },
     {
       "type": "noise",
@@ -1279,15 +378,27 @@
       "raw_targets": [
         {
           "kind": "qubit",
-          "index": 1
+          "index": 4
         },
         {
           "kind": "qubit",
-          "index": 8
+          "index": 7
         },
         {
           "kind": "qubit",
-          "index": 15
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 14
         },
         {
           "kind": "qubit",
@@ -1295,13 +406,1703 @@
         },
         {
           "kind": "qubit",
-          "index": 13
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        4,
+        1,
+        6,
+        3,
+        10,
+        8,
+        2,
+        0,
+        7,
+        5,
+        14,
+        11
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 5
         },
         {
           "kind": "qubit",
           "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 11
         }
       ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        8,
+        10,
+        13,
+        12,
+        15,
+        2,
+        5,
+        9,
+        11,
+        14,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        2,
+        10,
+        7,
+        12,
+        9,
+        1,
+        5,
+        8,
+        11,
+        13,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        5
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        11
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        16
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -7
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -5
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -4
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        6.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        }
+      ]
+    },
+    {
+      "type": "shift_coords",
+      "delta": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        4,
+        7,
+        6,
+        9,
+        10,
+        14,
+        3,
+        0,
+        8,
+        5,
+        15,
+        11
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        4,
+        1,
+        6,
+        3,
+        10,
+        8,
+        2,
+        0,
+        7,
+        5,
+        14,
+        11
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        8,
+        10,
+        13,
+        12,
+        15,
+        2,
+        5,
+        9,
+        11,
+        14,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        2,
+        10,
+        7,
+        12,
+        9,
+        1,
+        5,
+        8,
+        11,
+        13,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        5
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        11
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        16
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        0.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -8
+        },
+        {
+          "kind": "rec",
+          "offset": -16
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -7
+        },
+        {
+          "kind": "rec",
+          "offset": -15
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -6
+        },
+        {
+          "kind": "rec",
+          "offset": -14
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -5
+        },
+        {
+          "kind": "rec",
+          "offset": -13
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -4
+        },
+        {
+          "kind": "rec",
+          "offset": -12
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -3
+        },
+        {
+          "kind": "rec",
+          "offset": -11
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        6.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -10
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        6.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        },
+        {
+          "kind": "rec",
+          "offset": -9
+        }
+      ]
+    },
+    {
+      "type": "shift_coords",
+      "delta": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        4,
+        7,
+        6,
+        9,
+        10,
+        14,
+        3,
+        0,
+        8,
+        5,
+        15,
+        11
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        4,
+        1,
+        6,
+        3,
+        10,
+        8,
+        2,
+        0,
+        7,
+        5,
+        14,
+        11
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        8,
+        10,
+        13,
+        12,
+        15,
+        2,
+        5,
+        9,
+        11,
+        14,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 15
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 14
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        6,
+        2,
+        10,
+        7,
+        12,
+        9,
+        1,
+        5,
+        8,
+        11,
+        13,
+        16
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 7
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        },
+        {
+          "kind": "qubit",
+          "index": 9
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 5
+        },
+        {
+          "kind": "qubit",
+          "index": 8
+        },
+        {
+          "kind": "qubit",
+          "index": 11
+        },
+        {
+          "kind": "qubit",
+          "index": 13
+        },
+        {
+          "kind": "qubit",
+          "index": 16
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "H",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "LOSS",
+      "params": [
+        0.01
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 4
+        },
+        {
+          "kind": "qubit",
+          "index": 6
+        },
+        {
+          "kind": "qubit",
+          "index": 10
+        },
+        {
+          "kind": "qubit",
+          "index": 12
+        }
+      ]
+    },
+    {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        0
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        5
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        6
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        10
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        11
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        12
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "MR",
+      "targets": [
+        16
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        0.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -8
+        },
+        {
+          "kind": "rec",
+          "offset": -16
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -7
+        },
+        {
+          "kind": "rec",
+          "offset": -15
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -6
+        },
+        {
+          "kind": "rec",
+          "offset": -14
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        2.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -5
+        },
+        {
+          "kind": "rec",
+          "offset": -13
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -4
+        },
+        {
+          "kind": "rec",
+          "offset": -12
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        4.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -3
+        },
+        {
+          "kind": "rec",
+          "offset": -11
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        4.0,
+        6.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -2
+        },
+        {
+          "kind": "rec",
+          "offset": -10
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [
+        6.0,
+        2.0,
+        0.0
+      ],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
+        },
+        {
+          "kind": "rec",
+          "offset": -9
+        }
+      ]
+    },
+    {
+      "type": "tick"
     },
     {
       "type": "noise",

@@ -64,7 +64,14 @@ pub fn showcase_cases() -> Vec<ShowcaseCase> {
 }
 
 pub fn mixed_noise_rotated_memory_x_d3_r3() -> Vec<StimInstr> {
-    let base = crate::codegen::surface_code::rotated_memory_x(3, 3, 0.0);
+    let base = crate::codegen::surface_code::rotated_memory_x_with_params(
+        3,
+        3,
+        crate::codegen::NoiseParams {
+            after_clifford_loss_probability: 0.01,
+            ..crate::codegen::NoiseParams::none()
+        },
+    );
     let mut out = Vec::with_capacity(base.len() + 5);
     let insertion_index = final_tick_before_first_mx_index(&base)
         .expect("rotated_memory_x(3, 3, 0.0) should contain a final TICK before MX");
@@ -72,7 +79,6 @@ pub fn mixed_noise_rotated_memory_x_d3_r3() -> Vec<StimInstr> {
     for (index, instr) in base.into_iter().enumerate() {
         out.push(instr);
         if index == insertion_index {
-            out.push(noise_op("LOSS", &[1, 8, 15, 3, 13, 14]));
             out.push(noise_op("X_ERROR", &[2, 7, 9, 1]));
             out.push(noise_op("Z_ERROR", &[3, 13, 15]));
             out.push(noise_op("DEPOLARIZE1", &[9, 14, 8]));

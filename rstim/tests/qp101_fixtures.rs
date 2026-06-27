@@ -12,10 +12,7 @@ const MIXED_NOISE_SAMPLE_FIXTURE: &str =
     "surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json";
 const MIXED_NOISE_SAMPLE_SEED: u64 = 7;
 const MIXED_NOISE_ROUNDS: usize = 3;
-const MIXED_NOISE_DATA_QUBITS: usize = 9;
-const MAX_SPARSE_LOSS_TARGETS: usize = 6;
 const MAX_SPARSE_PAULI_TARGETS_PER_KIND: usize = 6;
-const MAX_TOTAL_MIXED_NOISE_TARGETS: usize = 18;
 
 fn fixture_path(file_name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -121,7 +118,7 @@ fn surface_code_fixture_has_expected_qp101_markers() {
 }
 
 #[test]
-fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
+fn mixed_noise_showcase_circuit_uses_generated_after_clifford_loss_and_common_pauli_noise() {
     let instrs = mixed_noise_showcase_instrs();
     let circuit_text = circuit_to_string(&instrs);
 
@@ -140,16 +137,16 @@ fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
 
     let loss_target_count = count_target_tokens_for_op(&circuit_text, "LOSS(0.01)");
     assert!(
-        loss_target_count > 0,
-        "mixed-noise showcase should contain at least one sparse loss target"
+        loss_target_count >= MIXED_NOISE_ROUNDS * 6,
+        "showcase should get dense after-Clifford atom loss from generation, got {loss_target_count} loss targets"
     );
     assert!(
-        loss_target_count <= MAX_SPARSE_LOSS_TARGETS,
-        "expected sparse loss placement (<= {MAX_SPARSE_LOSS_TARGETS} targets), got {loss_target_count}"
+        circuit_text.contains("H 4\nH 6\nH 10\nH 12\nLOSS(0.01) 4 6 10 12"),
+        "showcase should place LOSS immediately after H layers:\n{circuit_text}"
     );
     assert!(
-        loss_target_count < MIXED_NOISE_ROUNDS * MIXED_NOISE_DATA_QUBITS,
-        "loss placement regressed to the old dense pattern: {loss_target_count} targets"
+        circuit_text.contains("CX") && circuit_text.contains("\nLOSS(0.01)"),
+        "showcase should place LOSS after CX layers:\n{circuit_text}"
     );
 
     let pauli_target_counts = [
@@ -164,12 +161,6 @@ fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
             count_target_tokens_for_op(&circuit_text, "DEPOLARIZE2(0.01)"),
         ),
     ];
-    let total_mixed_noise_targets = loss_target_count
-        + pauli_target_counts
-            .iter()
-            .map(|(_, count)| *count)
-            .sum::<usize>();
-
     for (noise_op, target_count) in pauli_target_counts {
         assert!(
             target_count > 0,
@@ -180,10 +171,6 @@ fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
             "{noise_op} should stay sparse (<= {MAX_SPARSE_PAULI_TARGETS_PER_KIND} targets), got {target_count}"
         );
     }
-    assert!(
-        total_mixed_noise_targets <= MAX_TOTAL_MIXED_NOISE_TARGETS,
-        "mixed-noise showcase should remain visually sparse (<= {MAX_TOTAL_MIXED_NOISE_TARGETS} total noise targets), got {total_mixed_noise_targets}"
-    );
 }
 
 #[test]
