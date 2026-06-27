@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from benchmarks.bb_circuit_bposd_compare.verify_replay_trace import (
+    PINNED_SYNDROME_SUPPORT,
     main,
     verify_trace,
 )
@@ -15,7 +16,7 @@ CASE_ID = "bb90-p006-c10-seed12345-order7-hard-syndrome"
 EXPECTED_LOGICAL = [False, True, False, True, False, False, False, True]
 RUST_PREDICTED_LOGICAL = [False, True, False, True, False, False, False, True]
 PYTHON_PREDICTED_LOGICAL = [True, True, False, True, False, False, False, True]
-SYNDROME_SUPPORT = [5, 8, 14]
+SYNDROME_SUPPORT = PINNED_SYNDROME_SUPPORT
 
 
 def make_trace() -> dict[str, object]:
@@ -137,6 +138,60 @@ class VerifyReplayTraceTest(unittest.TestCase):
         trace["decoders"][1]["residual_syndrome_support"] = [42]
         self.assertIn(
             "ldpc_bposd residual_syndrome_matches contradicts residual_syndrome_weight",
+            "\n".join(verify_trace(trace)),
+        )
+
+    def test_verify_trace_rejects_wrong_pinned_artifact_metadata(self) -> None:
+        trace = make_trace()
+        trace["schema_version"] = 99
+        trace["case_id"] = "wrong-case"
+        trace["basis"] = "X"
+        trace["syndrome_weight"] = 999
+        trace["decoders"][0]["case_id"] = "wrong-case"
+        trace["decoders"][1]["case_id"] = "wrong-case"
+        trace["decoders"][0]["basis"] = "X"
+        trace["decoders"][1]["basis"] = "X"
+
+        errors = "\n".join(verify_trace(trace))
+
+        self.assertIn("trace schema_version must be 1", errors)
+        self.assertIn(
+            "trace case_id must be bb90-p006-c10-seed12345-order7-hard-syndrome",
+            errors,
+        )
+        self.assertIn("trace basis must be Z", errors)
+        self.assertIn("trace syndrome_weight does not match syndrome_support", errors)
+
+    def test_verify_trace_rejects_wrong_pinned_syndrome_support(self) -> None:
+        trace = make_trace()
+        mutated_support = list(SYNDROME_SUPPORT)
+        mutated_support[-1] += 1
+        trace["syndrome_support"] = mutated_support
+        trace["syndrome_weight"] = len(mutated_support)
+        trace["decoders"][0]["syndrome_support"] = mutated_support
+        trace["decoders"][1]["syndrome_support"] = mutated_support
+
+        self.assertIn(
+            "trace syndrome_support does not match pinned hard replay",
+            "\n".join(verify_trace(trace)),
+        )
+
+    def test_verify_trace_rejects_wrong_bp_osd_settings(self) -> None:
+        trace = make_trace()
+        trace["decoders"][1]["bp_osd_settings"]["max_iter"] = 1
+
+        self.assertIn(
+            "ldpc_bposd bp_osd_settings max_iter must be 10000",
+            "\n".join(verify_trace(trace)),
+        )
+
+    def test_verify_trace_rejects_non_mismatch_classification(self) -> None:
+        trace = make_trace()
+        trace["classification"] = "matched"
+        trace["decoders"][1]["predicted_logical"] = RUST_PREDICTED_LOGICAL
+
+        self.assertIn(
+            "trace classification must be logical_prediction_mismatch",
             "\n".join(verify_trace(trace)),
         )
 

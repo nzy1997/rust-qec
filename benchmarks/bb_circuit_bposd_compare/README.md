@@ -226,7 +226,9 @@ case: it accepts a complete paired trace and records the mismatch as
 Missing Python decoder dependencies remain explicit: `run_compare` records a
 skipped Python row and exits nonzero unless `--allow-missing-python` is passed.
 `verify_replay` also rejects skipped Python rows unless its own
-`--allow-missing-python` diagnostic flag is used.
+`--allow-missing-python` diagnostic flag is used. `verify_replay_trace` always
+requires a complete paired correction trace, so it rejects the incomplete trace
+written by `run_compare --allow-missing-python`.
 
 ### Counter-Bounded Release Smoke
 

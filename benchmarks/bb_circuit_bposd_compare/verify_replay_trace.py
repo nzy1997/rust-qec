@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from benchmarks.bb_circuit_bposd_compare.cases import HARD_REPLAY_CASES
+
 
 REQUIRED_TOP_LEVEL = (
     "schema_version",
@@ -32,6 +34,29 @@ REQUIRED_DECODER_FIELDS = (
     "residual_syndrome_support",
     "predicted_logical",
 )
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PINNED_FIXTURE_PATH = (
+    REPO_ROOT
+    / "rsinter"
+    / "tests"
+    / "fixtures"
+    / "bb_circuit_bposd"
+    / "bb90_hard_syndrome.json"
+)
+PINNED_FIXTURE = json.loads(PINNED_FIXTURE_PATH.read_text())
+PINNED_CASE = HARD_REPLAY_CASES[0]
+PINNED_SCHEMA_VERSION = 1
+PINNED_CASE_ID = PINNED_CASE.case_id
+PINNED_BASIS = "Z"
+PINNED_SYNDROME_SUPPORT = list(PINNED_FIXTURE["syndrome_support"])
+PINNED_EXPECTED_LOGICAL = list(PINNED_FIXTURE["expected_sampled_logical"])
+PINNED_BP_OSD_SETTINGS = {
+    "bp_method": PINNED_CASE.bp_method,
+    "max_iter": PINNED_CASE.max_iter,
+    "osd_method": PINNED_CASE.osd_method,
+    "osd_order": PINNED_CASE.osd_order,
+}
+PINNED_CLASSIFICATION = "logical_prediction_mismatch"
 
 
 def verify_trace(trace: dict[str, Any]) -> list[str]:
@@ -41,6 +66,7 @@ def verify_trace(trace: dict[str, Any]) -> list[str]:
             errors.append(f"trace missing {field}")
     if errors:
         return errors
+    _verify_pinned_top_level(trace, errors)
 
     decoders = trace.get("decoders")
     if not isinstance(decoders, list):
@@ -81,7 +107,32 @@ def verify_trace(trace: dict[str, Any]) -> list[str]:
             "trace classification mismatch: "
             f"expected {expected_classification}, got {trace.get('classification')}"
         )
+    if trace.get("classification") != PINNED_CLASSIFICATION:
+        errors.append(f"trace classification must be {PINNED_CLASSIFICATION}")
     return errors
+
+
+def _verify_pinned_top_level(trace: dict[str, Any], errors: list[str]) -> None:
+    if trace.get("schema_version") != PINNED_SCHEMA_VERSION:
+        errors.append(f"trace schema_version must be {PINNED_SCHEMA_VERSION}")
+    if trace.get("case_id") != PINNED_CASE_ID:
+        errors.append(f"trace case_id must be {PINNED_CASE_ID}")
+    if trace.get("basis") != PINNED_BASIS:
+        errors.append(f"trace basis must be {PINNED_BASIS}")
+
+    syndrome_support = trace.get("syndrome_support")
+    if not isinstance(syndrome_support, list):
+        errors.append("trace syndrome_support is not a list")
+    else:
+        if trace.get("syndrome_weight") != len(syndrome_support):
+            errors.append("trace syndrome_weight does not match syndrome_support")
+        if syndrome_support != PINNED_SYNDROME_SUPPORT:
+            errors.append("trace syndrome_support does not match pinned hard replay")
+
+    if trace.get("expected_sampled_logical") != PINNED_EXPECTED_LOGICAL:
+        errors.append(
+            "trace expected_sampled_logical does not match pinned hard replay"
+        )
 
 
 def _verify_decoder_entry(
@@ -103,6 +154,16 @@ def _verify_decoder_entry(
     for field in ("case_id", "basis", "syndrome_support", "expected_sampled_logical"):
         if entry.get(field) != trace.get(field):
             errors.append(f"{impl} is not paired with top-level {field}")
+
+    settings = entry.get("bp_osd_settings")
+    if not isinstance(settings, dict):
+        errors.append(f"{impl} bp_osd_settings is not an object")
+    else:
+        for field, expected in PINNED_BP_OSD_SETTINGS.items():
+            if settings.get(field) != expected:
+                errors.append(
+                    f"{impl} bp_osd_settings {field} must be {expected}"
+                )
 
     correction_support = entry.get("correction_support")
     if not isinstance(correction_support, list) or not correction_support:
