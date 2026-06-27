@@ -64,25 +64,17 @@ pub fn showcase_cases() -> Vec<ShowcaseCase> {
 }
 
 pub fn mixed_noise_rotated_memory_x_d3_r3() -> Vec<StimInstr> {
-    let base = crate::codegen::surface_code::rotated_memory_x_with_params(
-        3,
-        3,
-        crate::codegen::NoiseParams {
-            after_clifford_loss_probability: 0.01,
-            ..crate::codegen::NoiseParams::none()
-        },
-    );
-    let mut out = Vec::with_capacity(base.len() + 5);
+    let mut noise = crate::codegen::NoiseParams::uniform(0.01);
+    noise.after_clifford_loss_probability = 0.01;
+    let base = crate::codegen::surface_code::rotated_memory_x_with_params(3, 3, noise);
+    let mut out = Vec::with_capacity(base.len() + 1);
     let insertion_index = final_tick_before_first_mx_index(&base)
         .expect("rotated_memory_x(3, 3, 0.0) should contain a final TICK before MX");
 
     for (index, instr) in base.into_iter().enumerate() {
         out.push(instr);
         if index == insertion_index {
-            out.push(noise_op("X_ERROR", &[2, 7, 9, 1]));
             out.push(noise_op("Z_ERROR", &[3, 13, 15]));
-            out.push(noise_op("DEPOLARIZE1", &[9, 14, 8]));
-            out.push(noise_op("DEPOLARIZE2", &[1, 2]));
         }
     }
 
@@ -90,14 +82,18 @@ pub fn mixed_noise_rotated_memory_x_d3_r3() -> Vec<StimInstr> {
 }
 
 fn final_tick_before_first_mx_index(instrs: &[StimInstr]) -> Option<usize> {
-    let first_mx = instrs.iter().position(|instr| matches!(
-        instr,
-        StimInstr::Op { name, .. } if name == "MX"
-    ))?;
-    instrs[..first_mx].iter().rposition(|instr| matches!(
-        instr,
-        StimInstr::Op { name, .. } if name == "TICK"
-    ))
+    let first_mx = instrs.iter().position(|instr| {
+        matches!(
+            instr,
+            StimInstr::Op { name, .. } if name == "MX"
+        )
+    })?;
+    instrs[..first_mx].iter().rposition(|instr| {
+        matches!(
+            instr,
+            StimInstr::Op { name, .. } if name == "TICK"
+        )
+    })
 }
 
 fn noise_op(name: &str, qubits: &[u32]) -> StimInstr {
