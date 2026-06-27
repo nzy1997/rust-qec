@@ -8,6 +8,20 @@ and what its limits are.
 Individual showcase pages will be added by follow-up issues. Use
 [`_template.md`](docs/showcases/_template.md) for new pages.
 
+## Visual Highlights
+
+| Compact atom-loss sample-shot circuit | Surface-code d=3 r=3 atom-loss sample |
+| --- | --- |
+| ![Seeded atom-loss sample-shot SVG render](assets/atom-loss-sample-seed7.svg) | ![Seeded surface-code d=3 r=3 atom-loss sample-shot SVG render](assets/surface-code-d3-r3-atom-loss-seed7.svg) |
+
+| Surface-code decoder comparison | Stim versus rsinter memory-Z sweep |
+| --- | --- |
+| ![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png) | ![Stim versus rsinter memory-Z sweep plot](../figures/issue-65-memory-z-stim-vs-rsinter.png) |
+
+BB144 reference context:
+
+![BB144 LDPC versus surface reference plot](../figures/bb144_reference/ldpc_vs_surface.png)
+
 ## Categories
 
 ### Simulator And CLI Workflows
