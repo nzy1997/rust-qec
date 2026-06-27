@@ -104,3 +104,34 @@ python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler benchmarks/bb_c
 ```
 
 Both passed on the final run.
+
+## Second Review Fix
+
+### RED
+
+Added a regression test for malformed accepted rows:
+
+```python
+verify_bravyi_ler.verify_rows([make_row(shots_used="bad")])
+```
+
+The focused pytest run failed in the broken parse path, first with the undefined
+`errors` name and then with a message that did not identify the numeric field.
+That confirmed the parser was still not returning a `VerificationError` for bad
+numeric input.
+
+### GREEN
+
+`_parse_row` now returns `VerificationError` instances for parse and validation
+failures, and the error text names the specific field when numeric parsing
+fails.
+
+Verification commands:
+
+```bash
+python3 -m pytest benchmarks/bb_circuit_bposd_compare/tests/test_bravyi_ler_normalization.py
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler benchmarks/bb_circuit_bposd_compare/results/full/results.csv
+```
+
+Both passed on the final run, and the new regression test now covers the
+malformed accepted-row case.

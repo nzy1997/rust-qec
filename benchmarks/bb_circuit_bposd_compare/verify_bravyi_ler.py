@@ -61,7 +61,8 @@ def verify_rows(rows: list[dict[str, str]]) -> list[VerifiedRow | VerificationEr
         if not _is_accepted_batched_row(row):
             continue
         parsed = _parse_row(row, row_index)
-        if parsed is None:
+        if isinstance(parsed, VerificationError):
+            results.append(parsed)
             continue
         case_id, decoder_impl, p, num_cycles, shots_used, logical_errors, actual = parsed
         expected = logical_errors / shots_used
@@ -93,31 +94,50 @@ def _is_accepted_batched_row(row: dict[str, str]) -> bool:
 def _parse_row(
     row: dict[str, str],
     row_index: int,
-) -> tuple[str, str, str, int, int, int, float] | None:
+) -> tuple[str, str, str, int, int, int, float] | VerificationError:
     context = f"row {row_index} {row.get('case_id', '<missing case_id>')}"
-    try:
-        num_cycles = int(row["num_cycles"])
-        shots_used = int(row["shots_used"])
-        logical_errors = int(row["logical_errors"])
-        actual = float(row["logical_error_rate"])
-    except ValueError as error:
-        errors.append(f"{context}: failed to parse numeric normalization fields: {error}")
-        return None
+
+    def parse_int(field_name: str) -> int | VerificationError:
+        try:
+            return int(row[field_name])
+        except ValueError as error:
+            return VerificationError(
+                f"{context}: failed to parse numeric field {field_name}: {error}"
+            )
+
+    def parse_float(field_name: str) -> float | VerificationError:
+        try:
+            return float(row[field_name])
+        except ValueError as error:
+            return VerificationError(
+                f"{context}: failed to parse numeric field {field_name}: {error}"
+            )
+
+    num_cycles = parse_int("num_cycles")
+    if isinstance(num_cycles, VerificationError):
+        return num_cycles
+    shots_used = parse_int("shots_used")
+    if isinstance(shots_used, VerificationError):
+        return shots_used
+    logical_errors = parse_int("logical_errors")
+    if isinstance(logical_errors, VerificationError):
+        return logical_errors
+    actual = parse_float("logical_error_rate")
+    if isinstance(actual, VerificationError):
+        return actual
+
     if num_cycles <= 0:
-        errors.append(f"{context}: num_cycles must be positive")
-        return None
+        return VerificationError(f"{context}: num_cycles must be positive")
     if shots_used <= 0:
-        errors.append(f"{context}: shots_used must be positive for trial-level LER")
-        return None
+        return VerificationError(
+            f"{context}: shots_used must be positive for trial-level LER"
+        )
     if logical_errors < 0:
-        errors.append(f"{context}: logical_errors must be nonnegative")
-        return None
+        return VerificationError(f"{context}: logical_errors must be nonnegative")
     if logical_errors > shots_used:
-        errors.append(f"{context}: logical_errors must be <= shots_used")
-        return None
+        return VerificationError(f"{context}: logical_errors must be <= shots_used")
     if not math.isfinite(actual):
-        errors.append(f"{context}: logical_error_rate must be finite")
-        return None
+        return VerificationError(f"{context}: logical_error_rate must be finite")
     return (
         row["case_id"],
         row["decoder_impl"],
