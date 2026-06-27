@@ -375,9 +375,9 @@ fn rsinter_json_compare_case_accepts_ldpc_osd_method_and_exports_trial_predictio
             "--seed",
             "12345",
             "--max-bp-iterations",
-            "10",
+            "10000",
             "--osd-order",
-            "0",
+            "7",
             "--osd-method",
             "osd_cs",
             "--json-compare-case",
@@ -387,11 +387,23 @@ fn rsinter_json_compare_case_accepts_ldpc_osd_method_and_exports_trial_predictio
 
     assert!(output.status.success(), "{output:?}");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["max_bp_iterations"], 10000);
+    assert_eq!(json["osd_order"], 7);
     let trial = &json["trials"][0];
     assert_eq!(trial["z_logical_prediction"].as_array().unwrap().len(), 12);
+    assert!(trial["z_correction"].as_array().is_some());
+    assert_eq!(
+        trial["z_correction"].as_array().unwrap().len(),
+        json["z_model"]["num_bits"].as_u64().unwrap() as usize
+    );
     assert_eq!(trial["z_profile"]["decode_call_count"], 1);
     assert!(trial["z_profile"]["decode_seconds"].as_f64().unwrap() >= 0.0);
     assert!(trial["x_logical_prediction"].as_array().is_some());
+    assert!(trial["x_correction"].as_array().is_some());
+    assert_eq!(
+        trial["x_correction"].as_array().unwrap().len(),
+        json["x_model"]["num_bits"].as_u64().unwrap() as usize
+    );
     assert_eq!(trial["x_profile"]["decode_call_count"], 1);
 }
 

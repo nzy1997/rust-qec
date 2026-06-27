@@ -233,10 +233,25 @@ The verifier checks that the rows are paired on the fixture basis/syndrome and
 that Rust and Python logical predictions match. Rust rows also carry the OSD
 and GF(2) counters from the replay decode.
 
+The hard replay also writes `hard_replay_trace.json`, a one-case correction
+trace for the pinned Z-basis syndrome. Validate it with:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_replay_trace \
+  /tmp/rstim-bb90-hard-replay/hard_replay_trace.json
+```
+
+The CSV verifier remains the historical parity gate and exits nonzero when the
+logical predictions differ. The trace verifier is the diagnostic gate for that
+case: it accepts a complete paired trace and records the mismatch as
+`classification=logical_prediction_mismatch`.
+
 Missing Python decoder dependencies remain explicit: `run_compare` records a
 skipped Python row and exits nonzero unless `--allow-missing-python` is passed.
 `verify_replay` also rejects skipped Python rows unless its own
-`--allow-missing-python` diagnostic flag is used.
+`--allow-missing-python` diagnostic flag is used. `verify_replay_trace` always
+requires a complete paired correction trace, so it rejects the incomplete trace
+written by `run_compare --allow-missing-python`.
 
 ### Counter-Bounded Release Smoke
 
