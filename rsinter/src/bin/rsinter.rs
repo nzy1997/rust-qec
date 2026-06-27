@@ -5,8 +5,9 @@ use clap::{Parser, Subcommand};
 use rbposd::OsdVariant;
 
 use rsinter::bb_circuit_memory::{
-    export_comparison_case_for_code, export_comparison_case_for_code_with_osd_variant,
-    run_simulation_for_code, run_simulation_for_code_with_osd_variant, SimulationConfig,
+    export_bravyi_model_audit_for_code, export_comparison_case_for_code,
+    export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
+    run_simulation_for_code_with_osd_variant, SimulationConfig,
 };
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
 use rsinter::bench::merge::merge_result_rows;
@@ -52,6 +53,8 @@ enum Commands {
         osd_order: usize,
         #[arg(long)]
         osd_method: Option<String>,
+        #[arg(long)]
+        json_model_audit: bool,
         #[arg(long)]
         json_compare_case: bool,
     },
@@ -195,6 +198,7 @@ fn run() -> Result<(), String> {
             max_bp_iterations,
             osd_order,
             osd_method,
+            json_model_audit,
             json_compare_case,
         } => {
             let num_trials = usize::try_from(num_trials)
@@ -213,7 +217,12 @@ fn run() -> Result<(), String> {
                 }
                 None => None,
             };
-            if json_compare_case {
+            if json_model_audit {
+                let export = export_bravyi_model_audit_for_code(&code_id, config)?;
+                serde_json::to_writer_pretty(std::io::stdout(), &export)
+                    .map_err(|e| e.to_string())?;
+                println!();
+            } else if json_compare_case {
                 let export = match osd_variant {
                     Some(osd_variant) => export_comparison_case_for_code_with_osd_variant(
                         &code_id,

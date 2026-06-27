@@ -135,6 +135,29 @@ Both rows use `bp_method=ms`, `max_iter=10000`, `osd_method=osd_cs`, and
 and Rust OSD/GF(2) counters. Missing Python dependencies produce skipped rows
 and verifier failure unless `verify_diagnostic --allow-missing-python` is used.
 
+## Bravyi Effective Model Audit
+
+The BB72 model audit builds the Rust effective decoder models without Monte
+Carlo trials and verifies their source-backed contract evidence against the
+pinned Bravyi fixture:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.bravyi_model_audit \
+  --code-id bb72 \
+  --physical-error-rate 0.003 \
+  --num-cycles 6 \
+  --out /tmp/rstim-bb-model-audit/model_audit.json
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_model_audit \
+  /tmp/rstim-bb-model-audit/model_audit.json
+```
+
+The verifier checks BB72 shape, schedule labels and counts,
+`num_cycles_plus_tail=8`, X/Z `first_logical_row`, decoder dimensions,
+grouped-column hashes, and grouped probability totals. A negative control can
+copy the audit JSON, change `observed.syndrome_tail.noiseless_tail_cycles` from
+`2` to `1`, and rerun `verify_model_audit`; the verifier exits nonzero and
+names the tail-cycle mismatch.
+
 ## Full-Campaign Readiness Gate
 
 Before launching the full BB small-LDPC campaign, collect the prerequisite
