@@ -45,6 +45,9 @@ PYTHON_UPSTREAM_BP_METHOD = "ms"
 PYTHON_UPSTREAM_MAX_ITER = 10000
 PYTHON_UPSTREAM_OSD_METHOD = "osd_cs"
 PYTHON_UPSTREAM_OSD_ORDER = 7
+PYTHON_UPSTREAM_MS_SCALING_FACTOR = 0
+PYTHON_FAILURE_UNIT = "monte_carlo_trial"
+PYTHON_FAILURE_PREDICATE = "z_first_x_only_if_z_succeeds"
 PYTHON_DEPENDENCY_HINTS = ("ldpc", "bposd", "numpy", "bposddecoder")
 RUST_PROFILE_COUNTER_FIELDS = (
     "bp_seconds",
@@ -133,6 +136,17 @@ def _python_upstream_settings() -> dict[str, str]:
         "max_iter": _format_value(PYTHON_UPSTREAM_MAX_ITER),
         "osd_method": PYTHON_UPSTREAM_OSD_METHOD,
         "osd_order": _format_value(PYTHON_UPSTREAM_OSD_ORDER),
+    }
+
+
+def _python_bposd_decoder_kwargs() -> dict[str, object]:
+    return {
+        "max_iter": PYTHON_UPSTREAM_MAX_ITER,
+        "bp_method": PYTHON_UPSTREAM_BP_METHOD,
+        "ms_scaling_factor": PYTHON_UPSTREAM_MS_SCALING_FACTOR,
+        "osd_method": PYTHON_UPSTREAM_OSD_METHOD,
+        "osd_order": PYTHON_UPSTREAM_OSD_ORDER,
+        "input_vector_type": "syndrome",
     }
 
 
@@ -425,11 +439,7 @@ def _python_hard_replay_row(
     decoder = BpOsdDecoder(
         _dense_matrix(bundle["model"], np),
         error_channel=bundle["model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     setup_seconds = time.perf_counter() - setup_started
 
@@ -467,20 +477,12 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
     z_decoder = BpOsdDecoder(
         _dense_matrix(export["z_model"], np),
         error_channel=export["z_model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     x_decoder = BpOsdDecoder(
         _dense_matrix(export["x_model"], np),
         error_channel=export["x_model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     setup_seconds = time.perf_counter() - setup_started
 

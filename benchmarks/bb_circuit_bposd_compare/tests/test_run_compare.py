@@ -296,6 +296,7 @@ class RunCompareTest(unittest.TestCase):
             self.assertEqual(decoder.kwargs["max_iter"], 10000)
             self.assertEqual(decoder.kwargs["osd_method"], "osd_cs")
             self.assertEqual(decoder.kwargs["osd_order"], 7)
+            self.assertEqual(decoder.kwargs["ms_scaling_factor"], 0)
             self.assertEqual(decoder.kwargs["input_vector_type"], "syndrome")
 
     def test_run_suite_writes_skipped_python_rows_and_returns_nonzero(self) -> None:
