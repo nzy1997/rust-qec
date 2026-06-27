@@ -211,13 +211,99 @@ fn ldpc_osd_cs_candidate_plan_counts_singles_and_order_pairs() {
 }
 
 #[test]
-fn ldpc_osd_cs_uses_channel_prior_candidate_weight() {
+fn ldpc_osd_cs_solves_original_syndrome_instead_of_bp_residual() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 4, vec![vec![1]]).unwrap();
+    let channel = ChannelModel::BitFlipProbabilities(vec![0.05, 0.05, 0.05, 0.6]);
+    let syndrome = Syndrome::from(vec![true]);
+    let config = DecoderConfig {
+        max_bp_iterations: 0,
+        osd_variant: OsdVariant::LdpcCombinationSweep,
+        osd_order: 1,
+        ..DecoderConfig::default()
+    };
+
+    let result = BpOsdDecoder::new(pcm.clone(), channel.clone(), config)
+        .unwrap()
+        .decode(&syndrome)
+        .unwrap();
+
+    assert_eq!(
+        result.correction,
+        Correction::from(vec![false, true, false, false])
+    );
+    assert_eq!(pcm.multiply(&result.correction), syndrome);
+
+    let legacy = BpOsdDecoder::new(
+        pcm,
+        channel,
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_variant: OsdVariant::LegacyCombinationSweep,
+            osd_order: 1,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap()
+    .decode(&syndrome)
+    .unwrap();
+
+    assert_eq!(
+        legacy.correction,
+        Correction::from(vec![false, true, false, true])
+    );
+}
+
+#[test]
+fn ldpc_osd_cs_zero_syndrome_fast_path_respects_tied_prior_decision() {
+    let pcm = ParityCheckMatrix::from_sparse_rows(1, 1, vec![vec![0]]).unwrap();
+    let syndrome = Syndrome::from(vec![false]);
+    let channel = ChannelModel::BitFlipProbabilities(vec![0.5]);
+    let ldpc_config = DecoderConfig {
+        max_bp_iterations: 0,
+        osd_variant: OsdVariant::LdpcCombinationSweep,
+        osd_order: 0,
+        ..DecoderConfig::default()
+    };
+
+    let ldpc = BpOsdDecoder::new(pcm.clone(), channel.clone(), ldpc_config).unwrap();
+
+    let result = ldpc.decode(&syndrome).unwrap();
+    assert!(result.used_osd);
+    assert_eq!(result.bp_iterations, 0);
+    assert_eq!(result.correction, Correction::from(vec![false]));
+    let diagnostic = ldpc.diagnose_osd_path(&syndrome).unwrap();
+    assert!(diagnostic.used_osd);
+    assert_eq!(diagnostic.residual_syndrome_weight, 1);
+    let profile = ldpc
+        .profile_decode_with_osd_candidate_limit(&syndrome, usize::MAX)
+        .unwrap();
+    assert_eq!(profile.osd_use_count, 1);
+
+    let legacy = BpOsdDecoder::new(
+        pcm,
+        channel,
+        DecoderConfig {
+            max_bp_iterations: 0,
+            osd_variant: OsdVariant::LegacyCombinationSweep,
+            osd_order: 0,
+            ..DecoderConfig::default()
+        },
+    )
+    .unwrap()
+    .decode(&syndrome)
+    .unwrap();
+    assert!(!legacy.used_osd);
+    assert_eq!(legacy.correction, Correction::from(vec![false]));
+}
+
+#[test]
+fn ldpc_osd_cs_uses_channel_probability_candidate_weight() {
     let (pcm, channel, syndrome) = channel_prior_scoring_fixture();
     let decoder = BpOsdDecoder::new(
         pcm.clone(),
         channel,
         DecoderConfig {
-            max_bp_iterations: 1,
+            max_bp_iterations: 0,
             osd_variant: OsdVariant::LdpcCombinationSweep,
             osd_order: 2,
             ..DecoderConfig::default()
@@ -230,7 +316,7 @@ fn ldpc_osd_cs_uses_channel_prior_candidate_weight() {
     assert!(result.used_osd);
     assert_eq!(
         result.correction,
-        Correction::from(vec![false, false, false, true])
+        Correction::from(vec![false, true, false, false])
     );
     assert_eq!(pcm.multiply(&result.correction), syndrome);
     assert_eq!(result.stats.osd_candidate_count, 3);
