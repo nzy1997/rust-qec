@@ -123,8 +123,6 @@ def _run_rust_model_audit_export(
         physical_error_rate,
         "--num-cycles",
         str(num_cycles),
-        "--num-trials",
-        "1",
         "--max-bp-iterations",
         "10000",
         "--osd-order",

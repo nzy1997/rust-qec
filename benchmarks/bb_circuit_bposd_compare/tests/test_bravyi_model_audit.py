@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
 from benchmarks.bb_circuit_bposd_compare import bravyi_model_audit
@@ -182,6 +183,27 @@ def test_audit_cli_writes_json_with_mocked_rust_export(
     assert artifact["status"] == "pass"
     assert artifact["provenance"]["expected_fixture"] == str(expected_path)
     assert artifact["observed"]["models"]["Z"]["probability_total"] == "0.0092448000000000009"
+
+
+def test_rust_model_audit_export_uses_trial_free_json_audit_command(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(bravyi_model_audit.subprocess, "run", fake_run)
+
+    result = bravyi_model_audit._run_rust_model_audit_export("bb72", "0.003", 6)
+
+    assert result == {}
+    command = captured["command"]
+    assert "--json-model-audit" in command
+    assert "--num-trials" not in command
+    assert "--json-compare-case" not in command
 
 
 def test_checked_in_expected_fixture_has_required_provenance() -> None:
