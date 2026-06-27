@@ -2,10 +2,10 @@
 // Tests: noise parameter application in code generation.
 // Avoids overlap with existing codegen_noise.rs tests.
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::codegen::*;
-use rstim::ir::{circuit_to_string, StimInstr, StimTarget};
+use rstim::ir::{StimInstr, StimTarget, circuit_to_string};
 use rstim::sampler::sample_batch;
 
 fn rng() -> StdRng {
@@ -200,6 +200,7 @@ fn noise_params_none_is_clean() {
     assert_eq!(params.after_clifford_depolarization, 0.0);
     assert_eq!(params.before_measure_flip_probability, 0.0);
     assert_eq!(params.after_reset_flip_probability, 0.0);
+    assert_eq!(params.after_clifford_loss_probability, 0.0);
 }
 
 // --- NoiseParams::uniform sets all channels ---
@@ -210,6 +211,7 @@ fn noise_params_uniform_sets_all() {
     assert_eq!(params.after_clifford_depolarization, 0.05);
     assert_eq!(params.before_measure_flip_probability, 0.05);
     assert_eq!(params.after_reset_flip_probability, 0.05);
+    assert_eq!(params.after_clifford_loss_probability, 0.0);
 }
 
 // --- rep code with per-channel noise ---
@@ -220,6 +222,7 @@ fn rep_code_per_channel_noise_all_present() {
         after_clifford_depolarization: 0.022,
         before_measure_flip_probability: 0.033,
         after_reset_flip_probability: 0.044,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = repetition_code_memory_with_params(3, 2, params);
     let text = circuit_to_string(&circuit);
@@ -258,6 +261,7 @@ fn surface_code_per_channel_noise_present() {
         after_clifford_depolarization: 0.002,
         before_measure_flip_probability: 0.003,
         after_reset_flip_probability: 0.004,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = rotated_memory_z_with_params(3, 3, params);
     let text = circuit_to_string(&circuit);
@@ -271,6 +275,7 @@ fn surface_code_after_clifford_depolarization_matches_h_layer_noise_placement() 
         after_clifford_depolarization: 0.001,
         before_measure_flip_probability: 0.0,
         after_reset_flip_probability: 0.0,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = rotated_memory_z_with_params(3, 3, params);
 
@@ -288,6 +293,7 @@ fn surface_code_before_round_data_depolarization_does_not_extend_into_tail_measu
         after_clifford_depolarization: 0.0,
         before_measure_flip_probability: 0.0,
         after_reset_flip_probability: 0.0,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = rotated_memory_z_with_params(3, 3, params);
 
@@ -315,6 +321,7 @@ fn surface_code_before_measure_flip_covers_ancilla_and_final_data_measurements()
         after_clifford_depolarization: 0.0,
         before_measure_flip_probability: 0.001,
         after_reset_flip_probability: 0.0,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = rotated_memory_z_with_params(3, rounds, params);
 
@@ -338,6 +345,7 @@ fn surface_code_after_reset_flip_covers_initial_resets_and_ancilla_mr_resets() {
         after_clifford_depolarization: 0.0,
         before_measure_flip_probability: 0.0,
         after_reset_flip_probability: 0.001,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = rotated_memory_z_with_params(3, rounds, params);
 
@@ -400,6 +408,7 @@ fn color_code_per_channel_noise_present() {
         after_clifford_depolarization: 0.02,
         before_measure_flip_probability: 0.03,
         after_reset_flip_probability: 0.04,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = memory_xyz_with_params(5, 4, params);
     let text = circuit_to_string(&circuit);
@@ -457,6 +466,7 @@ fn noise_params_independent_channels() {
         after_clifford_depolarization: 0.05,
         before_measure_flip_probability: 0.0,
         after_reset_flip_probability: 0.0,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = repetition_code_memory_with_params(3, 2, params);
     let text = circuit_to_string(&circuit);

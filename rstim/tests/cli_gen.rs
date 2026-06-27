@@ -76,6 +76,89 @@ fn gen_unknown_code_fails() {
 }
 
 #[test]
+fn gen_surface_code_atom_loss_is_opt_in_from_cli() {
+    use std::fs;
+
+    let atom_loss_path = std::env::temp_dir().join(format!(
+        "rstim-surface-atom-loss-{}.stim",
+        std::process::id()
+    ));
+    let depol_only_path = std::env::temp_dir().join(format!(
+        "rstim-surface-depol-only-{}.stim",
+        std::process::id()
+    ));
+
+    let atom_loss = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_x",
+            "--distance",
+            "3",
+            "--rounds",
+            "3",
+            "--after_clifford_loss_probability",
+            "0.01",
+            "--out",
+            atom_loss_path.to_str().expect("utf8 temp path"),
+        ])
+        .output()
+        .expect("rstim gen atom-loss command should run");
+    assert!(
+        atom_loss.status.success(),
+        "atom-loss command failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&atom_loss.stdout),
+        String::from_utf8_lossy(&atom_loss.stderr)
+    );
+    let atom_loss_text = fs::read_to_string(&atom_loss_path).expect("atom-loss output exists");
+    assert!(
+        atom_loss_text.contains("LOSS(0.01)"),
+        "atom-loss output should contain LOSS(0.01):\n{atom_loss_text}"
+    );
+    assert!(
+        atom_loss_text.contains("H") && atom_loss_text.contains("CX"),
+        "positive control should include Clifford layers:\n{atom_loss_text}"
+    );
+
+    let depol_only = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_x",
+            "--distance",
+            "3",
+            "--rounds",
+            "3",
+            "--after_clifford_depolarization",
+            "0.01",
+            "--out",
+            depol_only_path.to_str().expect("utf8 temp path"),
+        ])
+        .output()
+        .expect("rstim gen depolarization command should run");
+    assert!(
+        depol_only.status.success(),
+        "depolarization command failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&depol_only.stdout),
+        String::from_utf8_lossy(&depol_only.stderr)
+    );
+    let depol_text = fs::read_to_string(&depol_only_path).expect("depol output exists");
+    assert!(depol_text.contains("DEPOLARIZE1(0.01)"));
+    assert!(depol_text.contains("DEPOLARIZE2(0.01)"));
+    assert!(
+        !depol_text.contains("LOSS(0.01)"),
+        "depolarization-only generation must not emit loss:\n{depol_text}"
+    );
+
+    let _ = fs::remove_file(atom_loss_path);
+    let _ = fs::remove_file(depol_only_path);
+}
+
+#[test]
 fn gen_common_without_distance_does_not_touch_out() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.stim");
@@ -309,10 +392,15 @@ fn gen_css_memory_rejects_non_logical_observable_and_preserves_out() {
     let hz = dir.path().join("hz.json");
     let obs = dir.path().join("obs.json");
     let out = dir.path().join("out.stim");
-    let steane_h = r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
+    let steane_h =
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#;
     std::fs::write(&hx, steane_h).unwrap();
     std::fs::write(&hz, steane_h).unwrap();
-    std::fs::write(&obs, r#"{"format":"sparse_rows","num_cols":7,"rows":[[0]]}"#).unwrap();
+    std::fs::write(
+        &obs,
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0]]}"#,
+    )
+    .unwrap();
     std::fs::write(&out, "keep me").unwrap();
 
     let output = rstim_cmd()

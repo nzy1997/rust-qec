@@ -12,10 +12,6 @@ const MIXED_NOISE_SAMPLE_FIXTURE: &str =
     "surface_code_rotated_memory_x_d3_r3_mixed_noise_sample_seed7.json";
 const MIXED_NOISE_SAMPLE_SEED: u64 = 7;
 const MIXED_NOISE_ROUNDS: usize = 3;
-const MIXED_NOISE_DATA_QUBITS: usize = 9;
-const MAX_SPARSE_LOSS_TARGETS: usize = 6;
-const MAX_SPARSE_PAULI_TARGETS_PER_KIND: usize = 6;
-const MAX_TOTAL_MIXED_NOISE_TARGETS: usize = 18;
 
 fn fixture_path(file_name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -27,12 +23,20 @@ fn fixture_path(file_name: &str) -> PathBuf {
 
 fn load_fixture(file_name: &str) -> Qp101Document {
     let path = fixture_path(file_name);
-    assert!(path.exists(), "fixture file does not exist: {}", path.display());
+    assert!(
+        path.exists(),
+        "fixture file does not exist: {}",
+        path.display()
+    );
 
     let text = fs::read_to_string(&path)
         .unwrap_or_else(|err| panic!("failed to read fixture {}: {err}", path.display()));
-    serde_json::from_str(&text)
-        .unwrap_or_else(|err| panic!("failed to parse fixture {} as Qp101Document: {err}", path.display()))
+    serde_json::from_str(&text).unwrap_or_else(|err| {
+        panic!(
+            "failed to parse fixture {} as Qp101Document: {err}",
+            path.display()
+        )
+    })
 }
 
 fn assert_common_markers(doc: &Qp101Document) {
@@ -49,7 +53,10 @@ fn assert_common_markers(doc: &Qp101Document) {
     let has_detector = ops.iter().any(|op| op["type"] == "detector");
     let has_observable_include = ops.iter().any(|op| op["type"] == "observable_include");
 
-    assert!(has_qubit_coords, "expected at least one qubit_coords operation");
+    assert!(
+        has_qubit_coords,
+        "expected at least one qubit_coords operation"
+    );
     assert!(has_tick, "expected at least one tick operation");
     assert!(has_detector, "expected at least one detector operation");
     assert!(
@@ -121,7 +128,7 @@ fn surface_code_fixture_has_expected_qp101_markers() {
 }
 
 #[test]
-fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
+fn mixed_noise_showcase_circuit_uses_generated_after_clifford_loss_and_common_pauli_noise() {
     let instrs = mixed_noise_showcase_instrs();
     let circuit_text = circuit_to_string(&instrs);
 
@@ -140,57 +147,44 @@ fn mixed_noise_showcase_circuit_contains_sparse_loss_and_common_pauli_noise() {
 
     let loss_target_count = count_target_tokens_for_op(&circuit_text, "LOSS(0.01)");
     assert!(
-        loss_target_count > 0,
-        "mixed-noise showcase should contain at least one sparse loss target"
+        loss_target_count >= MIXED_NOISE_ROUNDS * 6,
+        "showcase should get dense after-Clifford atom loss from generation, got {loss_target_count} loss targets"
     );
     assert!(
-        loss_target_count <= MAX_SPARSE_LOSS_TARGETS,
-        "expected sparse loss placement (<= {MAX_SPARSE_LOSS_TARGETS} targets), got {loss_target_count}"
+        circuit_text.contains("H 4\nH 6\nH 10\nH 12\nLOSS(0.01) 4 6 10 12"),
+        "showcase should place LOSS immediately after H layers:\n{circuit_text}"
     );
     assert!(
-        loss_target_count < MIXED_NOISE_ROUNDS * MIXED_NOISE_DATA_QUBITS,
-        "loss placement regressed to the old dense pattern: {loss_target_count} targets"
+        circuit_text.contains("CX") && circuit_text.contains("\nLOSS(0.01)"),
+        "showcase should place LOSS after CX layers:\n{circuit_text}"
     );
 
-    let pauli_target_counts = [
-        ("X_ERROR(0.01)", count_target_tokens_for_op(&circuit_text, "X_ERROR(0.01)")),
-        ("Z_ERROR(0.01)", count_target_tokens_for_op(&circuit_text, "Z_ERROR(0.01)")),
-        (
-            "DEPOLARIZE1(0.01)",
-            count_target_tokens_for_op(&circuit_text, "DEPOLARIZE1(0.01)"),
-        ),
-        (
-            "DEPOLARIZE2(0.01)",
-            count_target_tokens_for_op(&circuit_text, "DEPOLARIZE2(0.01)"),
-        ),
-    ];
-    let total_mixed_noise_targets = loss_target_count
-        + pauli_target_counts
-            .iter()
-            .map(|(_, count)| *count)
-            .sum::<usize>();
-
-    for (noise_op, target_count) in pauli_target_counts {
-        assert!(
-            target_count > 0,
-            "{noise_op} should affect at least one target in the mixed-noise showcase"
-        );
-        assert!(
-            target_count <= MAX_SPARSE_PAULI_TARGETS_PER_KIND,
-            "{noise_op} should stay sparse (<= {MAX_SPARSE_PAULI_TARGETS_PER_KIND} targets), got {target_count}"
-        );
-    }
+    let x_error_target_count = count_target_tokens_for_op(&circuit_text, "X_ERROR(0.01)");
     assert!(
-        total_mixed_noise_targets <= MAX_TOTAL_MIXED_NOISE_TARGETS,
-        "mixed-noise showcase should remain visually sparse (<= {MAX_TOTAL_MIXED_NOISE_TARGETS} total noise targets), got {total_mixed_noise_targets}"
+        x_error_target_count >= MIXED_NOISE_ROUNDS * 8,
+        "showcase should include generated before-measure X errors across rounds, got {x_error_target_count} targets"
+    );
+    let depolarize1_target_count = count_target_tokens_for_op(&circuit_text, "DEPOLARIZE1(0.01)");
+    assert!(
+        depolarize1_target_count >= MIXED_NOISE_ROUNDS * 8,
+        "showcase should include generated single-qubit depolarization across rounds, got {depolarize1_target_count} targets"
+    );
+    let depolarize2_target_count = count_target_tokens_for_op(&circuit_text, "DEPOLARIZE2(0.01)");
+    assert!(
+        depolarize2_target_count >= MIXED_NOISE_ROUNDS * 12,
+        "showcase should include generated two-qubit depolarization across rounds, got {depolarize2_target_count} targets"
+    );
+    let z_error_target_count = count_target_tokens_for_op(&circuit_text, "Z_ERROR(0.01)");
+    assert!(
+        z_error_target_count > 0,
+        "showcase should retain a visible sparse Z/Pauli error layer"
     );
 }
 
 #[test]
 fn mixed_noise_showcase_base_fixture_matches_exported_qp101() {
     let instrs = mixed_noise_showcase_instrs();
-    let generated =
-        export_qp101(&instrs).expect("export of mixed-noise showcase should succeed");
+    let generated = export_qp101(&instrs).expect("export of mixed-noise showcase should succeed");
     let fixture = load_fixture(MIXED_NOISE_BASE_FIXTURE);
 
     assert_eq!(generated, fixture);
