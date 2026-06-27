@@ -34,6 +34,10 @@ impl BpCore {
         prior_hard_decision(&self.prior_llrs)
     }
 
+    pub(crate) fn hard_decision_from_prior_with_ties_as_errors(&self) -> Correction {
+        prior_hard_decision_with_tie_rule(&self.prior_llrs, true)
+    }
+
     pub(crate) fn channel_probability_objective_weights(&self) -> &[f64] {
         &self.channel_probability_objective_weights
     }
@@ -122,7 +126,22 @@ fn probability_to_inverse_log_weight(probability: f64) -> f64 {
 }
 
 pub(crate) fn prior_hard_decision(prior_llrs: &[f64]) -> Correction {
-    Correction::from(prior_llrs.iter().map(|&llr| llr < 0.0).collect::<Vec<_>>())
+    prior_hard_decision_with_tie_rule(prior_llrs, false)
+}
+
+fn prior_hard_decision_with_tie_rule(prior_llrs: &[f64], ties_as_errors: bool) -> Correction {
+    Correction::from(
+        prior_llrs
+            .iter()
+            .map(|&llr| {
+                if ties_as_errors {
+                    llr <= 0.0
+                } else {
+                    llr < 0.0
+                }
+            })
+            .collect::<Vec<_>>(),
+    )
 }
 
 #[cfg(test)]

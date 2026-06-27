@@ -99,6 +99,14 @@ fn osd_inputs_for_variant<'a>(
     }
 }
 
+fn prior_correction_for_planner(core: &BpCore, planner: OsdVariant) -> Correction {
+    if planner == OsdVariant::LdpcCombinationSweep {
+        core.hard_decision_from_prior_with_ties_as_errors()
+    } else {
+        core.hard_decision_from_prior()
+    }
+}
+
 impl Clone for BpOsdDecoder {
     fn clone(&self) -> Self {
         Self {
@@ -140,7 +148,7 @@ impl BpOsdDecoder {
         }
 
         if syndrome.weight() == 0 {
-            let prior_correction = self.core.hard_decision_from_prior();
+            let prior_correction = prior_correction_for_planner(&self.core, effective_planner);
             if self.pcm.multiply(&prior_correction) == *syndrome {
                 return Ok(DecodeResult {
                     correction: prior_correction,
@@ -227,7 +235,7 @@ impl BpOsdDecoder {
         }
 
         if syndrome.weight() == 0 {
-            let prior_correction = self.core.hard_decision_from_prior();
+            let prior_correction = prior_correction_for_planner(&self.core, effective_planner);
             if self.pcm.multiply(&prior_correction) == *syndrome {
                 return Ok(OsdPathDiagnostic {
                     syndrome_weight: 0,
@@ -311,7 +319,7 @@ impl BpOsdDecoder {
         }
 
         if syndrome.weight() == 0 {
-            let prior_correction = self.core.hard_decision_from_prior();
+            let prior_correction = prior_correction_for_planner(&self.core, effective_planner);
             if self.pcm.multiply(&prior_correction) == *syndrome {
                 return Ok(DecodeStats {
                     decode_call_count: 1,

@@ -696,12 +696,14 @@ fn run_bp_serial_in_place(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{BpVariant, DecoderConfig, Schedule};
+    use crate::config::{BpVariant, DecoderConfig, OsdVariant, Schedule};
     use crate::matrix::ParityCheckMatrix;
     use crate::vector::{Correction, Syndrome};
 
     use super::{
-        recompute_residual_from_hard_decision, run_bp_compiled_in_place, run_bp_selected_in_place,
+        finish_all_variable_to_check_messages_from_suffix, recompute_residual_from_hard_decision,
+        refresh_all_bit_posteriors, refresh_all_bit_posteriors_and_prefix_variable_messages,
+        refresh_all_variable_to_check_messages, run_bp_compiled_in_place, run_bp_selected_in_place,
         run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
         update_check_to_variable_messages, update_check_to_variable_messages_with_rule, BpSchedule,
         BpWorkspace, CheckUpdateRule, CompiledGraph,
@@ -912,6 +914,114 @@ mod tests {
         assert_eq!(snapshot.iterations, 0);
         assert!(!snapshot.converged);
         assert_eq!(snapshot.residual_weight, 2);
+    }
+
+    #[test]
+    fn ldpc_minimum_sum_scales_messages_by_iteration_without_changing_legacy() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let syndrome = Syndrome::from(vec![false]);
+        let prior_llrs = vec![2.0, 3.0, 5.0];
+        let mut ldpc_workspace = BpWorkspace::new(&graph);
+        let ldpc_config = DecoderConfig {
+            max_bp_iterations: 1,
+            early_stop: true,
+            osd_variant: OsdVariant::LdpcCombinationSweep,
+            ..DecoderConfig::default()
+        };
+
+        run_bp_compiled_in_place(
+            &graph,
+            &syndrome,
+            &prior_llrs,
+            &ldpc_config,
+            &mut ldpc_workspace,
+        );
+
+        assert_eq!(ldpc_workspace.c_to_v, vec![1.5, 1.0, 1.0]);
+
+        let mut legacy_workspace = BpWorkspace::new(&graph);
+        let legacy_config = DecoderConfig {
+            max_bp_iterations: 1,
+            early_stop: true,
+            ..DecoderConfig::default()
+        };
+        run_bp_compiled_in_place(
+            &graph,
+            &syndrome,
+            &prior_llrs,
+            &legacy_config,
+            &mut legacy_workspace,
+        );
+
+        assert_eq!(legacy_workspace.c_to_v, vec![3.0, 2.0, 2.0]);
+    }
+
+    #[test]
+    fn ldpc_zero_llr_hard_decision_treats_ties_as_errors_without_changing_legacy() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(1, 2, vec![vec![0, 1]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let syndrome = Syndrome::from(vec![true]);
+        let prior_llrs = vec![0.0, 1.0];
+        let mut ldpc_workspace = BpWorkspace::new(&graph);
+        let ldpc_config = DecoderConfig {
+            max_bp_iterations: 0,
+            osd_variant: OsdVariant::LdpcCombinationSweep,
+            ..DecoderConfig::default()
+        };
+
+        run_bp_compiled_in_place(
+            &graph,
+            &syndrome,
+            &prior_llrs,
+            &ldpc_config,
+            &mut ldpc_workspace,
+        );
+
+        assert_eq!(ldpc_workspace.hard_decision_bits, vec![true, false]);
+
+        let mut legacy_workspace = BpWorkspace::new(&graph);
+        let legacy_config = DecoderConfig {
+            max_bp_iterations: 0,
+            ..DecoderConfig::default()
+        };
+        run_bp_compiled_in_place(
+            &graph,
+            &syndrome,
+            &prior_llrs,
+            &legacy_config,
+            &mut legacy_workspace,
+        );
+
+        assert_eq!(legacy_workspace.hard_decision_bits, vec![false, false]);
+    }
+
+    #[test]
+    fn ldpc_prefix_suffix_variable_update_matches_extrinsic_sum_for_finite_messages() {
+        let pcm = ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![0, 1], vec![0, 2]]).unwrap();
+        let graph = CompiledGraph::from_pcm(&pcm);
+        let prior_llrs = vec![4.0, 1.0, 2.0];
+        let check_messages = vec![0.5, 2.0, 1.0, 2.0];
+        let mut ldpc_workspace = BpWorkspace::new(&graph);
+        ldpc_workspace.c_to_v = check_messages.clone();
+        let mut extrinsic_workspace = BpWorkspace::new(&graph);
+        extrinsic_workspace.c_to_v = check_messages;
+
+        refresh_all_bit_posteriors_and_prefix_variable_messages(
+            &graph,
+            &prior_llrs,
+            &mut ldpc_workspace,
+        );
+        finish_all_variable_to_check_messages_from_suffix(&graph, &mut ldpc_workspace);
+        refresh_all_bit_posteriors(&graph, &prior_llrs, &mut extrinsic_workspace, true);
+        refresh_all_variable_to_check_messages(&graph, &mut extrinsic_workspace);
+
+        assert_eq!(
+            ldpc_workspace.posterior_llr,
+            extrinsic_workspace.posterior_llr
+        );
+        assert_eq!(ldpc_workspace.v_to_c, extrinsic_workspace.v_to_c);
+        assert_eq!(ldpc_workspace.v_to_c, vec![5.0, 1.0, 4.5, 2.0]);
     }
 
     #[test]
