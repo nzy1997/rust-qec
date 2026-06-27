@@ -167,6 +167,11 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
+        emit_after_clifford_loss(
+            instrs,
+            params.after_clifford_loss_probability,
+            &x_measure_qubits,
+        );
         if params.after_clifford_depolarization > 0.0 {
             for &q in &x_measure_qubits {
                 instrs.push(op(
@@ -182,6 +187,11 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
             let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
             if !targets.is_empty() {
                 instrs.push(op("CX", &[], &targets));
+                emit_after_clifford_loss(
+                    instrs,
+                    params.after_clifford_loss_probability,
+                    &cnot_layers[k],
+                );
             }
             if params.after_clifford_depolarization > 0.0 && !cnot_layers[k].is_empty() {
                 let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
@@ -193,6 +203,11 @@ fn rotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memory_
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
+        emit_after_clifford_loss(
+            instrs,
+            params.after_clifford_loss_probability,
+            &x_measure_qubits,
+        );
         if params.after_clifford_depolarization > 0.0 {
             for &q in &x_measure_qubits {
                 instrs.push(op(
@@ -307,6 +322,14 @@ fn op(name: &str, args: &[f64], targets: &[StimTarget]) -> StimInstr {
         args: args.to_vec(),
         targets: targets.to_vec(),
     }
+}
+
+fn emit_after_clifford_loss(instrs: &mut Vec<StimInstr>, probability: f64, qubits: &[u32]) {
+    if probability <= 0.0 || qubits.is_empty() {
+        return;
+    }
+    let targets: Vec<StimTarget> = qubits.iter().copied().map(StimTarget::Qubit).collect();
+    instrs.push(op("LOSS", &[probability], &targets));
 }
 
 /// Generate an unrotated surface code memory-X experiment circuit.
@@ -459,11 +482,21 @@ fn unrotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memor
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
+        emit_after_clifford_loss(
+            instrs,
+            params.after_clifford_loss_probability,
+            &x_measure_qubits,
+        );
         for k in 0..4 {
             instrs.push(op("TICK", &[], &[]));
             let targets: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
             if !targets.is_empty() {
                 instrs.push(op("CX", &[], &targets));
+                emit_after_clifford_loss(
+                    instrs,
+                    params.after_clifford_loss_probability,
+                    &cnot_layers[k],
+                );
             }
             if params.after_clifford_depolarization > 0.0 && !cnot_layers[k].is_empty() {
                 let pairs: Vec<StimTarget> = cnot_layers[k].iter().map(|&q| StimTarget::Qubit(q)).collect();
@@ -474,6 +507,11 @@ fn unrotated_surface_code(d: usize, rounds: usize, params: NoiseParams, is_memor
         for &q in &x_measure_qubits {
             instrs.push(op("H", &[], &[StimTarget::Qubit(q)]));
         }
+        emit_after_clifford_loss(
+            instrs,
+            params.after_clifford_loss_probability,
+            &x_measure_qubits,
+        );
         instrs.push(op("TICK", &[], &[]));
 
         if params.before_measure_flip_probability > 0.0 {
