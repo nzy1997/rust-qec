@@ -109,6 +109,30 @@ the current point is written with `status=ok` and
 manually and expires, the current aggregate rows are written with
 `status=partial` and `stop_reason=wall_budget_exhausted`.
 
+## BB72/BB144 Reference-Gap Report
+
+The full BB72/BB144 CSV may be preserved when a full paired rerun is too
+expensive for a PR. In that case, run a controlled paired plot-smoke rerun into
+`results/controlled/`, keep the full CSV under `results/full/`, and generate the
+source-backed report:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.write_reference_gap_report \
+  --results benchmarks/bb_circuit_bposd_compare/results/full/results.csv \
+  --contract benchmarks/bb_circuit_bposd_compare/reference/bravyi_contract.json \
+  --controlled-results benchmarks/bb_circuit_bposd_compare/results/controlled/results.csv \
+  --out benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md
+python3 -m benchmarks.bb_circuit_bposd_compare.validate_reference_gap_report \
+  --results benchmarks/bb_circuit_bposd_compare/results/full/results.csv \
+  --report benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md
+```
+
+The validator recomputes the Bravyi contract commit, LER/accounting checks, row
+counts, per-row LER table, Rust/Python deltas, and final #303 verdict from the
+checked-in sources. Removing the Bravyi commit or the final verdict from a copy
+of the report must make the validator exit nonzero and name the missing
+evidence.
+
 ## Diagnostic Tier
 
 The diagnostic tier runs selected high-p BB points with one trial per case. It
