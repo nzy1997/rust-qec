@@ -67,16 +67,16 @@ Each command writes an SVG file whose text starts with `<svg`.
 The plain render contains visible circuit labels such as `q0`, `H`, `CX`, and
 `M`. The atom-loss sample render contains the compact noise and measurement
 labels `>D1</text>`, `>LOSS</text>`, `>M</text>`, `>MRL</text>`, and
-`>DETECTOR</text>`, plus seeded sample-shot annotation text such as `marker: X`,
-`marker: L`, `marker: 1[L]`, `marker: L=1 | M=1[L]`, and `marker: D0`.
+`>DETECTOR</text>`, plus seeded sample-shot result text such as `X`, `L`,
+`1[L]`, `L=1 | M=1[L]`, and `D0`.
 
 The surface-code atom-loss render is a wider SVG with 17 qubit wires, repeated
-measurement rounds, `LOSS` operations, seeded sample markers, detector boxes,
-and an `OBS_INCLUDE(0)` marker.
+measurement rounds, `LOSS` operations, seeded sample results, detector boxes,
+and an `OBS_INCLUDE(0)` logical-observable block.
 
 The DEM-highlight render contains the base circuit labels `q0`, `XE`, `M`, and
-`DETECTOR`, then adds highlighted query-result annotations such as `marker: X`,
-`marker: D0`, `data-annotation-tags="dem-origin query-result"`, and
+`DETECTOR`, then adds highlighted query-result annotations such as `X`, `D0`,
+`data-annotation-tags="dem-origin query-result"`, and
 `data-annotation-tags="dem-symptom query-result"`.
 
 ## Visual Preview
@@ -96,8 +96,8 @@ surface-code distance-3, round-3 atom-loss fixture.
 - [`rstim/doc/cli.md`](rstim/doc/cli.md) documents `render_svg`,
   `--sample_shot --seed 7`, and `--highlight_dem_error 0`.
 - [`rstim/tests/cli_render_svg.rs`](rstim/tests/cli_render_svg.rs) verifies the
-  CLI paths, deterministic sample-shot SVG annotations, DEM-origin highlight
-  markers, and the `--seed` negative control.
+  CLI paths, deterministic sample-shot SVG annotations, DEM-origin highlights,
+  and the `--seed` negative control.
 - [`rstim/tests/qp101_svg.rs`](rstim/tests/qp101_svg.rs) verifies renderer
   details such as SVG labels, noise boxes, annotation styles, detector source
   labels, and viewBox behavior.
