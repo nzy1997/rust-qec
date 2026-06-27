@@ -100,7 +100,7 @@ def _parse_row(
     def parse_int(field_name: str) -> int | VerificationError:
         try:
             return int(row[field_name])
-        except ValueError as error:
+        except (TypeError, ValueError) as error:
             return VerificationError(
                 f"{context}: failed to parse numeric field {field_name}: {error}"
             )
@@ -108,7 +108,7 @@ def _parse_row(
     def parse_float(field_name: str) -> float | VerificationError:
         try:
             return float(row[field_name])
-        except ValueError as error:
+        except (TypeError, ValueError) as error:
             return VerificationError(
                 f"{context}: failed to parse numeric field {field_name}: {error}"
             )

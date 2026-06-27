@@ -135,3 +135,39 @@ python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler benchmarks/bb_c
 
 Both passed on the final run, and the new regression test now covers the
 malformed accepted-row case.
+
+## Third Review Fix
+
+### RED
+
+Added a regression test that sets a numeric cell to `None`:
+
+```python
+row = make_row()
+row["shots_used"] = None  # type: ignore[assignment]
+verify_bravyi_ler.verify_rows([row])
+```
+
+The focused pytest run failed with:
+
+```text
+TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'
+```
+
+That showed `_parse_row` still let `TypeError` escape instead of turning the
+bad cell into a `VerificationError`.
+
+### GREEN
+
+`_parse_row` now catches both `ValueError` and `TypeError` for numeric parsing,
+so missing CSV cells and malformed literals both return `VerificationError`
+instances with field-specific parse messages.
+
+Verification commands:
+
+```bash
+python3 -m pytest benchmarks/bb_circuit_bposd_compare/tests/test_bravyi_ler_normalization.py
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler benchmarks/bb_circuit_bposd_compare/results/full/results.csv
+```
+
+Both passed on the final run.

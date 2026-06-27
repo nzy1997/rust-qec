@@ -105,6 +105,21 @@ def test_verify_rows_returns_verification_error_for_bad_numeric_field() -> None:
     assert "shots_used" in verification_errors[0].message
 
 
+def test_verify_rows_returns_verification_error_for_missing_numeric_cell() -> None:
+    row = make_row()
+    row["shots_used"] = None  # type: ignore[assignment]
+
+    result = verify_bravyi_ler.verify_rows([row])
+
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
+
+    assert verification_errors
+    assert "parse" in verification_errors[0].message.lower()
+    assert "shots_used" in verification_errors[0].message
+
+
 def test_checked_in_full_results_are_trial_level_normalized() -> None:
     rows = verify_bravyi_ler.load_rows(FULL_RESULTS)
 
