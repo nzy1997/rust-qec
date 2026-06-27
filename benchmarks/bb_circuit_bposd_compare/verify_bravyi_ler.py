@@ -7,8 +7,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from benchmarks.bb_circuit_bposd_compare.cases import BATCHED_CSV_HEADER
-
 ACCEPTED_STATUSES = {"ok", "partial"}
 TOLERANCE = 1e-12
 REQUIRED_COLUMNS = (
@@ -35,9 +33,8 @@ class VerifiedRow:
 
 
 @dataclass(frozen=True)
-class VerificationResult:
-    verified_rows: list[VerifiedRow]
-    errors: list[str]
+class VerificationError:
+    message: str
 
 
 def load_rows(csv_path: Path) -> list[dict[str, str]]:
@@ -45,33 +42,35 @@ def load_rows(csv_path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def verify_rows(rows: list[dict[str, str]]) -> VerificationResult:
-    errors: list[str] = []
-    verified_rows: list[VerifiedRow] = []
+def verify_rows(rows: list[dict[str, str]]) -> list[VerifiedRow | VerificationError]:
+    results: list[VerifiedRow | VerificationError] = []
     if not rows:
-        return VerificationResult([], ["CSV has no data rows"])
+        return [VerificationError("CSV has no data rows")]
 
     missing_columns = [
         column for column in REQUIRED_COLUMNS if not all(column in row for row in rows)
     ]
     if missing_columns:
-        return VerificationResult(
-            [],
-            ["row is missing required CSV column(s): " + ", ".join(missing_columns)],
-        )
+        return [
+            VerificationError(
+                "row is missing required CSV column(s): " + ", ".join(missing_columns)
+            )
+        ]
 
     for row_index, row in enumerate(rows, start=2):
         if not _is_accepted_batched_row(row):
             continue
-        parsed = _parse_row(row, row_index, errors)
+        parsed = _parse_row(row, row_index)
         if parsed is None:
             continue
         case_id, decoder_impl, p, num_cycles, shots_used, logical_errors, actual = parsed
         expected = logical_errors / shots_used
         if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=TOLERANCE):
-            errors.append(_mismatch_message(row_index, row, actual, expected))
+            results.append(
+                VerificationError(_mismatch_message(row_index, row, actual, expected))
+            )
             continue
-        verified_rows.append(
+        results.append(
             VerifiedRow(
                 case_id=case_id,
                 decoder_impl=decoder_impl,
@@ -82,9 +81,9 @@ def verify_rows(rows: list[dict[str, str]]) -> VerificationResult:
             )
         )
 
-    if not verified_rows and not errors:
-        errors.append("CSV has no completed or partial batched rows to verify")
-    return VerificationResult(verified_rows, errors)
+    if not results:
+        return [VerificationError("CSV has no completed or partial batched rows to verify")]
+    return results
 
 
 def _is_accepted_batched_row(row: dict[str, str]) -> bool:
@@ -94,7 +93,6 @@ def _is_accepted_batched_row(row: dict[str, str]) -> bool:
 def _parse_row(
     row: dict[str, str],
     row_index: int,
-    errors: list[str],
 ) -> tuple[str, str, str, int, int, int, float] | None:
     context = f"row {row_index} {row.get('case_id', '<missing case_id>')}"
     try:
@@ -164,7 +162,7 @@ def _mismatch_message(
 
 def format_table(rows: list[VerifiedRow]) -> str:
     header = (
-        "status case_id decoder_impl shots_used logical_errors "
+        "case_id decoder_impl shots_used logical_errors "
         "logical_error_rate bravyi_tuple"
     )
     lines = [header]
@@ -184,12 +182,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("csv_path", type=Path)
     args = parser.parse_args(argv)
 
-    result = verify_rows(load_rows(args.csv_path))
-    if result.errors:
-        for error in result.errors:
-            print(error, file=sys.stderr)
+    results = verify_rows(load_rows(args.csv_path))
+    errors = [item for item in results if isinstance(item, VerificationError)]
+    verified_rows = [item for item in results if isinstance(item, VerifiedRow)]
+    if errors:
+        for error in errors:
+            print(error.message, file=sys.stderr)
         return 1
-    print(format_table(result.verified_rows))
+    print(format_table(verified_rows))
     return 0
 
 

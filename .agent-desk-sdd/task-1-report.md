@@ -62,3 +62,45 @@ PASS bb144-p0030-c12-t1000000-seed12345 rbposd 40000 200 0.0050000000000000001 b
   for the BB144 row used in the test.
 - Pytest emitted a cache write warning because the workspace cannot write to
   the repo root `.pytest_cache`; this did not affect test results.
+
+## Review Fix
+
+### RED
+
+After tightening the tests to the review findings, the focused suite failed in
+the expected places:
+
+```text
+TypeError: 'VerificationResult' object is not iterable
+```
+
+This showed the verifier was still returning the old wrapper instead of the
+required `list[VerifiedRow | VerificationError]`.
+
+The CLI column-shape test also failed on the first header token:
+
+```text
+AssertionError: assert ['status', ...] == ['case_id', ...]
+```
+
+That confirmed the table still exposed a `status` header, which the review asked
+to remove.
+
+### GREEN
+
+The implementation now returns a list of `VerifiedRow` and `VerificationError`
+instances, so callers can partition with `isinstance(...)`.
+The CLI header is now exactly:
+
+```text
+case_id decoder_impl shots_used logical_errors logical_error_rate bravyi_tuple
+```
+
+Verification commands:
+
+```bash
+python3 -m pytest benchmarks/bb_circuit_bposd_compare/tests/test_bravyi_ler_normalization.py
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler benchmarks/bb_circuit_bposd_compare/results/full/results.csv
+```
+
+Both passed on the final run.

@@ -5,8 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from benchmarks.bb_circuit_bposd_compare import verify_bravyi_ler
 from benchmarks.bb_circuit_bposd_compare.cases import BATCHED_CSV_HEADER
 
@@ -65,8 +63,15 @@ def test_verify_rows_accepts_ok_and_partial_trial_level_rows() -> None:
 
     result = verify_bravyi_ler.verify_rows(rows)
 
-    assert result.errors == []
-    assert [row.bravyi_tuple for row in result.verified_rows] == [
+    verified_rows = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerifiedRow)
+    ]
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
+
+    assert verification_errors == []
+    assert [row.bravyi_tuple for row in verified_rows] == [
         ("0.003", 12, 40000, 200),
         ("0.004", 6, 1000, 25),
     ]
@@ -77,9 +82,13 @@ def test_verify_rows_rejects_per_cycle_normalized_row() -> None:
 
     result = verify_bravyi_ler.verify_rows([row])
 
-    assert result.errors
-    assert "appears per-cycle normalized" in result.errors[0]
-    assert "trial-level LER" in result.errors[0]
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
+
+    assert verification_errors
+    assert "appears per-cycle normalized" in verification_errors[0].message
+    assert "trial-level LER" in verification_errors[0].message
 
 
 def test_checked_in_full_results_are_trial_level_normalized() -> None:
@@ -87,14 +96,47 @@ def test_checked_in_full_results_are_trial_level_normalized() -> None:
 
     result = verify_bravyi_ler.verify_rows(rows)
 
-    assert result.errors == []
-    assert result.verified_rows
-    bb144_rows = [row for row in result.verified_rows if "bb144" in row.case_id]
+    verified_rows = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerifiedRow)
+    ]
+
+    assert verified_rows
+    bb144_rows = [row for row in verified_rows if "bb144" in row.case_id]
     assert bb144_rows
     assert any(
         row.bravyi_tuple == ("0.003", 12, 40000, 200)
         for row in bb144_rows
     )
+
+
+def test_verify_rows_returns_partitionable_items() -> None:
+    result = verify_bravyi_ler.verify_rows(
+        [
+            make_row(),
+            make_row(
+                case_id="bb72-p0040-c6-t1000000-seed12345",
+                decoder_impl="ldpc_bposd",
+                code_id="bb72",
+                p="0.004",
+                num_cycles="6",
+                shots_used="1000",
+                logical_errors="25",
+                logical_error_rate="0.025",
+                status="partial",
+                stop_reason="wall_budget_exhausted",
+            ),
+        ]
+    )
+
+    verified_rows = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerifiedRow)
+    ]
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
+
+    assert len(verified_rows) == 2
+    assert verification_errors == []
 
 
 def test_cli_prints_pass_table_for_valid_csv(tmp_path: Path) -> None:
@@ -115,8 +157,36 @@ def test_cli_prints_pass_table_for_valid_csv(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "PASS" in result.stdout
-    assert "case_id" in result.stdout
     assert "bravyi_tuple=(0.003, 12, 40000, 200)" in result.stdout
+
+
+def test_cli_table_uses_exact_review_columns(tmp_path: Path) -> None:
+    csv_path = tmp_path / "results.csv"
+    write_csv(csv_path, [make_row()])
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler",
+            str(csv_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[0].split() == [
+        "case_id",
+        "decoder_impl",
+        "shots_used",
+        "logical_errors",
+        "logical_error_rate",
+        "bravyi_tuple",
+    ]
+    assert "status" not in lines[0]
 
 
 def test_cli_negative_control_exits_nonzero_for_per_cycle_csv(tmp_path: Path) -> None:
