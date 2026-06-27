@@ -44,8 +44,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from benchmarks.bb_circuit_bposd_compare import verify_bravyi_ler
 from benchmarks.bb_circuit_bposd_compare.cases import BATCHED_CSV_HEADER
 
@@ -85,6 +83,18 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def partition(
+    result: list[verify_bravyi_ler.VerifiedRow | verify_bravyi_ler.VerificationError],
+) -> tuple[list[verify_bravyi_ler.VerifiedRow], list[verify_bravyi_ler.VerificationError]]:
+    verified_rows = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerifiedRow)
+    ]
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
+    return verified_rows, verification_errors
+
+
 def test_verify_rows_accepts_ok_and_partial_trial_level_rows() -> None:
     rows = [
         make_row(),
@@ -103,9 +113,10 @@ def test_verify_rows_accepts_ok_and_partial_trial_level_rows() -> None:
     ]
 
     result = verify_bravyi_ler.verify_rows(rows)
+    verified_rows, verification_errors = partition(result)
 
-    assert result.errors == []
-    assert [row.bravyi_tuple for row in result.verified_rows] == [
+    assert verification_errors == []
+    assert [row.bravyi_tuple for row in verified_rows] == [
         ("0.003", 12, 40000, 200),
         ("0.004", 6, 1000, 25),
     ]
@@ -115,20 +126,22 @@ def test_verify_rows_rejects_per_cycle_normalized_row() -> None:
     row = make_row(logical_error_rate=str(200 / (40000 * 12)))
 
     result = verify_bravyi_ler.verify_rows([row])
+    _, verification_errors = partition(result)
 
-    assert result.errors
-    assert "appears per-cycle normalized" in result.errors[0]
-    assert "trial-level LER" in result.errors[0]
+    assert verification_errors
+    assert "appears per-cycle normalized" in verification_errors[0].message
+    assert "trial-level LER" in verification_errors[0].message
 
 
 def test_checked_in_full_results_are_trial_level_normalized() -> None:
     rows = verify_bravyi_ler.load_rows(FULL_RESULTS)
 
     result = verify_bravyi_ler.verify_rows(rows)
+    verified_rows, verification_errors = partition(result)
 
-    assert result.errors == []
-    assert result.verified_rows
-    bb144_rows = [row for row in result.verified_rows if "bb144" in row.case_id]
+    assert verification_errors == []
+    assert verified_rows
+    bb144_rows = [row for row in verified_rows if "bb144" in row.case_id]
     assert bb144_rows
     assert any(
         row.bravyi_tuple == ("0.003", 12, 40000, 200)
@@ -230,9 +243,8 @@ class VerifiedRow:
 
 
 @dataclass(frozen=True)
-class VerificationResult:
-    verified_rows: list[VerifiedRow]
-    errors: list[str]
+class VerificationError:
+    message: str
 
 
 def load_rows(csv_path: Path) -> list[dict[str, str]]:
@@ -240,33 +252,36 @@ def load_rows(csv_path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def verify_rows(rows: list[dict[str, str]]) -> VerificationResult:
-    errors: list[str] = []
-    verified_rows: list[VerifiedRow] = []
+def verify_rows(rows: list[dict[str, str]]) -> list[VerifiedRow | VerificationError]:
+    results: list[VerifiedRow | VerificationError] = []
     if not rows:
-        return VerificationResult([], ["CSV has no data rows"])
+        return [VerificationError("CSV has no data rows")]
 
     missing_columns = [
         column for column in REQUIRED_COLUMNS if not all(column in row for row in rows)
     ]
     if missing_columns:
-        return VerificationResult(
-            [],
-            ["row is missing required CSV column(s): " + ", ".join(missing_columns)],
-        )
+        return [
+            VerificationError(
+                "row is missing required CSV column(s): " + ", ".join(missing_columns)
+            )
+        ]
 
     for row_index, row in enumerate(rows, start=2):
         if not _is_accepted_batched_row(row):
             continue
-        parsed = _parse_row(row, row_index, errors)
-        if parsed is None:
+        parsed = _parse_row(row, row_index)
+        if isinstance(parsed, VerificationError):
+            results.append(parsed)
             continue
         case_id, decoder_impl, p, num_cycles, shots_used, logical_errors, actual = parsed
         expected = logical_errors / shots_used
         if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=TOLERANCE):
-            errors.append(_mismatch_message(row_index, row, actual, expected))
+            results.append(
+                VerificationError(_mismatch_message(row_index, row, actual, expected))
+            )
             continue
-        verified_rows.append(
+        results.append(
             VerifiedRow(
                 case_id=case_id,
                 decoder_impl=decoder_impl,
@@ -277,9 +292,9 @@ def verify_rows(rows: list[dict[str, str]]) -> VerificationResult:
             )
         )
 
-    if not verified_rows and not errors:
-        errors.append("CSV has no completed or partial batched rows to verify")
-    return VerificationResult(verified_rows, errors)
+    if not results:
+        return [VerificationError("CSV has no completed or partial batched rows to verify")]
+    return results
 
 
 def _is_accepted_batched_row(row: dict[str, str]) -> bool:
@@ -292,32 +307,50 @@ def _is_accepted_batched_row(row: dict[str, str]) -> bool:
 def _parse_row(
     row: dict[str, str],
     row_index: int,
-    errors: list[str],
-) -> tuple[str, str, str, int, int, int, float] | None:
+) -> tuple[str, str, str, int, int, int, float] | VerificationError:
     context = f"row {row_index} {row.get('case_id', '<missing case_id>')}"
-    try:
-        num_cycles = int(row["num_cycles"])
-        shots_used = int(row["shots_used"])
-        logical_errors = int(row["logical_errors"])
-        actual = float(row["logical_error_rate"])
-    except ValueError as error:
-        errors.append(f"{context}: failed to parse numeric normalization fields: {error}")
-        return None
+
+    def parse_int(field_name: str) -> int | VerificationError:
+        try:
+            return int(row[field_name])
+        except (TypeError, ValueError) as error:
+            return VerificationError(
+                f"{context}: failed to parse numeric field {field_name}: {error}"
+            )
+
+    def parse_float(field_name: str) -> float | VerificationError:
+        try:
+            return float(row[field_name])
+        except (TypeError, ValueError) as error:
+            return VerificationError(
+                f"{context}: failed to parse numeric field {field_name}: {error}"
+            )
+
+    num_cycles = parse_int("num_cycles")
+    if isinstance(num_cycles, VerificationError):
+        return num_cycles
+    shots_used = parse_int("shots_used")
+    if isinstance(shots_used, VerificationError):
+        return shots_used
+    logical_errors = parse_int("logical_errors")
+    if isinstance(logical_errors, VerificationError):
+        return logical_errors
+    actual = parse_float("logical_error_rate")
+    if isinstance(actual, VerificationError):
+        return actual
+
     if num_cycles <= 0:
-        errors.append(f"{context}: num_cycles must be positive")
-        return None
+        return VerificationError(f"{context}: num_cycles must be positive")
     if shots_used <= 0:
-        errors.append(f"{context}: shots_used must be positive for trial-level LER")
-        return None
+        return VerificationError(
+            f"{context}: shots_used must be positive for trial-level LER"
+        )
     if logical_errors < 0:
-        errors.append(f"{context}: logical_errors must be nonnegative")
-        return None
+        return VerificationError(f"{context}: logical_errors must be nonnegative")
     if logical_errors > shots_used:
-        errors.append(f"{context}: logical_errors must be <= shots_used")
-        return None
+        return VerificationError(f"{context}: logical_errors must be <= shots_used")
     if not math.isfinite(actual):
-        errors.append(f"{context}: logical_error_rate must be finite")
-        return None
+        return VerificationError(f"{context}: logical_error_rate must be finite")
     return (
         row["case_id"],
         row["decoder_impl"],
@@ -362,14 +395,13 @@ def _mismatch_message(
 
 def format_table(rows: list[VerifiedRow]) -> str:
     header = (
-        "status case_id decoder_impl shots_used logical_errors "
+        "case_id decoder_impl shots_used logical_errors "
         "logical_error_rate bravyi_tuple"
     )
     lines = [header]
     for row in rows:
         p, num_cycles, shots_used, logical_errors = row.bravyi_tuple
         lines.append(
-            "PASS "
             f"{row.case_id} {row.decoder_impl} {row.shots_used} "
             f"{row.logical_errors} {row.logical_error_rate:.17g} "
             f"bravyi_tuple=({p}, {num_cycles}, {shots_used}, {logical_errors})"
@@ -382,12 +414,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("csv_path", type=Path)
     args = parser.parse_args(argv)
 
-    result = verify_rows(load_rows(args.csv_path))
-    if result.errors:
-        for error in result.errors:
-            print(error, file=sys.stderr)
+    results = verify_rows(load_rows(args.csv_path))
+    errors = [item for item in results if isinstance(item, VerificationError)]
+    verified_rows = [item for item in results if isinstance(item, VerifiedRow)]
+    if errors:
+        for error in errors:
+            print(error.message, file=sys.stderr)
         return 1
-    print(format_table(result.verified_rows))
+    print("PASS Bravyi trial-level LER normalization")
+    print(format_table(verified_rows))
     return 0
 
 

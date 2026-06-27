@@ -189,7 +189,6 @@ def format_table(rows: list[VerifiedRow]) -> str:
     for row in rows:
         p, num_cycles, shots_used, logical_errors = row.bravyi_tuple
         lines.append(
-            "PASS "
             f"{row.case_id} {row.decoder_impl} {row.shots_used} "
             f"{row.logical_errors} {row.logical_error_rate:.17g} "
             f"bravyi_tuple=({p}, {num_cycles}, {shots_used}, {logical_errors})"
@@ -209,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(error.message, file=sys.stderr)
         return 1
+    print("PASS Bravyi trial-level LER normalization")
     print(format_table(verified_rows))
     return 0
 

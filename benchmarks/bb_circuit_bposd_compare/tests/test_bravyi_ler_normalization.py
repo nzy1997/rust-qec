@@ -124,11 +124,14 @@ def test_checked_in_full_results_are_trial_level_normalized() -> None:
     rows = verify_bravyi_ler.load_rows(FULL_RESULTS)
 
     result = verify_bravyi_ler.verify_rows(rows)
-
     verified_rows = [
         item for item in result if isinstance(item, verify_bravyi_ler.VerifiedRow)
     ]
+    verification_errors = [
+        item for item in result if isinstance(item, verify_bravyi_ler.VerificationError)
+    ]
 
+    assert verification_errors == []
     assert verified_rows
     bb144_rows = [row for row in verified_rows if "bb144" in row.case_id]
     assert bb144_rows
@@ -186,6 +189,7 @@ def test_cli_prints_pass_table_for_valid_csv(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "PASS" in result.stdout
+    assert "case_id decoder_impl shots_used logical_errors logical_error_rate bravyi_tuple" in result.stdout
     assert "bravyi_tuple=(0.003, 12, 40000, 200)" in result.stdout
 
 
@@ -207,7 +211,8 @@ def test_cli_table_uses_exact_review_columns(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     lines = result.stdout.strip().splitlines()
-    assert lines[0].split() == [
+    assert lines[0] == "PASS Bravyi trial-level LER normalization"
+    assert lines[1].split() == [
         "case_id",
         "decoder_impl",
         "shots_used",
@@ -215,7 +220,9 @@ def test_cli_table_uses_exact_review_columns(tmp_path: Path) -> None:
         "logical_error_rate",
         "bravyi_tuple",
     ]
-    assert "status" not in lines[0]
+    assert len(lines[1].split()) == 6
+    assert all("PASS" not in line for line in lines[1:])
+    assert "status" not in lines[1]
 
 
 def test_cli_negative_control_exits_nonzero_for_per_cycle_csv(tmp_path: Path) -> None:
