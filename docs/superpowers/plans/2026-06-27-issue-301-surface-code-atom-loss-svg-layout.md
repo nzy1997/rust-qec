@@ -263,21 +263,25 @@ after_clifford_loss_probability: f64,
 ```
 
 Thread this value through `main_inner`, `run_gen`, and
-`generate_common_circuit_text` by replacing the common-code `noise: f64` input
-with:
+`generate_common_circuit_text`. Preserve the existing common-generator
+`--after_clifford_depolarization` compatibility path by continuing to build
+common-code params from:
 
 ```rust
-NoiseParams {
-    after_clifford_depolarization: noise,
-    ..NoiseParams::none()
-}
+let mut params = NoiseParams::uniform(noise);
 ```
 
-and then setting:
+and then setting only the new opt-in atom-loss field:
 
 ```rust
 params.after_clifford_loss_probability = after_clifford_loss_probability;
 ```
+
+The issue body states that the existing depolarization flag already spreads
+standard Pauli/depolarizing noise through reset-adjacent, round-start,
+Clifford-adjacent, measurement-adjacent, and inter-round positions; this task
+must not narrow that behavior. The negative control is that this existing
+command does not emit `LOSS`.
 
 Keep CSS generation on `NoiseParams::uniform(noise)` because the new CLI flag is
 only part of the common surface-code path in this task.
