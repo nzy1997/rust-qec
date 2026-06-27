@@ -1,7 +1,7 @@
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document, Qp101Operation,
-    Qp101PauliBasis, Qp101TargetRef, export_qp101,
+    export_qp101, Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document,
+    Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
 };
 use rstim::qp101_svg::render_svg;
 
@@ -31,7 +31,7 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
     let svg = render_svg(&doc).expect("renderer should produce SVG");
 
     assert!(svg.starts_with("<svg"), "SVG should start with <svg: {svg}");
-    for attr in ["width=\"512\"", "height=\"112\"", "viewBox=\"0 0 512 112\""] {
+    for attr in ["width=\"512\"", "height=\"176\"", "viewBox=\"0 0 512 176\""] {
         assert!(svg.contains(attr), "SVG missing root attr {attr}: {svg}");
     }
     for marker in ["q0", "q1", "H", "CX", "tick"] {
@@ -156,7 +156,7 @@ fn svg_renderer_falls_back_when_paired_gate_operands_are_unmatched() {
         "unmatched paired operands should render a generic fallback box: {svg}"
     );
     assert!(
-        svg.contains("height=\"124\""),
+        svg.contains("height=\"204\""),
         "fallback box should span all validated lanes instead of dropping one: {svg}"
     );
     assert!(
@@ -194,7 +194,7 @@ fn svg_renderer_renders_unsupported_multi_qubit_gate_as_fallback_box() {
         "unsupported multi-qubit gate should render as one fallback box: {svg}"
     );
     assert!(
-        svg.contains("height=\"76\""),
+        svg.contains("height=\"116\""),
         "fallback box should span both qubit lanes: {svg}"
     );
     assert!(
@@ -472,15 +472,307 @@ fn svg_renderer_draws_noise_boxes() {
             "SVG missing compact noise label {label}: {svg}"
         );
     }
-    for note in ["p=0.1", "p=0.2", "p=0.3", "p=0.4", "p=0.5"] {
+    for note in ["0.1", "0.2", "0.3", "0.4", "0.5"] {
         assert!(
             svg.contains(note),
             "noise parameter note should remain visible for {note}: {svg}"
         );
     }
     assert!(
+        !svg.contains("p=0."),
+        "known noise parameter notes should be decimal-only: {svg}"
+    );
+    assert!(
         svg.matches("class=\"noise-box\"").count() >= 6,
         "known noise should render as compact per-target or paired boxes: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_places_sample_annotations_above_and_noise_params_below() {
+    let mut doc = export_qp101(
+        &parse_lines("LOSS(0.01) 0 1\n").expect("sample annotation fixture should parse"),
+    )
+    .expect("sample annotation fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Noise { annotations, .. } => {
+            let mut annotation = styled_annotation(
+                "marker",
+                None,
+                Some("L"),
+                Some("danger"),
+                None,
+                Some(true),
+                &["sample-trace", "query-result"],
+            );
+            annotation.target_slots = vec![1];
+            annotations.push(annotation);
+        }
+        op => panic!("expected LOSS noise operation, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("sample annotation fixture should render");
+
+    let loss_positions = text_positions(&svg, "LOSS");
+    assert_eq!(
+        loss_positions.len(),
+        2,
+        "fixture should render two LOSS boxes: {svg}"
+    );
+    let q0_loss_y = loss_positions[0].1;
+    let q1_loss_y = loss_positions[1].1;
+    let param_positions = text_positions(&svg, "0.01");
+    assert_eq!(
+        param_positions.len(),
+        2,
+        "each LOSS box should keep its own probability label: {svg}"
+    );
+    assert!(
+        !svg.contains("marker:"),
+        "sample annotations should show the result directly without the marker prefix: {svg}"
+    );
+    let sample_y = text_y(&svg, "L").expect("sample result should be positioned");
+
+    assert!(
+        param_positions.iter().all(|(_, y)| *y > q0_loss_y),
+        "noise probabilities should render below their boxes: {svg}"
+    );
+    assert!(
+        sample_y < q1_loss_y,
+        "sample results should render above their box: {svg}"
+    );
+    assert!(
+        sample_y - param_positions[0].1 >= 14,
+        "adjacent-lane probability/sample labels should have readable vertical separation: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_aligns_sample_annotation_rows_above_gates() {
+    let mut doc =
+        export_qp101(&parse_lines("LOSS(1) 1\nMRL 1\n").expect("sample row fixture should parse"))
+            .expect("sample row fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Noise { annotations, .. } => {
+            let mut annotation = styled_annotation(
+                "marker",
+                None,
+                Some("L"),
+                Some("danger"),
+                None,
+                Some(true),
+                &["sample-trace", "query-result"],
+            );
+            annotation.target_slots = vec![0];
+            annotations.push(annotation);
+        }
+        op => panic!("expected LOSS noise operation, got {op:?}"),
+    }
+    match &mut doc.operations[1] {
+        Qp101Operation::Gate { annotations, .. } => {
+            let mut annotation = annotation("marker", Some("L=1 | M=1[L]"), None);
+            annotation.tags = vec!["sample-trace".to_string(), "query-result".to_string()];
+            annotation.target_slots = vec![0];
+            annotations.push(annotation);
+        }
+        op => panic!("expected MRL gate operation, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("sample row fixture should render");
+
+    let loss_marker_y = text_y(&svg, "L").expect("loss sample result should be positioned");
+    let measurement_marker_y =
+        text_y(&svg, "L=1 | M=1[L]").expect("measurement sample result should be positioned");
+    assert_eq!(
+        loss_marker_y, measurement_marker_y,
+        "sample results in separate columns should align at the same distance above gate boxes: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_sizes_detector_and_observable_boxes_to_their_labels() {
+    let instrs = parse_lines(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(12) rec[-1]\n",
+    )
+    .expect("source operation box fixture should parse");
+    let doc = export_qp101(&instrs).expect("source operation box fixture should export");
+
+    let svg = render_svg(&doc).expect("source operation box fixture should render");
+
+    let detector_rect =
+        preceding_rect_before_text(&svg, "DETECTOR").expect("DETECTOR should have a box");
+    assert!(
+        detector_rect.width >= 64,
+        "DETECTOR box should be wide enough for its label: {svg}"
+    );
+    let observable_rect =
+        preceding_rect_before_text(&svg, "OBS_INCLUDE(12)").expect("OBS_INCLUDE should have a box");
+    assert!(
+        observable_rect.width >= 112,
+        "OBS_INCLUDE box should be wide enough for its label: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_places_pair_noise_sample_above_and_probability_below() {
+    let mut doc = export_qp101(
+        &parse_lines("DEPOLARIZE2(0.4) 0 1\n").expect("pair-noise annotation fixture should parse"),
+    )
+    .expect("pair-noise annotation fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Noise { annotations, .. } => {
+            let mut annotation = styled_annotation(
+                "marker",
+                None,
+                Some("hit"),
+                Some("danger"),
+                None,
+                Some(true),
+                &["sample-trace", "query-result"],
+            );
+            annotation.target_slots = vec![0];
+            annotations.push(annotation);
+        }
+        op => panic!("expected DEPOLARIZE2 noise operation, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("pair-noise annotation fixture should render");
+
+    let d2_positions = text_positions(&svg, "D2");
+    assert_eq!(
+        d2_positions.len(),
+        2,
+        "pair noise should render one D2 box on each target lane: {svg}"
+    );
+    let upper_d2_y = d2_positions.iter().map(|(_, y)| *y).min().unwrap();
+    let lower_d2_y = d2_positions.iter().map(|(_, y)| *y).max().unwrap();
+    let sample_y = text_y(&svg, "hit").expect("pair sample result should be positioned");
+    let probability_y = text_y(&svg, "0.4").expect("pair probability should be positioned");
+
+    assert!(
+        sample_y < upper_d2_y,
+        "pair sample result should be above the upper target lane: {svg}"
+    );
+    assert!(
+        probability_y > lower_d2_y,
+        "pair probability should be below the lower target lane: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_highlights_flipped_source_blocks_without_blue_marker_text() {
+    let instrs = parse_lines(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("source highlight fixture should parse");
+    let mut doc = export_qp101(&instrs).expect("source highlight fixture should export");
+    match &mut doc.operations[1] {
+        Qp101Operation::Detector { annotations, .. } => {
+            annotations.push(styled_annotation(
+                "marker",
+                None,
+                Some("D0"),
+                Some("info"),
+                None,
+                Some(true),
+                &["dem-symptom", "query-result"],
+            ));
+        }
+        op => panic!("expected detector operation, got {op:?}"),
+    }
+    match &mut doc.operations[2] {
+        Qp101Operation::ObservableInclude { annotations, .. } => {
+            annotations.push(styled_annotation(
+                "marker",
+                None,
+                Some("L0"),
+                Some("info"),
+                None,
+                Some(true),
+                &["dem-symptom", "query-result"],
+            ));
+        }
+        op => panic!("expected observable include operation, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("source highlight fixture should render");
+
+    assert!(
+        !svg.contains(">D0</text>") && !svg.contains(">L0</text>"),
+        "flipped source annotations should color blocks instead of rendering blue marker text: {svg}"
+    );
+    assert_eq!(
+        preceding_rect_attr_before_text(&svg, "DETECTOR", "fill").as_deref(),
+        Some("#dbeafe"),
+        "flipped detector block should be blue-filled: {svg}"
+    );
+    assert_eq!(
+        preceding_rect_attr_before_text(&svg, "OBS_INCLUDE(0)", "fill").as_deref(),
+        Some("#dbeafe"),
+        "flipped logical block should be blue-filled: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_packs_source_operations_by_host_lane() {
+    let instrs = parse_lines(
+        "M 0\n\
+         M 1\n\
+         M 2\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-2]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .expect("source packing fixture should parse");
+    let doc = export_qp101(&instrs).expect("source packing fixture should export");
+
+    let svg = render_svg(&doc).expect("source packing fixture should render");
+
+    let detector_positions = text_positions(&svg, "DETECTOR");
+    assert_eq!(
+        detector_positions.len(),
+        3,
+        "fixture should render three detector blocks: {svg}"
+    );
+    let logical_position =
+        text_xy(&svg, "OBS_INCLUDE(0)").expect("logical block should be positioned");
+    assert_eq!(
+        detector_positions[0].0, detector_positions[1].0,
+        "detectors on different host lanes should align like same-layer single-qubit gates: {svg}"
+    );
+    assert_eq!(
+        detector_positions[0].0, logical_position.0,
+        "logical block on a different host lane should align with same-layer detectors: {svg}"
+    );
+    assert!(
+        detector_positions[2].0 > logical_position.0,
+        "a later detector on the logical block's host lane should move to a later column: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_spaces_wide_source_blocks_on_the_same_host_lane() {
+    let instrs = parse_lines(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("same-lane source spacing fixture should parse");
+    let doc = export_qp101(&instrs).expect("same-lane source spacing fixture should export");
+
+    let svg = render_svg(&doc).expect("same-lane source spacing fixture should render");
+
+    let detector_position = text_xy(&svg, "DETECTOR").expect("detector should be positioned");
+    let logical_position =
+        text_xy(&svg, "OBS_INCLUDE(0)").expect("logical block should be positioned");
+    assert!(
+        logical_position.0 - detector_position.0 >= 144,
+        "same-lane source blocks should leave room for wide blocks and source labels: {svg}"
     );
 }
 
@@ -510,7 +802,7 @@ fn svg_renderer_falls_back_for_unknown_noise_gates() {
         "generic fallback should keep the canonical noise gate label visible: {svg}"
     );
     assert!(
-        svg.contains("p=0.4, 0.5"),
+        svg.contains("0.4, 0.5"),
         "generic fallback should keep the parameter text visible: {svg}"
     );
     assert!(
@@ -806,13 +1098,107 @@ fn svg_renderer_falls_back_for_odd_depolarize2_targets() {
         "odd paired noise should keep a visible generic DEPOLARIZE2 label: {svg}"
     );
     assert!(
-        svg.contains("p=0.4"),
+        svg.contains("0.4"),
         "fallback noise should still show parameter text: {svg}"
     );
     assert!(
         svg.contains("class=\"gate-box\""),
         "odd paired noise should use the generic fallback box: {svg}"
     );
+}
+
+#[test]
+fn surface_code_atom_loss_svg_layout_regression() {
+    let instrs = parse_lines(
+        "H 0\n\
+         H 1\n\
+         H 2\n\
+         LOSS(0.01) 0 1 2\n\
+         DEPOLARIZE1(0.01) 0 1 2\n\
+         TICK\n\
+         CX 0 3 1 2\n\
+         LOSS(0.01) 0 1 2 3\n\
+         TICK\n\
+         M 0 1 2 3\n",
+    )
+    .expect("layout fixture should parse");
+    let doc = export_qp101(&instrs).expect("layout fixture should export");
+    let svg = render_svg(&doc).expect("layout fixture should render");
+
+    assert!(
+        !svg.contains("p=0.01"),
+        "known noise labels must be decimal-only: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">0.01</text>").count(),
+        10,
+        "each LOSS/D1 box should have its own decimal label: {svg}"
+    );
+
+    let h_positions = text_positions(&svg, "H");
+    assert_eq!(h_positions.len(), 3);
+    assert_eq!(
+        h_positions[0].0, h_positions[1].0,
+        "same-layer H gates should share x"
+    );
+    assert_eq!(
+        h_positions[1].0, h_positions[2].0,
+        "same-layer H gates should share x"
+    );
+
+    let rects = element_rects(&svg, "noise-box");
+    assert!(!rects.is_empty());
+    assert_no_overlapping_rects(&rects, &svg);
+
+    let cx_positions = text_positions(&svg, "CX");
+    assert_eq!(
+        cx_positions.len(),
+        2,
+        "fixture should render two CX pairs: {svg}"
+    );
+    assert_ne!(
+        cx_positions[0].0, cx_positions[1].0,
+        "conflicting CX pairs should render in separate columns: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_packs_lane_disjoint_known_noise_boxes() {
+    let instrs = parse_lines(
+        "LOSS(0.01) 0 2\n\
+         DEPOLARIZE1(0.01) 1\n\
+         TICK\n",
+    )
+    .expect("known-noise packing fixture should parse");
+    let doc = export_qp101(&instrs).expect("known-noise packing fixture should export");
+    let svg = render_svg(&doc).expect("known-noise packing fixture should render");
+
+    let loss_positions = text_positions(&svg, "LOSS");
+    let d1_positions = text_positions(&svg, "D1");
+    assert_eq!(
+        loss_positions.len(),
+        2,
+        "fixture should render two LOSS boxes: {svg}"
+    );
+    assert_eq!(
+        d1_positions.len(),
+        1,
+        "fixture should render one D1 box: {svg}"
+    );
+    assert_eq!(
+        loss_positions[0].0, loss_positions[1].0,
+        "lane-disjoint LOSS boxes from one operation should share x: {svg}"
+    );
+    assert_eq!(
+        loss_positions[0].0, d1_positions[0].0,
+        "lane-disjoint known noise boxes from separate operations should share x: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">0.01</text>").count(),
+        3,
+        "each known noise box should keep its own decimal probability label: {svg}"
+    );
+    assert_no_overlapping_rects(&element_rects(&svg, "noise-box"), &svg);
 }
 
 #[test]
@@ -1494,6 +1880,85 @@ fn content_translate_y(svg: &str) -> Option<i32> {
     let value = &attrs[value_start..];
     let value_end = value.find(')')?;
     value[..value_end].parse().ok()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SvgRect {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+fn element_rects(svg: &str, class_name: &str) -> Vec<SvgRect> {
+    let mut rects = Vec::new();
+    let needle = format!("<rect class=\"{class_name}\"");
+    let mut search_start = 0usize;
+    while let Some(relative_start) = svg[search_start..].find(&needle) {
+        let start = search_start + relative_start;
+        let Some(end) = svg[start..].find("/>") else {
+            break;
+        };
+        let attrs = &svg[start..start + end];
+        if let (Some(x), Some(y), Some(width), Some(height)) = (
+            svg_attr_i32(attrs, "x"),
+            svg_attr_i32(attrs, "y"),
+            svg_attr_i32(attrs, "width"),
+            svg_attr_i32(attrs, "height"),
+        ) {
+            rects.push(SvgRect {
+                x,
+                y,
+                width,
+                height,
+            });
+        }
+        search_start = start + end;
+    }
+    rects
+}
+
+fn preceding_rect_before_text(svg: &str, content: &str) -> Option<SvgRect> {
+    let text_needle = format!(">{content}</text>");
+    let text_end = svg.find(&text_needle)?;
+    let rect_start = svg[..text_end].rfind("<rect")?;
+    let rect_end = svg[rect_start..text_end].find("/>")?;
+    let attrs = &svg[rect_start..rect_start + rect_end];
+    Some(SvgRect {
+        x: svg_attr_i32(attrs, "x")?,
+        y: svg_attr_i32(attrs, "y")?,
+        width: svg_attr_i32(attrs, "width")?,
+        height: svg_attr_i32(attrs, "height")?,
+    })
+}
+
+fn preceding_rect_attr_before_text(svg: &str, content: &str, attr: &str) -> Option<String> {
+    let text_needle = format!(">{content}</text>");
+    let text_end = svg.find(&text_needle)?;
+    let rect_start = svg[..text_end].rfind("<rect")?;
+    let rect_end = svg[rect_start..text_end].find("/>")?;
+    svg_attr(&svg[rect_start..rect_start + rect_end], attr)
+}
+
+fn svg_attr(attrs: &str, name: &str) -> Option<String> {
+    let needle = format!("{name}=\"");
+    let value_start = attrs.find(&needle)? + needle.len();
+    let value = &attrs[value_start..];
+    let value_end = value.find('"')?;
+    Some(value[..value_end].to_string())
+}
+
+fn assert_no_overlapping_rects(rects: &[SvgRect], svg: &str) {
+    for (left_index, left) in rects.iter().enumerate() {
+        for (right_index, right) in rects.iter().enumerate().skip(left_index + 1) {
+            let x_overlap = left.x < right.x + right.width && right.x < left.x + left.width;
+            let y_overlap = left.y < right.y + right.height && right.y < left.y + left.height;
+            assert!(
+                !(x_overlap && y_overlap),
+                "rect {left_index} {left:?} overlaps rect {right_index} {right:?}: {svg}"
+            );
+        }
+    }
 }
 
 fn annotation(kind: &str, label: Option<&str>, text: Option<&str>) -> Qp101Annotation {

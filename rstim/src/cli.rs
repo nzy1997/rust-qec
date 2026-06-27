@@ -100,6 +100,8 @@ pub enum Commands {
         rounds: usize,
         #[arg(long = "after_clifford_depolarization", default_value = "0")]
         noise: f64,
+        #[arg(long = "after_clifford_loss_probability", default_value = "0")]
+        after_clifford_loss_probability: f64,
         #[arg(long)]
         hx: Option<String>,
         #[arg(long)]
@@ -381,6 +383,7 @@ pub fn run(cli: Cli) -> Result<(), String> {
             distance,
             rounds,
             noise,
+            after_clifford_loss_probability,
             hx,
             hz,
             basis,
@@ -408,7 +411,9 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 let distance = distance
                     .ok_or_else(|| "distance is required for common generators".to_string())?;
                 let mut w = open_output(out.as_deref())?;
-                run_gen(&code, &task, distance, rounds, noise, &mut w)
+                let mut params = NoiseParams::uniform(noise);
+                params.after_clifford_loss_probability = after_clifford_loss_probability;
+                run_gen_with_params(&code, &task, distance, rounds, params, &mut w)
             }
         }
         Some(Commands::Convert {
@@ -868,6 +873,20 @@ pub fn run_gen(
         .map_err(|e| format!("write error: {e}"))
 }
 
+pub fn run_gen_with_params(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let circuit_text =
+        generate_common_circuit_text_with_params(code, task, distance, rounds, params)?;
+    out.write_all(circuit_text.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
+}
+
 pub fn run_css_gen(
     task: &str,
     hx_path: Option<&str>,
@@ -953,24 +972,40 @@ pub(crate) fn generate_common_circuit_text(
     rounds: usize,
     noise: f64,
 ) -> Result<String, String> {
+    generate_common_circuit_text_with_params(
+        code,
+        task,
+        distance,
+        rounds,
+        NoiseParams::uniform(noise),
+    )
+}
+
+pub(crate) fn generate_common_circuit_text_with_params(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+) -> Result<String, String> {
     let instrs = match (code, task) {
         ("repetition_code", "memory") => {
-            crate::codegen::repetition_code_memory(distance, rounds, noise)
+            crate::codegen::repetition_code_memory_with_params(distance, rounds, params)
         }
         ("surface_code", "rotated_memory_x") => {
-            crate::codegen::surface_code::rotated_memory_x(distance, rounds, noise)
+            crate::codegen::surface_code::rotated_memory_x_with_params(distance, rounds, params)
         }
         ("surface_code", "rotated_memory_z") => {
-            crate::codegen::surface_code::rotated_memory_z(distance, rounds, noise)
+            crate::codegen::surface_code::rotated_memory_z_with_params(distance, rounds, params)
         }
         ("surface_code", "unrotated_memory_x") => {
-            crate::codegen::surface_code::unrotated_memory_x(distance, rounds, noise)
+            crate::codegen::surface_code::unrotated_memory_x_with_params(distance, rounds, params)
         }
         ("surface_code", "unrotated_memory_z") => {
-            crate::codegen::surface_code::unrotated_memory_z(distance, rounds, noise)
+            crate::codegen::surface_code::unrotated_memory_z_with_params(distance, rounds, params)
         }
         ("color_code", "memory_xyz") => {
-            crate::codegen::color_code::memory_xyz(distance, rounds, noise)
+            crate::codegen::color_code::memory_xyz_with_params(distance, rounds, params)
         }
         _ => return Err(format!("unknown code/task: {code}/{task}")),
     };
@@ -1751,6 +1786,7 @@ mod tests {
                 distance: None,
                 rounds: 2,
                 noise: 0.0,
+                after_clifford_loss_probability: 0.0,
                 hx: Some(hx),
                 hz: Some(hz),
                 basis: Some("Z".to_string()),
@@ -1950,6 +1986,7 @@ mod tests {
                 distance: None,
                 rounds: 1,
                 noise: 0.0,
+                after_clifford_loss_probability: 0.0,
                 hx: None,
                 hz: None,
                 basis: None,

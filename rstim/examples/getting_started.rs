@@ -29,6 +29,7 @@ fn main() {
         after_clifford_depolarization: 0.02,
         before_measure_flip_probability: 0.01,
         after_reset_flip_probability: 0.01,
+        after_clifford_loss_probability: 0.0,
     };
     let circuit = repetition_code_memory_with_params(5, 3, params);
     println!("\n=== Repetition code (d=5, r=3) ===");

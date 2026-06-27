@@ -1,4 +1,7 @@
 from benchmarks.bb_circuit_bposd_compare.cases import (
+    BATCHED_CSV_HEADER,
+    BB72_BB144_FULL_CASES,
+    BB72_BB144_PLOT_SMOKE_CASES,
     CATALOG_HEADER,
     CSV_HEADER,
     HARD_REPLAY_CASES,
@@ -7,6 +10,9 @@ from benchmarks.bb_circuit_bposd_compare.cases import (
 )
 
 __all__ = [
+    "BATCHED_CSV_HEADER",
+    "BB72_BB144_FULL_CASES",
+    "BB72_BB144_PLOT_SMOKE_CASES",
     "CATALOG_HEADER",
     "CSV_HEADER",
     "HARD_REPLAY_CASES",

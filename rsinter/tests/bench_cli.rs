@@ -189,6 +189,45 @@ fn rsinter_bench_plot_surface_compare_csv_writes_png_from_legacy_csv() {
 }
 
 #[test]
+fn rsinter_bench_plot_bb_compare_csv_writes_png_from_batched_csv() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("bb_results.csv");
+    let out = dir
+        .path()
+        .join("plots")
+        .join("bb_circuit_bposd_compare.png");
+    fs::write(
+        &input,
+        "case_id,runner,decoder_impl,code_id,p,num_cycles,shots_budget,errors_budget,shots_used,seed,bp_method,max_iter,osd_method,osd_order,batch_size,batches_completed,setup_seconds,sample_seconds,decode_seconds,run_seconds,logical_errors,logical_error_rate,bp_seconds,osd_seconds,decode_call_count,bp_iteration_count,osd_use_count,osd_candidate_count,gf2_solve_count,gf2_full_elimination_count,status,stop_reason,error\n\
+bb72-p001-c6-t10-seed12345,batched_compare,rbposd,bb72,0.001,6,10,200,10,12345,ms,10000,osd_cs,7,5,2,0.1,0.2,0.4,0.7,0,0.0,0.2,0.1,20,10,0,0,0,0,ok,completed,\n\
+bb72-p001-c6-t10-seed12345,batched_compare,ldpc_bposd,bb72,0.001,6,10,200,10,12345,ms,10000,osd_cs,7,5,2,0.1,0.0,0.5,0.6,1,0.1,,,,,,,,,ok,completed,\n\
+bb72-p002-c6-t10-seed12345,batched_compare,rbposd,bb72,0.002,6,10,200,10,12345,ms,10000,osd_cs,7,5,2,0.1,0.2,0.5,0.8,1,0.1,0.3,0.2,20,10,1,16,1,1,partial,wall_budget_exhausted,\n\
+bb72-p002-c6-t10-seed12345,batched_compare,ldpc_bposd,bb72,0.002,6,10,200,10,12345,ms,10000,osd_cs,7,5,2,0.1,0.0,0.7,0.8,2,0.2,,,,,,,,,partial,wall_budget_exhausted,\n\
+bb72-skipped,batched_compare,ldpc_bposd,bb72,0.003,6,10,,0,12345,ms,10000,osd_cs,7,5,0,0.0,0.0,0.0,0.0,0,0.0,,,,,,,,,skipped,python_dependency_missing,missing ldpc package\n\
+bb72-error,batched_compare,legacy_decoder,bb72,0.003,6,10,,0,12345,ms,10000,osd_cs,7,5,0,0.0,0.0,0.0,0.0,0,0.0,,,,,,,,,error,rust_error,unsupported decoder\n",
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "plot-bb-compare-csv",
+            "--spec",
+            "../benchmarks/bb_circuit_bposd_compare/plot.toml",
+            "--input",
+            input.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let png = fs::read(out).unwrap();
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
+
+#[test]
 fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([

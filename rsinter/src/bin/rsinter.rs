@@ -5,15 +5,15 @@ use clap::{Parser, Subcommand};
 use rbposd::OsdVariant;
 
 use rsinter::bb_circuit_memory::{
-    SimulationConfig, export_comparison_case_for_code,
-    export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
-    run_simulation_for_code_with_osd_variant,
+    export_comparison_case_for_code, export_comparison_case_for_code_with_osd_variant,
+    run_simulation_for_code, run_simulation_for_code_with_osd_variant, SimulationConfig,
 };
+use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
 use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
-use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
+use rsinter::bench::run::{run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
 
@@ -22,7 +22,7 @@ use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
     name = "rsinter",
     version,
     about = "Rust benchmark and sampling harness",
-    after_help = "bench subcommands: run, merge, plot, plot-surface-compare-csv"
+    after_help = "bench subcommands: run, merge, plot, plot-surface-compare-csv, plot-bb-compare-csv"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -89,6 +89,14 @@ enum BenchCommands {
         out: String,
     },
     PlotSurfaceCompareCsv {
+        #[arg(long)]
+        spec: String,
+        #[arg(long)]
+        input: String,
+        #[arg(long)]
+        out: String,
+    },
+    PlotBbCompareCsv {
         #[arg(long)]
         spec: String,
         #[arg(long)]
@@ -166,6 +174,14 @@ fn run() -> Result<(), String> {
                 bench_spec.validate()?;
                 let rows =
                     read_surface_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
+                ensure_parent_dir(PathBuf::from(&out).as_path())?;
+                render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
+            }
+            BenchCommands::PlotBbCompareCsv { spec, input, out } => {
+                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+                let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+                bench_spec.validate()?;
+                let rows = read_bb_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
                 ensure_parent_dir(PathBuf::from(&out).as_path())?;
                 render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
             }

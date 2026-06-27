@@ -68,6 +68,47 @@ label still accepted by the validator.
 | `bb144` | 12 | 6 | supported |
 | `bb288` | 18 | 4 | unsupported Rust constructor |
 
+## BB72/BB144 Batched Compare
+
+The BB72/BB144 batched compare keeps the paired Rust/Python comparison, but it
+does not write per-trial syndrome or logical data to disk. Each batch is sampled
+and decoded by Rust, replayed immediately by Python `ldpc_bposd`, accumulated
+into aggregate rows, and then discarded. The output is only:
+
+- `results.csv`: aggregate Rust/Python rows with shots, logical errors, timing,
+  batch counts, and stop reason
+- `summary.md`: compact timing table
+- `bb_circuit_bposd_compare.png`: two-panel plot of logical error rate and
+  seconds per shot versus physical error rate, rendered by Rust `rsinter`
+
+The plot smoke uses the same BB72/BB144 physical-error-rate grid as the full
+suite, but uses 10 trials per point and prints per-case progress while it runs:
+
+```bash
+make bb-circuit-bposd-compare-plot-smoke
+```
+
+The full suite uses the same physical-error-rate grid with shared shot/error
+budgets:
+
+| code_id | p values | max shots | max errors |
+| --- | --- | ---: | ---: |
+| `bb72` | `0.003, 0.004, 0.005, 0.006` | `1000000` | `200` |
+| `bb144` | `0.003, 0.004, 0.005, 0.006` | `1000000` | `200` |
+
+Run it explicitly with:
+
+```bash
+make bb-circuit-bposd-compare-full
+```
+
+The `full` tier does not set a wall budget by default. It checks the error
+budget between batches; once either decoder has accumulated 200 logical errors,
+the current point is written with `status=ok` and
+`stop_reason=errors_budget_reached`. If `--wall-budget-seconds` is provided
+manually and expires, the current aggregate rows are written with
+`status=partial` and `stop_reason=wall_budget_exhausted`.
+
 ## Diagnostic Tier
 
 The diagnostic tier runs selected high-p BB points with one trial per case. It

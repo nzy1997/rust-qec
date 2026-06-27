@@ -54,6 +54,42 @@ CATALOG_HEADER = [
     "catalog_note",
 ]
 
+BATCHED_CSV_HEADER = [
+    "case_id",
+    "runner",
+    "decoder_impl",
+    "code_id",
+    "p",
+    "num_cycles",
+    "shots_budget",
+    "errors_budget",
+    "shots_used",
+    "seed",
+    "bp_method",
+    "max_iter",
+    "osd_method",
+    "osd_order",
+    "batch_size",
+    "batches_completed",
+    "setup_seconds",
+    "sample_seconds",
+    "decode_seconds",
+    "run_seconds",
+    "logical_errors",
+    "logical_error_rate",
+    "bp_seconds",
+    "osd_seconds",
+    "decode_call_count",
+    "bp_iteration_count",
+    "osd_use_count",
+    "osd_candidate_count",
+    "gf2_solve_count",
+    "gf2_full_elimination_count",
+    "status",
+    "stop_reason",
+    "error",
+]
+
 SMALL_LDPC_TRIALS = 50_000
 SMALL_LDPC_SEED = 12345
 SMALL_LDPC_BP_METHOD = "ms"
@@ -93,6 +129,7 @@ class CompareCase:
     scaling: int = 0
     catalog_status: str = "supported"
     catalog_note: str = ""
+    max_errors: int | None = None
 
 
 def _decimal(value: float) -> Decimal:
@@ -156,6 +193,43 @@ def _small_ldpc_case(code_id: str, p: float, cycles: int) -> CompareCase:
     )
 
 
+def _bb72_bb144_case(
+    code_id: str,
+    p: float,
+    cycles: int,
+    trials: int,
+    max_errors: int | None = None,
+) -> CompareCase:
+    case = CompareCase(
+        case_id="",
+        code_id=code_id,
+        p=p,
+        num_cycles=cycles,
+        num_trials=trials,
+        seed=SMALL_LDPC_SEED,
+        bp_method=SMALL_LDPC_BP_METHOD,
+        max_iter=SMALL_LDPC_MAX_ITER,
+        osd_method=SMALL_LDPC_OSD_METHOD,
+        osd_order=SMALL_LDPC_OSD_ORDER,
+        scaling=SMALL_LDPC_SCALING,
+        max_errors=max_errors,
+    )
+    return CompareCase(
+        case_id=format_case_id(case),
+        code_id=code_id,
+        p=p,
+        num_cycles=cycles,
+        num_trials=trials,
+        seed=SMALL_LDPC_SEED,
+        bp_method=SMALL_LDPC_BP_METHOD,
+        max_iter=SMALL_LDPC_MAX_ITER,
+        osd_method=SMALL_LDPC_OSD_METHOD,
+        osd_order=SMALL_LDPC_OSD_ORDER,
+        scaling=SMALL_LDPC_SCALING,
+        max_errors=max_errors,
+    )
+
+
 def _diagnostic_case(code_id: str, cycles: int, p: float) -> CompareCase:
     case = CompareCase(
         case_id="",
@@ -191,9 +265,42 @@ SMALL_LDPC_TARGETS = {
     "bb288": (18, (0.0035, 0.004, 0.005, 0.006)),
 }
 
+BB72_BB144_TARGETS = {
+    "bb72": (6, (0.003, 0.004, 0.005, 0.006)),
+    "bb144": (12, (0.003, 0.004, 0.005, 0.006)),
+}
+
+BB72_BB144_FULL_MAX_SHOTS = 1_000_000
+BB72_BB144_FULL_MAX_ERRORS = 200
+BB72_BB144_PLOT_SMOKE_SHOTS = 10
+
 SMALL_LDPC_CASES = tuple(
     _small_ldpc_case(code_id, p, cycles)
     for code_id, (cycles, p_values) in SMALL_LDPC_TARGETS.items()
+    for p in p_values
+)
+
+BB72_BB144_PLOT_SMOKE_CASES = tuple(
+    _bb72_bb144_case(
+        code_id,
+        p,
+        cycles,
+        trials=BB72_BB144_PLOT_SMOKE_SHOTS,
+        max_errors=BB72_BB144_FULL_MAX_ERRORS,
+    )
+    for code_id, (cycles, p_values) in BB72_BB144_TARGETS.items()
+    for p in p_values
+)
+
+BB72_BB144_FULL_CASES = tuple(
+    _bb72_bb144_case(
+        code_id,
+        p,
+        cycles,
+        trials=BB72_BB144_FULL_MAX_SHOTS,
+        max_errors=BB72_BB144_FULL_MAX_ERRORS,
+    )
+    for code_id, (cycles, p_values) in BB72_BB144_TARGETS.items()
     for p in p_values
 )
 
