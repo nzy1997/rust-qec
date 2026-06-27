@@ -201,6 +201,34 @@ def test_accepts_explicit_python_dependency_missing_skip() -> None:
     assert verified[0].ldpc_bposd_logical_errors is None
 
 
+def test_rejects_completed_ldpc_bposd_python_dependency_missing_partial_pair() -> None:
+    rows = make_pair(
+        rust_overrides={
+            "status": "partial",
+            "stop_reason": "python_dependency_missing",
+            "logical_errors": "3",
+        },
+        python_overrides={
+            "status": "partial",
+            "stop_reason": "python_dependency_missing",
+            "logical_errors": "1",
+        },
+    )
+    _, errors = partition(verify_batched_accounting.verify_rows(rows))
+    assert errors
+    assert "python_dependency_missing" in errors[0].message
+    assert "skipped ldpc_bposd row" in errors[0].message
+
+
+def test_returns_verification_error_for_malformed_rust_row_instead_of_crashing() -> None:
+    rows = make_pair(rust_overrides={"status": "skipped"})
+    result = verify_batched_accounting.verify_rows(rows)
+    verified, errors = partition(result)
+    assert verified == []
+    assert errors
+    assert "expected completed row status" in errors[0].message
+
+
 def test_rejects_logical_error_rate_not_computed_from_shots_used() -> None:
     rows = make_pair(python_overrides={"logical_error_rate": "0.999"})
     _, errors = partition(verify_batched_accounting.verify_rows(rows))

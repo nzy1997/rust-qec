@@ -141,6 +141,7 @@ def _verify_group(
     python_row_index, python_row = python_rows[0]
     python_status = python_row.get("status", "")
     python_stop_reason = python_row.get("stop_reason", "")
+    rust_stop_reason = rust_rows[0][1].get("stop_reason", "")
 
     if python_status == "skipped":
         skip_error = _validate_python_dependency_skip(
@@ -173,9 +174,22 @@ def _verify_group(
             )
         ]
 
+    if (
+        python_stop_reason == "python_dependency_missing"
+        or rust_stop_reason == "python_dependency_missing"
+    ):
+        errors.append(
+            VerificationError(
+                f"row {python_row_index} {context}: only a skipped ldpc_bposd row may use "
+                f"stop_reason='python_dependency_missing'"
+            )
+        )
+
     python_parsed = _parse_completed_row(python_row_index, python_row)
     if isinstance(python_parsed, VerificationError):
         errors.append(python_parsed)
+
+    if errors:
         return errors
 
     assert isinstance(rust_parsed, CompletedRow)
