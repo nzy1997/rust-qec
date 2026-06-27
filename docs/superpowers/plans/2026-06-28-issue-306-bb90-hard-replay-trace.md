@@ -68,7 +68,8 @@ assert_eq!(
 Run:
 
 ```bash
-cargo test -p rsinter simulation_case_export_records_z_failure_without_x_decode rsinter_bb_circuit_bposd_memory_json_compare_case_smoke
+cargo test -p rsinter simulation_case_export_records_z_failure_without_x_decode
+cargo test -p rsinter --test bench_cli rsinter_bb_circuit_bposd_memory_json_compare_case_smoke
 ```
 
 Expected: fails because `ComparisonTrialExport` has no `z_correction` or `x_correction` fields.
@@ -126,7 +127,8 @@ if let Some(trial) = trial_export.as_mut() {
 Run:
 
 ```bash
-cargo test -p rsinter simulation_case_export_records_z_failure_without_x_decode rsinter_bb_circuit_bposd_memory_json_compare_case_smoke
+cargo test -p rsinter simulation_case_export_records_z_failure_without_x_decode
+cargo test -p rsinter --test bench_cli rsinter_bb_circuit_bposd_memory_json_compare_case_smoke
 ```
 
 Expected: both tests pass.
