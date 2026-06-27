@@ -838,7 +838,40 @@ pub struct BbCircuitBposdComparisonExport {
     pub trials: Vec<ComparisonTrialExport>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BbCircuitBravyiModelAuditExport {
+    pub code_id: String,
+    pub physical_error_rate: f64,
+    pub num_cycles: usize,
+    pub noiseless_tail_cycles: usize,
+    pub num_cycles_plus_tail: usize,
+    pub code: BravyiModelAuditCodeExport,
+    pub schedule: BravyiModelAuditScheduleExport,
+    pub z_model: ComparisonModelExport,
+    pub x_model: ComparisonModelExport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BravyiModelAuditCodeExport {
+    pub ell: usize,
+    pub m: usize,
+    pub n2: usize,
+    pub n: usize,
+    pub k: usize,
+    pub x_check_count: usize,
+    pub z_check_count: usize,
+    pub data_qubit_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BravyiModelAuditScheduleExport {
+    pub sx_labels: [&'static str; 7],
+    pub sz_labels: [&'static str; 7],
+    pub operation_count: usize,
+    pub operation_count_by_kind: BTreeMap<&'static str, usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ComparisonModelExport {
     pub num_checks: usize,
     pub num_bits: usize,
@@ -940,6 +973,28 @@ pub fn export_comparison_case_for_code(
     config: SimulationConfig,
 ) -> Result<BbCircuitBposdComparisonExport, String> {
     export_comparison_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0)
+}
+
+pub fn export_bravyi_model_audit_for_code(
+    code_id: &str,
+    config: SimulationConfig,
+) -> Result<BbCircuitBravyiModelAuditExport, String> {
+    validate_model_config(&config)?;
+    let code = build_code(code_id)?;
+    let cycle = build_syndrome_cycle(&code);
+    let models = build_effective_models(&code, &cycle, &config)?;
+
+    Ok(BbCircuitBravyiModelAuditExport {
+        code_id: code_id.to_owned(),
+        physical_error_rate: config.physical_error_rate,
+        num_cycles: config.num_cycles,
+        noiseless_tail_cycles: BRAVYI_NOISELESS_TAIL_CYCLES,
+        num_cycles_plus_tail: config.num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES,
+        code: model_audit_code_export(&code),
+        schedule: model_audit_schedule_export(&cycle),
+        z_model: comparison_model_export(&models.z_faults),
+        x_model: comparison_model_export(&models.x_faults),
+    })
 }
 
 pub fn export_comparison_case_for_code_with_osd_variant(
@@ -1146,6 +1201,46 @@ fn comparison_model_export(model: &EffectiveDecoderModel) -> ComparisonModelExpo
         augmented_columns: model.augmented_columns.clone(),
         channel_probs: model.channel_probs.clone(),
         first_logical_row: model.first_logical_row,
+    }
+}
+
+fn operation_kind_label(kind: OperationKind) -> &'static str {
+    match kind {
+        OperationKind::Idle => "idle",
+        OperationKind::Cnot => "cnot",
+        OperationKind::PrepX => "prep_x",
+        OperationKind::PrepZ => "prep_z",
+        OperationKind::MeasX => "meas_x",
+        OperationKind::MeasZ => "meas_z",
+    }
+}
+
+fn model_audit_code_export(code: &BbCode) -> BravyiModelAuditCodeExport {
+    BravyiModelAuditCodeExport {
+        ell: code.ell(),
+        m: code.m(),
+        n2: code.n2(),
+        n: code.n(),
+        k: code.k(),
+        x_check_count: code.x_checks().len(),
+        z_check_count: code.z_checks().len(),
+        data_qubit_count: code.data_qubits().len(),
+    }
+}
+
+fn model_audit_schedule_export(cycle: &SyndromeCycle) -> BravyiModelAuditScheduleExport {
+    let mut operation_count_by_kind = BTreeMap::new();
+    for operation in cycle.operations() {
+        *operation_count_by_kind
+            .entry(operation_kind_label(operation.kind()))
+            .or_insert(0) += 1;
+    }
+
+    BravyiModelAuditScheduleExport {
+        sx_labels: cycle.sx_labels(),
+        sz_labels: cycle.sz_labels(),
+        operation_count: cycle.operations().len(),
+        operation_count_by_kind,
     }
 }
 
@@ -2105,8 +2200,8 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 mod tests {
     use super::{
         apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
-        in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
-        run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
+        export_bravyi_model_audit_for_code, in_row_span, nullspace, parse_schedule_slot, rref,
+        run_simulation, run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
         validate_model_config, validate_physical_error_rate, validate_simulation_config,
         EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
         SimulationConfig,
@@ -2463,5 +2558,35 @@ mod tests {
         assert_eq!(FaultBasis::Z.logical_rows(&code), code.logical_x_rows());
         assert_eq!(FaultBasis::X.logical_rows(&code), code.logical_z_rows());
         assert_ne!(code.logical_x_rows(), code.logical_z_rows());
+    }
+
+    #[test]
+    fn bravyi_model_audit_export_is_model_only_and_reports_tail_rows() {
+        let export = export_bravyi_model_audit_for_code(
+            "bb72",
+            SimulationConfig {
+                physical_error_rate: 0.003,
+                num_cycles: 1,
+                num_trials: 1,
+                seed: Some(12345),
+                max_bp_iterations: 10_000,
+                osd_order: 7,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(export.code_id, "bb72");
+        assert_eq!(export.code.n2, 36);
+        assert_eq!(export.code.n, 72);
+        assert_eq!(export.code.k, 12);
+        assert_eq!(export.noiseless_tail_cycles, 2);
+        assert_eq!(export.num_cycles_plus_tail, 3);
+        assert_eq!(export.z_model.first_logical_row, 36 * 3);
+        assert_eq!(export.x_model.first_logical_row, 36 * 3);
+        assert_eq!(export.z_model.num_checks, 36 * 3);
+        assert_eq!(export.x_model.num_checks, 36 * 3);
+        assert_eq!(export.schedule.sx_labels, ["idle", "1", "4", "3", "5", "0", "2"]);
+        assert_eq!(export.schedule.sz_labels, ["3", "5", "0", "1", "2", "4", "idle"]);
+        assert_eq!(export.schedule.operation_count_by_kind.get("cnot"), Some(&432));
     }
 }
