@@ -8,6 +8,7 @@ use crate::vector::{Correction, Syndrome};
 pub(crate) struct BpCore {
     graph: CompiledGraph,
     prior_llrs: Vec<f64>,
+    channel_probability_objective_weights: Vec<f64>,
 }
 
 impl BpCore {
@@ -15,9 +16,13 @@ impl BpCore {
         pcm: &ParityCheckMatrix,
         channel: &ChannelModel,
     ) -> Result<Self, DecodeError> {
+        let prior_llrs = compute_prior_llrs(pcm, channel)?;
+        let channel_probability_objective_weights =
+            compute_channel_probability_objective_weights(pcm, channel)?;
         Ok(Self {
             graph: CompiledGraph::from_pcm(pcm),
-            prior_llrs: compute_prior_llrs(pcm, channel)?,
+            prior_llrs,
+            channel_probability_objective_weights,
         })
     }
 
@@ -29,8 +34,8 @@ impl BpCore {
         prior_hard_decision(&self.prior_llrs)
     }
 
-    pub(crate) fn channel_prior_objective_weights(&self) -> &[f64] {
-        &self.prior_llrs
+    pub(crate) fn channel_probability_objective_weights(&self) -> &[f64] {
+        &self.channel_probability_objective_weights
     }
 
     pub(crate) fn run_bp_in_place(
@@ -70,6 +75,37 @@ pub(crate) fn compute_prior_llrs(
     }
 }
 
+pub(crate) fn compute_channel_probability_objective_weights(
+    pcm: &ParityCheckMatrix,
+    channel: &ChannelModel,
+) -> Result<Vec<f64>, DecodeError> {
+    match channel {
+        ChannelModel::Bsc { error_rate } => {
+            let probability = validate_probability(*error_rate)?;
+            Ok(vec![
+                probability_to_inverse_log_weight(probability);
+                pcm.num_bits()
+            ])
+        }
+        ChannelModel::BitFlipProbabilities(probabilities) => {
+            if probabilities.len() != pcm.num_bits() {
+                return Err(DecodeError::DimensionMismatch {
+                    what: "channel probabilities",
+                    expected: pcm.num_bits(),
+                    actual: probabilities.len(),
+                });
+            }
+
+            probabilities
+                .iter()
+                .map(|&probability| {
+                    validate_probability(probability).map(probability_to_inverse_log_weight)
+                })
+                .collect()
+        }
+    }
+}
+
 fn validate_probability(probability: f64) -> Result<f64, DecodeError> {
     if !probability.is_finite() || probability <= 0.0 || probability >= 1.0 {
         return Err(DecodeError::InvalidProbability);
@@ -79,6 +115,10 @@ fn validate_probability(probability: f64) -> Result<f64, DecodeError> {
 
 fn probability_to_llr(probability: f64) -> f64 {
     ((1.0 - probability) / probability).ln()
+}
+
+fn probability_to_inverse_log_weight(probability: f64) -> f64 {
+    (1.0 / probability).ln()
 }
 
 pub(crate) fn prior_hard_decision(prior_llrs: &[f64]) -> Correction {
@@ -141,20 +181,23 @@ mod tests {
     }
 
     #[test]
-    fn bp_core_exposes_channel_prior_objective_weights() {
+    fn bp_core_exposes_channel_probability_objective_weights() {
         let pcm = ParityCheckMatrix::from_sparse_rows(1, 3, vec![vec![0, 1, 2]]).unwrap();
         let core = BpCore::new(
             &pcm,
-            &ChannelModel::BitFlipProbabilities(vec![0.2, 0.3, 0.4]),
+            &ChannelModel::BitFlipProbabilities(vec![0.2, 0.4, 0.8]),
         )
         .unwrap();
 
-        let expected = compute_prior_llrs(
-            &pcm,
-            &ChannelModel::BitFlipProbabilities(vec![0.2, 0.3, 0.4]),
-        )
-        .unwrap();
+        let expected = vec![
+            (1.0_f64 / 0.2).ln(),
+            (1.0_f64 / 0.4).ln(),
+            (1.0_f64 / 0.8).ln(),
+        ];
 
-        assert_eq!(core.channel_prior_objective_weights(), expected.as_slice());
+        assert_eq!(
+            core.channel_probability_objective_weights(),
+            expected.as_slice()
+        );
     }
 }

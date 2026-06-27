@@ -2,13 +2,13 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::bp::BpWorkspace;
-use crate::config::{ChannelModel, DecoderConfig};
+use crate::config::{ChannelModel, DecoderConfig, OsdVariant};
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{
-    OsdWorkspace, decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
-    effective_osd_variant, profile_osd_with_workspace,
+    decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace, effective_osd_variant,
+    profile_osd_with_workspace, OsdWorkspace,
 };
 use crate::vector::{Correction, Syndrome};
 
@@ -77,6 +77,26 @@ pub struct BpOsdDecoder {
     config: DecoderConfig,
     bp_workspace: Mutex<BpWorkspace>,
     osd_workspace: Mutex<OsdWorkspace>,
+}
+
+fn osd_inputs_for_variant<'a>(
+    planner: OsdVariant,
+    core: &'a BpCore,
+    bp_workspace: &'a BpWorkspace,
+    zero_base: &'a [bool],
+) -> (&'a [bool], &'a [f64], &'a [f64]) {
+    match planner {
+        OsdVariant::LdpcCombinationSweep => (
+            zero_base,
+            &bp_workspace.posterior_llr,
+            core.channel_probability_objective_weights(),
+        ),
+        OsdVariant::Osd0 | OsdVariant::LegacyCombinationSweep => (
+            &bp_workspace.hard_decision_bits,
+            &bp_workspace.reliability,
+            &bp_workspace.reliability,
+        ),
+    }
 }
 
 impl Clone for BpOsdDecoder {
@@ -157,22 +177,17 @@ impl BpOsdDecoder {
                 },
             });
         }
-
         let osd_start = Instant::now();
         let osd_outcome = {
             let mut osd_workspace = self.osd_workspace.lock().unwrap();
-            let objective_weights = match effective_planner {
-                crate::config::OsdVariant::LdpcCombinationSweep => {
-                    self.core.channel_prior_objective_weights()
-                }
-                crate::config::OsdVariant::Osd0
-                | crate::config::OsdVariant::LegacyCombinationSweep => &bp_workspace.reliability,
-            };
+            let zero_base = vec![false; self.pcm.num_bits()];
+            let (base_correction_bits, ordering_reliability, objective_weights) =
+                osd_inputs_for_variant(effective_planner, &self.core, &bp_workspace, &zero_base);
             decode_osd_with_workspace(
                 &self.pcm,
                 syndrome,
-                &bp_workspace.hard_decision_bits,
-                &bp_workspace.reliability,
+                base_correction_bits,
+                ordering_reliability,
                 objective_weights,
                 &mut osd_workspace,
                 effective_planner,
@@ -252,11 +267,14 @@ impl BpOsdDecoder {
 
         let plan = {
             let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            let zero_base = vec![false; self.pcm.num_bits()];
+            let (base_correction_bits, ordering_reliability, _) =
+                osd_inputs_for_variant(effective_planner, &self.core, &bp_workspace, &zero_base);
             diagnose_osd_candidate_search_with_workspace(
                 &self.pcm,
                 syndrome,
-                &bp_workspace.hard_decision_bits,
-                &bp_workspace.reliability,
+                base_correction_bits,
+                ordering_reliability,
                 &mut osd_workspace,
                 effective_planner,
                 self.config.osd_order,
@@ -320,11 +338,14 @@ impl BpOsdDecoder {
         let osd_start = Instant::now();
         let osd_stats = {
             let mut osd_workspace = self.osd_workspace.lock().unwrap();
+            let zero_base = vec![false; self.pcm.num_bits()];
+            let (base_correction_bits, ordering_reliability, _) =
+                osd_inputs_for_variant(effective_planner, &self.core, &bp_workspace, &zero_base);
             profile_osd_with_workspace(
                 &self.pcm,
                 syndrome,
-                &bp_workspace.hard_decision_bits,
-                &bp_workspace.reliability,
+                base_correction_bits,
+                ordering_reliability,
                 &mut osd_workspace,
                 effective_planner,
                 self.config.osd_order,
