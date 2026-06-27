@@ -118,8 +118,14 @@ def _verify_decoder_entry(
             f"{impl} residual_syndrome_weight does not match residual_syndrome_support"
         )
 
-    if not isinstance(entry.get("residual_syndrome_matches"), bool):
+    residual_matches = entry.get("residual_syndrome_matches")
+    residual_weight = entry.get("residual_syndrome_weight")
+    if not isinstance(residual_matches, bool):
         errors.append(f"{impl} residual_syndrome_matches is not boolean")
+    elif isinstance(residual_weight, int) and residual_matches != (residual_weight == 0):
+        errors.append(
+            f"{impl} residual_syndrome_matches contradicts residual_syndrome_weight"
+        )
     if not isinstance(entry.get("predicted_logical"), list) or not entry.get(
         "predicted_logical"
     ):

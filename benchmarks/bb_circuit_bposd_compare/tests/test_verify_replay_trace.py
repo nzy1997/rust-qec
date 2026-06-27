@@ -130,6 +130,16 @@ class VerifyReplayTraceTest(unittest.TestCase):
             "\n".join(verify_trace(trace)),
         )
 
+    def test_verify_trace_rejects_contradictory_residual_status(self) -> None:
+        trace = make_trace()
+        trace["decoders"][1]["residual_syndrome_matches"] = True
+        trace["decoders"][1]["residual_syndrome_weight"] = 1
+        trace["decoders"][1]["residual_syndrome_support"] = [42]
+        self.assertIn(
+            "ldpc_bposd residual_syndrome_matches contradicts residual_syndrome_weight",
+            "\n".join(verify_trace(trace)),
+        )
+
     def test_main_prints_case_basis_and_classification(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "hard_replay_trace.json"
