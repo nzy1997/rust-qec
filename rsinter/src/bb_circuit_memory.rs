@@ -889,6 +889,8 @@ pub struct ComparisonTrialExport {
     pub x_logical: Vec<bool>,
     pub z_logical_prediction: Option<Vec<bool>>,
     pub x_logical_prediction: Option<Vec<bool>>,
+    pub z_correction: Option<Vec<bool>>,
+    pub x_correction: Option<Vec<bool>>,
     pub z_profile: Option<BbCircuitBposdProfile>,
     pub x_profile: Option<BbCircuitBposdProfile>,
 }
@@ -1138,6 +1140,7 @@ fn run_bb_p_point_case(
         let predicted_z = correction_to_logicals(&z_result.correction, &models.z_faults, code.k());
         if let Some(trial) = trial_export.as_mut() {
             trial.z_logical_prediction = Some(predicted_z.clone());
+            trial.z_correction = Some(z_result.correction.as_slice().to_vec());
             trial.z_profile = Some(profile_from_decode_stats(
                 ProfileReplayBasis::Z,
                 z_decode_seconds,
@@ -1164,6 +1167,7 @@ fn run_bb_p_point_case(
         let predicted_x = correction_to_logicals(&x_result.correction, &models.x_faults, code.k());
         if let Some(trial) = trial_export.as_mut() {
             trial.x_logical_prediction = Some(predicted_x.clone());
+            trial.x_correction = Some(x_result.correction.as_slice().to_vec());
             trial.x_profile = Some(profile_from_decode_stats(
                 ProfileReplayBasis::X,
                 x_decode_seconds,
@@ -1252,6 +1256,8 @@ fn comparison_trial_export(sample: &SampledTrial) -> ComparisonTrialExport {
         x_logical: sample.x_logical.clone(),
         z_logical_prediction: None,
         x_logical_prediction: None,
+        z_correction: None,
+        x_correction: None,
         z_profile: None,
         x_profile: None,
     }
@@ -2297,8 +2303,10 @@ mod tests {
             trial.z_logical_prediction.as_ref().unwrap(),
             &trial.z_logical
         );
+        assert!(trial.z_correction.as_ref().is_some_and(|bits| !bits.is_empty()));
         assert!(trial.z_profile.is_some());
         assert!(trial.x_logical_prediction.is_none());
+        assert!(trial.x_correction.is_none());
         assert!(trial.x_profile.is_none());
     }
 

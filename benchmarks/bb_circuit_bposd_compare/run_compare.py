@@ -63,6 +63,7 @@ BATCHED_DEFAULT_BATCH_SIZE = 500
 BB_COMPARE_PLOT_SPEC_PATH = (
     REPO_ROOT / "benchmarks" / "bb_circuit_bposd_compare" / "plot.toml"
 )
+HARD_REPLAY_TRACE_FILENAME = "hard_replay_trace.json"
 
 
 def _format_value(value: Any) -> str:
@@ -73,6 +74,18 @@ def _format_value(value: Any) -> str:
 
 def _format_json_list(values: Sequence[Any]) -> str:
     return json.dumps(list(values), separators=(",", ":"))
+
+
+def _support_from_bools(bits: Sequence[Any]) -> list[int]:
+    return [index for index, enabled in enumerate(bits) if bool(enabled)]
+
+
+def _vector_to_bools(vector: Any) -> list[bool]:
+    if hasattr(vector, "tolist"):
+        values = vector.tolist()
+    else:
+        values = list(vector)
+    return [bool(value) for value in values]
 
 
 def _base_row(case: CompareCase, decoder_impl: str) -> dict[str, str]:
@@ -345,6 +358,21 @@ def _predicted_logicals(
     return logicals
 
 
+def _residual_syndrome_support(
+    model: dict[str, Any],
+    correction_bits: Sequence[bool],
+    syndrome_bits: Sequence[bool],
+) -> list[int]:
+    residual: list[int] = []
+    for row_index, sparse_columns in enumerate(model["sparse_rows"]):
+        parity = False
+        for column_index in sparse_columns:
+            parity ^= bool(correction_bits[column_index])
+        if parity != bool(syndrome_bits[row_index]):
+            residual.append(row_index)
+    return residual
+
+
 def _load_hard_replay_fixture() -> dict[str, Any]:
     return json.loads(HARD_REPLAY_FIXTURE_PATH.read_text())
 
@@ -442,6 +470,15 @@ def _python_hard_replay_row(
     export: dict[str, Any],
     fixture: dict[str, Any],
 ) -> dict[str, str]:
+    row, _, _, _ = _python_hard_replay_decode(case, export, fixture)
+    return row
+
+
+def _python_hard_replay_decode(
+    case: CompareCase,
+    export: dict[str, Any],
+    fixture: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, Any], Any, list[bool]]:
     import numpy as np
     from ldpc import BpOsdDecoder
 
@@ -477,7 +514,103 @@ def _python_hard_replay_row(
             "status": "ok",
         }
     )
-    return row
+    return row, bundle, correction, logical_prediction
+
+
+def _trace_classification(decoders: Sequence[dict[str, Any]]) -> str:
+    if len(decoders) != 2 or any(entry.get("status") != "ok" for entry in decoders):
+        return "incomplete"
+    predictions = [entry.get("predicted_logical") for entry in decoders]
+    return "matched" if predictions[0] == predictions[1] else "logical_prediction_mismatch"
+
+
+def _rust_trace_entry(
+    case: CompareCase,
+    bundle: dict[str, Any],
+    trial: dict[str, Any],
+) -> dict[str, Any]:
+    correction_bits = trial.get("z_correction")
+    if correction_bits is None:
+        raise RuntimeError("Rust hard replay export is missing z_correction")
+    correction_support = _support_from_bools(correction_bits)
+    residual_support = _residual_syndrome_support(
+        bundle["model"], correction_bits, bundle["syndrome"]
+    )
+    profile = {
+        field: bundle["rust_profile"][field]
+        for field in RUST_PROFILE_COUNTER_FIELDS
+        if field in bundle["rust_profile"]
+    }
+    return {
+        "decoder_impl": "rbposd",
+        "status": "ok",
+        "case_id": case.case_id,
+        "basis": bundle["basis"],
+        "syndrome_support": list(bundle["syndrome_support"]),
+        "expected_sampled_logical": list(bundle["expected_logical"]),
+        "bp_osd_settings": {
+            "bp_method": case.bp_method,
+            "max_iter": case.max_iter,
+            "osd_method": case.osd_method,
+            "osd_order": case.osd_order,
+        },
+        "correction_support": correction_support,
+        "correction_weight": len(correction_support),
+        "residual_syndrome_support": residual_support,
+        "residual_syndrome_weight": len(residual_support),
+        "residual_syndrome_matches": not residual_support,
+        "predicted_logical": list(bundle["rust_prediction"]),
+        "profile": profile,
+    }
+
+
+def _python_trace_entry(
+    case: CompareCase,
+    bundle: dict[str, Any],
+    correction: Any,
+    logical_prediction: Sequence[bool],
+) -> dict[str, Any]:
+    correction_bits = _vector_to_bools(correction)
+    correction_support = _support_from_bools(correction_bits)
+    residual_support = _residual_syndrome_support(
+        bundle["model"], correction_bits, bundle["syndrome"]
+    )
+    return {
+        "decoder_impl": "ldpc_bposd",
+        "status": "ok",
+        "case_id": case.case_id,
+        "basis": bundle["basis"],
+        "syndrome_support": list(bundle["syndrome_support"]),
+        "expected_sampled_logical": list(bundle["expected_logical"]),
+        "bp_osd_settings": _python_bposd_decoder_kwargs(),
+        "correction_support": correction_support,
+        "correction_weight": len(correction_support),
+        "residual_syndrome_support": residual_support,
+        "residual_syndrome_weight": len(residual_support),
+        "residual_syndrome_matches": not residual_support,
+        "predicted_logical": list(logical_prediction),
+    }
+
+
+def _write_hard_replay_trace(
+    output_dir: Path,
+    case: CompareCase,
+    bundle: dict[str, Any],
+    decoders: list[dict[str, Any]],
+) -> None:
+    trace = {
+        "schema_version": 1,
+        "case_id": case.case_id,
+        "basis": bundle["basis"],
+        "syndrome_support": list(bundle["syndrome_support"]),
+        "syndrome_weight": len(bundle["syndrome_support"]),
+        "expected_sampled_logical": list(bundle["expected_logical"]),
+        "classification": _trace_classification(decoders),
+        "decoders": decoders,
+    }
+    (output_dir / HARD_REPLAY_TRACE_FILENAME).write_text(
+        json.dumps(trace, indent=2, sort_keys=True) + "\n"
+    )
 
 
 def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
@@ -882,16 +1015,26 @@ def run_hard_replay_suite(
     saw_skipped_python = False
 
     for case in HARD_REPLAY_CASES:
+        bundle: dict[str, Any] | None = None
+        trace_entries: list[dict[str, Any]] = []
         try:
             export = _call_exporter(exporter, case, rust_binary)
+            bundle = _hard_replay_bundle(case, export, fixture)
             rows.append(_rust_hard_replay_row(case, export, fixture))
+            trace_entries.append(_rust_trace_entry(case, bundle, export["trials"][0]))
         except Exception as error:
             saw_rust_error = True
             rows.append(_rust_error_row(case, error))
             continue
 
         try:
-            rows.append(_python_hard_replay_row(case, export, fixture))
+            row, bundle, correction, logical_prediction = _python_hard_replay_decode(
+                case, export, fixture
+            )
+            rows.append(row)
+            trace_entries.append(
+                _python_trace_entry(case, bundle, correction, logical_prediction)
+            )
         except ImportError as error:
             if not _is_missing_python_dependency(error):
                 raise
@@ -906,6 +1049,22 @@ def run_hard_replay_suite(
             except Exception:
                 pass
             rows.append(skipped)
+            if bundle is not None:
+                trace_entries.append(
+                    {
+                        "decoder_impl": "ldpc_bposd",
+                        "status": "skipped",
+                        "case_id": case.case_id,
+                        "basis": bundle["basis"],
+                        "syndrome_support": list(bundle["syndrome_support"]),
+                        "expected_sampled_logical": list(bundle["expected_logical"]),
+                        "bp_osd_settings": _python_bposd_decoder_kwargs(),
+                        "error": _python_dependency_error_text(error),
+                    }
+                )
+
+        if bundle is not None:
+            _write_hard_replay_trace(output_dir, case, bundle, trace_entries)
 
     _write_rows(rows, output_dir / "results.csv")
     write_summary(rows, output_dir / "summary.md")
