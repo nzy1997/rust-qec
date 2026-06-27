@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rbposd::{
     BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Syndrome,
@@ -13,6 +13,7 @@ use crate::failure::FailureKind;
 
 const SX_LABELS: [&str; 7] = ["idle", "1", "4", "3", "5", "0", "2"];
 const SZ_LABELS: [&str; 7] = ["3", "5", "0", "1", "2", "4", "idle"];
+pub const BRAVYI_NOISELESS_TAIL_CYCLES: usize = 2;
 const BB_CIRCUIT_BPOSD_BENCHMARK: &str = "bb-circuit-bposd-memory";
 const BB_CIRCUIT_BPOSD_RUNNER: &str = "rbposd";
 const BB_CIRCUIT_BPOSD_LANGUAGE: &str = "rust";
@@ -1624,7 +1625,7 @@ fn build_effective_model_for_basis(
     config: &SimulationConfig,
     basis: FaultBasis,
 ) -> Result<EffectiveDecoderModel, String> {
-    let total_cycles = config.num_cycles + 2;
+    let total_cycles = config.num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;
     let num_checks = code.n2();
     let first_logical_row = num_checks * total_cycles;
     let mut grouped_columns = BTreeMap::<Vec<usize>, f64>::new();
@@ -1905,7 +1906,7 @@ fn simulate_trial<R: Rng + ?Sized>(
     physical_error_rate: f64,
     rng: &mut R,
 ) -> SampledTrial {
-    let total_cycles = num_cycles + 2;
+    let total_cycles = num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;
     let mut z_state = vec![false; code.num_circuit_qubits()];
     let mut x_state = vec![false; code.num_circuit_qubits()];
     let mut x_check_measurements = vec![vec![false; code.n2()]; total_cycles];
@@ -2103,13 +2104,14 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 #[cfg(test)]
 mod tests {
     use super::{
-        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
-        SimulationConfig, apply_pauli_fault, build_upstream_code, cnot_fault_for_index,
-        correction_to_logicals, in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
+        apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
+        in_row_span, nullspace, parse_schedule_slot, rref, run_simulation,
         run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
         validate_model_config, validate_physical_error_rate, validate_simulation_config,
+        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
+        SimulationConfig,
     };
-    use rand::{SeedableRng, rngs::StdRng};
+    use rand::{rngs::StdRng, SeedableRng};
     use rbposd::{Correction, ParityCheckMatrix};
 
     #[test]

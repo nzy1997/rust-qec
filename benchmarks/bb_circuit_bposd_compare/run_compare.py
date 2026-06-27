@@ -45,6 +45,9 @@ PYTHON_UPSTREAM_BP_METHOD = "ms"
 PYTHON_UPSTREAM_MAX_ITER = 10000
 PYTHON_UPSTREAM_OSD_METHOD = "osd_cs"
 PYTHON_UPSTREAM_OSD_ORDER = 7
+PYTHON_UPSTREAM_MS_SCALING_FACTOR = 0
+PYTHON_FAILURE_UNIT = "monte_carlo_trial"
+PYTHON_FAILURE_PREDICATE = "z_first_x_only_if_z_succeeds"
 PYTHON_DEPENDENCY_HINTS = ("ldpc", "bposd", "numpy", "bposddecoder")
 RUST_PROFILE_COUNTER_FIELDS = (
     "bp_seconds",
@@ -134,6 +137,28 @@ def _python_upstream_settings() -> dict[str, str]:
         "osd_method": PYTHON_UPSTREAM_OSD_METHOD,
         "osd_order": _format_value(PYTHON_UPSTREAM_OSD_ORDER),
     }
+
+
+def _python_bposd_decoder_kwargs() -> dict[str, object]:
+    return {
+        "max_iter": PYTHON_UPSTREAM_MAX_ITER,
+        "bp_method": PYTHON_UPSTREAM_BP_METHOD,
+        "ms_scaling_factor": PYTHON_UPSTREAM_MS_SCALING_FACTOR,
+        "osd_method": PYTHON_UPSTREAM_OSD_METHOD,
+        "osd_order": PYTHON_UPSTREAM_OSD_ORDER,
+        "input_vector_type": "syndrome",
+    }
+
+
+def _bravyi_trial_failed(
+    z_predicted: Sequence[bool],
+    z_expected: Sequence[bool],
+    x_prediction: Callable[[], Sequence[bool]],
+    x_expected: Sequence[bool],
+) -> bool:
+    if list(z_predicted) != list(z_expected):
+        return True
+    return list(x_prediction()) != list(x_expected)
 
 
 def _run_rust_export(
@@ -425,11 +450,7 @@ def _python_hard_replay_row(
     decoder = BpOsdDecoder(
         _dense_matrix(bundle["model"], np),
         error_channel=bundle["model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     setup_seconds = time.perf_counter() - setup_started
 
@@ -467,20 +488,12 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
     z_decoder = BpOsdDecoder(
         _dense_matrix(export["z_model"], np),
         error_channel=export["z_model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     x_decoder = BpOsdDecoder(
         _dense_matrix(export["x_model"], np),
         error_channel=export["x_model"]["channel_probs"],
-        max_iter=PYTHON_UPSTREAM_MAX_ITER,
-        bp_method=PYTHON_UPSTREAM_BP_METHOD,
-        osd_method=PYTHON_UPSTREAM_OSD_METHOD,
-        osd_order=PYTHON_UPSTREAM_OSD_ORDER,
-        input_vector_type="syndrome",
+        **_python_bposd_decoder_kwargs(),
     )
     setup_seconds = time.perf_counter() - setup_started
 
@@ -493,17 +506,23 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
             export["z_model"],
             len(trial["z_logical"]),
         )
-        if z_predicted != list(trial["z_logical"]):
-            num_failed_trials += 1
-            continue
 
-        x_correction = x_decoder.decode(np.asarray(trial["x_syndrome"], dtype=np.uint8))
-        x_predicted = _predicted_logicals(
-            x_correction,
-            export["x_model"],
-            len(trial["x_logical"]),
-        )
-        if x_predicted != list(trial["x_logical"]):
+        def x_prediction(trial: dict[str, Any] = trial) -> Sequence[bool]:
+            x_correction = x_decoder.decode(
+                np.asarray(trial["x_syndrome"], dtype=np.uint8)
+            )
+            return _predicted_logicals(
+                x_correction,
+                export["x_model"],
+                len(trial["x_logical"]),
+            )
+
+        if _bravyi_trial_failed(
+            z_predicted,
+            trial["z_logical"],
+            x_prediction,
+            trial["x_logical"],
+        ):
             num_failed_trials += 1
     decode_seconds = time.perf_counter() - decode_started
 
