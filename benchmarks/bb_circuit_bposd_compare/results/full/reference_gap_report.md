@@ -18,8 +18,8 @@
 | Bravyi contract audit | PASS | `verify_bravyi_contract` accepted commit `fa77e3333d3ec44c79d8f914dd24c040d1da471b`. |
 | Bravyi LER audit | PASS | `verify_bravyi_ler` accepted 16 rows. |
 | Batched accounting audit | PASS | `verify_batched_accounting` accepted 8 paired groups. |
-| Bravyi model audit | PASS - #308 fixture and verifier are present; run `python3 -m benchmarks.bb_circuit_bposd_compare.verify_model_audit /tmp/rstim-bb-model-audit/model_audit.json` for fresh audit output. | BB72 effective-model audit remains the #308 gate. |
-| Hard replay parity | PASS - #307 fixed the pinned BB90 hard replay parity; run `python3 -m benchmarks.bb_circuit_bposd_compare.verify_replay /tmp/rstim-bb90-hard-replay/results.csv` for fresh replay output. | BB90 hard replay remains the #306/#307 gate. |
+| Bravyi model audit | PASS - #308 checked in `reference/bravyi_model_audit_bb72_p003_c6.json` and `verify_model_audit` verifies fresh audit artifacts against that fixture. | BB72 effective-model audit remains the #308 gate. |
+| Hard replay parity | PASS - #307 fixed the pinned BB90 hard-replay parity; `verify_replay` and `verify_replay_trace` remain the gates for regenerated replay artifacts. | BB90 hard replay remains the #306/#307 gate. |
 
 ## Regeneration Evidence
 

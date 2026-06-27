@@ -19,14 +19,13 @@ DEFAULT_CONTRACT_PATH = (
     Path(__file__).resolve().parent / "reference" / "bravyi_contract.json"
 )
 DEFAULT_MODEL_AUDIT_STATUS = (
-    "PASS - #308 fixture and verifier are present; run "
-    "`python3 -m benchmarks.bb_circuit_bposd_compare.verify_model_audit "
-    "/tmp/rstim-bb-model-audit/model_audit.json` for fresh audit output."
+    "PASS - #308 checked in "
+    "`reference/bravyi_model_audit_bb72_p003_c6.json` and "
+    "`verify_model_audit` verifies fresh audit artifacts against that fixture."
 )
 DEFAULT_HARD_REPLAY_STATUS = (
-    "PASS - #307 fixed the pinned BB90 hard replay parity; run "
-    "`python3 -m benchmarks.bb_circuit_bposd_compare.verify_replay "
-    "/tmp/rstim-bb90-hard-replay/results.csv` for fresh replay output."
+    "PASS - #307 fixed the pinned BB90 hard-replay parity; `verify_replay` "
+    "and `verify_replay_trace` remain the gates for regenerated replay artifacts."
 )
 
 
