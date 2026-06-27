@@ -1,6 +1,10 @@
 use std::fs;
 use std::process::Command;
 
+use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
+use rsinter::bench::plot::logical_rate_fit_for_plot;
+use rsinter::bench::spec::LogicalRateUnit;
+
 #[test]
 fn rsinter_cli_help_mentions_bench_subcommands() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
@@ -225,6 +229,35 @@ bb72-error,batched_compare,legacy_decoder,bb72,0.003,6,10,,0,12345,ms,10000,osd_
     assert!(output.status.success(), "{output:?}");
     let png = fs::read(out).unwrap();
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
+
+#[test]
+fn bb_compare_csv_adapter_preserves_trial_level_ler_for_plot_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("bb_results.csv");
+    fs::write(
+        &input,
+        "case_id,runner,decoder_impl,code_id,p,num_cycles,shots_budget,errors_budget,shots_used,seed,bp_method,max_iter,osd_method,osd_order,batch_size,batches_completed,setup_seconds,sample_seconds,decode_seconds,run_seconds,logical_errors,logical_error_rate,bp_seconds,osd_seconds,decode_call_count,bp_iteration_count,osd_use_count,osd_candidate_count,gf2_solve_count,gf2_full_elimination_count,status,stop_reason,error\n\
+bb144-p0030-c12-t1000000-seed12345,batched_compare,rbposd,bb144,0.003,12,1000000,200,40000,12345,ms,10000,osd_cs,7,500,80,1.0,2.0,3.0,6.0,200,0.005,1.0,2.0,20,10,1,16,1,1,ok,errors_budget_reached,\n",
+    )
+    .unwrap();
+
+    let rows = read_bb_compare_csv(&input, "bb_circuit_bposd_compare").unwrap();
+
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    assert_eq!(row.params["rounds"], serde_json::json!(12));
+    assert_eq!(
+        row.case_summary["logical_observable_count"],
+        serde_json::json!(1)
+    );
+    assert_eq!(row.metrics["logical_errors"], 200.0);
+    assert_eq!(row.metrics["shots_used"], 40000.0);
+    assert_eq!(row.metrics["logical_error_rate"], 0.005);
+
+    let fit = logical_rate_fit_for_plot(row, LogicalRateUnit::PerShot).unwrap();
+    assert_eq!(fit.best, Some(0.005));
+    assert_ne!(fit.best, Some(200.0 / (40000.0 * 12.0)));
 }
 
 #[test]
