@@ -16,6 +16,7 @@ const ABOVE_GATE_TEXT_GAP: i32 = 8;
 const SOURCE_GATE_MIN_WIDTH: i32 = 64;
 const SOURCE_GATE_TEXT_PAD: i32 = 24;
 const SOURCE_GATE_CHAR_WIDTH: i32 = 6;
+const SOURCE_OPERATION_MIN_COLUMN_SPAN: usize = 2;
 const REPEAT_GROUP_TOP_PAD: i32 = 8;
 const REPEAT_GROUP_BOTTOM_PAD: i32 = 8;
 const REPEAT_GROUP_X_PAD: i32 = 4;
@@ -127,6 +128,15 @@ enum LayerItem<'a> {
     },
 }
 
+struct SourceLayerItem<'a> {
+    lane: usize,
+    label: String,
+    source: String,
+    annotations: &'a [Qp101Annotation],
+    highlighted: bool,
+    column_span: usize,
+}
+
 impl LayerItem<'_> {
     fn span(&self, num_qubits: usize) -> Result<LaneSpan, String> {
         match self {
@@ -210,40 +220,114 @@ fn repeat_label_top_reserve(ops: &[Qp101Operation]) -> i32 {
 }
 
 fn count_visible_columns(ops: &[Qp101Operation], num_qubits: usize) -> Result<usize, String> {
+    let mut state = RenderState::default();
+    count_visible_columns_with_state(ops, num_qubits, &mut state)
+}
+
+fn count_visible_columns_with_state(
+    ops: &[Qp101Operation],
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<usize, String> {
     let mut total = 0usize;
     let mut layer = Vec::new();
+    let mut source_layer = Vec::new();
     for op in ops {
         match op {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
             Qp101Operation::Tick { .. } | Qp101Operation::Annotation { .. } => {
-                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
-                layer.clear();
+                count_and_clear_operation_layer(&mut total, &mut layer, num_qubits, state)?;
+                count_and_clear_source_layer(&mut total, &mut source_layer, num_qubits, state)?;
                 total = total.saturating_add(1);
             }
-            Qp101Operation::Detector { .. } => {
-                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
-                layer.clear();
-                total = total.saturating_add(source_operation_column_span("DETECTOR"));
+            Qp101Operation::Detector { .. } | Qp101Operation::ObservableInclude { .. } => {
+                count_and_clear_operation_layer(&mut total, &mut layer, num_qubits, state)?;
+                source_layer.push(op);
             }
-            Qp101Operation::ObservableInclude { index, .. } => {
-                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
-                layer.clear();
-                total = total.saturating_add(source_operation_column_span(&format!(
-                    "OBS_INCLUDE({index})"
-                )));
+            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => {
+                count_and_clear_source_layer(&mut total, &mut source_layer, num_qubits, state)?;
+                layer.push(op);
             }
-            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => layer.push(op),
             Qp101Operation::Repeat { count, body, .. } => {
-                total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
-                layer.clear();
-                let count = usize::try_from(*count).unwrap_or(usize::MAX);
-                total = total
-                    .saturating_add(count_visible_columns(body, num_qubits)?.saturating_mul(count));
+                count_and_clear_operation_layer(&mut total, &mut layer, num_qubits, state)?;
+                count_and_clear_source_layer(&mut total, &mut source_layer, num_qubits, state)?;
+                for _ in 0..*count {
+                    total = total
+                        .saturating_add(count_visible_columns_with_state(body, num_qubits, state)?);
+                }
             }
         }
     }
-    total = total.saturating_add(count_operation_layer_columns(&layer, num_qubits)?);
+    count_and_clear_operation_layer(&mut total, &mut layer, num_qubits, state)?;
+    count_and_clear_source_layer(&mut total, &mut source_layer, num_qubits, state)?;
     Ok(total)
+}
+
+fn count_and_clear_operation_layer(
+    total: &mut usize,
+    layer: &mut Vec<&Qp101Operation>,
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    *total = total.saturating_add(count_operation_layer_columns(layer, num_qubits)?);
+    for op in layer.drain(..) {
+        advance_measurement_state_for_count(op, num_qubits, state)?;
+    }
+    Ok(())
+}
+
+fn count_and_clear_source_layer(
+    total: &mut usize,
+    layer: &mut Vec<&Qp101Operation>,
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    *total = total.saturating_add(count_source_layer_columns(layer, num_qubits, state)?);
+    layer.clear();
+    Ok(())
+}
+
+fn count_source_layer_columns(
+    layer: &[&Qp101Operation],
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<usize, String> {
+    let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    for op in layer {
+        let item = source_layer_item(op, num_qubits, state)?;
+        let span = LaneSpan {
+            min: item.lane,
+            max: item.lane,
+        };
+        let assigned_column =
+            first_non_conflicting_column_with_width(&column_spans, span, item.column_span);
+        reserve_column_span(&mut column_spans, assigned_column, item.column_span, span);
+    }
+    Ok(column_spans.len())
+}
+
+fn advance_measurement_state_for_count(
+    op: &Qp101Operation,
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    match op {
+        Qp101Operation::Gate {
+            gate,
+            targets,
+            raw_targets,
+            ..
+        } => {
+            let _ = measurement_targets(gate, targets, raw_targets.as_deref(), num_qubits, state)?;
+        }
+        Qp101Operation::Noise {
+            gate, raw_targets, ..
+        } => {
+            let _ = measurement_targets(gate, &[], Some(raw_targets), num_qubits, state)?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn count_operation_layer_columns(
@@ -486,21 +570,27 @@ fn render_operations<'a>(
     state: &mut RenderState,
 ) -> Result<(), String> {
     let mut layer = Vec::new();
+    let mut source_layer = Vec::new();
     for op in ops {
         match op {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
             Qp101Operation::Tick { annotations } => {
                 flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
+                flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
                 render_tick(out, x_for_column(*column), num_qubits, annotations);
                 *column += 1;
             }
-            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => layer.push(op),
+            Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => {
+                flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
+                layer.push(op);
+            }
             Qp101Operation::Repeat {
                 count,
                 body,
                 annotations,
             } => {
                 flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
+                flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
                 let start_column = *column;
                 let mut iteration_starts = Vec::new();
                 let depth = state.repeat_depth;
@@ -522,61 +612,9 @@ fn render_operations<'a>(
                     state.repeat_groups.push(span);
                 }
             }
-            Qp101Operation::Detector {
-                sources,
-                annotations,
-                ..
-            } => {
+            Qp101Operation::Detector { .. } | Qp101Operation::ObservableInclude { .. } => {
                 flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
-                let x = x_for_column(*column);
-                let detector_index = state.next_detector_index;
-                state.next_detector_index += 1;
-                let source = source_label(sources, &state.measurements, num_qubits);
-                let highlighted = source_block_highlighted(annotations);
-                render_source_operation(
-                    out,
-                    x,
-                    source.host_lane,
-                    "DETECTOR",
-                    &format!("D{detector_index} = {}", source.text),
-                    highlighted,
-                );
-                render_source_annotations_with_line_offset(
-                    out,
-                    x,
-                    &[source.host_lane],
-                    annotations,
-                    1,
-                );
-                *column += source_operation_column_span("DETECTOR");
-            }
-            Qp101Operation::ObservableInclude {
-                index,
-                sources,
-                annotations,
-                ..
-            } => {
-                flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
-                let x = x_for_column(*column);
-                let source = source_label(sources, &state.measurements, num_qubits);
-                let label = format!("OBS_INCLUDE({index})");
-                let highlighted = source_block_highlighted(annotations);
-                render_source_operation(
-                    out,
-                    x,
-                    source.host_lane,
-                    &label,
-                    &format!("L{index} *= {}", source.text),
-                    highlighted,
-                );
-                render_source_annotations_with_line_offset(
-                    out,
-                    x,
-                    &[source.host_lane],
-                    annotations,
-                    1,
-                );
-                *column += source_operation_column_span(&label);
+                source_layer.push(op);
             }
             Qp101Operation::Annotation {
                 kind,
@@ -584,6 +622,7 @@ fn render_operations<'a>(
                 annotations,
             } => {
                 flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
+                flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
                 let x = x_for_column(*column);
                 let label = format!("{kind}: {text}");
                 render_top_note(out, x, &label);
@@ -593,6 +632,7 @@ fn render_operations<'a>(
         }
     }
     flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
+    flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
     Ok(())
 }
 
@@ -629,11 +669,130 @@ fn flush_operation_layer(
     Ok(())
 }
 
+fn flush_source_layer<'a>(
+    out: &mut String,
+    layer: &mut Vec<&'a Qp101Operation>,
+    num_qubits: usize,
+    column: &mut usize,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    if layer.is_empty() {
+        return Ok(());
+    }
+
+    let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    for op in layer.drain(..) {
+        let item = source_layer_item(op, num_qubits, state)?;
+        let span = LaneSpan {
+            min: item.lane,
+            max: item.lane,
+        };
+        let assigned_column =
+            first_non_conflicting_column_with_width(&column_spans, span, item.column_span);
+        reserve_column_span(&mut column_spans, assigned_column, item.column_span, span);
+        let x = x_for_column(*column + assigned_column);
+        render_source_operation(
+            out,
+            x,
+            item.lane,
+            &item.label,
+            &item.source,
+            item.highlighted,
+        );
+        render_source_annotations_with_line_offset(out, x, &[item.lane], item.annotations, 1);
+    }
+    *column += column_spans.len();
+    Ok(())
+}
+
+fn source_layer_item<'a>(
+    op: &'a Qp101Operation,
+    num_qubits: usize,
+    state: &mut RenderState,
+) -> Result<SourceLayerItem<'a>, String> {
+    match op {
+        Qp101Operation::Detector {
+            sources,
+            annotations,
+            ..
+        } => {
+            let detector_index = state.next_detector_index;
+            state.next_detector_index += 1;
+            let source = source_label(sources, &state.measurements, num_qubits);
+            let source_text = format!("D{detector_index} = {}", source.text);
+            Ok(SourceLayerItem {
+                lane: source.host_lane,
+                label: "DETECTOR".to_string(),
+                column_span: source_operation_column_span_for_item("DETECTOR", &source_text),
+                source: source_text,
+                annotations,
+                highlighted: source_block_highlighted(annotations),
+            })
+        }
+        Qp101Operation::ObservableInclude {
+            index,
+            sources,
+            annotations,
+            ..
+        } => {
+            let source = source_label(sources, &state.measurements, num_qubits);
+            let label = format!("OBS_INCLUDE({index})");
+            let source_text = format!("L{index} *= {}", source.text);
+            Ok(SourceLayerItem {
+                lane: source.host_lane,
+                column_span: source_operation_column_span_for_item(&label, &source_text),
+                source: source_text,
+                annotations,
+                highlighted: source_block_highlighted(annotations),
+                label,
+            })
+        }
+        other => Err(format!(
+            "internal error: non-source operation in source layer: {other:?}"
+        )),
+    }
+}
+
 fn first_non_conflicting_column(column_spans: &[Vec<LaneSpan>], span: LaneSpan) -> usize {
     column_spans
         .iter()
         .position(|spans| spans.iter().all(|existing| !existing.conflicts(span)))
         .unwrap_or(column_spans.len())
+}
+
+fn first_non_conflicting_column_with_width(
+    column_spans: &[Vec<LaneSpan>],
+    span: LaneSpan,
+    column_span: usize,
+) -> usize {
+    let column_span = column_span.max(1);
+    for start in 0..=column_spans.len() {
+        let fits = (start..start + column_span).all(|column| {
+            column >= column_spans.len()
+                || column_spans[column]
+                    .iter()
+                    .all(|existing| !existing.conflicts(span))
+        });
+        if fits {
+            return start;
+        }
+    }
+    column_spans.len()
+}
+
+fn reserve_column_span(
+    column_spans: &mut Vec<Vec<LaneSpan>>,
+    start: usize,
+    column_span: usize,
+    span: LaneSpan,
+) {
+    let end = start + column_span.max(1);
+    while column_spans.len() < end {
+        column_spans.push(Vec::new());
+    }
+    for spans in &mut column_spans[start..end] {
+        spans.push(span);
+    }
 }
 
 fn operation_lane_span(op: &Qp101Operation, num_qubits: usize) -> Result<LaneSpan, String> {
@@ -1685,16 +1844,24 @@ fn render_source_gate_box(
     ));
 }
 
-fn source_operation_column_span(label: &str) -> usize {
-    let width = source_gate_width(label);
+fn source_operation_column_span_for_item(label: &str, source: &str) -> usize {
+    let width = source_gate_width(label).max(source_text_width(source));
+    source_operation_column_span_for_width(width)
+}
+
+fn source_operation_column_span_for_width(width: i32) -> usize {
     usize::try_from((width + COLUMN_GAP - 1) / COLUMN_GAP)
         .unwrap_or(1)
-        .max(1)
+        .max(SOURCE_OPERATION_MIN_COLUMN_SPAN)
 }
 
 fn source_gate_width(label: &str) -> i32 {
     let text_width = label.chars().count() as i32 * SOURCE_GATE_CHAR_WIDTH + SOURCE_GATE_TEXT_PAD;
     SOURCE_GATE_MIN_WIDTH.max(text_width)
+}
+
+fn source_text_width(source: &str) -> i32 {
+    source.chars().count() as i32 * SOURCE_GATE_CHAR_WIDTH + SOURCE_GATE_TEXT_PAD
 }
 
 fn render_tick(out: &mut String, x: i32, num_qubits: usize, annotations: &[Qp101Annotation]) {

@@ -718,6 +718,65 @@ fn svg_renderer_highlights_flipped_source_blocks_without_blue_marker_text() {
 }
 
 #[test]
+fn svg_renderer_packs_source_operations_by_host_lane() {
+    let instrs = parse_lines(
+        "M 0\n\
+         M 1\n\
+         M 2\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-2]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .expect("source packing fixture should parse");
+    let doc = export_qp101(&instrs).expect("source packing fixture should export");
+
+    let svg = render_svg(&doc).expect("source packing fixture should render");
+
+    let detector_positions = text_positions(&svg, "DETECTOR");
+    assert_eq!(
+        detector_positions.len(),
+        3,
+        "fixture should render three detector blocks: {svg}"
+    );
+    let logical_position =
+        text_xy(&svg, "OBS_INCLUDE(0)").expect("logical block should be positioned");
+    assert_eq!(
+        detector_positions[0].0, detector_positions[1].0,
+        "detectors on different host lanes should align like same-layer single-qubit gates: {svg}"
+    );
+    assert_eq!(
+        detector_positions[0].0, logical_position.0,
+        "logical block on a different host lane should align with same-layer detectors: {svg}"
+    );
+    assert!(
+        detector_positions[2].0 > logical_position.0,
+        "a later detector on the logical block's host lane should move to a later column: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_spaces_wide_source_blocks_on_the_same_host_lane() {
+    let instrs = parse_lines(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("same-lane source spacing fixture should parse");
+    let doc = export_qp101(&instrs).expect("same-lane source spacing fixture should export");
+
+    let svg = render_svg(&doc).expect("same-lane source spacing fixture should render");
+
+    let detector_position = text_xy(&svg, "DETECTOR").expect("detector should be positioned");
+    let logical_position =
+        text_xy(&svg, "OBS_INCLUDE(0)").expect("logical block should be positioned");
+    assert!(
+        logical_position.0 - detector_position.0 >= 144,
+        "same-lane source blocks should leave room for wide blocks and source labels: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_falls_back_for_unknown_noise_gates() {
     let doc = Qp101Document {
         standard: "QP101-ZY".to_string(),
