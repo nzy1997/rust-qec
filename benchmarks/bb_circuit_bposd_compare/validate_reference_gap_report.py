@@ -37,7 +37,10 @@ def validate(results_path: Path, report_path: Path) -> list[str]:
     except Exception as error:
         return [f"source evidence failed validation: {error}"]
 
-    text = report_path.read_text()
+    try:
+        text = report_path.read_text()
+    except OSError as error:
+        return [f"failed to read report {report_path}: {error}"]
     contract_commit_line = f"- Bravyi contract commit: `{UPSTREAM_COMMIT}`"
     if contract_commit_line not in text:
         errors.append("missing Bravyi contract commit")

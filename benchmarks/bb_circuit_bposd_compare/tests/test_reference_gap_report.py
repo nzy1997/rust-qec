@@ -124,6 +124,21 @@ def test_validate_reference_gap_report_rejects_missing_final_verdict(
     assert "final verdict" in captured.err
 
 
+def test_validate_reference_gap_report_rejects_missing_report_file(
+    tmp_path: Path, capsys
+) -> None:
+    missing_report = tmp_path / "missing_reference_gap_report.md"
+
+    status = validate_reference_gap_report.main(
+        ["--results", str(RESULTS), "--report", str(missing_report)]
+    )
+
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "failed to read report" in captured.err
+    assert str(missing_report) in captured.err
+
+
 def test_validate_reference_gap_report_rejects_tampered_ler_row(
     tmp_path: Path, capsys
 ) -> None:
