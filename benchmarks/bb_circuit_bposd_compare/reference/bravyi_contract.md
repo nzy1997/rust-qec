@@ -27,7 +27,11 @@ The upstream Python replay uses min-sum BP with `max_iter=10000`,
 
 Source:
 https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L67-L72
-(`decoder_run.py` lines 67-72 and 329-349).
+(`decoder_run.py` lines 67-72).
+
+The decoder constructor receives these settings here:
+https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L329-L349
+(`decoder_run.py` lines 329-349).
 
 ## Cycle Convention
 
@@ -53,7 +57,9 @@ https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd
   https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/README.md#L16-L21
 - `decoder_setup.py` lines 511-618:
   https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_setup.py#L511-L618
-- `decoder_run.py` lines 67-72 and 329-349:
+- `decoder_run.py` lines 67-72:
   https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L67-L72
+- `decoder_run.py` lines 329-349:
+  https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L329-L349
 - `decoder_run.py` lines 364-415:
   https://github.com/sbravyi/BivariateBicycleCodes/blob/fa77e3333d3ec44c79d8f914dd24c040d1da471b/decoder_run.py#L364-L415

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from benchmarks.bb_circuit_bposd_compare import verify_replay, verify_smoke
 from benchmarks.bb_circuit_bposd_compare.cases import (
     BB72_BB144_FULL_CASES,
     BB72_BB144_PLOT_SMOKE_CASES,
@@ -28,11 +29,13 @@ from benchmarks.bb_circuit_bposd_compare.cases import (
 from benchmarks.bb_circuit_bposd_compare.run_compare import (
     PYTHON_FAILURE_PREDICATE,
     PYTHON_FAILURE_UNIT,
+    PYTHON_UPSTREAM_SEED,
     PYTHON_UPSTREAM_BP_METHOD,
     PYTHON_UPSTREAM_MAX_ITER,
     PYTHON_UPSTREAM_MS_SCALING_FACTOR,
     PYTHON_UPSTREAM_OSD_METHOD,
     PYTHON_UPSTREAM_OSD_ORDER,
+    _bravyi_trial_failed,
     _python_bposd_decoder_kwargs,
 )
 
@@ -64,10 +67,17 @@ EXPECTED_SOURCES = [
     },
     {
         "file": "decoder_run.py",
-        "lines": "67-72,329-349",
+        "lines": "67-72",
         "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/"
         f"{UPSTREAM_COMMIT}/decoder_run.py#L67-L72",
-        "supports": ["decoder"],
+        "supports": ["decoder_parameters"],
+    },
+    {
+        "file": "decoder_run.py",
+        "lines": "329-349",
+        "url": "https://github.com/sbravyi/BivariateBicycleCodes/blob/"
+        f"{UPSTREAM_COMMIT}/decoder_run.py#L329-L349",
+        "supports": ["decoder_constructor_kwargs"],
     },
     {
         "file": "decoder_run.py",
@@ -141,6 +151,7 @@ def validate_contract(contract: dict[str, object]) -> list[str]:
     _validate_manifest_scaling(contract, errors)
     _validate_python_decoder_kwargs(contract, errors)
     _validate_failure_contract(errors)
+    _validate_existing_verifier_settings(contract, errors)
     _validate_rust_tail_cycle_source(contract, errors)
     return errors
 
@@ -241,6 +252,89 @@ def _validate_failure_contract(errors: list[str]) -> None:
             "PYTHON_FAILURE_PREDICATE: expected "
             "'z_first_x_only_if_z_succeeds', "
             f"got {PYTHON_FAILURE_PREDICATE!r}"
+        )
+    x_decode_calls = 0
+
+    def x_must_not_run() -> Sequence[bool]:
+        raise AssertionError("X predicate ran after Z failure")
+
+    try:
+        if _bravyi_trial_failed([True], [False], x_must_not_run, [False]) is not True:
+            errors.append("_bravyi_trial_failed: expected Z failure to fail trial")
+    except Exception as error:  # pragma: no cover - covered by negative tests.
+        errors.append(
+            "_bravyi_trial_failed: expected Z failure to skip X, "
+            f"got {error}"
+        )
+
+    def x_fails() -> Sequence[bool]:
+        nonlocal x_decode_calls
+        x_decode_calls += 1
+        return [True]
+
+    if _bravyi_trial_failed([False], [False], x_fails, [False]) is not True:
+        errors.append("_bravyi_trial_failed: expected X failure to fail trial")
+    if x_decode_calls != 1:
+        errors.append(
+            "_bravyi_trial_failed: expected one X call after Z success and X failure, "
+            f"got {x_decode_calls}"
+        )
+
+    def x_succeeds() -> Sequence[bool]:
+        nonlocal x_decode_calls
+        x_decode_calls += 1
+        return [False]
+
+    if _bravyi_trial_failed([False], [False], x_succeeds, [False]) is not False:
+        errors.append("_bravyi_trial_failed: expected Z and X success to pass trial")
+    if x_decode_calls != 2:
+        errors.append(
+            "_bravyi_trial_failed: expected one X call for each Z-success trial, "
+            f"got {x_decode_calls}"
+        )
+
+
+def _validate_existing_verifier_settings(
+    contract: dict[str, object],
+    errors: list[str],
+) -> None:
+    decoder = _as_mapping(_get(contract, ("decoder",)))
+    if decoder is None:
+        return
+    expected_smoke = {
+        "bp_method": decoder.get("bp_method"),
+        "max_iter": str(decoder.get("max_iter")),
+        "osd_method": decoder.get("osd_method"),
+        "osd_order": str(decoder.get("osd_order")),
+        "seed": str(PYTHON_UPSTREAM_SEED),
+    }
+    for field, expected_value in expected_smoke.items():
+        actual = verify_smoke.PINNED_UPSTREAM_SETTINGS.get(field)
+        if actual != expected_value:
+            errors.append(
+                f"verify_smoke.PINNED_UPSTREAM_SETTINGS.{field}: "
+                f"expected {expected_value!r}, got {actual!r}"
+            )
+
+    expected_replay = {
+        "bp_method": decoder.get("bp_method"),
+        "max_iter": str(decoder.get("max_iter")),
+        "osd_order": str(decoder.get("osd_order")),
+        "seed": str(PYTHON_UPSTREAM_SEED),
+        "basis": "Z",
+    }
+    for field, expected_value in expected_replay.items():
+        actual = verify_replay.PINNED_REPLAY_SETTINGS.get(field)
+        if actual != expected_value:
+            errors.append(
+                f"verify_replay.PINNED_REPLAY_SETTINGS.{field}: "
+                f"expected {expected_value!r}, got {actual!r}"
+            )
+    osd_method = decoder.get("osd_method")
+    if osd_method not in verify_replay.ACCEPTED_OSD_METHODS:
+        errors.append(
+            "verify_replay.ACCEPTED_OSD_METHODS: expected to accept "
+            f"{osd_method!r}"
         )
 
 

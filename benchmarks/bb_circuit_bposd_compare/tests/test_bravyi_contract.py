@@ -42,6 +42,66 @@ def test_contract_negative_controls_name_mismatched_fields() -> None:
     assert any("decoder.ms_scaling_factor" in err for err in validate_contract(mutated))
 
 
+def test_contract_validator_cli_rejects_mutated_contract(tmp_path: Path) -> None:
+    mutated = _load_contract(CONTRACT_PATH)
+    mutated["decoder"]["ms_scaling_factor"] = 1
+    bad_contract_path = tmp_path / "bravyi_contract_bad.json"
+    bad_contract_path.write_text(json.dumps(mutated))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "benchmarks.bb_circuit_bposd_compare.verify_bravyi_contract",
+            str(bad_contract_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "decoder.ms_scaling_factor" in result.stderr
+
+
+def test_contract_validator_checks_python_failure_predicate_helper(
+    monkeypatch,
+) -> None:
+    def broken_predicate(
+        z_predicted: list[bool],
+        z_expected: list[bool],
+        x_prediction,
+        x_expected: list[bool],
+    ) -> bool:
+        return False
+
+    monkeypatch.setattr(
+        verify_bravyi_contract,
+        "_bravyi_trial_failed",
+        broken_predicate,
+    )
+
+    errors = validate_contract(_load_contract(CONTRACT_PATH))
+
+    assert any("_bravyi_trial_failed" in err for err in errors)
+
+
+def test_contract_validator_checks_existing_verify_module_pins(monkeypatch) -> None:
+    pinned_settings = dict(verify_bravyi_contract.verify_smoke.PINNED_UPSTREAM_SETTINGS)
+    pinned_settings["osd_order"] = "0"
+    monkeypatch.setattr(
+        verify_bravyi_contract.verify_smoke,
+        "PINNED_UPSTREAM_SETTINGS",
+        pinned_settings,
+    )
+
+    errors = validate_contract(_load_contract(CONTRACT_PATH))
+
+    assert any(
+        "verify_smoke.PINNED_UPSTREAM_SETTINGS.osd_order" in err for err in errors
+    )
+
+
 def test_contract_validator_checks_rust_tail_cycle_source(
     tmp_path: Path,
     monkeypatch,
@@ -95,6 +155,37 @@ def test_python_decoder_kwargs_expose_upstream_scaling() -> None:
     assert kwargs["osd_order"] == 7
     assert kwargs["ms_scaling_factor"] == 0
     assert kwargs["input_vector_type"] == "syndrome"
+
+
+def test_bravyi_trial_failure_predicate_matches_source_contract() -> None:
+    x_decode_calls = 0
+
+    def x_not_called() -> list[bool]:
+        raise AssertionError("X predicate must not run when Z fails")
+
+    assert (
+        run_compare._bravyi_trial_failed([True], [False], x_not_called, [False])
+        is True
+    )
+
+    def x_fails() -> list[bool]:
+        nonlocal x_decode_calls
+        x_decode_calls += 1
+        return [True]
+
+    assert run_compare._bravyi_trial_failed([False], [False], x_fails, [False]) is True
+    assert x_decode_calls == 1
+
+    def x_succeeds() -> list[bool]:
+        nonlocal x_decode_calls
+        x_decode_calls += 1
+        return [False]
+
+    assert (
+        run_compare._bravyi_trial_failed([False], [False], x_succeeds, [False])
+        is False
+    )
+    assert x_decode_calls == 2
 
 
 class FakeMatrix:
@@ -179,3 +270,56 @@ def test_python_row_counts_trial_failure_once_and_skips_x_when_z_fails() -> None
     assert row["logical_error_rate"] == "1.0"
     assert FakeDecoder.calls[0].decode_calls == 1
     assert FakeDecoder.calls[1].decode_calls == 0
+
+
+def test_python_row_counts_x_failure_after_z_succeeds() -> None:
+    class FakeDecoder:
+        calls: list["FakeDecoder"] = []
+
+        def __init__(self, matrix: FakeMatrix, **kwargs: object) -> None:
+            self.matrix = matrix
+            self.kwargs = kwargs
+            self.decode_calls = 0
+            FakeDecoder.calls.append(self)
+
+        def decode(self, syndrome: list[bool]) -> FakeVector:
+            self.decode_calls += 1
+            if self is FakeDecoder.calls[0]:
+                return FakeVector([False])
+            return FakeVector([True])
+
+    fake_ldpc = ModuleType("ldpc")
+    fake_ldpc.BpOsdDecoder = FakeDecoder
+    export = {
+        "z_model": {
+            "num_checks": 1,
+            "num_bits": 1,
+            "sparse_rows": [[]],
+            "augmented_columns": [[]],
+            "channel_probs": [0.1],
+            "first_logical_row": 1,
+        },
+        "x_model": {
+            "num_checks": 1,
+            "num_bits": 1,
+            "sparse_rows": [[0]],
+            "augmented_columns": [[1]],
+            "channel_probs": [0.1],
+            "first_logical_row": 1,
+        },
+        "trials": [
+            {
+                "z_syndrome": [False],
+                "x_syndrome": [True],
+                "z_logical": [False],
+                "x_logical": [False],
+            }
+        ],
+    }
+
+    with mock.patch.dict("sys.modules", {"numpy": FakeNumpy(), "ldpc": fake_ldpc}):
+        row = _python_row(SMOKE_CASES[0], export)
+
+    assert row["logical_error_rate"] == "1.0"
+    assert FakeDecoder.calls[0].decode_calls == 1
+    assert FakeDecoder.calls[1].decode_calls == 1

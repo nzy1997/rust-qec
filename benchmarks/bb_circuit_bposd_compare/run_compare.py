@@ -150,6 +150,17 @@ def _python_bposd_decoder_kwargs() -> dict[str, object]:
     }
 
 
+def _bravyi_trial_failed(
+    z_predicted: Sequence[bool],
+    z_expected: Sequence[bool],
+    x_prediction: Callable[[], Sequence[bool]],
+    x_expected: Sequence[bool],
+) -> bool:
+    if list(z_predicted) != list(z_expected):
+        return True
+    return list(x_prediction()) != list(x_expected)
+
+
 def _run_rust_export(
     case: CompareCase,
     rust_binary: Path | None = None,
@@ -495,17 +506,23 @@ def _python_row(case: CompareCase, export: dict[str, Any]) -> dict[str, str]:
             export["z_model"],
             len(trial["z_logical"]),
         )
-        if z_predicted != list(trial["z_logical"]):
-            num_failed_trials += 1
-            continue
 
-        x_correction = x_decoder.decode(np.asarray(trial["x_syndrome"], dtype=np.uint8))
-        x_predicted = _predicted_logicals(
-            x_correction,
-            export["x_model"],
-            len(trial["x_logical"]),
-        )
-        if x_predicted != list(trial["x_logical"]):
+        def x_prediction(trial: dict[str, Any] = trial) -> Sequence[bool]:
+            x_correction = x_decoder.decode(
+                np.asarray(trial["x_syndrome"], dtype=np.uint8)
+            )
+            return _predicted_logicals(
+                x_correction,
+                export["x_model"],
+                len(trial["x_logical"]),
+            )
+
+        if _bravyi_trial_failed(
+            z_predicted,
+            trial["z_logical"],
+            x_prediction,
+            trial["x_logical"],
+        ):
             num_failed_trials += 1
     decode_seconds = time.perf_counter() - decode_started
 
