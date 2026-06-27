@@ -134,6 +134,8 @@ def fake_hard_export(case):
                 "x_syndrome": [False],
                 "z_logical": FAKE_HARD_LOGICAL,
                 "x_logical": [False],
+                "z_correction": [True, False, True, True],
+                "x_correction": None,
                 "z_logical_prediction": FAKE_HARD_LOGICAL,
                 "x_logical_prediction": [False],
                 "z_profile": {
@@ -194,6 +196,11 @@ class FakeHardDecoder:
 
     def decode(self, syndrome):
         return FakeHardVector([True, False, True, True])
+
+
+class FakeHardMismatchDecoder(FakeHardDecoder):
+    def decode(self, syndrome):
+        return FakeHardVector([False, False, False, True])
 
 
 class FakeDiagnosticDecoder:
@@ -510,6 +517,7 @@ class RunCompareTest(unittest.TestCase):
                     )
             with (Path(tmpdir) / "results.csv").open(newline="") as handle:
                 rows = list(csv.DictReader(handle))
+            trace = json.loads((Path(tmpdir) / "hard_replay_trace.json").read_text())
 
         self.assertEqual(status, 0)
         self.assertEqual([row["decoder_impl"] for row in rows], ["rbposd", "ldpc_bposd"])
@@ -518,14 +526,49 @@ class RunCompareTest(unittest.TestCase):
         self.assertEqual(rows[0]["osd_method"], "osd_cs")
         self.assertEqual(rows[0]["logical_prediction"], rows[1]["logical_prediction"])
         self.assertEqual(json.loads(rows[0]["logical_prediction"]), FAKE_HARD_LOGICAL)
+        self.assertEqual(trace["case_id"], HARD_REPLAY_CASES[0].case_id)
+        self.assertEqual(trace["basis"], "Z")
+        self.assertEqual(trace["classification"], "matched")
+        self.assertEqual(trace["syndrome_support"], [0, 2, 3])
+        self.assertEqual(
+            [entry["decoder_impl"] for entry in trace["decoders"]],
+            ["rbposd", "ldpc_bposd"],
+        )
+        rust_trace, python_trace = trace["decoders"]
+        self.assertEqual(rust_trace["correction_support"], [0, 2, 3])
+        self.assertEqual(rust_trace["correction_weight"], 3)
+        self.assertTrue(rust_trace["residual_syndrome_matches"])
+        self.assertEqual(rust_trace["profile"]["osd_candidate_count"], 4100)
+        self.assertEqual(python_trace["correction_support"], [0, 2, 3])
+        self.assertEqual(python_trace["correction_weight"], 3)
+        self.assertTrue(python_trace["residual_syndrome_matches"])
         self.assertEqual(rows[0]["syndrome_support"], "[0,2,3]")
         self.assertEqual(rows[0]["osd_candidate_count"], "4100")
         self.assertEqual(rows[0]["gf2_solve_count"], "4101")
 
+    def test_hard_replay_suite_writes_logical_prediction_mismatch_trace(self) -> None:
+        fake_ldpc = ModuleType("ldpc")
+        fake_ldpc.BpOsdDecoder = FakeHardMismatchDecoder
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict("sys.modules", {"numpy": FakeHardNumpy(), "ldpc": fake_ldpc}):
+                with mock.patch(
+                    "benchmarks.bb_circuit_bposd_compare.run_compare._load_hard_replay_fixture",
+                    side_effect=fake_hard_fixture,
+                ):
+                    status = run_hard_replay_suite(
+                        Path(tmpdir),
+                        rust_exporter=fake_hard_export,
+                    )
+            trace = json.loads((Path(tmpdir) / "hard_replay_trace.json").read_text())
+
+        self.assertEqual(status, 0)
+        self.assertEqual(trace["classification"], "logical_prediction_mismatch")
+
     def test_hard_replay_suite_records_skipped_python_dependency_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch(
-                "benchmarks.bb_circuit_bposd_compare.run_compare._python_hard_replay_row",
+                "benchmarks.bb_circuit_bposd_compare.run_compare._python_hard_replay_decode",
                 side_effect=ModuleNotFoundError("No module named 'ldpc'"),
             ):
                 with mock.patch(
@@ -538,11 +581,14 @@ class RunCompareTest(unittest.TestCase):
                     )
             with (Path(tmpdir) / "results.csv").open(newline="") as handle:
                 rows = list(csv.DictReader(handle))
+            trace = json.loads((Path(tmpdir) / "hard_replay_trace.json").read_text())
 
         self.assertNotEqual(status, 0)
         self.assertEqual(rows[1]["decoder_impl"], "ldpc_bposd")
         self.assertEqual(rows[1]["status"], "skipped")
         self.assertIn("No module named 'ldpc'", rows[1]["error"])
+        self.assertEqual(trace["classification"], "incomplete")
+        self.assertEqual(trace["decoders"][1]["status"], "skipped")
 
 
 if __name__ == "__main__":
