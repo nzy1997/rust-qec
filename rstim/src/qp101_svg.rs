@@ -532,14 +532,22 @@ fn render_operations<'a>(
                 let detector_index = state.next_detector_index;
                 state.next_detector_index += 1;
                 let source = source_label(sources, &state.measurements, num_qubits);
+                let highlighted = source_block_highlighted(annotations);
                 render_source_operation(
                     out,
                     x,
                     source.host_lane,
                     "DETECTOR",
                     &format!("D{detector_index} = {}", source.text),
+                    highlighted,
                 );
-                render_annotations_with_line_offset(out, x, &[source.host_lane], annotations, 1);
+                render_source_annotations_with_line_offset(
+                    out,
+                    x,
+                    &[source.host_lane],
+                    annotations,
+                    1,
+                );
                 *column += source_operation_column_span("DETECTOR");
             }
             Qp101Operation::ObservableInclude {
@@ -552,14 +560,22 @@ fn render_operations<'a>(
                 let x = x_for_column(*column);
                 let source = source_label(sources, &state.measurements, num_qubits);
                 let label = format!("OBS_INCLUDE({index})");
+                let highlighted = source_block_highlighted(annotations);
                 render_source_operation(
                     out,
                     x,
                     source.host_lane,
                     &label,
                     &format!("L{index} *= {}", source.text),
+                    highlighted,
                 );
-                render_annotations_with_line_offset(out, x, &[source.host_lane], annotations, 1);
+                render_source_annotations_with_line_offset(
+                    out,
+                    x,
+                    &[source.host_lane],
+                    annotations,
+                    1,
+                );
                 *column += source_operation_column_span(&label);
             }
             Qp101Operation::Annotation {
@@ -852,14 +868,22 @@ fn render_known_noise_pair(
     lane_b: usize,
     annotations: &[&Qp101Annotation],
 ) {
-    let lanes = [lane_a, lane_b];
     render_noise_pair(out, x, lane_a, lane_b, noise_label(gate));
+    let upper_lane = lane_a.min(lane_b);
+    let lower_lane = lane_a.max(lane_b);
     let mut below_line_offset = 0usize;
     if let Some(note) = noise_param_note(params) {
-        render_param_note(out, x, &lanes, &note, below_line_offset);
+        render_param_note(out, x, &[lower_lane], &note, below_line_offset);
         below_line_offset += 1;
     }
-    render_annotation_refs_with_line_offset(out, x, &lanes, annotations, below_line_offset);
+    render_sample_annotation_refs(out, x, &[upper_lane], annotations);
+    render_below_annotation_refs_with_line_offset(
+        out,
+        x,
+        &[lower_lane],
+        annotations,
+        below_line_offset,
+    );
 }
 
 fn lane_y(q: usize) -> i32 {
@@ -1616,8 +1640,22 @@ fn render_gate_box_with_width(
     ));
 }
 
-fn render_source_operation(out: &mut String, x: i32, lane: usize, label: &str, source: &str) {
-    render_source_gate_box(out, x, lane_y(lane), source_gate_width(label), label);
+fn render_source_operation(
+    out: &mut String,
+    x: i32,
+    lane: usize,
+    label: &str,
+    source: &str,
+    highlighted: bool,
+) {
+    render_source_gate_box(
+        out,
+        x,
+        lane_y(lane),
+        source_gate_width(label),
+        label,
+        highlighted,
+    );
     out.push_str(&format!(
         "<text class=\"source-label\" x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
         below_gate_text_y(lane),
@@ -1625,14 +1663,24 @@ fn render_source_operation(out: &mut String, x: i32, lane: usize, label: &str, s
     ));
 }
 
-fn render_source_gate_box(out: &mut String, x: i32, y: i32, width: i32, label: &str) {
+fn render_source_gate_box(
+    out: &mut String,
+    x: i32,
+    y: i32,
+    width: i32,
+    label: &str,
+    highlighted: bool,
+) {
+    let fill = if highlighted { "#dbeafe" } else { "#f8fafc" };
+    let stroke = if highlighted { "#2563eb" } else { "#111827" };
+    let text_fill = if highlighted { "#1d4ed8" } else { "#111827" };
     out.push_str(&format!(
-        "<rect class=\"gate-box\" x=\"{}\" y=\"{}\" width=\"{width}\" height=\"{GATE_HEIGHT}\" rx=\"4\" ry=\"4\" stroke=\"#111827\" fill=\"#f8fafc\" />\n",
+        "<rect class=\"gate-box\" x=\"{}\" y=\"{}\" width=\"{width}\" height=\"{GATE_HEIGHT}\" rx=\"4\" ry=\"4\" stroke=\"{stroke}\" fill=\"{fill}\" />\n",
         x - width / 2,
         y - GATE_HEIGHT / 2
     ));
     out.push_str(&format!(
-        "<text x=\"{x}\" y=\"{y}\" fill=\"#111827\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"11\">{}</text>\n",
+        "<text x=\"{x}\" y=\"{y}\" fill=\"{text_fill}\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"11\">{}</text>\n",
         escape_xml(label)
     ));
 }
@@ -1792,6 +1840,27 @@ fn render_annotations_with_line_offset(
     line_offset: usize,
 ) {
     render_sample_annotations(out, x, lanes, annotations);
+    render_below_annotations_with_line_offset(out, x, lanes, annotations, line_offset);
+}
+
+fn render_source_annotations_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    line_offset: usize,
+) {
+    render_source_sample_annotations(out, x, lanes, annotations);
+    render_below_annotations_with_line_offset(out, x, lanes, annotations, line_offset);
+}
+
+fn render_below_annotations_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    line_offset: usize,
+) {
     let base_lane = lanes.first().copied().unwrap_or(0);
     let base_y = below_gate_text_y_with_offset(base_lane, line_offset);
     let mut below_index = 0usize;
@@ -1804,6 +1873,7 @@ fn render_annotations_with_line_offset(
             x,
             base_y + below_index as i32 * ANNOTATION_LINE_GAP,
             annotation,
+            None,
         );
         below_index += 1;
     }
@@ -1817,6 +1887,16 @@ fn render_annotation_refs_with_line_offset(
     line_offset: usize,
 ) {
     render_sample_annotation_refs(out, x, lanes, annotations);
+    render_below_annotation_refs_with_line_offset(out, x, lanes, annotations, line_offset);
+}
+
+fn render_below_annotation_refs_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[&Qp101Annotation],
+    line_offset: usize,
+) {
     let base_lane = lanes.first().copied().unwrap_or(0);
     let base_y = below_gate_text_y_with_offset(base_lane, line_offset);
     let mut below_index = 0usize;
@@ -1830,6 +1910,7 @@ fn render_annotation_refs_with_line_offset(
             x,
             base_y + below_index as i32 * ANNOTATION_LINE_GAP,
             annotation,
+            None,
         );
         below_index += 1;
     }
@@ -1844,6 +1925,21 @@ fn render_sample_annotations(
     let sample_annotations = annotations
         .iter()
         .filter(|annotation| is_sample_annotation(annotation))
+        .collect::<Vec<_>>();
+    render_sample_annotation_slice(out, x, lanes, &sample_annotations);
+}
+
+fn render_source_sample_annotations(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+) {
+    let sample_annotations = annotations
+        .iter()
+        .filter(|annotation| {
+            is_sample_annotation(annotation) && !is_source_block_highlight_annotation(annotation)
+        })
         .collect::<Vec<_>>();
     render_sample_annotation_slice(out, x, lanes, &sample_annotations);
 }
@@ -1874,7 +1970,7 @@ fn render_sample_annotation_slice(
     let base_lane = lanes.first().copied().unwrap_or(0);
     let mut used_rows = Vec::new();
     for annotation in annotations {
-        let mut row = sample_annotation_row(annotation);
+        let mut row = 0usize;
         while used_rows.contains(&row) {
             row += 1;
         }
@@ -1884,11 +1980,18 @@ fn render_sample_annotation_slice(
             x,
             above_gate_text_y_for_row(base_lane, row),
             annotation,
+            Some(&sample_annotation_content(annotation)),
         );
     }
 }
 
-fn render_annotation_text(out: &mut String, x: i32, y: i32, annotation: &Qp101Annotation) {
+fn render_annotation_text(
+    out: &mut String,
+    x: i32,
+    y: i32,
+    annotation: &Qp101Annotation,
+    content_override: Option<&str>,
+) {
     let mut parts = Vec::new();
     parts.push(annotation.kind.clone());
     if let Some(label) = annotation.label.as_deref() {
@@ -1897,11 +2000,27 @@ fn render_annotation_text(out: &mut String, x: i32, y: i32, annotation: &Qp101An
     if let Some(text) = annotation.text.as_deref() {
         parts.push(text.to_string());
     }
-    let content = escape_xml(&parts.join(": "));
+    let fallback_content;
+    let raw_content = if let Some(content) = content_override {
+        content
+    } else {
+        fallback_content = parts.join(": ");
+        &fallback_content
+    };
+    let content = escape_xml(raw_content);
     let attrs = annotation_svg_attrs(annotation);
     out.push_str(&format!(
         "<text {attrs} x=\"{x}\" y=\"{y}\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
     ));
+}
+
+fn sample_annotation_content(annotation: &Qp101Annotation) -> String {
+    match (annotation.label.as_deref(), annotation.text.as_deref()) {
+        (Some(label), Some(text)) if !text.is_empty() => format!("{label}: {text}"),
+        (Some(label), _) => label.to_string(),
+        (None, Some(text)) => text.to_string(),
+        (None, None) => annotation.kind.clone(),
+    }
 }
 
 fn is_sample_annotation(annotation: &Qp101Annotation) -> bool {
@@ -1911,21 +2030,12 @@ fn is_sample_annotation(annotation: &Qp101Annotation) -> bool {
         .any(|tag| tag == "sample-trace" || tag == "query-result")
 }
 
-fn sample_annotation_row(annotation: &Qp101Annotation) -> usize {
-    if is_danger_annotation(annotation) {
-        0
-    } else if is_info_annotation(annotation) {
-        2
-    } else {
-        1
-    }
+fn source_block_highlighted(annotations: &[Qp101Annotation]) -> bool {
+    annotations.iter().any(is_source_block_highlight_annotation)
 }
 
-fn is_danger_annotation(annotation: &Qp101Annotation) -> bool {
-    annotation.style.as_ref().is_some_and(|style| {
-        matches!(style.preset.as_deref(), Some("danger" | "red"))
-            || matches!(style.color.as_deref(), Some("danger" | "red"))
-    })
+fn is_source_block_highlight_annotation(annotation: &Qp101Annotation) -> bool {
+    is_sample_annotation(annotation) && is_info_annotation(annotation)
 }
 
 fn is_info_annotation(annotation: &Qp101Annotation) -> bool {
