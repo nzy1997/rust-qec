@@ -108,6 +108,19 @@ enum LayerItem<'a> {
         lane_a: usize,
         lane_b: usize,
     },
+    NoiseBox {
+        gate: &'a str,
+        params: &'a [f64],
+        lane: usize,
+        annotations: Vec<&'a Qp101Annotation>,
+    },
+    NoisePair {
+        gate: &'a str,
+        params: &'a [f64],
+        lane_a: usize,
+        lane_b: usize,
+        annotations: Vec<&'a Qp101Annotation>,
+    },
 }
 
 impl LayerItem<'_> {
@@ -123,6 +136,14 @@ impl LayerItem<'_> {
                 max: (*control_lane).max(*target_lane),
             }),
             LayerItem::SwapPair { lane_a, lane_b } => Ok(LaneSpan {
+                min: (*lane_a).min(*lane_b),
+                max: (*lane_a).max(*lane_b),
+            }),
+            LayerItem::NoiseBox { lane, .. } => Ok(LaneSpan {
+                min: *lane,
+                max: *lane,
+            }),
+            LayerItem::NoisePair { lane_a, lane_b, .. } => Ok(LaneSpan {
                 min: (*lane_a).min(*lane_b),
                 max: (*lane_a).max(*lane_b),
             }),
@@ -603,9 +624,76 @@ fn operation_layer_items<'a>(
                     .collect());
             }
         }
+        Qp101Operation::Noise {
+            gate,
+            params,
+            raw_targets,
+            annotations,
+        } => {
+            let lanes = raw_target_lanes(raw_targets, num_qubits, gate)?;
+            match noise_policy(gate) {
+                NoisePolicy::Single if !lanes.is_empty() => {
+                    return Ok(lanes
+                        .into_iter()
+                        .enumerate()
+                        .map(|(slot, lane)| LayerItem::NoiseBox {
+                            gate,
+                            params,
+                            lane,
+                            annotations: annotations_for_target_slots(
+                                annotations,
+                                &[slot],
+                                slot == 0,
+                            ),
+                        })
+                        .collect());
+                }
+                NoisePolicy::Pair if !lanes.is_empty() && lanes.len() % 2 == 0 => {
+                    return Ok(lanes
+                        .chunks_exact(2)
+                        .enumerate()
+                        .map(|(pair_index, pair)| {
+                            let first_slot = pair_index * 2;
+                            LayerItem::NoisePair {
+                                gate,
+                                params,
+                                lane_a: pair[0],
+                                lane_b: pair[1],
+                                annotations: annotations_for_target_slots(
+                                    annotations,
+                                    &[first_slot, first_slot + 1],
+                                    pair_index == 0,
+                                ),
+                            }
+                        })
+                        .collect());
+                }
+                _ => {}
+            }
+        }
         _ => {}
     }
     Ok(vec![LayerItem::Operation(op)])
+}
+
+fn annotations_for_target_slots<'a>(
+    annotations: &'a [Qp101Annotation],
+    target_slots: &[usize],
+    include_operation_annotations: bool,
+) -> Vec<&'a Qp101Annotation> {
+    annotations
+        .iter()
+        .filter(|annotation| {
+            if annotation.target_slots.is_empty() {
+                include_operation_annotations
+            } else {
+                annotation
+                    .target_slots
+                    .iter()
+                    .any(|slot| target_slots.contains(slot))
+            }
+        })
+        .collect()
 }
 
 fn render_layer_item(
@@ -626,6 +714,25 @@ fn render_layer_item(
         }
         LayerItem::SwapPair { lane_a, lane_b } => {
             render_swap_pair(out, x, *lane_a, *lane_b);
+            Ok(())
+        }
+        LayerItem::NoiseBox {
+            gate,
+            params,
+            lane,
+            annotations,
+        } => {
+            render_known_noise_box(out, x, gate, params, *lane, annotations);
+            Ok(())
+        }
+        LayerItem::NoisePair {
+            gate,
+            params,
+            lane_a,
+            lane_b,
+            annotations,
+        } => {
+            render_known_noise_pair(out, x, gate, params, *lane_a, *lane_b, annotations);
             Ok(())
         }
         LayerItem::Operation(op) => match op {
@@ -668,6 +775,38 @@ fn render_layer_item(
             _ => Ok(()),
         },
     }
+}
+
+fn render_known_noise_box(
+    out: &mut String,
+    x: i32,
+    gate: &str,
+    params: &[f64],
+    lane: usize,
+    annotations: &[&Qp101Annotation],
+) {
+    if let Some(note) = noise_param_note(params) {
+        render_param_note(out, x, &[lane], &note);
+    }
+    render_noise_box(out, x, lane_y(lane), noise_label(gate));
+    render_annotation_refs_with_line_offset(out, x, &[lane], annotations, 0);
+}
+
+fn render_known_noise_pair(
+    out: &mut String,
+    x: i32,
+    gate: &str,
+    params: &[f64],
+    lane_a: usize,
+    lane_b: usize,
+    annotations: &[&Qp101Annotation],
+) {
+    let lanes = [lane_a, lane_b];
+    if let Some(note) = noise_param_note(params) {
+        render_param_note(out, x, &lanes, &note);
+    }
+    render_noise_pair(out, x, lane_a, lane_b, noise_label(gate));
+    render_annotation_refs_with_line_offset(out, x, &lanes, annotations, 0);
 }
 
 fn lane_y(q: usize) -> i32 {
@@ -1565,6 +1704,34 @@ fn render_annotations_with_line_offset(
     let base_lane = lanes.first().copied().unwrap_or(0);
     let base_y = below_gate_text_y(base_lane) + line_offset as i32 * ANNOTATION_LINE_GAP;
     for (idx, annotation) in annotations.iter().enumerate() {
+        let mut parts = Vec::new();
+        parts.push(annotation.kind.clone());
+        if let Some(label) = annotation.label.as_deref() {
+            parts.push(label.to_string());
+        }
+        if let Some(text) = annotation.text.as_deref() {
+            parts.push(text.to_string());
+        }
+        let content = escape_xml(&parts.join(": "));
+        let attrs = annotation_svg_attrs(annotation);
+        out.push_str(&format!(
+            "<text {attrs} x=\"{x}\" y=\"{}\" text-anchor=\"middle\" font-size=\"11\">{content}</text>\n",
+            base_y + idx as i32 * ANNOTATION_LINE_GAP
+        ));
+    }
+}
+
+fn render_annotation_refs_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[&Qp101Annotation],
+    line_offset: usize,
+) {
+    let base_lane = lanes.first().copied().unwrap_or(0);
+    let base_y = below_gate_text_y(base_lane) + line_offset as i32 * ANNOTATION_LINE_GAP;
+    for (idx, annotation) in annotations.iter().enumerate() {
+        let annotation = *annotation;
         let mut parts = Vec::new();
         parts.push(annotation.kind.clone());
         if let Some(label) = annotation.label.as_deref() {

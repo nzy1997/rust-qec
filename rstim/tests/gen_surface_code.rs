@@ -86,9 +86,8 @@ fn cli_gen_surface_code_rotated_memory_x() {
 
 #[test]
 fn surface_code_after_clifford_atom_loss() {
-    use rstim::codegen::NoiseParams;
     use rstim::codegen::surface_code::rotated_memory_x_with_params;
-    use rstim::ir::StimInstr;
+    use rstim::codegen::NoiseParams;
 
     let instrs = rotated_memory_x_with_params(
         3,
@@ -98,6 +97,33 @@ fn surface_code_after_clifford_atom_loss() {
             ..NoiseParams::none()
         },
     );
+
+    assert_after_clifford_loss_layers(&instrs, 6, 12);
+}
+
+#[test]
+fn unrotated_surface_code_after_clifford_atom_loss() {
+    use rstim::codegen::surface_code::unrotated_memory_x_with_params;
+    use rstim::codegen::NoiseParams;
+
+    let instrs = unrotated_memory_x_with_params(
+        3,
+        3,
+        NoiseParams {
+            after_clifford_loss_probability: 0.01,
+            ..NoiseParams::none()
+        },
+    );
+
+    assert_after_clifford_loss_layers(&instrs, 6, 12);
+}
+
+fn assert_after_clifford_loss_layers(
+    instrs: &[rstim::ir::StimInstr],
+    expected_h_layers: usize,
+    expected_cx_layers: usize,
+) {
+    use rstim::ir::StimInstr;
 
     let mut h_layers = 0usize;
     let mut cx_layers = 0usize;
@@ -172,9 +198,12 @@ fn surface_code_after_clifford_atom_loss() {
         index += 1;
     }
 
-    assert_eq!(h_layers, 6, "three rounds should each have two H layers");
     assert_eq!(
-        cx_layers, 12,
+        h_layers, expected_h_layers,
+        "three rounds should each have two H layers"
+    );
+    assert_eq!(
+        cx_layers, expected_cx_layers,
         "three rounds should each have four CX layers"
     );
 }

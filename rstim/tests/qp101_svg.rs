@@ -875,6 +875,45 @@ fn surface_code_atom_loss_svg_layout_regression() {
 }
 
 #[test]
+fn svg_renderer_packs_lane_disjoint_known_noise_boxes() {
+    let instrs = parse_lines(
+        "LOSS(0.01) 0 2\n\
+         DEPOLARIZE1(0.01) 1\n\
+         TICK\n",
+    )
+    .expect("known-noise packing fixture should parse");
+    let doc = export_qp101(&instrs).expect("known-noise packing fixture should export");
+    let svg = render_svg(&doc).expect("known-noise packing fixture should render");
+
+    let loss_positions = text_positions(&svg, "LOSS");
+    let d1_positions = text_positions(&svg, "D1");
+    assert_eq!(
+        loss_positions.len(),
+        2,
+        "fixture should render two LOSS boxes: {svg}"
+    );
+    assert_eq!(
+        d1_positions.len(),
+        1,
+        "fixture should render one D1 box: {svg}"
+    );
+    assert_eq!(
+        loss_positions[0].0, loss_positions[1].0,
+        "lane-disjoint LOSS boxes from one operation should share x: {svg}"
+    );
+    assert_eq!(
+        loss_positions[0].0, d1_positions[0].0,
+        "lane-disjoint known noise boxes from separate operations should share x: {svg}"
+    );
+    assert_eq!(
+        svg.matches(">0.01</text>").count(),
+        3,
+        "each known noise box should keep its own decimal probability label: {svg}"
+    );
+    assert_no_overlapping_rects(&element_rects(&svg, "noise-box"), &svg);
+}
+
+#[test]
 fn svg_renderer_preserves_explicit_combiner_sources() {
     let doc = Qp101Document {
         standard: "QP101-ZY".to_string(),
