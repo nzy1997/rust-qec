@@ -7,6 +7,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from benchmarks.bb_circuit_bposd_compare.cases import BATCHED_CSV_HEADER
+
 
 TOLERANCE = 1e-12
 COMPLETED_STATUSES = {"ok", "partial"}
@@ -22,28 +24,7 @@ PAIR_METADATA_FIELDS = (
     "osd_method",
     "osd_order",
 )
-REQUIRED_COLUMNS = (
-    "case_id",
-    "runner",
-    "decoder_impl",
-    "code_id",
-    "p",
-    "num_cycles",
-    "errors_budget",
-    "shots_used",
-    "seed",
-    "bp_method",
-    "max_iter",
-    "osd_method",
-    "osd_order",
-    "batch_size",
-    "batches_completed",
-    "logical_errors",
-    "logical_error_rate",
-    "status",
-    "stop_reason",
-    "error",
-)
+REQUIRED_COLUMNS = tuple(BATCHED_CSV_HEADER)
 
 
 @dataclass(frozen=True)

@@ -209,6 +209,24 @@ def test_rejects_logical_error_rate_not_computed_from_shots_used() -> None:
     assert "logical_errors / shots_used" in errors[0].message
 
 
+def test_rejects_missing_official_batched_csv_header_column(tmp_path: Path) -> None:
+    csv_path = tmp_path / "missing_shots_budget.csv"
+    header = [column for column in BATCHED_CSV_HEADER if column != "shots_budget"]
+    row = {column: value for column, value in make_row().items() if column in header}
+    with csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=header)
+        writer.writeheader()
+        writer.writerow(row)
+
+    result = verify_batched_accounting.verify_rows(
+        verify_batched_accounting.load_rows(csv_path)
+    )
+    _, errors = partition(result)
+    assert errors
+    assert "row is missing required CSV column(s)" in errors[0].message
+    assert "shots_budget" in errors[0].message
+
+
 def test_cli_prints_pass_lines_for_full_results() -> None:
     result = subprocess.run(
         [
