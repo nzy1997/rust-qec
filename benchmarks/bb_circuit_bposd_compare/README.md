@@ -210,6 +210,14 @@ The verifier checks that the rows are paired on the fixture basis/syndrome and
 that Rust and Python logical predictions match. Rust rows also carry the OSD
 and GF(2) counters from the replay decode.
 
+The hard replay also writes `hard_replay_trace.json`, a one-case correction
+trace for the pinned Z-basis syndrome. Validate it with:
+
+```bash
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_replay_trace \
+  /tmp/rstim-bb90-hard-replay/hard_replay_trace.json
+```
+
 Missing Python decoder dependencies remain explicit: `run_compare` records a
 skipped Python row and exits nonzero unless `--allow-missing-python` is passed.
 `verify_replay` also rejects skipped Python rows unless its own
