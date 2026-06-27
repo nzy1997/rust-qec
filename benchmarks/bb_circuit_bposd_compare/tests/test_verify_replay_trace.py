@@ -85,6 +85,43 @@ class VerifyReplayTraceTest(unittest.TestCase):
             "\n".join(verify_trace(trace)),
         )
 
+    def test_verify_trace_rejects_duplicate_rbposd_decoder_entry(self) -> None:
+        trace = make_trace()
+        trace["decoders"][1]["decoder_impl"] = "rbposd"
+        self.assertIn(
+            "trace duplicate decoder entry rbposd",
+            "\n".join(verify_trace(trace)),
+        )
+
+    def test_verify_trace_rejects_unexpected_decoder_entry(self) -> None:
+        trace = make_trace()
+        trace["decoders"].append(
+            {
+                "decoder_impl": "mystery_decoder",
+                "status": "ok",
+                "case_id": CASE_ID,
+                "basis": "Z",
+                "syndrome_support": SYNDROME_SUPPORT,
+                "expected_sampled_logical": EXPECTED_LOGICAL,
+                "bp_osd_settings": {
+                    "bp_method": "ms",
+                    "max_iter": 10000,
+                    "osd_method": "osd_cs",
+                    "osd_order": 7,
+                },
+                "correction_support": [0],
+                "correction_weight": 1,
+                "residual_syndrome_matches": True,
+                "residual_syndrome_weight": 0,
+                "residual_syndrome_support": [],
+                "predicted_logical": RUST_PREDICTED_LOGICAL,
+            }
+        )
+        self.assertIn(
+            "trace decoder entries must contain exactly two dict entries",
+            "\n".join(verify_trace(trace)),
+        )
+
     def test_verify_trace_rejects_unpaired_syndrome_metadata(self) -> None:
         trace = make_trace()
         trace["decoders"][1]["syndrome_support"] = [5, 8, 15]

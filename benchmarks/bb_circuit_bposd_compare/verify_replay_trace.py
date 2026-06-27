@@ -45,17 +45,19 @@ def verify_trace(trace: dict[str, Any]) -> list[str]:
     decoders = trace.get("decoders")
     if not isinstance(decoders, list):
         return ["trace decoders is not a list"]
+    if len(decoders) != 2:
+        return ["trace decoder entries must contain exactly two dict entries"]
 
-    by_impl = {
-        entry.get("decoder_impl"): entry
-        for entry in decoders
-        if isinstance(entry, dict)
-    }
-    for impl in ("rbposd", "ldpc_bposd"):
-        if impl not in by_impl:
-            errors.append(f"trace missing decoder entry {impl}")
-    if errors:
-        return errors
+    by_impl: dict[str, dict[str, Any]] = {}
+    for entry in decoders:
+        if not isinstance(entry, dict):
+            return ["trace decoder entries must contain exactly two dict entries"]
+        impl = entry.get("decoder_impl")
+        if impl not in ("rbposd", "ldpc_bposd"):
+            return [f"trace unexpected decoder entry {impl}"]
+        if impl in by_impl:
+            return [f"trace duplicate decoder entry {impl}"]
+        by_impl[impl] = entry
 
     for impl in ("rbposd", "ldpc_bposd"):
         _verify_decoder_entry(trace, by_impl[impl], errors)
