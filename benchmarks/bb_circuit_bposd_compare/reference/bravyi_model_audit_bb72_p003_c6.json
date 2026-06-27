@@ -1,0 +1,86 @@
+{
+  "description": "Expected normalized BB72 Bravyi model-audit evidence for issue #308.",
+  "expected": {
+    "code": {
+      "data_qubit_count": 72,
+      "ell": 6,
+      "k": 12,
+      "m": 6,
+      "n": 72,
+      "n2": 36,
+      "x_check_count": 36,
+      "z_check_count": 36
+    },
+    "inputs": {
+      "code_id": "bb72",
+      "num_cycles": 6,
+      "physical_error_rate": "0.003"
+    },
+    "models": {
+      "X": {
+        "augmented_columns_hash": "4d18776f2050427266f45d75be1394c826f1259f9d77d56ee881f8cce299f7b8",
+        "channel_probabilities_hash": "979c1e264b0877c9686585d3e1fe4b8161409ad3a83d08645d0cb96bcccc77bc",
+        "decoder_columns": 2269,
+        "decoder_rows": 288,
+        "first_logical_row": 288,
+        "grouped_column_count": 2269,
+        "probability_max": "0.34560000000000168",
+        "probability_min": "0.00080000000000000004",
+        "probability_total": "9.2448000000000032",
+        "sparse_rows_hash": "a8bffa424dd5c469ac4a390533eb3e08822a0b05e3d1f918bad50647bdb94d92"
+      },
+      "Z": {
+        "augmented_columns_hash": "8522487226f03c4a84f44f6c18557490ad2e1521e276f8ae1ba22571a8fe92c2",
+        "channel_probabilities_hash": "0267cf635a21bdb5db8dab253c3bc74190d27e58ec9494ed771533326cd6859e",
+        "decoder_columns": 2233,
+        "decoder_rows": 288,
+        "first_logical_row": 288,
+        "grouped_column_count": 2233,
+        "probability_max": "0.34560000000000168",
+        "probability_min": "0.0016000000000000001",
+        "probability_total": "9.2448000000000032",
+        "sparse_rows_hash": "e3ac7b757401b35a5bbdcf79e58962a79cb36fe9cf39b1d3301ac737021bd5a7"
+      }
+    },
+    "schedule": {
+      "operation_count": 720,
+      "operation_count_by_kind": {
+        "cnot": 432,
+        "idle": 144,
+        "meas_x": 36,
+        "meas_z": 36,
+        "prep_x": 36,
+        "prep_z": 36
+      },
+      "sx_labels": [
+        "idle",
+        "1",
+        "4",
+        "3",
+        "5",
+        "0",
+        "2"
+      ],
+      "sz_labels": [
+        "3",
+        "5",
+        "0",
+        "1",
+        "2",
+        "4",
+        "idle"
+      ]
+    },
+    "syndrome_tail": {
+      "configured_noisy_cycles": 6,
+      "noiseless_tail_cycles": 2,
+      "num_cycles_plus_tail": 8
+    }
+  },
+  "fixture_version": 1,
+  "provenance": {
+    "contract_path": "benchmarks/bb_circuit_bposd_compare/reference/bravyi_contract.json",
+    "upstream_commit": "fa77e3333d3ec44c79d8f914dd24c040d1da471b",
+    "upstream_repository": "sbravyi/BivariateBicycleCodes"
+  }
+}
