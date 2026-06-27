@@ -22,6 +22,10 @@ BB144 note records implementation smoke evidence for the `bb-circuit-bposd-memor
 path and separates that smoke result from the manual upstream-budget
 reproduction command.
 
+The visual previews below also include the issue-65 memory-Z sweep figure as a
+parity/regression artifact. It is useful for seeing a checked plot surface, but
+it is not a decoder-ordering claim.
+
 ## Run It
 
 Smoke commands are intended for local implementation checks:
@@ -76,6 +80,25 @@ evidence, not statistical reproduction. The upstream-budget BB144 command has
 the same output shape with `50000` trials and is the command documented for a
 statistical comparison attempt.
 
+## Visual Evidence
+
+The checked-in surface-decoder full-tier artifact is generated from
+`benchmarks/surface_decoder_compare/results/full/results.csv` by `rsinter bench
+plot-surface-compare-csv`.
+
+![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png)
+
+The memory-Z sweep figure is a separate checked-in parity/regression artifact
+for comparing the Stim-facing and `rsinter`-facing paths.
+
+![Stim versus rsinter memory-Z sweep plot](../figures/issue-65-memory-z-stim-vs-rsinter.png)
+
+The BB144 reproduction note keeps reference figures available for context; the
+figures are reference material, not a newly claimed benchmark result from this
+showcase page.
+
+![BB144 LDPC versus surface reference plot](../figures/bb144_reference/ldpc_vs_surface.png)
+
 ## Code
 
 Primary evidence docs and commands:
@@ -88,6 +111,7 @@ Tracked surface-decoder comparison artifacts:
 
 - [`benchmarks/surface_decoder_compare/results/full/results.csv`](benchmarks/surface_decoder_compare/results/full/results.csv)
 - [`benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png`](benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png)
+- [`docs/figures/issue-65-memory-z-stim-vs-rsinter.png`](docs/figures/issue-65-memory-z-stim-vs-rsinter.png)
 
 `rsinter` benchmark specs:
 
@@ -141,4 +165,6 @@ evidence, not statistical reproduction. The BB144 note documents the
 not add or claim a completed new 50,000-trial result.
 
 This page does not implement new benchmark functionality, regenerate results,
-or resolve open algorithmic questions about decoder behavior.
+or resolve open algorithmic questions about decoder behavior. The memory-Z
+sweep and BB144 reference figures are included as visual context only; this
+page does not convert them into new statistical claims.

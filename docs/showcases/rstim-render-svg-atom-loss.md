@@ -18,6 +18,11 @@ fixture because it is intentionally small and exercises loss, lost-data
 measurement, and detector annotations. `qp101-viz` remains optional
 legacy/prototype context for users who need the older Typst fixture path.
 
+The larger surface-code preview uses the committed
+[`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim)
+fixture to show the same sample-shot overlay path on a distance-3, round-3
+rotated-memory circuit.
+
 ## Run It
 
 From the repository root, render a plain inline circuit:
@@ -37,6 +42,17 @@ rstim render_svg \
   --out /tmp/rstim-atom-loss-sample.svg
 ```
 
+Render the distance-3, round-3 surface-code atom-loss sample with the same
+deterministic seed:
+
+```sh
+rstim render_svg \
+  --sample_shot \
+  --seed 7 \
+  --in qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim \
+  --out /tmp/rstim-surface-code-d3-r3-atom-loss.svg
+```
+
 Render a compact DEM-origin highlight example:
 
 ```sh
@@ -51,26 +67,45 @@ Each command writes an SVG file whose text starts with `<svg`.
 The plain render contains visible circuit labels such as `q0`, `H`, `CX`, and
 `M`. The atom-loss sample render contains the compact noise and measurement
 labels `>D1</text>`, `>LOSS</text>`, `>M</text>`, `>MRL</text>`, and
-`>DETECTOR</text>`, plus seeded sample-shot annotation text such as `marker: X`,
-`marker: L`, `marker: 1[L]`, `marker: L=1 | M=1[L]`, and `marker: D0`.
+`>DETECTOR</text>`, plus seeded sample-shot result text such as `X`, `L`,
+`1[L]`, `L=1 | M=1[L]`, and `D0`.
+
+The surface-code atom-loss render is a wider SVG with 17 qubit wires, repeated
+measurement rounds, `LOSS` operations, seeded sample results, detector boxes,
+and an `OBS_INCLUDE(0)` logical-observable block.
 
 The DEM-highlight render contains the base circuit labels `q0`, `XE`, `M`, and
-`DETECTOR`, then adds highlighted query-result annotations such as `marker: X`,
-`marker: D0`, `data-annotation-tags="dem-origin query-result"`, and
+`DETECTOR`, then adds highlighted query-result annotations such as `X`, `D0`,
+`data-annotation-tags="dem-origin query-result"`, and
 `data-annotation-tags="dem-symptom query-result"`.
+
+## Visual Preview
+
+The compact checked-in preview below is generated from the committed atom-loss
+sample with `--sample_shot --seed 7`.
+
+![Seeded atom-loss sample-shot SVG render](assets/atom-loss-sample-seed7.svg)
+
+The wider checked-in preview uses the same seeded sample-shot path on the
+surface-code distance-3, round-3 atom-loss fixture.
+
+![Seeded surface-code d=3 r=3 atom-loss sample-shot SVG render](assets/surface-code-d3-r3-atom-loss-seed7.svg)
 
 ## Code
 
 - [`rstim/doc/cli.md`](rstim/doc/cli.md) documents `render_svg`,
   `--sample_shot --seed 7`, and `--highlight_dem_error 0`.
 - [`rstim/tests/cli_render_svg.rs`](rstim/tests/cli_render_svg.rs) verifies the
-  CLI paths, deterministic sample-shot SVG annotations, DEM-origin highlight
-  markers, and the `--seed` negative control.
+  CLI paths, deterministic sample-shot SVG annotations, DEM-origin highlights,
+  and the `--seed` negative control.
 - [`rstim/tests/qp101_svg.rs`](rstim/tests/qp101_svg.rs) verifies renderer
   details such as SVG labels, noise boxes, annotation styles, detector source
   labels, and viewBox behavior.
 - [`qp101-viz/examples/atom-loss-sample.stim`](qp101-viz/examples/atom-loss-sample.stim)
   is the small committed atom-loss input used by the sample-shot command.
+- [`qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim`](qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim)
+  is the committed surface-code atom-loss input used by the wide sample-shot
+  preview.
 
 ## Verification
 
@@ -93,6 +128,22 @@ sample-shot and highlight modes, and the negative control where
 `rstim render_svg --seed 7` without `--sample_shot` fails with
 `--seed is only supported with --sample_shot`.
 
+The preview SVG committed with this page can be regenerated with:
+
+```sh
+cargo run -q -p rstim --bin rstim -- render_svg \
+  --sample_shot \
+  --seed 7 \
+  --in qp101-viz/examples/atom-loss-sample.stim \
+  --out docs/showcases/assets/atom-loss-sample-seed7.svg
+
+cargo run -q -p rstim --bin rstim -- render_svg \
+  --sample_shot \
+  --seed 7 \
+  --in qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim \
+  --out docs/showcases/assets/surface-code-d3-r3-atom-loss-seed7.svg
+```
+
 ## Limits
 
 This showcase covers the built-in static SVG renderer, the currently supported
@@ -100,6 +151,10 @@ sample-shot annotation path, and single detector-error-model error highlighting.
 Sample-shot rendering supports the sampled events exercised by the focused CLI
 tests, including fired noise branches, loss-caused measurement information,
 measurement outcomes, and detector flips.
+
+The surface-code distance-3, round-3 preview is intentionally wide. It is meant
+as a visual artifact for inspection in Markdown or a browser, not as a compact
+thumbnail.
 
 `--seed` is only supported with `--sample_shot`; it is not a standalone render
 option. `--sample_shot` and `--highlight_dem_error` are mutually exclusive, so

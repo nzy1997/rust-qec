@@ -10,16 +10,18 @@ docs.
 
 ## What You Can Do
 
-- Parse, inspect, sample, and analyze Stim-like stabilizer circuits with the
-  `rstim` crate and CLI.
-- Generate standard QEC memory circuits and export detector error models for
-  decoder workflows.
-- Render static SVG circuit diagrams with `render_svg`, or export QP101 JSON
-  with `export_json` for downstream tooling.
-- Run Rust decoder and benchmark harnesses across `rmatching`, `rbposd`,
-  `rilpqec`, and `rsinter`.
-- Use showcase, CLI, and benchmark docs as stable starting points for runnable
-  examples.
+With `rstim` you can:
+
+- [Trace a circuit through stats, detector events, detector-error-model
+  extraction, and DEM sampling](docs/showcases/rstim-cli-dem-pipeline.md).
+- [Render circuit diagrams as SVG, including seeded atom-loss sample-shot
+  overlays](docs/showcases/rstim-render-svg-atom-loss.md).
+- [Construct CSS code matrices and run small exact-distance
+  checks](docs/showcases/qec-code-css-construction.md).
+- [Inspect benchmark and reproduction evidence, including the checked-in
+  surface-code decoder comparison plot](docs/showcases/benchmark-evidence.md).
+- [Browse the full showcase index](docs/showcases/README.md) for runnable
+  workflow categories and verification commands.
 
 ## Workspace Map
 
