@@ -27,28 +27,29 @@ CONTRACT = (
 )
 
 
-def write_report(tmp_path: Path) -> Path:
+def write_report(tmp_path: Path, *, full_csv_treatment: str | None = None) -> Path:
     report = tmp_path / "reference_gap_report.md"
-    status = write_reference_gap_report.main(
-        [
-            "--results",
-            str(RESULTS),
-            "--contract",
-            str(CONTRACT),
-            "--out",
-            str(report),
-            "--controlled-results",
-            str(RESULTS),
-            "--python-env",
-            "/private/tmp/rstim-ldpc-venv/bin/python (ldpc 2.4.1, bposd 2.1, numpy 2.5.0)",
-            "--rust-binary",
-            "target/release/rsinter",
-            "--rust-commit",
-            "6e3d5a9c66e69c5c210c84bad298ca7593db0867",
-            "--controlled-command",
-            "python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke",
-        ]
-    )
+    args = [
+        "--results",
+        str(RESULTS),
+        "--contract",
+        str(CONTRACT),
+        "--out",
+        str(report),
+        "--controlled-results",
+        str(RESULTS),
+        "--python-env",
+        "/private/tmp/rstim-ldpc-venv/bin/python (ldpc 2.4.1, bposd 2.1, numpy 2.5.0)",
+        "--rust-binary",
+        "target/release/rsinter",
+        "--rust-commit",
+        "6e3d5a9c66e69c5c210c84bad298ca7593db0867",
+        "--controlled-command",
+        "python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke",
+    ]
+    if full_csv_treatment is not None:
+        args.extend(["--full-csv-treatment", full_csv_treatment])
+    status = write_reference_gap_report.main(args)
     assert status == 0
     return report
 
@@ -68,10 +69,24 @@ def test_write_reference_gap_report_includes_required_sections(tmp_path: Path) -
     assert "Hard replay parity | PASS" in text
     assert "Full results rows: 16" in text
     assert "Paired comparison groups: 8" in text
-    assert "| bb72 | 0.003 | 6 | rbposd | 7000 | 201 | 0.028714285714285713 | ok | errors_budget_reached |" in text
-    assert "| bb72 | 0.003 | 6 | 0.028714285714285713 | 0.026 | 0.002714285714285713 |" in text
+    assert "| bb72 | 0.003 | 6 | rbposd | 8000 | 216 | 0.027 | ok | errors_budget_reached |" in text
+    assert "| bb72 | 0.003 | 6 | 0.027 | 0.027125 | -0.000125 |" in text
     assert "**Final verdict for #303:**" in text
     assert "not directly comparable" in text
+
+
+def test_write_reference_gap_report_can_record_fresh_full_rerun(
+    tmp_path: Path,
+) -> None:
+    treatment = (
+        "fresh full paired rerun completed for the checked-in benchmark evidence."
+    )
+    report = write_report(tmp_path, full_csv_treatment=treatment)
+    text = report.read_text()
+
+    assert f"- Full CSV treatment: {treatment}" in text
+    assert "preserved because the full paired rerun is too expensive" not in text
+    assert "preserved BB72/BB144 full run" not in text
 
 
 def test_validate_reference_gap_report_accepts_generated_report(
@@ -145,8 +160,8 @@ def test_validate_reference_gap_report_rejects_tampered_ler_row(
     report = write_report(tmp_path)
     report.write_text(
         report.read_text().replace(
-            "| bb72 | 0.003 | 6 | rbposd | 7000 | 201 | 0.028714285714285713 | ok | errors_budget_reached |",
-            "| bb72 | 0.003 | 6 | rbposd | 7000 | 201 | 0.001 | ok | errors_budget_reached |",
+            "| bb72 | 0.003 | 6 | rbposd | 8000 | 216 | 0.027 | ok | errors_budget_reached |",
+            "| bb72 | 0.003 | 6 | rbposd | 8000 | 216 | 0.001 | ok | errors_budget_reached |",
             1,
         )
     )

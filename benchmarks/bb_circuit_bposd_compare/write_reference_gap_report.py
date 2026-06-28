@@ -27,6 +27,9 @@ DEFAULT_HARD_REPLAY_STATUS = (
     "PASS - #307 fixed the pinned BB90 hard-replay parity; `verify_replay` "
     "and `verify_replay_trace` remain the gates for regenerated replay artifacts."
 )
+DEFAULT_FULL_CSV_TREATMENT = (
+    "preserved because the full paired rerun is too expensive for this PR."
+)
 
 
 @dataclass(frozen=True)
@@ -184,6 +187,7 @@ def render_report(
     rust_binary: str = "not recorded",
     rust_commit: str = "not recorded",
     controlled_command: str = "not recorded",
+    full_csv_treatment: str = DEFAULT_FULL_CSV_TREATMENT,
     model_audit_status: str = DEFAULT_MODEL_AUDIT_STATUS,
     hard_replay_status: str = DEFAULT_HARD_REPLAY_STATUS,
 ) -> str:
@@ -222,7 +226,7 @@ def render_report(
         f"- Full results CSV: `{results_path}`",
         f"- Full results rows: {len(evidence.rows)}",
         f"- Paired comparison groups: {len(evidence.pairs)}",
-        "- Full CSV treatment: preserved because the full paired rerun is too expensive for this PR.",
+        f"- Full CSV treatment: {full_csv_treatment}",
         f"- {controlled_line}",
         f"- Controlled command: `{controlled_command}`",
         f"- Python environment: `{python_env}`",
@@ -240,7 +244,7 @@ def render_report(
         "## Final Verdict For #303",
         "",
         "**Final verdict for #303:** Implementation checks pass on the current "
-        "artifacts, but the preserved BB72/BB144 full run is not directly "
+        "artifacts, but the checked-in BB72/BB144 full rows are not directly "
         "comparable to the paper/reference target. The checked-in full rows are "
         "batched, error-budget-stopped comparison rows rather than a fresh "
         "fixed-shot reproduction of the pinned Bravyi curve, and the controlled "
@@ -262,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rust-binary", default="not recorded")
     parser.add_argument("--rust-commit", default="not recorded")
     parser.add_argument("--controlled-command", default="not recorded")
+    parser.add_argument("--full-csv-treatment", default=DEFAULT_FULL_CSV_TREATMENT)
     parser.add_argument("--model-audit-status", default=DEFAULT_MODEL_AUDIT_STATUS)
     parser.add_argument("--hard-replay-status", default=DEFAULT_HARD_REPLAY_STATUS)
     args = parser.parse_args(argv)
@@ -276,6 +281,7 @@ def main(argv: list[str] | None = None) -> int:
             rust_binary=args.rust_binary,
             rust_commit=args.rust_commit,
             controlled_command=args.controlled_command,
+            full_csv_treatment=args.full_csv_treatment,
             model_audit_status=args.model_audit_status,
             hard_replay_status=args.hard_replay_status,
         )

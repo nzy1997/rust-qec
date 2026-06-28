@@ -13,18 +13,16 @@ questions:
   [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
   and the checked-in full-tier artifacts under
   [`benchmarks/surface_decoder_compare/results/full/`](benchmarks/surface_decoder_compare/results/full/).
-- BB144 circuit-level BP-OSD reproduction evidence in
-  [`docs/bb144_circuit_bposd_reproduction.md`](docs/bb144_circuit_bposd_reproduction.md).
+- BB72/BB144 circuit-level BP-OSD comparison evidence in
+  [`benchmarks/bb_circuit_bposd_compare/README.md`](benchmarks/bb_circuit_bposd_compare/README.md)
+  and the checked-in full-tier artifacts under
+  [`benchmarks/bb_circuit_bposd_compare/results/full/`](benchmarks/bb_circuit_bposd_compare/results/full/).
 
 The surface-decoder comparison material demonstrates benchmark harness wiring,
 tracked result artifacts, and smoke versus full campaign entry points. The
-BB144 note records implementation smoke evidence for the `bb-circuit-bposd-memory`
-path and separates that smoke result from the manual upstream-budget
-reproduction command.
-
-The visual previews below also include the issue-65 memory-Z sweep figure as a
-parity/regression artifact. It is useful for seeing a checked plot surface, but
-it is not a decoder-ordering claim.
+BB72/BB144 material demonstrates the paired batched Rust/Python comparison
+workflow, checked-in result tables, a source-backed reference-gap report, and a
+Rust-rendered full plot.
 
 ## Run It
 
@@ -33,26 +31,15 @@ Smoke commands are intended for local implementation checks:
 ```sh
 make surface-decoder-compare-smoke
 make bench-surface-smoke
-cargo run -p rsinter -- bb-circuit-bposd-memory \
-  --physical-error-rate 0.003 \
-  --num-cycles 12 \
-  --num-trials 1 \
-  --seed 12345 \
-  --max-bp-iterations 10 \
-  --osd-order 0
+make bb-circuit-bposd-compare-plot-smoke
 ```
 
-Full or manual campaigns are longer-running evidence-generation commands:
+Full campaigns are longer-running evidence-generation commands:
 
 ```sh
 make surface-decoder-compare-full
 make bench-surface-full
-cargo run --release -p rsinter -- bb-circuit-bposd-memory \
-  --physical-error-rate 0.003 \
-  --num-cycles 12 \
-  --num-trials 50000 \
-  --max-bp-iterations 10000 \
-  --osd-order 7
+make bb-circuit-bposd-compare-full
 ```
 
 ## Expected Result
@@ -74,11 +61,20 @@ plot-surface-compare-csv`.
 `rsinter` benchmark framework and write artifacts under
 `benchmarks/out/surface_decoder/`.
 
-The short BB144 command prints a four-column result line such as
-`0.003	12	1	<num_failed_trials>`. That command is implementation smoke
-evidence, not statistical reproduction. The upstream-budget BB144 command has
-the same output shape with `50000` trials and is the command documented for a
-statistical comparison attempt.
+`make bb-circuit-bposd-compare-plot-smoke` writes a tiny paired BB72/BB144
+plot-smoke artifact set under
+`benchmarks/bb_circuit_bposd_compare/results/plot-smoke/`; that directory is
+ignored and is for local plotting checks.
+
+`make bb-circuit-bposd-compare-full` writes `results.csv`, `summary.md`, and a
+Rust-rendered `bb_circuit_bposd_compare.png` under
+[`benchmarks/bb_circuit_bposd_compare/results/full/`](benchmarks/bb_circuit_bposd_compare/results/full/).
+The committed full-tier evidence currently includes
+[`results.csv`](benchmarks/bb_circuit_bposd_compare/results/full/results.csv),
+[`summary.md`](benchmarks/bb_circuit_bposd_compare/results/full/summary.md),
+[`bb_circuit_bposd_compare.png`](benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png),
+and
+[`reference_gap_report.md`](benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md).
 
 ## Visual Evidence
 
@@ -88,40 +84,37 @@ plot-surface-compare-csv`.
 
 ![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png)
 
-The memory-Z sweep figure is a separate checked-in parity/regression artifact
-for comparing the Stim-facing and `rsinter`-facing paths.
+The checked-in BB72/BB144 circuit BP-OSD full-tier artifact is generated from
+`benchmarks/bb_circuit_bposd_compare/results/full/results.csv` by the
+BB-circuit comparison workflow using `benchmarks/bb_circuit_bposd_compare/plot.toml`.
 
-![Stim versus rsinter memory-Z sweep plot](../figures/issue-65-memory-z-stim-vs-rsinter.png)
-
-The BB144 reproduction note keeps reference figures available for context; the
-figures are reference material, not a newly claimed benchmark result from this
-showcase page.
-
-![BB144 LDPC versus surface reference plot](../figures/bb144_reference/ldpc_vs_surface.png)
+![BB72/BB144 circuit BP-OSD comparison plot](../../benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png)
 
 ## Code
 
 Primary evidence docs and commands:
 
 - [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
-- [`docs/bb144_circuit_bposd_reproduction.md`](docs/bb144_circuit_bposd_reproduction.md)
+- [`benchmarks/bb_circuit_bposd_compare/README.md`](benchmarks/bb_circuit_bposd_compare/README.md)
 - [`Makefile`](Makefile)
 
 Tracked surface-decoder comparison artifacts:
 
 - [`benchmarks/surface_decoder_compare/results/full/results.csv`](benchmarks/surface_decoder_compare/results/full/results.csv)
 - [`benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png`](benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png)
-- [`docs/figures/issue-65-memory-z-stim-vs-rsinter.png`](docs/figures/issue-65-memory-z-stim-vs-rsinter.png)
 
 `rsinter` benchmark specs:
 
 - [`benchmarks/surface_decoder/spec.toml`](benchmarks/surface_decoder/spec.toml)
 - [`benchmarks/surface_decoder/full.toml`](benchmarks/surface_decoder/full.toml)
+- [`benchmarks/bb_circuit_bposd_compare/plot.toml`](benchmarks/bb_circuit_bposd_compare/plot.toml)
 
-BB144 reference material:
+Tracked BB72/BB144 circuit comparison artifacts:
 
-- [`docs/figures/bb144_reference/small_ldpc.png`](docs/figures/bb144_reference/small_ldpc.png)
-- [`docs/figures/bb144_reference/ldpc_vs_surface.png`](docs/figures/bb144_reference/ldpc_vs_surface.png)
+- [`benchmarks/bb_circuit_bposd_compare/results/full/results.csv`](benchmarks/bb_circuit_bposd_compare/results/full/results.csv)
+- [`benchmarks/bb_circuit_bposd_compare/results/full/summary.md`](benchmarks/bb_circuit_bposd_compare/results/full/summary.md)
+- [`benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png`](benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png)
+- [`benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md`](benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md)
 
 ## Verification
 
@@ -137,8 +130,20 @@ Run the surface-decoder comparison docs contract:
 python3 -m unittest benchmarks.surface_decoder_compare.tests.test_docs_contract -q
 ```
 
-That contract checks the required evidence links and owns the negative control
-for BB-circuit command-key typos by rejecting unknown BB command keys.
+That contract checks the required evidence links and rejects misspelled
+BB-circuit make targets in the showcase text.
+
+Run the BB circuit evidence validators:
+
+```sh
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_bravyi_ler \
+  benchmarks/bb_circuit_bposd_compare/results/full/results.csv
+python3 -m benchmarks.bb_circuit_bposd_compare.verify_batched_accounting \
+  benchmarks/bb_circuit_bposd_compare/results/full/results.csv
+python3 -m benchmarks.bb_circuit_bposd_compare.validate_reference_gap_report \
+  --results benchmarks/bb_circuit_bposd_compare/results/full/results.csv \
+  --report benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md
+```
 
 Run the `rsinter` benchmark spec and registry tests:
 
@@ -147,7 +152,8 @@ cargo test -p rsinter --test bench_specs --test bench_registry -q
 ```
 
 These tests keep checked-in surface-decoder runner aliases and registry
-expansion behavior current.
+expansion behavior current, and keep the BB circuit plot spec pinned to the
+paper-style logical-rate-per-syndrome-cycle view.
 
 ## Limits
 
@@ -159,12 +165,9 @@ The surface-decoder smoke commands are implementation checks. They are not a
 replacement for the full comparison campaign and should not be cited as
 statistical evidence.
 
-The BB144 lower-budget and one-trial commands are implementation smoke
-evidence, not statistical reproduction. The BB144 note documents the
-50,000-trial manual command for statistical comparison, but this showcase does
-not add or claim a completed new 50,000-trial result.
+The BB72/BB144 full rows are batched, error-budget-stopped paired comparison
+rows. They are not a fixed-shot reproduction of the pinned Bravyi reference
+curve, and the reference-gap report records that interpretation boundary.
 
 This page does not implement new benchmark functionality, regenerate results,
-or resolve open algorithmic questions about decoder behavior. The memory-Z
-sweep and BB144 reference figures are included as visual context only; this
-page does not convert them into new statistical claims.
+or resolve open algorithmic questions about decoder behavior.
