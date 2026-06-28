@@ -75,26 +75,37 @@ class DocsContractTest(unittest.TestCase):
         doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text()
 
         self.assertIn("benchmarks/surface_decoder_compare/README.md", doc)
-        self.assertIn("docs/bb144_circuit_bposd_reproduction.md", doc)
+        self.assertIn("benchmarks/bb_circuit_bposd_compare/README.md", doc)
         self.assertIn("benchmarks/surface_decoder_compare/results/full/results.csv", doc)
         self.assertIn(
             "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
             doc,
         )
-        self.assertIn("implementation smoke evidence", doc)
-        self.assertIn("not statistical reproduction", doc)
-        self.assertIn("bb-circuit-bposd-memory", doc)
+        self.assertIn("benchmarks/bb_circuit_bposd_compare/results/full/results.csv", doc)
+        self.assertIn("benchmarks/bb_circuit_bposd_compare/results/full/summary.md", doc)
+        self.assertIn(
+            "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
+            doc,
+        )
+        self.assertIn(
+            "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+            doc,
+        )
+        self.assertIn("batched, error-budget-stopped", doc)
+        self.assertIn("paired comparison", doc)
+        self.assertIn("not a fixed-shot reproduction", doc)
+        self.assertIn("make bb-circuit-bposd-compare-full", doc)
         assert_valid_bb_circuit_command_keys(doc)
 
     def test_benchmark_evidence_showcase_rejects_bb_circuit_command_typo(self) -> None:
         doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text().replace(
-            "cargo run -p rsinter -- bb-circuit-bposd-memory \\",
-            "cargo run -p rsinter -- bb-circuit-bposd-memroy \\",
+            "make bb-circuit-bposd-compare-full",
+            "make bb-circuit-bposd-compare-fulll",
             1,
         )
 
         with self.assertRaisesRegex(
-            AssertionError, "unknown BB circuit command key: bb-circuit-bposd-memroy"
+            AssertionError, "unknown BB circuit command key: bb-circuit-bposd-compare-fulll"
         ):
             assert_valid_bb_circuit_command_keys(doc)
 
@@ -169,7 +180,12 @@ def makefile_targets(makefile: str, *target_names: str) -> str:
 
 
 def assert_valid_bb_circuit_command_keys(text: str) -> None:
-    known = {"bb-circuit-bposd-memory"}
+    known = {
+        "bb-circuit-bposd-memory",
+        "bb-circuit-bposd-compare-smoke",
+        "bb-circuit-bposd-compare-plot-smoke",
+        "bb-circuit-bposd-compare-full",
+    }
     keys = set(re.findall(r"\bbb-circuit-bposd-[A-Za-z0-9_-]+\b", text))
     unknown = sorted(keys - known)
     if unknown:

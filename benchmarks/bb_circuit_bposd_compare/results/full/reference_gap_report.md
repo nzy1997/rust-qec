@@ -26,47 +26,47 @@
 - Full results CSV: `benchmarks/bb_circuit_bposd_compare/results/full/results.csv`
 - Full results rows: 16
 - Paired comparison groups: 8
-- Full CSV treatment: preserved because the full paired rerun is too expensive for this PR.
+- Full CSV treatment: fresh full paired rerun completed for the checked-in benchmark evidence.
 - Controlled rerun artifact: `benchmarks/bb_circuit_bposd_compare/results/controlled/results.csv` with 16 rows and 8 paired groups.
 - Controlled command: `MPLCONFIGDIR=/tmp/rstim-mplconfig /private/tmp/rstim-ldpc-venv/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/controlled --rust-binary target/release/rsinter --batch-size 10`
 - Python environment: `/private/tmp/rstim-ldpc-venv/bin/python (ldpc 2.4.1, bposd 2.1, numpy 2.5.0)`
 - Rust binary: `target/release/rsinter`
-- Rust source commit: `1d2df4bc97f63f4f87308b54a05c6bb8e06a5067`
+- Rust source commit: `cc6ee302523c0810bef71ee891eca77fb9396508`
 
 ## Per-Row LER Table
 
 | code_id | p | cycles | decoder | shots | logical_errors | LER | status | stop_reason |
 | --- | ---: | ---: | --- | ---: | ---: | ---: | --- | --- |
-| bb144 | 0.003 | 12 | rbposd | 40000 | 200 | 0.005 | ok | errors_budget_reached |
-| bb144 | 0.003 | 12 | ldpc_bposd | 40000 | 138 | 0.00345 | ok | errors_budget_reached |
-| bb144 | 0.004 | 12 | rbposd | 4500 | 209 | 0.04644444444444444 | ok | errors_budget_reached |
-| bb144 | 0.004 | 12 | ldpc_bposd | 4500 | 159 | 0.035333333333333335 | ok | errors_budget_reached |
-| bb144 | 0.005 | 12 | rbposd | 1000 | 224 | 0.224 | ok | errors_budget_reached |
-| bb144 | 0.005 | 12 | ldpc_bposd | 1000 | 183 | 0.183 | ok | errors_budget_reached |
-| bb144 | 0.006 | 12 | rbposd | 500 | 272 | 0.544 | ok | errors_budget_reached |
-| bb144 | 0.006 | 12 | ldpc_bposd | 500 | 246 | 0.492 | ok | errors_budget_reached |
-| bb72 | 0.003 | 6 | rbposd | 7000 | 201 | 0.028714285714285713 | ok | errors_budget_reached |
-| bb72 | 0.003 | 6 | ldpc_bposd | 7000 | 182 | 0.026 | ok | errors_budget_reached |
-| bb72 | 0.004 | 6 | rbposd | 2500 | 212 | 0.0848 | ok | errors_budget_reached |
-| bb72 | 0.004 | 6 | ldpc_bposd | 2500 | 194 | 0.0776 | ok | errors_budget_reached |
-| bb72 | 0.005 | 6 | rbposd | 1000 | 214 | 0.214 | ok | errors_budget_reached |
-| bb72 | 0.005 | 6 | ldpc_bposd | 1000 | 205 | 0.205 | ok | errors_budget_reached |
-| bb72 | 0.006 | 6 | rbposd | 1000 | 405 | 0.405 | ok | errors_budget_reached |
-| bb72 | 0.006 | 6 | ldpc_bposd | 1000 | 390 | 0.39 | ok | errors_budget_reached |
+| bb144 | 0.003 | 12 | rbposd | 56000 | 204 | 0.003642857142857143 | ok | errors_budget_reached |
+| bb144 | 0.003 | 12 | ldpc_bposd | 56000 | 204 | 0.003642857142857143 | ok | errors_budget_reached |
+| bb144 | 0.004 | 12 | rbposd | 5500 | 200 | 0.03636363636363636 | ok | errors_budget_reached |
+| bb144 | 0.004 | 12 | ldpc_bposd | 5500 | 200 | 0.03636363636363636 | ok | errors_budget_reached |
+| bb144 | 0.005 | 12 | rbposd | 1500 | 272 | 0.18133333333333335 | ok | errors_budget_reached |
+| bb144 | 0.005 | 12 | ldpc_bposd | 1500 | 272 | 0.18133333333333335 | ok | errors_budget_reached |
+| bb144 | 0.006 | 12 | rbposd | 500 | 238 | 0.476 | ok | errors_budget_reached |
+| bb144 | 0.006 | 12 | ldpc_bposd | 500 | 238 | 0.476 | ok | errors_budget_reached |
+| bb72 | 0.003 | 6 | rbposd | 8000 | 216 | 0.027 | ok | errors_budget_reached |
+| bb72 | 0.003 | 6 | ldpc_bposd | 8000 | 217 | 0.027125 | ok | errors_budget_reached |
+| bb72 | 0.004 | 6 | rbposd | 3000 | 233 | 0.07766666666666666 | ok | errors_budget_reached |
+| bb72 | 0.004 | 6 | ldpc_bposd | 3000 | 233 | 0.07766666666666666 | ok | errors_budget_reached |
+| bb72 | 0.005 | 6 | rbposd | 1500 | 300 | 0.2 | ok | errors_budget_reached |
+| bb72 | 0.005 | 6 | ldpc_bposd | 1500 | 300 | 0.2 | ok | errors_budget_reached |
+| bb72 | 0.006 | 6 | rbposd | 1000 | 384 | 0.384 | ok | errors_budget_reached |
+| bb72 | 0.006 | 6 | ldpc_bposd | 1000 | 383 | 0.383 | ok | errors_budget_reached |
 
 ## Rust/Python Delta Table
 
 | code_id | p | cycles | Rust LER | Python LER | Rust-Python delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| bb144 | 0.003 | 12 | 0.005 | 0.00345 | 0.00155 |
-| bb144 | 0.004 | 12 | 0.04644444444444444 | 0.035333333333333335 | 0.011111111111111105 |
-| bb144 | 0.005 | 12 | 0.224 | 0.183 | 0.041 |
-| bb144 | 0.006 | 12 | 0.544 | 0.492 | 0.052 |
-| bb72 | 0.003 | 6 | 0.028714285714285713 | 0.026 | 0.002714285714285713 |
-| bb72 | 0.004 | 6 | 0.0848 | 0.0776 | 0.0072 |
-| bb72 | 0.005 | 6 | 0.214 | 0.205 | 0.009 |
-| bb72 | 0.006 | 6 | 0.405 | 0.39 | 0.015 |
+| bb144 | 0.003 | 12 | 0.003642857142857143 | 0.003642857142857143 | 0 |
+| bb144 | 0.004 | 12 | 0.03636363636363636 | 0.03636363636363636 | 0 |
+| bb144 | 0.005 | 12 | 0.18133333333333335 | 0.18133333333333335 | 0 |
+| bb144 | 0.006 | 12 | 0.476 | 0.476 | 0 |
+| bb72 | 0.003 | 6 | 0.027 | 0.027125 | -0.000125 |
+| bb72 | 0.004 | 6 | 0.07766666666666666 | 0.07766666666666666 | 0 |
+| bb72 | 0.005 | 6 | 0.2 | 0.2 | 0 |
+| bb72 | 0.006 | 6 | 0.384 | 0.383 | 0.001 |
 
 ## Final Verdict For #303
 
-**Final verdict for #303:** Implementation checks pass on the current artifacts, but the preserved BB72/BB144 full run is not directly comparable to the paper/reference target. The checked-in full rows are batched, error-budget-stopped comparison rows rather than a fresh fixed-shot reproduction of the pinned Bravyi curve, and the controlled rerun is intentionally smoke-sized evidence that the post-#307 path still executes paired Rust/Python rows. No specific remaining implementation gap is identified by this report.
+**Final verdict for #303:** Implementation checks pass on the current artifacts, but the checked-in BB72/BB144 full rows are not directly comparable to the paper/reference target. The checked-in full rows are batched, error-budget-stopped comparison rows rather than a fresh fixed-shot reproduction of the pinned Bravyi curve, and the controlled rerun is intentionally smoke-sized evidence that the post-#307 path still executes paired Rust/Python rows. No specific remaining implementation gap is identified by this report.

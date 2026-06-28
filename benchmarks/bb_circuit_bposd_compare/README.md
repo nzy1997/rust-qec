@@ -78,8 +78,9 @@ into aggregate rows, and then discarded. The output is only:
 - `results.csv`: aggregate Rust/Python rows with shots, logical errors, timing,
   batch counts, and stop reason
 - `summary.md`: compact timing table
-- `bb_circuit_bposd_compare.png`: two-panel plot of logical error rate and
-  seconds per shot versus physical error rate, rendered by Rust `rsinter`
+- `bb_circuit_bposd_compare.png`: two-panel plot of paper-style logical error
+  rate per syndrome cycle and seconds per shot versus physical error rate,
+  rendered by Rust `rsinter`
 
 The plot smoke uses the same BB72/BB144 physical-error-rate grid as the full
 suite, but uses 10 trials per point and prints per-case progress while it runs:

@@ -21,6 +21,7 @@ code_id = ["bb72", "bb144"]
 [plot]
 title = "BB Circuit rbposd vs ldpc/bposd"
 confidence_interval_likelihood_factor = 9.0
+logical_rate_unit = "per_round"
 
 [plot.fit]
 enabled = false
@@ -38,7 +39,7 @@ label_template = "{params.code_id} {runner}"
 [[plot.panel]]
 metric = "metrics.logical_error_rate"
 scale = "log"
-label = "Logical Error Rate"
+label = "Logical Error Rate per Syndrome Cycle"
 
 [[plot.panel]]
 metric = "metrics.run_seconds_per_shot"

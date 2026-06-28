@@ -14,13 +14,9 @@ Individual showcase pages will be added by follow-up issues. Use
 | --- | --- |
 | ![Seeded atom-loss sample-shot SVG render](assets/atom-loss-sample-seed7.svg) | ![Seeded surface-code d=3 r=3 atom-loss sample-shot SVG render](assets/surface-code-d3-r3-atom-loss-seed7.svg) |
 
-| Surface-code decoder comparison | Stim versus rsinter memory-Z sweep |
+| Surface-code decoder comparison | BB72/BB144 circuit BP-OSD comparison |
 | --- | --- |
-| ![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png) | ![Stim versus rsinter memory-Z sweep plot](../figures/issue-65-memory-z-stim-vs-rsinter.png) |
-
-BB144 reference context:
-
-![BB144 LDPC versus surface reference plot](../figures/bb144_reference/ldpc_vs_surface.png)
+| ![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png) | ![BB72/BB144 circuit BP-OSD comparison plot](../../benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png) |
 
 ## Categories
 
@@ -74,6 +70,7 @@ Primary code and docs:
 - [`rbposd/`](rbposd/)
 - [`rilpqec/`](rilpqec/)
 - [`benchmarks/surface_decoder_compare/`](benchmarks/surface_decoder_compare/)
+- [`benchmarks/bb_circuit_bposd_compare/`](benchmarks/bb_circuit_bposd_compare/)
 - [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
 
 ### Code Construction Workflows
