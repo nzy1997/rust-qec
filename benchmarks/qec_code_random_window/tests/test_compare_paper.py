@@ -167,15 +167,15 @@ class ComparePaperTest(unittest.TestCase):
             self.assertIn("## Provenance", markdown)
             self.assertIn("Paper baselines:", markdown)
             self.assertIn(
-                "| case_id | local_best_upper_bound | paper_method | paper_upper_bound | upper_bound_delta | elapsed_time_ratio | baseline_provenance | source_file | source_sheet | source_row | status |",
+                "| case_id | local_best_upper_bound | local_median_elapsed_s | paper_method | paper_upper_bound | paper_elapsed_s | upper_bound_delta | elapsed_time_ratio | baseline_provenance | source_file | source_sheet | source_row | status |",
                 markdown,
             )
             self.assertIn(
-                "| matched_case | 5 | QDistRndMW | 6 | -1 | 0.500000 | bb-summary.xlsx#BB summary:2 | bb-summary.xlsx | BB summary | 2 | paper_matched |",
+                "| matched_case | 5 | 2.5 | QDistRndMW | 6 | 5.0 | -1 | 0.500000 | bb-summary.xlsx#BB summary:2 | bb-summary.xlsx | BB summary | 2 | paper_matched |",
                 markdown,
             )
             self.assertIn(
-                "| optional_unmatched_case | 3 | NA | NA | NA | NA | NA | NA | NA | NA | no_paper_baseline |",
+                "| optional_unmatched_case | 3 | 1.0 | NA | NA | NA | NA | NA | NA | NA | NA | NA | no_paper_baseline |",
                 markdown,
             )
 
@@ -368,3 +368,39 @@ class ComparePaperTest(unittest.TestCase):
             compare_paper.compare_cases(cases, local_summaries, paper_baselines)
         self.assertIn("summary.csv:2", str(cm.exception))
         self.assertIn('field "best_upper_bound"', str(cm.exception))
+
+    def test_run_rejects_local_summary_missing_manifest_case(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,baseline_required,best_upper_bound,median_elapsed_s\n"
+                "matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,2.5\n"
+                "optional_unmatched_case,steane,any,unmapped:steane,false,3,1.0\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_compare(Path(tmp), local_summary=local_summary)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing local summary rows", result.stderr)
+            self.assertIn("required_missing_case", result.stderr)
+
+    def test_nonpositive_local_timing_is_preserved_but_ratio_is_na(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,baseline_required,best_upper_bound,median_elapsed_s\n"
+                "matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,0\n"
+                "optional_unmatched_case,steane,any,unmapped:steane,false,3,1.0\n"
+                "required_missing_case,bb144,any,codeDistancePYPI:bivariate_bicycle:bb144,true,11,9.0\n",
+                encoding="utf-8",
+            )
+            out_dir = Path(tmp) / "out"
+
+            result = self.run_compare(out_dir, local_summary=local_summary)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            matched = read_csv_rows(out_dir / "comparison.csv")[0]
+            self.assertEqual(matched["local_median_elapsed_s"], "0")
+            self.assertEqual(matched["paper_elapsed_s"], "5.0")
+            self.assertEqual(matched["elapsed_time_ratio"], "NA")

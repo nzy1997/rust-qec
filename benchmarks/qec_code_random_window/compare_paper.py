@@ -149,6 +149,12 @@ def load_local_summaries(
             "best_upper_bound": row.get("best_upper_bound", ""),
             "median_elapsed_s": row.get("median_elapsed_s", ""),
         }
+    missing_case_ids = sorted(known_case_ids - set(summaries))
+    if missing_case_ids:
+        raise CompareError(
+            f"{path}: missing local summary rows for case_id(s): "
+            + ", ".join(missing_case_ids)
+        )
     return summaries
 
 
@@ -205,6 +211,20 @@ def _parse_positive_or_none(value: object, location: str, field_name: str) -> fl
     return parsed
 
 
+def _parse_float_or_none(value: object, location: str, field_name: str) -> float | None:
+    if _is_blank(value) or value == NA:
+        return None
+    if isinstance(value, bool):
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}')
+    try:
+        parsed = float(str(value).strip())
+    except ValueError as error:
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}') from error
+    if not math.isfinite(parsed):
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}')
+    return parsed
+
+
 def _parse_int_or_none(value: object, location: str, field_name: str) -> int | None:
     if _is_blank(value) or value == NA:
         return None
@@ -257,13 +277,15 @@ def compare_cases(
 
         local_row_location = local.get("_row_location", f"{case_id}:comparison") if local else f"{case_id}:comparison"
         paper_row_location = paper.get("_row_location", f"{case_id}:comparison") if paper else f"{case_id}:comparison"
+        local_elapsed_text = _value_or_na(local, "median_elapsed_s")
+        _parse_float_or_none(local_elapsed_text, local_row_location, "median_elapsed_s")
         local_best = _parse_int_or_none(
             _value_or_na(local, "best_upper_bound"),
             local_row_location,
             "best_upper_bound",
         )
         local_elapsed = _parse_positive_or_none(
-            _value_or_na(local, "median_elapsed_s"),
+            local_elapsed_text,
             local_row_location,
             "median_elapsed_s",
         )
@@ -305,9 +327,7 @@ def compare_cases(
                 "baseline_key": str(case["baseline_key"]),
                 "baseline_required": _stringify(baseline_required),
                 "local_best_upper_bound": str(local_best) if local_best is not None else NA,
-                "local_median_elapsed_s": (
-                    _stringify(local_elapsed) if local_elapsed is not None else NA
-                ),
+                "local_median_elapsed_s": local_elapsed_text,
                 "paper_method": paper_method,
                 "paper_upper_bound": paper_upper_text,
                 "paper_elapsed_s": paper_elapsed_text,
@@ -353,15 +373,17 @@ def write_comparison_md(
         "",
         "## Comparison Table",
         "",
-        "| case_id | local_best_upper_bound | paper_method | paper_upper_bound | upper_bound_delta | elapsed_time_ratio | baseline_provenance | source_file | source_sheet | source_row | status |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| case_id | local_best_upper_bound | local_median_elapsed_s | paper_method | paper_upper_bound | paper_elapsed_s | upper_bound_delta | elapsed_time_ratio | baseline_provenance | source_file | source_sheet | source_row | status |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
 
     for row in rows:
         lines.append(
             (
-                f"| {row['case_id']} | {row['local_best_upper_bound']} | {row['paper_method']} | "
-                f"{row['paper_upper_bound']} | {row['upper_bound_delta']} | "
+                f"| {row['case_id']} | {row['local_best_upper_bound']} | "
+                f"{row['local_median_elapsed_s']} | {row['paper_method']} | "
+                f"{row['paper_upper_bound']} | {row['paper_elapsed_s']} | "
+                f"{row['upper_bound_delta']} | "
                 f"{row['elapsed_time_ratio']} | {row['baseline_provenance']} | "
                 f"{row['baseline_source_file']} | {row['baseline_source_sheet']} | "
                 f"{row['baseline_source_row']} | {row['comparison_status']} |"
