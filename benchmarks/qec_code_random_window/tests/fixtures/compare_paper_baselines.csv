@@ -1,0 +1,3 @@
+case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row
+matched_case,bb72,QDistRndMW,6,5.0,bb-summary.xlsx,BB summary,2
+required_missing_case,bb144,QDistEvol,12,0,bb-summary.xlsx,BB summary,3

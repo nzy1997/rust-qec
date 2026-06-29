@@ -1,0 +1,4 @@
+case_id,code_id,distance_side,baseline_key,baseline_required,manifest_seed,manifest_iterations,manifest_restarts,manifest_target_weight,target_upper_bound,attempted_seed_rows,successful_seed_rows,best_upper_bound,median_elapsed_s,min_elapsed_s,max_elapsed_s,target_hit_count,target_hit_rate,run_seed_values,run_iterations_values,run_restarts_values,run_target_weight_values,run_status_values,summary_status
+matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,11,10,2,5,5,2,2,5,2.5,2.0,3.0,1,0.500000,11;12,10,2,5,ok,ok
+optional_unmatched_case,steane,any,unmapped:steane,false,21,20,1,3,3,1,1,3,1.0,1.0,1.0,1,1.000000,21,20,1,3,ok,ok
+required_missing_case,bb144,any,codeDistancePYPI:bivariate_bicycle:bb144,true,31,30,3,12,12,1,1,11,9.0,9.0,9.0,1,1.000000,31,30,3,12,ok,ok
