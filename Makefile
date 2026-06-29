@@ -79,22 +79,23 @@ bb-circuit-bposd-compare-full:
 qec-code-random-window-bench-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
-	python3 -m benchmarks.qec_code_random_window.validate_cases benchmarks/qec_code_random_window/cases.smoke.toml
+	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES)
 	cargo build -p qec-code --offline
-	python3 -m benchmarks.qec_code_random_window.run_local --cases benchmarks/qec_code_random_window/cases.smoke.toml --out benchmarks/out/qec_code_random_window/smoke/local-runs.jsonl --qec-code-bin target/debug/qec-code
-	python3 -m benchmarks.qec_code_random_window.summarize --cases benchmarks/qec_code_random_window/cases.smoke.toml --runs benchmarks/out/qec_code_random_window/smoke/local-runs.jsonl --out-dir benchmarks/out/qec_code_random_window/smoke/summary
-	printf '%s\n' 'case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row' > benchmarks/out/qec_code_random_window/smoke/paper-baselines.empty.csv
-	python3 -m benchmarks.qec_code_random_window.compare_paper --cases benchmarks/qec_code_random_window/cases.smoke.toml --local-summary benchmarks/out/qec_code_random_window/smoke/summary/summary.csv --paper-baselines benchmarks/out/qec_code_random_window/smoke/paper-baselines.empty.csv --out-dir benchmarks/out/qec_code_random_window/smoke/comparison
+	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
+	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary
+	printf '%s\n' '$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)' > $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv
+	python3 -m benchmarks.qec_code_random_window.compare_paper --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --local-summary $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary/summary.csv --paper-baselines $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/comparison
 
 qec-code-random-window-bench-full:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
-	python3 -m benchmarks.qec_code_random_window.validate_cases benchmarks/qec_code_random_window/cases.full.toml
+	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES)
 	cargo build -p qec-code --offline
-	python3 -m benchmarks.qec_code_random_window.run_local --cases benchmarks/qec_code_random_window/cases.full.toml --out benchmarks/out/qec_code_random_window/full/local-runs.jsonl --qec-code-bin target/debug/qec-code
-	python3 -m benchmarks.qec_code_random_window.summarize --cases benchmarks/qec_code_random_window/cases.full.toml --runs benchmarks/out/qec_code_random_window/full/local-runs.jsonl --out-dir benchmarks/out/qec_code_random_window/full/summary
-	CODEDISTANCE_PAPER_RESULTS_DIR=$${CODEDISTANCE_PAPER_RESULTS_DIR} python3 -m benchmarks.qec_code_random_window.import_paper_baselines --cases benchmarks/qec_code_random_window/cases.full.toml --out benchmarks/out/qec_code_random_window/full/paper-baselines.csv
-	python3 -m benchmarks.qec_code_random_window.compare_paper --cases benchmarks/qec_code_random_window/cases.full.toml --local-summary benchmarks/out/qec_code_random_window/full/summary/summary.csv --paper-baselines benchmarks/out/qec_code_random_window/full/paper-baselines.csv --out-dir benchmarks/out/qec_code_random_window/full/comparison --strict-baselines
+	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
+	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary
+	# CODEDISTANCE_PAPER_RESULTS_DIR controls paper baseline import source
+	python3 -m benchmarks.qec_code_random_window.import_paper_baselines --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv
+	python3 -m benchmarks.qec_code_random_window.compare_paper --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --local-summary $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary/summary.csv --paper-baselines $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/comparison --strict-baselines
 
 # Release a new version: make release V=0.2.0
 release:

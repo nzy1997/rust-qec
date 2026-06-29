@@ -63,13 +63,15 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         makefile = read_text(MAKEFILE)
         body = make_target_body(makefile, "qec-code-random-window-bench-smoke")
 
-        self.assertIn("benchmarks/qec_code_random_window/cases.smoke.toml", body)
-        self.assertIn("benchmarks/out/qec_code_random_window/smoke", body)
+        self.assertIn("QEC_CODE_RANDOM_WINDOW_SMOKE_CASES := benchmarks/qec_code_random_window/cases.smoke.toml", makefile)
+        self.assertIn("QEC_CODE_RANDOM_WINDOW_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/smoke", makefile)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)", body)
         self.assertIn("python3 -m benchmarks.qec_code_random_window.validate_cases", body)
         self.assertIn("python3 -m benchmarks.qec_code_random_window.run_local", body)
         self.assertIn("python3 -m benchmarks.qec_code_random_window.summarize", body)
         self.assertIn("python3 -m benchmarks.qec_code_random_window.compare_paper", body)
-        self.assertIn("case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)", body)
         self.assertNotIn("--strict-baselines", body)
 
     def test_makefile_exposes_smoke_pipeline_uses_header_only_baselines(self) -> None:
@@ -77,7 +79,7 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         body = make_target_body(makefile, "qec-code-random-window-bench-smoke")
 
         self.assertIn(
-            "case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row",
+            "$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)",
             body,
         )
         self.assertNotIn("import_paper_baselines", body)
@@ -132,8 +134,10 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         makefile = read_text(MAKEFILE)
         body = make_target_body(makefile, "qec-code-random-window-bench-full")
 
-        self.assertIn("benchmarks/qec_code_random_window/cases.full.toml", body)
-        self.assertIn("benchmarks/out/qec_code_random_window/full", body)
+        self.assertIn("QEC_CODE_RANDOM_WINDOW_FULL_CASES := benchmarks/qec_code_random_window/cases.full.toml", makefile)
+        self.assertIn("QEC_CODE_RANDOM_WINDOW_FULL_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/full", makefile)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_FULL_CASES)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_FULL_DIR)", body)
         self.assertIn("python3 -m benchmarks.qec_code_random_window.import_paper_baselines", body)
         self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", body)
         self.assertIn("--strict-baselines", body)
