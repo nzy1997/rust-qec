@@ -52,21 +52,6 @@ def _stringify(value: object) -> str:
     return str(value)
 
 
-def _validated_cases(path: Path) -> list[dict[str, Any]]:
-    try:
-        manifest = load_manifest(path)
-    except Exception as error:
-        raise CompareError(f"{path}: {error}") from error
-
-    errors = validate_manifest(manifest)
-    if errors:
-        raise CompareError("\n".join(f"{path}: {error}" for error in errors))
-
-    cases = manifest.get("cases")
-    assert isinstance(cases, list)
-    return [case for case in cases if isinstance(case, dict)]
-
-
 def _require_columns(
     path: Path,
     fieldnames: list[str] | None,
@@ -94,16 +79,73 @@ def _require_case_id(path: Path, row: dict[str, str], index: int) -> str:
     return case_id
 
 
-def load_local_summaries(path: Path, known_case_ids: set[str]) -> dict[str, dict[str, str]]:
-    fieldnames, rows = _load_csv_rows(path)
-    _require_columns(path, fieldnames, ("case_id", "best_upper_bound", "median_elapsed_s"))
+def _validate_summary_metadata(
+    path: Path,
+    row_number: int,
+    case_id: str,
+    row: dict[str, str],
+    manifest_case: dict[str, Any],
+) -> None:
+    mismatches: list[str] = []
+    for field, expected in (
+        ("code_id", str(manifest_case["code_id"])),
+        ("distance_side", str(manifest_case["distance_side"])),
+        ("baseline_key", str(manifest_case["baseline_key"])),
+    ):
+        actual = row.get(field, "").strip()
+        if actual != expected:
+            mismatches.append(f'{field} expected "{expected}", got "{actual}"')
 
+    actual_required = row.get("baseline_required", "").strip().lower()
+    expected_required = "true" if manifest_case["baseline_required"] else "false"
+    if actual_required not in {"true", "false"}:
+        mismatches.append(f'baseline_required must be "true" or "false", got "{actual_required}"')
+    elif actual_required != expected_required:
+        mismatches.append(
+            f'baseline_required expected "{expected_required}", got "{actual_required}"'
+        )
+
+    if mismatches:
+        raise _fail(
+            f"{path}:{row_number}",
+            f'case "{case_id}" metadata mismatch in local summary: '
+            + ", ".join(mismatches),
+        )
+
+
+def load_local_summaries(
+    path: Path,
+    known_case_ids: set[str],
+    cases_by_id: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, str]]:
+    fieldnames, rows = _load_csv_rows(path)
+    _require_columns(
+        path,
+        fieldnames,
+        (
+            "case_id",
+            "code_id",
+            "distance_side",
+            "baseline_key",
+            "baseline_required",
+            "best_upper_bound",
+            "median_elapsed_s",
+        ),
+    )
+
+    case_lookup = cases_by_id or {}
     summaries: dict[str, dict[str, str]] = {}
     for index, row in enumerate(rows, start=2):
         case_id = _require_case_id(path, row, index)
         if case_id not in known_case_ids:
             raise _fail(f"{path}:{index}", f'unknown case_id "{case_id}"')
+        if case_id in summaries:
+            raise _fail(f"{path}:{index}", f'duplicate case_id "{case_id}"')
+        manifest_case = case_lookup.get(case_id)
+        if manifest_case is not None:
+            _validate_summary_metadata(path, index, case_id, row, manifest_case)
         summaries[case_id] = {
+            "_row_location": f"{path}:{index}",
             "best_upper_bound": row.get("best_upper_bound", ""),
             "median_elapsed_s": row.get("median_elapsed_s", ""),
         }
@@ -135,6 +177,7 @@ def load_paper_baselines(path: Path, known_case_ids: set[str]) -> dict[str, dict
         if case_id in baselines:
             continue
         baselines[case_id] = {
+            "_row_location": f"{path}:{index}",
             "paper_case": row.get("paper_case", ""),
             "baseline_method": row.get("baseline_method", ""),
             "baseline_upper_bound": row.get("baseline_upper_bound", ""),
@@ -146,32 +189,32 @@ def load_paper_baselines(path: Path, known_case_ids: set[str]) -> dict[str, dict
     return baselines
 
 
-def _parse_positive_or_none(value: object) -> float | None:
+def _parse_positive_or_none(value: object, location: str, field_name: str) -> float | None:
     if _is_blank(value) or value == NA:
         return None
     if isinstance(value, bool):
-        raise CompareError(f"invalid numeric value: {value!r}")
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}')
     try:
         parsed = float(str(value).strip())
     except ValueError as error:
-        raise CompareError(f"invalid numeric value: {value!r}") from error
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}') from error
     if not math.isfinite(parsed):
-        raise CompareError(f"invalid numeric value: {value!r}")
+        raise _fail(location, f'field "{field_name}" invalid numeric value: {value!r}')
     if parsed <= 0:
         return None
     return parsed
 
 
-def _parse_int_or_none(value: object) -> int | None:
+def _parse_int_or_none(value: object, location: str, field_name: str) -> int | None:
     if _is_blank(value) or value == NA:
         return None
     if isinstance(value, bool):
-        raise CompareError(f"invalid integer value: {value!r}")
+        raise _fail(location, f'field "{field_name}" invalid integer value: {value!r}')
     text = str(value).strip()
     try:
         return int(text)
     except ValueError as error:
-        raise CompareError(f"invalid integer value: {value!r}") from error
+        raise _fail(location, f'field "{field_name}" invalid integer value: {value!r}') from error
 
 
 def _format_delta(local: int | None, paper: int | None) -> str:
@@ -194,13 +237,6 @@ def _baseline_provenance(row: dict[str, str]) -> str:
     return f"{row['source_file']}#{row['source_sheet']}:{row['source_row']}"
 
 
-def _case_lookup(cases: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    lookup: dict[str, dict[str, Any]] = {}
-    for case in cases:
-        lookup[case["case_id"]] = case
-    return lookup
-
-
 def _value_or_na(row: dict[str, str] | None, field: str) -> str:
     if row is None:
         return NA
@@ -219,10 +255,28 @@ def compare_cases(
         local = local_summaries.get(case_id)
         paper = paper_baselines.get(case_id)
 
-        local_best = _parse_int_or_none(_value_or_na(local, "best_upper_bound"))
-        local_elapsed = _parse_positive_or_none(_value_or_na(local, "median_elapsed_s"))
-        paper_upper = _parse_int_or_none(_value_or_na(paper, "baseline_upper_bound"))
-        paper_elapsed = _parse_positive_or_none(_value_or_na(paper, "baseline_elapsed_s"))
+        local_row_location = local.get("_row_location", f"{case_id}:comparison") if local else f"{case_id}:comparison"
+        paper_row_location = paper.get("_row_location", f"{case_id}:comparison") if paper else f"{case_id}:comparison"
+        local_best = _parse_int_or_none(
+            _value_or_na(local, "best_upper_bound"),
+            local_row_location,
+            "best_upper_bound",
+        )
+        local_elapsed = _parse_positive_or_none(
+            _value_or_na(local, "median_elapsed_s"),
+            local_row_location,
+            "median_elapsed_s",
+        )
+        paper_upper = _parse_int_or_none(
+            _value_or_na(paper, "baseline_upper_bound"),
+            paper_row_location,
+            "baseline_upper_bound",
+        )
+        paper_elapsed = _parse_positive_or_none(
+            _value_or_na(paper, "baseline_elapsed_s"),
+            paper_row_location,
+            "baseline_elapsed_s",
+        )
 
         baseline_required = case["baseline_required"]
         has_paper = paper is not None
@@ -333,9 +387,14 @@ def run(args: argparse.Namespace, argv: list[str] | None = None) -> int:
     cases = manifest["cases"]
     assert isinstance(cases, list)
     case_ids = {case["case_id"] for case in cases if isinstance(case, dict)}
+    case_lookup = {case["case_id"]: case for case in cases if isinstance(case, dict)}
 
     try:
-        local_summaries = load_local_summaries(args.local_summary, case_ids)
+        local_summaries = load_local_summaries(
+            args.local_summary,
+            case_ids,
+            case_lookup,
+        )
         paper_baselines = load_paper_baselines(args.paper_baselines, case_ids)
         rows = compare_cases(cases, local_summaries, paper_baselines)
     except CompareError as error:

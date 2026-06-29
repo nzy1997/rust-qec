@@ -25,11 +25,38 @@ def compare_paper_module():
     return compare_paper
 
 
+def compare_cases_manifest() -> dict[str, dict[str, object]]:
+    return {
+        "matched_case": {
+            "case_id": "matched_case",
+            "code_id": "bb72",
+            "distance_side": "any",
+            "baseline_key": "codeDistancePYPI:bivariate_bicycle:bb72",
+            "baseline_required": True,
+        },
+        "optional_unmatched_case": {
+            "case_id": "optional_unmatched_case",
+            "code_id": "steane",
+            "distance_side": "any",
+            "baseline_key": "unmapped:steane",
+            "baseline_required": False,
+        },
+        "required_missing_case": {
+            "case_id": "required_missing_case",
+            "code_id": "bb144",
+            "distance_side": "any",
+            "baseline_key": "codeDistancePYPI:bivariate_bicycle:bb144",
+            "baseline_required": True,
+        },
+    }
+
+
 class ComparePaperTest(unittest.TestCase):
     def run_compare(
         self,
         out_dir: Path,
         *,
+        local_summary: Path | None = None,
         paper_baselines: Path | None = None,
         strict: bool = False,
     ) -> subprocess.CompletedProcess[str]:
@@ -40,7 +67,7 @@ class ComparePaperTest(unittest.TestCase):
             "--cases",
             str(FIXTURES / "compare_cases.toml"),
             "--local-summary",
-            str(FIXTURES / "compare_summary.csv"),
+            str(local_summary or FIXTURES / "compare_summary.csv"),
             "--paper-baselines",
             str(paper_baselines or FIXTURES / "compare_paper_baselines.csv"),
             "--out-dir",
@@ -232,3 +259,112 @@ class ComparePaperTest(unittest.TestCase):
         self.assertIn("--local-summary", result.stdout)
         self.assertIn("--paper-baselines", result.stdout)
         self.assertIn("--strict-baselines", result.stdout)
+
+    def test_load_local_summaries_rejects_duplicate_case_ids(self) -> None:
+        compare_paper = compare_paper_module()
+        manifest_cases = compare_cases_manifest()
+        case_ids = set(manifest_cases)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,baseline_required,best_upper_bound,median_elapsed_s\n"
+                "matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,2.5\n"
+                "matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,2.5\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(compare_paper.CompareError) as cm:
+                compare_paper.load_local_summaries(local_summary, case_ids, manifest_cases)
+            self.assertIn("duplicate case_id", str(cm.exception))
+            self.assertIn("matched_case", str(cm.exception))
+
+    def test_load_local_summaries_rejects_metadata_mismatch(self) -> None:
+        compare_paper = compare_paper_module()
+        manifest_cases = compare_cases_manifest()
+        case_ids = set(manifest_cases)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,baseline_required,best_upper_bound,median_elapsed_s\n"
+                "matched_case,bb73,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,2.5\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(compare_paper.CompareError) as cm:
+                compare_paper.load_local_summaries(local_summary, case_ids, manifest_cases)
+            self.assertIn("metadata mismatch", str(cm.exception))
+            self.assertIn("code_id expected", str(cm.exception))
+
+    def test_run_rejects_unknown_case_id_in_local_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,baseline_required,best_upper_bound,median_elapsed_s\n"
+                "not_a_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,true,5,2.5\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_compare(Path(tmp), local_summary=local_summary)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('unknown case_id "not_a_case"', result.stderr)
+
+    def test_run_rejects_unknown_case_id_in_paper_baselines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            paper_baselines = Path(tmp) / "paper_baselines.csv"
+            paper_baselines.write_text(
+                "case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row\n"
+                "unknown_case,bb72,QDistRndMW,6,5.0,bb-summary.xlsx,BB summary,2\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_compare(
+                Path(tmp),
+                paper_baselines=paper_baselines,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('unknown case_id "unknown_case"', result.stderr)
+
+    def test_load_local_summaries_rejects_missing_required_columns(self) -> None:
+        compare_paper = compare_paper_module()
+        case_ids = set(compare_cases_manifest())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            local_summary = Path(tmp) / "summary.csv"
+            local_summary.write_text(
+                "case_id,code_id,distance_side,baseline_key,best_upper_bound,median_elapsed_s\n"
+                "matched_case,bb72,any,codeDistancePYPI:bivariate_bicycle:bb72,5,2.5\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(compare_paper.CompareError) as cm:
+                compare_paper.load_local_summaries(
+                    local_summary,
+                    case_ids,
+                )
+            self.assertIn("missing required column(s)", str(cm.exception))
+            self.assertIn("baseline_required", str(cm.exception))
+
+    def test_compare_cases_rejects_malformed_numeric_local_summary(self) -> None:
+        compare_paper = compare_paper_module()
+        cases = [
+            {
+                "case_id": "matched_case",
+                "code_id": "bb72",
+                "distance_side": "any",
+                "baseline_key": "codeDistancePYPI:bivariate_bicycle:bb72",
+                "baseline_required": True,
+            }
+        ]
+        local_summaries = {
+            "matched_case": {
+                "_row_location": "summary.csv:2",
+                "best_upper_bound": "abc",
+                "median_elapsed_s": "2.5",
+            }
+        }
+        paper_baselines: dict[str, dict[str, str]] = {}
+
+        with self.assertRaises(compare_paper.CompareError) as cm:
+            compare_paper.compare_cases(cases, local_summaries, paper_baselines)
+        self.assertIn("summary.csv:2", str(cm.exception))
+        self.assertIn('field "best_upper_bound"', str(cm.exception))
