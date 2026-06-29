@@ -1,9 +1,15 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full
 
 DEFAULT_BRANCH ?= master
 
 # Cross-platform sed in-place: macOS needs -i '', Linux needs -i
 SED_I := sed -i$(shell if [ "$$(uname)" = "Darwin" ]; then echo " ''"; fi)
+QEC_CODE_RANDOM_WINDOW_OUT ?= benchmarks/out/qec_code_random_window
+QEC_CODE_RANDOM_WINDOW_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/smoke
+QEC_CODE_RANDOM_WINDOW_FULL_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/full
+QEC_CODE_RANDOM_WINDOW_SMOKE_CASES := benchmarks/qec_code_random_window/cases.smoke.toml
+QEC_CODE_RANDOM_WINDOW_FULL_CASES := benchmarks/qec_code_random_window/cases.full.toml
+QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER := case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row
 
 help:
 	@echo "Available targets:"
@@ -17,6 +23,8 @@ help:
 	@echo "  bb-circuit-bposd-compare-smoke - Run the BB circuit rbposd vs ldpc/bposd smoke comparison"
 	@echo "  bb-circuit-bposd-compare-plot-smoke - Run tiny BB72/BB144 batched compare and plot smoke"
 	@echo "  bb-circuit-bposd-compare-full - Run the full BB72/BB144 batched compare suite"
+	@echo "  qec-code-random-window-bench-smoke - Run qec-code random-window smoke evidence pipeline"
+	@echo "  qec-code-random-window-bench-full  - Run qec-code random-window full pipeline using CODEDISTANCE_PAPER_RESULTS_DIR"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -67,6 +75,27 @@ bb-circuit-bposd-compare-plot-smoke:
 bb-circuit-bposd-compare-full:
 	cargo build --release -p rsinter
 	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier full --output-dir benchmarks/bb_circuit_bposd_compare/results/full --rust-binary target/release/rsinter --batch-size 500
+
+qec-code-random-window-bench-smoke:
+	rm -rf $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
+	mkdir -p $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
+	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES)
+	cargo build -p qec-code
+	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
+	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary
+	printf '%s\n' '$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)' > $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv
+	python3 -m benchmarks.qec_code_random_window.compare_paper --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --local-summary $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary/summary.csv --paper-baselines $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/comparison
+
+qec-code-random-window-bench-full:
+	rm -rf $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
+	mkdir -p $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
+	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES)
+	cargo build -p qec-code
+	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
+	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary
+	# CODEDISTANCE_PAPER_RESULTS_DIR controls paper baseline import source
+	python3 -m benchmarks.qec_code_random_window.import_paper_baselines --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv
+	python3 -m benchmarks.qec_code_random_window.compare_paper --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --local-summary $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary/summary.csv --paper-baselines $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/comparison --strict-baselines
 
 # Release a new version: make release V=0.2.0
 release:
