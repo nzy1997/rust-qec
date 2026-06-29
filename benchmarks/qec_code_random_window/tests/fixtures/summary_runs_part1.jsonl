@@ -1,0 +1,2 @@
+{"case_id":"target_case","status":"ok","seed":11,"iterations":10,"restarts":2,"target_weight":5,"upper_bound":7,"elapsed_s":3.0,"command":["qec-code","code","css-distance","random-window-upper-bound","--code-id","bb72","--seed","11"]}
+{"case_id":"target_case","status":"cli_error","seed":13,"iterations":10,"restarts":2,"target_weight":5,"upper_bound":null,"elapsed_s":0.5,"stderr_context":"fixture failure"}

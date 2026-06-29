@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import statistics
 import sys
 from pathlib import Path
@@ -39,12 +40,16 @@ CSV_FIELDS = [
 ]
 
 
+class SummaryError(ValueError):
+    """User-facing validation error for summary inputs."""
+
+
 def _is_int(value: object) -> bool:
     return type(value) is int
 
 
-def _fail(location: str, message: str) -> ValueError:
-    return ValueError(f"{location}: {message}")
+def _fail(location: str, message: str) -> SummaryError:
+    return SummaryError(f"{location}: {message}")
 
 
 def _require_int(
@@ -84,6 +89,8 @@ def _require_elapsed(row: dict[str, Any], location: str) -> float:
     if type(value) not in {int, float}:
         raise _fail(location, 'field "elapsed_s" must be numeric')
     parsed = float(value)
+    if not math.isfinite(parsed):
+        raise _fail(location, 'field "elapsed_s" must be finite')
     if parsed < 0:
         raise _fail(location, 'field "elapsed_s" must be non-negative')
     return parsed
@@ -137,7 +144,7 @@ def _validate_row(
     return validated
 
 
-def _load_run_rows(paths: list[Path], known_case_ids: set[str]) -> list[dict[str, Any]]:
+def load_run_rows(paths: list[Path], known_case_ids: set[str]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in paths:
         try:
@@ -229,7 +236,18 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
     }
 
 
-def _write_csv(path: Path, summaries: list[dict[str, object]]) -> None:
+def summarize_cases(
+    cases: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, object]]]:
+    rows_by_case = {case["case_id"]: [] for case in cases if isinstance(case, dict)}
+    for row in rows:
+        rows_by_case[row["case_id"]].append(row)
+    summaries = [_summarize_case(case, rows_by_case[case["case_id"]]) for case in cases]
+    return rows_by_case, summaries
+
+
+def write_summary_csv(path: Path, summaries: list[dict[str, object]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
         writer.writeheader()
@@ -275,7 +293,7 @@ def _observed_settings_lines(
     return lines
 
 
-def _write_markdown(
+def write_summary_md(
     path: Path,
     *,
     manifest_path: Path,
@@ -338,45 +356,47 @@ def _write_markdown(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def run(args: argparse.Namespace) -> int:
+def _validated_cases(manifest_path: Path) -> list[dict[str, Any]]:
+    manifest = load_manifest(manifest_path)
+    errors = validate_manifest(manifest)
+    if errors:
+        raise SummaryError("\n".join(f"{manifest_path}: {error}" for error in errors))
+    cases = manifest["cases"]
+    assert isinstance(cases, list)
+    return [case for case in cases if isinstance(case, dict)]
+
+
+def run(args: argparse.Namespace, argv: list[str] | None = None) -> int:
     try:
         manifest = load_manifest(args.cases)
+        cases = _validated_cases(args.cases)
+    except SummaryError as error:
+        print(error, file=sys.stderr)
+        return 2
     except Exception as error:
         print(f"{args.cases}: {error}", file=sys.stderr)
         return 2
 
-    errors = validate_manifest(manifest)
-    if errors:
-        for error in errors:
-            print(f"{args.cases}: {error}", file=sys.stderr)
-        return 2
-
-    cases = manifest["cases"]
-    assert isinstance(cases, list)
-    known_case_ids = {case["case_id"] for case in cases if isinstance(case, dict)}
+    known_case_ids = {case["case_id"] for case in cases}
 
     try:
-        rows = _load_run_rows(args.runs, known_case_ids)
-    except ValueError as error:
+        rows = load_run_rows(args.runs, known_case_ids)
+    except SummaryError as error:
         print(error, file=sys.stderr)
         return 1
 
-    rows_by_case = {case["case_id"]: [] for case in cases if isinstance(case, dict)}
-    for row in rows:
-        rows_by_case[row["case_id"]].append(row)
-
-    summaries = [_summarize_case(case, rows_by_case[case["case_id"]]) for case in cases]
+    rows_by_case, summaries = summarize_cases(cases, rows)
 
     try:
         args.out_dir.mkdir(parents=True, exist_ok=True)
-        _write_csv(args.out_dir / "summary.csv", summaries)
-        _write_markdown(
+        write_summary_csv(args.out_dir / "summary.csv", summaries)
+        write_summary_md(
             args.out_dir / "summary.md",
             manifest_path=args.cases,
             run_paths=args.runs,
-            argv=sys.argv[1:] if args.argv is None else args.argv,
+            argv=sys.argv[1:] if argv is None else argv,
             manifest=manifest,
-            cases=[case for case in cases if isinstance(case, dict)],
+            cases=cases,
             rows_by_case=rows_by_case,
             summaries=summaries,
         )
@@ -400,8 +420,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    setattr(args, "argv", argv)
-    return run(args)
+    return run(args, argv)
 
 
 if __name__ == "__main__":

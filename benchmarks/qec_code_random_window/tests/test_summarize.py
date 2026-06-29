@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import argparse
 import csv
+import inspect
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from benchmarks.qec_code_random_window import summarize
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -48,6 +52,8 @@ class SummarizeTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, "")
+            with (out_dir / "summary.csv").open(newline="", encoding="utf-8") as handle:
+                self.assertEqual(csv.reader(handle).__next__(), summarize.CSV_FIELDS)
             self.assertEqual(
                 read_csv_rows(out_dir / "summary.csv"),
                 [
@@ -132,6 +138,26 @@ class SummarizeTest(unittest.TestCase):
                 ],
             )
 
+    def test_multiple_run_files_aggregate_into_one_manifest_ordered_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            result = self.run_summarizer(
+                out_dir,
+                FIXTURES / "summary_runs_part1.jsonl",
+                FIXTURES / "summary_runs_part2.jsonl",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                [row["case_id"] for row in read_csv_rows(out_dir / "summary.csv")],
+                ["target_case", "no_success_case", "unattempted_case"],
+            )
+            target_row = read_csv_rows(out_dir / "summary.csv")[0]
+            self.assertEqual(target_row["attempted_seed_rows"], "3")
+            self.assertEqual(target_row["successful_seed_rows"], "2")
+            self.assertEqual(target_row["run_seed_values"], "11;12;13")
+            self.assertEqual(target_row["run_status_values"], "cli_error;ok")
+
     def test_summary_markdown_has_manifest_rows_and_zero_success_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = Path(tmp)
@@ -157,6 +183,57 @@ class SummarizeTest(unittest.TestCase):
             self.assertIn("missing_upper_bound_success.jsonl:1", result.stderr)
             self.assertIn("upper_bound", result.stderr)
             self.assertIn('status = "ok"', result.stderr)
+
+    def test_success_row_nonfinite_elapsed_exits_nonzero_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.run_summarizer(
+                Path(tmp),
+                FIXTURES / "nonfinite_elapsed_success.jsonl",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("nonfinite_elapsed_success.jsonl:1", result.stderr)
+            self.assertIn("elapsed_s", result.stderr)
+            self.assertIn("finite", result.stderr)
+
+    def test_module_exports_requested_api_names(self) -> None:
+        self.assertTrue(issubclass(summarize.SummaryError, Exception))
+        self.assertTrue(callable(summarize.load_run_rows))
+        self.assertTrue(callable(summarize.summarize_cases))
+        self.assertTrue(callable(summarize.write_summary_csv))
+        self.assertTrue(callable(summarize.write_summary_md))
+        self.assertTrue(callable(summarize.run))
+        self.assertEqual(
+            list(inspect.signature(summarize.run).parameters),
+            ["args", "argv"],
+        )
+
+    def test_load_run_rows_raises_summary_error_for_invalid_row(self) -> None:
+        manifest = summarize.load_manifest(FIXTURES / "summary_cases.toml")
+        with self.assertRaises(summarize.SummaryError) as context:
+            summarize.load_run_rows(
+                [FIXTURES / "nonfinite_elapsed_success.jsonl"],
+                {case["case_id"] for case in manifest["cases"]},
+            )
+
+        self.assertIn("nonfinite_elapsed_success.jsonl:1", str(context.exception))
+        self.assertIn("elapsed_s", str(context.exception))
+
+    def test_run_supports_direct_args_and_custom_argv(self) -> None:
+        manifest = summarize.load_manifest(FIXTURES / "summary_cases.toml")
+        with tempfile.TemporaryDirectory() as tmp:
+            args = argparse.Namespace(
+                cases=FIXTURES / "summary_cases.toml",
+                runs=[FIXTURES / "summary_runs.jsonl"],
+                out_dir=Path(tmp),
+            )
+
+            exit_code = summarize.run(args, ["--cases", "fixture", "--runs", "fixture"])
+
+            self.assertEqual(exit_code, 0)
+            markdown = (Path(tmp) / "summary.md").read_text(encoding="utf-8")
+            self.assertIn("Summarizer argv: `--cases fixture --runs fixture`", markdown)
+            self.assertEqual(len(manifest["cases"]), 3)
 
     def test_help_exits_zero(self) -> None:
         result = subprocess.run(
