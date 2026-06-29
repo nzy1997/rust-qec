@@ -1,0 +1,38 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+description = "Fixture cases for qec-code random-window summarizer tests."
+
+[[cases]]
+case_id = "target_case"
+code_id = "bb72"
+distance_side = "any"
+iterations = 10
+restarts = 2
+seed = 11
+target_weight = 5
+target_upper_bound = 5
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+baseline_required = true
+
+[[cases]]
+case_id = "no_success_case"
+code_id = "steane"
+distance_side = "any"
+iterations = 20
+restarts = 1
+seed = 21
+target_weight = 3
+baseline_key = "unmapped:steane"
+baseline_required = false
+
+[[cases]]
+case_id = "unattempted_case"
+code_id = "toric:d=3"
+distance_side = "any"
+iterations = 30
+restarts = 3
+seed = 31
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:toric_d3"
+baseline_required = false
