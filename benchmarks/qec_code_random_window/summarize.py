@@ -311,7 +311,7 @@ def write_summary_md(
         f"- Manifest: `{manifest_path}`",
         f"- Run files: {', '.join(f'`{path}`' for path in run_paths)}",
         f"- Manifest suite/version: `{manifest.get('suite')}` / `{manifest.get('manifest_version')}`",
-        f"- Summarizer argv: `{' '.join(argv)}`",
+        f"- Summarizer argv: `{json.dumps(argv)}`",
         "- Manifest command settings:",
         *_manifest_settings_lines(cases),
         "- Observed run command settings:",

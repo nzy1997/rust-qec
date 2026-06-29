@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import inspect
+import json
 import subprocess
 import sys
 import tempfile
@@ -227,12 +228,14 @@ class SummarizeTest(unittest.TestCase):
                 runs=[FIXTURES / "summary_runs.jsonl"],
                 out_dir=Path(tmp),
             )
+            argv = ["--cases", "fixture path", "--label", "token with spaces"]
 
-            exit_code = summarize.run(args, ["--cases", "fixture", "--runs", "fixture"])
+            exit_code = summarize.run(args, argv)
 
             self.assertEqual(exit_code, 0)
             markdown = (Path(tmp) / "summary.md").read_text(encoding="utf-8")
-            self.assertIn("Summarizer argv: `--cases fixture --runs fixture`", markdown)
+            self.assertIn(f"Summarizer argv: `{json.dumps(argv)}`", markdown)
+            self.assertNotIn("Summarizer argv: `--cases fixture path --label token with spaces`", markdown)
             self.assertEqual(len(manifest["cases"]), 3)
 
     def test_help_exits_zero(self) -> None:
