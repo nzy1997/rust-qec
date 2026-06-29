@@ -1,0 +1,39 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+description = "Fixture cases for qec-code random-window paper comparison tests."
+
+[[cases]]
+case_id = "matched_case"
+code_id = "bb72"
+distance_side = "any"
+iterations = 10
+restarts = 2
+seed = 11
+target_weight = 5
+target_upper_bound = 5
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+baseline_required = true
+
+[[cases]]
+case_id = "optional_unmatched_case"
+code_id = "steane"
+distance_side = "any"
+iterations = 20
+restarts = 1
+seed = 21
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:steane"
+baseline_required = false
+
+[[cases]]
+case_id = "required_missing_case"
+code_id = "bb144"
+distance_side = "any"
+iterations = 30
+restarts = 3
+seed = 31
+target_weight = 12
+target_upper_bound = 12
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb144"
+baseline_required = true
