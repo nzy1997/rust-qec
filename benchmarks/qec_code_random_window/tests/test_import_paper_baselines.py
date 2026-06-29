@@ -404,6 +404,70 @@ class ImportPaperBaselinesTest(unittest.TestCase):
             self.assertIn("bivariate", result.stderr)
             self.assertIn("summary", result.stderr)
 
+    def test_selected_bad_workbook_is_not_silently_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            out = tmp_path / "baselines.csv"
+            paper_dir = tmp_path / "paper-results"
+            paper_dir.mkdir()
+            write_manifest(
+                manifest,
+                """
+            [[cases]]
+            case_id = "bb72_fixture"
+            code_id = "bb72"
+            distance_side = "any"
+            iterations = 5000
+            restarts = 8
+            seed = 7
+            target_weight = 6
+            target_upper_bound = 6
+            baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+            baseline_required = true
+            """,
+            )
+            write_xlsx(
+                paper_dir / "bb-renamed.xlsx",
+                "Other Data",
+                [
+                    [
+                        "paper_case",
+                        "baseline_method",
+                        "baseline_upper_bound",
+                        "baseline_elapsed_s",
+                    ],
+                    ["bb72", "QDistRndMW", 6, 12.5],
+                ],
+            )
+            write_xlsx(
+                paper_dir / "bb-summary.xlsx",
+                "BB summary",
+                [
+                    [
+                        "paper_case",
+                        "baseline_method",
+                        "baseline_upper_bound",
+                        "baseline_elapsed_s",
+                    ],
+                    ["bb72", "QDistRndMW", 6, 12.5],
+                ],
+            )
+
+            result = run_importer(
+                [
+                    "--cases",
+                    str(manifest),
+                    "--paper-results-dir",
+                    str(paper_dir),
+                    "--out",
+                    str(out),
+                ]
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing required sheet", result.stderr)
+
     def test_missing_required_column_exits_nonzero_and_names_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -718,6 +782,56 @@ class ImportPaperBaselinesTest(unittest.TestCase):
             self.assertIn(
                 "bb72_fixture,bb72,QDistRndMW,6,12.5",
                 out.read_text(encoding="utf-8"),
+            )
+
+    def test_qc_named_workbook_and_sheet_are_selected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            out = tmp_path / "baselines.csv"
+            paper_dir = tmp_path / "paper-results"
+            paper_dir.mkdir()
+            write_manifest(
+                manifest,
+                """
+            [[cases]]
+            case_id = "bb72_fixture"
+            code_id = "bb72"
+            distance_side = "any"
+            iterations = 5000
+            restarts = 8
+            seed = 7
+            target_weight = 6
+            target_upper_bound = 6
+            baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+            baseline_required = true
+            """,
+            )
+            write_xlsx(
+                paper_dir / "qc-results.xlsx",
+                "QC",
+                [
+                    ["case", "method", "ub", "runtime_s"],
+                    ["bb72", "QDistRndMW", 6, 12.5],
+                ],
+            )
+
+            result = run_importer(
+                [
+                    "--cases",
+                    str(manifest),
+                    "--paper-results-dir",
+                    str(paper_dir),
+                    "--out",
+                    str(out),
+                ]
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                out.read_text(encoding="utf-8"),
+                "case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row\n"
+                "bb72_fixture,bb72,QDistRndMW,6,12.5,qc-results.xlsx,QC,2\n",
             )
 
     def test_unmapped_case_is_omitted_not_silently_matched(self) -> None:

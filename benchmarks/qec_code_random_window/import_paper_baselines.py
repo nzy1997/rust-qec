@@ -49,7 +49,7 @@ REQUIRED_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "runtime_s",
     ),
 }
-SELECTED_NAME_TOKENS = ("bb", "bivariate", "summary")
+SELECTED_NAME_TOKENS = ("bb", "bivariate", "qc", "summary")
 BASELINE_KEY_TO_PAPER_CASE = {
     "codeDistancePYPI:bivariate_bicycle:bb72": "bb72",
     "codeDistancePYPI:bivariate_bicycle:bb144": "bb144",
@@ -370,13 +370,7 @@ def import_rows(cases_path: Path, paper_results_dir: Path) -> list[dict[str, str
 
     all_sheet_rows: list[SheetRow] = []
     for workbook_path in _paper_result_files(paper_results_dir):
-        try:
-            workbook_rows = _extract_sheet_rows(workbook_path)
-        except ValueError as error:
-            if "missing required sheet" in str(error):
-                continue
-            raise
-        all_sheet_rows.extend(workbook_rows)
+        all_sheet_rows.extend(_extract_sheet_rows(workbook_path))
 
     if not all_sheet_rows:
         raise _required_sheet_error()
