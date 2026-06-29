@@ -1,0 +1,26 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+
+[[cases]]
+case_id = "duplicate_case"
+code_id = "steane"
+distance_side = "any"
+iterations = 10
+restarts = 1
+seed = 7
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:steane"
+baseline_required = false
+
+[[cases]]
+case_id = "duplicate_case"
+code_id = "surface_rotated:d=3"
+distance_side = "any"
+iterations = 10
+restarts = 1
+seed = 7
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:surface_rotated_d3"
+baseline_required = false

@@ -1,0 +1,14 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+
+[[cases]]
+case_id = "strict_missing_baseline"
+code_id = "bb72"
+distance_side = "any"
+iterations = 10
+restarts = 1
+seed = 7
+target_weight = 6
+target_upper_bound = 6
+baseline_key = ""
+baseline_required = true
