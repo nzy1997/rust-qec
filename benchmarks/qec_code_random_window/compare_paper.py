@@ -69,18 +69,20 @@ def _validated_cases(path: Path) -> list[dict[str, Any]]:
 
 def _require_columns(
     path: Path,
-    rows: list[dict[str, str]],
+    fieldnames: list[str] | None,
     required: list[str] | tuple[str, ...],
 ) -> None:
-    missing = [column for column in required if any(column not in row for row in rows) or not rows]
+    present = set(fieldnames or [])
+    missing = [column for column in required if column not in present]
     if missing:
         raise CompareError(f"{path}: missing required column(s): {', '.join(missing)}")
 
 
-def _load_csv_rows(path: Path) -> list[dict[str, str]]:
+def _load_csv_rows(path: Path) -> tuple[list[str] | None, list[dict[str, str]]]:
     try:
         with path.open(newline="", encoding="utf-8") as handle:
-            return list(csv.DictReader(handle))
+            reader = csv.DictReader(handle)
+            return reader.fieldnames, list(reader)
     except OSError as error:
         raise CompareError(f"{path}: {error}") from error
 
@@ -93,8 +95,8 @@ def _require_case_id(path: Path, row: dict[str, str], index: int) -> str:
 
 
 def load_local_summaries(path: Path, known_case_ids: set[str]) -> dict[str, dict[str, str]]:
-    rows = _load_csv_rows(path)
-    _require_columns(path, rows, ("case_id", "best_upper_bound", "median_elapsed_s"))
+    fieldnames, rows = _load_csv_rows(path)
+    _require_columns(path, fieldnames, ("case_id", "best_upper_bound", "median_elapsed_s"))
 
     summaries: dict[str, dict[str, str]] = {}
     for index, row in enumerate(rows, start=2):
@@ -109,10 +111,10 @@ def load_local_summaries(path: Path, known_case_ids: set[str]) -> dict[str, dict
 
 
 def load_paper_baselines(path: Path, known_case_ids: set[str]) -> dict[str, dict[str, str]]:
-    rows = _load_csv_rows(path)
+    fieldnames, rows = _load_csv_rows(path)
     _require_columns(
         path,
-        rows,
+        fieldnames,
         (
             "case_id",
             "paper_case",
@@ -153,8 +155,10 @@ def _parse_positive_or_none(value: object) -> float | None:
         parsed = float(str(value).strip())
     except ValueError as error:
         raise CompareError(f"invalid numeric value: {value!r}") from error
-    if not math.isfinite(parsed) or parsed < 0:
+    if not math.isfinite(parsed):
         raise CompareError(f"invalid numeric value: {value!r}")
+    if parsed <= 0:
+        return None
     return parsed
 
 
