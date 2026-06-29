@@ -62,6 +62,7 @@ harnesses, smoke runs, and reproducible comparison outputs.
 Showcases:
 
 - [`Benchmark And Reproduction Evidence`](docs/showcases/benchmark-evidence.md)
+- [`qec-code random-window benchmark`](docs/showcases/qec-code-random-window-benchmark.md)
 
 Primary code and docs:
 
