@@ -25,13 +25,31 @@ CANONICAL_COLUMNS: tuple[str, ...] = (
 
 MANIFEST_VERSION = 1
 SUITE = "qec_code_random_window"
-SHEET_NAME = "BB summary"
 REQUIRED_COLUMNS = (
     "paper_case",
     "baseline_method",
     "baseline_upper_bound",
     "baseline_elapsed_s",
 )
+REQUIRED_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    "paper_case": ("paper_case", "case", "name", "code"),
+    "baseline_method": ("baseline_method", "method", "algorithm", "decoder"),
+    "baseline_upper_bound": (
+        "baseline_upper_bound",
+        "upper_bound",
+        "ub",
+        "distance",
+        "d",
+    ),
+    "baseline_elapsed_s": (
+        "baseline_elapsed_s",
+        "elapsed_s",
+        "seconds",
+        "time_s",
+        "runtime_s",
+    ),
+}
+SELECTED_NAME_TOKENS = ("bb", "bivariate", "summary")
 BASELINE_KEY_TO_PAPER_CASE = {
     "codeDistancePYPI:bivariate_bicycle:bb72": "bb72",
     "codeDistancePYPI:bivariate_bicycle:bb144": "bb144",
@@ -203,27 +221,54 @@ def workbook_rows(path: Path) -> dict[str, list[list[str]]]:
         return _sheet_rows_with_stdlib(path)
 
 
-def _normalize_header(value: str) -> str:
-    return value.strip()
+def _normalize_name(value: str) -> str:
+    normalized = value.strip().lower().replace(" ", "_").replace("-", "_")
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized
+
+
+def _is_selected_name(value: str) -> bool:
+    normalized = _normalize_name(value)
+    return any(token in normalized for token in SELECTED_NAME_TOKENS)
+
+
+def _required_sheet_error() -> ValueError:
+    tokens = ", ".join(SELECTED_NAME_TOKENS)
+    return ValueError(
+        "missing required sheet in selected workbooks; expected sheet name containing one of: "
+        + tokens
+    )
 
 
 def _extract_sheet_rows(path: Path) -> list[SheetRow]:
     rows_by_sheet = workbook_rows(path)
-    if SHEET_NAME not in rows_by_sheet:
-        raise ValueError(f'{path.name}: missing required sheet "{SHEET_NAME}"')
-    sheet_rows = rows_by_sheet[SHEET_NAME]
-    if not sheet_rows:
-        raise ValueError(f'{path.name}: sheet "{SHEET_NAME}" is empty')
+    selected_sheets = [
+        (sheet_name, sheet_rows)
+        for sheet_name, sheet_rows in rows_by_sheet.items()
+        if _is_selected_name(sheet_name)
+    ]
+    if not selected_sheets:
+        raise _required_sheet_error()
 
-    header = [_normalize_header(value) for value in sheet_rows[0]]
+    sheet_name, sheet_rows = selected_sheets[0]
+    if not sheet_rows:
+        raise ValueError(f'{path.name}: sheet "{sheet_name}" is empty')
+
+    header_indexes = {
+        _normalize_name(value): index for index, value in enumerate(sheet_rows[0])
+    }
     indexes: dict[str, int] = {}
     for column in REQUIRED_COLUMNS:
-        try:
-            indexes[column] = header.index(column)
-        except ValueError as error:
+        for alias in REQUIRED_COLUMN_ALIASES[column]:
+            index = header_indexes.get(_normalize_name(alias))
+            if index is not None:
+                indexes[column] = index
+                break
+        if column not in indexes:
             raise ValueError(
-                f'{path.name}: sheet "{SHEET_NAME}" missing required column "{column}"'
-            ) from error
+                f'{path.name}: sheet "{sheet_name}" missing required column "{column}"'
+            )
 
     extracted: list[SheetRow] = []
     for row_number, row in enumerate(sheet_rows[1:], start=2):
@@ -235,7 +280,7 @@ def _extract_sheet_rows(path: Path) -> list[SheetRow]:
         extracted.append(
             SheetRow(
                 source_file=path.name,
-                source_sheet=SHEET_NAME,
+                source_sheet=sheet_name,
                 source_row=row_number,
                 values=values,
             )
@@ -244,7 +289,11 @@ def _extract_sheet_rows(path: Path) -> list[SheetRow]:
 
 
 def _paper_result_files(paper_results_dir: Path) -> list[Path]:
-    return sorted(path for path in paper_results_dir.iterdir() if path.suffix.lower() == ".xlsx")
+    return sorted(
+        path
+        for path in paper_results_dir.iterdir()
+        if path.suffix.lower() == ".xlsx" and _is_selected_name(path.stem)
+    )
 
 
 def _match_rows(
@@ -303,7 +352,6 @@ def import_rows(cases_path: Path, paper_results_dir: Path) -> list[dict[str, str
         )
 
     all_sheet_rows: list[SheetRow] = []
-    found_required_sheet = False
     for workbook_path in _paper_result_files(paper_results_dir):
         try:
             workbook_rows = _extract_sheet_rows(workbook_path)
@@ -311,11 +359,10 @@ def import_rows(cases_path: Path, paper_results_dir: Path) -> list[dict[str, str
             if "missing required sheet" in str(error):
                 continue
             raise
-        found_required_sheet = True
         all_sheet_rows.extend(workbook_rows)
 
-    if not found_required_sheet:
-        raise ValueError(f'missing required sheet "{SHEET_NAME}"')
+    if not all_sheet_rows:
+        raise _required_sheet_error()
 
     return _match_rows(required_aliases, all_sheet_rows)
 
