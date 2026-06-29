@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import re
 import csv
+import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
-import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -80,7 +80,7 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
             "case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row",
             body,
         )
-        self.assertNotIn("benchmarks/qec_code_random_window/import_paper_baselines.py", body)
+        self.assertNotIn("import_paper_baselines", body)
 
     def test_smoke_target_generates_no_paper_baseline_rows_with_header_only_baseline_csv(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
