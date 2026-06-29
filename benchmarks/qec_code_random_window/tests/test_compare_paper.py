@@ -9,8 +9,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from benchmarks.qec_code_random_window import compare_paper
-
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = ROOT / "benchmarks" / "qec_code_random_window" / "tests" / "fixtures"
@@ -19,6 +17,12 @@ FIXTURES = ROOT / "benchmarks" / "qec_code_random_window" / "tests" / "fixtures"
 def read_csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def compare_paper_module():
+    from benchmarks.qec_code_random_window import compare_paper
+
+    return compare_paper
 
 
 class ComparePaperTest(unittest.TestCase):
@@ -53,6 +57,8 @@ class ComparePaperTest(unittest.TestCase):
         )
 
     def test_fixture_inputs_write_exact_comparison_csv_values(self) -> None:
+        compare_paper = compare_paper_module()
+
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = Path(tmp)
             result = self.run_compare(out_dir)
@@ -174,6 +180,8 @@ class ComparePaperTest(unittest.TestCase):
             self.assertEqual(missing["comparison_status"], "no_paper_baseline")
 
     def test_module_exports_requested_api_names(self) -> None:
+        compare_paper = compare_paper_module()
+
         self.assertTrue(issubclass(compare_paper.CompareError, Exception))
         self.assertTrue(callable(compare_paper.load_local_summaries))
         self.assertTrue(callable(compare_paper.load_paper_baselines))
@@ -187,6 +195,8 @@ class ComparePaperTest(unittest.TestCase):
         )
 
     def test_run_supports_direct_args_and_custom_argv(self) -> None:
+        compare_paper = compare_paper_module()
+
         with tempfile.TemporaryDirectory() as tmp:
             args = argparse.Namespace(
                 cases=FIXTURES / "compare_cases.toml",
