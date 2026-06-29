@@ -54,6 +54,10 @@ BASELINE_KEY_TO_PAPER_CASE = {
     "codeDistancePYPI:bivariate_bicycle:bb72": "bb72",
     "codeDistancePYPI:bivariate_bicycle:bb144": "bb144",
 }
+PAPER_CASE_ALIASES: dict[str, tuple[str, ...]] = {
+    "bb72": ("bb72", "bb 72", "bb-72"),
+    "bb144": ("bb144", "bb 144", "bb-144"),
+}
 WORKBOOK_NS = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 REL_NS = {"rel": "http://schemas.openxmlformats.org/package/2006/relationships"}
 DOC_REL_NS = {
@@ -241,6 +245,17 @@ def _required_sheet_error() -> ValueError:
     )
 
 
+def _paper_case_lookup() -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for canonical, aliases in PAPER_CASE_ALIASES.items():
+        for alias in aliases:
+            lookup[_normalize_name(alias)] = canonical
+    return lookup
+
+
+PAPER_CASE_LOOKUP = _paper_case_lookup()
+
+
 def _extract_sheet_rows(path: Path) -> list[SheetRow]:
     rows_by_sheet = workbook_rows(path)
     selected_sheets = [
@@ -251,40 +266,40 @@ def _extract_sheet_rows(path: Path) -> list[SheetRow]:
     if not selected_sheets:
         raise _required_sheet_error()
 
-    sheet_name, sheet_rows = selected_sheets[0]
-    if not sheet_rows:
-        raise ValueError(f'{path.name}: sheet "{sheet_name}" is empty')
-
-    header_indexes = {
-        _normalize_name(value): index for index, value in enumerate(sheet_rows[0])
-    }
-    indexes: dict[str, int] = {}
-    for column in REQUIRED_COLUMNS:
-        for alias in REQUIRED_COLUMN_ALIASES[column]:
-            index = header_indexes.get(_normalize_name(alias))
-            if index is not None:
-                indexes[column] = index
-                break
-        if column not in indexes:
-            raise ValueError(
-                f'{path.name}: sheet "{sheet_name}" missing required column "{column}"'
-            )
-
     extracted: list[SheetRow] = []
-    for row_number, row in enumerate(sheet_rows[1:], start=2):
-        values = {}
-        for column, index in indexes.items():
-            values[column] = row[index].strip() if index < len(row) else ""
-        if not any(values.values()):
-            continue
-        extracted.append(
-            SheetRow(
-                source_file=path.name,
-                source_sheet=sheet_name,
-                source_row=row_number,
-                values=values,
+    for sheet_name, sheet_rows in selected_sheets:
+        if not sheet_rows:
+            raise ValueError(f'{path.name}: sheet "{sheet_name}" is empty')
+
+        header_indexes = {
+            _normalize_name(value): index for index, value in enumerate(sheet_rows[0])
+        }
+        indexes: dict[str, int] = {}
+        for column in REQUIRED_COLUMNS:
+            for alias in REQUIRED_COLUMN_ALIASES[column]:
+                index = header_indexes.get(_normalize_name(alias))
+                if index is not None:
+                    indexes[column] = index
+                    break
+            if column not in indexes:
+                raise ValueError(
+                    f'{path.name}: sheet "{sheet_name}" missing required column "{column}"'
+                )
+
+        for row_number, row in enumerate(sheet_rows[1:], start=2):
+            values = {}
+            for column, index in indexes.items():
+                values[column] = row[index].strip() if index < len(row) else ""
+            if not any(values.values()):
+                continue
+            extracted.append(
+                SheetRow(
+                    source_file=path.name,
+                    source_sheet=sheet_name,
+                    source_row=row_number,
+                    values=values,
+                )
             )
-        )
     return extracted
 
 
@@ -303,7 +318,9 @@ def _match_rows(
     matched: list[tuple[int, str, str, int, str, dict[str, str]]] = []
     seen_required: set[str] = set()
     for row in sheet_rows:
-        paper_case = row.values["paper_case"]
+        paper_case = PAPER_CASE_LOOKUP.get(_normalize_name(row.values["paper_case"]))
+        if paper_case is None:
+            continue
         mapping = required_aliases.get(paper_case)
         if mapping is None:
             continue

@@ -15,7 +15,7 @@ Run the importer with an explicit paper-results path:
 ```bash
 python3 -m benchmarks.qec_code_random_window.import_paper_baselines \
   --cases benchmarks/qec_code_random_window/cases.full.toml \
-  --paper-results-dir /path/to/codeDistancePYPI/paper-results \
+  --paper-results-dir "/path/to/codeDistancePYPI/paper results" \
   --out /tmp/codeDistancePYPI-baselines.csv
 ```
 
