@@ -1,0 +1,51 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+description = "Fast smoke cases for qec-code random-window upper-bound evidence."
+
+[[cases]]
+case_id = "steane_smoke"
+code_id = "steane"
+distance_side = "any"
+iterations = 500
+restarts = 4
+seed = 7
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:steane"
+baseline_required = false
+
+[[cases]]
+case_id = "surface_rotated_d3_smoke"
+code_id = "surface_rotated:d=3"
+distance_side = "any"
+iterations = 500
+restarts = 4
+seed = 7
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:surface_rotated_d3"
+baseline_required = false
+
+[[cases]]
+case_id = "toric_d3_smoke"
+code_id = "toric:d=3"
+distance_side = "any"
+iterations = 500
+restarts = 4
+seed = 7
+target_weight = 3
+target_upper_bound = 3
+baseline_key = "unmapped:toric_d3"
+baseline_required = false
+
+[[cases]]
+case_id = "bb72_smoke"
+code_id = "bb72"
+distance_side = "any"
+iterations = 5000
+restarts = 8
+seed = 7
+target_weight = 6
+target_upper_bound = 6
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+baseline_required = true
