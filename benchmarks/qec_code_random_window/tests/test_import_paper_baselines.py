@@ -104,6 +104,17 @@ def run_importer(
 
 
 class ImportPaperBaselinesTest(unittest.TestCase):
+    def test_readme_documents_external_data_setup(self) -> None:
+        readme = (
+            ROOT / "benchmarks" / "qec_code_random_window" / "README.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("https://github.com/m-webster/codeDistancePYPI", readme)
+        self.assertIn("paper results", readme)
+        self.assertIn("openpyxl", readme)
+        self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", readme)
+        self.assertIn("unmapped", readme)
+
     def test_selected_workbook_and_alias_headers_convert(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
