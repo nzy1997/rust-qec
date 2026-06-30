@@ -272,6 +272,74 @@ baseline_required = true
                 markdown,
             )
 
+    def test_duplicate_seed_rows_are_rejected_for_targeted_case(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            manifest.write_text(
+                """
+manifest_version = 1
+suite = "qec_code_random_window"
+
+[[cases]]
+case_id = "target_case"
+code_id = "surface_rotated:d=5"
+distance_side = "any"
+iterations = 20
+restarts = 2
+seed = 11
+target_weight = 5
+target_upper_bound = 5
+baseline_key = "unmapped:target"
+baseline_required = false
+""".lstrip(),
+                encoding="utf-8",
+            )
+            runs.write_text(
+                "".join(
+                    json.dumps(
+                        {
+                            "case_id": "target_case",
+                            "status": "ok",
+                            "seed": 11,
+                            "iterations": 20,
+                            "restarts": 2,
+                            "target_weight": 5,
+                            "upper_bound": 5,
+                            "elapsed_s": 1.0,
+                        }
+                    )
+                    + "\n"
+                    for _ in range(2)
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "benchmarks.qec_code_random_window.summarize",
+                    "--cases",
+                    str(manifest),
+                    "--runs",
+                    str(runs),
+                    "--out-dir",
+                    str(out_dir),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("target_case", result.stderr)
+            self.assertIn('field "seed"', result.stderr)
+            self.assertIn("11", result.stderr)
+
     def test_summary_markdown_has_manifest_rows_and_zero_success_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = Path(tmp)

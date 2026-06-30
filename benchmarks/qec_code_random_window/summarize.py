@@ -320,7 +320,7 @@ def _validate_case_rows(case: dict[str, Any], rows: list[dict[str, Any]]) -> set
             duplicate_seeds.add(seed)
         seen_seeds.add(seed)
 
-    if duplicate_seeds and case.get("target_weight") is None:
+    if duplicate_seeds:
         raise SummaryError(
             f'case "{case_id}" field "seed" has duplicate attempted row(s): '
             f"{_format_seed_set(duplicate_seeds)}"
