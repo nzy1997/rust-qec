@@ -42,16 +42,18 @@ if mode == "non_json":
     print("not json")
     sys.exit(0)
 
+target_weight = value_after("--target-weight")
+upper_bound = int(target_weight or os.environ.get("FAKE_QEC_CODE_UPPER_BOUND", "3"))
 payload = {
     "status": "completed",
     "method": "random-window-upper-bound",
     "bound_type": "upper",
-    "upper_bound": int(value_after("--target-weight") or "3"),
+    "upper_bound": upper_bound,
     "options": {
         "iterations": int(value_after("--iterations") or "0"),
         "restarts": int(value_after("--restarts") or "0"),
         "seed": int(value_after("--seed") or "0"),
-        "target_weight": int(value_after("--target-weight") or "0"),
+        "target_weight": None if target_weight is None else int(target_weight),
     },
 }
 
@@ -90,6 +92,33 @@ baseline_required = false
     )
 
 
+def write_no_target_manifest(path: Path, code_ids: list[str]) -> None:
+    cases = []
+    for index, code_id in enumerate(code_ids, start=1):
+        cases.append(
+            f'''
+[[cases]]
+case_id = "case_{index}"
+code_id = "{code_id}"
+distance_side = "any"
+iterations = 10
+restarts = 2
+seed = 5
+target_upper_bound = 3
+baseline_key = "unmapped:case_{index}"
+baseline_required = false
+'''.strip()
+        )
+
+    path.write_text(
+        'manifest_version = 1\n'
+        'suite = "qec_code_random_window"\n\n'
+        + "\n\n".join(cases)
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def read_jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
@@ -113,8 +142,12 @@ class RunLocalTest(unittest.TestCase):
         *extra_args: str,
         mode: str = "ok",
         code_ids: list[str] | None = None,
+        no_target_manifest: bool = False,
     ) -> subprocess.CompletedProcess[str]:
-        write_manifest(self.manifest, code_ids or ["steane", "surface_rotated:d=3"])
+        if no_target_manifest:
+            write_no_target_manifest(self.manifest, code_ids or ["steane", "surface_rotated:d=3"])
+        else:
+            write_manifest(self.manifest, code_ids or ["steane", "surface_rotated:d=3"])
         env = os.environ.copy()
         env["FAKE_QEC_CODE_INVOCATIONS"] = str(self.invocations)
         env["FAKE_QEC_CODE_MODE"] = mode
@@ -209,6 +242,41 @@ class RunLocalTest(unittest.TestCase):
         self.assertEqual(rows[0]["status"], "missing_upper_bound")
         self.assertIsNone(rows[0]["upper_bound"])
         self.assertEqual(rows[0]["raw_cli_json"]["status"], "completed")
+
+    def test_case_without_target_weight_omits_cli_flag_and_records_null_target(self) -> None:
+        result = self.run_runner(
+            "--build-profile",
+            "release",
+            code_ids=["steane"],
+            no_target_manifest=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = read_jsonl(self.out)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["status"], "ok")
+        self.assertIsNone(row["target_weight"])
+        self.assertEqual(row["build_profile"], "release")
+        self.assertIsNone(row["raw_cli_json"]["options"]["target_weight"])
+
+        invocations = read_jsonl(self.invocations)
+        argv = invocations[0]["argv"]
+        self.assertNotIn("--target-weight", argv)
+
+    def test_target_weight_override_still_adds_cli_flag_for_no_target_manifest(self) -> None:
+        result = self.run_runner(
+            "--target-weight",
+            "3",
+            code_ids=["steane"],
+            no_target_manifest=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        row = read_jsonl(self.out)[0]
+        self.assertEqual(row["target_weight"], 3)
+        argv = read_jsonl(self.invocations)[0]["argv"]
+        self.assertEqual(argv[argv.index("--target-weight") + 1], "3")
 
 
 if __name__ == "__main__":

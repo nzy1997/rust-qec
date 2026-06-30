@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -7,8 +7,10 @@ SED_I := sed -i$(shell if [ "$$(uname)" = "Darwin" ]; then echo " ''"; fi)
 QEC_CODE_RANDOM_WINDOW_OUT ?= benchmarks/out/qec_code_random_window
 QEC_CODE_RANDOM_WINDOW_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/smoke
 QEC_CODE_RANDOM_WINDOW_FULL_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/full
+QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-smoke
 QEC_CODE_RANDOM_WINDOW_SMOKE_CASES := benchmarks/qec_code_random_window/cases.smoke.toml
 QEC_CODE_RANDOM_WINDOW_FULL_CASES := benchmarks/qec_code_random_window/cases.full.toml
+QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES := benchmarks/qec_code_random_window/cases.no-target-smoke.toml
 QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER := case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row
 
 help:
@@ -25,6 +27,7 @@ help:
 	@echo "  bb-circuit-bposd-compare-full - Run the full BB72/BB144 batched compare suite"
 	@echo "  qec-code-random-window-bench-smoke - Run qec-code random-window smoke evidence pipeline"
 	@echo "  qec-code-random-window-bench-full  - Run qec-code random-window full pipeline using CODEDISTANCE_PAPER_RESULTS_DIR"
+	@echo "  qec-code-random-window-bench-no-target-smoke - Run release/no-target random-window fixed-budget smoke"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -96,6 +99,14 @@ qec-code-random-window-bench-full:
 	# CODEDISTANCE_PAPER_RESULTS_DIR controls paper baseline import source
 	python3 -m benchmarks.qec_code_random_window.import_paper_baselines --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv
 	python3 -m benchmarks.qec_code_random_window.compare_paper --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --local-summary $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary/summary.csv --paper-baselines $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/paper-baselines.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/comparison --strict-baselines
+
+qec-code-random-window-bench-no-target-smoke:
+	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
+	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
+	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)
+	cargo build --release -p qec-code
+	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
+	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/summary
 
 # Release a new version: make release V=0.2.0
 release:

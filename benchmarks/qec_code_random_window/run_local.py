@@ -59,11 +59,29 @@ def _case_int(case: dict[str, Any], field: str) -> int:
     return value
 
 
+def _case_optional_int(case: dict[str, Any], field: str) -> int | None:
+    value = case.get(field)
+    if value is None:
+        return None
+    if type(value) is not int:
+        raise TypeError(f'{case["case_id"]} field "{field}" must be an integer')
+    return value
+
+
 def _case_str(case: dict[str, Any], field: str) -> str:
     value = case[field]
     if not isinstance(value, str):
         raise TypeError(f'{case["case_id"]} field "{field}" must be a string')
     return value
+
+
+def _infer_build_profile(qec_code_bin: str) -> str:
+    normalized = qec_code_bin.replace("\\", "/")
+    if "/target/release/" in f"/{normalized}" or normalized.startswith("target/release/"):
+        return "release"
+    if "/target/debug/" in f"/{normalized}" or normalized.startswith("target/debug/"):
+        return "debug"
+    return "custom"
 
 
 def _build_command(
@@ -72,9 +90,9 @@ def _build_command(
     seed: int,
     iterations: int,
     restarts: int,
-    target_weight: int,
+    target_weight: int | None,
 ) -> list[str]:
-    return [
+    command = [
         qec_code_bin,
         "code",
         "css-distance",
@@ -87,10 +105,11 @@ def _build_command(
         str(restarts),
         "--seed",
         str(seed),
-        "--target-weight",
-        str(target_weight),
         "--json",
     ]
+    if target_weight is not None:
+        command.extend(["--target-weight", str(target_weight)])
+    return command
 
 
 def _row_prefix(
@@ -99,7 +118,8 @@ def _row_prefix(
     seed: int,
     iterations: int,
     restarts: int,
-    target_weight: int,
+    target_weight: int | None,
+    build_profile: str,
     elapsed_s: float,
 ) -> dict[str, Any]:
     return {
@@ -110,6 +130,7 @@ def _row_prefix(
         "iterations": iterations,
         "restarts": restarts,
         "target_weight": target_weight,
+        "build_profile": build_profile,
         "target_upper_bound": case.get("target_upper_bound"),
         "baseline_key": case.get("baseline_key"),
         "baseline_required": case.get("baseline_required"),
@@ -182,10 +203,11 @@ def _classify_completed(
 def _run_case_seed(
     case: dict[str, Any],
     qec_code_bin: str,
+    build_profile: str,
     seed: int,
     iterations: int,
     restarts: int,
-    target_weight: int,
+    target_weight: int | None,
 ) -> dict[str, Any]:
     command = _build_command(
         qec_code_bin,
@@ -207,7 +229,16 @@ def _run_case_seed(
         elapsed_s = time.perf_counter() - start
     except OSError as error:
         elapsed_s = time.perf_counter() - start
-        row = _row_prefix(case, command, seed, iterations, restarts, target_weight, elapsed_s)
+        row = _row_prefix(
+            case,
+            command,
+            seed,
+            iterations,
+            restarts,
+            target_weight,
+            build_profile,
+            elapsed_s,
+        )
         row["status"] = "spawn_error"
         row["returncode"] = None
         row["error"] = str(error)
@@ -215,7 +246,16 @@ def _run_case_seed(
         row["stderr_context"] = ""
         return row
 
-    row = _row_prefix(case, command, seed, iterations, restarts, target_weight, elapsed_s)
+    row = _row_prefix(
+        case,
+        command,
+        seed,
+        iterations,
+        restarts,
+        target_weight,
+        build_profile,
+        elapsed_s,
+    )
     return _classify_completed(row, completed)
 
 
@@ -234,6 +274,7 @@ def run(args: argparse.Namespace) -> int:
 
     cases = manifest["cases"]
     qec_code_bin = args.qec_code_bin or _default_qec_code_bin()
+    build_profile = args.build_profile or _infer_build_profile(qec_code_bin)
     rows_ok = True
 
     try:
@@ -257,13 +298,14 @@ def run(args: argparse.Namespace) -> int:
                 target_weight = (
                     args.target_weight
                     if args.target_weight is not None
-                    else _case_int(case, "target_weight")
+                    else _case_optional_int(case, "target_weight")
                 )
 
                 for seed in seeds:
                     row = _run_case_seed(
                         case,
                         qec_code_bin,
+                        build_profile,
                         seed,
                         iterations,
                         restarts,
@@ -291,6 +333,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--target-weight",
         type=_positive_int,
         help="Override manifest target_weight.",
+    )
+    parser.add_argument(
+        "--build-profile",
+        choices=("debug", "release", "custom"),
+        help="Build profile label recorded in output rows. Defaults to the qec-code path shape.",
     )
     parser.add_argument(
         "--qec-code-bin",

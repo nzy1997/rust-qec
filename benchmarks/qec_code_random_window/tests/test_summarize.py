@@ -159,6 +159,85 @@ class SummarizeTest(unittest.TestCase):
             self.assertEqual(target_row["run_seed_values"], "11;12;13")
             self.assertEqual(target_row["run_status_values"], "cli_error;ok")
 
+    def test_no_target_run_rows_summarize_with_blank_target_weight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            manifest.write_text(
+                """
+manifest_version = 1
+suite = "qec_code_random_window"
+
+[[cases]]
+case_id = "bb144_no_target_smoke"
+code_id = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 12
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb144"
+baseline_required = true
+""".lstrip(),
+                encoding="utf-8",
+            )
+            runs.write_text(
+                json.dumps(
+                    {
+                        "case_id": "bb144_no_target_smoke",
+                        "status": "ok",
+                        "seed": 7,
+                        "iterations": 500,
+                        "restarts": 1,
+                        "target_weight": None,
+                        "upper_bound": 12,
+                        "elapsed_s": 3.76,
+                        "build_profile": "release",
+                        "command": [
+                            "target/release/qec-code",
+                            "code",
+                            "css-distance",
+                            "random-window-upper-bound",
+                            "--code-id",
+                            "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0",
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "benchmarks.qec_code_random_window.summarize",
+                    "--cases",
+                    str(manifest),
+                    "--runs",
+                    str(runs),
+                    "--out-dir",
+                    str(out_dir),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            row = read_csv_rows(out_dir / "summary.csv")[0]
+            self.assertEqual(row["manifest_target_weight"], "")
+            self.assertEqual(row["run_target_weight_values"], "")
+            self.assertEqual(row["best_upper_bound"], "12")
+            markdown = (out_dir / "summary.md").read_text(encoding="utf-8")
+            self.assertIn(
+                "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | note |",
+                markdown,
+            )
+
     def test_summary_markdown_has_manifest_rows_and_zero_success_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out_dir = Path(tmp)
