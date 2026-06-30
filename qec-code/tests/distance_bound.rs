@@ -6,7 +6,8 @@ use qec_code::distance_bound::{
     validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
     verify_issue_225_ladder_case, BoundType, BoundValidationContext, DistanceBoundMethod,
     DistanceBoundProvenance, DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness,
-    Issue225LadderCase, RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions,
+    Issue225LadderCase, RandomWindowSearchStats, RandomWindowUpperBoundOptions,
+    RandomizedUpperBoundOptions,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
 use std::time::{Duration, Instant};
@@ -334,6 +335,66 @@ fn random_window_upper_bound_returns_best_witness_after_exhausting_iterations() 
 }
 
 #[test]
+fn random_window_upper_bound_reports_search_stats() {
+    let css = css_from_built_in_code_id("surface_rotated:d=5");
+    let target_result = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 20,
+            restarts: 2,
+            seed: 7,
+            target_weight: Some(5),
+        },
+    )
+    .unwrap();
+
+    let json = serde_json::to_value(&target_result).unwrap();
+    let search_stats = json["search_stats"]
+        .as_object()
+        .expect("random-window result should serialize search_stats");
+    for field in [
+        "permutations_sampled",
+        "kernel_basis_generations",
+        "component_candidates_generated",
+        "zero_candidates_rejected",
+        "stabilizer_span_candidates_rejected",
+        "witness_validation_candidates_rejected",
+        "valid_witnesses_found",
+        "best_witness_updates",
+    ] {
+        assert!(
+            search_stats[field].as_u64().is_some(),
+            "{field} should serialize as a non-negative integer"
+        );
+    }
+
+    let stats = target_result
+        .search_stats
+        .expect("random-window result should carry stats");
+    assert!(stats.permutations_sampled > 0);
+    assert!(stats.component_candidates_generated >= stats.valid_witnesses_found);
+    assert!(stats.component_candidates_generated >= stats.best_witness_updates);
+    assert!(stats.valid_witnesses_found >= stats.best_witness_updates);
+    assert!(stats.target_reached);
+
+    let no_target = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 2,
+            restarts: 1,
+            seed: 7,
+            target_weight: None,
+        },
+    )
+    .unwrap();
+    let no_target_stats = no_target
+        .search_stats
+        .expect("random-window result should carry stats");
+    assert!(no_target_stats.permutations_sampled > 0);
+    assert!(!no_target_stats.target_reached);
+}
+
+#[test]
 fn completed_bound_result_serializes_with_upper_bound_contract() {
     let result = valid_result();
 
@@ -353,6 +414,7 @@ fn completed_bound_result_serializes_with_upper_bound_contract() {
     assert_eq!(json["options"]["target_weight"], serde_json::Value::Null);
     assert_eq!(json["provenance"]["tool"], "qec-code");
     assert_eq!(json["provenance"]["method_revision"], 1);
+    assert!(json.get("search_stats").is_none());
 }
 
 #[test]
@@ -375,6 +437,10 @@ fn random_window_upper_bound_result_serializes_contract() {
     assert_eq!(json["options"]["target_weight"], 1);
     assert_eq!(json["provenance"]["tool"], "qec-code");
     assert_eq!(json["provenance"]["method_revision"], 1);
+    assert_eq!(
+        json["search_stats"],
+        serde_json::to_value(RandomWindowSearchStats::default()).unwrap()
+    );
 }
 
 #[test]

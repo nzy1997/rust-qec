@@ -1502,6 +1502,7 @@ fn css_distance_randomized_upper_bound_code_id_outputs_json() {
     assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["upper_bound"], 3);
     assert_eq!(json["options"]["seed"], 7);
+    assert!(json.get("search_stats").is_none());
 }
 
 #[test]
@@ -1787,6 +1788,7 @@ fn css_distance_random_window_upper_bound_cli_contract() {
     assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["upper_bound"], 5);
     assert_eq!(json["witness"]["weight"], 5);
+    assert!(json["search_stats"].is_object());
 
     let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
     let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");

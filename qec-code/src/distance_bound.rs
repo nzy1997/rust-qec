@@ -145,6 +145,19 @@ impl DistanceBoundProvenance {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomWindowSearchStats {
+    pub permutations_sampled: usize,
+    pub kernel_basis_generations: usize,
+    pub component_candidates_generated: usize,
+    pub zero_candidates_rejected: usize,
+    pub stabilizer_span_candidates_rejected: usize,
+    pub witness_validation_candidates_rejected: usize,
+    pub valid_witnesses_found: usize,
+    pub best_witness_updates: usize,
+    pub target_reached: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DistanceBoundResult<Options = RandomizedUpperBoundOptions> {
     pub status: DistanceBoundStatus,
@@ -155,6 +168,8 @@ pub struct DistanceBoundResult<Options = RandomizedUpperBoundOptions> {
     pub witness: DistanceBoundWitness,
     pub options: Options,
     pub provenance: DistanceBoundProvenance,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_stats: Option<RandomWindowSearchStats>,
 }
 
 impl<Options> DistanceBoundResult<Options> {
@@ -174,6 +189,7 @@ impl<Options> DistanceBoundResult<Options> {
             witness,
             options,
             provenance: DistanceBoundProvenance::current(),
+            search_stats: None,
         }
     }
 }
@@ -202,13 +218,33 @@ impl DistanceBoundResult<RandomWindowUpperBoundOptions> {
         witness: DistanceBoundWitness,
         options: RandomWindowUpperBoundOptions,
     ) -> Self {
-        Self::completed_with_method(
+        let mut result = Self::completed_with_method(
             DistanceBoundMethod::RandomWindowUpperBound,
             upper_bound,
             logical_class,
             witness,
             options,
-        )
+        );
+        result.search_stats = Some(RandomWindowSearchStats::default());
+        result
+    }
+
+    fn completed_random_window_upper_bound_with_stats(
+        upper_bound: usize,
+        logical_class: LogicalClass,
+        witness: DistanceBoundWitness,
+        options: RandomWindowUpperBoundOptions,
+        stats: RandomWindowSearchStats,
+    ) -> Self {
+        let mut result = Self::completed_with_method(
+            DistanceBoundMethod::RandomWindowUpperBound,
+            upper_bound,
+            logical_class,
+            witness,
+            options,
+        );
+        result.search_stats = Some(stats);
+        result
     }
 }
 
@@ -287,10 +323,12 @@ pub fn random_window_css_upper_bound(
     let hz_span = gf2::try_rref_with_width(css.hz(), width)?;
     let mut rng = SplitMix64::new(options.seed);
     let mut best_witness: Option<Pauli> = None;
+    let mut search_stats = RandomWindowSearchStats::default();
 
     for _restart in 0..options.restarts {
         for _iteration in 0..options.iterations {
             let permutation = shuffled_columns(width, &mut rng);
+            search_stats.permutations_sampled += 1;
             consider_component_candidates(
                 css.hz(),
                 &hx_span,
@@ -300,12 +338,15 @@ pub fn random_window_css_upper_bound(
                 code,
                 &stabilizer_span,
                 &mut best_witness,
+                &mut search_stats,
             )?;
             if target_reached(&best_witness, options.target_weight) {
+                search_stats.target_reached = true;
                 return completed_random_window_upper_bound_result(
                     code,
                     best_witness.unwrap(),
                     options,
+                    search_stats,
                 );
             }
 
@@ -318,19 +359,22 @@ pub fn random_window_css_upper_bound(
                 code,
                 &stabilizer_span,
                 &mut best_witness,
+                &mut search_stats,
             )?;
             if target_reached(&best_witness, options.target_weight) {
+                search_stats.target_reached = true;
                 return completed_random_window_upper_bound_result(
                     code,
                     best_witness.unwrap(),
                     options,
+                    search_stats,
                 );
             }
         }
     }
 
     let witness = best_witness.ok_or(QecError::RandomizedUpperBoundWitnessNotFound)?;
-    completed_random_window_upper_bound_result(code, witness, options)
+    completed_random_window_upper_bound_result(code, witness, options, search_stats)
 }
 
 fn completed_randomized_upper_bound_result(
@@ -369,26 +413,34 @@ fn consider_component_candidates(
     code: &StabilizerCode,
     stabilizer_span: &gf2::ReducedRows,
     best_witness: &mut Option<Pauli>,
+    search_stats: &mut RandomWindowSearchStats,
 ) -> Result<()> {
+    search_stats.kernel_basis_generations += 1;
     let candidates =
         gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation)?;
+    search_stats.component_candidates_generated += candidates.len();
 
     for candidate in candidates {
         if !candidate.iter().any(|bit| *bit == 1) {
+            search_stats.zero_candidates_rejected += 1;
             continue;
         }
         if gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate)? {
+            search_stats.stabilizer_span_candidates_rejected += 1;
             continue;
         }
 
         let witness = component_candidate_to_pauli(component, candidate)?;
         if validate_witness_against_code_with_span(code, stabilizer_span, &witness).is_err() {
+            search_stats.witness_validation_candidates_rejected += 1;
             continue;
         }
+        search_stats.valid_witnesses_found += 1;
         if best_witness
             .as_ref()
             .is_none_or(|current| witness.weight() < current.weight())
         {
+            search_stats.best_witness_updates += 1;
             *best_witness = Some(witness);
         }
     }
@@ -423,12 +475,14 @@ fn completed_random_window_upper_bound_result(
     code: &StabilizerCode,
     witness: Pauli,
     options: RandomWindowUpperBoundOptions,
+    search_stats: RandomWindowSearchStats,
 ) -> Result<DistanceBoundResult<RandomWindowUpperBoundOptions>> {
-    let result = DistanceBoundResult::completed_random_window_upper_bound(
+    let result = DistanceBoundResult::completed_random_window_upper_bound_with_stats(
         witness.weight(),
         classify_witness_support(&witness),
         DistanceBoundWitness::from_pauli(&witness),
         options,
+        search_stats,
     );
     validate_random_window_upper_bound_result(
         &result,
