@@ -39,6 +39,25 @@ CSV_FIELDS = [
     "summary_status",
 ]
 
+SEARCH_STAT_INT_FIELDS = [
+    "permutations_sampled",
+    "kernel_basis_generations",
+    "component_candidates_generated",
+    "zero_candidates_rejected",
+    "stabilizer_span_candidates_rejected",
+    "witness_validation_candidates_rejected",
+    "valid_witnesses_found",
+    "best_witness_updates",
+]
+
+SEARCH_STAT_CSV_FIELDS = [
+    "search_stats_rows",
+    *(f"search_stats_total_{field}" for field in SEARCH_STAT_INT_FIELDS),
+    "search_stats_target_reached_count",
+]
+
+CSV_FIELDS = [*CSV_FIELDS[:-1], *SEARCH_STAT_CSV_FIELDS, CSV_FIELDS[-1]]
+
 
 class SummaryError(ValueError):
     """User-facing validation error for summary inputs."""
@@ -116,6 +135,43 @@ def _require_elapsed(row: dict[str, Any], location: str) -> float:
     return parsed
 
 
+def _validate_search_stats(row: dict[str, Any], location: str) -> dict[str, Any] | None:
+    raw_cli_json = row.get("raw_cli_json")
+    if raw_cli_json is None:
+        return None
+    if not isinstance(raw_cli_json, dict):
+        raise _fail(location, 'field "raw_cli_json" must be a JSON object when present')
+
+    search_stats = raw_cli_json.get("search_stats")
+    if search_stats is None:
+        return None
+    if not isinstance(search_stats, dict):
+        raise _fail(location, 'field "raw_cli_json.search_stats" must be a JSON object')
+
+    validated: dict[str, Any] = {}
+    for field in SEARCH_STAT_INT_FIELDS:
+        value = search_stats.get(field)
+        if not _is_int(value):
+            raise _fail(location, f"search_stats.{field} must be a non-negative integer")
+        if value < 0:
+            raise _fail(location, f"search_stats.{field} must be a non-negative integer")
+        validated[field] = value
+
+    target_reached = search_stats.get("target_reached")
+    if type(target_reached) is not bool:
+        raise _fail(location, "search_stats.target_reached must be a boolean")
+    validated["target_reached"] = target_reached
+
+    if validated["best_witness_updates"] > validated["component_candidates_generated"]:
+        raise _fail(
+            location,
+            "search_stats.best_witness_updates must be less than or equal to "
+            "search_stats.component_candidates_generated",
+        )
+
+    return validated
+
+
 def _validate_row(
     row: dict[str, Any],
     *,
@@ -161,6 +217,7 @@ def _validate_row(
     validated["restarts"] = restarts
     validated["target_weight"] = target_weight
     validated["elapsed_s"] = elapsed_s
+    validated["search_stats"] = _validate_search_stats(row, location)
     return validated
 
 
@@ -213,6 +270,9 @@ def _join_sorted(values: set[int | str]) -> str:
 
 def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, object]:
     successful = [row for row in rows if row["status"] == "ok"]
+    stats_rows = [
+        row["search_stats"] for row in successful if row.get("search_stats") is not None
+    ]
     target_upper_bound = case.get("target_upper_bound")
     best_upper_bound = min((row["upper_bound"] for row in successful), default=None)
     elapsed_values = [row["elapsed_s"] for row in successful]
@@ -227,6 +287,21 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         target_hit_rate = (
             f"{target_hit_count / len(successful):.6f}" if successful else None
         )
+
+    search_stat_summary = {
+        "search_stats_rows": len(stats_rows) if stats_rows else None,
+        **{
+            f"search_stats_total_{field}": sum(stats[field] for stats in stats_rows)
+            if stats_rows
+            else None
+            for field in SEARCH_STAT_INT_FIELDS
+        },
+        "search_stats_target_reached_count": sum(
+            1 for stats in stats_rows if stats["target_reached"]
+        )
+        if stats_rows
+        else None,
+    }
 
     return {
         "case_id": case["case_id"],
@@ -254,6 +329,7 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
             {row["target_weight"] for row in rows if row["target_weight"] is not None}
         ),
         "run_status_values": _join_sorted({row["status"] for row in rows}),
+        **search_stat_summary,
         "summary_status": "ok" if successful else "no_success",
     }
 
@@ -343,8 +419,8 @@ def write_summary_md(
         "",
         "## Case Summary",
         "",
-        "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | note |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | search_stats | note |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
 
     for summary in summaries:
@@ -364,9 +440,19 @@ def write_summary_md(
 
         best_upper_bound = summary["best_upper_bound"]
         best_text = "-" if best_upper_bound in {None, ""} else str(best_upper_bound)
+        if summary["search_stats_rows"] in {None, ""}:
+            search_stats_text = "-"
+        else:
+            search_stats_text = (
+                f"stats_rows={summary['search_stats_rows']}, "
+                f"permutations={summary['search_stats_total_permutations_sampled']}, "
+                f"candidates={summary['search_stats_total_component_candidates_generated']}, "
+                f"target_reached={summary['search_stats_target_reached_count']}"
+            )
         lines.append(
             "| {case_id} | {code_id} | {summary_status} | {attempted_seed_rows} | "
-            "{successful_seed_rows} | {best} | {target_upper_bound} | {elapsed} | {note} |".format(
+            "{successful_seed_rows} | {best} | {target_upper_bound} | {elapsed} | "
+            "{search_stats} | {note} |".format(
                 case_id=summary["case_id"],
                 code_id=summary["code_id"],
                 summary_status=summary["summary_status"],
@@ -375,6 +461,7 @@ def write_summary_md(
                 best=best_text,
                 target_upper_bound=target_upper_bound_text,
                 elapsed=elapsed_text,
+                search_stats=search_stats_text,
                 note=note,
             )
         )
