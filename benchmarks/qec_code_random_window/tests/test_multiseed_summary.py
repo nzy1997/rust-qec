@@ -264,6 +264,36 @@ class MultiSeedSummaryTest(unittest.TestCase):
             self.assertIn("observed 7;11", result.stderr)
             self.assertIn("missing 17", result.stderr)
 
+    def test_expected_seeds_reject_no_target_case_with_no_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            _write_manifest(manifest)
+            _write_jsonl(
+                runs,
+                [
+                    _row("bb72_no_target_smoke", 7, "ok", upper_bound=6, elapsed_s=1.0, target_upper_bound=6),
+                    _row("bb72_no_target_smoke", 11, "ok", upper_bound=7, elapsed_s=3.0, target_upper_bound=6),
+                    _row("bb72_no_target_smoke", 17, "ok", upper_bound=6, elapsed_s=2.0, target_upper_bound=6),
+                ],
+            )
+
+            result = self.run_summarizer(
+                manifest,
+                runs,
+                out_dir,
+                expected_seeds=[7, 11, 17],
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("bb144_no_target_smoke", result.stderr)
+            self.assertIn('field "seed"', result.stderr)
+            self.assertIn("7;11;17", result.stderr)
+            self.assertIn("observed none", result.stderr)
+            self.assertIn("missing 7;11;17", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

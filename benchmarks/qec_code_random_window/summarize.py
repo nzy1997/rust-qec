@@ -373,16 +373,21 @@ def _validate_multiseed_no_target_seed_sets(
     seed_sets_by_case: dict[str, set[int]],
     expected_seeds: list[int] | None = None,
 ) -> None:
-    no_target_seed_sets = {
-        case["case_id"]: seed_sets_by_case[case["case_id"]]
-        for case in cases
-        if case.get("target_weight") is None and seed_sets_by_case[case["case_id"]]
-    }
-    if not no_target_seed_sets:
-        return
     if expected_seeds is not None and len(expected_seeds) > 1:
+        no_target_seed_sets = {
+            case["case_id"]: seed_sets_by_case[case["case_id"]]
+            for case in cases
+            if case.get("target_weight") is None
+        }
         expected = set(expected_seeds)
     else:
+        no_target_seed_sets = {
+            case["case_id"]: seed_sets_by_case[case["case_id"]]
+            for case in cases
+            if case.get("target_weight") is None and seed_sets_by_case[case["case_id"]]
+        }
+        if not no_target_seed_sets:
+            return
         expected = max(no_target_seed_sets.values(), key=lambda values: (len(values), sorted(values)))
     if len(expected) <= 1:
         return
@@ -396,7 +401,7 @@ def _validate_multiseed_no_target_seed_sets(
             if extra:
                 details.append(f"extra {_format_seed_set(extra)}")
             expected_text = _format_seed_set(expected)
-            observed_text = _format_seed_set(observed)
+            observed_text = _format_seed_set(observed) or "none"
             rule = "must exactly match expected seed set" if expected_seeds is not None else "must include observed multi-seed set"
             raise SummaryError(
                 f'case "{case_id}" field "seed" {rule} '
