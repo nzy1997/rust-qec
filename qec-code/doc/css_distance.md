@@ -66,6 +66,17 @@ A completed random-window run has this shape:
     "tool": "qec-code",
     "tool_version": "0.1.0",
     "method_revision": 1
+  },
+  "search_stats": {
+    "permutations_sampled": 1,
+    "kernel_basis_generations": 1,
+    "component_candidates_generated": 1,
+    "zero_candidates_rejected": 0,
+    "stabilizer_span_candidates_rejected": 0,
+    "witness_validation_candidates_rejected": 0,
+    "valid_witnesses_found": 1,
+    "best_witness_updates": 1,
+    "target_reached": true
   }
 }
 ```
@@ -80,6 +91,10 @@ A completed random-window run has this shape:
 - `witness`: the Pauli support and its `weight`.
 - `options`: the effective randomized-search options.
 - `provenance`: the emitting tool version and method revision.
+- `search_stats`: random-window diagnostic counters for sampled permutations,
+  kernel basis generations, generated component candidates, rejection reasons,
+  valid witnesses, best-witness updates, and whether `target_weight` ended the
+  run early.
 
 When `bound_type: "upper"` appears in this JSON, the value is an upper bound from a randomized search, not a certified exact distance. Treat `upper_bound` as evidence that a logical operator of that weight was found; do not treat it as a proof that no lower-weight logical operator exists.
 
