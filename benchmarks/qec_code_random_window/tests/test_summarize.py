@@ -81,6 +81,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "10",
                         "run_restarts_values": "2",
                         "run_target_weight_values": "5",
+                        "run_build_profile_values": "",
                         "run_status_values": "cli_error;ok",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -117,6 +118,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "20",
                         "run_restarts_values": "1",
                         "run_target_weight_values": "3",
+                        "run_build_profile_values": "",
                         "run_status_values": "cli_error",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -153,6 +155,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "",
                         "run_restarts_values": "",
                         "run_target_weight_values": "",
+                        "run_build_profile_values": "",
                         "run_status_values": "",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -261,10 +264,11 @@ baseline_required = true
             row = read_csv_rows(out_dir / "summary.csv")[0]
             self.assertEqual(row["manifest_target_weight"], "")
             self.assertEqual(row["run_target_weight_values"], "")
+            self.assertEqual(row["run_build_profile_values"], "release")
             self.assertEqual(row["best_upper_bound"], "12")
             markdown = (out_dir / "summary.md").read_text(encoding="utf-8")
             self.assertIn(
-                "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | search_stats | note |",
+                "| case_id | code_id | status | attempted | successful | observed_seeds | best_upper_bound | target_upper_bound | target_hits | elapsed_s | target_weight | build_profile | search_stats | note |",
                 markdown,
             )
 
