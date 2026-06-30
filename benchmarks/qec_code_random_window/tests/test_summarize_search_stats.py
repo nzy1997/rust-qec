@@ -133,7 +133,33 @@ baseline_required = false
             self.assertIn("permutations=5", markdown)
             self.assertIn("target_reached=1", markdown)
 
-    def test_rejects_inconsistent_or_negative_counters(self) -> None:
+    def test_rejects_valid_witnesses_found_above_component_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            self.write_manifest(manifest)
+            bad_stats = {
+                "permutations_sampled": 1,
+                "kernel_basis_generations": 1,
+                "component_candidates_generated": 1,
+                "zero_candidates_rejected": 0,
+                "stabilizer_span_candidates_rejected": 0,
+                "witness_validation_candidates_rejected": 0,
+                "valid_witnesses_found": 2,
+                "best_witness_updates": 1,
+                "target_reached": False,
+            }
+            runs.write_text(json.dumps(self.row(stats=bad_stats)) + "\n", encoding="utf-8")
+
+            result = self.run_summarizer(manifest, runs, out_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("search_stats.valid_witnesses_found", result.stderr)
+            self.assertIn("search_stats.component_candidates_generated", result.stderr)
+
+    def test_rejects_best_witness_updates_above_component_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             manifest = tmp_path / "cases.toml"
@@ -159,6 +185,58 @@ baseline_required = false
             self.assertIn("search_stats.best_witness_updates", result.stderr)
             self.assertIn("search_stats.component_candidates_generated", result.stderr)
 
+    def test_rejects_best_witness_updates_above_valid_witnesses(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            self.write_manifest(manifest)
+            bad_stats = {
+                "permutations_sampled": 1,
+                "kernel_basis_generations": 1,
+                "component_candidates_generated": 3,
+                "zero_candidates_rejected": 0,
+                "stabilizer_span_candidates_rejected": 0,
+                "witness_validation_candidates_rejected": 0,
+                "valid_witnesses_found": 1,
+                "best_witness_updates": 2,
+                "target_reached": False,
+            }
+            runs.write_text(json.dumps(self.row(stats=bad_stats)) + "\n", encoding="utf-8")
+
+            result = self.run_summarizer(manifest, runs, out_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("search_stats.best_witness_updates", result.stderr)
+            self.assertIn("search_stats.valid_witnesses_found", result.stderr)
+
+    def test_rejects_non_boolean_target_reached(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            self.write_manifest(manifest)
+            bad_stats = {
+                "permutations_sampled": 1,
+                "kernel_basis_generations": 1,
+                "component_candidates_generated": 1,
+                "zero_candidates_rejected": 0,
+                "stabilizer_span_candidates_rejected": 0,
+                "witness_validation_candidates_rejected": 0,
+                "valid_witnesses_found": 1,
+                "best_witness_updates": 1,
+                "target_reached": "yes",
+            }
+            runs.write_text(json.dumps(self.row(stats=bad_stats)) + "\n", encoding="utf-8")
+
+            result = self.run_summarizer(manifest, runs, out_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("search_stats.target_reached", result.stderr)
+
+    def test_rejects_negative_counters(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             manifest = tmp_path / "cases.toml"

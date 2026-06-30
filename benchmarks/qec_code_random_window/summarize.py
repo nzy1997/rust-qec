@@ -162,11 +162,25 @@ def _validate_search_stats(row: dict[str, Any], location: str) -> dict[str, Any]
         raise _fail(location, "search_stats.target_reached must be a boolean")
     validated["target_reached"] = target_reached
 
+    if validated["valid_witnesses_found"] > validated["component_candidates_generated"]:
+        raise _fail(
+            location,
+            "search_stats.valid_witnesses_found must be less than or equal to "
+            "search_stats.component_candidates_generated",
+        )
+
     if validated["best_witness_updates"] > validated["component_candidates_generated"]:
         raise _fail(
             location,
             "search_stats.best_witness_updates must be less than or equal to "
             "search_stats.component_candidates_generated",
+        )
+
+    if validated["best_witness_updates"] > validated["valid_witnesses_found"]:
+        raise _fail(
+            location,
+            "search_stats.best_witness_updates must be less than or equal to "
+            "search_stats.valid_witnesses_found",
         )
 
     return validated
