@@ -261,6 +261,59 @@ baseline_required = false
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("search_stats.permutations_sampled", result.stderr)
 
+    def test_rejects_inconsistent_or_negative_counters(self) -> None:
+        cases = [
+            (
+                {
+                    "permutations_sampled": 1,
+                    "kernel_basis_generations": 1,
+                    "component_candidates_generated": 1,
+                    "zero_candidates_rejected": 0,
+                    "stabilizer_span_candidates_rejected": 0,
+                    "witness_validation_candidates_rejected": 0,
+                    "valid_witnesses_found": 1,
+                    "best_witness_updates": 2,
+                    "target_reached": False,
+                },
+                [
+                    "search_stats.best_witness_updates",
+                    "search_stats.component_candidates_generated",
+                ],
+            ),
+            (
+                {
+                    "permutations_sampled": -1,
+                    "kernel_basis_generations": 1,
+                    "component_candidates_generated": 1,
+                    "zero_candidates_rejected": 0,
+                    "stabilizer_span_candidates_rejected": 0,
+                    "witness_validation_candidates_rejected": 0,
+                    "valid_witnesses_found": 1,
+                    "best_witness_updates": 1,
+                    "target_reached": False,
+                },
+                ["search_stats.permutations_sampled"],
+            ),
+        ]
+        for bad_stats, expected_stderr in cases:
+            with self.subTest(expected_stderr=expected_stderr):
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    manifest = tmp_path / "cases.toml"
+                    runs = tmp_path / "runs.jsonl"
+                    out_dir = tmp_path / "summary"
+                    self.write_manifest(manifest)
+                    runs.write_text(
+                        json.dumps(self.row(stats=bad_stats)) + "\n",
+                        encoding="utf-8",
+                    )
+
+                    result = self.run_summarizer(manifest, runs, out_dir)
+
+                    self.assertNotEqual(result.returncode, 0)
+                    for expected in expected_stderr:
+                        self.assertIn(expected, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
