@@ -1,14 +1,19 @@
 # QEC Random Window Benchmark Baselines
 
-The benchmark suite has three local entry points:
+The benchmark suite has four local entry points:
 
 - `make qec-code-random-window-bench-smoke` runs a cheap debug-built wiring
   check with known `target_weight` values.
 - `make qec-code-random-window-bench-full` runs the known-target reproduction
   path and imports strict paper baselines from `CODEDISTANCE_PAPER_RESULTS_DIR`.
 - `make qec-code-random-window-bench-no-target-smoke` builds
-  `target/release/qec-code` and runs BB72/BB144 without `--target-weight`, so
-  the fixed-budget timing is not confused with early-stop reproduction timing.
+  `target/release/qec-code` and runs the BB72/BB144 smoke cases without
+  `--target-weight`, so fixed-budget throughput timing is separated from
+  early-stop reproduction timing.
+- `make qec-code-random-window-bench-no-target-ladder-smoke` builds
+  `target/release/qec-code` and runs the issue-225 ladder of
+  `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144` without `--target-weight`,
+  and writes outputs to `benchmarks/out/qec_code_random_window/no-target-ladder-smoke/`.
 
 This benchmark can import external paper results from
 `https://github.com/m-webster/codeDistancePYPI`.

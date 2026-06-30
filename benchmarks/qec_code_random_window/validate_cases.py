@@ -20,6 +20,12 @@ REQUIRED_CASE_FIELDS = {
     "baseline_key",
     "baseline_required",
 }
+NO_TARGET_LADDER_REQUIRED_CASE_IDS = {
+    "surface_rotated_d5",
+    "toric_d5",
+    "bb72",
+    "bb144",
+}
 
 
 def _is_int(value: object) -> bool:
@@ -134,6 +140,36 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     return errors
 
 
+def validate_no_target_ladder_manifest(
+    manifest: dict[str, Any],
+    required_case_ids: set[str] | None = None,
+) -> list[str]:
+    errors = validate_manifest(manifest)
+    cases = manifest.get("cases")
+    if not isinstance(cases, list):
+        return errors
+
+    required = required_case_ids or NO_TARGET_LADDER_REQUIRED_CASE_IDS
+    present = {
+        raw_case.get("case_id")
+        for raw_case in cases
+        if isinstance(raw_case, dict) and isinstance(raw_case.get("case_id"), str)
+    }
+    for missing_case_id in sorted(required - present):
+        errors.append(f'no-target ladder manifest missing required case "{missing_case_id}"')
+
+    for index, raw_case in enumerate(cases):
+        if not isinstance(raw_case, dict):
+            continue
+        case_id = raw_case.get("case_id")
+        case_label = f'case "{case_id}"' if isinstance(case_id, str) else f"case[{index}]"
+        if "target_weight" in raw_case:
+            errors.append(
+                f'{case_label} must omit field "target_weight" for no-target ladder runs'
+            )
+    return errors
+
+
 def load_manifest(path: Path) -> dict[str, Any]:
     with path.open("rb") as handle:
         manifest = tomllib.load(handle)
@@ -145,6 +181,11 @@ def load_manifest(path: Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate qec-code random-window case manifests.")
     parser.add_argument("manifest", type=Path)
+    parser.add_argument(
+        "--no-target-ladder-smoke",
+        action="store_true",
+        help="Require no-target issue-225 ladder smoke semantics.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -153,7 +194,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.manifest}: {error}", file=sys.stderr)
         return 1
 
-    errors = validate_manifest(manifest)
+    if args.no_target_ladder_smoke:
+        errors = validate_no_target_ladder_manifest(manifest)
+    else:
+        errors = validate_manifest(manifest)
     if errors:
         for error in errors:
             print(f"{args.manifest}: {error}", file=sys.stderr)

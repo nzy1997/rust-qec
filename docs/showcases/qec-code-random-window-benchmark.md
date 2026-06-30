@@ -19,8 +19,12 @@ algorithm.
 
 The known-target smoke/full targets pass `--target-weight`, so their elapsed
 times answer the reproduction question: how quickly the run finds a known bound.
-The release/no-target target omits `--target-weight`, so its elapsed time
+The release/no-target targets omit `--target-weight`, so their elapsed time
 answers a fixed-budget throughput question for the selected release binary.
+The BB-only target (`no-target-smoke`) only runs BB72 and BB144.
+The ladder variant runs `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144`
+so the same fixed-budget/no-target settings are exercised across a 4-case
+issue-225 ladder profile.
 
 ## Run It
 
@@ -42,6 +46,12 @@ spreadsheets separately:
 ```sh
 CODEDISTANCE_PAPER_RESULTS_DIR=/path/to/codeDistancePYPI/paper-results \
   make qec-code-random-window-bench-full
+```
+
+Run the release/no-target ladder smoke pipeline:
+
+```sh
+make qec-code-random-window-bench-no-target-ladder-smoke
 ```
 
 ## Expected Result
@@ -78,6 +88,12 @@ writes JSONL plus summary artifacts under
 `benchmarks/out/qec_code_random_window/no-target-smoke/`. Each JSONL row records
 `build_profile = "release"` and `target_weight = null`.
 
+The release/no-target-ladder target validates
+`benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml`, builds
+`target/release/qec-code`, runs `surface_rotated_d5`, `toric_d5`, `bb72`, and
+`bb144` without `--target-weight`, and writes JSONL plus summary artifacts under
+`benchmarks/out/qec_code_random_window/no-target-ladder-smoke/`.
+
 ## Code
 
 Pipeline entry points and generated-output policy:
@@ -90,6 +106,7 @@ Random-window benchmark modules and manifests:
 - [`benchmarks/qec_code_random_window/cases.smoke.toml`](benchmarks/qec_code_random_window/cases.smoke.toml)
 - [`benchmarks/qec_code_random_window/cases.full.toml`](benchmarks/qec_code_random_window/cases.full.toml)
 - [`benchmarks/qec_code_random_window/cases.no-target-smoke.toml`](benchmarks/qec_code_random_window/cases.no-target-smoke.toml)
+- [`benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml`](benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml)
 - [`benchmarks/qec_code_random_window/validate_cases.py`](benchmarks/qec_code_random_window/validate_cases.py)
 - [`benchmarks/qec_code_random_window/run_local.py`](benchmarks/qec_code_random_window/run_local.py)
 - [`benchmarks/qec_code_random_window/summarize.py`](benchmarks/qec_code_random_window/summarize.py)
@@ -110,6 +127,16 @@ Run the release/no-target smoke target:
 ```sh
 make qec-code-random-window-bench-no-target-smoke
 ```
+
+Run the release/no-target-ladder smoke target:
+
+```sh
+make qec-code-random-window-bench-no-target-ladder-smoke
+```
+
+Confirm ladder artifacts exist under
+`benchmarks/out/qec_code_random_window/no-target-ladder-smoke/` with
+`local-runs.jsonl` and `summary/summary.csv`.
 
 Confirm `local-runs.jsonl` shows `target_weight` as `null` and
 `build_profile` as `release`.
