@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_DIR = ROOT / "benchmarks" / "qec_code_random_window"
 SMOKE_MANIFEST = PACKAGE_DIR / "cases.smoke.toml"
 FULL_MANIFEST = PACKAGE_DIR / "cases.full.toml"
+NO_TARGET_SMOKE_MANIFEST = PACKAGE_DIR / "cases.no-target-smoke.toml"
 FIXTURES = PACKAGE_DIR / "tests" / "fixtures"
 BB144_CODE_ID = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"
 
@@ -52,6 +53,13 @@ class ValidateCasesTest(unittest.TestCase):
 
     def test_full_manifest_cli_prints_pass(self) -> None:
         result = run_validator(FULL_MANIFEST)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "PASS\n")
+        self.assertEqual(result.stderr, "")
+
+    def test_no_target_smoke_manifest_cli_prints_pass(self) -> None:
+        result = run_validator(NO_TARGET_SMOKE_MANIFEST)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "PASS\n")
@@ -108,6 +116,30 @@ class ValidateCasesTest(unittest.TestCase):
             cases["bb144_full"]["baseline_key"],
             "codeDistancePYPI:bivariate_bicycle:bb144",
         )
+
+    def test_no_target_smoke_manifest_omits_target_weight_for_bb_cases(self) -> None:
+        cases = cases_by_id(NO_TARGET_SMOKE_MANIFEST)
+
+        self.assertEqual(
+            tuple(cases),
+            (
+                "bb72_no_target_smoke",
+                "bb144_no_target_smoke",
+            ),
+        )
+        self.assertEqual(cases["bb72_no_target_smoke"]["code_id"], "bb72")
+        self.assertEqual(cases["bb72_no_target_smoke"]["iterations"], 500)
+        self.assertEqual(cases["bb72_no_target_smoke"]["restarts"], 1)
+        self.assertEqual(cases["bb72_no_target_smoke"]["seed"], 7)
+        self.assertEqual(cases["bb72_no_target_smoke"]["target_upper_bound"], 6)
+        self.assertNotIn("target_weight", cases["bb72_no_target_smoke"])
+
+        self.assertEqual(cases["bb144_no_target_smoke"]["code_id"], BB144_CODE_ID)
+        self.assertEqual(cases["bb144_no_target_smoke"]["iterations"], 500)
+        self.assertEqual(cases["bb144_no_target_smoke"]["restarts"], 1)
+        self.assertEqual(cases["bb144_no_target_smoke"]["seed"], 7)
+        self.assertEqual(cases["bb144_no_target_smoke"]["target_upper_bound"], 12)
+        self.assertNotIn("target_weight", cases["bb144_no_target_smoke"])
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@ REQUIRED_CASE_FIELDS = {
     "iterations",
     "restarts",
     "seed",
-    "target_weight",
     "baseline_key",
     "baseline_required",
 }
@@ -109,7 +108,9 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         _require_positive_int(raw_case, "iterations", case_label, errors)
         _require_positive_int(raw_case, "restarts", case_label, errors)
         _require_nonnegative_int(raw_case, "seed", case_label, errors)
-        target_weight = _require_positive_int(raw_case, "target_weight", case_label, errors)
+        target_weight = None
+        if "target_weight" in raw_case:
+            target_weight = _require_positive_int(raw_case, "target_weight", case_label, errors)
 
         target_upper_bound = raw_case.get("target_upper_bound")
         if target_upper_bound is not None:

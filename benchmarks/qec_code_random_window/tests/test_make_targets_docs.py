@@ -13,6 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 MAKEFILE = ROOT / "Makefile"
 CASES_SMOKE = ROOT / "benchmarks" / "qec_code_random_window" / "cases.smoke.toml"
+CASES_NO_TARGET_SMOKE = (
+    ROOT / "benchmarks" / "qec_code_random_window" / "cases.no-target-smoke.toml"
+)
 SHOWCASE = ROOT / "docs" / "showcases" / "qec-code-random-window-benchmark.md"
 SHOWCASE_INDEX = ROOT / "docs" / "showcases" / "README.md"
 
@@ -142,13 +145,47 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", body)
         self.assertIn("--strict-baselines", body)
 
+    def test_makefile_exposes_release_no_target_smoke_pipeline(self) -> None:
+        makefile = read_text(MAKEFILE)
+        body = make_target_body(makefile, "qec-code-random-window-bench-no-target-smoke")
+
+        self.assertIn("qec-code-random-window-bench-no-target-smoke", makefile)
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES := benchmarks/qec_code_random_window/cases.no-target-smoke.toml",
+            makefile,
+        )
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-smoke",
+            makefile,
+        )
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)", body)
+        self.assertIn("cargo build --release -p qec-code", body)
+        self.assertIn("--qec-code-bin target/release/qec-code", body)
+        self.assertIn("--build-profile release", body)
+        self.assertNotIn("--target-weight", body)
+
+    def test_no_target_smoke_manifest_is_distinct_from_known_target_manifests(self) -> None:
+        manifest = tomllib.loads(CASES_NO_TARGET_SMOKE.read_text(encoding="utf-8"))
+        cases = manifest["cases"]
+
+        self.assertEqual([case["case_id"] for case in cases], [
+            "bb72_no_target_smoke",
+            "bb144_no_target_smoke",
+        ])
+        self.assertTrue(all("target_weight" not in case for case in cases))
+        self.assertTrue(any(case["target_upper_bound"] == 12 for case in cases))
+
     def test_showcase_documents_smoke_command_outputs_and_limits(self) -> None:
         showcase = read_text(SHOWCASE)
         index = read_text(SHOWCASE_INDEX)
 
         self.assertIn("make qec-code-random-window-bench-smoke", showcase)
+        self.assertIn("make qec-code-random-window-bench-no-target-smoke", showcase)
         self.assertIn("random-window-upper-bound", showcase)
         self.assertIn("only the local `random-window-upper-bound`", showcase)
+        self.assertIn("release/no-target", showcase)
+        self.assertIn("known-target", showcase)
         self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", showcase)
         self.assertIn("benchmarks/out/qec_code_random_window/", showcase)
         self.assertIn("`NA`", showcase)

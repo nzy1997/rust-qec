@@ -1,0 +1,25 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+description = "Release no-target fixed-budget smoke cases for qec-code random-window upper-bound throughput evidence."
+
+[[cases]]
+case_id = "bb72_no_target_smoke"
+code_id = "bb72"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 6
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+baseline_required = true
+
+[[cases]]
+case_id = "bb144_no_target_smoke"
+code_id = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 12
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb144"
+baseline_required = true

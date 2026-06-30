@@ -70,6 +70,26 @@ def _require_int(
     return value
 
 
+def _require_optional_int(
+    row: dict[str, Any],
+    field: str,
+    location: str,
+    *,
+    positive: bool = False,
+    nonnegative: bool = False,
+) -> int | None:
+    value = row.get(field)
+    if value is None:
+        return None
+    if not _is_int(value):
+        raise _fail(location, f'field "{field}" must be an integer or null')
+    if positive and value <= 0:
+        raise _fail(location, f'field "{field}" must be a positive integer or null')
+    if nonnegative and value < 0:
+        raise _fail(location, f'field "{field}" must be a non-negative integer or null')
+    return value
+
+
 def _require_status(row: dict[str, Any], location: str) -> str:
     value = row.get("status")
     if not isinstance(value, str) or not value:
@@ -110,7 +130,7 @@ def _validate_row(
     seed = _require_int(row, "seed", location, nonnegative=True)
     iterations = _require_int(row, "iterations", location, positive=True)
     restarts = _require_int(row, "restarts", location, positive=True)
-    target_weight = _require_int(row, "target_weight", location, positive=True)
+    target_weight = _require_optional_int(row, "target_weight", location, positive=True)
     elapsed_s = _require_elapsed(row, location)
 
     command = row.get("command")
@@ -217,7 +237,7 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         "manifest_seed": case["seed"],
         "manifest_iterations": case["iterations"],
         "manifest_restarts": case["restarts"],
-        "manifest_target_weight": case["target_weight"],
+        "manifest_target_weight": case.get("target_weight"),
         "target_upper_bound": target_upper_bound,
         "attempted_seed_rows": len(rows),
         "successful_seed_rows": len(successful),
@@ -230,7 +250,9 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         "run_seed_values": _join_sorted({row["seed"] for row in rows}),
         "run_iterations_values": _join_sorted({row["iterations"] for row in rows}),
         "run_restarts_values": _join_sorted({row["restarts"] for row in rows}),
-        "run_target_weight_values": _join_sorted({row["target_weight"] for row in rows}),
+        "run_target_weight_values": _join_sorted(
+            {row["target_weight"] for row in rows if row["target_weight"] is not None}
+        ),
         "run_status_values": _join_sorted({row["status"] for row in rows}),
         "summary_status": "ok" if successful else "no_success",
     }
@@ -259,7 +281,7 @@ def _manifest_settings_lines(cases: list[dict[str, Any]]) -> list[str]:
     return [
         (
             f"- `{case['case_id']}`: seed={case['seed']}, iterations={case['iterations']}, "
-            f"restarts={case['restarts']}, target_weight={case['target_weight']}"
+            f"restarts={case['restarts']}, target_weight={case.get('target_weight') or 'none'}"
         )
         for case in cases
     ]
@@ -278,7 +300,9 @@ def _observed_settings_lines(
         seeds = _join_sorted({row["seed"] for row in rows})
         iterations = _join_sorted({row["iterations"] for row in rows})
         restarts = _join_sorted({row["restarts"] for row in rows})
-        target_weights = _join_sorted({row["target_weight"] for row in rows})
+        target_weights = _join_sorted(
+            {row["target_weight"] for row in rows if row["target_weight"] is not None}
+        )
         commands = sorted(
             {" ".join(row["command"]) for row in rows if isinstance(row.get("command"), list)}
         )

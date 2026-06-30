@@ -17,12 +17,23 @@ Local runs execute only the local `random-window-upper-bound` command. They do
 not run QDistEvol, QDistRndMW, m4ri, Gurobi, SAT, or any other external paper
 algorithm.
 
+The known-target smoke/full targets pass `--target-weight`, so their elapsed
+times answer the reproduction question: how quickly the run finds a known bound.
+The release/no-target target omits `--target-weight`, so its elapsed time
+answers a fixed-budget throughput question for the selected release binary.
+
 ## Run It
 
 Run the smoke pipeline from the repository root:
 
 ```sh
 make qec-code-random-window-bench-smoke
+```
+
+Run the release/no-target fixed-budget smoke pipeline:
+
+```sh
+make qec-code-random-window-bench-no-target-smoke
 ```
 
 Run the full pipeline only after obtaining the upstream paper-result
@@ -60,6 +71,13 @@ The full target writes the same artifact shape under
 `benchmarks/out/qec_code_random_window/full/`, but first imports canonical
 baseline rows from `CODEDISTANCE_PAPER_RESULTS_DIR`.
 
+The release/no-target target validates
+`benchmarks/qec_code_random_window/cases.no-target-smoke.toml`, builds
+`target/release/qec-code`, runs BB72 and BB144 without `--target-weight`, and
+writes JSONL plus summary artifacts under
+`benchmarks/out/qec_code_random_window/no-target-smoke/`. Each JSONL row records
+`build_profile = "release"` and `target_weight = null`.
+
 ## Code
 
 Pipeline entry points and generated-output policy:
@@ -71,6 +89,7 @@ Random-window benchmark modules and manifests:
 
 - [`benchmarks/qec_code_random_window/cases.smoke.toml`](benchmarks/qec_code_random_window/cases.smoke.toml)
 - [`benchmarks/qec_code_random_window/cases.full.toml`](benchmarks/qec_code_random_window/cases.full.toml)
+- [`benchmarks/qec_code_random_window/cases.no-target-smoke.toml`](benchmarks/qec_code_random_window/cases.no-target-smoke.toml)
 - [`benchmarks/qec_code_random_window/validate_cases.py`](benchmarks/qec_code_random_window/validate_cases.py)
 - [`benchmarks/qec_code_random_window/run_local.py`](benchmarks/qec_code_random_window/run_local.py)
 - [`benchmarks/qec_code_random_window/summarize.py`](benchmarks/qec_code_random_window/summarize.py)
@@ -85,6 +104,15 @@ Run the smoke target:
 ```sh
 make qec-code-random-window-bench-smoke
 ```
+
+Run the release/no-target smoke target:
+
+```sh
+make qec-code-random-window-bench-no-target-smoke
+```
+
+Confirm `local-runs.jsonl` shows `target_weight` as `null` and
+`build_profile` as `release`.
 
 Confirm the comparison Markdown contains `NA` baseline fields for smoke rows
 without paper data:
