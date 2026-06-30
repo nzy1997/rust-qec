@@ -105,7 +105,12 @@ class MultiSeedSummaryTest(unittest.TestCase):
         manifest: Path,
         runs: Path,
         out_dir: Path,
+        *,
+        expected_seeds: list[int] | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        expected_seed_args: list[str] = []
+        if expected_seeds is not None:
+            expected_seed_args = ["--expected-seeds", *(str(seed) for seed in expected_seeds)]
         return subprocess.run(
             [
                 sys.executable,
@@ -117,6 +122,7 @@ class MultiSeedSummaryTest(unittest.TestCase):
                 str(runs),
                 "--out-dir",
                 str(out_dir),
+                *expected_seed_args,
             ],
             cwd=ROOT,
             check=False,
@@ -226,6 +232,37 @@ class MultiSeedSummaryTest(unittest.TestCase):
             self.assertIn("bb144_no_target_smoke", mixed_result.stderr)
             self.assertIn("build_profile", mixed_result.stderr)
             self.assertIn("debug;release", mixed_result.stderr)
+
+    def test_expected_seeds_reject_uniformly_incomplete_no_target_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            _write_manifest(manifest)
+            _write_jsonl(
+                runs,
+                [
+                    _row("bb72_no_target_smoke", 7, "ok", upper_bound=6, elapsed_s=1.0, target_upper_bound=6),
+                    _row("bb72_no_target_smoke", 11, "ok", upper_bound=7, elapsed_s=3.0, target_upper_bound=6),
+                    _row("bb144_no_target_smoke", 7, "ok", upper_bound=12, elapsed_s=4.0, target_upper_bound=12),
+                    _row("bb144_no_target_smoke", 11, "ok", upper_bound=13, elapsed_s=8.0, target_upper_bound=12),
+                ],
+            )
+
+            result = self.run_summarizer(
+                manifest,
+                runs,
+                out_dir,
+                expected_seeds=[7, 11, 17],
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("bb72_no_target_smoke", result.stderr)
+            self.assertIn('field "seed"', result.stderr)
+            self.assertIn("7;11;17", result.stderr)
+            self.assertIn("observed 7;11", result.stderr)
+            self.assertIn("missing 17", result.stderr)
 
 
 if __name__ == "__main__":

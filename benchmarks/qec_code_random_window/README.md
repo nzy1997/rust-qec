@@ -12,8 +12,9 @@ The benchmark suite has four local entry points:
   early-stop reproduction timing.
 - `make qec-code-random-window-bench-no-target-multiseed-smoke` builds
   `target/release/qec-code`, runs the BB72/BB144 no-target smoke cases with
-  seeds `7`, `11`, and `17`, and summarizes per-case stability fields while
-  preserving one JSONL row per case/seed.
+  seeds `7`, `11`, and `17`, validates that expected seed set during summary,
+  and summarizes per-case stability fields while preserving one JSONL row per
+  case/seed.
 - `make qec-code-random-window-bench-no-target-ladder-smoke` builds
   `target/release/qec-code` and runs the issue-225 ladder of
   `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144` without `--target-weight`,

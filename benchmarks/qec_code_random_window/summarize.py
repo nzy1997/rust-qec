@@ -64,6 +64,16 @@ class SummaryError(ValueError):
     """User-facing validation error for summary inputs."""
 
 
+def _parse_nonnegative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer") from error
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a non-negative integer")
+    return parsed
+
+
 def _is_int(value: object) -> bool:
     return type(value) is int
 
@@ -361,6 +371,7 @@ def _validate_case_rows(case: dict[str, Any], rows: list[dict[str, Any]]) -> set
 def _validate_multiseed_no_target_seed_sets(
     cases: list[dict[str, Any]],
     seed_sets_by_case: dict[str, set[int]],
+    expected_seeds: list[int] | None = None,
 ) -> None:
     no_target_seed_sets = {
         case["case_id"]: seed_sets_by_case[case["case_id"]]
@@ -369,7 +380,10 @@ def _validate_multiseed_no_target_seed_sets(
     }
     if not no_target_seed_sets:
         return
-    expected = max(no_target_seed_sets.values(), key=lambda values: (len(values), sorted(values)))
+    if expected_seeds is not None and len(expected_seeds) > 1:
+        expected = set(expected_seeds)
+    else:
+        expected = max(no_target_seed_sets.values(), key=lambda values: (len(values), sorted(values)))
     if len(expected) <= 1:
         return
     for case_id, observed in no_target_seed_sets.items():
@@ -381,9 +395,12 @@ def _validate_multiseed_no_target_seed_sets(
                 details.append(f"missing {_format_seed_set(missing)}")
             if extra:
                 details.append(f"extra {_format_seed_set(extra)}")
+            expected_text = _format_seed_set(expected)
+            observed_text = _format_seed_set(observed)
+            rule = "must exactly match expected seed set" if expected_seeds is not None else "must include observed multi-seed set"
             raise SummaryError(
-                f'case "{case_id}" field "seed" must include observed multi-seed set '
-                f"{_format_seed_set(expected)}; observed {_format_seed_set(observed)} "
+                f'case "{case_id}" field "seed" {rule} '
+                f"{expected_text}; observed {observed_text} "
                 f"({', '.join(details)})"
             )
 
@@ -460,6 +477,7 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
 def summarize_cases(
     cases: list[dict[str, Any]],
     rows: list[dict[str, Any]],
+    expected_seeds: list[int] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, object]]]:
     rows_by_case = {case["case_id"]: [] for case in cases if isinstance(case, dict)}
     for row in rows:
@@ -468,7 +486,7 @@ def summarize_cases(
         case["case_id"]: _validate_case_rows(case, rows_by_case[case["case_id"]])
         for case in cases
     }
-    _validate_multiseed_no_target_seed_sets(cases, seed_sets_by_case)
+    _validate_multiseed_no_target_seed_sets(cases, seed_sets_by_case, expected_seeds)
     summaries = [_summarize_case(case, rows_by_case[case["case_id"]]) for case in cases]
     return rows_by_case, summaries
 
@@ -641,7 +659,11 @@ def run(args: argparse.Namespace, argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        rows_by_case, summaries = summarize_cases(cases, rows)
+        rows_by_case, summaries = summarize_cases(
+            cases,
+            rows,
+            getattr(args, "expected_seeds", None),
+        )
     except SummaryError as error:
         print(error, file=sys.stderr)
         return 1
@@ -673,6 +695,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cases", type=Path, required=True)
     parser.add_argument("--runs", type=Path, nargs="+", required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--expected-seeds", type=_parse_nonnegative_int, nargs="+")
     return parser
 
 

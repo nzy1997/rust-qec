@@ -24,7 +24,8 @@ answers a fixed-budget throughput question for the selected release binary.
 The BB-only target (`no-target-smoke`) only runs BB72 and BB144.
 The release/no-target multiseed target (`no-target-multiseed-smoke`) runs the
 same BB72/BB144 cases with seeds `7`, `11`, and `17`, so it reports stability
-across repeated release runs without changing the per-seed JSONL rows.
+across repeated release runs without changing the per-seed JSONL rows, and the
+summary validates that the expected `7;11;17` seed set was actually attempted.
 The ladder variant runs `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144`
 so the same fixed-budget/no-target settings are exercised across a 4-case
 issue-225 ladder profile.

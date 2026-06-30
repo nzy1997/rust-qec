@@ -183,6 +183,10 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("--qec-code-bin target/release/qec-code", body)
         self.assertIn("--build-profile release", body)
         self.assertIn("--seeds 7 11 17", body)
+        self.assertIn("run_status=0", body)
+        self.assertIn("|| run_status=$$?", body)
+        self.assertIn("--expected-seeds 7 11 17", body)
+        self.assertIn("exit $$run_status", body)
         self.assertNotIn("--target-weight", body)
 
     def test_makefile_exposes_no_target_ladder_smoke_pipeline(self) -> None:

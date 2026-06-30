@@ -408,6 +408,7 @@ baseline_required = false
                 cases=FIXTURES / "summary_cases.toml",
                 runs=[FIXTURES / "summary_runs.jsonl"],
                 out_dir=Path(tmp),
+                expected_seeds=None,
             )
             argv = ["--cases", "fixture path", "--label", "token with spaces"]
 
@@ -437,6 +438,7 @@ baseline_required = false
         self.assertIn("--cases", result.stdout)
         self.assertIn("--runs", result.stdout)
         self.assertIn("--out-dir", result.stdout)
+        self.assertIn("--expected-seeds", result.stdout)
 
 
 if __name__ == "__main__":
