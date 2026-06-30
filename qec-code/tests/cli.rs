@@ -1502,6 +1502,7 @@ fn css_distance_randomized_upper_bound_code_id_outputs_json() {
     assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["upper_bound"], 3);
     assert_eq!(json["options"]["seed"], 7);
+    assert!(json.get("search_stats").is_none());
 }
 
 #[test]

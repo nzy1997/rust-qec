@@ -414,6 +414,7 @@ fn completed_bound_result_serializes_with_upper_bound_contract() {
     assert_eq!(json["options"]["target_weight"], serde_json::Value::Null);
     assert_eq!(json["provenance"]["tool"], "qec-code");
     assert_eq!(json["provenance"]["method_revision"], 1);
+    assert!(json.get("search_stats").is_none());
 }
 
 #[test]
