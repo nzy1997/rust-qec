@@ -22,6 +22,9 @@ times answer the reproduction question: how quickly the run finds a known bound.
 The release/no-target targets omit `--target-weight`, so their elapsed time
 answers a fixed-budget throughput question for the selected release binary.
 The BB-only target (`no-target-smoke`) only runs BB72 and BB144.
+The release/no-target multiseed target (`no-target-multiseed-smoke`) runs the
+same BB72/BB144 cases with seeds `7`, `11`, and `17`, so it reports stability
+across repeated release runs without changing the per-seed JSONL rows.
 The ladder variant runs `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144`
 so the same fixed-budget/no-target settings are exercised across a 4-case
 issue-225 ladder profile.
@@ -38,6 +41,12 @@ Run the release/no-target fixed-budget smoke pipeline:
 
 ```sh
 make qec-code-random-window-bench-no-target-smoke
+```
+
+Run the release/no-target multiseed smoke pipeline:
+
+```sh
+make qec-code-random-window-bench-no-target-multiseed-smoke
 ```
 
 Run the full pipeline only after obtaining the upstream paper-result
@@ -88,6 +97,15 @@ writes JSONL plus summary artifacts under
 `benchmarks/out/qec_code_random_window/no-target-smoke/`. Each JSONL row records
 `build_profile = "release"` and `target_weight = null`.
 
+The release/no-target multiseed target validates
+`benchmarks/qec_code_random_window/cases.no-target-smoke.toml`, builds
+`target/release/qec-code`, runs BB72 and BB144 without `--target-weight` with
+seeds `7`, `11`, and `17`, and writes JSONL plus summary artifacts under
+`benchmarks/out/qec_code_random_window/no-target-multiseed-smoke/`. Each
+summary reports the observed seeds, attempted and successful seed counts,
+target-hit rates, elapsed min/median/max, and unset no-target weights while
+preserving one JSONL row per case/seed.
+
 The release/no-target-ladder target validates
 `benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml`, builds
 `target/release/qec-code`, runs `surface_rotated_d5`, `toric_d5`, `bb72`, and
@@ -128,6 +146,12 @@ Run the release/no-target smoke target:
 make qec-code-random-window-bench-no-target-smoke
 ```
 
+Run the release/no-target multiseed smoke target:
+
+```sh
+make qec-code-random-window-bench-no-target-multiseed-smoke
+```
+
 Run the release/no-target-ladder smoke target:
 
 ```sh
@@ -136,6 +160,10 @@ make qec-code-random-window-bench-no-target-ladder-smoke
 
 Confirm ladder artifacts exist under
 `benchmarks/out/qec_code_random_window/no-target-ladder-smoke/` with
+`local-runs.jsonl` and `summary/summary.csv`.
+
+Confirm multiseed artifacts exist under
+`benchmarks/out/qec_code_random_window/no-target-multiseed-smoke/` with
 `local-runs.jsonl` and `summary/summary.csv`.
 
 Confirm `local-runs.jsonl` shows `target_weight` as `null` and
