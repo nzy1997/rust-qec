@@ -343,13 +343,15 @@ def write_summary_md(
         "",
         "## Case Summary",
         "",
-        "| case_id | code_id | status | attempted | successful | best_upper_bound | target | elapsed_s | note |",
+        "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | note |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
 
     for summary in summaries:
-        target = summary["target_upper_bound"]
-        target_text = "-" if target in {None, ""} else str(target)
+        target_upper_bound = summary["target_upper_bound"]
+        target_upper_bound_text = (
+            "-" if target_upper_bound in {None, ""} else str(target_upper_bound)
+        )
         if summary["successful_seed_rows"]:
             elapsed_text = (
                 f"median={summary['median_elapsed_s']}, min={summary['min_elapsed_s']}, "
@@ -364,14 +366,14 @@ def write_summary_md(
         best_text = "-" if best_upper_bound in {None, ""} else str(best_upper_bound)
         lines.append(
             "| {case_id} | {code_id} | {summary_status} | {attempted_seed_rows} | "
-            "{successful_seed_rows} | {best} | {target} | {elapsed} | {note} |".format(
+            "{successful_seed_rows} | {best} | {target_upper_bound} | {elapsed} | {note} |".format(
                 case_id=summary["case_id"],
                 code_id=summary["code_id"],
                 summary_status=summary["summary_status"],
                 attempted_seed_rows=summary["attempted_seed_rows"],
                 successful_seed_rows=summary["successful_seed_rows"],
                 best=best_text,
-                target=target_text,
+                target_upper_bound=target_upper_bound_text,
                 elapsed=elapsed_text,
                 note=note,
             )

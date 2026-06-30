@@ -232,6 +232,11 @@ baseline_required = true
             self.assertEqual(row["manifest_target_weight"], "")
             self.assertEqual(row["run_target_weight_values"], "")
             self.assertEqual(row["best_upper_bound"], "12")
+            markdown = (out_dir / "summary.md").read_text(encoding="utf-8")
+            self.assertIn(
+                "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | note |",
+                markdown,
+            )
 
     def test_summary_markdown_has_manifest_rows_and_zero_success_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
