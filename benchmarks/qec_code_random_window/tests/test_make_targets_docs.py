@@ -16,6 +16,9 @@ CASES_SMOKE = ROOT / "benchmarks" / "qec_code_random_window" / "cases.smoke.toml
 CASES_NO_TARGET_SMOKE = (
     ROOT / "benchmarks" / "qec_code_random_window" / "cases.no-target-smoke.toml"
 )
+CASES_NO_TARGET_LADDER_SMOKE = (
+    ROOT / "benchmarks" / "qec_code_random_window" / "cases.no-target-ladder-smoke.toml"
+)
 SHOWCASE = ROOT / "docs" / "showcases" / "qec-code-random-window-benchmark.md"
 SHOWCASE_INDEX = ROOT / "docs" / "showcases" / "README.md"
 
@@ -165,6 +168,37 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("--build-profile release", body)
         self.assertNotIn("--target-weight", body)
 
+    def test_makefile_exposes_no_target_ladder_smoke_pipeline(self) -> None:
+        makefile = read_text(MAKEFILE)
+        body = make_target_body(makefile, "qec-code-random-window-bench-no-target-ladder-smoke")
+
+        self.assertIn("qec-code-random-window-bench-no-target-ladder-smoke", makefile)
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES := benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml",
+            makefile,
+        )
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-ladder-smoke",
+            makefile,
+        )
+        self.assertIn("--no-target-ladder-smoke", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)", body)
+        self.assertIn("cargo build --release -p qec-code", body)
+        self.assertIn("--build-profile release", body)
+        self.assertNotIn("--target-weight", body)
+
+    def test_no_target_ladder_smoke_manifest_case_ids_are_documented(self) -> None:
+        manifest = tomllib.loads(CASES_NO_TARGET_LADDER_SMOKE.read_text(encoding="utf-8"))
+        cases = manifest["cases"]
+        self.assertEqual(sorted([case["case_id"] for case in cases]), [
+            "bb144",
+            "bb72",
+            "surface_rotated_d5",
+            "toric_d5",
+        ])
+        self.assertTrue(all("target_weight" not in case for case in cases))
+
     def test_no_target_smoke_manifest_is_distinct_from_known_target_manifests(self) -> None:
         manifest = tomllib.loads(CASES_NO_TARGET_SMOKE.read_text(encoding="utf-8"))
         cases = manifest["cases"]
@@ -182,11 +216,16 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
 
         self.assertIn("make qec-code-random-window-bench-smoke", showcase)
         self.assertIn("make qec-code-random-window-bench-no-target-smoke", showcase)
+        self.assertIn("make qec-code-random-window-bench-no-target-ladder-smoke", showcase)
         self.assertIn("random-window-upper-bound", showcase)
         self.assertIn("only the local `random-window-upper-bound`", showcase)
         self.assertIn("release/no-target", showcase)
+        self.assertIn("release/no-target-ladder", showcase)
+        self.assertIn("no-target-ladder", showcase)
         self.assertIn("known-target", showcase)
         self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", showcase)
         self.assertIn("benchmarks/out/qec_code_random_window/", showcase)
         self.assertIn("`NA`", showcase)
+        self.assertIn("no-target-smoke", showcase)
+        self.assertIn("no-target-ladder-smoke", showcase)
         self.assertIn("qec-code random-window benchmark", index.lower())

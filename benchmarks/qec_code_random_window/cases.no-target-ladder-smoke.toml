@@ -1,0 +1,51 @@
+manifest_version = 1
+suite = "qec_code_random_window"
+description = "Release no-target issue-225 ladder smoke cases for qec-code random-window upper-bound profiling."
+
+[[cases]]
+case_id = "surface_rotated_d5"
+code_id = "surface_rotated:d=5"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 5
+source_issue = 225
+baseline_key = "unmapped:surface_rotated_d5"
+baseline_required = false
+
+[[cases]]
+case_id = "toric_d5"
+code_id = "toric:d=5"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 5
+source_issue = 225
+baseline_key = "unmapped:toric_d5"
+baseline_required = false
+
+[[cases]]
+case_id = "bb72"
+code_id = "bb72"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 6
+source_issue = 225
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb72"
+baseline_required = true
+
+[[cases]]
+case_id = "bb144"
+code_id = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"
+distance_side = "any"
+iterations = 500
+restarts = 1
+seed = 7
+target_upper_bound = 12
+source_issue = 225
+baseline_key = "codeDistancePYPI:bivariate_bicycle:bb144"
+baseline_required = true
