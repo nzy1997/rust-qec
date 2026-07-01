@@ -338,7 +338,6 @@ pub fn random_window_css_upper_bound(
     }
 
     let width = code.n();
-    let stabilizer_span = gf2::try_rref_with_width(&code.stabilizer_rows(), width * 2)?;
     let hx_span = gf2::try_rref_with_width(css.hx(), width)?;
     let hz_span = gf2::try_rref_with_width(css.hz(), width)?;
     let mut rng = SplitMix64::new(options.seed);
@@ -358,8 +357,6 @@ pub fn random_window_css_upper_bound(
                 ComponentKind::XLike,
                 width,
                 &permutation,
-                code,
-                &stabilizer_span,
                 &mut best_witness,
                 &mut search_stats,
             )?;
@@ -380,8 +377,6 @@ pub fn random_window_css_upper_bound(
                 ComponentKind::ZLike,
                 width,
                 &permutation,
-                code,
-                &stabilizer_span,
                 &mut best_witness,
                 &mut search_stats,
             )?;
@@ -430,14 +425,55 @@ enum ComponentKind {
     ZLike,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CssComponentCandidateVerdict {
+    Accepted,
+    Zero,
+    NonKernel,
+    StabilizerSpan,
+}
+
+fn css_component_candidate_verdict(
+    opposite_checks: &[Vec<u8>],
+    stabilizer_component_span: &gf2::ReducedRows,
+    candidate: &[u8],
+) -> Result<CssComponentCandidateVerdict> {
+    let width = stabilizer_component_span.width;
+    gf2::validate_rows_with_width(opposite_checks, width)?;
+    gf2::validate_target(candidate)?;
+    if candidate.len() != width {
+        return Err(QecError::RowWidthMismatch {
+            expected: width,
+            actual: candidate.len(),
+        });
+    }
+    if !candidate.iter().any(|bit| *bit == 1) {
+        return Ok(CssComponentCandidateVerdict::Zero);
+    }
+
+    for check in opposite_checks {
+        let parity = check
+            .iter()
+            .zip(candidate)
+            .fold(0, |acc, (&check_bit, &candidate_bit)| acc ^ (check_bit & candidate_bit));
+        if parity != 0 {
+            return Ok(CssComponentCandidateVerdict::NonKernel);
+        }
+    }
+
+    if gf2::try_in_reduced_row_span(stabilizer_component_span, candidate)? {
+        return Ok(CssComponentCandidateVerdict::StabilizerSpan);
+    }
+
+    Ok(CssComponentCandidateVerdict::Accepted)
+}
+
 fn consider_component_candidates(
     kernel_checks: &[Vec<u8>],
     stabilizer_component_span: &gf2::ReducedRows,
     component: ComponentKind,
     width: usize,
     permutation: &[usize],
-    code: &StabilizerCode,
-    stabilizer_span: &gf2::ReducedRows,
     best_witness: &mut Option<Pauli>,
     search_stats: &mut RandomWindowSearchStats,
 ) -> Result<()> {
@@ -450,10 +486,9 @@ fn consider_component_candidates(
 
     consider_component_candidate_rows(
         candidates,
+        kernel_checks,
         stabilizer_component_span,
         component,
-        code,
-        stabilizer_span,
         best_witness,
         search_stats,
     )
@@ -461,10 +496,9 @@ fn consider_component_candidates(
 
 fn consider_component_candidate_rows(
     candidates: Vec<Vec<u8>>,
+    kernel_checks: &[Vec<u8>],
     stabilizer_component_span: &gf2::ReducedRows,
     component: ComponentKind,
-    code: &StabilizerCode,
-    stabilizer_span: &gf2::ReducedRows,
     best_witness: &mut Option<Pauli>,
     search_stats: &mut RandomWindowSearchStats,
 ) -> Result<()> {
@@ -486,25 +520,31 @@ fn consider_component_candidate_rows(
             search_stats.weight_pruned_candidates += 1;
             continue;
         }
-        let in_component_span = gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate);
+        let component_verdict =
+            css_component_candidate_verdict(kernel_checks, stabilizer_component_span, &candidate)?;
         add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
-        if in_component_span? {
-            search_stats.stabilizer_span_candidates_rejected += 1;
-            continue;
+        match component_verdict {
+            CssComponentCandidateVerdict::Accepted => {}
+            CssComponentCandidateVerdict::Zero => {
+                search_stats.zero_candidates_rejected += 1;
+                continue;
+            }
+            CssComponentCandidateVerdict::NonKernel => {
+                search_stats.witness_validation_candidates_rejected += 1;
+                continue;
+            }
+            CssComponentCandidateVerdict::StabilizerSpan => {
+                search_stats.stabilizer_span_candidates_rejected += 1;
+                continue;
+            }
         }
 
         let validation_started = Instant::now();
         let witness = component_candidate_to_pauli(component, candidate)?;
-        let witness_is_valid =
-            validate_witness_against_code_with_span(code, stabilizer_span, &witness).is_ok();
         add_elapsed_ns(
             &mut search_stats.witness_validation_time_ns,
             validation_started,
         );
-        if !witness_is_valid {
-            search_stats.witness_validation_candidates_rejected += 1;
-            continue;
-        }
         search_stats.valid_witnesses_found += 1;
         let best_update_started = Instant::now();
         let should_update = best_witness
@@ -906,18 +946,15 @@ mod tests {
     #[test]
     fn random_window_prunes_candidates_that_cannot_improve_best() {
         let width = 3;
-        let code = StabilizerCode::from_stabilizers(width, vec![]).unwrap();
         let component_span = empty_reduced_rows(width);
-        let stabilizer_span = empty_reduced_rows(width * 2);
         let mut best_witness = Some(x_pauli(width, &[0, 1]));
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
             vec![vec![0, 0, 0], vec![1, 1, 0], vec![1, 1, 1], vec![0, 0, 1]],
+            &[],
             &component_span,
             ComponentKind::XLike,
-            &code,
-            &stabilizer_span,
             &mut best_witness,
             &mut search_stats,
         )
@@ -940,18 +977,15 @@ mod tests {
     #[test]
     fn random_window_pruning_does_not_skip_strictly_better_candidate() {
         let width = 5;
-        let code = StabilizerCode::from_stabilizers(width, vec![]).unwrap();
         let component_span = empty_reduced_rows(width);
-        let stabilizer_span = empty_reduced_rows(width * 2);
         let mut best_witness = Some(x_pauli(width, &[0, 1, 2, 3, 4]));
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
             vec![vec![1, 1, 1, 0, 0]],
+            &[],
             &component_span,
             ComponentKind::XLike,
-            &code,
-            &stabilizer_span,
             &mut best_witness,
             &mut search_stats,
         )
