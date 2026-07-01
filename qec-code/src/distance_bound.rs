@@ -343,6 +343,7 @@ pub fn random_window_css_upper_bound(
     let mut rng = SplitMix64::new(options.seed);
     let mut best_witness: Option<Pauli> = None;
     let mut search_stats = RandomWindowSearchStats::default();
+    let mut kernel_workspace = gf2::RandomWindowKernelWorkspace::new();
     let search_started = Instant::now();
 
     for _restart in 0..options.restarts {
@@ -357,6 +358,7 @@ pub fn random_window_css_upper_bound(
                 ComponentKind::XLike,
                 width,
                 &permutation,
+                &mut kernel_workspace,
                 &mut best_witness,
                 &mut search_stats,
             )?;
@@ -377,6 +379,7 @@ pub fn random_window_css_upper_bound(
                 ComponentKind::ZLike,
                 width,
                 &permutation,
+                &mut kernel_workspace,
                 &mut best_witness,
                 &mut search_stats,
             )?;
@@ -476,13 +479,14 @@ fn consider_component_candidates(
     component: ComponentKind,
     width: usize,
     permutation: &[usize],
+    kernel_workspace: &mut gf2::RandomWindowKernelWorkspace,
     best_witness: &mut Option<Pauli>,
     search_stats: &mut RandomWindowSearchStats,
 ) -> Result<()> {
     search_stats.kernel_basis_generations += 1;
     let kernel_started = Instant::now();
     let candidates =
-        gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation);
+        kernel_workspace.try_kernel_basis_with_width(kernel_checks, width, permutation);
     add_elapsed_ns(&mut search_stats.kernel_basis_time_ns, kernel_started);
     let candidates = candidates?;
 
@@ -497,7 +501,7 @@ fn consider_component_candidates(
 }
 
 fn consider_component_candidate_rows(
-    candidates: Vec<Vec<u8>>,
+    candidates: &[Vec<u8>],
     kernel_checks: &[Vec<u8>],
     stabilizer_component_span: &gf2::ReducedRows,
     component: ComponentKind,
@@ -562,11 +566,11 @@ fn consider_component_candidate_rows(
     Ok(())
 }
 
-fn component_candidate_to_pauli(component: ComponentKind, candidate: Vec<u8>) -> Result<Pauli> {
+fn component_candidate_to_pauli(component: ComponentKind, candidate: &[u8]) -> Result<Pauli> {
     let width = candidate.len();
     match component {
-        ComponentKind::XLike => Pauli::from_xz_bits(candidate, vec![0; width]),
-        ComponentKind::ZLike => Pauli::from_xz_bits(vec![0; width], candidate),
+        ComponentKind::XLike => Pauli::from_xz_bits(candidate.to_vec(), vec![0; width]),
+        ComponentKind::ZLike => Pauli::from_xz_bits(vec![0; width], candidate.to_vec()),
     }
 }
 
@@ -913,7 +917,7 @@ mod tests {
         component: ComponentKind,
         candidate: &[u8],
     ) -> Result<CssComponentCandidateVerdict> {
-        let witness = component_candidate_to_pauli(component, candidate.to_vec())?;
+        let witness = component_candidate_to_pauli(component, candidate)?;
         match validate_witness_against_code_with_span(code, stabilizer_span, &witness) {
             Ok(()) => Ok(CssComponentCandidateVerdict::Accepted),
             Err(QecError::DistanceBoundValidationFailed(message))
@@ -951,7 +955,7 @@ mod tests {
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
-            vec![vec![0, 0, 0], vec![1, 1, 0], vec![1, 1, 1], vec![0, 0, 1]],
+            &[vec![0, 0, 0], vec![1, 1, 0], vec![1, 1, 1], vec![0, 0, 1]],
             &[],
             &component_span,
             ComponentKind::XLike,
@@ -982,7 +986,7 @@ mod tests {
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
-            vec![vec![1, 1, 1, 0, 0]],
+            &[vec![1, 1, 1, 0, 0]],
             &[],
             &component_span,
             ComponentKind::XLike,
@@ -995,6 +999,37 @@ mod tests {
         assert_eq!(best.weight(), 3);
         assert_eq!(search_stats.component_candidates_generated, 1);
         assert_eq!(search_stats.weight_pruned_candidates, 0);
+        assert_eq!(search_stats.valid_witnesses_found, 1);
+        assert_eq!(search_stats.best_witness_updates, 1);
+    }
+
+    #[test]
+    fn random_window_candidate_rows_accepts_workspace_output_without_stale_rows() {
+        let width = 3;
+        let component_span = empty_reduced_rows(width);
+        let mut workspace = gf2::RandomWindowKernelWorkspace::new();
+        let permutation = vec![2, 0, 1];
+        let candidates = workspace
+            .try_kernel_basis_with_width(&[], width, &permutation)
+            .unwrap();
+        assert_eq!(candidates, &[vec![0, 0, 1], vec![1, 0, 0], vec![0, 1, 0],]);
+
+        let mut best_witness = Some(x_pauli(width, &[0, 1]));
+        let mut search_stats = RandomWindowSearchStats::default();
+        consider_component_candidate_rows(
+            candidates,
+            &[],
+            &component_span,
+            ComponentKind::XLike,
+            &mut best_witness,
+            &mut search_stats,
+        )
+        .unwrap();
+
+        let best = best_witness.expect("workspace candidate should update the best witness");
+        assert_eq!(best.weight(), 1);
+        assert_eq!(search_stats.component_candidates_generated, 3);
+        assert_eq!(search_stats.weight_pruned_candidates, 2);
         assert_eq!(search_stats.valid_witnesses_found, 1);
         assert_eq!(search_stats.best_witness_updates, 1);
     }
@@ -1082,7 +1117,7 @@ mod tests {
         let mut x_best = None;
         let mut x_stats = RandomWindowSearchStats::default();
         consider_component_candidate_rows(
-            vec![vec![0, 0, 1], vec![1, 1, 0]],
+            &[vec![0, 0, 1], vec![1, 1, 0]],
             css.hz(),
             &hx_span,
             ComponentKind::XLike,
@@ -1101,7 +1136,7 @@ mod tests {
         let mut z_best = None;
         let mut z_stats = RandomWindowSearchStats::default();
         consider_component_candidate_rows(
-            vec![vec![1, 0, 0], vec![0, 0, 1]],
+            &[vec![1, 0, 0], vec![0, 0, 1]],
             css.hx(),
             &hz_span,
             ComponentKind::ZLike,
