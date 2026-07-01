@@ -168,6 +168,27 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("--build-profile release", body)
         self.assertNotIn("--target-weight", body)
 
+    def test_makefile_exposes_release_no_target_multiseed_smoke_pipeline(self) -> None:
+        makefile = read_text(MAKEFILE)
+        body = make_target_body(makefile, "qec-code-random-window-bench-no-target-multiseed-smoke")
+
+        self.assertIn("qec-code-random-window-bench-no-target-multiseed-smoke", makefile)
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-multiseed-smoke",
+            makefile,
+        )
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)", body)
+        self.assertIn("cargo build --release -p qec-code", body)
+        self.assertIn("--qec-code-bin target/release/qec-code", body)
+        self.assertIn("--build-profile release", body)
+        self.assertIn("--seeds 7 11 17", body)
+        self.assertIn("run_status=0", body)
+        self.assertIn("|| run_status=$$?", body)
+        self.assertIn("--expected-seeds 7 11 17", body)
+        self.assertIn("exit $$run_status", body)
+        self.assertNotIn("--target-weight", body)
+
     def test_makefile_exposes_no_target_ladder_smoke_pipeline(self) -> None:
         makefile = read_text(MAKEFILE)
         body = make_target_body(makefile, "qec-code-random-window-bench-no-target-ladder-smoke")
@@ -216,16 +237,25 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
 
         self.assertIn("make qec-code-random-window-bench-smoke", showcase)
         self.assertIn("make qec-code-random-window-bench-no-target-smoke", showcase)
+        self.assertIn("make qec-code-random-window-bench-no-target-multiseed-smoke", showcase)
         self.assertIn("make qec-code-random-window-bench-no-target-ladder-smoke", showcase)
         self.assertIn("random-window-upper-bound", showcase)
         self.assertIn("only the local `random-window-upper-bound`", showcase)
         self.assertIn("release/no-target", showcase)
+        self.assertIn("release/no-target multiseed", showcase)
         self.assertIn("release/no-target-ladder", showcase)
         self.assertIn("no-target-ladder", showcase)
         self.assertIn("known-target", showcase)
         self.assertIn("CODEDISTANCE_PAPER_RESULTS_DIR", showcase)
         self.assertIn("benchmarks/out/qec_code_random_window/", showcase)
+        self.assertIn("benchmarks/out/qec_code_random_window/no-target-multiseed-smoke/", showcase)
         self.assertIn("`NA`", showcase)
         self.assertIn("no-target-smoke", showcase)
+        self.assertIn("no-target-multiseed-smoke", showcase)
         self.assertIn("no-target-ladder-smoke", showcase)
+        self.assertIn("observed seeds", showcase)
+        self.assertIn("attempted and successful seed counts", showcase)
+        self.assertIn("target-hit rates", showcase)
+        self.assertIn("elapsed min/median/max", showcase)
+        self.assertIn("unset no-target weights", showcase)
         self.assertIn("qec-code random-window benchmark", index.lower())

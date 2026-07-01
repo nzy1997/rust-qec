@@ -35,6 +35,7 @@ CSV_FIELDS = [
     "run_iterations_values",
     "run_restarts_values",
     "run_target_weight_values",
+    "run_build_profile_values",
     "run_status_values",
     "summary_status",
 ]
@@ -61,6 +62,16 @@ CSV_FIELDS = [*CSV_FIELDS[:-1], *SEARCH_STAT_CSV_FIELDS, CSV_FIELDS[-1]]
 
 class SummaryError(ValueError):
     """User-facing validation error for summary inputs."""
+
+
+def _parse_nonnegative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer") from error
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a non-negative integer")
+    return parsed
 
 
 def _is_int(value: object) -> bool:
@@ -106,6 +117,15 @@ def _require_optional_int(
         raise _fail(location, f'field "{field}" must be a positive integer or null')
     if nonnegative and value < 0:
         raise _fail(location, f'field "{field}" must be a non-negative integer or null')
+    return value
+
+
+def _require_optional_str(row: dict[str, Any], field: str, location: str) -> str | None:
+    value = row.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise _fail(location, f'field "{field}" must be a non-empty string when present')
     return value
 
 
@@ -201,6 +221,7 @@ def _validate_row(
     iterations = _require_int(row, "iterations", location, positive=True)
     restarts = _require_int(row, "restarts", location, positive=True)
     target_weight = _require_optional_int(row, "target_weight", location, positive=True)
+    build_profile = _require_optional_str(row, "build_profile", location)
     elapsed_s = _require_elapsed(row, location)
 
     command = row.get("command")
@@ -230,6 +251,7 @@ def _validate_row(
     validated["iterations"] = iterations
     validated["restarts"] = restarts
     validated["target_weight"] = target_weight
+    validated["build_profile"] = build_profile
     validated["elapsed_s"] = elapsed_s
     validated["search_stats"] = _validate_search_stats(row, location)
     return validated
@@ -280,6 +302,112 @@ def _join_sorted(values: set[int | str]) -> str:
         return ";".join(str(value) for value in ordered)
     ordered = sorted(str(value) for value in values)
     return ";".join(ordered)
+
+
+def _format_seed_set(seeds: set[int]) -> str:
+    return _join_sorted(seeds)
+
+
+def _validate_case_rows(case: dict[str, Any], rows: list[dict[str, Any]]) -> set[int]:
+    case_id = case["case_id"]
+    if not rows:
+        return set()
+    seen_seeds: set[int] = set()
+    duplicate_seeds: set[int] = set()
+    iterations_values = {row["iterations"] for row in rows}
+    restarts_values = {row["restarts"] for row in rows}
+    target_weight_values = {row["target_weight"] for row in rows}
+    build_profile_values = {row["build_profile"] for row in rows if row.get("build_profile") is not None}
+    target_upper_bound_values = {
+        row["target_upper_bound"]
+        for row in rows
+        if "target_upper_bound" in row and row["target_upper_bound"] is not None
+    }
+
+    for row in rows:
+        seed = row["seed"]
+        if seed in seen_seeds:
+            duplicate_seeds.add(seed)
+        seen_seeds.add(seed)
+
+    if duplicate_seeds:
+        raise SummaryError(
+            f'case "{case_id}" field "seed" has duplicate attempted row(s): '
+            f"{_format_seed_set(duplicate_seeds)}"
+        )
+    if iterations_values != {case["iterations"]}:
+        raise SummaryError(
+            f'case "{case_id}" field "iterations" must match manifest value '
+            f'{case["iterations"]}; observed {_join_sorted(iterations_values)}'
+        )
+    if restarts_values != {case["restarts"]}:
+        raise SummaryError(
+            f'case "{case_id}" field "restarts" must match manifest value '
+            f'{case["restarts"]}; observed {_join_sorted(restarts_values)}'
+        )
+    expected_target_weight = case.get("target_weight")
+    if target_weight_values != {expected_target_weight}:
+        expected = "none" if expected_target_weight is None else str(expected_target_weight)
+        observed = _join_sorted({value for value in target_weight_values if value is not None}) or "none"
+        raise SummaryError(
+            f'case "{case_id}" field "target_weight" must match manifest value '
+            f"{expected}; observed {observed}"
+        )
+    expected_target_upper_bound = case.get("target_upper_bound")
+    if target_upper_bound_values and target_upper_bound_values != {expected_target_upper_bound}:
+        expected = "none" if expected_target_upper_bound is None else str(expected_target_upper_bound)
+        raise SummaryError(
+            f'case "{case_id}" field "target_upper_bound" must match manifest value '
+            f"{expected}; observed {_join_sorted(target_upper_bound_values)}"
+        )
+    if len(build_profile_values) > 1:
+        raise SummaryError(
+            f'case "{case_id}" field "build_profile" must be homogeneous; '
+            f"observed {_join_sorted(build_profile_values)}"
+        )
+    return seen_seeds
+
+
+def _validate_multiseed_no_target_seed_sets(
+    cases: list[dict[str, Any]],
+    seed_sets_by_case: dict[str, set[int]],
+    expected_seeds: list[int] | None = None,
+) -> None:
+    if expected_seeds is not None and len(expected_seeds) > 1:
+        no_target_seed_sets = {
+            case["case_id"]: seed_sets_by_case[case["case_id"]]
+            for case in cases
+            if case.get("target_weight") is None
+        }
+        expected = set(expected_seeds)
+    else:
+        no_target_seed_sets = {
+            case["case_id"]: seed_sets_by_case[case["case_id"]]
+            for case in cases
+            if case.get("target_weight") is None and seed_sets_by_case[case["case_id"]]
+        }
+        if not no_target_seed_sets:
+            return
+        expected = max(no_target_seed_sets.values(), key=lambda values: (len(values), sorted(values)))
+    if len(expected) <= 1:
+        return
+    for case_id, observed in no_target_seed_sets.items():
+        if observed != expected:
+            missing = expected - observed
+            extra = observed - expected
+            details = []
+            if missing:
+                details.append(f"missing {_format_seed_set(missing)}")
+            if extra:
+                details.append(f"extra {_format_seed_set(extra)}")
+            expected_text = _format_seed_set(expected)
+            observed_text = _format_seed_set(observed) or "none"
+            rule = "must exactly match expected seed set" if expected_seeds is not None else "must include observed multi-seed set"
+            raise SummaryError(
+                f'case "{case_id}" field "seed" {rule} '
+                f"{expected_text}; observed {observed_text} "
+                f"({', '.join(details)})"
+            )
 
 
 def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, object]:
@@ -342,6 +470,9 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         "run_target_weight_values": _join_sorted(
             {row["target_weight"] for row in rows if row["target_weight"] is not None}
         ),
+        "run_build_profile_values": _join_sorted(
+            {row["build_profile"] for row in rows if row.get("build_profile") is not None}
+        ),
         "run_status_values": _join_sorted({row["status"] for row in rows}),
         **search_stat_summary,
         "summary_status": "ok" if successful else "no_success",
@@ -351,10 +482,16 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
 def summarize_cases(
     cases: list[dict[str, Any]],
     rows: list[dict[str, Any]],
+    expected_seeds: list[int] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, object]]]:
     rows_by_case = {case["case_id"]: [] for case in cases if isinstance(case, dict)}
     for row in rows:
         rows_by_case[row["case_id"]].append(row)
+    seed_sets_by_case = {
+        case["case_id"]: _validate_case_rows(case, rows_by_case[case["case_id"]])
+        for case in cases
+    }
+    _validate_multiseed_no_target_seed_sets(cases, seed_sets_by_case, expected_seeds)
     summaries = [_summarize_case(case, rows_by_case[case["case_id"]]) for case in cases]
     return rows_by_case, summaries
 
@@ -433,8 +570,8 @@ def write_summary_md(
         "",
         "## Case Summary",
         "",
-        "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | search_stats | note |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| case_id | code_id | status | attempted | successful | observed_seeds | best_upper_bound | target_upper_bound | target_hits | elapsed_s | target_weight | build_profile | search_stats | note |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
 
     for summary in summaries:
@@ -442,6 +579,15 @@ def write_summary_md(
         target_upper_bound_text = (
             "-" if target_upper_bound in {None, ""} else str(target_upper_bound)
         )
+        target_hits_text = "-"
+        if summary["target_hit_count"] not in {None, ""}:
+            rate = summary["target_hit_rate"] or ""
+            target_hits_text = f"{summary['target_hit_count']}/{summary['successful_seed_rows']}"
+            if rate:
+                target_hits_text = f"{target_hits_text} ({rate})"
+        target_weight_text = summary["run_target_weight_values"] or "none"
+        build_profile_text = summary["run_build_profile_values"] or "none"
+        observed_seeds_text = summary["run_seed_values"] or "none"
         if summary["successful_seed_rows"]:
             elapsed_text = (
                 f"median={summary['median_elapsed_s']}, min={summary['min_elapsed_s']}, "
@@ -465,16 +611,21 @@ def write_summary_md(
             )
         lines.append(
             "| {case_id} | {code_id} | {summary_status} | {attempted_seed_rows} | "
-            "{successful_seed_rows} | {best} | {target_upper_bound} | {elapsed} | "
+            "{successful_seed_rows} | {observed_seeds} | {best} | {target_upper_bound} | "
+            "{target_hits} | {elapsed} | {target_weight} | {build_profile} | "
             "{search_stats} | {note} |".format(
                 case_id=summary["case_id"],
                 code_id=summary["code_id"],
                 summary_status=summary["summary_status"],
                 attempted_seed_rows=summary["attempted_seed_rows"],
                 successful_seed_rows=summary["successful_seed_rows"],
+                observed_seeds=observed_seeds_text,
                 best=best_text,
                 target_upper_bound=target_upper_bound_text,
+                target_hits=target_hits_text,
                 elapsed=elapsed_text,
+                target_weight=target_weight_text,
+                build_profile=build_profile_text,
                 search_stats=search_stats_text,
                 note=note,
             )
@@ -512,7 +663,15 @@ def run(args: argparse.Namespace, argv: list[str] | None = None) -> int:
         print(error, file=sys.stderr)
         return 1
 
-    rows_by_case, summaries = summarize_cases(cases, rows)
+    try:
+        rows_by_case, summaries = summarize_cases(
+            cases,
+            rows,
+            getattr(args, "expected_seeds", None),
+        )
+    except SummaryError as error:
+        print(error, file=sys.stderr)
+        return 1
 
     try:
         args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -541,6 +700,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cases", type=Path, required=True)
     parser.add_argument("--runs", type=Path, nargs="+", required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--expected-seeds", type=_parse_nonnegative_int, nargs="+")
     return parser
 
 

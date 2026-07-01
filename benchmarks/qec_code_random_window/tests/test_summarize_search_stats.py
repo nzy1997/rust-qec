@@ -60,11 +60,11 @@ baseline_required = false
             text=True,
         )
 
-    def row(self, *, stats: dict[str, object]) -> dict[str, object]:
+    def row(self, *, stats: dict[str, object], seed: int = 7) -> dict[str, object]:
         return {
             "case_id": "stats_case",
             "status": "ok",
-            "seed": 7,
+            "seed": seed,
             "iterations": 20,
             "restarts": 2,
             "target_weight": 5,
@@ -99,6 +99,7 @@ baseline_required = false
                     }
                 ),
                 self.row(
+                    seed=11,
                     stats={
                         "permutations_sampled": 3,
                         "kernel_basis_generations": 6,

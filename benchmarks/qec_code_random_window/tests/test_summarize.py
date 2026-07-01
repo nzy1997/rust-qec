@@ -81,6 +81,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "10",
                         "run_restarts_values": "2",
                         "run_target_weight_values": "5",
+                        "run_build_profile_values": "",
                         "run_status_values": "cli_error;ok",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -117,6 +118,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "20",
                         "run_restarts_values": "1",
                         "run_target_weight_values": "3",
+                        "run_build_profile_values": "",
                         "run_status_values": "cli_error",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -153,6 +155,7 @@ class SummarizeTest(unittest.TestCase):
                         "run_iterations_values": "",
                         "run_restarts_values": "",
                         "run_target_weight_values": "",
+                        "run_build_profile_values": "",
                         "run_status_values": "",
                         "search_stats_rows": "",
                         "search_stats_total_permutations_sampled": "",
@@ -261,12 +264,81 @@ baseline_required = true
             row = read_csv_rows(out_dir / "summary.csv")[0]
             self.assertEqual(row["manifest_target_weight"], "")
             self.assertEqual(row["run_target_weight_values"], "")
+            self.assertEqual(row["run_build_profile_values"], "release")
             self.assertEqual(row["best_upper_bound"], "12")
             markdown = (out_dir / "summary.md").read_text(encoding="utf-8")
             self.assertIn(
-                "| case_id | code_id | status | attempted | successful | best_upper_bound | target_upper_bound | elapsed_s | search_stats | note |",
+                "| case_id | code_id | status | attempted | successful | observed_seeds | best_upper_bound | target_upper_bound | target_hits | elapsed_s | target_weight | build_profile | search_stats | note |",
                 markdown,
             )
+
+    def test_duplicate_seed_rows_are_rejected_for_targeted_case(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest = tmp_path / "cases.toml"
+            runs = tmp_path / "runs.jsonl"
+            out_dir = tmp_path / "summary"
+            manifest.write_text(
+                """
+manifest_version = 1
+suite = "qec_code_random_window"
+
+[[cases]]
+case_id = "target_case"
+code_id = "surface_rotated:d=5"
+distance_side = "any"
+iterations = 20
+restarts = 2
+seed = 11
+target_weight = 5
+target_upper_bound = 5
+baseline_key = "unmapped:target"
+baseline_required = false
+""".lstrip(),
+                encoding="utf-8",
+            )
+            runs.write_text(
+                "".join(
+                    json.dumps(
+                        {
+                            "case_id": "target_case",
+                            "status": "ok",
+                            "seed": 11,
+                            "iterations": 20,
+                            "restarts": 2,
+                            "target_weight": 5,
+                            "upper_bound": 5,
+                            "elapsed_s": 1.0,
+                        }
+                    )
+                    + "\n"
+                    for _ in range(2)
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "benchmarks.qec_code_random_window.summarize",
+                    "--cases",
+                    str(manifest),
+                    "--runs",
+                    str(runs),
+                    "--out-dir",
+                    str(out_dir),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("target_case", result.stderr)
+            self.assertIn('field "seed"', result.stderr)
+            self.assertIn("11", result.stderr)
 
     def test_summary_markdown_has_manifest_rows_and_zero_success_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -336,6 +408,7 @@ baseline_required = true
                 cases=FIXTURES / "summary_cases.toml",
                 runs=[FIXTURES / "summary_runs.jsonl"],
                 out_dir=Path(tmp),
+                expected_seeds=None,
             )
             argv = ["--cases", "fixture path", "--label", "token with spaces"]
 
@@ -365,6 +438,7 @@ baseline_required = true
         self.assertIn("--cases", result.stdout)
         self.assertIn("--runs", result.stdout)
         self.assertIn("--out-dir", result.stdout)
+        self.assertIn("--expected-seeds", result.stdout)
 
 
 if __name__ == "__main__":
