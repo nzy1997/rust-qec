@@ -1321,6 +1321,7 @@ mod tests {
     #[test]
     fn random_window_component_filter_reports_validation_errors() {
         let span = empty_reduced_rows(3);
+        let packed_filter = PackedCssComponentFilter::try_new(&[], &span).unwrap();
 
         assert_eq!(
             css_component_candidate_verdict(&[], &span, &[1, 0]).unwrap_err(),
@@ -1351,6 +1352,27 @@ mod tests {
                 col: 1,
                 value: 2,
             }
+        );
+        assert_eq!(
+            bitpacked_css_component_candidate_verdict(&packed_filter, &gf2::BitPackedRow::zeros(2))
+                .unwrap_err(),
+            QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            }
+        );
+        let invalid_span = gf2::ReducedRows {
+            rows: vec![vec![1, 2, 0]],
+            pivot_cols: vec![0],
+            width: 3,
+        };
+        assert_eq!(
+            PackedCssComponentFilter::try_new(&[], &invalid_span).err(),
+            Some(QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            })
         );
     }
 

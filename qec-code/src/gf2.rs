@@ -621,10 +621,9 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        BitPackedRow, PackedReducedRows, RandomWindowKernelWorkspace,
         try_in_packed_reduced_row_span, try_in_reduced_row_span, try_in_row_span_with_width,
         try_nullspace_basis_with_width, try_random_window_kernel_basis_with_width, try_rank,
-        try_select_independent_rows,
+        try_select_independent_rows, BitPackedRow, PackedReducedRows, RandomWindowKernelWorkspace,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -674,10 +673,7 @@ mod tests {
         let mut lhs = BitPackedRow::try_from_dense(&lhs_dense, 144).unwrap();
         let rhs = BitPackedRow::try_from_dense(&rhs_dense, 144).unwrap();
 
-        assert_eq!(
-            lhs.dot_parity(&rhs).unwrap(),
-            dot(&lhs_dense, &rhs_dense)
-        );
+        assert_eq!(lhs.dot_parity(&rhs).unwrap(), dot(&lhs_dense, &rhs_dense));
         assert_eq!(lhs.weight(), dense_weight(&lhs_dense));
         assert!(!lhs.eq_logical(&rhs).unwrap());
         assert!(!lhs.is_zero());
@@ -705,10 +701,7 @@ mod tests {
 
             assert_eq!(dirty.to_dense(), dense);
             assert_eq!(dirty.weight(), dense_weight(&dense));
-            assert_eq!(
-                dirty.dot_parity(&clean).unwrap(),
-                dot(&dense, &dense)
-            );
+            assert_eq!(dirty.dot_parity(&clean).unwrap(), dot(&dense, &dense));
             assert!(dirty.eq_logical(&clean).unwrap());
             assert_eq!(dirty.is_zero(), dense.iter().all(|bit| *bit == 0));
 
@@ -765,7 +758,10 @@ mod tests {
     #[test]
     fn packed_reduced_row_span_membership_matches_dense_membership() {
         let reduced = super::try_rref_with_width(
-            &[row_with_ones(65, &[0, 1, 64]), row_with_ones(65, &[1, 2, 64])],
+            &[
+                row_with_ones(65, &[0, 1, 64]),
+                row_with_ones(65, &[1, 2, 64]),
+            ],
             65,
         )
         .unwrap();
@@ -788,6 +784,29 @@ mod tests {
         zero.set_storage_padding_for_test();
 
         assert_eq!(try_in_packed_reduced_row_span(&packed, &zero), Ok(true));
+    }
+
+    #[test]
+    fn packed_reduced_row_span_membership_reports_width_mismatches() {
+        let reduced = super::try_rref_with_width(&[vec![1, 0, 0]], 3).unwrap();
+        let packed = PackedReducedRows::try_from_reduced_rows(&reduced).unwrap();
+        let target = BitPackedRow::zeros(2);
+        let row = BitPackedRow::zeros(3);
+
+        assert_eq!(
+            row.bit(3),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 4,
+            })
+        );
+        assert_eq!(
+            try_in_packed_reduced_row_span(&packed, &target),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            })
+        );
     }
 
     #[test]
