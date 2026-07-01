@@ -5,6 +5,7 @@ use crate::error::{QecError, Result};
 use crate::gf2;
 use crate::Pauli;
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -156,6 +157,24 @@ pub struct RandomWindowSearchStats {
     pub valid_witnesses_found: usize,
     pub best_witness_updates: usize,
     pub target_reached: bool,
+    pub permutation_time_ns: u64,
+    pub kernel_basis_time_ns: u64,
+    pub span_filter_time_ns: u64,
+    pub witness_validation_time_ns: u64,
+    pub best_update_time_ns: u64,
+    pub total_search_time_ns: u64,
+}
+
+fn duration_ns(duration: Duration) -> u64 {
+    duration.as_nanos().try_into().unwrap_or(u64::MAX)
+}
+
+fn add_elapsed_ns(total: &mut u64, started: Instant) {
+    *total = total.saturating_add(duration_ns(started.elapsed()));
+}
+
+fn finish_search_timing(search_stats: &mut RandomWindowSearchStats, started: Instant) {
+    search_stats.total_search_time_ns = duration_ns(started.elapsed()).max(1);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -324,10 +343,13 @@ pub fn random_window_css_upper_bound(
     let mut rng = SplitMix64::new(options.seed);
     let mut best_witness: Option<Pauli> = None;
     let mut search_stats = RandomWindowSearchStats::default();
+    let search_started = Instant::now();
 
     for _restart in 0..options.restarts {
         for _iteration in 0..options.iterations {
+            let permutation_started = Instant::now();
             let permutation = shuffled_columns(width, &mut rng);
+            add_elapsed_ns(&mut search_stats.permutation_time_ns, permutation_started);
             search_stats.permutations_sampled += 1;
             consider_component_candidates(
                 css.hz(),
@@ -342,6 +364,7 @@ pub fn random_window_css_upper_bound(
             )?;
             if target_reached(&best_witness, options.target_weight) {
                 search_stats.target_reached = true;
+                finish_search_timing(&mut search_stats, search_started);
                 return completed_random_window_upper_bound_result(
                     code,
                     best_witness.unwrap(),
@@ -363,6 +386,7 @@ pub fn random_window_css_upper_bound(
             )?;
             if target_reached(&best_witness, options.target_weight) {
                 search_stats.target_reached = true;
+                finish_search_timing(&mut search_stats, search_started);
                 return completed_random_window_upper_bound_result(
                     code,
                     best_witness.unwrap(),
@@ -374,6 +398,7 @@ pub fn random_window_css_upper_bound(
     }
 
     let witness = best_witness.ok_or(QecError::RandomizedUpperBoundWitnessNotFound)?;
+    finish_search_timing(&mut search_stats, search_started);
     completed_random_window_upper_bound_result(code, witness, options, search_stats)
 }
 
@@ -416,33 +441,49 @@ fn consider_component_candidates(
     search_stats: &mut RandomWindowSearchStats,
 ) -> Result<()> {
     search_stats.kernel_basis_generations += 1;
+    let kernel_started = Instant::now();
     let candidates =
-        gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation)?;
+        gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation);
+    add_elapsed_ns(&mut search_stats.kernel_basis_time_ns, kernel_started);
+    let candidates = candidates?;
     search_stats.component_candidates_generated += candidates.len();
 
     for candidate in candidates {
+        let span_started = Instant::now();
         if !candidate.iter().any(|bit| *bit == 1) {
+            add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
             search_stats.zero_candidates_rejected += 1;
             continue;
         }
-        if gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate)? {
+        let in_component_span = gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate);
+        add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
+        if in_component_span? {
             search_stats.stabilizer_span_candidates_rejected += 1;
             continue;
         }
 
+        let validation_started = Instant::now();
         let witness = component_candidate_to_pauli(component, candidate)?;
-        if validate_witness_against_code_with_span(code, stabilizer_span, &witness).is_err() {
+        let witness_is_valid =
+            validate_witness_against_code_with_span(code, stabilizer_span, &witness).is_ok();
+        add_elapsed_ns(
+            &mut search_stats.witness_validation_time_ns,
+            validation_started,
+        );
+        if !witness_is_valid {
             search_stats.witness_validation_candidates_rejected += 1;
             continue;
         }
         search_stats.valid_witnesses_found += 1;
-        if best_witness
+        let best_update_started = Instant::now();
+        let should_update = best_witness
             .as_ref()
-            .is_none_or(|current| witness.weight() < current.weight())
-        {
+            .is_none_or(|current| witness.weight() < current.weight());
+        if should_update {
             search_stats.best_witness_updates += 1;
             *best_witness = Some(witness);
         }
+        add_elapsed_ns(&mut search_stats.best_update_time_ns, best_update_started);
     }
 
     Ok(())

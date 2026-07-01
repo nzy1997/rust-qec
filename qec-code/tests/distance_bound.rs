@@ -198,6 +198,21 @@ fn run_issue_225_random_window_ladder<'a>(
     rows
 }
 
+fn clear_random_window_search_timing(
+    result: &mut qec_code::distance_bound::DistanceBoundResult<RandomWindowUpperBoundOptions>,
+) {
+    let stats = result
+        .search_stats
+        .as_mut()
+        .expect("random-window result should carry stats");
+    stats.permutation_time_ns = 0;
+    stats.kernel_basis_time_ns = 0;
+    stats.span_filter_time_ns = 0;
+    stats.witness_validation_time_ns = 0;
+    stats.best_update_time_ns = 0;
+    stats.total_search_time_ns = 0;
+}
+
 #[test]
 fn css_code_preserves_dense_component_rows_for_search() {
     let css = CssCode::from_hx_hz(vec![vec![1, 1, 0]], vec![vec![0, 0, 1]]).unwrap();
@@ -214,8 +229,15 @@ fn random_window_upper_bound_finds_surface_and_toric_distance_under_pinned_optio
 
         let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
         let second = random_window_css_upper_bound(&css, options).unwrap();
+        let mut first_without_timing = first.clone();
+        let mut second_without_timing = second.clone();
+        clear_random_window_search_timing(&mut first_without_timing);
+        clear_random_window_search_timing(&mut second_without_timing);
 
-        assert_eq!(first, second, "{code_id} should be deterministic");
+        assert_eq!(
+            first_without_timing, second_without_timing,
+            "{code_id} should be deterministic"
+        );
         assert_eq!(first.method, DistanceBoundMethod::RandomWindowUpperBound);
         assert_eq!(first.upper_bound, 5, "{code_id}");
         assert_eq!(first.witness.weight, 5, "{code_id}");
@@ -320,8 +342,12 @@ fn random_window_upper_bound_returns_best_witness_after_exhausting_iterations() 
 
     let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
     let second = random_window_css_upper_bound(&css, options).unwrap();
+    let mut first_without_timing = first.clone();
+    let mut second_without_timing = second.clone();
+    clear_random_window_search_timing(&mut first_without_timing);
+    clear_random_window_search_timing(&mut second_without_timing);
 
-    assert_eq!(first, second);
+    assert_eq!(first_without_timing, second_without_timing);
     assert_eq!(first.upper_bound, 1);
     assert_eq!(first.logical_class, LogicalClass::ZLike);
     validate_random_window_upper_bound_result(
@@ -392,6 +418,68 @@ fn random_window_upper_bound_reports_search_stats() {
         .expect("random-window result should carry stats");
     assert!(no_target_stats.permutations_sampled > 0);
     assert!(!no_target_stats.target_reached);
+}
+
+#[test]
+fn random_window_upper_bound_reports_search_timing() {
+    let css = css_from_built_in_code_id("surface_rotated:d=5");
+    let result = random_window_css_upper_bound(
+        &css,
+        RandomWindowUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 7,
+            target_weight: Some(5),
+        },
+    )
+    .unwrap();
+
+    let json = serde_json::to_value(&result).unwrap();
+    let search_stats = json["search_stats"]
+        .as_object()
+        .expect("random-window result should serialize search_stats");
+    let timing_fields = [
+        "permutation_time_ns",
+        "kernel_basis_time_ns",
+        "span_filter_time_ns",
+        "witness_validation_time_ns",
+        "best_update_time_ns",
+        "total_search_time_ns",
+    ];
+    for field in timing_fields {
+        assert!(
+            search_stats[field].as_u64().is_some(),
+            "{field} should serialize as a non-negative integer"
+        );
+    }
+    assert!(
+        search_stats["total_search_time_ns"].as_u64().unwrap() > 0,
+        "completed non-empty random-window run should report positive total search time"
+    );
+
+    let stats = result
+        .search_stats
+        .expect("random-window result should carry stats");
+    let named_stage_sum = stats.permutation_time_ns
+        + stats.kernel_basis_time_ns
+        + stats.span_filter_time_ns
+        + stats.witness_validation_time_ns
+        + stats.best_update_time_ns;
+    assert!(stats.total_search_time_ns >= named_stage_sum);
+
+    let randomized = randomized_css_upper_bound(
+        &css,
+        RandomizedUpperBoundOptions {
+            iterations: 20,
+            restarts: 1,
+            seed: 7,
+            target_weight: Some(5),
+        },
+    )
+    .unwrap();
+    let randomized_json = serde_json::to_value(&randomized).unwrap();
+    assert_eq!(randomized_json["method"], "randomized-upper-bound");
+    assert!(randomized_json.get("search_stats").is_none());
 }
 
 #[test]

@@ -57,7 +57,26 @@ SEARCH_STAT_CSV_FIELDS = [
     "search_stats_target_reached_count",
 ]
 
-CSV_FIELDS = [*CSV_FIELDS[:-1], *SEARCH_STAT_CSV_FIELDS, CSV_FIELDS[-1]]
+SEARCH_TIMING_FIELDS = [
+    "permutation_time_ns",
+    "kernel_basis_time_ns",
+    "span_filter_time_ns",
+    "witness_validation_time_ns",
+    "best_update_time_ns",
+    "total_search_time_ns",
+]
+
+SEARCH_TIMING_CSV_FIELDS = [
+    "search_timing_rows",
+    *(f"search_timing_total_{field}" for field in SEARCH_TIMING_FIELDS),
+]
+
+CSV_FIELDS = [
+    *CSV_FIELDS[:-1],
+    *SEARCH_STAT_CSV_FIELDS,
+    *SEARCH_TIMING_CSV_FIELDS,
+    CSV_FIELDS[-1],
+]
 
 
 class SummaryError(ValueError):
@@ -181,6 +200,27 @@ def _validate_search_stats(row: dict[str, Any], location: str) -> dict[str, Any]
     if type(target_reached) is not bool:
         raise _fail(location, "search_stats.target_reached must be a boolean")
     validated["target_reached"] = target_reached
+
+    present_timing_fields = [field for field in SEARCH_TIMING_FIELDS if field in search_stats]
+    if present_timing_fields:
+        for field in SEARCH_TIMING_FIELDS:
+            value = search_stats.get(field)
+            if not _is_int(value) or value < 0:
+                raise _fail(location, f"search_stats.{field} must be a non-negative integer")
+            validated[field] = value
+        named_stage_sum = sum(
+            validated[field]
+            for field in SEARCH_TIMING_FIELDS
+            if field != "total_search_time_ns"
+        )
+        if validated["total_search_time_ns"] < named_stage_sum:
+            raise _fail(
+                location,
+                "search_stats.total_search_time_ns must be greater than or equal to "
+                "search_stats.permutation_time_ns + search_stats.kernel_basis_time_ns + "
+                "search_stats.span_filter_time_ns + search_stats.witness_validation_time_ns + "
+                "search_stats.best_update_time_ns",
+            )
 
     if validated["valid_witnesses_found"] > validated["component_candidates_generated"]:
         raise _fail(
@@ -308,6 +348,16 @@ def _format_seed_set(seeds: set[int]) -> str:
     return _join_sorted(seeds)
 
 
+def _format_ns_as_ms(value: object) -> str:
+    if value in {None, ""}:
+        return "-"
+    assert isinstance(value, int)
+    if value == 0:
+        return "0.000 ms"
+    rounded_up_thousandths_ms = (value + 999) // 1000
+    return f"{rounded_up_thousandths_ms / 1000:.3f} ms"
+
+
 def _validate_case_rows(case: dict[str, Any], rows: list[dict[str, Any]]) -> set[int]:
     case_id = case["case_id"]
     if not rows:
@@ -415,6 +465,9 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
     stats_rows = [
         row["search_stats"] for row in successful if row.get("search_stats") is not None
     ]
+    timing_rows = [
+        stats for stats in stats_rows if all(field in stats for field in SEARCH_TIMING_FIELDS)
+    ]
     target_upper_bound = case.get("target_upper_bound")
     best_upper_bound = min((row["upper_bound"] for row in successful), default=None)
     elapsed_values = [row["elapsed_s"] for row in successful]
@@ -443,6 +496,15 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         )
         if stats_rows
         else None,
+    }
+    search_timing_summary = {
+        "search_timing_rows": len(timing_rows) if timing_rows else None,
+        **{
+            f"search_timing_total_{field}": sum(stats[field] for stats in timing_rows)
+            if timing_rows
+            else None
+            for field in SEARCH_TIMING_FIELDS
+        },
     }
 
     return {
@@ -475,6 +537,7 @@ def _summarize_case(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
         ),
         "run_status_values": _join_sorted({row["status"] for row in rows}),
         **search_stat_summary,
+        **search_timing_summary,
         "summary_status": "ok" if successful else "no_success",
     }
 
@@ -608,6 +671,19 @@ def write_summary_md(
                 f"permutations={summary['search_stats_total_permutations_sampled']}, "
                 f"candidates={summary['search_stats_total_component_candidates_generated']}, "
                 f"target_reached={summary['search_stats_target_reached_count']}"
+            )
+        if summary["search_timing_rows"] not in {None, ""}:
+            timing_text = (
+                f"timing_rows={summary['search_timing_rows']}, "
+                f"total={_format_ns_as_ms(summary['search_timing_total_total_search_time_ns'])}, "
+                f"kernel={_format_ns_as_ms(summary['search_timing_total_kernel_basis_time_ns'])}, "
+                f"span={_format_ns_as_ms(summary['search_timing_total_span_filter_time_ns'])}, "
+                f"witness={_format_ns_as_ms(summary['search_timing_total_witness_validation_time_ns'])}, "
+                f"permutation={_format_ns_as_ms(summary['search_timing_total_permutation_time_ns'])}, "
+                f"best_update={_format_ns_as_ms(summary['search_timing_total_best_update_time_ns'])}"
+            )
+            search_stats_text = (
+                timing_text if search_stats_text == "-" else f"{search_stats_text}; {timing_text}"
             )
         lines.append(
             "| {case_id} | {code_id} | {summary_status} | {attempted_seed_rows} | "
