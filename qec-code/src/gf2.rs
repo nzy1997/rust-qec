@@ -3,10 +3,180 @@ use crate::error::{QecError, Result};
 pub(crate) type BinaryRow = Vec<u8>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct BitPackedRow {
+    width: usize,
+    words: Vec<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReducedRows {
     pub rows: Vec<BinaryRow>,
     pub pivot_cols: Vec<usize>,
     pub width: usize,
+}
+
+#[allow(dead_code)]
+fn word_count(width: usize) -> usize {
+    width.div_ceil(64)
+}
+
+#[allow(dead_code)]
+fn tail_mask(width: usize) -> u64 {
+    if width == 0 {
+        return 0;
+    }
+    let tail_bits = width % 64;
+    if tail_bits == 0 {
+        u64::MAX
+    } else {
+        (1u64 << tail_bits) - 1
+    }
+}
+
+#[allow(dead_code)]
+impl BitPackedRow {
+    pub(crate) fn try_from_dense(row: &[u8], width: usize) -> Result<Self> {
+        validate_target(row)?;
+        if row.len() != width {
+            return Err(QecError::RowWidthMismatch {
+                expected: width,
+                actual: row.len(),
+            });
+        }
+
+        let mut words = vec![0u64; word_count(width)];
+        for (index, bit) in row.iter().copied().enumerate() {
+            if bit == 1 {
+                words[index / 64] |= 1u64 << (index % 64);
+            }
+        }
+
+        let mut row = Self { width, words };
+        row.clear_padding_bits();
+        Ok(row)
+    }
+
+    pub(crate) fn zeros(width: usize) -> Self {
+        Self {
+            width,
+            words: vec![0; word_count(width)],
+        }
+    }
+
+    pub(crate) fn width(&self) -> usize {
+        self.width
+    }
+
+    pub(crate) fn to_dense(&self) -> Vec<u8> {
+        let mut dense = vec![0; self.width];
+        for index in 0..self.width {
+            let word = self.words[index / 64];
+            dense[index] = u8::from(((word >> (index % 64)) & 1) == 1);
+        }
+        dense
+    }
+
+    pub(crate) fn xor_assign(&mut self, rhs: &Self) -> Result<()> {
+        if self.width != rhs.width {
+            return Err(QecError::RowWidthMismatch {
+                expected: self.width,
+                actual: rhs.width,
+            });
+        }
+
+        for (left, right) in self.words.iter_mut().zip(&rhs.words) {
+            *left ^= *right;
+        }
+        self.clear_padding_bits();
+        Ok(())
+    }
+
+    pub(crate) fn dot_parity(&self, rhs: &Self) -> Result<u8> {
+        if self.width != rhs.width {
+            return Err(QecError::RowWidthMismatch {
+                expected: self.width,
+                actual: rhs.width,
+            });
+        }
+
+        if self.words.is_empty() {
+            return Ok(0);
+        }
+
+        let last = self.words.len() - 1;
+        let mut parity = 0u32;
+        for (left, right) in self.words[..last].iter().zip(&rhs.words[..last]) {
+            parity ^= (*left & *right).count_ones();
+        }
+        let mask = tail_mask(self.width);
+        parity ^= ((self.words[last] & rhs.words[last]) & mask).count_ones();
+
+        Ok((parity & 1) as u8)
+    }
+
+    pub(crate) fn weight(&self) -> usize {
+        if self.words.is_empty() {
+            return 0;
+        }
+
+        let last = self.words.len() - 1;
+        let mut weight = 0usize;
+        for word in &self.words[..last] {
+            weight += word.count_ones() as usize;
+        }
+        weight += (self.words[last] & tail_mask(self.width)).count_ones() as usize;
+        weight
+    }
+
+    pub(crate) fn eq_logical(&self, rhs: &Self) -> Result<bool> {
+        if self.width != rhs.width {
+            return Err(QecError::RowWidthMismatch {
+                expected: self.width,
+                actual: rhs.width,
+            });
+        }
+
+        if self.words.len() != rhs.words.len() {
+            return Ok(false);
+        }
+
+        if self.words.is_empty() {
+            return Ok(true);
+        }
+
+        let last = self.words.len() - 1;
+        if self.words[..last] != rhs.words[..last] {
+            return Ok(false);
+        }
+        let mask = tail_mask(self.width);
+        Ok((self.words[last] & mask) == (rhs.words[last] & mask))
+    }
+
+    pub(crate) fn is_zero(&self) -> bool {
+        if self.words.is_empty() {
+            return true;
+        }
+
+        let last = self.words.len() - 1;
+        if self.words[..last].iter().any(|word| *word != 0) {
+            return false;
+        }
+        (self.words[last] & tail_mask(self.width)) == 0
+    }
+
+    fn clear_padding_bits(&mut self) {
+        if let Some(last) = self.words.last_mut() {
+            *last &= tail_mask(self.width);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_storage_padding_for_test(&mut self) {
+        if let Some(last) = self.words.last_mut() {
+            *last |= !tail_mask(self.width);
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -389,15 +559,136 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        RandomWindowKernelWorkspace, try_in_reduced_row_span, try_in_row_span_with_width,
-        try_nullspace_basis_with_width, try_random_window_kernel_basis_with_width, try_rank,
-        try_select_independent_rows,
+        try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
+        try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
+        BitPackedRow, RandomWindowKernelWorkspace,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
         lhs.iter()
             .zip(rhs)
             .fold(0, |parity, (left, right)| parity ^ (*left & *right))
+    }
+
+    fn patterned_row(width: usize, salt: usize) -> Vec<u8> {
+        (0..width)
+            .map(|index| u8::from(((index * salt + index / 3 + salt) % 5) < 2))
+            .collect()
+    }
+
+    fn dense_weight(row: &[u8]) -> usize {
+        row.iter().map(|bit| usize::from(*bit)).sum()
+    }
+
+    #[test]
+    fn gf2_bitpacked_rows_match_dense_binary_rows() {
+        for width in [0, 1, 63, 64, 65, 144] {
+            let dense = patterned_row(width, 7);
+            let packed = BitPackedRow::try_from_dense(&dense, width).unwrap();
+
+            assert_eq!(packed.width(), width);
+            assert_eq!(packed.to_dense(), dense);
+        }
+    }
+
+    #[test]
+    fn gf2_bitpacked_row_ops_match_dense_ops() {
+        let lhs_dense = patterned_row(144, 3);
+        let rhs_dense = patterned_row(144, 5);
+        let mut expected_xor = lhs_dense.clone();
+        for (left, right) in expected_xor.iter_mut().zip(&rhs_dense) {
+            *left ^= *right;
+        }
+
+        let mut lhs = BitPackedRow::try_from_dense(&lhs_dense, 144).unwrap();
+        let rhs = BitPackedRow::try_from_dense(&rhs_dense, 144).unwrap();
+
+        assert_eq!(
+            lhs.dot_parity(&rhs).unwrap(),
+            dot(&lhs_dense, &rhs_dense)
+        );
+        assert_eq!(lhs.weight(), dense_weight(&lhs_dense));
+        assert!(!lhs.eq_logical(&rhs).unwrap());
+        assert!(!lhs.is_zero());
+
+        lhs.xor_assign(&rhs).unwrap();
+        assert_eq!(lhs.to_dense(), expected_xor);
+        assert_eq!(lhs.weight(), dense_weight(&expected_xor));
+        assert_eq!(
+            lhs.dot_parity(&rhs).unwrap(),
+            dot(&expected_xor, &rhs_dense)
+        );
+        assert!(BitPackedRow::zeros(144).is_zero());
+        assert!(BitPackedRow::zeros(144)
+            .eq_logical(&BitPackedRow::try_from_dense(&vec![0; 144], 144).unwrap())
+            .unwrap());
+    }
+
+    #[test]
+    fn gf2_bitpacked_row_ops_handle_tail_bits() {
+        for width in [1, 63, 65, 144] {
+            let dense = patterned_row(width, 11);
+            let mut clean = BitPackedRow::try_from_dense(&dense, width).unwrap();
+            let mut dirty = BitPackedRow::try_from_dense(&dense, width).unwrap();
+            dirty.set_storage_padding_for_test();
+
+            assert_eq!(dirty.to_dense(), dense);
+            assert_eq!(dirty.weight(), dense_weight(&dense));
+            assert_eq!(
+                dirty.dot_parity(&clean).unwrap(),
+                dot(&dense, &dense)
+            );
+            assert!(dirty.eq_logical(&clean).unwrap());
+            assert_eq!(dirty.is_zero(), dense.iter().all(|bit| *bit == 0));
+
+            clean.xor_assign(&dirty).unwrap();
+            assert!(clean.is_zero());
+            assert_eq!(clean.to_dense(), vec![0; width]);
+        }
+    }
+
+    #[test]
+    fn gf2_bitpacked_rows_reject_invalid_binary_inputs() {
+        assert_eq!(
+            BitPackedRow::try_from_dense(&[1, 2, 0], 3),
+            Err(QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            })
+        );
+        assert_eq!(
+            BitPackedRow::try_from_dense(&[1, 0], 3),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            })
+        );
+
+        let width_three = BitPackedRow::try_from_dense(&[1, 0, 1], 3).unwrap();
+        let width_four = BitPackedRow::try_from_dense(&[1, 0, 1, 0], 4).unwrap();
+        assert_eq!(
+            width_three.dot_parity(&width_four),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 4,
+            })
+        );
+        assert_eq!(
+            width_three.eq_logical(&width_four),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 4,
+            })
+        );
+        let mut width_three_copy = width_three.clone();
+        assert_eq!(
+            width_three_copy.xor_assign(&width_four),
+            Err(QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 4,
+            })
+        );
     }
 
     #[test]
