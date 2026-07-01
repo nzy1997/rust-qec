@@ -68,6 +68,18 @@ impl BitPackedRow {
         self.width
     }
 
+    pub(crate) fn bit(&self, index: usize) -> Result<u8> {
+        if index >= self.width {
+            return Err(QecError::RowWidthMismatch {
+                expected: self.width,
+                actual: index + 1,
+            });
+        }
+        Ok(u8::from(
+            ((self.words[index / 64] >> (index % 64)) & 1) == 1,
+        ))
+    }
+
     pub(crate) fn to_dense(&self) -> Vec<u8> {
         let mut dense = vec![0; self.width];
         for index in 0..self.width {
@@ -177,6 +189,56 @@ impl BitPackedRow {
             *last |= !tail_mask(self.width);
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct PackedReducedRows {
+    rows: Vec<BitPackedRow>,
+    pivot_cols: Vec<usize>,
+    width: usize,
+}
+
+#[allow(dead_code)]
+impl PackedReducedRows {
+    pub(crate) fn try_from_reduced_rows(reduced: &ReducedRows) -> Result<Self> {
+        let rows = reduced
+            .rows
+            .iter()
+            .map(|row| BitPackedRow::try_from_dense(row, reduced.width))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self {
+            rows,
+            pivot_cols: reduced.pivot_cols.clone(),
+            width: reduced.width,
+        })
+    }
+
+    pub(crate) fn width(&self) -> usize {
+        self.width
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) fn try_in_packed_reduced_row_span(
+    reduced: &PackedReducedRows,
+    target: &BitPackedRow,
+) -> Result<bool> {
+    if target.width() != reduced.width {
+        return Err(QecError::RowWidthMismatch {
+            expected: reduced.width,
+            actual: target.width(),
+        });
+    }
+
+    let mut remainder = target.clone();
+    for (pivot_row, pivot_col) in reduced.pivot_cols.iter().copied().enumerate() {
+        if remainder.bit(pivot_col)? == 1 {
+            remainder.xor_assign(&reduced.rows[pivot_row])?;
+        }
+    }
+
+    Ok(remainder.is_zero())
 }
 
 #[derive(Debug, Default)]
@@ -559,9 +621,10 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
-        try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
-        BitPackedRow, RandomWindowKernelWorkspace,
+        BitPackedRow, PackedReducedRows, RandomWindowKernelWorkspace,
+        try_in_packed_reduced_row_span, try_in_reduced_row_span, try_in_row_span_with_width,
+        try_nullspace_basis_with_width, try_random_window_kernel_basis_with_width, try_rank,
+        try_select_independent_rows,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -578,6 +641,14 @@ mod tests {
 
     fn dense_weight(row: &[u8]) -> usize {
         row.iter().map(|bit| usize::from(*bit)).sum()
+    }
+
+    fn row_with_ones(width: usize, ones: &[usize]) -> Vec<u8> {
+        let mut row = vec![0; width];
+        for &index in ones {
+            row[index] = 1;
+        }
+        row
     }
 
     #[test]
@@ -689,6 +760,34 @@ mod tests {
                 actual: 4,
             })
         );
+    }
+
+    #[test]
+    fn packed_reduced_row_span_membership_matches_dense_membership() {
+        let reduced = super::try_rref_with_width(
+            &[row_with_ones(65, &[0, 1, 64]), row_with_ones(65, &[1, 2, 64])],
+            65,
+        )
+        .unwrap();
+        let packed = PackedReducedRows::try_from_reduced_rows(&reduced).unwrap();
+        let member = BitPackedRow::try_from_dense(&row_with_ones(65, &[0, 2]), 65).unwrap();
+        let nonmember = BitPackedRow::try_from_dense(&row_with_ones(65, &[3]), 65).unwrap();
+
+        assert_eq!(try_in_packed_reduced_row_span(&packed, &member), Ok(true));
+        assert_eq!(
+            try_in_packed_reduced_row_span(&packed, &nonmember),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn packed_reduced_row_span_membership_ignores_target_padding_bits() {
+        let reduced = super::try_rref_with_width(&[vec![1, 0, 0]], 3).unwrap();
+        let packed = PackedReducedRows::try_from_reduced_rows(&reduced).unwrap();
+        let mut zero = BitPackedRow::zeros(3);
+        zero.set_storage_padding_for_test();
+
+        assert_eq!(try_in_packed_reduced_row_span(&packed, &zero), Ok(true));
     }
 
     #[test]
