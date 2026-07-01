@@ -479,11 +479,11 @@ fn consider_component_candidates(
         let should_update = best_witness
             .as_ref()
             .is_none_or(|current| witness.weight() < current.weight());
-        add_elapsed_ns(&mut search_stats.best_update_time_ns, best_update_started);
         if should_update {
             search_stats.best_witness_updates += 1;
             *best_witness = Some(witness);
         }
+        add_elapsed_ns(&mut search_stats.best_update_time_ns, best_update_started);
     }
 
     Ok(())
