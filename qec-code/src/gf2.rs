@@ -389,9 +389,9 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
-        try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
-        RandomWindowKernelWorkspace,
+        RandomWindowKernelWorkspace, try_in_reduced_row_span, try_in_row_span_with_width,
+        try_nullspace_basis_with_width, try_random_window_kernel_basis_with_width, try_rank,
+        try_select_independent_rows,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -546,7 +546,11 @@ mod tests {
                     vec![1, 1, 0, 1, 1],
                 ],
                 5,
-                vec![vec![0, 1, 2, 3, 4], vec![4, 2, 0, 3, 1], vec![1, 3, 4, 0, 2]],
+                vec![
+                    vec![0, 1, 2, 3, 4],
+                    vec![4, 2, 0, 3, 1],
+                    vec![1, 3, 4, 0, 2],
+                ],
             ),
         ];
         let mut workspace = RandomWindowKernelWorkspace::new();
@@ -563,8 +567,14 @@ mod tests {
                     .unwrap()
                     .to_vec();
 
-                assert_eq!(actual, reference, "width {width} permutation {permutation:?}");
-                assert_eq!(expected, reference, "width {width} permutation {permutation:?}");
+                assert_eq!(
+                    actual, reference,
+                    "width {width} permutation {permutation:?}"
+                );
+                assert_eq!(
+                    expected, reference,
+                    "width {width} permutation {permutation:?}"
+                );
                 assert!(actual.iter().all(|row| row.len() == width));
                 for vector in &actual {
                     assert_kernel_vector(&matrix, vector);
