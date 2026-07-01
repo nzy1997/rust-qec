@@ -899,14 +899,12 @@ mod tests {
     }
 
     fn first_non_kernel_candidate(checks: &[Vec<u8>], width: usize) -> Vec<u8> {
-        for column in 0..width {
-            if checks.iter().any(|row| row[column] == 1) {
-                let mut candidate = vec![0; width];
-                candidate[column] = 1;
-                return candidate;
-            }
-        }
-        panic!("expected at least one nonzero check column");
+        let column = (0..width)
+            .find(|&column| checks.iter().any(|row| row[column] == 1))
+            .expect("expected at least one nonzero check column");
+        let mut candidate = vec![0; width];
+        candidate[column] = 1;
+        candidate
     }
 
     fn full_validator_component_verdict(
@@ -1117,6 +1115,62 @@ mod tests {
         assert_eq!(z_stats.stabilizer_span_candidates_rejected, 1);
         assert_eq!(z_stats.valid_witnesses_found, 0);
         assert_eq!(z_stats.best_witness_updates, 0);
+    }
+
+    #[test]
+    fn random_window_component_filter_reports_validation_errors() {
+        let span = empty_reduced_rows(3);
+
+        assert_eq!(
+            css_component_candidate_verdict(&[], &span, &[1, 0]).unwrap_err(),
+            QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            }
+        );
+        assert_eq!(
+            css_component_candidate_verdict(&[], &span, &[1, 2, 0]).unwrap_err(),
+            QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            }
+        );
+        assert_eq!(
+            css_component_candidate_verdict(&[vec![1, 0]], &span, &[1, 0, 0]).unwrap_err(),
+            QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            }
+        );
+        assert_eq!(
+            css_component_candidate_verdict(&[vec![1, 2, 0]], &span, &[1, 0, 0]).unwrap_err(),
+            QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn full_validator_component_verdict_propagates_unexpected_errors() {
+        let code = StabilizerCode::from_stabilizers(2, vec![]).unwrap();
+        let stabilizer_span = empty_reduced_rows(4);
+
+        assert_eq!(
+            full_validator_component_verdict(
+                &code,
+                &stabilizer_span,
+                ComponentKind::XLike,
+                &[1, 0, 0],
+            )
+            .unwrap_err(),
+            QecError::RowWidthMismatch {
+                expected: 4,
+                actual: 6,
+            }
+        );
     }
 
     #[test]
