@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -10,10 +10,12 @@ QEC_CODE_RANDOM_WINDOW_FULL_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/full
 QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-smoke
 QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-multiseed-smoke
 QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/no-target-ladder-smoke
+QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/issue225-readiness-smoke
 QEC_CODE_RANDOM_WINDOW_SMOKE_CASES := benchmarks/qec_code_random_window/cases.smoke.toml
 QEC_CODE_RANDOM_WINDOW_FULL_CASES := benchmarks/qec_code_random_window/cases.full.toml
 QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES := benchmarks/qec_code_random_window/cases.no-target-smoke.toml
 QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES := benchmarks/qec_code_random_window/cases.no-target-ladder-smoke.toml
+QEC_CODE_RANDOM_WINDOW_ISSUE225_EVIDENCE := benchmarks/qec_code_random_window/issue225_evidence.json
 QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER := case_id,paper_case,baseline_method,baseline_upper_bound,baseline_elapsed_s,source_file,source_sheet,source_row
 
 help:
@@ -33,6 +35,7 @@ help:
 	@echo "  qec-code-random-window-bench-no-target-smoke - Run release/no-target random-window fixed-budget smoke"
 	@echo "  qec-code-random-window-bench-no-target-multiseed-smoke - Run release/no-target random-window three-seed smoke"
 	@echo "  qec-code-random-window-bench-no-target-ladder-smoke - Run release/no-target-ladder random-window smoke"
+	@echo "  qec-code-random-window-bench-issue225-readiness-smoke - Run issue-225 readiness report smoke"
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
@@ -127,6 +130,13 @@ qec-code-random-window-bench-no-target-ladder-smoke:
 	cargo build --release -p qec-code
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/summary
+
+qec-code-random-window-bench-issue225-readiness-smoke:
+	rm -rf $(QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR)
+	mkdir -p $(QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR)
+	$(MAKE) qec-code-random-window-bench-no-target-ladder-smoke
+	$(MAKE) qec-code-random-window-bench-no-target-multiseed-smoke
+	python3 -m benchmarks.qec_code_random_window.issue225_readiness --evidence $(QEC_CODE_RANDOM_WINDOW_ISSUE225_EVIDENCE) --ladder-runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --ladder-summary $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/summary/summary.csv --multiseed-runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl --multiseed-summary $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/summary/summary.csv --out-dir $(QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR)
 
 # Release a new version: make release V=0.2.0
 release:

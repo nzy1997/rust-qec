@@ -1,6 +1,6 @@
 # QEC Random Window Benchmark Baselines
 
-The benchmark suite has four local entry points:
+The benchmark suite has five local entry points:
 
 - `make qec-code-random-window-bench-smoke` runs a cheap debug-built wiring
   check with known `target_weight` values.
@@ -19,6 +19,14 @@ The benchmark suite has four local entry points:
   `target/release/qec-code` and runs the issue-225 ladder of
   `surface_rotated_d5`, `toric_d5`, `bb72`, and `bb144` without `--target-weight`,
   and writes outputs to `benchmarks/out/qec_code_random_window/no-target-ladder-smoke/`.
+- `make qec-code-random-window-bench-issue225-readiness-smoke` reruns the
+  no-target ladder and no-target multiseed smokes, validates the committed
+  `issue225_evidence.json` chain, writes
+  `benchmarks/out/qec_code_random_window/issue225-readiness-smoke/report.md`
+  plus `summary.txt`, and prints `issue_225_readiness: PASS` on success.
+
+The issue-225 readiness report is local evidence only. Keep generated benchmark
+output under `benchmarks/out/qec_code_random_window/` untracked, and do not commit generated benchmark output.
 
 This benchmark can import external paper results from
 `https://github.com/m-webster/codeDistancePYPI`.

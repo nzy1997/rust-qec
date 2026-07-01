@@ -1,0 +1,109 @@
+{
+  "issue_225": {
+    "issue": 225,
+    "url": "https://github.com/nzy1997/rstim/issues/225",
+    "summary": "random-window upper-bound goal and acceleration closure readiness"
+  },
+  "chain": [
+    {
+      "milestone": "M1: benchmark evidence and no-target semantics",
+      "issue": 337,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/337",
+      "title": "Add a release no-target issue-225 ladder profiling smoke",
+      "pr": 340,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/340",
+      "merged_at": "2026-06-30T09:46:34Z",
+      "evidence": "Adds release/no-target ladder smoke for surface_rotated_d5, toric_d5, bb72, and bb144."
+    },
+    {
+      "milestone": "M1: benchmark evidence and no-target semantics",
+      "issue": 338,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/338",
+      "title": "Report random-window search counters in CLI JSON",
+      "pr": 341,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/341",
+      "merged_at": "2026-06-30T10:02:25Z",
+      "evidence": "Adds search_stats counters and benchmark summary aggregation."
+    },
+    {
+      "milestone": "M1: benchmark evidence and no-target semantics",
+      "issue": 339,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/339",
+      "title": "Add multi-seed no-target stability reporting",
+      "pr": 342,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/342",
+      "merged_at": "2026-07-01T01:31:41Z",
+      "evidence": "Adds BB72/BB144 no-target multi-seed summaries for seeds 7, 11, and 17."
+    },
+    {
+      "milestone": "M2: diagnostics and pruning",
+      "issue": 343,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/343",
+      "title": "Add per-stage timing diagnostics to random-window search",
+      "pr": 347,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/347",
+      "merged_at": "2026-07-01T04:00:41Z",
+      "evidence": "Adds kernel, span, witness, and total timing buckets."
+    },
+    {
+      "milestone": "M2: diagnostics and pruning",
+      "issue": 344,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/344",
+      "title": "Replace inner-loop witness validation with CSS component checks",
+      "pr": 349,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/349",
+      "merged_at": "2026-07-01T06:09:01Z",
+      "evidence": "Adds algebraic CSS component filtering before full witness construction."
+    },
+    {
+      "milestone": "M2: diagnostics and pruning",
+      "issue": 345,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/345",
+      "title": "Prune candidates that cannot beat current best",
+      "pr": 348,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/348",
+      "merged_at": "2026-07-01T04:51:43Z",
+      "evidence": "Adds current-best pruning and weight_pruned_candidates evidence."
+    },
+    {
+      "milestone": "M2: diagnostics and pruning",
+      "issue": 346,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/346",
+      "title": "Introduce a reusable GF(2) workspace",
+      "pr": 350,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/350",
+      "merged_at": "2026-07-01T07:14:04Z",
+      "evidence": "Reuses GF(2) workspace state for random-window kernel-basis generation."
+    },
+    {
+      "milestone": "M3: bit-packed acceleration",
+      "issue": 351,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/351",
+      "title": "Add bit-packed GF(2) row primitives",
+      "pr": 355,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/355",
+      "merged_at": "2026-07-01T10:45:48Z",
+      "evidence": "Adds dense GF(2) row packing, XOR, parity, popcount, and zero checks."
+    },
+    {
+      "milestone": "M3: bit-packed acceleration",
+      "issue": 352,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/352",
+      "title": "Use bit-packed kernel-basis generation",
+      "pr": 357,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/357",
+      "merged_at": "2026-07-01T12:19:13Z",
+      "evidence": "Routes random-window kernel-basis workspace through bit-packed GF(2) rows."
+    },
+    {
+      "milestone": "M3: bit-packed acceleration",
+      "issue": 353,
+      "issue_url": "https://github.com/nzy1997/rstim/issues/353",
+      "title": "Use bit-packed CSS span filtering",
+      "pr": 356,
+      "pr_url": "https://github.com/nzy1997/rstim/pull/356",
+      "merged_at": "2026-07-01T12:52:16Z",
+      "evidence": "Routes CSS component filtering through bit-packed kernel and stabilizer-span checks."
+    }
+  ]
+}
