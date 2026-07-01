@@ -455,7 +455,9 @@ fn css_component_candidate_verdict(
         let parity = check
             .iter()
             .zip(candidate)
-            .fold(0, |acc, (&check_bit, &candidate_bit)| acc ^ (check_bit & candidate_bit));
+            .fold(0, |acc, (&check_bit, &candidate_bit)| {
+                acc ^ (check_bit & candidate_bit)
+            });
         if parity != 0 {
             return Ok(CssComponentCandidateVerdict::NonKernel);
         }
@@ -1004,8 +1006,8 @@ mod tests {
         for code_id in ["surface_rotated:d=3", "bb72"] {
             let css = css_from_built_in_code_id(code_id);
             let width = css.code().n();
-            let stabilizer_span = gf2::try_rref_with_width(&css.code().stabilizer_rows(), width * 2)
-                .unwrap();
+            let stabilizer_span =
+                gf2::try_rref_with_width(&css.code().stabilizer_rows(), width * 2).unwrap();
             let identity_permutation = (0..width).collect::<Vec<_>>();
 
             for (component, kernel_checks, component_span_rows) in [
@@ -1032,12 +1034,9 @@ mod tests {
                 let mut non_kernel_rejected = 0;
                 let mut stabilizer_span_rejected = 0;
                 for candidate in candidates {
-                    let component_verdict = css_component_candidate_verdict(
-                        kernel_checks,
-                        &component_span,
-                        &candidate,
-                    )
-                    .unwrap();
+                    let component_verdict =
+                        css_component_candidate_verdict(kernel_checks, &component_span, &candidate)
+                            .unwrap();
                     let full_verdict = full_validator_component_verdict(
                         css.code(),
                         &stabilizer_span,
@@ -1060,7 +1059,10 @@ mod tests {
                     }
                 }
 
-                assert!(accepted > 0, "{code_id} {component:?} should have accepted rows");
+                assert!(
+                    accepted > 0,
+                    "{code_id} {component:?} should have accepted rows"
+                );
                 assert!(
                     non_kernel_rejected > 0,
                     "{code_id} {component:?} should exercise non-kernel rejection"
