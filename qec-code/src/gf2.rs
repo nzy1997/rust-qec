@@ -64,8 +64,25 @@ impl BitPackedRow {
         }
     }
 
+    fn reset_zero_width(&mut self, width: usize) {
+        self.width = width;
+        self.words.clear();
+        self.words.resize(word_count(width), 0);
+    }
+
     pub(crate) fn width(&self) -> usize {
         self.width
+    }
+
+    fn bit(&self, index: usize) -> u8 {
+        debug_assert!(index < self.width);
+        let word = self.words[index / 64];
+        u8::from(((word >> (index % 64)) & 1) == 1)
+    }
+
+    fn set_bit(&mut self, index: usize) {
+        debug_assert!(index < self.width);
+        self.words[index / 64] |= 1u64 << (index % 64);
     }
 
     pub(crate) fn to_dense(&self) -> Vec<u8> {
@@ -90,6 +107,29 @@ impl BitPackedRow {
         }
         self.clear_padding_bits();
         Ok(())
+    }
+
+    fn xor_assign_from_col(&mut self, rhs: &Self, start_col: usize) {
+        debug_assert_eq!(self.width, rhs.width);
+        debug_assert!(start_col < self.width);
+
+        if self.words.is_empty() {
+            return;
+        }
+
+        let start_word = start_col / 64;
+        let offset = start_col % 64;
+        if offset == 0 {
+            for word in start_word..self.words.len() {
+                self.words[word] ^= rhs.words[word];
+            }
+        } else {
+            self.words[start_word] ^= rhs.words[start_word] & (u64::MAX << offset);
+            for word in (start_word + 1)..self.words.len() {
+                self.words[word] ^= rhs.words[word];
+            }
+        }
+        self.clear_padding_bits();
     }
 
     pub(crate) fn dot_parity(&self, rhs: &Self) -> Result<u8> {
@@ -181,7 +221,7 @@ impl BitPackedRow {
 
 #[derive(Debug, Default)]
 pub(crate) struct RandomWindowKernelWorkspace {
-    permuted_rows: Vec<BinaryRow>,
+    permuted_rows: Vec<BitPackedRow>,
     permuted_len: usize,
     pivot_cols: Vec<usize>,
     pivot_seen: Vec<bool>,
@@ -231,13 +271,14 @@ impl RandomWindowKernelWorkspace {
         self.permuted_len = matrix.len();
         for (row_index, row) in matrix.iter().enumerate() {
             if row_index == self.permuted_rows.len() {
-                self.permuted_rows.push(Vec::new());
+                self.permuted_rows.push(BitPackedRow::zeros(width));
             }
             let permuted_row = &mut self.permuted_rows[row_index];
-            permuted_row.clear();
-            permuted_row.resize(width, 0);
+            permuted_row.reset_zero_width(width);
             for (permuted_col, &original_col) in column_permutation.iter().enumerate() {
-                permuted_row[permuted_col] = row[original_col];
+                if row[original_col] == 1 {
+                    permuted_row.set_bit(permuted_col);
+                }
             }
         }
     }
@@ -247,16 +288,14 @@ impl RandomWindowKernelWorkspace {
         let mut pivot_row = 0;
 
         for col in 0..width {
-            let Some(pivot) = (pivot_row..rows.len()).find(|&row| rows[row][col] == 1) else {
+            let Some(pivot) = (pivot_row..rows.len()).find(|&row| rows[row].bit(col) == 1) else {
                 continue;
             };
             rows.swap(pivot_row, pivot);
 
             for row in 0..rows.len() {
-                if row != pivot_row && rows[row][col] == 1 {
-                    for k in col..width {
-                        rows[row][k] ^= rows[pivot_row][k];
-                    }
+                if row != pivot_row && rows[row].bit(col) == 1 {
+                    xor_packed_row_from_col(rows, row, pivot_row, col);
                 }
             }
 
@@ -288,7 +327,7 @@ impl RandomWindowKernelWorkspace {
             vector.resize(width, 0);
             vector[column_permutation[free_col]] = 1;
             for (pivot_row, &pivot_col) in self.pivot_cols.iter().enumerate() {
-                if self.permuted_rows[pivot_row][free_col] == 1 {
+                if self.permuted_rows[pivot_row].bit(free_col) == 1 {
                     vector[column_permutation[pivot_col]] = 1;
                 }
             }
@@ -296,6 +335,21 @@ impl RandomWindowKernelWorkspace {
         }
 
         self.basis_len = basis_len;
+    }
+}
+
+fn xor_packed_row_from_col(
+    rows: &mut [BitPackedRow],
+    target_row: usize,
+    pivot_row: usize,
+    start_col: usize,
+) {
+    if target_row < pivot_row {
+        let (before_pivot, pivot_and_after) = rows.split_at_mut(pivot_row);
+        before_pivot[target_row].xor_assign_from_col(&pivot_and_after[0], start_col);
+    } else {
+        let (before_target, target_and_after) = rows.split_at_mut(target_row);
+        target_and_after[0].xor_assign_from_col(&before_target[pivot_row], start_col);
     }
 }
 
@@ -559,9 +613,9 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
-        try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
+        BitPackedRow, RandomWindowKernelWorkspace, try_in_reduced_row_span,
+        try_in_row_span_with_width, try_nullspace_basis_with_width,
         try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
-        BitPackedRow, RandomWindowKernelWorkspace,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -603,10 +657,7 @@ mod tests {
         let mut lhs = BitPackedRow::try_from_dense(&lhs_dense, 144).unwrap();
         let rhs = BitPackedRow::try_from_dense(&rhs_dense, 144).unwrap();
 
-        assert_eq!(
-            lhs.dot_parity(&rhs).unwrap(),
-            dot(&lhs_dense, &rhs_dense)
-        );
+        assert_eq!(lhs.dot_parity(&rhs).unwrap(), dot(&lhs_dense, &rhs_dense));
         assert_eq!(lhs.weight(), dense_weight(&lhs_dense));
         assert!(!lhs.eq_logical(&rhs).unwrap());
         assert!(!lhs.is_zero());
@@ -619,9 +670,11 @@ mod tests {
             dot(&expected_xor, &rhs_dense)
         );
         assert!(BitPackedRow::zeros(144).is_zero());
-        assert!(BitPackedRow::zeros(144)
-            .eq_logical(&BitPackedRow::try_from_dense(&vec![0; 144], 144).unwrap())
-            .unwrap());
+        assert!(
+            BitPackedRow::zeros(144)
+                .eq_logical(&BitPackedRow::try_from_dense(&vec![0; 144], 144).unwrap())
+                .unwrap()
+        );
     }
 
     #[test]
@@ -634,10 +687,7 @@ mod tests {
 
             assert_eq!(dirty.to_dense(), dense);
             assert_eq!(dirty.weight(), dense_weight(&dense));
-            assert_eq!(
-                dirty.dot_parity(&clean).unwrap(),
-                dot(&dense, &dense)
-            );
+            assert_eq!(dirty.dot_parity(&clean).unwrap(), dot(&dense, &dense));
             assert!(dirty.eq_logical(&clean).unwrap());
             assert_eq!(dirty.is_zero(), dense.iter().all(|bit| *bit == 0));
 
@@ -798,6 +848,22 @@ mod tests {
         original_basis
     }
 
+    fn permutation_by_stride(width: usize, stride: usize) -> Vec<usize> {
+        (0..width).map(|index| (index * stride) % width).collect()
+    }
+
+    fn assert_workspace_active_rows_are_packed_width(
+        workspace: &RandomWindowKernelWorkspace,
+        width: usize,
+    ) {
+        assert!(
+            workspace.permuted_rows[..workspace.permuted_len]
+                .iter()
+                .all(|row| row.width() == width),
+            "active packed workspace rows should use logical width {width}"
+        );
+    }
+
     #[test]
     fn gf2_random_window_kernel_basis_contract() {
         let matrix = vec![vec![1, 1, 0, 0], vec![0, 1, 1, 0]];
@@ -818,7 +884,8 @@ mod tests {
     }
 
     #[test]
-    fn gf2_random_window_workspace_matches_existing_kernel_basis() {
+    fn gf2_bitpacked_random_window_kernel_basis_matches_dense_workspace() {
+        let width_144 = 144;
         let cases = vec![
             (
                 Vec::<Vec<u8>>::new(),
@@ -843,6 +910,22 @@ mod tests {
                     vec![1, 3, 4, 0, 2],
                 ],
             ),
+            (
+                vec![
+                    patterned_row(width_144, 3),
+                    patterned_row(width_144, 5),
+                    patterned_row(width_144, 7),
+                    patterned_row(width_144, 11),
+                    patterned_row(width_144, 13),
+                    patterned_row(width_144, 17),
+                ],
+                width_144,
+                vec![
+                    (0..width_144).collect::<Vec<_>>(),
+                    (0..width_144).rev().collect::<Vec<_>>(),
+                    permutation_by_stride(width_144, 5),
+                ],
+            ),
         ];
         let mut workspace = RandomWindowKernelWorkspace::new();
 
@@ -857,6 +940,7 @@ mod tests {
                     .try_kernel_basis_with_width(&matrix, width, &permutation)
                     .unwrap()
                     .to_vec();
+                assert_workspace_active_rows_are_packed_width(&workspace, width);
 
                 assert_eq!(
                     actual, reference,
@@ -875,26 +959,29 @@ mod tests {
     }
 
     #[test]
-    fn gf2_random_window_workspace_reuse_resets_state() {
+    fn gf2_bitpacked_random_window_kernel_workspace_reuse_resets_state() {
         let mut workspace = RandomWindowKernelWorkspace::new();
 
+        let wide_width = 65;
         let wide = vec![
-            vec![1, 0, 1, 0, 1],
-            vec![0, 1, 1, 1, 0],
-            vec![1, 1, 0, 0, 1],
+            patterned_row(wide_width, 3),
+            patterned_row(wide_width, 7),
+            patterned_row(wide_width, 11),
         ];
-        let wide_permutation = vec![4, 2, 0, 3, 1];
+        let wide_permutation = permutation_by_stride(wide_width, 2);
         let expected_wide =
-            reference_random_window_kernel_basis_with_width(&wide, 5, &wide_permutation);
+            reference_random_window_kernel_basis_with_width(&wide, wide_width, &wide_permutation);
         let helper_wide =
-            try_random_window_kernel_basis_with_width(&wide, 5, &wide_permutation).unwrap();
+            try_random_window_kernel_basis_with_width(&wide, wide_width, &wide_permutation)
+                .unwrap();
         assert_eq!(helper_wide, expected_wide);
         assert_eq!(
             workspace
-                .try_kernel_basis_with_width(&wide, 5, &wide_permutation)
+                .try_kernel_basis_with_width(&wide, wide_width, &wide_permutation)
                 .unwrap(),
             expected_wide.as_slice()
         );
+        assert_workspace_active_rows_are_packed_width(&workspace, wide_width);
 
         let narrow = vec![vec![1, 1], vec![0, 0]];
         let narrow_permutation = vec![1, 0];
@@ -907,6 +994,7 @@ mod tests {
             .try_kernel_basis_with_width(&narrow, 2, &narrow_permutation)
             .unwrap()
             .to_vec();
+        assert_workspace_active_rows_are_packed_width(&workspace, 2);
         assert_eq!(actual_narrow, expected_narrow);
         assert!(actual_narrow.iter().all(|row| row.len() == 2));
         for vector in &actual_narrow {
@@ -924,6 +1012,7 @@ mod tests {
             .try_kernel_basis_with_width(&larger, 4, &larger_permutation)
             .unwrap()
             .to_vec();
+        assert_workspace_active_rows_are_packed_width(&workspace, 4);
         assert_eq!(actual_larger, expected_larger);
         assert!(actual_larger.iter().all(|row| row.len() == 4));
         for vector in &actual_larger {
@@ -932,13 +1021,14 @@ mod tests {
     }
 
     #[test]
-    fn gf2_random_window_workspace_rejects_stale_or_invalid_inputs() {
+    fn gf2_bitpacked_random_window_kernel_basis_rejects_invalid_inputs() {
         let mut workspace = RandomWindowKernelWorkspace::new();
         let previous_wide = vec![vec![1, 0, 1, 0], vec![0, 1, 1, 1]];
         let previous_permutation = vec![3, 0, 2, 1];
         workspace
             .try_kernel_basis_with_width(&previous_wide, 4, &previous_permutation)
             .unwrap();
+        assert_workspace_active_rows_are_packed_width(&workspace, 4);
 
         let duplicate_permutation = vec![0, 1, 1, 3];
         assert_eq!(
@@ -947,6 +1037,22 @@ mod tests {
                 .unwrap_err(),
             QecError::InvalidColumnPermutation {
                 reason: "duplicate column 1".to_owned(),
+            }
+        );
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&previous_wide, 4, &[0, 1, 2])
+                .unwrap_err(),
+            QecError::InvalidColumnPermutation {
+                reason: "expected length 4, got 3".to_owned(),
+            }
+        );
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&previous_wide, 4, &[0, 1, 2, 4])
+                .unwrap_err(),
+            QecError::InvalidColumnPermutation {
+                reason: "column 4 out of range for width 4".to_owned(),
             }
         );
 
@@ -984,6 +1090,7 @@ mod tests {
             .try_kernel_basis_with_width(&narrow, 2, &narrow_permutation)
             .unwrap()
             .to_vec();
+        assert_workspace_active_rows_are_packed_width(&workspace, 2);
         assert_eq!(actual_narrow, expected_narrow);
         assert!(actual_narrow.iter().all(|row| row.len() == 2));
         for vector in &actual_narrow {
