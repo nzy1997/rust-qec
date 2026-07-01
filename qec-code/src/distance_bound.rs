@@ -1216,6 +1216,8 @@ mod tests {
                 (ComponentKind::ZLike, css.hx(), css.hz()),
             ] {
                 let component_span = gf2::try_rref_with_width(component_span_rows, width).unwrap();
+                let packed_filter =
+                    PackedCssComponentFilter::try_new(kernel_checks, &component_span).unwrap();
                 let candidates = component_filter_reference_candidates(
                     kernel_checks,
                     component_span_rows,
@@ -1227,9 +1229,13 @@ mod tests {
                 let mut non_kernel_rejected = 0;
                 let mut stabilizer_span_rejected = 0;
                 for candidate in candidates {
-                    let component_verdict =
-                        css_component_candidate_verdict(kernel_checks, &component_span, &candidate)
-                            .unwrap();
+                    let packed_candidate =
+                        gf2::BitPackedRow::try_from_dense(&candidate, width).unwrap();
+                    let component_verdict = bitpacked_css_component_candidate_verdict(
+                        &packed_filter,
+                        &packed_candidate,
+                    )
+                    .unwrap();
                     let full_verdict = full_validator_component_verdict(
                         css.code(),
                         &stabilizer_span,
