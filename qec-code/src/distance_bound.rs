@@ -838,9 +838,61 @@ fn validate_witness_against_code_with_span(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codes::built_in_css::built_in_css_checks;
+    use crate::css::{CssCode, SparseRowsMatrix};
 
     fn empty_reduced_rows(width: usize) -> gf2::ReducedRows {
         gf2::try_rref_with_width(&[], width).unwrap()
+    }
+
+    fn css_from_sparse_rows(num_cols: usize, hx: Vec<Vec<usize>>, hz: Vec<Vec<usize>>) -> CssCode {
+        let hx = SparseRowsMatrix::new(num_cols, hx).unwrap().to_dense_rows();
+        let hz = SparseRowsMatrix::new(num_cols, hz).unwrap().to_dense_rows();
+        CssCode::from_hx_hz(hx, hz).unwrap()
+    }
+
+    fn css_from_built_in_code_id(code_id: &str) -> CssCode {
+        let checks = built_in_css_checks(code_id).unwrap();
+        css_from_sparse_rows(checks.num_cols, checks.hx, checks.hz)
+    }
+
+    fn first_non_kernel_candidate(checks: &[Vec<u8>], width: usize) -> Vec<u8> {
+        for column in 0..width {
+            if checks.iter().any(|row| row[column] == 1) {
+                let mut candidate = vec![0; width];
+                candidate[column] = 1;
+                return candidate;
+            }
+        }
+        panic!("expected at least one nonzero check column");
+    }
+
+    fn full_validator_component_verdict(
+        code: &StabilizerCode,
+        stabilizer_span: &gf2::ReducedRows,
+        component: ComponentKind,
+        candidate: &[u8],
+    ) -> Result<CssComponentCandidateVerdict> {
+        let witness = component_candidate_to_pauli(component, candidate.to_vec())?;
+        match validate_witness_against_code_with_span(code, stabilizer_span, &witness) {
+            Ok(()) => Ok(CssComponentCandidateVerdict::Accepted),
+            Err(QecError::DistanceBoundValidationFailed(message))
+                if message == "witness must be non-identity" =>
+            {
+                Ok(CssComponentCandidateVerdict::Zero)
+            }
+            Err(QecError::DistanceBoundValidationFailed(message))
+                if message == "witness does not commute with stabilizers" =>
+            {
+                Ok(CssComponentCandidateVerdict::NonKernel)
+            }
+            Err(QecError::DistanceBoundValidationFailed(message))
+                if message == "witness lies in stabilizer span" =>
+            {
+                Ok(CssComponentCandidateVerdict::StabilizerSpan)
+            }
+            Err(error) => Err(error),
+        }
     }
 
     fn x_pauli(width: usize, support: &[usize]) -> Pauli {
@@ -911,6 +963,124 @@ mod tests {
         assert_eq!(search_stats.weight_pruned_candidates, 0);
         assert_eq!(search_stats.valid_witnesses_found, 1);
         assert_eq!(search_stats.best_witness_updates, 1);
+    }
+
+    #[test]
+    fn random_window_component_filter_matches_full_witness_validation() {
+        for code_id in ["surface_rotated:d=3", "bb72"] {
+            let css = css_from_built_in_code_id(code_id);
+            let width = css.code().n();
+            let stabilizer_span = gf2::try_rref_with_width(&css.code().stabilizer_rows(), width * 2)
+                .unwrap();
+            let identity_permutation = (0..width).collect::<Vec<_>>();
+
+            for (component, kernel_checks, component_span_rows) in [
+                (ComponentKind::XLike, css.hz(), css.hx()),
+                (ComponentKind::ZLike, css.hx(), css.hz()),
+            ] {
+                let component_span = gf2::try_rref_with_width(component_span_rows, width).unwrap();
+                let mut candidates = Vec::new();
+                candidates.push(vec![0; width]);
+                candidates.push(first_non_kernel_candidate(kernel_checks, width));
+                if let Some(span_row) = component_span_rows.first() {
+                    candidates.push(span_row.clone());
+                }
+                candidates.extend(
+                    gf2::try_random_window_kernel_basis_with_width(
+                        kernel_checks,
+                        width,
+                        &identity_permutation,
+                    )
+                    .unwrap(),
+                );
+
+                let mut accepted = 0;
+                let mut non_kernel_rejected = 0;
+                let mut stabilizer_span_rejected = 0;
+                for candidate in candidates {
+                    let component_verdict = css_component_candidate_verdict(
+                        kernel_checks,
+                        &component_span,
+                        &candidate,
+                    )
+                    .unwrap();
+                    let full_verdict = full_validator_component_verdict(
+                        css.code(),
+                        &stabilizer_span,
+                        component,
+                        &candidate,
+                    )
+                    .unwrap();
+
+                    assert_eq!(
+                        component_verdict, full_verdict,
+                        "{code_id} {component:?} candidate {candidate:?}"
+                    );
+                    match component_verdict {
+                        CssComponentCandidateVerdict::Accepted => accepted += 1,
+                        CssComponentCandidateVerdict::NonKernel => non_kernel_rejected += 1,
+                        CssComponentCandidateVerdict::StabilizerSpan => {
+                            stabilizer_span_rejected += 1
+                        }
+                        CssComponentCandidateVerdict::Zero => {}
+                    }
+                }
+
+                assert!(accepted > 0, "{code_id} {component:?} should have accepted rows");
+                assert!(
+                    non_kernel_rejected > 0,
+                    "{code_id} {component:?} should exercise non-kernel rejection"
+                );
+                assert!(
+                    stabilizer_span_rejected > 0,
+                    "{code_id} {component:?} should exercise stabilizer-span rejection"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn random_window_component_filter_rejects_non_kernel_and_stabilizer_span_candidates() {
+        let css = css_from_sparse_rows(3, vec![vec![0, 1]], vec![vec![2]]);
+        let width = css.code().n();
+
+        let hx_span = gf2::try_rref_with_width(css.hx(), width).unwrap();
+        let mut x_best = None;
+        let mut x_stats = RandomWindowSearchStats::default();
+        consider_component_candidate_rows(
+            vec![vec![0, 0, 1], vec![1, 1, 0]],
+            css.hz(),
+            &hx_span,
+            ComponentKind::XLike,
+            &mut x_best,
+            &mut x_stats,
+        )
+        .unwrap();
+        assert!(x_best.is_none());
+        assert_eq!(x_stats.component_candidates_generated, 2);
+        assert_eq!(x_stats.witness_validation_candidates_rejected, 1);
+        assert_eq!(x_stats.stabilizer_span_candidates_rejected, 1);
+        assert_eq!(x_stats.valid_witnesses_found, 0);
+        assert_eq!(x_stats.best_witness_updates, 0);
+
+        let hz_span = gf2::try_rref_with_width(css.hz(), width).unwrap();
+        let mut z_best = None;
+        let mut z_stats = RandomWindowSearchStats::default();
+        consider_component_candidate_rows(
+            vec![vec![1, 0, 0], vec![0, 0, 1]],
+            css.hx(),
+            &hz_span,
+            ComponentKind::ZLike,
+            &mut z_best,
+            &mut z_stats,
+        )
+        .unwrap();
+        assert!(z_best.is_none());
+        assert_eq!(z_stats.component_candidates_generated, 2);
+        assert_eq!(z_stats.witness_validation_candidates_rejected, 1);
+        assert_eq!(z_stats.stabilizer_span_candidates_rejected, 1);
+        assert_eq!(z_stats.valid_witnesses_found, 0);
+        assert_eq!(z_stats.best_witness_updates, 0);
     }
 
     #[test]
