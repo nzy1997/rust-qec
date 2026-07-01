@@ -9,6 +9,126 @@ pub(crate) struct ReducedRows {
     pub width: usize,
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct RandomWindowKernelWorkspace {
+    permuted_rows: Vec<BinaryRow>,
+    permuted_len: usize,
+    pivot_cols: Vec<usize>,
+    pivot_seen: Vec<bool>,
+    permutation_seen: Vec<bool>,
+    basis_rows: Vec<BinaryRow>,
+    basis_len: usize,
+}
+
+impl RandomWindowKernelWorkspace {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn try_kernel_basis_with_width(
+        &mut self,
+        matrix: &[BinaryRow],
+        width: usize,
+        column_permutation: &[usize],
+    ) -> Result<&[BinaryRow]> {
+        self.reset_logical_state();
+        validate_rows_with_width(matrix, width)?;
+        validate_column_permutation_with_seen(
+            column_permutation,
+            width,
+            &mut self.permutation_seen,
+        )?;
+
+        self.fill_permuted_rows(matrix, width, column_permutation);
+        self.reduce_permuted_rows(width);
+        self.fill_original_order_basis(width, column_permutation);
+
+        Ok(&self.basis_rows[..self.basis_len])
+    }
+
+    fn reset_logical_state(&mut self) {
+        self.permuted_len = 0;
+        self.basis_len = 0;
+        self.pivot_cols.clear();
+    }
+
+    fn fill_permuted_rows(
+        &mut self,
+        matrix: &[BinaryRow],
+        width: usize,
+        column_permutation: &[usize],
+    ) {
+        self.permuted_len = matrix.len();
+        for (row_index, row) in matrix.iter().enumerate() {
+            if row_index == self.permuted_rows.len() {
+                self.permuted_rows.push(Vec::new());
+            }
+            let permuted_row = &mut self.permuted_rows[row_index];
+            permuted_row.clear();
+            permuted_row.resize(width, 0);
+            for (permuted_col, &original_col) in column_permutation.iter().enumerate() {
+                permuted_row[permuted_col] = row[original_col];
+            }
+        }
+    }
+
+    fn reduce_permuted_rows(&mut self, width: usize) {
+        let rows = &mut self.permuted_rows[..self.permuted_len];
+        let mut pivot_row = 0;
+
+        for col in 0..width {
+            let Some(pivot) = (pivot_row..rows.len()).find(|&row| rows[row][col] == 1) else {
+                continue;
+            };
+            rows.swap(pivot_row, pivot);
+
+            for row in 0..rows.len() {
+                if row != pivot_row && rows[row][col] == 1 {
+                    for k in col..width {
+                        rows[row][k] ^= rows[pivot_row][k];
+                    }
+                }
+            }
+
+            self.pivot_cols.push(col);
+            pivot_row += 1;
+            if pivot_row == rows.len() {
+                break;
+            }
+        }
+    }
+
+    fn fill_original_order_basis(&mut self, width: usize, column_permutation: &[usize]) {
+        self.pivot_seen.clear();
+        self.pivot_seen.resize(width, false);
+        for &pivot_col in &self.pivot_cols {
+            self.pivot_seen[pivot_col] = true;
+        }
+
+        let mut basis_len = 0;
+        for free_col in 0..width {
+            if self.pivot_seen[free_col] {
+                continue;
+            }
+            if basis_len == self.basis_rows.len() {
+                self.basis_rows.push(Vec::new());
+            }
+            let vector = &mut self.basis_rows[basis_len];
+            vector.clear();
+            vector.resize(width, 0);
+            vector[column_permutation[free_col]] = 1;
+            for (pivot_row, &pivot_col) in self.pivot_cols.iter().enumerate() {
+                if self.permuted_rows[pivot_row][free_col] == 1 {
+                    vector[column_permutation[pivot_col]] = 1;
+                }
+            }
+            basis_len += 1;
+        }
+
+        self.basis_len = basis_len;
+    }
+}
+
 pub(crate) fn validate_rows(matrix: &[BinaryRow]) -> Result<usize> {
     let width = matrix.first().map_or(0, Vec::len);
     validate_rows_with_width(matrix, width)?;
@@ -222,41 +342,30 @@ pub(crate) fn try_random_window_kernel_basis_with_width(
     width: usize,
     column_permutation: &[usize],
 ) -> Result<Vec<BinaryRow>> {
-    validate_rows_with_width(matrix, width)?;
-    validate_column_permutation(column_permutation, width)?;
-
-    let permuted = matrix
-        .iter()
-        .map(|row| {
-            column_permutation
-                .iter()
-                .map(|&original_col| row[original_col])
-                .collect::<BinaryRow>()
-        })
-        .collect::<Vec<_>>();
-
-    let permuted_basis = try_nullspace_basis_with_width(&permuted, width)?;
-    let mut original_basis = Vec::with_capacity(permuted_basis.len());
-    for permuted_vector in permuted_basis {
-        let mut original_vector = vec![0; width];
-        for (permuted_col, &original_col) in column_permutation.iter().enumerate() {
-            original_vector[original_col] = permuted_vector[permuted_col];
-        }
-        original_basis.push(original_vector);
-    }
-
-    Ok(original_basis)
+    let mut workspace = RandomWindowKernelWorkspace::new();
+    let basis = workspace.try_kernel_basis_with_width(matrix, width, column_permutation)?;
+    Ok(basis.to_vec())
 }
 
 #[allow(dead_code)]
 fn validate_column_permutation(column_permutation: &[usize], width: usize) -> Result<()> {
+    let mut seen = Vec::new();
+    validate_column_permutation_with_seen(column_permutation, width, &mut seen)
+}
+
+fn validate_column_permutation_with_seen(
+    column_permutation: &[usize],
+    width: usize,
+    seen: &mut Vec<bool>,
+) -> Result<()> {
     if column_permutation.len() != width {
         return Err(QecError::InvalidColumnPermutation {
             reason: format!("expected length {width}, got {}", column_permutation.len()),
         });
     }
 
-    let mut seen = vec![false; width];
+    seen.clear();
+    seen.resize(width, false);
     for &column in column_permutation {
         if column >= width {
             return Err(QecError::InvalidColumnPermutation {
@@ -281,6 +390,7 @@ mod tests {
     use super::{
         try_in_reduced_row_span, try_in_row_span_with_width, try_nullspace_basis_with_width,
         try_random_window_kernel_basis_with_width, try_rank, try_select_independent_rows,
+        RandomWindowKernelWorkspace,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -385,6 +495,149 @@ mod tests {
         }
         assert_eq!(basis.len(), original_nullspace.len());
         assert_eq!(try_rank(&basis).unwrap(), original_nullspace.len());
+    }
+
+    #[test]
+    fn gf2_random_window_workspace_matches_existing_kernel_basis() {
+        let cases = vec![
+            (
+                Vec::<Vec<u8>>::new(),
+                3,
+                vec![vec![0, 1, 2], vec![2, 1, 0], vec![1, 2, 0]],
+            ),
+            (
+                vec![vec![1, 1, 0, 0], vec![0, 1, 1, 0]],
+                4,
+                vec![vec![0, 1, 2, 3], vec![3, 0, 2, 1], vec![2, 3, 1, 0]],
+            ),
+            (
+                vec![
+                    vec![1, 0, 1, 1, 0],
+                    vec![0, 1, 1, 0, 1],
+                    vec![1, 1, 0, 1, 1],
+                ],
+                5,
+                vec![vec![0, 1, 2, 3, 4], vec![4, 2, 0, 3, 1], vec![1, 3, 4, 0, 2]],
+            ),
+        ];
+        let mut workspace = RandomWindowKernelWorkspace::new();
+
+        for (matrix, width, permutations) in cases {
+            for permutation in permutations {
+                let expected =
+                    try_random_window_kernel_basis_with_width(&matrix, width, &permutation)
+                        .unwrap();
+                let actual = workspace
+                    .try_kernel_basis_with_width(&matrix, width, &permutation)
+                    .unwrap()
+                    .to_vec();
+
+                assert_eq!(actual, expected, "width {width} permutation {permutation:?}");
+                assert!(actual.iter().all(|row| row.len() == width));
+                for vector in &actual {
+                    assert_kernel_vector(&matrix, vector);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn gf2_random_window_workspace_reuse_resets_state() {
+        let mut workspace = RandomWindowKernelWorkspace::new();
+
+        let wide = vec![
+            vec![1, 0, 1, 0, 1],
+            vec![0, 1, 1, 1, 0],
+            vec![1, 1, 0, 0, 1],
+        ];
+        let wide_permutation = vec![4, 2, 0, 3, 1];
+        let expected_wide =
+            try_random_window_kernel_basis_with_width(&wide, 5, &wide_permutation).unwrap();
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&wide, 5, &wide_permutation)
+                .unwrap(),
+            expected_wide.as_slice()
+        );
+
+        let narrow = vec![vec![1, 1], vec![0, 0]];
+        let narrow_permutation = vec![1, 0];
+        let expected_narrow =
+            try_random_window_kernel_basis_with_width(&narrow, 2, &narrow_permutation).unwrap();
+        let actual_narrow = workspace
+            .try_kernel_basis_with_width(&narrow, 2, &narrow_permutation)
+            .unwrap()
+            .to_vec();
+        assert_eq!(actual_narrow, expected_narrow);
+        assert!(actual_narrow.iter().all(|row| row.len() == 2));
+        for vector in &actual_narrow {
+            assert_kernel_vector(&narrow, vector);
+        }
+
+        let larger = vec![vec![1, 0, 0, 1], vec![0, 1, 1, 0]];
+        let larger_permutation = vec![2, 0, 3, 1];
+        let expected_larger =
+            try_random_window_kernel_basis_with_width(&larger, 4, &larger_permutation).unwrap();
+        let actual_larger = workspace
+            .try_kernel_basis_with_width(&larger, 4, &larger_permutation)
+            .unwrap()
+            .to_vec();
+        assert_eq!(actual_larger, expected_larger);
+        assert!(actual_larger.iter().all(|row| row.len() == 4));
+        for vector in &actual_larger {
+            assert_kernel_vector(&larger, vector);
+        }
+    }
+
+    #[test]
+    fn gf2_random_window_workspace_rejects_stale_or_invalid_inputs() {
+        let mut workspace = RandomWindowKernelWorkspace::new();
+        let previous_wide = vec![vec![1, 0, 1, 0], vec![0, 1, 1, 1]];
+        let previous_permutation = vec![3, 0, 2, 1];
+        workspace
+            .try_kernel_basis_with_width(&previous_wide, 4, &previous_permutation)
+            .unwrap();
+
+        let duplicate_permutation = vec![0, 1, 1, 3];
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&previous_wide, 4, &duplicate_permutation)
+                .unwrap_err(),
+            try_random_window_kernel_basis_with_width(&previous_wide, 4, &duplicate_permutation)
+                .unwrap_err()
+        );
+
+        let invalid_binary = vec![vec![1, 2, 0, 0]];
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&invalid_binary, 4, &[0, 1, 2, 3])
+                .unwrap_err(),
+            try_random_window_kernel_basis_with_width(&invalid_binary, 4, &[0, 1, 2, 3])
+                .unwrap_err()
+        );
+
+        let mismatched_width = vec![vec![1, 0, 0, 1], vec![1, 0]];
+        assert_eq!(
+            workspace
+                .try_kernel_basis_with_width(&mismatched_width, 4, &[0, 1, 2, 3])
+                .unwrap_err(),
+            try_random_window_kernel_basis_with_width(&mismatched_width, 4, &[0, 1, 2, 3])
+                .unwrap_err()
+        );
+
+        let narrow = vec![vec![1, 1]];
+        let narrow_permutation = vec![1, 0];
+        let expected_narrow =
+            try_random_window_kernel_basis_with_width(&narrow, 2, &narrow_permutation).unwrap();
+        let actual_narrow = workspace
+            .try_kernel_basis_with_width(&narrow, 2, &narrow_permutation)
+            .unwrap()
+            .to_vec();
+        assert_eq!(actual_narrow, expected_narrow);
+        assert!(actual_narrow.iter().all(|row| row.len() == 2));
+        for vector in &actual_narrow {
+            assert_kernel_vector(&narrow, vector);
+        }
     }
 
     #[test]
