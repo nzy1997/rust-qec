@@ -1,9 +1,9 @@
-use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::css::CssCode;
 use crate::distance::LogicalClass;
 use crate::error::{QecError, Result};
 use crate::gf2;
+use crate::Pauli;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
@@ -340,6 +340,8 @@ pub fn random_window_css_upper_bound(
     let width = code.n();
     let hx_span = gf2::try_rref_with_width(css.hx(), width)?;
     let hz_span = gf2::try_rref_with_width(css.hz(), width)?;
+    let x_component_filter = PackedCssComponentFilter::try_new(css.hz(), &hx_span)?;
+    let z_component_filter = PackedCssComponentFilter::try_new(css.hx(), &hz_span)?;
     let mut rng = SplitMix64::new(options.seed);
     let mut best_witness: Option<Pauli> = None;
     let mut search_stats = RandomWindowSearchStats::default();
@@ -354,7 +356,7 @@ pub fn random_window_css_upper_bound(
             search_stats.permutations_sampled += 1;
             consider_component_candidates(
                 css.hz(),
-                &hx_span,
+                &x_component_filter,
                 ComponentKind::XLike,
                 width,
                 &permutation,
@@ -375,7 +377,7 @@ pub fn random_window_css_upper_bound(
 
             consider_component_candidates(
                 css.hx(),
-                &hz_span,
+                &z_component_filter,
                 ComponentKind::ZLike,
                 width,
                 &permutation,
@@ -436,6 +438,7 @@ enum CssComponentCandidateVerdict {
     StabilizerSpan,
 }
 
+#[allow(dead_code)]
 fn css_component_candidate_verdict(
     opposite_checks: &[Vec<u8>],
     stabilizer_component_span: &gf2::ReducedRows,
@@ -473,9 +476,62 @@ fn css_component_candidate_verdict(
     Ok(CssComponentCandidateVerdict::Accepted)
 }
 
+struct PackedCssComponentFilter {
+    opposite_checks: Vec<gf2::BitPackedRow>,
+    stabilizer_component_span: gf2::PackedReducedRows,
+}
+
+impl PackedCssComponentFilter {
+    fn try_new(
+        opposite_checks: &[Vec<u8>],
+        stabilizer_component_span: &gf2::ReducedRows,
+    ) -> Result<Self> {
+        let width = stabilizer_component_span.width;
+        gf2::validate_rows_with_width(opposite_checks, width)?;
+        let opposite_checks = opposite_checks
+            .iter()
+            .map(|row| gf2::BitPackedRow::try_from_dense(row, width))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(Self {
+            opposite_checks,
+            stabilizer_component_span: gf2::PackedReducedRows::try_from_reduced_rows(
+                stabilizer_component_span,
+            )?,
+        })
+    }
+
+    fn width(&self) -> usize {
+        self.stabilizer_component_span.width()
+    }
+}
+
+fn bitpacked_css_component_candidate_verdict(
+    filter: &PackedCssComponentFilter,
+    candidate: &gf2::BitPackedRow,
+) -> Result<CssComponentCandidateVerdict> {
+    if candidate.width() != filter.width() {
+        return Err(QecError::RowWidthMismatch {
+            expected: filter.width(),
+            actual: candidate.width(),
+        });
+    }
+    if candidate.is_zero() {
+        return Ok(CssComponentCandidateVerdict::Zero);
+    }
+    for check in &filter.opposite_checks {
+        if check.dot_parity(candidate)? != 0 {
+            return Ok(CssComponentCandidateVerdict::NonKernel);
+        }
+    }
+    if gf2::try_in_packed_reduced_row_span(&filter.stabilizer_component_span, candidate)? {
+        return Ok(CssComponentCandidateVerdict::StabilizerSpan);
+    }
+    Ok(CssComponentCandidateVerdict::Accepted)
+}
+
 fn consider_component_candidates(
     kernel_checks: &[Vec<u8>],
-    stabilizer_component_span: &gf2::ReducedRows,
+    component_filter: &PackedCssComponentFilter,
     component: ComponentKind,
     width: usize,
     permutation: &[usize],
@@ -492,8 +548,7 @@ fn consider_component_candidates(
 
     consider_component_candidate_rows(
         candidates,
-        kernel_checks,
-        stabilizer_component_span,
+        component_filter,
         component,
         best_witness,
         search_stats,
@@ -502,8 +557,7 @@ fn consider_component_candidates(
 
 fn consider_component_candidate_rows(
     candidates: &[Vec<u8>],
-    kernel_checks: &[Vec<u8>],
-    stabilizer_component_span: &gf2::ReducedRows,
+    component_filter: &PackedCssComponentFilter,
     component: ComponentKind,
     best_witness: &mut Option<Pauli>,
     search_stats: &mut RandomWindowSearchStats,
@@ -512,7 +566,9 @@ fn consider_component_candidate_rows(
 
     for candidate in candidates {
         let span_started = Instant::now();
-        let candidate_weight = candidate.iter().filter(|&&bit| bit == 1).count();
+        let packed_candidate =
+            gf2::BitPackedRow::try_from_dense(candidate, component_filter.width())?;
+        let candidate_weight = packed_candidate.weight();
         if candidate_weight == 0 {
             add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
             search_stats.zero_candidates_rejected += 1;
@@ -527,7 +583,7 @@ fn consider_component_candidate_rows(
             continue;
         }
         let component_verdict =
-            css_component_candidate_verdict(kernel_checks, stabilizer_component_span, &candidate)?;
+            bitpacked_css_component_candidate_verdict(component_filter, &packed_candidate)?;
         add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
         match component_verdict {
             CssComponentCandidateVerdict::Accepted => {}
@@ -911,6 +967,25 @@ mod tests {
         candidate
     }
 
+    fn component_filter_reference_candidates(
+        kernel_checks: &[Vec<u8>],
+        component_span_rows: &[Vec<u8>],
+        width: usize,
+        permutation: &[usize],
+    ) -> Vec<Vec<u8>> {
+        let mut candidates = Vec::new();
+        candidates.push(vec![0; width]);
+        candidates.push(first_non_kernel_candidate(kernel_checks, width));
+        if let Some(span_row) = component_span_rows.first() {
+            candidates.push(span_row.clone());
+        }
+        candidates.extend(
+            gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation)
+                .unwrap(),
+        );
+        candidates
+    }
+
     fn full_validator_component_verdict(
         code: &StabilizerCode,
         stabilizer_span: &gf2::ReducedRows,
@@ -951,13 +1026,13 @@ mod tests {
     fn random_window_prunes_candidates_that_cannot_improve_best() {
         let width = 3;
         let component_span = empty_reduced_rows(width);
+        let component_filter = PackedCssComponentFilter::try_new(&[], &component_span).unwrap();
         let mut best_witness = Some(x_pauli(width, &[0, 1]));
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
             &[vec![0, 0, 0], vec![1, 1, 0], vec![1, 1, 1], vec![0, 0, 1]],
-            &[],
-            &component_span,
+            &component_filter,
             ComponentKind::XLike,
             &mut best_witness,
             &mut search_stats,
@@ -982,13 +1057,13 @@ mod tests {
     fn random_window_pruning_does_not_skip_strictly_better_candidate() {
         let width = 5;
         let component_span = empty_reduced_rows(width);
+        let component_filter = PackedCssComponentFilter::try_new(&[], &component_span).unwrap();
         let mut best_witness = Some(x_pauli(width, &[0, 1, 2, 3, 4]));
         let mut search_stats = RandomWindowSearchStats::default();
 
         consider_component_candidate_rows(
             &[vec![1, 1, 1, 0, 0]],
-            &[],
-            &component_span,
+            &component_filter,
             ComponentKind::XLike,
             &mut best_witness,
             &mut search_stats,
@@ -1004,9 +1079,103 @@ mod tests {
     }
 
     #[test]
+    fn random_window_bitpacked_component_filter_matches_dense_filter() {
+        for code_id in ["surface_rotated:d=3", "bb72"] {
+            let css = css_from_built_in_code_id(code_id);
+            let width = css.code().n();
+            let identity_permutation = (0..width).collect::<Vec<_>>();
+
+            for (component, kernel_checks, component_span_rows) in [
+                (ComponentKind::XLike, css.hz(), css.hx()),
+                (ComponentKind::ZLike, css.hx(), css.hz()),
+            ] {
+                let component_span = gf2::try_rref_with_width(component_span_rows, width).unwrap();
+                let packed_filter =
+                    PackedCssComponentFilter::try_new(kernel_checks, &component_span).unwrap();
+                let mut candidates = component_filter_reference_candidates(
+                    kernel_checks,
+                    component_span_rows,
+                    width,
+                    &identity_permutation,
+                );
+
+                for candidate in candidates.drain(..) {
+                    let dense_verdict =
+                        css_component_candidate_verdict(kernel_checks, &component_span, &candidate)
+                            .unwrap();
+                    let packed_candidate =
+                        gf2::BitPackedRow::try_from_dense(&candidate, width).unwrap();
+                    let packed_verdict = bitpacked_css_component_candidate_verdict(
+                        &packed_filter,
+                        &packed_candidate,
+                    )
+                    .unwrap();
+
+                    assert_eq!(
+                        packed_verdict, dense_verdict,
+                        "{code_id} {component:?} candidate {candidate:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn random_window_bitpacked_component_filter_rejects_tail_bit_and_span_false_positive_cases() {
+        let span = gf2::try_rref_with_width(
+            &[{
+                let mut row = vec![0; 65];
+                row[0] = 1;
+                row
+            }],
+            65,
+        )
+        .unwrap();
+        let packed_filter = PackedCssComponentFilter::try_new(&[], &span).unwrap();
+
+        let mut dirty_zero = gf2::BitPackedRow::zeros(65);
+        dirty_zero.set_storage_padding_for_test();
+        assert_eq!(
+            bitpacked_css_component_candidate_verdict(&packed_filter, &dirty_zero).unwrap(),
+            CssComponentCandidateVerdict::Zero
+        );
+
+        let nonmember_same_word = gf2::BitPackedRow::try_from_dense(
+            &{
+                let mut row = vec![0; 65];
+                row[1] = 1;
+                row
+            },
+            65,
+        )
+        .unwrap();
+        assert_eq!(
+            bitpacked_css_component_candidate_verdict(&packed_filter, &nonmember_same_word)
+                .unwrap(),
+            CssComponentCandidateVerdict::Accepted
+        );
+
+        let nonkernel_filter = PackedCssComponentFilter::try_new(
+            &[{
+                let mut row = vec![0; 65];
+                row[1] = 1;
+                row
+            }],
+            &gf2::try_rref_with_width(&[], 65).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            bitpacked_css_component_candidate_verdict(&nonkernel_filter, &nonmember_same_word)
+                .unwrap(),
+            CssComponentCandidateVerdict::NonKernel
+        );
+    }
+
+    #[test]
     fn random_window_candidate_rows_accepts_workspace_output_without_stale_rows() {
         let width = 3;
         let component_span = empty_reduced_rows(width);
+        let component_filter = PackedCssComponentFilter::try_new(&[], &component_span).unwrap();
         let mut workspace = gf2::RandomWindowKernelWorkspace::new();
         let permutation = vec![2, 0, 1];
         let candidates = workspace
@@ -1018,8 +1187,7 @@ mod tests {
         let mut search_stats = RandomWindowSearchStats::default();
         consider_component_candidate_rows(
             candidates,
-            &[],
-            &component_span,
+            &component_filter,
             ComponentKind::XLike,
             &mut best_witness,
             &mut search_stats,
@@ -1048,28 +1216,26 @@ mod tests {
                 (ComponentKind::ZLike, css.hx(), css.hz()),
             ] {
                 let component_span = gf2::try_rref_with_width(component_span_rows, width).unwrap();
-                let mut candidates = Vec::new();
-                candidates.push(vec![0; width]);
-                candidates.push(first_non_kernel_candidate(kernel_checks, width));
-                if let Some(span_row) = component_span_rows.first() {
-                    candidates.push(span_row.clone());
-                }
-                candidates.extend(
-                    gf2::try_random_window_kernel_basis_with_width(
-                        kernel_checks,
-                        width,
-                        &identity_permutation,
-                    )
-                    .unwrap(),
+                let packed_filter =
+                    PackedCssComponentFilter::try_new(kernel_checks, &component_span).unwrap();
+                let candidates = component_filter_reference_candidates(
+                    kernel_checks,
+                    component_span_rows,
+                    width,
+                    &identity_permutation,
                 );
 
                 let mut accepted = 0;
                 let mut non_kernel_rejected = 0;
                 let mut stabilizer_span_rejected = 0;
                 for candidate in candidates {
-                    let component_verdict =
-                        css_component_candidate_verdict(kernel_checks, &component_span, &candidate)
-                            .unwrap();
+                    let packed_candidate =
+                        gf2::BitPackedRow::try_from_dense(&candidate, width).unwrap();
+                    let component_verdict = bitpacked_css_component_candidate_verdict(
+                        &packed_filter,
+                        &packed_candidate,
+                    )
+                    .unwrap();
                     let full_verdict = full_validator_component_verdict(
                         css.code(),
                         &stabilizer_span,
@@ -1114,12 +1280,12 @@ mod tests {
         let width = css.code().n();
 
         let hx_span = gf2::try_rref_with_width(css.hx(), width).unwrap();
+        let x_component_filter = PackedCssComponentFilter::try_new(css.hz(), &hx_span).unwrap();
         let mut x_best = None;
         let mut x_stats = RandomWindowSearchStats::default();
         consider_component_candidate_rows(
             &[vec![0, 0, 1], vec![1, 1, 0]],
-            css.hz(),
-            &hx_span,
+            &x_component_filter,
             ComponentKind::XLike,
             &mut x_best,
             &mut x_stats,
@@ -1133,12 +1299,12 @@ mod tests {
         assert_eq!(x_stats.best_witness_updates, 0);
 
         let hz_span = gf2::try_rref_with_width(css.hz(), width).unwrap();
+        let z_component_filter = PackedCssComponentFilter::try_new(css.hx(), &hz_span).unwrap();
         let mut z_best = None;
         let mut z_stats = RandomWindowSearchStats::default();
         consider_component_candidate_rows(
             &[vec![1, 0, 0], vec![0, 0, 1]],
-            css.hx(),
-            &hz_span,
+            &z_component_filter,
             ComponentKind::ZLike,
             &mut z_best,
             &mut z_stats,
@@ -1155,6 +1321,7 @@ mod tests {
     #[test]
     fn random_window_component_filter_reports_validation_errors() {
         let span = empty_reduced_rows(3);
+        let packed_filter = PackedCssComponentFilter::try_new(&[], &span).unwrap();
 
         assert_eq!(
             css_component_candidate_verdict(&[], &span, &[1, 0]).unwrap_err(),
@@ -1185,6 +1352,27 @@ mod tests {
                 col: 1,
                 value: 2,
             }
+        );
+        assert_eq!(
+            bitpacked_css_component_candidate_verdict(&packed_filter, &gf2::BitPackedRow::zeros(2))
+                .unwrap_err(),
+            QecError::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+            }
+        );
+        let invalid_span = gf2::ReducedRows {
+            rows: vec![vec![1, 2, 0]],
+            pivot_cols: vec![0],
+            width: 3,
+        };
+        assert_eq!(
+            PackedCssComponentFilter::try_new(&[], &invalid_span).err(),
+            Some(QecError::InvalidBinaryEntry {
+                row: 0,
+                col: 1,
+                value: 2,
+            })
         );
     }
 
