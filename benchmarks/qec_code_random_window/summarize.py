@@ -45,6 +45,7 @@ SEARCH_STAT_INT_FIELDS = [
     "kernel_basis_generations",
     "component_candidates_generated",
     "zero_candidates_rejected",
+    "weight_pruned_candidates",
     "stabilizer_span_candidates_rejected",
     "witness_validation_candidates_rejected",
     "valid_witnesses_found",
@@ -670,6 +671,7 @@ def write_summary_md(
                 f"stats_rows={summary['search_stats_rows']}, "
                 f"permutations={summary['search_stats_total_permutations_sampled']}, "
                 f"candidates={summary['search_stats_total_component_candidates_generated']}, "
+                f"weight_pruned={summary['search_stats_total_weight_pruned_candidates']}, "
                 f"target_reached={summary['search_stats_target_reached_count']}"
             )
         if summary["search_timing_rows"] not in {None, ""}:

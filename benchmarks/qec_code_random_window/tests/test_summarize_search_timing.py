@@ -83,6 +83,7 @@ baseline_required = false
             "kernel_basis_generations": 4,
             "component_candidates_generated": 8,
             "zero_candidates_rejected": 1,
+            "weight_pruned_candidates": 0,
             "stabilizer_span_candidates_rejected": 2,
             "witness_validation_candidates_rejected": 3,
             "valid_witnesses_found": 2,
