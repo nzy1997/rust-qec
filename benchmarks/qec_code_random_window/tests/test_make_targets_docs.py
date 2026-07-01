@@ -209,6 +209,25 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("--build-profile release", body)
         self.assertNotIn("--target-weight", body)
 
+    def test_makefile_exposes_issue225_readiness_smoke_pipeline(self) -> None:
+        makefile = read_text(MAKEFILE)
+        body = make_target_body(makefile, "qec-code-random-window-bench-issue225-readiness-smoke")
+
+        self.assertIn("qec-code-random-window-bench-issue225-readiness-smoke", makefile)
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR := $(QEC_CODE_RANDOM_WINDOW_OUT)/issue225-readiness-smoke",
+            makefile,
+        )
+        self.assertIn(
+            "QEC_CODE_RANDOM_WINDOW_ISSUE225_EVIDENCE := benchmarks/qec_code_random_window/issue225_evidence.json",
+            makefile,
+        )
+        self.assertIn("$(MAKE) qec-code-random-window-bench-no-target-ladder-smoke", body)
+        self.assertIn("$(MAKE) qec-code-random-window-bench-no-target-multiseed-smoke", body)
+        self.assertIn("python3 -m benchmarks.qec_code_random_window.issue225_readiness", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_ISSUE225_EVIDENCE)", body)
+        self.assertIn("$(QEC_CODE_RANDOM_WINDOW_ISSUE225_READINESS_SMOKE_DIR)", body)
+
     def test_no_target_ladder_smoke_manifest_case_ids_are_documented(self) -> None:
         manifest = tomllib.loads(CASES_NO_TARGET_LADDER_SMOKE.read_text(encoding="utf-8"))
         cases = manifest["cases"]
@@ -259,3 +278,11 @@ class QecRandomWindowBenchmarkDocsTest(unittest.TestCase):
         self.assertIn("elapsed min/median/max", showcase)
         self.assertIn("unset no-target weights", showcase)
         self.assertIn("qec-code random-window benchmark", index.lower())
+
+    def test_readme_documents_issue225_readiness_target(self) -> None:
+        readme = read_text(ROOT / "benchmarks" / "qec_code_random_window" / "README.md")
+        self.assertIn("make qec-code-random-window-bench-issue225-readiness-smoke", readme)
+        self.assertIn("issue225-readiness-smoke/report.md", readme)
+        self.assertIn("issue_225_readiness: PASS", readme)
+        self.assertIn("local evidence only", readme)
+        self.assertIn("do not commit generated benchmark output", readme)
