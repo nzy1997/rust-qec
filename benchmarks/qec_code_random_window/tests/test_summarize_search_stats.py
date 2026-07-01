@@ -91,6 +91,7 @@ baseline_required = false
                         "kernel_basis_generations": 4,
                         "component_candidates_generated": 8,
                         "zero_candidates_rejected": 1,
+                        "weight_pruned_candidates": 5,
                         "stabilizer_span_candidates_rejected": 2,
                         "witness_validation_candidates_rejected": 3,
                         "valid_witnesses_found": 2,
@@ -105,6 +106,7 @@ baseline_required = false
                         "kernel_basis_generations": 6,
                         "component_candidates_generated": 10,
                         "zero_candidates_rejected": 0,
+                        "weight_pruned_candidates": 7,
                         "stabilizer_span_candidates_rejected": 1,
                         "witness_validation_candidates_rejected": 4,
                         "valid_witnesses_found": 3,
@@ -127,11 +129,13 @@ baseline_required = false
             self.assertEqual(
                 row["search_stats_total_component_candidates_generated"], "18"
             )
+            self.assertEqual(row["search_stats_total_weight_pruned_candidates"], "12")
             self.assertEqual(row["search_stats_total_best_witness_updates"], "3")
             self.assertEqual(row["search_stats_target_reached_count"], "1")
             markdown = (out_dir / "summary.md").read_text(encoding="utf-8")
             self.assertIn("stats_rows=2", markdown)
             self.assertIn("permutations=5", markdown)
+            self.assertIn("weight_pruned=12", markdown)
             self.assertIn("target_reached=1", markdown)
 
     def test_rejects_valid_witnesses_found_above_component_candidates(self) -> None:
@@ -146,6 +150,7 @@ baseline_required = false
                 "kernel_basis_generations": 1,
                 "component_candidates_generated": 1,
                 "zero_candidates_rejected": 0,
+                "weight_pruned_candidates": 0,
                 "stabilizer_span_candidates_rejected": 0,
                 "witness_validation_candidates_rejected": 0,
                 "valid_witnesses_found": 2,
@@ -172,6 +177,7 @@ baseline_required = false
                 "kernel_basis_generations": 1,
                 "component_candidates_generated": 1,
                 "zero_candidates_rejected": 0,
+                "weight_pruned_candidates": 0,
                 "stabilizer_span_candidates_rejected": 0,
                 "witness_validation_candidates_rejected": 0,
                 "valid_witnesses_found": 1,
@@ -198,6 +204,7 @@ baseline_required = false
                 "kernel_basis_generations": 1,
                 "component_candidates_generated": 3,
                 "zero_candidates_rejected": 0,
+                "weight_pruned_candidates": 0,
                 "stabilizer_span_candidates_rejected": 0,
                 "witness_validation_candidates_rejected": 0,
                 "valid_witnesses_found": 1,
@@ -224,6 +231,7 @@ baseline_required = false
                 "kernel_basis_generations": 1,
                 "component_candidates_generated": 1,
                 "zero_candidates_rejected": 0,
+                "weight_pruned_candidates": 0,
                 "stabilizer_span_candidates_rejected": 0,
                 "witness_validation_candidates_rejected": 0,
                 "valid_witnesses_found": 1,
@@ -249,6 +257,7 @@ baseline_required = false
                 "kernel_basis_generations": 1,
                 "component_candidates_generated": 1,
                 "zero_candidates_rejected": 0,
+                "weight_pruned_candidates": 0,
                 "stabilizer_span_candidates_rejected": 0,
                 "witness_validation_candidates_rejected": 0,
                 "valid_witnesses_found": 1,
@@ -270,6 +279,7 @@ baseline_required = false
                     "kernel_basis_generations": 1,
                     "component_candidates_generated": 1,
                     "zero_candidates_rejected": 0,
+                    "weight_pruned_candidates": 0,
                     "stabilizer_span_candidates_rejected": 0,
                     "witness_validation_candidates_rejected": 0,
                     "valid_witnesses_found": 1,
@@ -287,6 +297,7 @@ baseline_required = false
                     "kernel_basis_generations": 1,
                     "component_candidates_generated": 1,
                     "zero_candidates_rejected": 0,
+                    "weight_pruned_candidates": 0,
                     "stabilizer_span_candidates_rejected": 0,
                     "witness_validation_candidates_rejected": 0,
                     "valid_witnesses_found": 1,

@@ -383,6 +383,7 @@ fn random_window_upper_bound_reports_search_stats() {
         "kernel_basis_generations",
         "component_candidates_generated",
         "zero_candidates_rejected",
+        "weight_pruned_candidates",
         "stabilizer_span_candidates_rejected",
         "witness_validation_candidates_rejected",
         "valid_witnesses_found",

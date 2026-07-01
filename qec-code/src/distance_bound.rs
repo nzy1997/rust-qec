@@ -152,6 +152,7 @@ pub struct RandomWindowSearchStats {
     pub kernel_basis_generations: usize,
     pub component_candidates_generated: usize,
     pub zero_candidates_rejected: usize,
+    pub weight_pruned_candidates: usize,
     pub stabilizer_span_candidates_rejected: usize,
     pub witness_validation_candidates_rejected: usize,
     pub valid_witnesses_found: usize,
@@ -446,13 +447,43 @@ fn consider_component_candidates(
         gf2::try_random_window_kernel_basis_with_width(kernel_checks, width, permutation);
     add_elapsed_ns(&mut search_stats.kernel_basis_time_ns, kernel_started);
     let candidates = candidates?;
+
+    consider_component_candidate_rows(
+        candidates,
+        stabilizer_component_span,
+        component,
+        code,
+        stabilizer_span,
+        best_witness,
+        search_stats,
+    )
+}
+
+fn consider_component_candidate_rows(
+    candidates: Vec<Vec<u8>>,
+    stabilizer_component_span: &gf2::ReducedRows,
+    component: ComponentKind,
+    code: &StabilizerCode,
+    stabilizer_span: &gf2::ReducedRows,
+    best_witness: &mut Option<Pauli>,
+    search_stats: &mut RandomWindowSearchStats,
+) -> Result<()> {
     search_stats.component_candidates_generated += candidates.len();
 
     for candidate in candidates {
         let span_started = Instant::now();
-        if !candidate.iter().any(|bit| *bit == 1) {
+        let candidate_weight = candidate.iter().filter(|&&bit| bit == 1).count();
+        if candidate_weight == 0 {
             add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
             search_stats.zero_candidates_rejected += 1;
+            continue;
+        }
+        if best_witness
+            .as_ref()
+            .is_some_and(|current| candidate_weight >= current.weight())
+        {
+            add_elapsed_ns(&mut search_stats.span_filter_time_ns, span_started);
+            search_stats.weight_pruned_candidates += 1;
             continue;
         }
         let in_component_span = gf2::try_in_reduced_row_span(stabilizer_component_span, &candidate);
@@ -807,6 +838,80 @@ fn validate_witness_against_code_with_span(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn empty_reduced_rows(width: usize) -> gf2::ReducedRows {
+        gf2::try_rref_with_width(&[], width).unwrap()
+    }
+
+    fn x_pauli(width: usize, support: &[usize]) -> Pauli {
+        let mut x = vec![0; width];
+        for &index in support {
+            x[index] = 1;
+        }
+        Pauli::from_xz_bits(x, vec![0; width]).unwrap()
+    }
+
+    #[test]
+    fn random_window_prunes_candidates_that_cannot_improve_best() {
+        let width = 3;
+        let code = StabilizerCode::from_stabilizers(width, vec![]).unwrap();
+        let component_span = empty_reduced_rows(width);
+        let stabilizer_span = empty_reduced_rows(width * 2);
+        let mut best_witness = Some(x_pauli(width, &[0, 1]));
+        let mut search_stats = RandomWindowSearchStats::default();
+
+        consider_component_candidate_rows(
+            vec![vec![0, 0, 0], vec![1, 1, 0], vec![1, 1, 1], vec![0, 0, 1]],
+            &component_span,
+            ComponentKind::XLike,
+            &code,
+            &stabilizer_span,
+            &mut best_witness,
+            &mut search_stats,
+        )
+        .unwrap();
+
+        let best = best_witness.expect("strictly lighter candidate should replace current best");
+        assert_eq!(best.weight(), 1);
+        assert_eq!(search_stats.component_candidates_generated, 4);
+        assert_eq!(search_stats.zero_candidates_rejected, 1);
+        assert_eq!(search_stats.weight_pruned_candidates, 2);
+        assert_eq!(search_stats.valid_witnesses_found, 1);
+        assert_eq!(search_stats.best_witness_updates, 1);
+        assert_eq!(search_stats.stabilizer_span_candidates_rejected, 0);
+        assert_eq!(search_stats.witness_validation_candidates_rejected, 0);
+
+        let stats_json = serde_json::to_value(search_stats).unwrap();
+        assert_eq!(stats_json["weight_pruned_candidates"], 2);
+    }
+
+    #[test]
+    fn random_window_pruning_does_not_skip_strictly_better_candidate() {
+        let width = 5;
+        let code = StabilizerCode::from_stabilizers(width, vec![]).unwrap();
+        let component_span = empty_reduced_rows(width);
+        let stabilizer_span = empty_reduced_rows(width * 2);
+        let mut best_witness = Some(x_pauli(width, &[0, 1, 2, 3, 4]));
+        let mut search_stats = RandomWindowSearchStats::default();
+
+        consider_component_candidate_rows(
+            vec![vec![1, 1, 1, 0, 0]],
+            &component_span,
+            ComponentKind::XLike,
+            &code,
+            &stabilizer_span,
+            &mut best_witness,
+            &mut search_stats,
+        )
+        .unwrap();
+
+        let best = best_witness.expect("weight-3 candidate should replace weight-5 best");
+        assert_eq!(best.weight(), 3);
+        assert_eq!(search_stats.component_candidates_generated, 1);
+        assert_eq!(search_stats.weight_pruned_candidates, 0);
+        assert_eq!(search_stats.valid_witnesses_found, 1);
+        assert_eq!(search_stats.best_witness_updates, 1);
+    }
 
     #[test]
     fn witness_validation_rejects_identity_witness() {
