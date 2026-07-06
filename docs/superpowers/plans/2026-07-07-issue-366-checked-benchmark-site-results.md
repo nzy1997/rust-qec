@@ -46,7 +46,7 @@
 - Produces: built-site validator behavior that rejects unlisted checked artifact references.
 - Produces: Rust contract test `checked_benchmark_artifacts_are_linked`.
 
-- [ ] **Step 1: Write the failing Rust site contract test**
+- [x] **Step 1: Write the failing Rust site contract test**
 
 Add this helper after `assert_contains_all_case_insensitive` in `rstim/tests/site_contract.rs`:
 
@@ -229,7 +229,7 @@ fn checked_benchmark_artifacts_are_linked() {
 }
 ```
 
-- [ ] **Step 2: Write the failing Python validator tests**
+- [x] **Step 2: Write the failing Python validator tests**
 
 In `tools/test_check_site_manifest.py`, update the `_site/index.html` fixture text in `write_fixture_manifest` so it includes the checked-results section:
 
@@ -282,7 +282,7 @@ def test_rejects_built_site_artifact_reference_not_listed_in_manifest(self) -> N
     )
 ```
 
-- [ ] **Step 3: Run tests to verify RED**
+- [x] **Step 3: Run tests to verify RED**
 
 Run:
 
@@ -293,7 +293,7 @@ python3 -m unittest tools.test_check_site_manifest -q
 
 Expected: the Rust test fails because the checked-results section and renderer do not exist yet. The Python test fails because built-site validation does not yet require checked-result renderer markers or reject unlisted checked artifact references.
 
-- [ ] **Step 4: Add manifest caveats to checked evidence items**
+- [x] **Step 4: Add manifest caveats to checked evidence items**
 
 In `site/benchmark-site.json`, add this field to evidence item `surface-decoder-full` after `claims_limit`:
 
@@ -313,7 +313,7 @@ Add this field to evidence item `bb-circuit-full` after `claims_limit`:
 ]
 ```
 
-- [ ] **Step 5: Add the checked-results shell to the site HTML**
+- [x] **Step 5: Add the checked-results shell to the site HTML**
 
 In `site/index.html`, add a primary nav link after Evidence:
 
@@ -345,7 +345,7 @@ Add this section after `</section>` for `id="benchmark-evidence"` and before `id
       </section>
 ```
 
-- [ ] **Step 6: Render checked result cards from the manifest**
+- [x] **Step 6: Render checked result cards from the manifest**
 
 In `site/app.js`, add these constants after `const benchmarkManifest = document.getElementById("benchmark-manifest");`:
 
@@ -500,7 +500,7 @@ renderCheckedBenchmarkResults(manifest);
 
 In the catch block, also set `checkedBenchmarkResults.innerHTML` when the checked-results container exists.
 
-- [ ] **Step 7: Style the checked result cards**
+- [x] **Step 7: Style the checked result cards**
 
 In `site/styles.css`, add `.checked-results-section` to the existing flex-column section list:
 
@@ -595,7 +595,7 @@ and:
 }
 ```
 
-- [ ] **Step 8: Extend the built-site manifest checker**
+- [x] **Step 8: Extend the built-site manifest checker**
 
 In `tools/check_site_manifest.py`, add `import re` with the imports.
 
@@ -686,7 +686,7 @@ if isinstance(manifest, dict):
     validate_site_artifact_references(site_root, manifest, errors)
 ```
 
-- [ ] **Step 9: Run focused tests to verify GREEN**
+- [x] **Step 9: Run focused tests to verify GREEN**
 
 Run:
 
@@ -697,7 +697,7 @@ python3 -m unittest tools.test_check_site_manifest -q
 
 Expected: both commands exit 0.
 
-- [ ] **Step 10: Build the site and run issue verification**
+- [x] **Step 10: Build the site and run issue verification**
 
 Run:
 
@@ -721,7 +721,7 @@ cargo test
 
 Expected: exits 0. If it hangs or fails in a pre-existing unrelated test, record the exact last output and still keep the issue-specific verification evidence from Step 10.
 
-- [ ] **Step 12: Commit implementation**
+- [x] **Step 12: Commit implementation**
 
 Run:
 

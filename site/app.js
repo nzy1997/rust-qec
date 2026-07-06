@@ -198,6 +198,8 @@
   }
 
   const benchmarkManifest = document.getElementById("benchmark-manifest");
+  const checkedBenchmarkResults = document.getElementById("checked-benchmark-result-cards");
+  const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full"];
 
   function renderBadge(label, value) {
     return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;
@@ -245,6 +247,133 @@
       .join("");
   }
 
+  function findEvidenceItem(manifest, itemId) {
+    const families = Array.isArray(manifest.families) ? manifest.families : [];
+    for (const family of families) {
+      const items = Array.isArray(family.evidence_items) ? family.evidence_items : [];
+      const item = items.find((candidate) => candidate && candidate.id === itemId);
+      if (item) {
+        return { family, item };
+      }
+    }
+    return null;
+  }
+
+  function fileName(path) {
+    return String(path || "").split("/").pop() || String(path || "artifact");
+  }
+
+  function renderArtifactLinks(item) {
+    const artifacts = Array.isArray(item.artifacts) ? item.artifacts : [];
+    const checkedArtifacts = artifacts.filter(
+      (artifact) => artifact && artifact.checked === true && artifact.path,
+    );
+    if (!checkedArtifacts.length) {
+      return "<p>No checked artifacts are listed for this item.</p>";
+    }
+    const links = checkedArtifacts
+      .map(
+        (artifact) => `
+        <li>
+          <a href="${escapeHtml(artifact.path)}">${escapeHtml(fileName(artifact.path))}</a>
+          <span class="badge">${escapeHtml(artifact.kind || "artifact")}</span>
+        </li>
+      `,
+      )
+      .join("");
+    return `<ul class="result-link-list">${links}</ul>`;
+  }
+
+  function renderImageArtifacts(item) {
+    const artifacts = Array.isArray(item.artifacts) ? item.artifacts : [];
+    const images = artifacts.filter(
+      (artifact) => artifact && artifact.checked === true && artifact.kind === "image" && artifact.path,
+    );
+    if (!images.length) {
+      return "";
+    }
+    return images
+      .map(
+        (image) => `
+        <figure class="result-plot">
+          <a href="${escapeHtml(image.path)}">
+            <img src="${escapeHtml(image.path)}" alt="${escapeHtml(item.title || "Checked benchmark plot")}">
+          </a>
+        </figure>
+      `,
+      )
+      .join("");
+  }
+
+  function renderCommandList(commands) {
+    if (!Array.isArray(commands) || !commands.length) {
+      return "<p>No reproduction command is listed.</p>";
+    }
+    const commandText = commands.map((command) => `$ ${command}`).join("\n");
+    return `<pre class="result-commands"><code>${escapeHtml(commandText)}</code></pre>`;
+  }
+
+  function renderTextList(values) {
+    if (!Array.isArray(values) || !values.length) {
+      return "";
+    }
+    return `<ul class="result-note-list">${values.map((value) => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`;
+  }
+
+  function renderSourceLinks(paths) {
+    if (!Array.isArray(paths) || !paths.length) {
+      return "";
+    }
+    const links = paths
+      .map((path) => `<li><a href="${escapeHtml(path)}">${escapeHtml(path)}</a></li>`)
+      .join("");
+    return `<ul class="result-link-list source-links">${links}</ul>`;
+  }
+
+  function renderCheckedBenchmarkResults(manifest) {
+    if (!checkedBenchmarkResults) {
+      return;
+    }
+    checkedBenchmarkResults.innerHTML = checkedBenchmarkItems
+      .map((itemId) => {
+        const found = findEvidenceItem(manifest, itemId);
+        if (!found) {
+          return `<article class="result-card error"><h3>${escapeHtml(itemId)}</h3><p>Missing checked benchmark manifest item.</p></article>`;
+        }
+        const { family, item } = found;
+        return `
+        <article class="result-card">
+          <div class="result-card-copy">
+            <div class="manifest-heading">
+              <div>
+                <p class="eyebrow">${escapeHtml(family.title || family.id || "Benchmark family")}</p>
+                <h3>${escapeHtml(item.title || item.id || "Checked benchmark result")}</h3>
+              </div>
+              <div class="schema-meta">
+                ${renderBadge("family", family.status)}
+                ${renderBadge("status", item.status)}
+                ${renderBadge("tier", item.tier)}
+              </div>
+            </div>
+            <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
+            <h4>Artifacts</h4>
+            ${renderArtifactLinks(item)}
+            <h4>Reproduction</h4>
+            ${renderCommandList(item.commands)}
+            <h4>Caveats</h4>
+            ${renderTextList(item.caveats)}
+            <h4>Provenance Sources</h4>
+            ${renderSourceLinks(item.provenance_sources || family.source_docs)}
+          </div>
+          <div class="result-card-plot">
+            ${renderImageArtifacts(item)}
+          </div>
+        </article>
+      `;
+      })
+      .join("");
+  }
+
   function renderNav(root, groupedNodes) {
     navList.innerHTML = "";
     const allButtons = [];
@@ -274,7 +403,7 @@
     }
   }
 
-  if (benchmarkManifest) {
+  if (benchmarkManifest || checkedBenchmarkResults) {
     fetch("data/benchmark-site.json")
       .then((response) => {
         if (!response.ok) {
@@ -284,13 +413,23 @@
       })
       .then((manifest) => {
         renderBenchmarkManifest(manifest);
+        renderCheckedBenchmarkResults(manifest);
       })
       .catch((error) => {
-        benchmarkManifest.classList.add("error");
-        benchmarkManifest.innerHTML = `
-          <p>Benchmark manifest could not be loaded: ${escapeHtml(error.message)}</p>
-          <p><a href="data/benchmark-site.json">Open benchmark-site.json</a></p>
-        `;
+        if (benchmarkManifest) {
+          benchmarkManifest.classList.add("error");
+          benchmarkManifest.innerHTML = `
+            <p>Benchmark manifest could not be loaded: ${escapeHtml(error.message)}</p>
+            <p><a href="data/benchmark-site.json">Open benchmark-site.json</a></p>
+          `;
+        }
+        if (checkedBenchmarkResults) {
+          checkedBenchmarkResults.classList.add("error");
+          checkedBenchmarkResults.innerHTML = `
+            <p>Checked benchmark results could not be loaded: ${escapeHtml(error.message)}</p>
+            <p><a href="data/benchmark-site.json">Open benchmark-site.json</a></p>
+          `;
+        }
       });
   }
 

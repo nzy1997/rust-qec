@@ -49,7 +49,11 @@
             "docs/showcases/benchmark-evidence.md",
             "benchmarks/surface_decoder_compare/README.md"
           ],
-          "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim."
+          "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim.",
+          "caveats": [
+            "The checked-in surface-decoder full-tier artifacts are evidence for the committed run, not a promise about current local machine speed or a general decoder ordering.",
+            "Surface-decoder smoke commands are local implementation checks and are not a replacement for the full comparison campaign."
+          ]
         },
         {
           "id": "surface-decoder-local-smoke",
@@ -139,7 +143,11 @@
             "docs/showcases/benchmark-evidence.md",
             "benchmarks/bb_circuit_bposd_compare/README.md"
           ],
-          "claims_limit": "Checked full-tier artifacts document the committed BB72/BB144 paired comparison and reference-gap report only."
+          "claims_limit": "Checked full-tier artifacts document the committed BB72/BB144 paired comparison and reference-gap report only.",
+          "caveats": [
+            "The BB72/BB144 full rows are batched, error-budget-stopped paired comparison rows.",
+            "They are not a fixed-shot reproduction of the pinned Bravyi reference curve; the reference-gap report records that interpretation boundary."
+          ]
         },
         {
           "id": "bb-circuit-local-readiness",

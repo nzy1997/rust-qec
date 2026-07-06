@@ -40,6 +40,59 @@ fn assert_contains_all_case_insensitive(haystack: &str, markers: &[&str], contex
     }
 }
 
+fn find_evidence_item<'a>(manifest: &'a Value, item_id: &str) -> (&'a Value, &'a Value) {
+    let families = manifest["families"]
+        .as_array()
+        .expect("manifest families must be an array");
+    for family in families {
+        let items = family["evidence_items"]
+            .as_array()
+            .expect("family evidence_items must be an array");
+        for item in items {
+            if item["id"].as_str() == Some(item_id) {
+                return (family, item);
+            }
+        }
+    }
+    panic!("missing evidence item {item_id}");
+}
+
+fn assert_checked_artifacts(item: &Value, expected: &[(&str, &str)]) {
+    let artifacts = item["artifacts"]
+        .as_array()
+        .expect("evidence item artifacts must be an array");
+    for (path, kind) in expected {
+        let artifact = artifacts
+            .iter()
+            .find(|artifact| artifact["path"].as_str() == Some(*path))
+            .unwrap_or_else(|| panic!("missing checked artifact {path}"));
+        assert_eq!(
+            artifact["kind"].as_str(),
+            Some(*kind),
+            "artifact {path} must have kind {kind}"
+        );
+        assert_eq!(
+            artifact["checked"].as_bool(),
+            Some(true),
+            "artifact {path} must be checked"
+        );
+        assert_repo_file_exists(path);
+    }
+}
+
+fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
+    let values = item[field]
+        .as_array()
+        .unwrap_or_else(|| panic!("evidence item field {field} must be an array"));
+    assert!(
+        values
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|value| value.contains(marker)),
+        "evidence item field {field} is missing marker {marker}"
+    );
+}
+
 #[test]
 fn qp101_browser_resources_are_preserved() {
     let index = read_repo_file("site/index.html");
@@ -227,4 +280,120 @@ fn benchmark_methodology_lists_required_provenance() {
             );
         }
     }
+}
+
+#[test]
+fn checked_benchmark_artifacts_are_linked() {
+    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/app.js");
+    let manifest_text = read_repo_file("site/benchmark-site.json");
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .expect("site benchmark manifest must be valid JSON");
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"checked-benchmark-results\"",
+            "id=\"checked-benchmark-result-cards\"",
+            "data-checked-items=\"surface-decoder-full bb-circuit-full\"",
+            "Checked Benchmark Results",
+        ],
+        "checked benchmark result section",
+    );
+
+    assert_contains_all(
+        &app,
+        &[
+            "const checkedBenchmarkItems",
+            "renderCheckedBenchmarkResults",
+            "findEvidenceItem",
+            "item.artifacts",
+            "artifact.checked",
+            "artifact.kind === \"image\"",
+            "item.commands",
+            "item.caveats",
+            "renderArtifactLinks",
+            "renderCommandList",
+            "renderTextList",
+        ],
+        "checked benchmark result renderer",
+    );
+
+    for hardcoded_path in [
+        "benchmarks/surface_decoder_compare/results/full/results.csv",
+        "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+        "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+        "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
+        "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+    ] {
+        assert!(
+            !index.contains(hardcoded_path),
+            "checked artifact path {hardcoded_path} must come from the manifest, not index.html"
+        );
+        assert!(
+            !app.contains(hardcoded_path),
+            "checked artifact path {hardcoded_path} must come from the manifest, not app.js"
+        );
+    }
+
+    let (surface_family, surface_item) = find_evidence_item(&manifest, "surface-decoder-full");
+    assert_eq!(surface_family["status"].as_str(), Some("existing"));
+    assert_eq!(surface_item["status"].as_str(), Some("existing"));
+    assert_eq!(surface_item["tier"].as_str(), Some("full"));
+    assert_checked_artifacts(
+        surface_item,
+        &[
+            (
+                "benchmarks/surface_decoder_compare/results/full/results.csv",
+                "csv",
+            ),
+            (
+                "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                "image",
+            ),
+        ],
+    );
+    assert_item_has_text_list_marker(surface_item, "commands", "make surface-decoder-compare-full");
+    assert_item_has_text_list_marker(surface_item, "caveats", "committed run");
+    assert!(
+        surface_item["claims_limit"]
+            .as_str()
+            .is_some_and(|value| value.contains("committed-run evidence")),
+        "surface checked item must keep its manifest claims limit"
+    );
+
+    let (bb_family, bb_item) = find_evidence_item(&manifest, "bb-circuit-full");
+    assert_eq!(bb_family["status"].as_str(), Some("partial"));
+    assert_eq!(bb_item["status"].as_str(), Some("existing"));
+    assert_eq!(bb_item["tier"].as_str(), Some("full"));
+    assert_checked_artifacts(
+        bb_item,
+        &[
+            (
+                "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+                "csv",
+            ),
+            (
+                "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
+                "image",
+            ),
+            (
+                "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+                "report",
+            ),
+        ],
+    );
+    assert_item_has_text_list_marker(bb_item, "commands", "make bb-circuit-bposd-compare-full");
+    assert_item_has_text_list_marker(
+        bb_item,
+        "caveats",
+        "batched, error-budget-stopped paired comparison rows",
+    );
+    assert_item_has_text_list_marker(bb_item, "caveats", "not a fixed-shot reproduction");
+    assert!(
+        bb_item["claims_limit"]
+            .as_str()
+            .is_some_and(|value| value.contains("reference-gap report only")),
+        "BB checked item must keep its manifest claims limit"
+    );
 }
