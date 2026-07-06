@@ -47,20 +47,63 @@ code {
 
 .top-nav {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   max-width: 1120px;
   margin: 0 auto;
   padding: 1rem 1.25rem 0;
 }
 
-.top-nav a {
+.brand,
+.nav-links,
+.docs-card-links,
+.docs-home,
+.docs-grid,
+.qp101-section,
+.qp101-kicker {
+  display: flex;
+  gap: 1rem;
+}
+
+.brand {
+  align-items: center;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.nav-links {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.top-nav a:not(.brand) {
   color: var(--muted);
   font-size: 0.95rem;
   text-decoration: none;
 }
 
-.top-nav a:hover {
+.brand:hover,
+.brand:focus-visible {
+  color: var(--text);
+}
+
+.top-nav a:not(.brand):hover {
   color: var(--text);
 }
 
@@ -109,6 +152,12 @@ h3 {
   font-size: 1.15rem;
 }
 
+.section-copy {
+  max-width: 760px;
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -143,6 +192,16 @@ main {
   padding: 2rem 1.25rem 4rem;
 }
 
+.docs-home,
+.qp101-section {
+  flex-direction: column;
+}
+
+.docs-home {
+  margin-top: 0;
+}
+
+.docs-grid,
 .intro-grid,
 .example-grid {
   display: grid;
@@ -150,12 +209,32 @@ main {
   gap: 1rem;
 }
 
+.docs-card,
 .intro-grid article,
 .example-grid article {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.docs-card {
+  padding: 1.25rem;
+}
+
+.docs-card p {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+}
+
+.docs-card-links {
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.docs-card-links a {
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .intro-grid article {
@@ -173,6 +252,11 @@ section {
 
 .section-heading {
   margin-bottom: 1rem;
+}
+
+.qp101-kicker {
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .panel {
@@ -435,10 +519,6 @@ pre code {
 }
 
 @media (max-width: 820px) {
-  .top-nav {
-    justify-content: flex-start;
-  }
-
   .hero {
     padding-top: 3.5rem;
   }
@@ -451,6 +531,13 @@ pre code {
     font-size: 2rem;
   }
 
+  .top-nav,
+  .nav-links {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .docs-grid,
   .intro-grid,
   .example-grid,
   .schema-shell {
@@ -468,6 +555,7 @@ pre code {
 
 @media (max-width: 540px) {
   .top-nav,
+  .nav-links,
   .actions,
   .site-footer {
     flex-direction: column;
