@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "families": [
+    {
+      "id": "surface-decoder-comparison",
+      "title": "Surface Decoder Comparison",
+      "status": "existing",
+      "source_docs": [
+        "docs/showcases/benchmark-evidence.md",
+        "benchmarks/surface_decoder_compare/README.md"
+      ],
+      "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim.",
+      "evidence_items": [
+        {
+          "id": "surface-decoder-full",
+          "title": "Checked surface-decoder full artifacts",
+          "status": "existing",
+          "tier": "full",
+          "artifacts": [
+            {
+              "path": "benchmarks/surface_decoder_compare/results/full/results.csv",
+              "kind": "csv",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+              "kind": "image",
+              "checked": true
+            }
+          ],
+          "commands": [
+            "make surface-decoder-compare-full",
+            "make bench-surface-full"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "external repository commits",
+            "command line",
+            "seeds",
+            "build profile",
+            "shots or error budgets",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/benchmark-evidence.md",
+            "benchmarks/surface_decoder_compare/README.md"
+          ],
+          "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim."
+        },
+        {
+          "id": "surface-decoder-local-smoke",
+          "title": "Surface-decoder local smoke and framework commands",
+          "status": "local-only",
+          "tier": "smoke",
+          "artifacts": [],
+          "commands": [
+            "make surface-decoder-compare-smoke",
+            "make bench-surface-smoke",
+            "make bench-surface-full"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "command line",
+            "seeds",
+            "build profile",
+            "shots or error budgets",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/benchmark-evidence.md",
+            "benchmarks/surface_decoder_compare/README.md"
+          ],
+          "claims_limit": "Smoke and framework outputs are local implementation checks under ignored output directories unless promoted by a future checked-artifact policy."
+        }
+      ]
+    },
+    {
+      "id": "bb-circuit-bposd-comparison",
+      "title": "BB Circuit BP-OSD Comparison",
+      "status": "partial",
+      "source_docs": [
+        "docs/showcases/benchmark-evidence.md",
+        "benchmarks/bb_circuit_bposd_compare/README.md"
+      ],
+      "claims_limit": "Checked full-tier artifacts document the committed BB72/BB144 paired comparison and reference-gap report only.",
+      "evidence_items": [
+        {
+          "id": "bb-circuit-full",
+          "title": "Checked BB72/BB144 full artifacts",
+          "status": "existing",
+          "tier": "full",
+          "artifacts": [
+            {
+              "path": "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+              "kind": "csv",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/bb_circuit_bposd_compare/results/full/summary.md",
+              "kind": "report",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
+              "kind": "image",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+              "kind": "report",
+              "checked": true
+            }
+          ],
+          "commands": [
+            "make bb-circuit-bposd-compare-full"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "external repository commits",
+            "command line",
+            "seeds",
+            "build profile",
+            "shots or error budgets",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/benchmark-evidence.md",
+            "benchmarks/bb_circuit_bposd_compare/README.md"
+          ],
+          "claims_limit": "Checked full-tier artifacts document the committed BB72/BB144 paired comparison and reference-gap report only."
+        },
+        {
+          "id": "bb-circuit-local-readiness",
+          "title": "BB circuit local readiness and diagnostic gates",
+          "status": "local-only",
+          "tier": "readiness",
+          "artifacts": [],
+          "commands": [
+            "make bb-circuit-bposd-compare-smoke",
+            "make bb-circuit-bposd-compare-plot-smoke",
+            "python3 -m benchmarks.bb_circuit_bposd_compare.ready_for_full --results-dir /tmp/rstim-bb-ready",
+            "python3 -m benchmarks.bb_circuit_bposd_compare.write_readiness_report --results-dir /tmp/rstim-bb-ready --out /tmp/bb-bposd-readiness.md"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "external repository commits",
+            "command line",
+            "seeds",
+            "build profile",
+            "shots or error budgets",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/benchmark-evidence.md",
+            "benchmarks/bb_circuit_bposd_compare/README.md"
+          ],
+          "claims_limit": "Readiness and diagnostic outputs remain local-only until the broader small-LDPC campaign has a checked evidence policy."
+        }
+      ]
+    },
+    {
+      "id": "qec-code-random-window",
+      "title": "qec-code Random Window",
+      "status": "local-only",
+      "source_docs": [
+        "docs/showcases/qec-code-random-window-benchmark.md",
+        "benchmarks/qec_code_random_window/README.md"
+      ],
+      "claims_limit": "Local random-window runs are implementation evidence only and do not establish site-facing benchmark claims.",
+      "evidence_items": [
+        {
+          "id": "qec-code-random-window-local-pipeline",
+          "title": "qec-code random-window local pipeline",
+          "status": "local-only",
+          "tier": "local-pipeline",
+          "artifacts": [],
+          "commands": [
+            "make qec-code-random-window-bench-smoke",
+            "make qec-code-random-window-bench-full",
+            "make qec-code-random-window-bench-no-target-smoke",
+            "make qec-code-random-window-bench-no-target-multiseed-smoke",
+            "make qec-code-random-window-bench-no-target-ladder-smoke",
+            "make qec-code-random-window-bench-issue225-readiness-smoke"
+          ],
+          "provenance_requirements": [
+            "command line",
+            "build profile",
+            "seeds",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/qec-code-random-window-benchmark.md",
+            "benchmarks/qec_code_random_window/README.md"
+          ],
+          "claims_limit": "Local wiring, reproduction, and readiness checks only."
+        }
+      ]
+    },
+    {
+      "id": "rstim-vs-stim-simulator",
+      "title": "rstim versus Stim Simulator",
+      "status": "future",
+      "source_docs": [
+        "rstim/doc/performance_parity.md"
+      ],
+      "claims_limit": "No current site-facing benchmark artifacts are tracked for this future comparison family.",
+      "evidence_items": [
+        {
+          "id": "rstim-vs-stim-future",
+          "title": "Future rstim versus Stim simulator benchmark",
+          "status": "future",
+          "tier": "future",
+          "artifacts": [],
+          "commands": [],
+          "provenance_requirements": [
+            "command line",
+            "date"
+          ],
+          "provenance_sources": [
+            "rstim/doc/performance_parity.md"
+          ],
+          "claims_limit": "Planning entry only."
+        }
+      ]
+    },
+    {
+      "id": "internal-regression-evidence",
+      "title": "Internal Regression Evidence",
+      "status": "partial",
+      "source_docs": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/rbposd-parity.yml",
+        "rstim/doc/performance_parity.md"
+      ],
+      "claims_limit": "Regression and compatibility evidence only; not benchmark comparison claims.",
+      "evidence_items": [
+        {
+          "id": "rstim-perf-ci",
+          "title": "rstim perf CI",
+          "status": "partial",
+          "tier": "regression-gate",
+          "artifacts": [],
+          "commands": [
+            "mkdir -p perf-artifacts",
+            "cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "Rust version",
+            "dependency versions",
+            "command line",
+            "build profile",
+            "date"
+          ],
+          "provenance_sources": [
+            ".github/workflows/ci.yml",
+            "rstim/doc/performance_parity.md"
+          ],
+          "claims_limit": "Regression gate evidence only."
+        },
+        {
+          "id": "rbposd-parity-gate",
+          "title": "rbposd parity gate",
+          "status": "partial",
+          "tier": "compatibility-gate",
+          "artifacts": [],
+          "commands": [
+            "python3 -m pip install -r rbposd/scripts/requirements-parity.txt",
+            "cargo test -p rbposd --test reference --test parity_cli --test tooling",
+            "python3 rbposd/scripts/parity_harness.py --repo-root . --fixtures-dir rbposd/tests/fixtures/parity --json-output rbposd-parity-report.json"
+          ],
+          "provenance_requirements": [
+            "OS",
+            "Python version",
+            "dependency versions",
+            "external repository commits",
+            "command line",
+            "date"
+          ],
+          "provenance_sources": [
+            ".github/workflows/rbposd-parity.yml",
+            "rstim/doc/performance_parity.md"
+          ],
+          "claims_limit": "Compatibility and parity-gate evidence only."
+        }
+      ]
+    }
+  ]
+}
