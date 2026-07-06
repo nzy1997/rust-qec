@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 import tools.check_site_manifest as check_site_manifest
+import tools.copy_site_benchmark_data as copy_site_benchmark_data
 
 
 VALID_MANIFEST = {
@@ -30,7 +31,12 @@ VALID_MANIFEST = {
                             "path": "benchmarks/surface_decoder_compare/results/full/results.csv",
                             "kind": "csv",
                             "checked": True,
-                        }
+                        },
+                        {
+                            "path": "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                            "kind": "image",
+                            "checked": True,
+                        },
                     ],
                     "commands": ["make surface-decoder-compare-full"],
                     "provenance_requirements": ["command line", "date"],
@@ -139,9 +145,11 @@ class SiteManifestValidatorTest(unittest.TestCase):
 
         (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
+        (root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").write_text("png\n", encoding="utf-8")
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
+        (root / "benchmarks/out/local-only.csv").write_text("local\n", encoding="utf-8")
 
         manifest = json.loads(json.dumps(VALID_MANIFEST))
         if remove_family is not None:
@@ -183,6 +191,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 ".gitignore",
                 "docs/showcases/benchmark-evidence.md",
                 "benchmarks/surface_decoder_compare/results/full/results.csv",
+                "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
                 "benchmarks/qec_code_random_window/README.md",
                 ".github/workflows/ci.yml",
                 "site/benchmark-site.json",
@@ -263,6 +272,37 @@ class SiteManifestValidatorTest(unittest.TestCase):
             repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
+
+    def test_site_root_validation_rejects_missing_copied_checked_artifact(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest()
+        site_root = repo / "_site"
+        (site_root / "data").mkdir(parents=True)
+        site_manifest = site_root / "data/benchmark-site.json"
+        site_manifest.write_text(manifest_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+        errors = check_site_manifest.validate_manifest(repo, site_manifest, site_root=site_root)
+
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "benchmarks/surface_decoder_compare/results/full/results.csv" in error
+                and "not copied" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_copy_helper_copies_manifest_and_checked_artifacts_only(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest()
+        site_root = repo / "_site"
+
+        errors = copy_site_benchmark_data.copy_benchmark_site_data(repo, manifest_path, site_root)
+
+        self.assertEqual(errors, [])
+        self.assertTrue((site_root / "data/benchmark-site.json").is_file())
+        self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").is_file())
+        self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").is_file())
+        self.assertFalse((site_root / "benchmarks/out/local-only.csv").exists())
 
 
 if __name__ == "__main__":
