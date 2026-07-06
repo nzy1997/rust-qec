@@ -50,7 +50,7 @@ def path_is_tracked(repo_root: Path, relative: str) -> bool:
 
 
 def path_is_ignored(repo_root: Path, relative: str) -> bool:
-    return git_ok(repo_root, ["check-ignore", "-q", "--", relative])
+    return git_ok(repo_root, ["check-ignore", "--no-index", "-q", "--", relative])
 
 
 def load_json(path: Path) -> Any:
@@ -60,6 +60,17 @@ def load_json(path: Path) -> Any:
 
 def add_error(errors: list[str], scope: str, message: str) -> None:
     errors.append(f"{scope}: {message}")
+
+
+def is_non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def validate_non_empty_string(scope: str, field: str, value: Any, errors: list[str]) -> str | None:
+    if not is_non_empty_string(value):
+        add_error(errors, scope, f"{field} must be a non-empty string")
+        return None
+    return value
 
 
 def validate_repo_path(repo_root: Path, relative: str, scope: str, label: str, errors: list[str]) -> None:
@@ -81,11 +92,27 @@ def validate_artifact(repo_root: Path, family_id: str, item_id: str, artifact: d
         add_error(errors, scope, f"artifact missing required field {missing[0]}")
         return
 
+    artifact_path = validate_non_empty_string(scope, "artifact path", artifact["path"], errors)
+    validate_non_empty_string(scope, "artifact kind", artifact["kind"], errors)
     if artifact["checked"] is not True:
-        add_error(errors, scope, f"artifact {artifact['path']} must set checked=True")
+        add_error(errors, scope, f"artifact {artifact.get('path')} must set checked=True")
+        return
+    if artifact_path is None:
         return
 
-    validate_repo_path(repo_root, artifact["path"], scope, "artifact", errors)
+    validate_repo_path(repo_root, artifact_path, scope, "artifact", errors)
+
+
+def validate_string_list(scope: str, label: str, values: Any, errors: list[str], *, allow_empty: bool) -> None:
+    if not isinstance(values, list):
+        add_error(errors, scope, f"{label} must be a list")
+        return
+    if not values and not allow_empty:
+        add_error(errors, scope, f"{label} must not be empty")
+        return
+    for value in values:
+        if not isinstance(value, str):
+            add_error(errors, scope, f"{label} entries must be strings")
 
 
 def validate_path_list(repo_root: Path, scope: str, label: str, paths: Any, errors: list[str]) -> None:
@@ -110,10 +137,21 @@ def validate_item(repo_root: Path, family_id: str, item: Any, errors: list[str])
     for field in ITEM_REQUIRED_FIELDS:
         if field not in item:
             add_error(errors, scope, f"missing required field {field}")
+    validate_non_empty_string(scope, "id", item.get("id"), errors)
+    validate_non_empty_string(scope, "title", item.get("title"), errors)
+    validate_non_empty_string(scope, "claims_limit", item.get("claims_limit"), errors)
     if not isinstance(item.get("status"), str) or item["status"] not in ALLOWED_STATUSES:
         add_error(errors, scope, f"invalid status {item.get('status')!r}")
     if not isinstance(item.get("tier"), str) or not item["tier"]:
         add_error(errors, scope, "tier must be a non-empty string")
+    validate_string_list(scope, "commands", item.get("commands"), errors, allow_empty=True)
+    validate_string_list(
+        scope,
+        "provenance_requirements",
+        item.get("provenance_requirements"),
+        errors,
+        allow_empty=False,
+    )
 
     if item.get("status") in {"local-only", "future"} and item.get("artifacts"):
         add_error(errors, scope, f"{item['status']} evidence item must not list checked artifacts")
@@ -142,6 +180,9 @@ def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | No
     for field in FAMILY_REQUIRED_FIELDS:
         if field not in family:
             add_error(errors, scope, f"missing required field {field}")
+    family_id_value = validate_non_empty_string(scope, "id", family.get("id"), errors)
+    validate_non_empty_string(scope, "title", family.get("title"), errors)
+    validate_non_empty_string(scope, "claims_limit", family.get("claims_limit"), errors)
 
     if not isinstance(family.get("status"), str) or family["status"] not in ALLOWED_STATUSES:
         add_error(errors, scope, f"invalid status {family.get('status')!r}")
@@ -150,12 +191,18 @@ def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | No
 
     evidence_items = family.get("evidence_items")
     if isinstance(evidence_items, list):
+        seen_items: set[str] = set()
         for item in evidence_items:
+            if isinstance(item, dict) and isinstance(item.get("id"), str):
+                item_id = item["id"]
+                if item_id in seen_items:
+                    add_error(errors, scope, f"duplicate evidence item id {item_id}")
+                seen_items.add(item_id)
             validate_item(repo_root, family_id, item, errors)
     else:
         add_error(errors, scope, "evidence_items must be a list")
 
-    return family_id
+    return family_id_value
 
 
 def validate_manifest(repo_root: Path, manifest_path: Path) -> list[str]:

@@ -152,6 +152,19 @@ class SiteManifestValidatorTest(unittest.TestCase):
             del manifest["families"][0]["evidence_items"][0]["claims_limit"]
         elif mutation == "ignored_artifact":
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
+        elif mutation == "force_tracked_ignored_artifact":
+            manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
+        elif mutation == "bad_artifact_path_type":
+            manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = 42
+        elif mutation == "bad_artifact_kind_type":
+            manifest["families"][0]["evidence_items"][0]["artifacts"][0]["kind"] = []
+        elif mutation == "bad_commands_type":
+            manifest["families"][0]["evidence_items"][0]["commands"] = "make surface-decoder-compare-full"
+        elif mutation == "bad_provenance_requirements_type":
+            manifest["families"][0]["evidence_items"][0]["provenance_requirements"] = ["command line", 123]
+        elif mutation == "duplicate_item_id":
+            duplicate = json.loads(json.dumps(manifest["families"][0]["evidence_items"][0]))
+            manifest["families"][0]["evidence_items"].append(duplicate)
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -171,6 +184,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
             cwd=root,
             check=True,
         )
+        if mutation == "force_tracked_ignored_artifact":
+            subprocess.run(["git", "add", "-f", "benchmarks/out/ignored.csv"], cwd=root, check=True)
         return root, manifest_path
 
     def test_accepts_valid_fixture_and_reports_families(self) -> None:
@@ -198,6 +213,33 @@ class SiteManifestValidatorTest(unittest.TestCase):
 
     def test_self_test_exercises_negative_controls(self) -> None:
         self.assertEqual(check_site_manifest.run_self_test(), [])
+
+    def test_rejects_force_tracked_ignored_artifact(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest(mutation="force_tracked_ignored_artifact")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any("surface-decoder-full" in error and "ignored" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_malformed_metadata_without_crashing(self) -> None:
+        for mutation, entry_id, rule in [
+            ("bad_artifact_path_type", "surface-decoder-full", "artifact path must be a non-empty string"),
+            ("bad_artifact_kind_type", "surface-decoder-full", "artifact kind must be a non-empty string"),
+            ("bad_commands_type", "surface-decoder-full", "commands must be a list"),
+            ("bad_provenance_requirements_type", "surface-decoder-full", "provenance_requirements entries must be strings"),
+        ]:
+            repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
+            errors = check_site_manifest.validate_manifest(repo, manifest_path)
+            self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
+
+    def test_rejects_duplicate_evidence_item_ids(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest(mutation="duplicate_item_id")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any("family surface-decoder-comparison" in error and "duplicate evidence item id surface-decoder-full" in error for error in errors),
+            errors,
+        )
 
 
 if __name__ == "__main__":
