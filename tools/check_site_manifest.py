@@ -115,9 +115,20 @@ def validate_string_list(scope: str, label: str, values: Any, errors: list[str],
             add_error(errors, scope, f"{label} entries must be strings")
 
 
-def validate_path_list(repo_root: Path, scope: str, label: str, paths: Any, errors: list[str]) -> None:
+def validate_path_list(
+    repo_root: Path,
+    scope: str,
+    label: str,
+    paths: Any,
+    errors: list[str],
+    *,
+    allow_empty: bool = False,
+) -> None:
     if not isinstance(paths, list):
         add_error(errors, scope, f"{label} must be a list")
+        return
+    if not paths and not allow_empty:
+        add_error(errors, scope, f"{label} must not be empty")
         return
     for path in paths:
         if not isinstance(path, str):
@@ -226,6 +237,7 @@ def validate_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
         return errors
 
     seen: set[str] = set()
+    seen_items: set[str] = set()
     family_ids: list[str] = []
     for family in families:
         family_id = validate_family(repo_root, family, errors)
@@ -235,6 +247,14 @@ def validate_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
         if family_id in seen:
             add_error(errors, "manifest", f"duplicate family id {family_id}")
         seen.add(family_id)
+        if isinstance(family, dict) and isinstance(family.get("evidence_items"), list):
+            for item in family["evidence_items"]:
+                if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                    continue
+                item_id = item["id"]
+                if item_id in seen_items:
+                    add_error(errors, "manifest", f"duplicate evidence item id {item_id}")
+                seen_items.add(item_id)
 
     missing = sorted(REQUIRED_FAMILY_IDS - set(family_ids))
     for family_id in missing:

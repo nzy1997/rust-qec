@@ -165,6 +165,12 @@ class SiteManifestValidatorTest(unittest.TestCase):
         elif mutation == "duplicate_item_id":
             duplicate = json.loads(json.dumps(manifest["families"][0]["evidence_items"][0]))
             manifest["families"][0]["evidence_items"].append(duplicate)
+        elif mutation == "cross_family_duplicate_item_id":
+            manifest["families"][1]["evidence_items"][0]["id"] = "surface-decoder-full"
+        elif mutation == "empty_source_docs":
+            manifest["families"][0]["source_docs"] = []
+        elif mutation == "empty_provenance_sources":
+            manifest["families"][0]["evidence_items"][0]["provenance_sources"] = []
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -240,6 +246,23 @@ class SiteManifestValidatorTest(unittest.TestCase):
             any("family surface-decoder-comparison" in error and "duplicate evidence item id surface-decoder-full" in error for error in errors),
             errors,
         )
+
+    def test_rejects_cross_family_duplicate_evidence_item_ids(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest(mutation="cross_family_duplicate_item_id")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any("manifest" in error and "duplicate evidence item id surface-decoder-full" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_empty_source_and_provenance_sources(self) -> None:
+        for mutation, entry_id, rule in [
+            ("empty_source_docs", "family surface-decoder-comparison", "source_docs must not be empty"),
+            ("empty_provenance_sources", "surface-decoder-full", "provenance_sources must not be empty"),
+        ]:
+            repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
+            errors = check_site_manifest.validate_manifest(repo, manifest_path)
+            self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
 
 
 if __name__ == "__main__":
