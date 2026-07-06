@@ -231,16 +231,16 @@ def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list
     try:
         manifest_errors = check_site_manifest.validate_manifest(repo_root, manifest_path, site_root=site_root)
     except (OSError, UnicodeDecodeError) as exc:
-        manifest_errors = [f"manifest validation could not read built-site files: {exc}"]
+        manifest_errors = [f"data/benchmark-site.json could not be read during manifest validation: {exc}"]
     try:
         site_errors = check_site_manifest.validate_site_root(site_root, manifest_path)
     except (OSError, UnicodeDecodeError) as exc:
-        site_errors = [f"site-root validation could not read built-site files: {exc}"]
+        site_errors = [f"data/benchmark-site.json could not be read during site-root validation: {exc}"]
     combined = manifest_errors + site_errors
     manifest: dict[str, object] | None = None
     try:
         loaded = check_site_manifest.load_json(manifest_path)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError, OSError, UnicodeDecodeError):
         loaded = None
     if isinstance(loaded, dict):
         manifest = loaded

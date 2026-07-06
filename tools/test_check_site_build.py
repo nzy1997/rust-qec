@@ -129,7 +129,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 )
 
     def test_invalid_utf8_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in ("index.html", "app.js"):
+        for relative in ("index.html", "app.js", "data/benchmark-site.json"):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
