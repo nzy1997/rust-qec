@@ -107,6 +107,7 @@ fn workspace_feature_walkthroughs_are_linked() {
             "rstim/doc/cli.md",
             "rstim stats",
             "rstim sample",
+            "rstim sample_dem",
             "rstim detect",
             "rstim analyze_errors",
             "rstim render_svg",
