@@ -94,6 +94,81 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
 }
 
 #[test]
+fn readme_links_benchmarked_site() {
+    let readme = read_repo_file("README.md");
+    let showcase_index = read_repo_file("docs/showcases/README.md");
+
+    for (context, text) in [
+        ("README.md", readme.as_str()),
+        ("docs/showcases/README.md", showcase_index.as_str()),
+    ] {
+        assert_contains_all_case_insensitive(
+            text,
+            &[
+                "benchmarked documentation site",
+                "benchmark evidence",
+                "qp101",
+                "make build-site",
+                "python3 tools/check_site_build.py _site",
+            ],
+            context,
+        );
+        assert!(
+            text.contains("https://nzy1997.github.io/rstim/"),
+            "{context} must link to the GitHub Pages documentation site"
+        );
+    }
+}
+
+#[test]
+fn pages_workflow_builds_benchmarked_site() {
+    let workflow = read_repo_file(".github/workflows/deploy-pages.yml");
+    let makefile = read_repo_file("Makefile");
+
+    assert_contains_all(
+        &workflow,
+        &[
+            "actions/configure-pages@v5",
+            "run: make build-site",
+            "actions/upload-pages-artifact@v3",
+            "path: _site",
+            "actions/deploy-pages@v4",
+        ],
+        "Pages deployment workflow",
+    );
+
+    for forbidden in [
+        "npm install",
+        "npm ci",
+        "pnpm install",
+        "yarn install",
+        "vite build",
+        "next build",
+    ] {
+        assert!(
+            !workflow.contains(forbidden),
+            "Pages workflow must stay focused on make build-site, found {forbidden}"
+        );
+    }
+
+    assert_contains_all_case_insensitive(
+        &makefile,
+        &["build-site", "benchmarked documentation site"],
+        "Makefile build-site help",
+    );
+    assert_contains_all(
+        &makefile,
+        &[
+            "cp site/index.html site/styles.css site/app.js _site/",
+            "cp site/benchmark-site.json _site/data/benchmark-site.json",
+            "python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery",
+            "python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json",
+        ],
+        "Makefile build-site target",
+    );
+}
+
+#[test]
 fn qp101_browser_resources_are_preserved() {
     let index = read_repo_file("site/index.html");
     let app = read_repo_file("site/app.js");
