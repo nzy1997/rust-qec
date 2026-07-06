@@ -197,6 +197,54 @@
     `;
   }
 
+  const benchmarkManifest = document.getElementById("benchmark-manifest");
+
+  function renderBadge(label, value) {
+    return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;
+  }
+
+  function renderBenchmarkManifest(manifest) {
+    if (!benchmarkManifest) {
+      return;
+    }
+    const families = Array.isArray(manifest.families) ? manifest.families : [];
+    if (!families.length) {
+      benchmarkManifest.innerHTML = "<p>No benchmark families are listed.</p>";
+      return;
+    }
+    benchmarkManifest.innerHTML = families
+      .map((family) => {
+        const items = Array.isArray(family.evidence_items) ? family.evidence_items : [];
+        const itemHtml = items
+          .map((item) => `
+            <article class="manifest-item">
+              <div class="manifest-heading">
+                <h4>${escapeHtml(item.title || item.id || "Evidence item")}</h4>
+                <div class="schema-meta">
+                  ${renderBadge("status", item.status)}
+                  ${renderBadge("tier", item.tier)}
+                </div>
+              </div>
+              <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || "No claims limit recorded.")}</p>
+            </article>
+          `)
+          .join("");
+        return `
+          <article class="manifest-family">
+            <div class="manifest-heading">
+              <h3>${escapeHtml(family.title || family.id || "Benchmark family")}</h3>
+              <div class="schema-meta">
+                ${renderBadge("status", family.status)}
+              </div>
+            </div>
+            <p><strong>Claims limit:</strong> ${escapeHtml(family.claims_limit || "No claims limit recorded.")}</p>
+            <div class="manifest-items">${itemHtml}</div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
   function renderNav(root, groupedNodes) {
     navList.innerHTML = "";
     const allButtons = [];
@@ -224,6 +272,26 @@
     if (allButtons.length) {
       allButtons[0].click();
     }
+  }
+
+  if (benchmarkManifest) {
+    fetch("data/benchmark-site.json")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((manifest) => {
+        renderBenchmarkManifest(manifest);
+      })
+      .catch((error) => {
+        benchmarkManifest.classList.add("error");
+        benchmarkManifest.innerHTML = `
+          <p>Benchmark manifest could not be loaded: ${escapeHtml(error.message)}</p>
+          <p><a href="data/benchmark-site.json">Open benchmark-site.json</a></p>
+        `;
+      });
   }
 
   fetch("qp101.schema.json")

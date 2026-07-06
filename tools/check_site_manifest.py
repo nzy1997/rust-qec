@@ -298,6 +298,46 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
     return errors
 
 
+def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
+    errors: list[str] = []
+    scope = "site root"
+    index_path = site_root / "index.html"
+    app_path = site_root / "app.js"
+    expected_manifest = site_root / "data/benchmark-site.json"
+
+    for path, label in [
+        (index_path, "index.html"),
+        (app_path, "app.js"),
+        (expected_manifest, "data/benchmark-site.json"),
+    ]:
+        if not path.is_file():
+            add_error(errors, scope, f"missing built site file {label}")
+
+    if manifest_path.resolve() != expected_manifest.resolve():
+        add_error(errors, scope, "manifest path must be _site/data/benchmark-site.json when --site-root is used")
+
+    index = index_path.read_text(encoding="utf-8") if index_path.is_file() else ""
+    app = app_path.read_text(encoding="utf-8") if app_path.is_file() else ""
+
+    for marker in ['id="benchmarks"', 'id="benchmark-manifest"', "Benchmark Methodology", "Claims Policy"]:
+        if marker not in index:
+            add_error(errors, scope, f"index.html missing benchmark marker {marker}")
+
+    required_app_markers = [
+        'fetch("data/benchmark-site.json")',
+        "renderBenchmarkManifest",
+        "family.status",
+        "family.claims_limit",
+        "item.status",
+        "item.claims_limit",
+    ]
+    missing_app_markers = [marker for marker in required_app_markers if marker not in app]
+    if missing_app_markers:
+        add_error(errors, scope, f"app.js missing manifest status and claims_limit wiring: {missing_app_markers}")
+
+    return errors
+
+
 def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     tmpdir = tempfile.TemporaryDirectory()
     root = Path(tmpdir.name)
@@ -485,7 +525,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate the benchmark site manifest.")
     parser.add_argument("--self-test", action="store_true", help="Run the validator self-test")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Repository root for git checks")
-    parser.add_argument("--site-root", type=Path, help="Validate checked artifact copies under this built site root")
+    parser.add_argument(
+        "--site-root",
+        type=Path,
+        help="Built site root for copied artifact and status/claims-limit wiring checks",
+    )
     parser.add_argument("manifest", nargs="?", type=Path, help="Path to site/benchmark-site.json")
     return parser.parse_args()
 
@@ -509,6 +553,8 @@ def main() -> int:
         return 1
 
     errors = validate_manifest(args.repo_root, args.manifest, site_root=args.site_root)
+    if args.site_root is not None:
+        errors.extend(validate_site_root(args.site_root, args.manifest))
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
