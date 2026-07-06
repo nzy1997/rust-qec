@@ -146,6 +146,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
         (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").write_text("png\n", encoding="utf-8")
+        (root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").write_text("unchecked\n", encoding="utf-8")
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
@@ -162,6 +163,14 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
         elif mutation == "force_tracked_ignored_artifact":
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
+        elif mutation == "unchecked_tracked_artifact":
+            manifest["families"][0]["evidence_items"][0]["artifacts"].append(
+                {
+                    "path": "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
+                    "kind": "csv",
+                    "checked": False,
+                }
+            )
         elif mutation == "bad_artifact_path_type":
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = 42
         elif mutation == "bad_artifact_kind_type":
@@ -192,6 +201,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "docs/showcases/benchmark-evidence.md",
                 "benchmarks/surface_decoder_compare/results/full/results.csv",
                 "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
                 "benchmarks/qec_code_random_window/README.md",
                 ".github/workflows/ci.yml",
                 "site/benchmark-site.json",
@@ -303,6 +313,15 @@ class SiteManifestValidatorTest(unittest.TestCase):
         self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").is_file())
         self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").is_file())
         self.assertFalse((site_root / "benchmarks/out/local-only.csv").exists())
+
+    def test_copy_helper_rejects_unchecked_tracked_artifact(self) -> None:
+        repo, manifest_path = self.write_fixture_manifest(mutation="unchecked_tracked_artifact")
+        site_root = repo / "_site"
+
+        errors = copy_site_benchmark_data.copy_benchmark_site_data(repo, manifest_path, site_root)
+
+        self.assertTrue(any("checked=True" in error for error in errors), errors)
+        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").exists())
 
 
 if __name__ == "__main__":
