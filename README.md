@@ -8,6 +8,20 @@ simulation, command-line circuit workflows, decoder experiments, and benchmark
 evidence. Use this README as the map; the detailed workflows live in the linked
 docs.
 
+## Benchmarked Documentation Site
+
+The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
+is the broad repository reference: workspace walkthroughs, benchmark evidence,
+checked results, methodology and claims limits, plus the QP101 schema browser
+and gallery that used to be the whole Pages surface.
+
+Build and check the same Pages tree locally:
+
+```sh
+make build-site
+python3 tools/check_site_build.py _site
+```
+
 ## What You Can Do
 
 With `rstim` you can:

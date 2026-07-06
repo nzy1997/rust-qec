@@ -94,6 +94,33 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
 }
 
 #[test]
+fn readme_links_benchmarked_site() {
+    let readme = read_repo_file("README.md");
+    let showcase_index = read_repo_file("docs/showcases/README.md");
+
+    for (context, text) in [
+        ("README.md", readme.as_str()),
+        ("docs/showcases/README.md", showcase_index.as_str()),
+    ] {
+        assert_contains_all_case_insensitive(
+            text,
+            &[
+                "benchmarked documentation site",
+                "benchmark evidence",
+                "qp101",
+                "make build-site",
+                "python3 tools/check_site_build.py _site",
+            ],
+            context,
+        );
+        assert!(
+            text.contains("https://nzy1997.github.io/rstim/"),
+            "{context} must link to the GitHub Pages documentation site"
+        );
+    }
+}
+
+#[test]
 fn qp101_browser_resources_are_preserved() {
     let index = read_repo_file("site/index.html");
     let app = read_repo_file("site/app.js");

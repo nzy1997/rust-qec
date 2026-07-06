@@ -8,6 +8,20 @@ and what its limits are.
 Individual showcase pages will be added by follow-up issues. Use
 [`_template.md`](docs/showcases/_template.md) for new pages.
 
+## Benchmarked Documentation Site
+
+The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
+turns these runnable showcase pages into a broader Pages reference with
+workspace walkthroughs, benchmark evidence, checked results, methodology and
+claims limits, and the QP101 schema browser.
+
+Build and check the same Pages tree locally:
+
+```sh
+make build-site
+python3 tools/check_site_build.py _site
+```
+
 ## Visual Highlights
 
 | Compact atom-loss sample-shot circuit | Surface-code d=3 r=3 atom-loss sample |
