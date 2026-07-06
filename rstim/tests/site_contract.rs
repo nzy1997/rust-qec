@@ -243,6 +243,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
             "<code>qec-code</code>",
             "Random-Window Distance Search",
             "Local-only evidence",
+            "QEC-code random-window upper-bound local-only evidence",
             "benchmarks/out/qec_code_random_window/",
             "docs/showcases/qec-code-random-window-benchmark.md",
             "benchmarks/qec_code_random_window/README.md",
@@ -283,6 +284,10 @@ fn qec_code_and_future_benchmarks_are_classified() {
         .as_array()
         .expect("qec-code family evidence_items must be an array");
     assert!(!qec_items.is_empty(), "qec-code family must list evidence items");
+    assert!(
+        !index.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
+        "qec-code random-window site copy must not describe evidence without local-only or partial status"
+    );
     for item in qec_items {
         let item_id = item["id"].as_str().unwrap_or("<missing>");
         let status = item["status"]
@@ -292,13 +297,9 @@ fn qec_code_and_future_benchmarks_are_classified() {
             matches!(status, "local-only" | "partial"),
             "qec-code item {item_id} must be local-only or partial, got {status}"
         );
-        let artifacts = item["artifacts"]
+        item["artifacts"]
             .as_array()
             .unwrap_or_else(|| panic!("qec-code item {item_id} artifacts must be an array"));
-        assert!(
-            !(status == "existing" && item["tier"] == "full" && artifacts.is_empty()),
-            "qec-code item {item_id} must not claim existing checked full evidence without artifacts"
-        );
     }
 
     let future_family = families
