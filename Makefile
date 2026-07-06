@@ -22,7 +22,7 @@ help:
 	@echo "Available targets:"
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
-	@echo "  build-site           - Build the QP101 GitHub Pages site into _site"
+	@echo "  build-site           - Build the benchmarked documentation site into _site"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
