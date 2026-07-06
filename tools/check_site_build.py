@@ -172,6 +172,13 @@ def load_html(index_path: Path) -> tuple[str, HtmlCollector]:
     return text, collector
 
 
+def read_text_file(path: Path) -> tuple[str | None, str | None]:
+    try:
+        return path.read_text(encoding="utf-8"), None
+    except OSError as exc:
+        return None, f"{path.name}: {exc.strerror or exc}"
+
+
 def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCollector, app_text: str) -> CheckResult:
     missing_anchors = [anchor for anchor in REQUIRED_ANCHORS if anchor not in collector.ids]
     if missing_anchors:
@@ -221,9 +228,8 @@ def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list
     return results, manifest
 
 
-def check_benchmark_methodology(index_text: str, manifest: dict[str, object] | None) -> CheckResult:
-    manifest_text = json.dumps(manifest, sort_keys=True) if manifest is not None else ""
-    missing = [phrase for phrase in CLAIMS_POLICY_PHRASES if phrase not in index_text and phrase not in manifest_text]
+def check_benchmark_methodology(index_text: str) -> CheckResult:
+    missing = [phrase for phrase in CLAIMS_POLICY_PHRASES if phrase not in index_text]
     if missing:
         return fail("benchmark methodology", "missing claims-policy phrases: " + ", ".join(missing))
     return pass_("benchmark methodology", "claims-policy phrases are present")
@@ -315,14 +321,34 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
 
     results.append(check_non_empty_files(site_root, QP101_REQUIRED_FILES, "QP101 assets"))
 
-    index_text, collector = load_html(site_root / "index.html")
-    app_text = (site_root / "app.js").read_text(encoding="utf-8")
-    results.append(check_workspace_overview(site_root, index_text, collector, app_text))
+    index_text, index_error = read_text_file(site_root / "index.html")
+    app_text, app_error = read_text_file(site_root / "app.js")
+    collector: HtmlCollector | None = None
+    workspace_read_errors = [error for error in (index_error, app_error) if error is not None]
+
+    if index_text is not None:
+        collector = HtmlCollector()
+        collector.feed(index_text)
+
+    if workspace_read_errors:
+        results.append(fail("workspace overview", "could not read built-site files: " + "; ".join(workspace_read_errors)))
+    elif collector is not None and app_text is not None:
+        results.append(check_workspace_overview(site_root, index_text, collector, app_text))
 
     manifest_results, manifest = check_manifest_and_artifacts(site_root, repo_root)
     results.extend(manifest_results)
-    results.append(check_benchmark_methodology(index_text, manifest))
-    results.append(check_checked_artifacts(site_root, index_text, app_text, manifest))
+    if index_text is None:
+        results.append(fail("benchmark methodology", "could not read built-site files: index.html"))
+    else:
+        results.append(check_benchmark_methodology(index_text))
+
+    if index_text is None or app_text is None:
+        unreadable = ", ".join(
+            name for name, text in (("index.html", index_text), ("app.js", app_text)) if text is None
+        )
+        results.append(fail("checked benchmark artifacts", f"could not read built-site files: {unreadable}"))
+    else:
+        results.append(check_checked_artifacts(site_root, index_text, app_text, manifest))
     results.append(check_local_only_future(site_root, manifest))
 
     return results

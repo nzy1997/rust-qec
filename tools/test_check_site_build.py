@@ -65,6 +65,43 @@ class SiteBuildCheckerTest(unittest.TestCase):
             check_site_build.format_summary(results),
         )
 
+    def test_missing_index_or_app_returns_fail_summary_instead_of_raising(self) -> None:
+        for relative in ("index.html", "app.js"):
+            with self.subTest(relative=relative):
+                fixture = check_site_build.make_fixture_site()
+                self.addCleanup(fixture.cleanup)
+                (fixture.site_root / relative).unlink()
+
+                results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+                summary = check_site_build.format_summary(results)
+
+                self.assertIn("SUMMARY: FAIL", summary)
+                self.assertTrue(
+                    any(result.status == "FAIL" and relative in result.detail for result in results),
+                    summary,
+                )
+
+    def test_rejects_missing_claims_policy_phrase_even_if_manifest_keeps_it(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        index = fixture.site_root / "index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace("committed-run evidence", "checked-run evidence"),
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and "benchmark methodology" in result.area
+                and "committed-run evidence" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
     def test_rejects_unmanifested_checked_artifact_link(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
