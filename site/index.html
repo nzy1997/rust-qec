@@ -264,11 +264,46 @@
           <article class="compact-card">
             <h3>Random-window distance search</h3>
             <p>
-              QEC-code random-window upper-bound evidence, no-target smoke profiles,
-              and paper-baseline comparison wiring.
+              QEC-code random-window upper-bound local-only evidence, no-target
+              smoke profiles, and paper-baseline comparison wiring.
             </p>
             <div class="docs-card-links">
               <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-random-window-benchmark.md">Random-window showcase</a>
+            </div>
+          </article>
+          <article id="qec-code-random-window-benchmark" class="compact-card">
+            <h3><code>qec-code</code> Random-Window Distance Search</h3>
+            <p>
+              Local-only evidence for random-window upper-bound searches. The
+              source docs, case manifests, tests, and commands are checked in,
+              but generated outputs remain under
+              <code>benchmarks/out/qec_code_random_window/</code> and are not
+              checked site artifacts.
+            </p>
+            <ul class="manifest-list" aria-label="qec-code random-window Make targets">
+              <li><code>make qec-code-random-window-bench-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-full</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-multiseed-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-ladder-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-issue225-readiness-smoke</code></li>
+            </ul>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-random-window-benchmark.md">Random-window showcase</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/qec_code_random_window/README.md">Benchmark README</a>
+            </div>
+          </article>
+          <article id="future-simulator-benchmarks" class="compact-card">
+            <h3><code>rstim</code> versus Stim Simulator Benchmarks</h3>
+            <p>
+              Future work for simulator-level comparisons. No current site-facing
+              results are claimed here; planned coverage includes sampling,
+              detection, DEM extraction, conversion, repeat-heavy circuits, and
+              memory footprint.
+            </p>
+            <div class="docs-card-links">
+              <a href="#benchmarks">Claims policy</a>
+              <a href="https://github.com/nzy1997/rstim/issues/359">Benchmark direction map</a>
             </div>
           </article>
         </div>

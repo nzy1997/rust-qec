@@ -228,3 +228,123 @@ fn benchmark_methodology_lists_required_provenance() {
         }
     }
 }
+
+#[test]
+fn qec_code_and_future_benchmarks_are_classified() {
+    let index = read_repo_file("site/index.html");
+    let manifest_text = read_repo_file("site/benchmark-site.json");
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .expect("site benchmark manifest must be valid JSON");
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"qec-code-random-window-benchmark\"",
+            "<code>qec-code</code>",
+            "Random-Window Distance Search",
+            "Local-only evidence",
+            "QEC-code random-window upper-bound local-only evidence",
+            "benchmarks/out/qec_code_random_window/",
+            "docs/showcases/qec-code-random-window-benchmark.md",
+            "benchmarks/qec_code_random_window/README.md",
+            "qec-code-random-window-bench-smoke",
+            "qec-code-random-window-bench-full",
+            "qec-code-random-window-bench-no-target-smoke",
+            "qec-code-random-window-bench-no-target-multiseed-smoke",
+            "qec-code-random-window-bench-no-target-ladder-smoke",
+            "qec-code-random-window-bench-issue225-readiness-smoke",
+            "id=\"future-simulator-benchmarks\"",
+            "<code>rstim</code>",
+            "versus Stim Simulator Benchmarks",
+            "Future work",
+            "sampling",
+            "detection",
+            "DEM extraction",
+            "conversion",
+            "memory footprint",
+        ],
+        "qec-code and future benchmark site sections",
+    );
+
+    let families = manifest["families"]
+        .as_array()
+        .expect("manifest families must be an array");
+    let qec_family = families
+        .iter()
+        .find(|family| family["id"] == "qec-code-random-window")
+        .expect("qec-code random-window family must exist");
+    let qec_status = qec_family["status"]
+        .as_str()
+        .expect("qec-code family status must be a string");
+    assert!(
+        matches!(qec_status, "local-only" | "partial"),
+        "qec-code family must be local-only or partial, got {qec_status}"
+    );
+    let qec_items = qec_family["evidence_items"]
+        .as_array()
+        .expect("qec-code family evidence_items must be an array");
+    assert!(!qec_items.is_empty(), "qec-code family must list evidence items");
+    assert!(
+        !index.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
+        "qec-code random-window site copy must not describe evidence without local-only or partial status"
+    );
+    for item in qec_items {
+        let item_id = item["id"].as_str().unwrap_or("<missing>");
+        let status = item["status"]
+            .as_str()
+            .unwrap_or_else(|| panic!("qec-code item {item_id} missing status"));
+        assert!(
+            matches!(status, "local-only" | "partial"),
+            "qec-code item {item_id} must be local-only or partial, got {status}"
+        );
+        item["artifacts"]
+            .as_array()
+            .unwrap_or_else(|| panic!("qec-code item {item_id} artifacts must be an array"));
+    }
+
+    let future_family = families
+        .iter()
+        .find(|family| family["id"] == "rstim-vs-stim-simulator")
+        .expect("future simulator family must exist");
+    assert_eq!(
+        future_family["status"], "future",
+        "rstim versus Stim simulator family must be future"
+    );
+    let future_items = future_family["evidence_items"]
+        .as_array()
+        .expect("future simulator evidence_items must be an array");
+    assert!(!future_items.is_empty(), "future simulator family must list evidence items");
+    for item in future_items {
+        let item_id = item["id"].as_str().unwrap_or("<missing>");
+        assert_eq!(
+            item["status"], "future",
+            "future simulator item {item_id} must be future"
+        );
+        assert!(
+            item["artifacts"]
+                .as_array()
+                .is_some_and(|artifacts| artifacts.is_empty()),
+            "future simulator item {item_id} must not list checked artifacts"
+        );
+    }
+
+    for family in families {
+        let Some(items) = family["evidence_items"].as_array() else {
+            continue;
+        };
+        for item in items {
+            let Some(artifacts) = item["artifacts"].as_array() else {
+                continue;
+            };
+            for artifact in artifacts {
+                if artifact["checked"].as_bool().unwrap_or(false) {
+                    let path = artifact["path"].as_str().unwrap_or("");
+                    assert!(
+                        !path.starts_with("benchmarks/out/"),
+                        "checked artifact must not point under benchmarks/out/: {path}"
+                    );
+                }
+            }
+        }
+    }
+}
