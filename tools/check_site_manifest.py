@@ -85,6 +85,34 @@ def validate_repo_path(repo_root: Path, relative: str, scope: str, label: str, e
         add_error(errors, scope, f"{label} {relative} is not tracked by git")
 
 
+def iter_checked_artifact_paths(manifest: dict[str, Any]) -> list[tuple[str, str]]:
+    paths: list[tuple[str, str]] = []
+    for family in manifest.get("families", []):
+        if not isinstance(family, dict):
+            continue
+        for item in family.get("evidence_items", []):
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get("id", "<missing>")
+            for artifact in item.get("artifacts", []):
+                if not isinstance(artifact, dict):
+                    continue
+                if artifact.get("checked") is True and isinstance(artifact.get("path"), str):
+                    paths.append((item_id, artifact["path"]))
+    return paths
+
+
+def validate_site_paths(site_root: Path, manifest: dict[str, Any], errors: list[str]) -> None:
+    for item_id, artifact_path in iter_checked_artifact_paths(manifest):
+        copied = site_root / artifact_path
+        if not copied.is_file():
+            add_error(
+                errors,
+                f"evidence item {item_id}",
+                f"checked artifact {artifact_path} was not copied to {site_root}",
+            )
+
+
 def validate_artifact(repo_root: Path, family_id: str, item_id: str, artifact: dict[str, Any], errors: list[str]) -> None:
     scope = f"evidence item {item_id}"
     missing = [field for field in ("path", "kind", "checked") if field not in artifact]
@@ -216,7 +244,7 @@ def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | No
     return family_id_value
 
 
-def validate_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
+def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | None = None) -> list[str]:
     errors: list[str] = []
     try:
         manifest = load_json(manifest_path)
@@ -263,6 +291,9 @@ def validate_manifest(repo_root: Path, manifest_path: Path) -> list[str]:
     extra = sorted(set(family_ids) - REQUIRED_FAMILY_IDS)
     for family_id in extra:
         add_error(errors, "manifest", f"unexpected family {family_id}")
+
+    if site_root is not None and not errors:
+        validate_site_paths(site_root, manifest, errors)
 
     return errors
 
@@ -454,6 +485,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate the benchmark site manifest.")
     parser.add_argument("--self-test", action="store_true", help="Run the validator self-test")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Repository root for git checks")
+    parser.add_argument("--site-root", type=Path, help="Validate checked artifact copies under this built site root")
     parser.add_argument("manifest", nargs="?", type=Path, help="Path to site/benchmark-site.json")
     return parser.parse_args()
 
@@ -476,7 +508,7 @@ def main() -> int:
         print("error: manifest path is required unless --self-test is used", file=sys.stderr)
         return 1
 
-    errors = validate_manifest(args.repo_root, args.manifest)
+    errors = validate_manifest(args.repo_root, args.manifest, site_root=args.site_root)
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
