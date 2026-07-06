@@ -165,16 +165,23 @@ def collect_local_string_paths(*texts: str) -> set[str]:
     return found
 
 
-def load_html(index_path: Path) -> tuple[str, HtmlCollector]:
-    text = index_path.read_text(encoding="utf-8")
-    collector = HtmlCollector()
-    collector.feed(text)
-    return text, collector
+def resolve_site_reference(site_root: Path, value: str) -> tuple[str | None, Path | None, str | None]:
+    normalized = normalize_local_reference(value)
+    if normalized is None:
+        return None, None, None
+    candidate = (site_root / normalized).resolve(strict=False)
+    try:
+        candidate.relative_to(site_root)
+    except ValueError:
+        return normalized, None, f"path escape outside built site: {normalized}"
+    return normalized, candidate, None
 
 
 def read_text_file(path: Path) -> tuple[str | None, str | None]:
     try:
         return path.read_text(encoding="utf-8"), None
+    except UnicodeDecodeError as exc:
+        return None, f"{path.name}: invalid UTF-8 ({exc})"
     except OSError as exc:
         return None, f"{path.name}: {exc.strerror or exc}"
 
@@ -191,16 +198,26 @@ def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCo
             if anchor and anchor not in collector.ids:
                 missing_refs.append(f"missing same-page anchor #{anchor}")
             continue
-        normalized = normalize_local_reference(href)
-        if normalized is not None and not (site_root / normalized).exists():
+        normalized, candidate, error = resolve_site_reference(site_root, href)
+        if error is not None:
+            missing_refs.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
             missing_refs.append(normalized)
     for src in collector.srcs:
-        normalized = normalize_local_reference(src)
-        if normalized is not None and not (site_root / normalized).exists():
+        normalized, candidate, error = resolve_site_reference(site_root, src)
+        if error is not None:
+            missing_refs.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
             missing_refs.append(normalized)
 
     string_paths = collect_local_string_paths(index_text, app_text)
-    missing_string_paths = sorted(path for path in string_paths if not (site_root / path).exists())
+    missing_string_paths: list[str] = []
+    for path in sorted(string_paths):
+        normalized, candidate, error = resolve_site_reference(site_root, path)
+        if error is not None:
+            missing_string_paths.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
+            missing_string_paths.append(normalized)
     if missing_refs or missing_string_paths:
         details = missing_refs + missing_string_paths
         return fail("workspace overview", "missing local references: " + ", ".join(details))
@@ -211,8 +228,14 @@ def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCo
 def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list[CheckResult], dict[str, object] | None]:
     results: list[CheckResult] = []
     manifest_path = site_root / "data/benchmark-site.json"
-    manifest_errors = check_site_manifest.validate_manifest(repo_root, manifest_path, site_root=site_root)
-    site_errors = check_site_manifest.validate_site_root(site_root, manifest_path)
+    try:
+        manifest_errors = check_site_manifest.validate_manifest(repo_root, manifest_path, site_root=site_root)
+    except (OSError, UnicodeDecodeError) as exc:
+        manifest_errors = [f"manifest validation could not read built-site files: {exc}"]
+    try:
+        site_errors = check_site_manifest.validate_site_root(site_root, manifest_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        site_errors = [f"site-root validation could not read built-site files: {exc}"]
     combined = manifest_errors + site_errors
     manifest: dict[str, object] | None = None
     try:
@@ -679,6 +702,40 @@ def run_self_test() -> list[str]:
                     encoding="utf-8",
                 ),
                 "not listed as a checked manifest artifact",
+            ),
+            (
+                "html_escape_outside_site",
+                lambda f: (
+                    (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
+                    (f.site_root / "index.html").write_text(
+                        (f.site_root / "index.html").read_text(encoding="utf-8").replace(
+                            'href="QP101-ZY.md"', 'href="../outside.txt"', 1
+                        ),
+                        encoding="utf-8",
+                    ),
+                ),
+                "path escape outside built site: ../outside.txt",
+            ),
+            (
+                "js_escape_outside_site",
+                lambda f: (
+                    (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
+                    (f.site_root / "app.js").write_text(
+                        (f.site_root / "app.js").read_text(encoding="utf-8") + '\nconst escaped = "../outside.txt";\n',
+                        encoding="utf-8",
+                    ),
+                ),
+                "path escape outside built site: ../outside.txt",
+            ),
+            (
+                "invalid_utf8_index",
+                lambda f: (f.site_root / "index.html").write_bytes(b"\xff\xfe\xfa"),
+                "index.html: invalid UTF-8",
+            ),
+            (
+                "invalid_utf8_app",
+                lambda f: (f.site_root / "app.js").write_bytes(b"\xff\xfe\xfa"),
+                "app.js: invalid UTF-8",
             ),
         ]
 

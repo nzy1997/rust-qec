@@ -65,12 +65,75 @@ class SiteBuildCheckerTest(unittest.TestCase):
             check_site_build.format_summary(results),
         )
 
+    def test_rejects_html_reference_that_escapes_site_root(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        outside = fixture.repo_root / "outside.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        index = fixture.site_root / "index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace('href="QP101-ZY.md"', 'href="../outside.txt"', 1),
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        summary = check_site_build.format_summary(results)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "workspace overview"
+                and "../outside.txt" in result.detail
+                and "escape" in result.detail
+                for result in results
+            ),
+            summary,
+        )
+
+    def test_rejects_js_reference_that_escapes_site_root(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        outside = fixture.repo_root / "outside.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        app = fixture.site_root / "app.js"
+        app.write_text(app.read_text(encoding="utf-8") + '\nconst escaped = "../outside.txt";\n', encoding="utf-8")
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        summary = check_site_build.format_summary(results)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "workspace overview"
+                and "../outside.txt" in result.detail
+                and "escape" in result.detail
+                for result in results
+            ),
+            summary,
+        )
+
     def test_missing_index_or_app_returns_fail_summary_instead_of_raising(self) -> None:
         for relative in ("index.html", "app.js"):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
                 (fixture.site_root / relative).unlink()
+
+                results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+                summary = check_site_build.format_summary(results)
+
+                self.assertIn("SUMMARY: FAIL", summary)
+                self.assertTrue(
+                    any(result.status == "FAIL" and relative in result.detail for result in results),
+                    summary,
+                )
+
+    def test_invalid_utf8_returns_fail_summary_instead_of_raising(self) -> None:
+        for relative in ("index.html", "app.js"):
+            with self.subTest(relative=relative):
+                fixture = check_site_build.make_fixture_site()
+                self.addCleanup(fixture.cleanup)
+                (fixture.site_root / relative).write_bytes(b"\xff\xfe\xfa")
 
                 results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
                 summary = check_site_build.format_summary(results)
