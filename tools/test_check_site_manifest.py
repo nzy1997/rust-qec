@@ -312,7 +312,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
         self.assertTrue((site_root / "data/benchmark-site.json").is_file())
         self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").is_file())
         self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").is_file())
-        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").exists())
+        self.assertFalse((site_root / "benchmarks/out/local-only.csv").exists())
 
     def test_copy_helper_rejects_unchecked_tracked_artifact(self) -> None:
         repo, manifest_path = self.write_fixture_manifest(mutation="unchecked_tracked_artifact")
