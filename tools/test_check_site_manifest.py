@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 import tools.check_site_manifest as check_site_manifest
+import tools.copy_site_benchmark_data as copy_site_benchmark_data
 
 
 VALID_MANIFEST = {
@@ -30,7 +31,12 @@ VALID_MANIFEST = {
                             "path": "benchmarks/surface_decoder_compare/results/full/results.csv",
                             "kind": "csv",
                             "checked": True,
-                        }
+                        },
+                        {
+                            "path": "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                            "kind": "image",
+                            "checked": True,
+                        },
                     ],
                     "commands": ["make surface-decoder-compare-full"],
                     "provenance_requirements": ["command line", "date"],
@@ -140,6 +146,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
 
         (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
+        (root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").write_text("png\n", encoding="utf-8")
+        (root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").write_text("unchecked\n", encoding="utf-8")
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "_site/index.html").write_text(
@@ -151,6 +159,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
+        (root / "benchmarks/out/local-only.csv").write_text("local\n", encoding="utf-8")
 
         manifest = json.loads(json.dumps(VALID_MANIFEST))
         if remove_family is not None:
@@ -163,6 +172,14 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
         elif mutation == "force_tracked_ignored_artifact":
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
+        elif mutation == "unchecked_tracked_artifact":
+            manifest["families"][0]["evidence_items"][0]["artifacts"].append(
+                {
+                    "path": "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
+                    "kind": "csv",
+                    "checked": False,
+                }
+            )
         elif mutation == "bad_artifact_path_type":
             manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = 42
         elif mutation == "bad_artifact_kind_type":
@@ -194,6 +211,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 ".gitignore",
                 "docs/showcases/benchmark-evidence.md",
                 "benchmarks/surface_decoder_compare/results/full/results.csv",
+                "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
                 "benchmarks/qec_code_random_window/README.md",
                 ".github/workflows/ci.yml",
                 "site/benchmark-site.json",
@@ -274,6 +293,47 @@ class SiteManifestValidatorTest(unittest.TestCase):
             repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
+
+    def test_site_root_validation_rejects_missing_copied_checked_artifact(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        site_root = repo / "_site"
+
+        errors = check_site_manifest.validate_manifest(repo, built_manifest_path, site_root=site_root)
+
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "benchmarks/surface_decoder_compare/results/full/results.csv" in error
+                and "not copied" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_copy_helper_copies_manifest_and_checked_artifacts_only(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest()
+        site_root = repo / "_site-copy"
+
+        errors = copy_site_benchmark_data.copy_benchmark_site_data(repo, manifest_path, site_root)
+
+        self.assertEqual(errors, [])
+        self.assertTrue((site_root / "data/benchmark-site.json").is_file())
+        self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").is_file())
+        self.assertTrue((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").is_file())
+        self.assertFalse((site_root / "benchmarks/out/local-only.csv").exists())
+        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").exists())
+
+    def test_copy_helper_rejects_unchecked_tracked_artifact(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="unchecked_tracked_artifact")
+        site_root = repo / "_site-copy"
+
+        errors = copy_site_benchmark_data.copy_benchmark_site_data(repo, manifest_path, site_root)
+
+        self.assertTrue(any("checked=True" in error for error in errors), errors)
+        self.assertFalse((site_root / "data/benchmark-site.json").exists())
+        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").exists())
+        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").exists())
+        self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").exists())
 
     def test_accepts_built_site_manifest_when_site_root_is_wired(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
