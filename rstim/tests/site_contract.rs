@@ -19,6 +19,25 @@ fn assert_repo_file_exists(relative: &str) {
     assert!(Path::new(&path).is_file(), "missing site resource {}", path.display());
 }
 
+fn assert_contains_all(haystack: &str, markers: &[&str], context: &str) {
+    for marker in markers {
+        assert!(
+            haystack.contains(marker),
+            "{context} is missing marker {marker}"
+        );
+    }
+}
+
+fn assert_contains_all_case_insensitive(haystack: &str, markers: &[&str], context: &str) {
+    let lower = haystack.to_lowercase();
+    for marker in markers {
+        assert!(
+            lower.contains(&marker.to_lowercase()),
+            "{context} is missing marker {marker}"
+        );
+    }
+}
+
 #[test]
 fn qp101_browser_resources_are_preserved() {
     let index = read_repo_file("site/index.html");
@@ -60,4 +79,58 @@ fn qp101_browser_resources_are_preserved() {
     ] {
         assert_repo_file_exists(relative);
     }
+}
+
+#[test]
+fn workspace_feature_walkthroughs_are_linked() {
+    let index = read_repo_file("site/index.html");
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"workspace-overview\"",
+            "id=\"feature-walkthroughs\"",
+            "id=\"benchmark-evidence\"",
+            "rstim",
+            "rsinter",
+            "rmatching",
+            "rbposd",
+            "rilpqec",
+            "qec-code",
+            "qec-ilp-core",
+            "docs/showcases/rstim-cli-dem-pipeline.md",
+            "docs/showcases/rstim-render-svg-atom-loss.md",
+            "docs/showcases/qec-code-css-construction.md",
+            "docs/showcases/benchmark-evidence.md",
+            "docs/showcases/qec-code-random-window-benchmark.md",
+            "docs/showcases/README.md",
+            "rstim/doc/cli.md",
+            "rstim stats",
+            "rstim sample",
+            "rstim sample_dem",
+            "rstim detect",
+            "rstim analyze_errors",
+            "rstim render_svg",
+            "rstim export_json",
+            "rsinter bench",
+            "code css",
+            "random-window-upper-bound",
+        ],
+        "workspace walkthrough site source",
+    );
+
+    assert_contains_all_case_insensitive(
+        &index,
+        &[
+            "circuit parsing",
+            "sampling",
+            "detection",
+            "dem extraction",
+            "svg/qp101 export",
+            "decoder experiments",
+            "css construction",
+            "distance-search workflows",
+        ],
+        "workspace walkthrough copy",
+    );
 }
