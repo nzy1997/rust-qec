@@ -46,7 +46,7 @@
 - Produces: browser function `renderBenchmarkManifest(manifest: object)`.
 - Produces: Rust test `benchmark_methodology_lists_required_provenance`.
 
-- [ ] **Step 1: Write the failing Rust site contract test**
+- [x] **Step 1: Write the failing Rust site contract test**
 
 Add these imports and helper structs near the top of `rstim/tests/site_contract.rs`:
 
@@ -135,7 +135,7 @@ fn benchmark_methodology_lists_required_provenance() {
 }
 ```
 
-- [ ] **Step 2: Write the failing Python validator tests**
+- [x] **Step 2: Write the failing Python validator tests**
 
 In `tools/test_check_site_manifest.py`, extend the temporary fixture setup to create built-site files:
 
@@ -180,7 +180,7 @@ def test_rejects_built_site_without_manifest_status_wiring(self) -> None:
     self.assertTrue(any("status" in error and "claims_limit" in error for error in errors), errors)
 ```
 
-- [ ] **Step 3: Run tests to verify RED**
+- [x] **Step 3: Run tests to verify RED**
 
 Run:
 
@@ -193,7 +193,7 @@ Expected: the Rust test fails because `site/index.html` has no `#benchmarks`
 methodology section and `site/app.js` does not fetch `data/benchmark-site.json`.
 The Python test fails because `validate_site_root` does not exist.
 
-- [ ] **Step 4: Add built manifest copy to the site build**
+- [x] **Step 4: Add built manifest copy to the site build**
 
 In `Makefile`, update the `build-site` target so it creates `_site/data` and copies the manifest:
 
@@ -207,7 +207,7 @@ build-site:
 
 Keep the existing QP101 copies and gallery command after these lines.
 
-- [ ] **Step 5: Add the benchmark methodology section**
+- [x] **Step 5: Add the benchmark methodology section**
 
 In `site/index.html`, add `<a href="#benchmarks">Benchmarks</a>` to `.nav-links`.
 
@@ -322,7 +322,7 @@ Add this section between `docs-home` and `qp101`:
       </section>
 ```
 
-- [ ] **Step 6: Style the benchmark section**
+- [x] **Step 6: Style the benchmark section**
 
 In `site/styles.css`, add `.tier-grid` to the existing grid selector:
 
@@ -428,7 +428,7 @@ Then add benchmark-specific styles:
 
 In the `@media (max-width: 820px)` block, add `.tier-grid`, `.evidence-policy-grid`, `.benchmark-manifest`, and `.provenance-panel` to the one-column grid list.
 
-- [ ] **Step 7: Render manifest status and claims-limit fields in JavaScript**
+- [x] **Step 7: Render manifest status and claims-limit fields in JavaScript**
 
 In `site/app.js`, keep the existing QP101 schema browser code intact and add these helpers before the final `})();`:
 
@@ -502,7 +502,7 @@ In `site/app.js`, keep the existing QP101 schema browser code intact and add the
   }
 ```
 
-- [ ] **Step 8: Add built-site validator support**
+- [x] **Step 8: Add built-site validator support**
 
 In `tools/check_site_manifest.py`, add this function after `validate_manifest`:
 
@@ -560,7 +560,7 @@ if args.site_root is not None:
     errors.extend(validate_site_root(args.site_root, args.manifest))
 ```
 
-- [ ] **Step 9: Run focused GREEN verification**
+- [x] **Step 9: Run focused GREEN verification**
 
 Run:
 
@@ -574,7 +574,7 @@ python3 tools/check_site_manifest.py --repo-root . --site-root _site _site/data/
 Expected: all commands exit 0. The validator prints one `ok: family ...` line
 for each manifest family.
 
-- [ ] **Step 10: Run repository verification**
+- [x] **Step 10: Run repository verification**
 
 Run:
 
@@ -585,7 +585,7 @@ git diff --check
 
 Expected: both commands exit 0.
 
-- [ ] **Step 11: Commit the implementation**
+- [x] **Step 11: Commit the implementation**
 
 Run:
 
