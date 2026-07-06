@@ -60,6 +60,9 @@ code {
 .nav-links,
 .docs-card-links,
 .docs-home,
+.workspace-overview,
+.feature-walkthroughs,
+.benchmark-evidence,
 .docs-grid,
 .qp101-section,
 .qp101-kicker {
@@ -193,6 +196,10 @@ main {
 }
 
 .docs-home,
+.workspace-overview,
+.feature-walkthroughs,
+.benchmark-evidence,
+.benchmark-section,
 .qp101-section {
   flex-direction: column;
 }
@@ -202,17 +209,31 @@ main {
 }
 
 .docs-grid,
+.workspace-grid,
+.walkthrough-grid,
+.evidence-grid,
 .intro-grid,
 .example-grid,
 .tier-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
 .benchmark-section {
   display: flex;
   flex-direction: column;
+}
+
+.docs-grid,
+.workspace-grid,
+.walkthrough-grid,
+.intro-grid,
+.example-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .tier-grid {
@@ -232,12 +253,31 @@ main {
   padding: 1.25rem;
 }
 
+.compact-card {
+  min-width: 0;
+  padding: 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
 .docs-card p {
   margin: 0.65rem 0 0;
   color: var(--muted);
 }
 
+.compact-card p {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+}
+
 .docs-card-links {
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.compact-card .docs-card-links {
   flex-wrap: wrap;
   margin-top: 1rem;
 }
@@ -624,6 +664,9 @@ pre code {
   }
 
   .docs-grid,
+  .workspace-grid,
+  .walkthrough-grid,
+  .evidence-grid,
   .intro-grid,
   .example-grid,
   .tier-grid,
