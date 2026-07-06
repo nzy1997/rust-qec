@@ -151,11 +151,16 @@ class SiteManifestValidatorTest(unittest.TestCase):
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "_site/index.html").write_text(
-            '<section id="benchmarks"><div id="benchmark-manifest"></div></section>\n',
+            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
+            '<section id="checked-benchmark-results"><div id="checked-benchmark-result-cards" '
+            'data-checked-items="surface-decoder-full bb-circuit-full"></div></section>\n',
             encoding="utf-8",
         )
         (root / "_site/app.js").write_text(
-            'fetch("data/benchmark-site.json"); family.status; family.claims_limit; item.status; item.claims_limit;\n',
+            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
+            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'family.status; family.claims_limit; item.status; item.claims_limit; '
+            'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
             encoding="utf-8",
         )
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
@@ -338,16 +343,45 @@ class SiteManifestValidatorTest(unittest.TestCase):
     def test_accepts_built_site_manifest_when_site_root_is_wired(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         (repo / "_site/index.html").write_text(
-            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n',
+            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
+            '<section id="checked-benchmark-results"><div id="checked-benchmark-result-cards" '
+            'data-checked-items="surface-decoder-full bb-circuit-full"></div></section>\n',
             encoding="utf-8",
         )
         (repo / "_site/app.js").write_text(
-            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); family.status; family.claims_limit; item.status; item.claims_limit;\n',
+            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
+            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'family.status; family.claims_limit; item.status; item.claims_limit; '
+            'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
             encoding="utf-8",
         )
         errors = check_site_manifest.validate_manifest(repo, built_manifest_path)
         errors.extend(check_site_manifest.validate_site_root(repo / "_site", built_manifest_path))
         self.assertEqual(errors, [])
+
+    def test_rejects_built_site_without_checked_result_wiring(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        (repo / "_site/app.js").write_text(
+            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
+            'family.status; family.claims_limit; item.status; item.claims_limit;\n',
+            encoding="utf-8",
+        )
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+        self.assertTrue(any("checked result" in error for error in errors), errors)
+
+    def test_rejects_built_site_artifact_reference_not_listed_in_manifest(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        index = repo / "_site/index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8")
+            + '<a href="benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
+            encoding="utf-8",
+        )
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+        self.assertTrue(
+            any("not listed as a checked manifest artifact" in error for error in errors),
+            errors,
+        )
 
     def test_rejects_built_site_without_manifest_status_wiring(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()

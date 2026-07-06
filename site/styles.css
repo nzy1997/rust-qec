@@ -199,6 +199,7 @@ main {
 .workspace-overview,
 .feature-walkthroughs,
 .benchmark-evidence,
+.checked-results-section,
 .benchmark-section,
 .qp101-section {
   flex-direction: column;
@@ -214,7 +215,8 @@ main {
 .evidence-grid,
 .intro-grid,
 .example-grid,
-.tier-grid {
+.tier-grid,
+.checked-results-grid {
   display: grid;
   gap: 1rem;
 }
@@ -350,6 +352,10 @@ main {
   gap: 1rem;
 }
 
+.checked-results-grid {
+  grid-template-columns: 1fr;
+}
+
 .manifest-family {
   min-width: 0;
 }
@@ -370,6 +376,65 @@ main {
 .manifest-item {
   padding-top: 0.75rem;
   border-top: 1px solid var(--border);
+}
+
+.result-card {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.result-card-copy,
+.result-card-plot {
+  min-width: 0;
+}
+
+.result-card h4 {
+  margin: 1rem 0 0.45rem;
+}
+
+.result-card p,
+.result-note-list {
+  color: var(--muted);
+}
+
+.result-link-list,
+.result-note-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.result-link-list a {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.result-commands {
+  border-radius: 8px;
+}
+
+.result-plot {
+  margin: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 0.8rem;
+}
+
+.result-plot img {
+  display: block;
+  width: 100%;
+  min-width: 360px;
+  height: auto;
 }
 
 section {
@@ -672,12 +737,14 @@ pre code {
   .tier-grid,
   .evidence-policy-grid,
   .benchmark-manifest,
+  .checked-results-grid,
   .provenance-panel,
   .schema-shell {
     grid-template-columns: 1fr;
   }
 
-  .gallery-card {
+  .gallery-card,
+  .result-card {
     grid-template-columns: 1fr;
   }
 

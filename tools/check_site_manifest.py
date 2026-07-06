@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,9 @@ ITEM_REQUIRED_FIELDS = {
     "provenance_sources",
     "claims_limit",
 }
+CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
+    r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
+)
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -191,6 +195,8 @@ def validate_item(repo_root: Path, family_id: str, item: Any, errors: list[str])
         errors,
         allow_empty=False,
     )
+    if "caveats" in item:
+        validate_string_list(scope, "caveats", item.get("caveats"), errors, allow_empty=False)
 
     if item.get("status") in {"local-only", "future"} and item.get("artifacts"):
         add_error(errors, scope, f"{item['status']} evidence item must not list checked artifacts")
@@ -319,7 +325,14 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     index = index_path.read_text(encoding="utf-8") if index_path.is_file() else ""
     app = app_path.read_text(encoding="utf-8") if app_path.is_file() else ""
 
-    for marker in ['id="benchmarks"', 'id="benchmark-manifest"', "Benchmark Methodology", "Claims Policy"]:
+    for marker in [
+        'id="benchmarks"',
+        'id="benchmark-manifest"',
+        'id="checked-benchmark-results"',
+        'id="checked-benchmark-result-cards"',
+        "Benchmark Methodology",
+        "Claims Policy",
+    ]:
         if marker not in index:
             add_error(errors, scope, f"index.html missing benchmark marker {marker}")
 
@@ -335,7 +348,43 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     if missing_app_markers:
         add_error(errors, scope, f"app.js missing manifest status and claims_limit wiring: {missing_app_markers}")
 
+    checked_result_markers = [
+        "checkedBenchmarkItems",
+        "renderCheckedBenchmarkResults",
+        "item.artifacts",
+        "item.commands",
+        "item.caveats",
+        "artifact.checked",
+        'artifact.kind === "image"',
+    ]
+    missing_checked_markers = [marker for marker in checked_result_markers if marker not in app]
+    if missing_checked_markers:
+        add_error(errors, scope, f"app.js missing checked result rendering: {missing_checked_markers}")
+
+    try:
+        manifest = load_json(manifest_path)
+    except (FileNotFoundError, json.JSONDecodeError):
+        manifest = None
+    if isinstance(manifest, dict):
+        validate_site_artifact_references(site_root, manifest, errors)
+
     return errors
+
+
+def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any], errors: list[str]) -> None:
+    checked_paths = {artifact_path for _, artifact_path in iter_checked_artifact_paths(manifest)}
+    for relative in ("index.html", "app.js"):
+        path = site_root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in sorted(set(CHECKED_ARTIFACT_REFERENCE_RE.findall(text))):
+            if match not in checked_paths:
+                add_error(
+                    errors,
+                    "site root",
+                    f"{relative} references checked artifact {match} that is not listed as a checked manifest artifact",
+                )
 
 
 def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
