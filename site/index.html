@@ -22,6 +22,7 @@
           <a href="#workspace-overview">Workspace</a>
           <a href="#feature-walkthroughs">Walkthroughs</a>
           <a href="#benchmark-evidence">Evidence</a>
+          <a href="#benchmarks">Methodology</a>
           <a href="#qp101">QP101</a>
           <a href="#operations">Operations</a>
           <a href="#gallery">Gallery</a>
@@ -271,6 +272,111 @@
             </div>
           </article>
         </div>
+      </section>
+
+      <section id="benchmarks" class="benchmark-section" aria-labelledby="benchmark-title">
+        <div class="section-heading">
+          <p class="eyebrow">Benchmark methodology</p>
+          <h2 id="benchmark-title">Benchmark Methodology</h2>
+          <p class="section-copy">
+            Benchmark pages separate smoke checks, checked full artifacts,
+            extended campaigns, and reference reproduction work so the site
+            does not imply broader performance claims than the recorded
+            evidence supports.
+          </p>
+        </div>
+
+        <section class="tier-grid" aria-label="Benchmark tiers">
+          <article>
+            <h3><code>smoke</code></h3>
+            <p>
+              Local wiring checks with small cases. smoke checks verify wiring,
+              command compatibility, and artifact shape; they are not
+              statistical evidence.
+            </p>
+          </article>
+          <article>
+            <h3><code>full</code></h3>
+            <p>
+              Checked artifact campaigns with recorded provenance. full evidence can describe the committed checked run only within its recorded commands, hardware, versions, seeds, and budgets.
+            </p>
+          </article>
+          <article>
+            <h3><code>extended</code></h3>
+            <p>
+              Longer local or future campaigns that broaden case coverage but
+              remain non-publishable until their artifacts and provenance are
+              checked into the site manifest.
+            </p>
+          </article>
+          <article>
+            <h3><code>reference reproduction</code></h3>
+            <p>
+              Source-backed reproduction against an external paper, dataset,
+              or repository commit. The reproduced scope and mismatches must be
+              stated next to the result.
+            </p>
+          </article>
+        </section>
+
+        <section class="provenance-panel" aria-labelledby="provenance-title">
+          <div>
+            <p class="eyebrow">Required provenance</p>
+            <h3 id="provenance-title">Every benchmark claim needs these fields</h3>
+          </div>
+          <ul class="provenance-list">
+            <li>OS</li>
+            <li>CPU</li>
+            <li>Rust version</li>
+            <li>Python version</li>
+            <li>dependency versions</li>
+            <li>external repository commits</li>
+            <li>command line</li>
+            <li>seeds</li>
+            <li>build profile</li>
+            <li>shots or error budgets</li>
+            <li>date</li>
+          </ul>
+        </section>
+
+        <section class="evidence-policy-grid" aria-label="Evidence policy">
+          <article>
+            <h3>Publishable Evidence</h3>
+            <p>
+              Publishable evidence is tracked by git, listed in the manifest,
+              tied to source documents, and bounded by a manifest
+              <code>claims_limit</code>. It may support statements about the
+              specific committed artifact set, not broad decoder rankings.
+            </p>
+          </article>
+          <article>
+            <h3>Local-Only Evidence</h3>
+            <p>
+              Local-only evidence can validate commands and readiness, but
+              ignored generated outputs and workstation-specific timings are
+              not site-facing benchmark claims.
+            </p>
+          </article>
+          <article>
+            <h3>Claims Policy</h3>
+            <p>
+              Broad performance claims require full provenance, checked
+              artifacts, source-backed interpretation, and an explicit
+              manifest claims limit. Future benchmark families cannot appear
+              without status and claims-limit fields.
+            </p>
+          </article>
+        </section>
+
+        <section class="manifest-panel" aria-labelledby="manifest-title">
+          <div class="section-heading">
+            <p class="eyebrow">Manifest-backed inventory</p>
+            <h3 id="manifest-title">Benchmark Status And Claims Limits</h3>
+          </div>
+          <div id="benchmark-manifest" class="benchmark-manifest" aria-live="polite">
+            <p>Loading benchmark manifest.</p>
+          </div>
+        </section>
       </section>
 
       <section id="qp101" class="qp101-section" aria-labelledby="qp101-title">

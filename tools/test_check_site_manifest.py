@@ -135,12 +135,21 @@ class SiteManifestValidatorTest(unittest.TestCase):
         (root / "benchmarks/qec_code_random_window").mkdir(parents=True)
         (root / ".github/workflows").mkdir(parents=True)
         (root / "site").mkdir(parents=True)
+        (root / "_site/data").mkdir(parents=True)
         (root / "benchmarks/out").mkdir(parents=True)
 
         (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
+        (root / "_site/index.html").write_text(
+            '<section id="benchmarks"><div id="benchmark-manifest"></div></section>\n',
+            encoding="utf-8",
+        )
+        (root / "_site/app.js").write_text(
+            'fetch("data/benchmark-site.json"); family.status; family.claims_limit; item.status; item.claims_limit;\n',
+            encoding="utf-8",
+        )
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
 
         manifest = json.loads(json.dumps(VALID_MANIFEST))
@@ -174,6 +183,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        built_manifest_path = root / "_site/data/benchmark-site.json"
+        built_manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
         subprocess.run(["git", "init", "-q"], cwd=root, check=True)
         subprocess.run(
@@ -192,15 +203,15 @@ class SiteManifestValidatorTest(unittest.TestCase):
         )
         if mutation == "force_tracked_ignored_artifact":
             subprocess.run(["git", "add", "-f", "benchmarks/out/ignored.csv"], cwd=root, check=True)
-        return root, manifest_path
+        return root, manifest_path, built_manifest_path
 
     def test_accepts_valid_fixture_and_reports_families(self) -> None:
-        repo, manifest_path = self.write_fixture_manifest()
+        repo, manifest_path, _ = self.write_fixture_manifest()
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertEqual(errors, [])
 
     def test_rejects_missing_required_family(self) -> None:
-        repo, manifest_path = self.write_fixture_manifest(remove_family="rstim-vs-stim-simulator")
+        repo, manifest_path, _ = self.write_fixture_manifest(remove_family="rstim-vs-stim-simulator")
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertTrue(
             any("manifest" in error and "rstim-vs-stim-simulator" in error for error in errors),
@@ -213,7 +224,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
             ("missing_claims_limit", "surface-decoder-full", "claims_limit"),
             ("ignored_artifact", "surface-decoder-full", "ignored"),
         ]:
-            repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
+            repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
 
@@ -221,7 +232,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
         self.assertEqual(check_site_manifest.run_self_test(), [])
 
     def test_rejects_force_tracked_ignored_artifact(self) -> None:
-        repo, manifest_path = self.write_fixture_manifest(mutation="force_tracked_ignored_artifact")
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="force_tracked_ignored_artifact")
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertTrue(
             any("surface-decoder-full" in error and "ignored" in error for error in errors),
@@ -235,12 +246,12 @@ class SiteManifestValidatorTest(unittest.TestCase):
             ("bad_commands_type", "surface-decoder-full", "commands must be a list"),
             ("bad_provenance_requirements_type", "surface-decoder-full", "provenance_requirements entries must be strings"),
         ]:
-            repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
+            repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
 
     def test_rejects_duplicate_evidence_item_ids(self) -> None:
-        repo, manifest_path = self.write_fixture_manifest(mutation="duplicate_item_id")
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="duplicate_item_id")
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertTrue(
             any("family surface-decoder-comparison" in error and "duplicate evidence item id surface-decoder-full" in error for error in errors),
@@ -248,7 +259,7 @@ class SiteManifestValidatorTest(unittest.TestCase):
         )
 
     def test_rejects_cross_family_duplicate_evidence_item_ids(self) -> None:
-        repo, manifest_path = self.write_fixture_manifest(mutation="cross_family_duplicate_item_id")
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="cross_family_duplicate_item_id")
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertTrue(
             any("manifest" in error and "duplicate evidence item id surface-decoder-full" in error for error in errors),
@@ -260,9 +271,29 @@ class SiteManifestValidatorTest(unittest.TestCase):
             ("empty_source_docs", "family surface-decoder-comparison", "source_docs must not be empty"),
             ("empty_provenance_sources", "surface-decoder-full", "provenance_sources must not be empty"),
         ]:
-            repo, manifest_path = self.write_fixture_manifest(mutation=mutation)
+            repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
+
+    def test_accepts_built_site_manifest_when_site_root_is_wired(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        (repo / "_site/index.html").write_text(
+            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n',
+            encoding="utf-8",
+        )
+        (repo / "_site/app.js").write_text(
+            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); family.status; family.claims_limit; item.status; item.claims_limit;\n',
+            encoding="utf-8",
+        )
+        errors = check_site_manifest.validate_manifest(repo, built_manifest_path)
+        errors.extend(check_site_manifest.validate_site_root(repo / "_site", built_manifest_path))
+        self.assertEqual(errors, [])
+
+    def test_rejects_built_site_without_manifest_status_wiring(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        (repo / "_site/app.js").write_text('fetch("data/benchmark-site.json");\n', encoding="utf-8")
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+        self.assertTrue(any("status" in error and "claims_limit" in error for error in errors), errors)
 
 
 if __name__ == "__main__":

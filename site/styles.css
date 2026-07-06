@@ -199,6 +199,7 @@ main {
 .workspace-overview,
 .feature-walkthroughs,
 .benchmark-evidence,
+.benchmark-section,
 .qp101-section {
   flex-direction: column;
 }
@@ -212,9 +213,15 @@ main {
 .walkthrough-grid,
 .evidence-grid,
 .intro-grid,
-.example-grid {
+.example-grid,
+.tier-grid {
   display: grid;
   gap: 1rem;
+}
+
+.benchmark-section {
+  display: flex;
+  flex-direction: column;
 }
 
 .docs-grid,
@@ -227,6 +234,10 @@ main {
 
 .evidence-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tier-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .docs-card,
@@ -283,6 +294,82 @@ main {
 .intro-grid p,
 .schema-detail p {
   color: var(--muted);
+}
+
+.tier-grid article,
+.evidence-policy-grid article,
+.manifest-family {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.tier-grid p,
+.evidence-policy-grid p,
+.manifest-family p,
+.manifest-item p {
+  color: var(--muted);
+}
+
+.provenance-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.provenance-list,
+.manifest-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provenance-list li,
+.manifest-list li {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fbfcfd;
+}
+
+.evidence-policy-grid,
+.benchmark-manifest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.manifest-family {
+  min-width: 0;
+}
+
+.manifest-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.manifest-items {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.manifest-item {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 section {
@@ -582,6 +669,10 @@ pre code {
   .evidence-grid,
   .intro-grid,
   .example-grid,
+  .tier-grid,
+  .evidence-policy-grid,
+  .benchmark-manifest,
+  .provenance-panel,
   .schema-shell {
     grid-template-columns: 1fr;
   }
