@@ -8,21 +8,21 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn read_site_file(relative: &str) -> String {
-    let path = repo_root().join("_site").join(relative);
+fn read_repo_file(relative: &str) -> String {
+    let path = repo_root().join(relative);
     fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()))
 }
 
-fn assert_site_file_exists(relative: &str) {
-    let path = repo_root().join("_site").join(relative);
-    assert!(Path::new(&path).is_file(), "missing built site file {}", path.display());
+fn assert_repo_file_exists(relative: &str) {
+    let path = repo_root().join(relative);
+    assert!(Path::new(&path).is_file(), "missing site resource {}", path.display());
 }
 
 #[test]
 fn qp101_browser_resources_are_preserved() {
-    let index = read_site_file("index.html");
-    let app = read_site_file("app.js");
+    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/app.js");
 
     for marker in [
         "id=\"qp101\"",
@@ -40,7 +40,7 @@ fn qp101_browser_resources_are_preserved() {
         "src=\"gallery/repeat-detector-site.svg\"",
         "src=\"gallery/atom-loss-sample.svg\"",
     ] {
-        assert!(index.contains(marker), "built index is missing marker {marker}");
+        assert!(index.contains(marker), "site index is missing marker {marker}");
     }
 
     assert!(
@@ -49,15 +49,15 @@ fn qp101_browser_resources_are_preserved() {
     );
 
     for relative in [
-        "qp101.schema.json",
-        "QP101-ZY.md",
-        "examples/basic.qp101.json",
-        "examples/repeat-detector.qp101.json",
-        "examples/atom-loss-sample.qp101.json",
-        "gallery/basic-site.svg",
-        "gallery/repeat-detector-site.svg",
-        "gallery/atom-loss-sample.svg",
+        "rstim/doc/qp101.schema.json",
+        "rstim/doc/QP101-ZY.md",
+        "qp101-viz/examples/basic.qp101.json",
+        "qp101-viz/examples/repeat-detector.qp101.json",
+        "qp101-viz/examples/atom-loss-sample.qp101.json",
+        "qp101-viz/examples/basic.stim",
+        "qp101-viz/examples/repeat-detector.stim",
+        "qp101-viz/examples/atom-loss-sample.stim",
     ] {
-        assert_site_file_exists(relative);
+        assert_repo_file_exists(relative);
     }
 }
