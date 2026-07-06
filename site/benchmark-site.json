@@ -182,7 +182,7 @@
         "docs/showcases/qec-code-random-window-benchmark.md",
         "benchmarks/qec_code_random_window/README.md"
       ],
-      "claims_limit": "Local random-window runs are implementation evidence only and do not establish site-facing benchmark claims.",
+      "claims_limit": "Local-only evidence for random-window upper-bound searches. Generated outputs remain under benchmarks/out/qec_code_random_window/ and are not site-facing benchmark claims.",
       "evidence_items": [
         {
           "id": "qec-code-random-window-local-pipeline",
@@ -208,7 +208,7 @@
             "docs/showcases/qec-code-random-window-benchmark.md",
             "benchmarks/qec_code_random_window/README.md"
           ],
-          "claims_limit": "Local wiring, reproduction, and readiness checks only."
+          "claims_limit": "Local-only evidence for random-window upper-bound searches. Generated outputs remain under benchmarks/out/qec_code_random_window/ and are not site-facing benchmark claims."
         }
       ]
     },
@@ -219,7 +219,7 @@
       "source_docs": [
         "rstim/doc/performance_parity.md"
       ],
-      "claims_limit": "No current site-facing benchmark artifacts are tracked for this future comparison family.",
+      "claims_limit": "Future work only; no current site-facing benchmark artifacts are tracked for this comparison family.",
       "evidence_items": [
         {
           "id": "rstim-vs-stim-future",
@@ -235,7 +235,7 @@
           "provenance_sources": [
             "rstim/doc/performance_parity.md"
           ],
-          "claims_limit": "Planning entry only."
+          "claims_limit": "Future work only; no current site-facing benchmark artifacts are tracked for this comparison family."
         }
       ]
     },
