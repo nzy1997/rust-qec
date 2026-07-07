@@ -135,10 +135,10 @@ def _validate_circuit_counts(case: dict[str, Any], case_label: str, input_path: 
             errors.append(f'{case_label} field "{field}" must be {actual}')
 
 
-def validate_manifest(manifest: dict[str, Any], base_dir: Path) -> list[str]:
+def validate_manifest(manifest: dict[str, Any], manifest_path: Path) -> list[str]:
     errors: list[str] = []
     benchmark_dir = Path(__file__).resolve().parent
-    base_dir = base_dir.resolve()
+    manifest_path = manifest_path.resolve()
 
     if manifest.get("manifest_version") != MANIFEST_VERSION:
         errors.append("manifest_version must be 1")
@@ -209,7 +209,7 @@ def validate_manifest(manifest: dict[str, Any], base_dir: Path) -> list[str]:
 
         input_value = _require_str(raw_case, "canonical_input_path", case_label, errors)
         if input_value is not None:
-            input_path = _case_input_path(input_value, base_dir, benchmark_dir)
+            input_path = _case_input_path(input_value, manifest_path, benchmark_dir)
             try:
                 input_path.relative_to(benchmark_dir)
             except ValueError:
@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.manifest}: {error}", file=sys.stderr)
         return 1
 
-    errors = validate_manifest(manifest, args.manifest.parent)
+    errors = validate_manifest(manifest, args.manifest)
     if errors:
         for error in errors:
             print(f"{args.manifest}: {error}", file=sys.stderr)

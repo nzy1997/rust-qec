@@ -80,6 +80,7 @@ class ValidateCasesTest(unittest.TestCase):
             "before_round_data_depolarization must be 0 for stim_surface_d11_r100",
             result.stderr,
         )
+        self.assertNotIn("canonical_input_path", result.stderr)
 
     def test_nested_manifest_falls_back_to_benchmark_root_fixture_path(self) -> None:
         manifest_text = """\
