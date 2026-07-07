@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    PerfMeasurementRecord, PerfRecordStatus, benchmark_cases, comparison_variant_labels,
-    expected_variant_labels,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfMeasurementRecord,
+    PerfRecordStatus,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -136,6 +136,7 @@ pub fn summarize_jsonl_str_with_options(
     raw: &str,
     options: PerfSummaryOptions,
 ) -> Result<PerfSummary, String> {
+    let selected_label = options.case_label.as_deref();
     let case_defs = benchmark_cases()
         .into_iter()
         .map(|case| (case.label.to_string(), case))
@@ -149,6 +150,11 @@ pub fn summarize_jsonl_str_with_options(
 
     for line in raw.lines().filter(|line| !line.trim().is_empty()) {
         let record = PerfMeasurementRecord::from_json_line(line)?;
+        if let Some(label) = selected_label {
+            if record.case_label != label {
+                continue;
+            }
+        }
         let Some(case_def) = case_defs.get(&record.case_label) else {
             return Err(format!(
                 "unknown benchmark case label in raw jsonl: {}",
@@ -219,10 +225,10 @@ pub fn summarize_jsonl_str_with_options(
             .push(record);
     }
 
-    let cases_to_summarize = match options.case_label {
+    let cases_to_summarize = match selected_label {
         Some(label) => {
             let case = case_defs
-                .get(&label)
+                .get(label)
                 .copied()
                 .ok_or_else(|| format!("unknown benchmark case: {label}"))?;
             vec![case]

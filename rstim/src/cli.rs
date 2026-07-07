@@ -704,12 +704,7 @@ fn write_perf_ci_raw_artifact(
     case_label: Option<&str>,
 ) -> Result<(), PerfCiError> {
     if let Ok(source_path) = std::env::var("RSTIM_TEST_PERF_CI_RAW") {
-        std::fs::copy(&source_path, raw_path).map_err(|e| {
-            PerfCiError::Infrastructure(format!(
-                "failed to copy test perf raw artifact from {source_path} to {}: {e}",
-                raw_path.display()
-            ))
-        })?;
+        write_test_perf_ci_raw_override(&source_path, raw_path, case_label)?;
         return Ok(());
     }
 
@@ -724,6 +719,47 @@ fn write_perf_ci_raw_artifact(
         crate::perf::run_benchmark_suite_to_writer(&mut raw, options)
     }
     .map_err(PerfCiError::Infrastructure)
+}
+
+fn write_test_perf_ci_raw_override(
+    source_path: &str,
+    raw_path: &std::path::Path,
+    case_label: Option<&str>,
+) -> Result<(), PerfCiError> {
+    let Some(label) = case_label else {
+        std::fs::copy(source_path, raw_path).map_err(|e| {
+            PerfCiError::Infrastructure(format!(
+                "failed to copy test perf raw artifact from {source_path} to {}: {e}",
+                raw_path.display()
+            ))
+        })?;
+        return Ok(());
+    };
+
+    let raw_text = std::fs::read_to_string(source_path).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
+            "failed to read test perf raw artifact from {source_path}: {e}"
+        ))
+    })?;
+    let mut filtered = String::new();
+    for line in raw_text.lines().filter(|line| !line.trim().is_empty()) {
+        let value = serde_json::from_str::<serde_json::Value>(line).map_err(|e| {
+            PerfCiError::Infrastructure(format!(
+                "failed to parse test perf raw artifact from {source_path}: {e}"
+            ))
+        })?;
+        if value.get("case_label").and_then(serde_json::Value::as_str) == Some(label) {
+            filtered.push_str(line);
+            filtered.push('\n');
+        }
+    }
+
+    std::fs::write(raw_path, filtered).map_err(|e| {
+        PerfCiError::Infrastructure(format!(
+            "failed to write filtered test perf raw artifact {}: {e}",
+            raw_path.display()
+        ))
+    })
 }
 
 fn finalize_perf_ci_artifacts(

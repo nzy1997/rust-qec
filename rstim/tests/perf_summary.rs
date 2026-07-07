@@ -203,11 +203,10 @@ fn summarize_uses_none_when_all_memory_samples_are_missing() {
         .iter()
         .find(|case| case.case_label == "loss-protection-sample")
         .expect("loss protection case");
-    assert!(
-        case.variants
-            .iter()
-            .all(|variant| variant.median_peak_memory_bytes.is_none())
-    );
+    assert!(case
+        .variants
+        .iter()
+        .all(|variant| variant.median_peak_memory_bytes.is_none()));
 }
 
 #[test]
@@ -241,12 +240,10 @@ fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
 
     assert_eq!(summary.cases.len(), 1);
     assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
-    assert!(
-        !summary
-            .issues
-            .iter()
-            .any(|issue| issue.message.contains("missing benchmark case data"))
-    );
+    assert!(!summary
+        .issues
+        .iter()
+        .any(|issue| issue.message.contains("missing benchmark case data")));
 
     let stim = summary.cases[0]
         .variants
@@ -260,6 +257,30 @@ fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
     let report = render_markdown_report(&summary, None);
     assert!(report.contains("stim-cli status: `tool_failed`"));
     assert!(report.contains("stim failed: boom"));
+}
+
+#[test]
+fn selected_summary_ignores_unrelated_raw_issues() {
+    let raw = concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":999,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = rstim::perf::summarize_jsonl_str_with_options(
+        raw,
+        rstim::perf::PerfSummaryOptions {
+            case_label: Some("loss-protection-sample".to_string()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(summary.cases.len(), 1);
+    assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
+    assert!(!summary
+        .issues
+        .iter()
+        .any(|issue| issue.case_label == "rep-sample-d13-r13"));
 }
 
 #[test]
