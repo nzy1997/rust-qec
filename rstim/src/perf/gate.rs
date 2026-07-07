@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    PerfCaseTier, PerfComparisonSummary, PerfRecordStatus, PerfSummary, PerfVariantSummary,
-    benchmark_cases, comparison_variant_labels, expected_variant_labels,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfCaseTier,
+    PerfComparisonSummary, PerfRecordStatus, PerfSummary, PerfVariantSummary,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -76,7 +76,9 @@ pub fn evaluate_summary(summary: &PerfSummary, config: PerfGateConfig) -> PerfGa
     let mut summary_cases = BTreeMap::new();
 
     for case in &summary.cases {
-        if summary_cases.insert(case.case_label.as_str(), case).is_some()
+        if summary_cases
+            .insert(case.case_label.as_str(), case)
+            .is_some()
             && gating_case_labels.contains(case.case_label.as_str())
         {
             contract_messages.push(format!(

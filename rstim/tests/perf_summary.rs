@@ -224,6 +224,41 @@ fn report_renders_optional_newline_and_empty_sections() {
 }
 
 #[test]
+fn legacy_summary_json_defaults_variant_status_to_completed() {
+    let summary: rstim::perf::PerfSummary = serde_json::from_str(
+        r#"{
+            "cases": [
+                {
+                    "case_label": "loss-protection-sample",
+                    "workload": "sample",
+                    "tier": "gating",
+                    "requires_compiled": false,
+                    "requires_fallback": true,
+                    "expected_variants": ["stim-cli", "rstim-interpreted"],
+                    "present_variants": ["stim-cli"],
+                    "variants": [
+                        {
+                            "tool_variant": "stim-cli",
+                            "sample_count": 1,
+                            "median_wall_time_ns": 80,
+                            "median_peak_memory_bytes": null
+                        }
+                    ],
+                    "comparisons": []
+                }
+            ],
+            "issues": []
+        }"#,
+    )
+    .expect("legacy summary json");
+
+    let variant = &summary.cases[0].variants[0];
+    assert_eq!(variant.status, "completed");
+    assert!(variant.failure_reason.is_none());
+    assert!(variant.stderr.is_none());
+}
+
+#[test]
 fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
     let raw = concat!(
         "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"stim failed: boom\",\"stderr\":\"boom\\n\"}\n",

@@ -28,9 +28,14 @@ pub struct PerfVariantSummary {
     pub sample_count: usize,
     pub median_wall_time_ns: u128,
     pub median_peak_memory_bytes: Option<u64>,
+    #[serde(default = "default_perf_variant_summary_status")]
     pub status: String,
     pub failure_reason: Option<String>,
     pub stderr: Option<String>,
+}
+
+fn default_perf_variant_summary_status() -> String {
+    PerfRecordStatus::Completed.as_str().to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

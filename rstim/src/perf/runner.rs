@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -13,8 +14,8 @@ use crate::sampler::{sample_batch_with_options, SampleOptions, SamplingBackend};
 use crate::stats::summarize;
 
 use super::{
-    benchmark_case_variants, benchmark_cases, effective_repeat_count, PerfBenchmarkCase,
-    PerfMeasurementRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
+    benchmark_case_variants, benchmark_cases, effective_repeat_count, expected_variant_labels,
+    PerfBenchmarkCase, PerfMeasurementRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -308,6 +309,43 @@ fn run_selected_case_measurements(
         }
     }
 
+    let available_variants = variants
+        .iter()
+        .map(|variant| variant.label())
+        .collect::<BTreeSet<_>>();
+    for expected_variant in expected_variant_labels(case) {
+        if available_variants.contains(expected_variant) {
+            continue;
+        }
+
+        for measurement_index in 0..total_rounds {
+            let warmup = measurement_index < options.warmup_rounds;
+            records.push(PerfMeasurementRecord {
+                case_label: case.label.to_string(),
+                tool_variant: expected_variant.to_string(),
+                workload: case.workload.as_str().to_string(),
+                tier: case.tier.as_str().to_string(),
+                measurement_index,
+                warmup,
+                qubits: summary.num_qubits,
+                measurements: summary.num_measurements,
+                detectors: summary.num_detectors,
+                observables: summary.num_observables,
+                repeat_depth: summary.max_repeat_depth,
+                repeat_count,
+                shots: case.shots,
+                wall_time_ns: 0,
+                peak_memory_bytes: current_peak_memory_bytes(),
+                status: PerfRecordStatus::MissingVariant,
+                failure_reason: Some(format!(
+                    "variant {expected_variant} is not available for benchmark case {}",
+                    case.label
+                )),
+                stderr: None,
+            });
+        }
+    }
+
     Ok(records)
 }
 
@@ -464,5 +502,56 @@ mod tests {
         assert!(records
             .iter()
             .all(|record| record.case_label == "inline-sample"));
+    }
+
+    #[test]
+    fn selected_case_measurements_record_unavailable_expected_variants() {
+        let case = PerfBenchmarkCase {
+            label: "synthetic-selected-missing-compiled",
+            workload: PerfWorkload::Sample,
+            source: PerfCircuitSource::Inline { text: "M 0\n" },
+            shots: Some(1),
+            tier: PerfCaseTier::ReportOnly,
+            requires_compiled: true,
+            requires_fallback: false,
+            comparisons: &[],
+        };
+
+        let records = run_selected_case_measurements(
+            case,
+            "M 0\n",
+            &[PerfVariant::RstimInterpreted],
+            PerfRunOptions {
+                warmup_rounds: 0,
+                measured_rounds: 1,
+            },
+        )
+        .expect("selected records");
+
+        let missing = records
+            .iter()
+            .filter(|record| record.status == PerfRecordStatus::MissingVariant)
+            .collect::<Vec<_>>();
+        assert_eq!(missing.len(), 2);
+        assert!(missing.iter().any(|record| {
+            record.tool_variant == "stim-cli"
+                && record
+                    .failure_reason
+                    .as_deref()
+                    .unwrap()
+                    .contains("variant stim-cli is not available")
+        }));
+        assert!(missing.iter().any(|record| {
+            record.tool_variant == "rstim-compiled"
+                && record
+                    .failure_reason
+                    .as_deref()
+                    .unwrap()
+                    .contains("variant rstim-compiled is not available")
+        }));
+        assert!(records.iter().any(|record| {
+            record.tool_variant == "rstim-interpreted"
+                && record.status == PerfRecordStatus::Completed
+        }));
     }
 }
