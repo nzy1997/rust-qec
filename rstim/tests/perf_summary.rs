@@ -146,15 +146,21 @@ fn summarize_surfaces_metadata_mismatches_and_conflicting_case_metadata() {
 
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("workload mismatch: expected sample but saw detect")
+            && issue
+                .message
+                .contains("workload mismatch: expected sample but saw detect")
     }));
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("tier mismatch: expected gating but saw report_only")
+            && issue
+                .message
+                .contains("tier mismatch: expected gating but saw report_only")
     }));
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("conflicting record metadata within case")
+            && issue
+                .message
+                .contains("conflicting record metadata within case")
     }));
 }
 
@@ -165,7 +171,9 @@ fn summarize_rejects_variants_with_only_warmup_measurements() {
     ))
     .unwrap_err();
 
-    assert!(err.contains("missing measured records for case loss-protection-sample variant stim-cli"));
+    assert!(
+        err.contains("missing measured records for case loss-protection-sample variant stim-cli")
+    );
 }
 
 #[test]
@@ -195,10 +203,11 @@ fn summarize_uses_none_when_all_memory_samples_are_missing() {
         .iter()
         .find(|case| case.case_label == "loss-protection-sample")
         .expect("loss protection case");
-    assert!(case
-        .variants
-        .iter()
-        .all(|variant| variant.median_peak_memory_bytes.is_none()));
+    assert!(
+        case.variants
+            .iter()
+            .all(|variant| variant.median_peak_memory_bytes.is_none())
+    );
 }
 
 #[test]
@@ -213,6 +222,44 @@ fn report_renders_optional_newline_and_empty_sections() {
     assert!(report.contains("PASS\n\n"));
     assert!(report.contains("## Gating Cases\n\n_None._"));
     assert!(report.contains("## Report-Only Cases\n\n_None._"));
+}
+
+#[test]
+fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
+    let raw = concat!(
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"stim failed: boom\",\"stderr\":\"boom\\n\"}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = rstim::perf::summarize_jsonl_str_with_options(
+        raw,
+        rstim::perf::PerfSummaryOptions {
+            case_label: Some("loss-protection-sample".to_string()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(summary.cases.len(), 1);
+    assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
+    assert!(
+        !summary
+            .issues
+            .iter()
+            .any(|issue| issue.message.contains("missing benchmark case data"))
+    );
+
+    let stim = summary.cases[0]
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "stim-cli")
+        .unwrap();
+    assert_eq!(stim.status, "tool_failed");
+    assert_eq!(stim.sample_count, 0);
+    assert_eq!(stim.failure_reason.as_deref(), Some("stim failed: boom"));
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("stim-cli status: `tool_failed`"));
+    assert!(report.contains("stim failed: boom"));
 }
 
 #[test]

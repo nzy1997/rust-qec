@@ -13,8 +13,8 @@ use crate::sampler::{SampleOptions, SamplingBackend, sample_batch_with_options};
 use crate::stats::summarize;
 
 use super::{
-    PerfBenchmarkCase, PerfMeasurementRecord, PerfVariant, PerfWorkload, benchmark_case_variants,
-    benchmark_cases, effective_repeat_count,
+    PerfBenchmarkCase, PerfMeasurementRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
+    benchmark_case_variants, benchmark_cases, effective_repeat_count,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,6 +215,9 @@ pub fn run_case_measurements(
                 shots: case.shots,
                 wall_time_ns,
                 peak_memory_bytes: current_peak_memory_bytes(),
+                status: PerfRecordStatus::Completed,
+                failure_reason: None,
+                stderr: None,
             });
         }
     }

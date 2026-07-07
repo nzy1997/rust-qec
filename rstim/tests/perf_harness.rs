@@ -3,8 +3,8 @@ use rstim::compiled::{CompiledPathDecision, choose_analyzer_path, compile_circui
 use rstim::parser::parse_lines;
 use rstim::perf::{
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
-    PerfRecord, PerfVariant, PerfWorkload, benchmark_case_variants, benchmark_cases,
-    benchmark_variants, effective_repeat_count,
+    PerfRecord, PerfRecordStatus, PerfVariant, PerfWorkload, benchmark_case_variants,
+    benchmark_cases, benchmark_variants, effective_repeat_count,
 };
 use serde_json::Value;
 
@@ -105,6 +105,9 @@ fn perf_measurement_record_json_line_contains_round_metadata() {
         shots: Some(20_000),
         wall_time_ns: 456_789,
         peak_memory_bytes: Some(8_192),
+        status: PerfRecordStatus::Completed,
+        failure_reason: None,
+        stderr: None,
     };
 
     let line = record.to_json_line();
@@ -128,6 +131,51 @@ fn perf_measurement_record_json_line_contains_round_metadata() {
     assert_eq!(json["wall_time_ns"], 456_789);
     assert_eq!(json["peak_memory_bytes"], 8_192);
     assert_eq!(parsed, record);
+}
+
+#[test]
+fn perf_measurement_record_json_line_contains_status_and_failure_context() {
+    let record = PerfMeasurementRecord {
+        case_label: "loss-protection-sample".to_string(),
+        tool_variant: PerfVariant::StimCli.label().to_string(),
+        workload: PerfWorkload::Sample.as_str().to_string(),
+        tier: PerfCaseTier::Gating.as_str().to_string(),
+        measurement_index: 0,
+        warmup: false,
+        qubits: 1,
+        measurements: 1,
+        detectors: 1,
+        observables: 0,
+        repeat_depth: 1,
+        repeat_count: 0,
+        shots: Some(128),
+        wall_time_ns: 0,
+        peak_memory_bytes: None,
+        status: PerfRecordStatus::ToolFailed,
+        failure_reason: Some("stim failed: boom".to_string()),
+        stderr: Some("boom\n".to_string()),
+    };
+
+    let line = record.to_json_line();
+    let json: serde_json::Value = serde_json::from_str(line.trim_end()).unwrap();
+    let parsed = PerfMeasurementRecord::from_json_line(line.trim_end()).unwrap();
+
+    assert_eq!(json["status"], "tool_failed");
+    assert_eq!(json["failure_reason"], "stim failed: boom");
+    assert_eq!(json["stderr"], "boom\n");
+    assert_eq!(parsed, record);
+}
+
+#[test]
+fn perf_measurement_record_deserializes_legacy_rows_as_completed() {
+    let parsed = PerfMeasurementRecord::from_json_line(
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}"
+    )
+    .unwrap();
+
+    assert_eq!(parsed.status, PerfRecordStatus::Completed);
+    assert_eq!(parsed.failure_reason, None);
+    assert_eq!(parsed.stderr, None);
 }
 
 #[test]
