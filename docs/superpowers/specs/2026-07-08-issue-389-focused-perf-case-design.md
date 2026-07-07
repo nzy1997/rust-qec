@@ -45,10 +45,10 @@ and the current peak-memory sample if available. That keeps the raw JSONL shape
 parseable by the existing summary layer while still making failures explicit.
 
 The first implementation records `tool_failed` for spawn failures, stdin write
-failures, wait failures, and nonzero process exits from `stim-cli`.
-`timed_out` and `missing_variant` are part of the public status vocabulary for
-future runner extensions; this issue does not add a timeout mechanism or force
-records for compiled variants that are not available on a circuit.
+failures, wait failures, and nonzero process exits from `stim-cli`. It records
+`missing_variant` when the selected case expects a variant that discovery cannot
+run for that circuit. `timed_out` is part of the public status vocabulary for a
+future runner timeout mechanism, but this issue does not add timeout controls.
 
 ## CLI Contract
 
