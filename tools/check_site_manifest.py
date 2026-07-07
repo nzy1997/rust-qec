@@ -552,6 +552,15 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     if missing_checked_markers:
         add_error(errors, scope, f"app.js missing checked result rendering: {missing_checked_markers}")
 
+    provenance_markers = [
+        "item.provenance",
+        "renderProvenance",
+        "renderProvenance(item.provenance)",
+    ]
+    missing_provenance_markers = [marker for marker in provenance_markers if marker not in app]
+    if missing_provenance_markers:
+        add_error(errors, scope, f"app.js missing provenance wiring: {missing_provenance_markers}")
+
     try:
         manifest = load_json(manifest_path)
     except (FileNotFoundError, json.JSONDecodeError):

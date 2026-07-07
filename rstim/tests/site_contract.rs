@@ -94,6 +94,22 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
 }
 
 #[test]
+fn checked_result_provenance_styles_wrap_long_values() {
+    let styles = read_repo_file("site/styles.css");
+
+    assert_contains_all(
+        &styles,
+        &[
+            ".provenance-hash",
+            ".provenance-hash-list code",
+            ".provenance-value-list code",
+            "overflow-wrap: anywhere",
+        ],
+        "checked result provenance wrapping styles",
+    );
+}
+
+#[test]
 fn readme_links_benchmarked_site() {
     let readme = read_repo_file("README.md");
     let showcase_index = read_repo_file("docs/showcases/README.md");
@@ -390,6 +406,12 @@ fn checked_benchmark_artifacts_are_linked() {
             "renderArtifactLinks",
             "renderCommandList",
             "renderTextList",
+            "renderProvenance",
+            "renderProvenance(item.provenance)",
+            "item.provenance",
+            "recorded",
+            "not_recorded",
+            "artifact_hashes",
         ],
         "checked benchmark result renderer",
     );
@@ -471,6 +493,33 @@ fn checked_benchmark_artifacts_are_linked() {
             .is_some_and(|value| value.contains("reference-gap report only")),
         "BB checked item must keep its manifest claims limit"
     );
+
+    for (item_id, item) in [
+        ("surface-decoder-full", surface_item),
+        ("bb-circuit-full", bb_item),
+    ] {
+        let provenance = item["provenance"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{item_id} must carry canonical provenance"));
+        for field in [
+            "schema_version",
+            "artifact_date",
+            "source_commit",
+            "commands",
+            "cpu_model",
+            "artifact_hashes",
+        ] {
+            assert!(
+                provenance.contains_key(field),
+                "{item_id} provenance is missing field {field}"
+            );
+        }
+        assert_eq!(
+            provenance["artifact_hashes"]["status"].as_str(),
+            Some("recorded"),
+            "{item_id} artifact hashes must be recorded"
+        );
+    }
 }
 
 #[test]
