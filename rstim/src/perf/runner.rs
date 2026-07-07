@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
@@ -43,6 +44,10 @@ impl PerfRunOptions {
 fn source_text(source: super::PerfCircuitSource) -> Result<String, String> {
     match source {
         super::PerfCircuitSource::Inline { text } => Ok(text.to_string()),
+        super::PerfCircuitSource::Fixture {
+            canonical_input_path,
+            ..
+        } => fixture_text(canonical_input_path),
         super::PerfCircuitSource::Generator {
             code,
             task,
@@ -51,6 +56,19 @@ fn source_text(source: super::PerfCircuitSource) -> Result<String, String> {
             noise,
         } => generate_common_circuit_text(code, task, distance, rounds, noise),
     }
+}
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")))
+        .to_path_buf()
+}
+
+fn fixture_text(canonical_input_path: &str) -> Result<String, String> {
+    let path = workspace_root().join(canonical_input_path);
+    std::fs::read_to_string(&path)
+        .map_err(|e| format!("failed to read perf fixture {}: {e}", path.display()))
 }
 
 fn current_peak_memory_bytes() -> Option<u64> {
@@ -235,7 +253,7 @@ pub fn run_benchmark_suite_to_writer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::perf::{PerfCaseTier, PerfCircuitSource};
+    use crate::perf::{PerfCaseTier, PerfCircuitSource, PerfNoiseMetadata};
 
     #[test]
     fn source_text_returns_error_for_unknown_generator_pair() {
@@ -249,6 +267,25 @@ mod tests {
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("unknown code/task"));
+    }
+
+    #[test]
+    fn source_text_loads_checked_fixture_text() {
+        let text = source_text(PerfCircuitSource::Fixture {
+            case_id: "stim_surface_d11_r100",
+            canonical_input_path:
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+            noise: PerfNoiseMetadata {
+                before_round_data_depolarization: 0.0,
+                after_clifford_depolarization: 0.001,
+                before_measure_flip_probability: 0.001,
+                after_reset_flip_probability: 0.001,
+            },
+        })
+        .expect("checked fixture text");
+
+        assert!(text.starts_with("# Generated surface_code circuit."));
+        assert!(text.contains("QUBIT_COORDS(1, 1) 1"));
     }
 
     #[test]
@@ -318,6 +355,10 @@ mod tests {
                 (2, false),
             ]
         );
-        assert!(records.iter().all(|record| record.case_label == "inline-sample"));
+        assert!(
+            records
+                .iter()
+                .all(|record| record.case_label == "inline-sample")
+        );
     }
 }
