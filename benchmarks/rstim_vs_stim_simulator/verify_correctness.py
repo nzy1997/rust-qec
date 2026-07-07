@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import math
 import random
+import subprocess
+import time
 from collections.abc import Sequence
+from pathlib import Path
 
 
 STATUS_PASS = "pass"
@@ -10,6 +14,298 @@ STATUS_MISMATCH = "statistical_mismatch"
 STATUS_STIM_FAILED = "stim_failed"
 STATUS_RSTIM_FAILED = "rstim_failed"
 STATUS_SKIPPED = "skipped"
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+
+def resolve_case_input_path(raw_path: str, base_dir: Path) -> Path:
+    candidate = (base_dir / raw_path).resolve()
+    if candidate.is_relative_to(PACKAGE_DIR):
+        return candidate
+    return (PACKAGE_DIR / raw_path).resolve()
+
+
+def default_rstim_command() -> list[str]:
+    binary = Path("target/release/rstim")
+    if binary.exists():
+        return [str(binary)]
+    return ["cargo", "run", "--quiet", "-p", "rstim", "--bin", "rstim", "--"]
+
+
+def build_sample_command(
+    tool_command: list[str], *, mode: str, shots: int, seed: int, input_path: Path
+) -> list[str]:
+    command = [
+        *tool_command,
+        mode,
+        "--shots",
+        str(shots),
+        "--seed",
+        str(seed),
+        "--out_format",
+        "01",
+        "--in",
+        str(input_path),
+    ]
+    if mode == "detect":
+        command.insert(len(tool_command) + 1, "--append_observables")
+    return command
+
+
+def run_tool(command: list[str], *, input_path: Path) -> dict[str, object]:
+    start = time.perf_counter()
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        elapsed_s = time.perf_counter() - start
+        return {
+            "command": command,
+            "input_path": str(input_path),
+            "exit_code": None,
+            "stdout": "",
+            "stderr": str(error),
+            "elapsed_s": elapsed_s,
+            "success": False,
+        }
+
+    elapsed_s = time.perf_counter() - start
+    return {
+        "command": command,
+        "input_path": str(input_path),
+        "exit_code": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+        "elapsed_s": elapsed_s,
+        "success": completed.returncode == 0,
+    }
+
+
+def _deterministic_bitflip_seed(case_id: str, seed: int) -> int:
+    digest = hashlib.sha256(f"{case_id}:{seed}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def _failure_result(
+    *,
+    case: dict[str, object],
+    status: str,
+    mode: str,
+    input_path: Path,
+    expected_bits: int,
+    shots: int,
+    seeds: list[int],
+    selected_columns: list[int],
+    selected_pairs: list[tuple[int, int]],
+    failure_reasons: list[str],
+    stim_runs: list[dict[str, object]],
+    rstim_runs: list[dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "case_id": case["case_id"],
+        "tier": case["tier"],
+        "status": status,
+        "mode": mode,
+        "input_path": str(input_path),
+        "expected_bits": expected_bits,
+        "shots_per_seed": shots,
+        "seeds": list(seeds),
+        "sample_count": 0,
+        "selected_columns": selected_columns,
+        "selected_pairs": [list(pair) for pair in selected_pairs],
+        "failure_reasons": failure_reasons,
+        "stim_runs": stim_runs,
+        "rstim_runs": rstim_runs,
+    }
+
+
+def verify_case(
+    case: dict[str, object],
+    *,
+    base_dir: Path,
+    stim_command: list[str],
+    rstim_command: list[str],
+    shots: int,
+    seeds: list[int],
+    inject_rstim_bitflip_rate: float,
+) -> dict[str, object]:
+    tier = str(case["tier"])
+    case_id = str(case["case_id"])
+    input_path = resolve_case_input_path(str(case["canonical_input_path"]), base_dir)
+    mode = "detect" if int(case["expected_detectors"]) > 0 else "sample"
+    expected_bits = (
+        int(case["expected_detectors"]) + int(case["expected_observables"])
+        if mode == "detect"
+        else int(case["expected_measurements"])
+    )
+    selected_columns = select_columns(
+        expected_bits,
+        observable_count=int(case["expected_observables"]),
+    )
+    selected_pairs = select_pairs(
+        selected_columns,
+        bit_count=expected_bits,
+        observable_count=int(case["expected_observables"]),
+    )
+
+    if tier == "documentation-only":
+        return {
+            "case_id": case_id,
+            "tier": tier,
+            "status": STATUS_SKIPPED,
+            "mode": mode,
+            "input_path": str(input_path),
+            "expected_bits": expected_bits,
+            "shots_per_seed": shots,
+            "seeds": list(seeds),
+            "sample_count": 0,
+            "selected_columns": selected_columns,
+            "selected_pairs": [list(pair) for pair in selected_pairs],
+            "failure_reasons": ["documentation-only"],
+            "stim_runs": [],
+            "rstim_runs": [],
+        }
+
+    stim_runs: list[dict[str, object]] = []
+    rstim_runs: list[dict[str, object]] = []
+    stim_samples: list[list[int]] = []
+    rstim_samples: list[list[int]] = []
+
+    for seed in seeds:
+        stim_run = run_tool(
+            build_sample_command(
+                list(stim_command),
+                mode=mode,
+                shots=shots,
+                seed=seed,
+                input_path=input_path,
+            ),
+            input_path=input_path,
+        )
+        stim_runs.append(stim_run)
+        if not bool(stim_run["success"]):
+            return _failure_result(
+                case=case,
+                status=STATUS_STIM_FAILED,
+                mode=mode,
+                input_path=input_path,
+                expected_bits=expected_bits,
+                shots=shots,
+                seeds=seeds,
+                selected_columns=selected_columns,
+                selected_pairs=selected_pairs,
+                failure_reasons=[f"seed {seed}: {stim_run['stderr'] or 'stim failed'}"],
+                stim_runs=stim_runs,
+                rstim_runs=rstim_runs,
+            )
+        try:
+            stim_seed_samples = parse_01_samples(
+                str(stim_run["stdout"]),
+                expected_bits=expected_bits,
+                expected_shots=shots,
+            )
+        except ValueError as error:
+            return _failure_result(
+                case=case,
+                status=STATUS_STIM_FAILED,
+                mode=mode,
+                input_path=input_path,
+                expected_bits=expected_bits,
+                shots=shots,
+                seeds=seeds,
+                selected_columns=selected_columns,
+                selected_pairs=selected_pairs,
+                failure_reasons=[f"seed {seed}: failed to parse stim output: {error}"],
+                stim_runs=stim_runs,
+                rstim_runs=rstim_runs,
+            )
+        stim_samples.extend(stim_seed_samples)
+
+        rstim_run = run_tool(
+            build_sample_command(
+                list(rstim_command),
+                mode=mode,
+                shots=shots,
+                seed=seed,
+                input_path=input_path,
+            ),
+            input_path=input_path,
+        )
+        rstim_runs.append(rstim_run)
+        if not bool(rstim_run["success"]):
+            return _failure_result(
+                case=case,
+                status=STATUS_RSTIM_FAILED,
+                mode=mode,
+                input_path=input_path,
+                expected_bits=expected_bits,
+                shots=shots,
+                seeds=seeds,
+                selected_columns=selected_columns,
+                selected_pairs=selected_pairs,
+                failure_reasons=[f"seed {seed}: {rstim_run['stderr'] or 'rstim failed'}"],
+                stim_runs=stim_runs,
+                rstim_runs=rstim_runs,
+            )
+        try:
+            rstim_seed_samples = parse_01_samples(
+                str(rstim_run["stdout"]),
+                expected_bits=expected_bits,
+                expected_shots=shots,
+            )
+        except ValueError as error:
+            return _failure_result(
+                case=case,
+                status=STATUS_RSTIM_FAILED,
+                mode=mode,
+                input_path=input_path,
+                expected_bits=expected_bits,
+                shots=shots,
+                seeds=seeds,
+                selected_columns=selected_columns,
+                selected_pairs=selected_pairs,
+                failure_reasons=[f"seed {seed}: failed to parse rstim output: {error}"],
+                stim_runs=stim_runs,
+                rstim_runs=rstim_runs,
+            )
+
+        if inject_rstim_bitflip_rate:
+            rstim_seed_samples = inject_bitflip(
+                rstim_seed_samples,
+                rate=inject_rstim_bitflip_rate,
+                seed=_deterministic_bitflip_seed(case_id, seed),
+            )
+        rstim_samples.extend(rstim_seed_samples)
+
+    comparison = compare_sample_sets(
+        stim_samples,
+        rstim_samples,
+        columns=selected_columns,
+        pairs=selected_pairs,
+    )
+    return {
+        "case_id": case_id,
+        "tier": tier,
+        "status": comparison["status"],
+        "mode": mode,
+        "input_path": str(input_path),
+        "expected_bits": expected_bits,
+        "shots_per_seed": shots,
+        "seeds": list(seeds),
+        "sample_count": comparison["sample_count"],
+        "selected_columns": selected_columns,
+        "selected_pairs": [list(pair) for pair in selected_pairs],
+        "max_delta": comparison["max_delta"],
+        "max_tolerance": comparison["max_tolerance"],
+        "failure_reasons": comparison["failure_reasons"],
+        "marginals": comparison["marginals"],
+        "pairs": comparison["pairs"],
+        "stim_runs": stim_runs,
+        "rstim_runs": rstim_runs,
+    }
 
 
 def parse_01_samples(stdout: str, *, expected_bits: int, expected_shots: int) -> list[list[int]]:

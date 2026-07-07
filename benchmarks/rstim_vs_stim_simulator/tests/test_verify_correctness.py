@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import subprocess
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from benchmarks.rstim_vs_stim_simulator.verify_correctness import (
     compare_sample_sets,
+    default_rstim_command,
     inject_bitflip,
     parse_01_samples,
+    run_tool,
     select_columns,
     select_pairs,
+    verify_case,
 )
 
 
@@ -55,6 +61,59 @@ class VerifyCorrectnessHelpersTest(unittest.TestCase):
             [[1, 1], [0, 0]],
         )
         self.assertEqual(samples, [[0, 0], [1, 1]])
+
+
+class VerifyCorrectnessRunnerTest(unittest.TestCase):
+    def test_default_rstim_command_uses_cargo_when_binary_is_absent(self) -> None:
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_correctness.Path.exists",
+            return_value=False,
+        ):
+            self.assertEqual(
+                default_rstim_command(),
+                ["cargo", "run", "--quiet", "-p", "rstim", "--bin", "rstim", "--"],
+            )
+
+    def test_run_tool_records_failure_stderr(self) -> None:
+        completed = subprocess.CompletedProcess(["bad"], 2, "", "broken")
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_correctness.subprocess.run",
+            return_value=completed,
+        ):
+            result = run_tool(["bad"], input_path=Path("case.stim"))
+        self.assertEqual(result["exit_code"], 2)
+        self.assertEqual(result["stderr"], "broken")
+        self.assertFalse(result["success"])
+
+    def test_verify_case_records_stim_failure_before_statistics(self) -> None:
+        case = {
+            "case_id": "case_a",
+            "tier": "smoke",
+            "canonical_input_path": "fixtures/example.stim",
+            "expected_measurements": 2,
+            "expected_detectors": 0,
+            "expected_observables": 0,
+        }
+        with mock.patch("benchmarks.rstim_vs_stim_simulator.verify_correctness.run_tool") as mocked:
+            mocked.return_value = {
+                "command": ["stim"],
+                "exit_code": 1,
+                "stdout": "",
+                "stderr": "stim failed",
+                "elapsed_s": 0.01,
+                "success": False,
+            }
+            result = verify_case(
+                case,
+                base_dir=Path("benchmarks/rstim_vs_stim_simulator"),
+                stim_command=["stim"],
+                rstim_command=["rstim"],
+                shots=4,
+                seeds=[1],
+                inject_rstim_bitflip_rate=0.0,
+            )
+        self.assertEqual(result["status"], "stim_failed")
+        self.assertIn("stim failed", result["failure_reasons"][0])
 
 
 if __name__ == "__main__":
