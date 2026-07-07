@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -36,6 +37,7 @@ ITEM_REQUIRED_FIELDS = {
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
 )
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1
 PROVENANCE_REQUIRED_FIELDS = (
     "schema_version",
@@ -79,6 +81,14 @@ def load_json(path: Path) -> Any:
         return json.load(handle)
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def add_error(errors: list[str], scope: str, message: str) -> None:
     errors.append(f"{scope}: {message}")
 
@@ -106,8 +116,8 @@ def validate_repo_path(repo_root: Path, relative: str, scope: str, label: str, e
         add_error(errors, scope, f"{label} {relative} is not tracked by git")
 
 
-def iter_checked_artifact_paths(manifest: dict[str, Any]) -> list[tuple[str, str]]:
-    paths: list[tuple[str, str]] = []
+def iter_checked_artifacts(manifest: dict[str, Any]) -> list[tuple[dict[str, Any], str, str]]:
+    artifacts: list[tuple[dict[str, Any], str, str]] = []
     for family in manifest.get("families", []):
         if not isinstance(family, dict):
             continue
@@ -119,19 +129,33 @@ def iter_checked_artifact_paths(manifest: dict[str, Any]) -> list[tuple[str, str
                 if not isinstance(artifact, dict):
                     continue
                 if artifact.get("checked") is True and isinstance(artifact.get("path"), str):
-                    paths.append((item_id, artifact["path"]))
-    return paths
+                    artifacts.append((item, item_id, artifact["path"]))
+    return artifacts
 
 
-def validate_site_paths(site_root: Path, manifest: dict[str, Any], errors: list[str]) -> None:
-    for item_id, artifact_path in iter_checked_artifact_paths(manifest):
+def iter_checked_artifact_paths(manifest: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(item_id, artifact_path) for _, item_id, artifact_path in iter_checked_artifacts(manifest)]
+
+
+def validate_site_paths(repo_root: Path, site_root: Path, manifest: dict[str, Any], errors: list[str]) -> None:
+    del repo_root
+    for item, item_id, artifact_path in iter_checked_artifacts(manifest):
         copied = site_root / artifact_path
+        scope = f"evidence item {item_id}"
         if not copied.is_file():
             add_error(
                 errors,
-                f"evidence item {item_id}",
+                scope,
                 f"checked artifact {artifact_path} was not copied to {site_root}",
             )
+            continue
+
+        recorded_digest = recorded_artifact_sha256(item, artifact_path)
+        if recorded_digest is None:
+            add_error(errors, scope, f"checked artifact {artifact_path} is missing recorded sha256 for site validation")
+            continue
+        if sha256_file(copied) != recorded_digest:
+            add_error(errors, scope, f"copied artifact {artifact_path} sha256 digest does not match recorded hash")
 
 
 def validate_artifact(repo_root: Path, family_id: str, item_id: str, artifact: dict[str, Any], errors: list[str]) -> None:
@@ -159,6 +183,34 @@ def item_has_checked_artifacts(item: dict[str, Any]) -> bool:
     return any(isinstance(artifact, dict) and artifact.get("checked") is True for artifact in artifacts)
 
 
+def checked_artifact_paths_for_item(item: dict[str, Any]) -> list[str]:
+    artifacts = item.get("artifacts")
+    if not isinstance(artifacts, list):
+        return []
+    return [
+        artifact["path"]
+        for artifact in artifacts
+        if isinstance(artifact, dict) and artifact.get("checked") is True and isinstance(artifact.get("path"), str)
+    ]
+
+
+def recorded_artifact_sha256(item: dict[str, Any], artifact_path: str) -> str | None:
+    provenance = item.get("provenance")
+    if not isinstance(provenance, dict):
+        return None
+    artifact_hashes = provenance.get("artifact_hashes")
+    if not isinstance(artifact_hashes, dict) or artifact_hashes.get("status") != "recorded":
+        return None
+    value = artifact_hashes.get("value")
+    if not isinstance(value, dict):
+        return None
+    entry = value.get(artifact_path)
+    if not isinstance(entry, dict):
+        return None
+    digest = entry.get("sha256")
+    return digest if isinstance(digest, str) else None
+
+
 def validate_provenance_status_field(scope: str, provenance: dict[str, Any], field: str, errors: list[str]) -> None:
     if field not in provenance:
         add_error(errors, scope, f"provenance missing required field {field}")
@@ -183,7 +235,77 @@ def validate_provenance_status_field(scope: str, provenance: dict[str, Any], fie
     add_error(errors, scope, f"provenance.{field} status must be 'recorded' or 'not_recorded'")
 
 
-def validate_checked_item_provenance(scope: str, item: dict[str, Any], errors: list[str]) -> None:
+def validate_checked_artifact_hashes(
+    repo_root: Path, scope: str, item: dict[str, Any], provenance: dict[str, Any], errors: list[str]
+) -> None:
+    artifact_paths = checked_artifact_paths_for_item(item)
+    artifact_hashes = provenance.get("artifact_hashes")
+    if not isinstance(artifact_hashes, dict):
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes for {artifact_path} must be an object with recorded sha256 entries",
+            )
+        return
+    if artifact_hashes.get("status") != "recorded":
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes for {artifact_path} must be recorded for checked artifacts",
+            )
+        return
+
+    value = artifact_hashes.get("value")
+    if not isinstance(value, dict):
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes recorded entry value for {artifact_path} must be an object",
+            )
+        return
+
+    expected_paths = set(artifact_paths)
+    for unexpected_path in sorted(set(value) - expected_paths):
+        add_error(
+            errors,
+            scope,
+            f"provenance.artifact_hashes has unexpected hash entry for {unexpected_path}",
+        )
+
+    for artifact_path in artifact_paths:
+        entry = value.get(artifact_path)
+        if entry is None:
+            add_error(errors, scope, f"provenance.artifact_hashes missing hash entry for {artifact_path}")
+            continue
+        if not isinstance(entry, dict):
+            add_error(errors, scope, f"provenance.artifact_hashes entry for {artifact_path} must be an object with sha256")
+            continue
+        if set(entry) != {"sha256"}:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes entry for {artifact_path} has unsupported hash shape; only sha256 is supported",
+            )
+            continue
+
+        recorded_digest = entry.get("sha256")
+        if not isinstance(recorded_digest, str) or SHA256_RE.fullmatch(recorded_digest) is None:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes entry for {artifact_path} must include sha256 as 64 lowercase hex characters",
+            )
+            continue
+
+        repo_file = repo_root / artifact_path
+        if repo_file.is_file() and sha256_file(repo_file) != recorded_digest:
+            add_error(errors, scope, f"artifact {artifact_path} sha256 digest does not match repository file")
+
+
+def validate_checked_item_provenance(repo_root: Path, scope: str, item: dict[str, Any], errors: list[str]) -> None:
     if not item_has_checked_artifacts(item):
         return
 
@@ -200,6 +322,7 @@ def validate_checked_item_provenance(scope: str, item: dict[str, Any], errors: l
         if field == "schema_version":
             continue
         validate_provenance_status_field(scope, provenance, field, errors)
+    validate_checked_artifact_hashes(repo_root, scope, item, provenance, errors)
 
 
 def validate_string_list(scope: str, label: str, values: Any, errors: list[str], *, allow_empty: bool) -> None:
@@ -279,7 +402,7 @@ def validate_item(repo_root: Path, family_id: str, item: Any, errors: list[str])
                 add_error(errors, scope, "artifact entries must be objects")
     else:
         add_error(errors, scope, "artifacts must be a list")
-    validate_checked_item_provenance(scope, item, errors)
+    validate_checked_item_provenance(repo_root, scope, item, errors)
 
 
 def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | None:
@@ -367,7 +490,7 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
         add_error(errors, "manifest", f"unexpected family {family_id}")
 
     if site_root is not None and not errors:
-        validate_site_paths(site_root, manifest, errors)
+        validate_site_paths(repo_root, site_root, manifest, errors)
 
     return errors
 
@@ -488,7 +611,14 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "seed_policy": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
             "build_profile": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
             "shots_or_error_budget": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
-            "artifact_hashes": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "artifact_hashes": {
+                "status": "recorded",
+                "value": {
+                    "benchmarks/surface_decoder_compare/results/full/results.csv": {
+                        "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+                    }
+                },
+            },
         }
 
     manifest = {
@@ -641,6 +771,13 @@ def run_self_test() -> list[str]:
             ("missing_provenance_cpu_model", "surface-decoder-full", "cpu_model"),
             ("provenance_cpu_model_missing_reason", "surface-decoder-full", "reason"),
             ("bad_provenance_schema_version", "surface-decoder-full", "schema_version"),
+            ("bad_artifact_hash", "surface-decoder-full", "sha256"),
+            ("missing_artifact_hash", "surface-decoder-full", "results.csv"),
+            (
+                "artifact_hash_extra_path",
+                "surface-decoder-full",
+                "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
+            ),
         ]
 
         for mutation, entry_id, rule in mutations:
@@ -659,6 +796,18 @@ def run_self_test() -> list[str]:
                 manifest["families"][0]["evidence_items"][0]["provenance"]["cpu_model"] = {"status": "not_recorded"}
             elif mutation == "bad_provenance_schema_version":
                 manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = 2
+            elif mutation == "bad_artifact_hash":
+                manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                    "benchmarks/surface_decoder_compare/results/full/results.csv"
+                ]["sha256"] = "0" * 64
+            elif mutation == "missing_artifact_hash":
+                del manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                    "benchmarks/surface_decoder_compare/results/full/results.csv"
+                ]
+            elif mutation == "artifact_hash_extra_path":
+                manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                    "benchmarks/surface_decoder_compare/results/full/unchecked.csv"
+                ] = {"sha256": "a" * 64}
 
             manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             mutated_errors = validate_manifest(repo_root, manifest_path)

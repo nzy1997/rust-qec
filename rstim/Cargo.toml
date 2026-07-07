@@ -13,3 +13,4 @@ qec-code = { path = "../qec-code" }
 
 [dev-dependencies]
 tempfile = "3"
+toml = "0.8"
