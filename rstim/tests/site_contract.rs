@@ -93,6 +93,132 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
     );
 }
 
+fn js_function_body<'a>(source: &'a str, function_name: &str, next_function_marker: &str) -> &'a str {
+    let signature = format!("function {function_name}(");
+    let function_start = source
+        .find(&signature)
+        .unwrap_or_else(|| panic!("missing function {function_name}"));
+    let body_start = source[function_start..]
+        .find('{')
+        .map(|offset| function_start + offset + 1)
+        .unwrap_or_else(|| panic!("function {function_name} is missing an opening brace"));
+    let body_end = source[body_start..]
+        .find(next_function_marker)
+        .map(|offset| {
+            let next_function_start = body_start + offset;
+            source[body_start..next_function_start]
+                .rfind("\n  }\n\n")
+                .map(|close_offset| body_start + close_offset)
+                .unwrap_or(next_function_start)
+        })
+        .unwrap_or_else(|| {
+            panic!("function {function_name} is missing marker {next_function_marker:?} after its body")
+        });
+    &source[body_start..body_end]
+}
+
+const CANONICAL_PROVENANCE_KEYS: &[&str] = &[
+    "schema_version",
+    "artifact_date",
+    "source_commit",
+    "commands",
+    "os",
+    "cpu_model",
+    "rust_version",
+    "python_version",
+    "dependency_versions",
+    "external_repository_commits",
+    "seed_policy",
+    "build_profile",
+    "shots_or_error_budget",
+    "artifact_hashes",
+];
+
+fn checked_artifact_paths(item: &Value) -> Vec<&str> {
+    item["artifacts"]
+        .as_array()
+        .unwrap_or_else(|| panic!("evidence item artifacts must be an array"))
+        .iter()
+        .filter(|artifact| artifact["checked"].as_bool().unwrap_or(false))
+        .map(|artifact| {
+            artifact["path"]
+                .as_str()
+                .unwrap_or_else(|| panic!("checked artifact must carry a path: {artifact:?}"))
+        })
+        .collect()
+}
+
+fn assert_canonical_provenance(item_id: &str, item: &Value) {
+    let provenance = item["provenance"]
+        .as_object()
+        .unwrap_or_else(|| panic!("{item_id} must carry canonical provenance"));
+
+    for key in CANONICAL_PROVENANCE_KEYS {
+        assert!(
+            provenance.contains_key(*key),
+            "{item_id} provenance is missing key {key}"
+        );
+    }
+    assert_eq!(
+        provenance["schema_version"].as_i64(),
+        Some(1),
+        "{item_id} provenance schema_version must be 1"
+    );
+
+    for key in CANONICAL_PROVENANCE_KEYS
+        .iter()
+        .copied()
+        .filter(|key| *key != "schema_version")
+    {
+        let entry = provenance[key]
+            .as_object()
+            .unwrap_or_else(|| panic!("{item_id} provenance.{key} must be an object"));
+        let status = entry
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{item_id} provenance.{key} must carry status"));
+        assert!(
+            matches!(status, "recorded" | "not_recorded"),
+            "{item_id} provenance.{key} has unsupported status {status}"
+        );
+        if status == "not_recorded" {
+            assert!(
+                entry
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .is_some_and(|reason| !reason.trim().is_empty()),
+                "{item_id} provenance.{key} not_recorded entries must carry a reason"
+            );
+        }
+    }
+
+    let artifact_hashes = provenance["artifact_hashes"]
+        .as_object()
+        .unwrap_or_else(|| panic!("{item_id} provenance.artifact_hashes must be an object"));
+    assert_eq!(
+        artifact_hashes.get("status").and_then(Value::as_str),
+        Some("recorded"),
+        "{item_id} provenance.artifact_hashes must be recorded"
+    );
+    let hash_values = artifact_hashes
+        .get("value")
+        .and_then(Value::as_object)
+        .unwrap_or_else(|| panic!("{item_id} provenance.artifact_hashes.value must be an object"));
+
+    for path in checked_artifact_paths(item) {
+        let hash_entry = hash_values
+            .get(path)
+            .unwrap_or_else(|| panic!("{item_id} provenance.artifact_hashes is missing checked artifact {path}"));
+        assert!(
+            hash_entry
+                .get("sha256")
+                .and_then(Value::as_str)
+                .is_some_and(|digest| !digest.trim().is_empty()),
+            "{item_id} checked artifact {path} must carry provenance.artifact_hashes sha256"
+        );
+    }
+}
+
 #[test]
 fn checked_result_provenance_styles_wrap_long_values() {
     let styles = read_repo_file("site/styles.css");
@@ -519,6 +645,51 @@ fn checked_benchmark_artifacts_are_linked() {
             Some("recorded"),
             "{item_id} artifact hashes must be recorded"
         );
+    }
+}
+
+#[test]
+fn checked_benchmark_provenance_is_manifest_backed() {
+    let app = read_repo_file("site/app.js");
+    let index = read_repo_file("site/index.html");
+    let manifest_text = read_repo_file("site/benchmark-site.json");
+    let manifest: Value =
+        serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
+
+    let checked_renderer = js_function_body(&app, "renderCheckedBenchmarkResults", "\n  function renderNav(");
+
+    assert_contains_all(
+        checked_renderer,
+        &[
+            "checkedBenchmarkResults.innerHTML",
+            "checkedBenchmarkItems",
+            "findEvidenceItem",
+            "renderProvenance(item.provenance)",
+        ],
+        "checked benchmark provenance renderer",
+    );
+
+    for hardcoded in [
+        "schema_version",
+        "artifact_hashes",
+        "source_commit",
+        "cpu_model",
+        "benchmarks/surface_decoder_compare/results/full/results.csv",
+        "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+        "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+        "benchmarks/bb_circuit_bposd_compare/results/full/summary.md",
+        "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
+        "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+    ] {
+        assert!(
+            !index.contains(hardcoded),
+            "checked provenance value {hardcoded} must come from the manifest renderer, not index.html"
+        );
+    }
+
+    for item_id in ["surface-decoder-full", "bb-circuit-full"] {
+        let (_, item) = find_evidence_item(&manifest, item_id);
+        assert_canonical_provenance(item_id, item);
     }
 }
 
