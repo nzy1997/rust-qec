@@ -11,6 +11,7 @@ from benchmarks.rstim_vs_stim_simulator.verify_correctness import (
     build_sample_command,
     compare_sample_sets,
     default_rstim_command,
+    format_report,
     inject_bitflip,
     main,
     parse_01_samples,
@@ -235,7 +236,7 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
 
 
 class VerifyCorrectnessCliTest(unittest.TestCase):
-    def test_main_writes_json_and_prints_pass(self) -> None:
+    def test_main_writes_json_and_prints_warn_when_manifest_includes_skipped_case(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             out = Path(temp_dir) / "summary.json"
             manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}, {}]}
@@ -263,6 +264,10 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
                         "failure_reasons": [],
                         "selected_columns": [0],
                         "selected_pairs": [],
+                        "marginals": [],
+                        "pairs": [],
+                        "stim_runs": [{"success": True}, {"success": True}],
+                        "rstim_runs": [{"success": True}, {"success": True}],
                     },
                     {
                         "case_id": "doc_case",
@@ -270,6 +275,10 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
                         "status": "skipped",
                         "sample_count": 0,
                         "failure_reasons": ["documentation-only"],
+                        "selected_columns": [0],
+                        "selected_pairs": [],
+                        "stim_runs": [],
+                        "rstim_runs": [],
                     },
                 ]
                 with mock.patch("sys.stdout.write") as stdout:
@@ -285,9 +294,9 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
                     )
             self.assertEqual(code, 0)
             data = json.loads(out.read_text())
-            self.assertEqual(data["status"], "pass")
+            self.assertEqual(data["status"], "warn")
             self.assertEqual(data["case_count"], 2)
-            self.assertTrue(any("PASS correctness smoke" in call.args[0] for call in stdout.call_args_list))
+            self.assertTrue(any("WARN correctness smoke" in call.args[0] for call in stdout.call_args_list))
 
     def test_main_returns_nonzero_for_statistical_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -334,6 +343,110 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
             self.assertTrue(
                 any("FAIL statistical mismatch" in call.args[0] for call in stdout.call_args_list)
             )
+
+    def test_format_report_prefers_tool_failure_headline_over_warn(self) -> None:
+        summary = {
+            "status": "stim_failed",
+            "manifest_path": "benchmarks/rstim_vs_stim_simulator/cases.smoke.toml",
+            "case_count": 2,
+            "shots": 4,
+            "seeds": [1, 2],
+            "counts": {
+                "pass": 0,
+                "statistical_mismatch": 0,
+                "stim_failed": 1,
+                "rstim_failed": 0,
+                "skipped": 1,
+            },
+            "cases": [
+                {
+                    "case_id": "case_a",
+                    "status": "stim_failed",
+                    "sample_count": 2,
+                    "selected_columns": [0],
+                    "selected_pairs": [],
+                    "max_delta": 0.0,
+                    "max_tolerance": 0.01,
+                    "failure_reasons": ["seed 2: stim failed"],
+                    "marginals": [],
+                    "pairs": [],
+                    "stim_runs": [{"success": True}, {"success": False}],
+                    "rstim_runs": [{"success": True}, {"success": True}],
+                },
+                {
+                    "case_id": "doc_case",
+                    "status": "skipped",
+                    "sample_count": 0,
+                    "selected_columns": [],
+                    "selected_pairs": [],
+                    "failure_reasons": ["documentation-only"],
+                    "stim_runs": [],
+                    "rstim_runs": [],
+                },
+            ],
+        }
+
+        exit_code, report = format_report(summary)
+
+        self.assertEqual(exit_code, 1)
+        self.assertTrue(report.startswith("FAIL tool failure"))
+        self.assertIn("summary status=stim_failed", report)
+
+    def test_format_report_includes_rates_tolerance_and_tool_status_fields(self) -> None:
+        summary = {
+            "status": "pass",
+            "manifest_path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "case_count": 1,
+            "shots": 8,
+            "seeds": [11, 12],
+            "counts": {
+                "pass": 1,
+                "statistical_mismatch": 0,
+                "stim_failed": 0,
+                "rstim_failed": 0,
+                "skipped": 0,
+            },
+            "cases": [
+                {
+                    "case_id": "case_a",
+                    "status": "pass",
+                    "sample_count": 16,
+                    "selected_columns": [0, 3],
+                    "selected_pairs": [[0, 3]],
+                    "max_delta": 0.05,
+                    "max_tolerance": 0.08,
+                    "failure_reasons": [],
+                    "marginals": [
+                        {
+                            "column": 0,
+                            "stim_rate": 0.125,
+                            "rstim_rate": 0.1875,
+                            "delta": 0.0625,
+                            "tolerance": 0.08,
+                        }
+                    ],
+                    "pairs": [
+                        {
+                            "pair": [0, 3],
+                            "stim_rate": 0.0,
+                            "rstim_rate": 0.0625,
+                            "delta": 0.0625,
+                            "tolerance": 0.09,
+                        }
+                    ],
+                    "stim_runs": [{"success": True}, {"success": True}],
+                    "rstim_runs": [{"success": True}, {"success": False}],
+                }
+            ],
+        }
+
+        _, report = format_report(summary)
+
+        self.assertIn("PASS correctness full", report)
+        self.assertIn("marginal c0 stim=0.125000 rstim=0.187500 delta=0.062500 tol=0.080000", report)
+        self.assertIn("pair 0,3 stim=0.000000 rstim=0.062500 delta=0.062500 tol=0.090000", report)
+        self.assertIn("stim_runs=2/2_ok", report)
+        self.assertIn("rstim_runs=1/2_ok", report)
 
 
 if __name__ == "__main__":

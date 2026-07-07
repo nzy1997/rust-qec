@@ -17,6 +17,7 @@ from benchmarks.rstim_vs_stim_simulator.validate_cases import load_manifest, val
 
 
 STATUS_PASS = "pass"
+STATUS_WARN = "warn"
 STATUS_MISMATCH = "statistical_mismatch"
 STATUS_STIM_FAILED = "stim_failed"
 STATUS_RSTIM_FAILED = "rstim_failed"
@@ -619,7 +620,47 @@ def _overall_status(case_results: Sequence[dict[str, object]]) -> str:
         return STATUS_RSTIM_FAILED
     if STATUS_MISMATCH in statuses:
         return STATUS_MISMATCH
+    if STATUS_SKIPPED in statuses:
+        return STATUS_WARN
     return STATUS_PASS
+
+
+def _suite_label(summary: dict[str, object]) -> str:
+    manifest_path = Path(str(summary.get("manifest_path", "")))
+    stem = manifest_path.stem
+    if stem.endswith(".smoke"):
+        return "smoke"
+    if stem.endswith(".full"):
+        return "full"
+    return "correctness"
+
+
+def _successful_run_count(runs: Sequence[dict[str, object]]) -> int:
+    return sum(1 for run in runs if bool(run.get("success")))
+
+
+def _format_stat(label: str, entry: dict[str, object]) -> str:
+    return (
+        f"{label} "
+        f"stim={float(entry['stim_rate']):.6f} rstim={float(entry['rstim_rate']):.6f} "
+        f"delta={float(entry['delta']):.6f} tol={float(entry['tolerance']):.6f}"
+    )
+
+
+def _case_rate_lines(case: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    marginals = list(case.get("marginals", []))
+    pairs = list(case.get("pairs", []))
+    if marginals:
+        worst_marginal = max(marginals, key=lambda entry: float(entry["delta"]))
+        marginal_label = f"marginal c{worst_marginal['column']}"
+        lines.append(f"  rates {_format_stat(marginal_label, worst_marginal)}")
+    if pairs:
+        worst_pair = max(pairs, key=lambda entry: float(entry["delta"]))
+        pair = worst_pair["pair"]
+        pair_label = f"pair {pair[0]},{pair[1]}"
+        lines.append(f"  rates {_format_stat(pair_label, worst_pair)}")
+    return lines
 
 
 def build_summary(args: argparse.Namespace) -> dict[str, object]:
@@ -673,14 +714,18 @@ def write_summary(path: Path, summary: dict[str, object]) -> None:
 
 def format_report(summary: dict[str, object]) -> tuple[int, str]:
     status = str(summary["status"])
+    suite_label = _suite_label(summary)
     if status in {STATUS_STIM_FAILED, STATUS_RSTIM_FAILED}:
         first_line = "FAIL tool failure"
         exit_code = 1
     elif status == STATUS_MISMATCH:
         first_line = "FAIL statistical mismatch"
         exit_code = 1
+    elif status == STATUS_WARN:
+        first_line = f"WARN correctness {suite_label}"
+        exit_code = 0
     else:
-        first_line = "PASS correctness smoke"
+        first_line = f"PASS correctness {suite_label}"
         exit_code = 0
 
     lines = [first_line]
@@ -705,6 +750,8 @@ def format_report(summary: dict[str, object]) -> tuple[int, str]:
         max_tolerance = case.get("max_tolerance")
         selected_columns = case.get("selected_columns", [])
         selected_pairs = case.get("selected_pairs", [])
+        stim_runs = case.get("stim_runs", [])
+        rstim_runs = case.get("rstim_runs", [])
         lines.append(
             f"{case['case_id']} "
             f"status={case['status']} "
@@ -715,6 +762,12 @@ def format_report(summary: dict[str, object]) -> tuple[int, str]:
             f"tolerance={max_tolerance if max_tolerance is not None else 'n/a'}"
             f"{reason_suffix}"
         )
+        lines.append(
+            "  tools "
+            f"stim_runs={_successful_run_count(stim_runs)}/{len(stim_runs)}_ok "
+            f"rstim_runs={_successful_run_count(rstim_runs)}/{len(rstim_runs)}_ok"
+        )
+        lines.extend(_case_rate_lines(case))
     return exit_code, "\n".join(lines)
 
 
