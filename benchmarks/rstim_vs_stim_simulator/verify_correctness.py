@@ -620,7 +620,7 @@ def _overall_status(case_results: Sequence[dict[str, object]]) -> str:
         return STATUS_RSTIM_FAILED
     if STATUS_MISMATCH in statuses:
         return STATUS_MISMATCH
-    if STATUS_SKIPPED in statuses:
+    if STATUS_WARN in statuses:
         return STATUS_WARN
     return STATUS_PASS
 

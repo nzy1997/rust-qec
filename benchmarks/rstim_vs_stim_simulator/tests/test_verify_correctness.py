@@ -236,7 +236,7 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
 
 
 class VerifyCorrectnessCliTest(unittest.TestCase):
-    def test_main_writes_json_and_prints_warn_when_manifest_includes_skipped_case(self) -> None:
+    def test_main_writes_json_and_keeps_documentation_only_skip_out_of_warn_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             out = Path(temp_dir) / "summary.json"
             manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}, {}]}
@@ -294,9 +294,9 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
                     )
             self.assertEqual(code, 0)
             data = json.loads(out.read_text())
-            self.assertEqual(data["status"], "warn")
+            self.assertEqual(data["status"], "pass")
             self.assertEqual(data["case_count"], 2)
-            self.assertTrue(any("WARN correctness smoke" in call.args[0] for call in stdout.call_args_list))
+            self.assertTrue(any("PASS correctness smoke" in call.args[0] for call in stdout.call_args_list))
 
     def test_main_returns_nonzero_for_statistical_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
