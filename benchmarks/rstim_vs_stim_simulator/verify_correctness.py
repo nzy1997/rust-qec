@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
+import json
 import math
 import random
+import shlex
 import subprocess
+import sys
 import time
 from collections.abc import Sequence
 from pathlib import Path
+import tomllib
+
+from benchmarks.rstim_vs_stim_simulator.validate_cases import load_manifest, validate_manifest
 
 
 STATUS_PASS = "pass"
@@ -568,3 +575,173 @@ def compare_sample_sets(
         "max_tolerance": max_tolerance,
         "failure_reasons": failure_reasons,
     }
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive integer")
+    return parsed
+
+
+def _parse_seeds(raw_value: str) -> list[int]:
+    seeds: list[int] = []
+    for chunk in raw_value.split(","):
+        stripped = chunk.strip()
+        if not stripped:
+            continue
+        try:
+            seed = int(stripped)
+        except ValueError as error:
+            raise ValueError(f"invalid seed {stripped!r}") from error
+        seeds.append(seed)
+    if not seeds:
+        raise ValueError("at least one seed is required")
+    return seeds
+
+
+def _command_from_arg(raw_command: str | None, *, default: list[str] | None = None) -> list[str]:
+    if raw_command is None:
+        if default is None:
+            raise ValueError("command is required")
+        return list(default)
+    command = shlex.split(raw_command)
+    if not command:
+        raise ValueError("command must not be empty")
+    return command
+
+
+def _overall_status(case_results: Sequence[dict[str, object]]) -> str:
+    statuses = [str(result["status"]) for result in case_results]
+    if STATUS_STIM_FAILED in statuses:
+        return STATUS_STIM_FAILED
+    if STATUS_RSTIM_FAILED in statuses:
+        return STATUS_RSTIM_FAILED
+    if STATUS_MISMATCH in statuses:
+        return STATUS_MISMATCH
+    return STATUS_PASS
+
+
+def build_summary(args: argparse.Namespace) -> dict[str, object]:
+    manifest = load_manifest(args.cases)
+    errors = validate_manifest(manifest, args.cases.parent)
+    if errors:
+        raise ValueError("\n".join(errors))
+
+    stim_command = _command_from_arg(args.stim)
+    rstim_command = _command_from_arg(args.rstim, default=default_rstim_command())
+    seeds = _parse_seeds(args.seeds)
+    cases = manifest["cases"]
+    case_results = [
+        verify_case(
+            case,
+            base_dir=args.cases.parent,
+            stim_command=stim_command,
+            rstim_command=rstim_command,
+            shots=args.shots,
+            seeds=seeds,
+            inject_rstim_bitflip_rate=args.inject_rstim_bitflip_rate,
+        )
+        for case in cases
+    ]
+    counts = {
+        STATUS_PASS: sum(1 for result in case_results if result["status"] == STATUS_PASS),
+        STATUS_MISMATCH: sum(1 for result in case_results if result["status"] == STATUS_MISMATCH),
+        STATUS_STIM_FAILED: sum(1 for result in case_results if result["status"] == STATUS_STIM_FAILED),
+        STATUS_RSTIM_FAILED: sum(1 for result in case_results if result["status"] == STATUS_RSTIM_FAILED),
+        STATUS_SKIPPED: sum(1 for result in case_results if result["status"] == STATUS_SKIPPED),
+    }
+    return {
+        "manifest_path": str(args.cases),
+        "suite": manifest.get("suite"),
+        "status": _overall_status(case_results),
+        "case_count": len(case_results),
+        "shots": args.shots,
+        "seeds": seeds,
+        "stim_command": stim_command,
+        "rstim_command": rstim_command,
+        "inject_rstim_bitflip_rate": args.inject_rstim_bitflip_rate,
+        "counts": counts,
+        "cases": case_results,
+    }
+
+
+def write_summary(path: Path, summary: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+
+
+def format_report(summary: dict[str, object]) -> tuple[int, str]:
+    status = str(summary["status"])
+    if status in {STATUS_STIM_FAILED, STATUS_RSTIM_FAILED}:
+        first_line = "FAIL tool failure"
+        exit_code = 1
+    elif status == STATUS_MISMATCH:
+        first_line = "FAIL statistical mismatch"
+        exit_code = 1
+    else:
+        first_line = "PASS correctness smoke"
+        exit_code = 0
+
+    lines = [first_line]
+    lines.append(
+        "summary "
+        f"status={status} "
+        f"cases={summary['case_count']} "
+        f"shots={summary['shots']} "
+        f"seeds={len(summary['seeds'])} "
+        f"pass={summary['counts'][STATUS_PASS]} "
+        f"mismatch={summary['counts'][STATUS_MISMATCH]} "
+        f"stim_failed={summary['counts'][STATUS_STIM_FAILED]} "
+        f"rstim_failed={summary['counts'][STATUS_RSTIM_FAILED]} "
+        f"skipped={summary['counts'][STATUS_SKIPPED]}"
+    )
+    for case in summary["cases"]:
+        failure_reasons = case.get("failure_reasons", [])
+        reason_suffix = ""
+        if failure_reasons:
+            reason_suffix = f" reason={failure_reasons[0]}"
+        max_delta = case.get("max_delta")
+        max_tolerance = case.get("max_tolerance")
+        selected_columns = case.get("selected_columns", [])
+        selected_pairs = case.get("selected_pairs", [])
+        lines.append(
+            f"{case['case_id']} "
+            f"status={case['status']} "
+            f"samples={case['sample_count']} "
+            f"marginals={len(selected_columns)} "
+            f"pairs={len(selected_pairs)} "
+            f"max_delta={max_delta if max_delta is not None else 'n/a'} "
+            f"tolerance={max_tolerance if max_tolerance is not None else 'n/a'}"
+            f"{reason_suffix}"
+        )
+    return exit_code, "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Verify rstim sampling correctness against canonical Stim fixtures."
+    )
+    parser.add_argument("--cases", type=Path, required=True)
+    parser.add_argument("--stim", default="stim")
+    parser.add_argument("--rstim", default=None)
+    parser.add_argument("--shots", type=_positive_int, required=True)
+    parser.add_argument("--seeds", default="12345")
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--inject-rstim-bitflip-rate", type=float, default=0.0)
+    args = parser.parse_args(argv)
+
+    try:
+        summary = build_summary(args)
+    except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
+        print(f"{args.cases}: {error}", file=sys.stderr)
+        return 1
+
+    write_summary(args.out, summary)
+    exit_code, report = format_report(summary)
+    print(report)
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

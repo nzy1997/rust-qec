@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -10,6 +12,7 @@ from benchmarks.rstim_vs_stim_simulator.verify_correctness import (
     compare_sample_sets,
     default_rstim_command,
     inject_bitflip,
+    main,
     parse_01_samples,
     run_tool,
     select_columns,
@@ -229,6 +232,108 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
         self.assertIn("max_delta", result)
         self.assertIn("max_tolerance", result)
         self.assertTrue(result["marginals"])
+
+
+class VerifyCorrectnessCliTest(unittest.TestCase):
+    def test_main_writes_json_and_prints_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = Path(temp_dir) / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}, {}]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.verify_case"
+                ) as mocked,
+            ):
+                mocked.side_effect = [
+                    {
+                        "case_id": "case_a",
+                        "tier": "smoke",
+                        "status": "pass",
+                        "sample_count": 4,
+                        "max_delta": 0.0,
+                        "max_tolerance": 0.01,
+                        "failure_reasons": [],
+                        "selected_columns": [0],
+                        "selected_pairs": [],
+                    },
+                    {
+                        "case_id": "doc_case",
+                        "tier": "documentation-only",
+                        "status": "skipped",
+                        "sample_count": 0,
+                        "failure_reasons": ["documentation-only"],
+                    },
+                ]
+                with mock.patch("sys.stdout.write") as stdout:
+                    code = main(
+                        [
+                            "--cases",
+                            "benchmarks/rstim_vs_stim_simulator/cases.smoke.toml",
+                            "--shots",
+                            "4",
+                            "--out",
+                            str(out),
+                        ]
+                    )
+            self.assertEqual(code, 0)
+            data = json.loads(out.read_text())
+            self.assertEqual(data["status"], "pass")
+            self.assertEqual(data["case_count"], 2)
+            self.assertTrue(any("PASS correctness smoke" in call.args[0] for call in stdout.call_args_list))
+
+    def test_main_returns_nonzero_for_statistical_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = Path(temp_dir) / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.verify_case"
+                ) as mocked,
+            ):
+                mocked.return_value = {
+                    "case_id": "case_a",
+                    "tier": "smoke",
+                    "status": "statistical_mismatch",
+                    "sample_count": 4,
+                    "max_delta": 0.2,
+                    "max_tolerance": 0.01,
+                    "failure_reasons": ["marginal c0 delta 0.2 > tolerance 0.01"],
+                    "selected_columns": [0],
+                    "selected_pairs": [],
+                }
+                with mock.patch("sys.stdout.write") as stdout:
+                    code = main(
+                        [
+                            "--cases",
+                            "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                            "--shots",
+                            "4",
+                            "--out",
+                            str(out),
+                        ]
+                    )
+            self.assertEqual(code, 1)
+            data = json.loads(out.read_text())
+            self.assertEqual(data["status"], "statistical_mismatch")
+            self.assertTrue(
+                any("FAIL statistical mismatch" in call.args[0] for call in stdout.call_args_list)
+            )
 
 
 if __name__ == "__main__":
