@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -23,6 +24,21 @@ def run_validator(path: Path) -> subprocess.CompletedProcess[str]:
             str(path),
         ],
         cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def run_validator_with_cwd(path: Path, cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "benchmarks.rstim_vs_stim_simulator.validate_cases",
+            str(path),
+        ],
+        cwd=cwd,
         check=False,
         capture_output=True,
         text=True,
@@ -64,6 +80,49 @@ class ValidateCasesTest(unittest.TestCase):
             "before_round_data_depolarization must be 0 for stim_surface_d11_r100",
             result.stderr,
         )
+
+    def test_nested_manifest_falls_back_to_benchmark_root_fixture_path(self) -> None:
+        manifest_text = """\
+manifest_version = 1
+suite = "rstim_vs_stim_simulator"
+generated_outputs_root = "benchmarks/out/rstim_vs_stim_simulator"
+
+[[cases]]
+case_id = "stim_surface_d11_r100"
+tier = "full"
+source = "stim"
+workload = "surface_code:rotated_memory_z"
+code = "surface_code"
+task = "rotated_memory_z"
+distance = 11
+rounds = 100
+canonical_input_path = "fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+generation_command = "stim gen --code surface_code --task rotated_memory_z --distance 11 --rounds 100 --after_clifford_depolarization 0.001 --after_reset_flip_probability 0.001 --before_measure_flip_probability 0.001 --before_round_data_depolarization 0 --out benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+after_clifford_depolarization = 0.001
+after_reset_flip_probability = 0.001
+before_measure_flip_probability = 0.001
+before_round_data_depolarization = 0
+shots = 1024
+expected_qubits = 274
+expected_measurements = 12121
+expected_detectors = 12000
+expected_observables = 1
+stim_version = "1.15.0"
+provenance = "Canonical full Stim-generated surface_code:rotated_memory_z fixture for later simulator speed and correctness comparisons."
+"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            nested_dir = temp_root / "nested" / "manifests"
+            nested_dir.mkdir(parents=True)
+            manifest_path = nested_dir / "fixture.toml"
+            manifest_path.write_text(manifest_text)
+
+            result = run_validator_with_cwd(manifest_path, ROOT)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "PASS 1 fixture cases\n")
+        self.assertEqual(result.stderr, "")
 
     def test_smoke_manifest_pins_three_catalog_entries(self) -> None:
         cases = cases_by_id(SMOKE_MANIFEST)

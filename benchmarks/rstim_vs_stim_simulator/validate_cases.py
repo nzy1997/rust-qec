@@ -89,8 +89,11 @@ def _require_probability(
     return probability
 
 
-def _case_input_path(raw_path: str, base_dir: Path) -> Path:
-    return (base_dir / raw_path).resolve()
+def _case_input_path(raw_path: str, manifest_path: Path, benchmark_dir: Path) -> Path:
+    candidate = (manifest_path.parent / raw_path).resolve()
+    if candidate.is_relative_to(benchmark_dir.resolve()):
+        return candidate
+    return (benchmark_dir / raw_path).resolve()
 
 
 def _validate_full_case_noise(case: dict[str, Any], case_label: str, errors: list[str]) -> None:
@@ -206,7 +209,7 @@ def validate_manifest(manifest: dict[str, Any], base_dir: Path) -> list[str]:
 
         input_value = _require_str(raw_case, "canonical_input_path", case_label, errors)
         if input_value is not None:
-            input_path = _case_input_path(input_value, base_dir)
+            input_path = _case_input_path(input_value, base_dir, benchmark_dir)
             try:
                 input_path.relative_to(benchmark_dir)
             except ValueError:
