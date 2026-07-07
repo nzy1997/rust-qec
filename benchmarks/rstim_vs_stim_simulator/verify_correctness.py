@@ -33,10 +33,10 @@ def resolve_case_input_path(raw_path: str, base_dir: Path) -> Path:
 
 
 def default_rstim_command() -> list[str]:
-    binary = Path("target/release/rstim")
-    if binary.exists():
-        return [str(binary)]
-    return ["cargo", "run", "--quiet", "-p", "rstim", "--bin", "rstim", "--"]
+    for binary in (Path("target/release/rstim"), Path("target/debug/rstim")):
+        if binary.exists():
+            return [str(binary)]
+    return ["cargo", "run", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"]
 
 
 def build_sample_command(

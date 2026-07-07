@@ -79,14 +79,28 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
             "expected_observables": 0,
         }
 
-    def test_default_rstim_command_uses_cargo_when_binary_is_absent(self) -> None:
+    def test_default_rstim_command_prefers_release_binary(self) -> None:
         with mock.patch(
             "benchmarks.rstim_vs_stim_simulator.verify_correctness.Path.exists",
-            return_value=False,
+            side_effect=[True],
+        ):
+            self.assertEqual(default_rstim_command(), ["target/release/rstim"])
+
+    def test_default_rstim_command_falls_back_to_debug_binary(self) -> None:
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_correctness.Path.exists",
+            side_effect=[False, True],
+        ):
+            self.assertEqual(default_rstim_command(), ["target/debug/rstim"])
+
+    def test_default_rstim_command_uses_offline_cargo_when_binaries_are_absent(self) -> None:
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_correctness.Path.exists",
+            side_effect=[False, False],
         ):
             self.assertEqual(
                 default_rstim_command(),
-                ["cargo", "run", "--quiet", "-p", "rstim", "--bin", "rstim", "--"],
+                ["cargo", "run", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"],
             )
 
     def test_run_tool_records_failure_stderr(self) -> None:
