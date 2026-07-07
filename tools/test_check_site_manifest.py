@@ -10,6 +10,27 @@ from pathlib import Path
 import tools.check_site_manifest as check_site_manifest
 import tools.copy_site_benchmark_data as copy_site_benchmark_data
 
+PROVENANCE_NOT_RECORDED_REASON = "historical fixture predates canonical provenance capture"
+
+
+def fixture_provenance(commands: list[str]) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "artifact_date": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "source_commit": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "commands": {"status": "recorded", "value": commands},
+        "os": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "cpu_model": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "rust_version": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "python_version": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "dependency_versions": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "external_repository_commits": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "seed_policy": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "build_profile": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "shots_or_error_budget": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "artifact_hashes": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+    }
+
 
 VALID_MANIFEST = {
     "schema_version": 1,
@@ -39,6 +60,7 @@ VALID_MANIFEST = {
                         },
                     ],
                     "commands": ["make surface-decoder-compare-full"],
+                    "provenance": fixture_provenance(["make surface-decoder-compare-full"]),
                     "provenance_requirements": ["command line", "date"],
                     "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                     "claims_limit": "Fixture claim limit.",
@@ -59,6 +81,7 @@ VALID_MANIFEST = {
                     "tier": "full",
                     "artifacts": [],
                     "commands": ["make bb-circuit-bposd-compare-full"],
+                    "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"]),
                     "provenance_requirements": ["command line", "date"],
                     "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                     "claims_limit": "Fixture claim limit.",
@@ -202,6 +225,18 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["source_docs"] = []
         elif mutation == "empty_provenance_sources":
             manifest["families"][0]["evidence_items"][0]["provenance_sources"] = []
+        elif mutation == "missing_provenance":
+            del manifest["families"][0]["evidence_items"][0]["provenance"]
+        elif mutation == "missing_provenance_cpu_model":
+            del manifest["families"][0]["evidence_items"][0]["provenance"]["cpu_model"]
+        elif mutation == "provenance_cpu_model_missing_reason":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["cpu_model"] = {"status": "not_recorded"}
+        elif mutation == "bad_provenance_schema_version":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = 2
+        elif mutation == "bad_provenance_schema_version_type":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = "1"
+        elif mutation == "bad_provenance_schema_version_bool":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = True
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -298,6 +333,48 @@ class SiteManifestValidatorTest(unittest.TestCase):
             repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(any(entry_id in error and rule in error for error in errors), errors)
+
+    def test_rejects_checked_item_without_canonical_provenance(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="missing_provenance")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any("surface-decoder-full" in error and "provenance" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_checked_item_missing_provenance_key(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="missing_provenance_cpu_model")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any("surface-decoder-full" in error and "cpu_model" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_not_recorded_provenance_without_reason(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="provenance_cpu_model_missing_reason")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "cpu_model" in error
+                and "reason" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_unsupported_provenance_schema_version(self) -> None:
+        for mutation in (
+            "bad_provenance_schema_version",
+            "bad_provenance_schema_version_type",
+            "bad_provenance_schema_version_bool",
+        ):
+            repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
+            errors = check_site_manifest.validate_manifest(repo, manifest_path)
+            self.assertTrue(
+                any("surface-decoder-full" in error and "schema_version" in error for error in errors),
+                errors,
+            )
 
     def test_site_root_validation_rejects_missing_copied_checked_artifact(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
