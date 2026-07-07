@@ -42,3 +42,34 @@ round data depolarization and change the workload contract.
 python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml
 python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml
 ```
+
+## Correctness Verification
+
+Run the smoke correctness verifier:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
+  --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml \
+  --shots 20000 \
+  --out /tmp/rstim-vs-stim-correctness.json
+```
+
+The expected smoke verdict is `PASS correctness smoke`. The JSON report keeps
+per-case selected marginal and pair rates, tolerances, sample counts, tool
+status, stderr, and failure reasons. By default the verifier uses
+`target/release/rstim` if it already exists, otherwise `target/debug/rstim` if
+it exists, and otherwise falls back to
+`cargo run --offline --quiet -p rstim --bin rstim --`, so the documented smoke
+command works in a normal checkout without needing a separate prebuild step.
+
+Run the verifier negative control:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
+  --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml \
+  --shots 20000 \
+  --inject-rstim-bitflip-rate 0.20 \
+  --out /tmp/rstim-vs-stim-correctness-bad.json
+```
+
+The expected negative-control verdict is `FAIL statistical mismatch`.
