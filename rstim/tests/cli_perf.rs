@@ -2,6 +2,8 @@ use std::process::Command;
 
 use rstim::perf::summarize_jsonl_str;
 
+const PUBLIC_SELECTED_CASE_LABEL: &str = "stim-style-surface-sample-d11-r100-b1024";
+
 fn rstim_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
@@ -290,4 +292,91 @@ fn perf_ci_case_writes_only_selected_artifacts_without_gate_failure() {
     assert!(report.contains("loss-protection-sample"));
     assert!(!report.contains("rep-sample-d13-r13"));
     assert!(report.contains("tool_failed"));
+}
+
+#[test]
+fn perf_run_case_with_public_label_writes_only_selected_completed_records() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim-success");
+    let out = dir.path().join("raw.jsonl");
+    write_fake_stim(&fake_stim, "#!/bin/sh\ncat >/dev/null\nexit 0\n");
+
+    let output = rstim_cmd()
+        .env("RSTIM_TEST_STIM", &fake_stim)
+        .args([
+            "perf",
+            "run",
+            "--case",
+            PUBLIC_SELECTED_CASE_LABEL,
+            "--warmup-rounds",
+            "0",
+            "--measure-rounds",
+            "1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let raw = std::fs::read_to_string(out).unwrap();
+    assert!(!raw.is_empty());
+    assert!(raw.contains("\"tool_variant\":\"stim-cli\""));
+    assert!(raw.contains("\"tool_variant\":\"rstim-"));
+    assert!(raw.contains("\"status\":\"completed\""));
+    assert!(!raw.contains("loss-protection-sample"));
+    assert!(raw
+        .lines()
+        .all(|line| line.contains(&format!("\"case_label\":\"{PUBLIC_SELECTED_CASE_LABEL}\""))));
+}
+
+#[test]
+fn perf_ci_case_with_public_label_writes_only_selected_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim-success");
+    let out_dir = dir.path().join("focused-ci-public-case");
+    write_fake_stim(&fake_stim, "#!/bin/sh\ncat >/dev/null\nexit 0\n");
+
+    let output = rstim_cmd()
+        .env("RSTIM_TEST_STIM", &fake_stim)
+        .args([
+            "perf",
+            "ci",
+            "--case",
+            PUBLIC_SELECTED_CASE_LABEL,
+            "--warmup-rounds",
+            "0",
+            "--measure-rounds",
+            "1",
+            "--out-dir",
+            out_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let raw = std::fs::read_to_string(out_dir.join("raw.jsonl")).unwrap();
+    let summary = std::fs::read_to_string(out_dir.join("summary.json")).unwrap();
+    let report = std::fs::read_to_string(out_dir.join("report.md")).unwrap();
+
+    assert!(!raw.is_empty());
+    assert!(raw
+        .lines()
+        .all(|line| line.contains(&format!("\"case_label\":\"{PUBLIC_SELECTED_CASE_LABEL}\""))));
+    assert!(summary.contains(&format!("\"case_label\": \"{PUBLIC_SELECTED_CASE_LABEL}\"")));
+    assert!(!summary.contains("rep-sample-d13-r13"));
+    assert!(!summary.contains("loss-protection-sample"));
+    assert!(report.contains(PUBLIC_SELECTED_CASE_LABEL));
+    assert!(!report.contains("rep-sample-d13-r13"));
+    assert!(!report.contains("loss-protection-sample"));
 }
