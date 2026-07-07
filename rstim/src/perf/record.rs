@@ -73,6 +73,36 @@ pub struct PerfMeasurementRecord {
     pub shots: Option<usize>,
     pub wall_time_ns: u128,
     pub peak_memory_bytes: Option<u64>,
+    #[serde(default = "default_perf_record_status")]
+    pub status: PerfRecordStatus,
+    #[serde(default)]
+    pub failure_reason: Option<String>,
+    #[serde(default)]
+    pub stderr: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PerfRecordStatus {
+    Completed,
+    ToolFailed,
+    TimedOut,
+    MissingVariant,
+}
+
+impl PerfRecordStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PerfRecordStatus::Completed => "completed",
+            PerfRecordStatus::ToolFailed => "tool_failed",
+            PerfRecordStatus::TimedOut => "timed_out",
+            PerfRecordStatus::MissingVariant => "missing_variant",
+        }
+    }
+}
+
+fn default_perf_record_status() -> PerfRecordStatus {
+    PerfRecordStatus::Completed
 }
 
 impl PerfMeasurementRecord {

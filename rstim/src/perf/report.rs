@@ -68,6 +68,18 @@ fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
         case.present_variants.join("`, `")
     ));
     for variant in &case.variants {
+        if variant.status != "completed" {
+            out.push_str(&format!(
+                "- {} status: `{}`",
+                variant.tool_variant, variant.status
+            ));
+            if let Some(reason) = &variant.failure_reason {
+                out.push_str(&format!("; reason: `{}`", reason));
+            }
+            out.push('\n');
+        }
+    }
+    for variant in &case.variants {
         out.push_str(&format!(
             "- {} median wall time: `{}` ns over `{}` measured rounds\n",
             variant.tool_variant, variant.median_wall_time_ns, variant.sample_count

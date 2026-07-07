@@ -146,15 +146,21 @@ fn summarize_surfaces_metadata_mismatches_and_conflicting_case_metadata() {
 
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("workload mismatch: expected sample but saw detect")
+            && issue
+                .message
+                .contains("workload mismatch: expected sample but saw detect")
     }));
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("tier mismatch: expected gating but saw report_only")
+            && issue
+                .message
+                .contains("tier mismatch: expected gating but saw report_only")
     }));
     assert!(summary.issues.iter().any(|issue| {
         issue.case_label == "loss-protection-sample"
-            && issue.message.contains("conflicting record metadata within case")
+            && issue
+                .message
+                .contains("conflicting record metadata within case")
     }));
 }
 
@@ -165,7 +171,9 @@ fn summarize_rejects_variants_with_only_warmup_measurements() {
     ))
     .unwrap_err();
 
-    assert!(err.contains("missing measured records for case loss-protection-sample variant stim-cli"));
+    assert!(
+        err.contains("missing measured records for case loss-protection-sample variant stim-cli")
+    );
 }
 
 #[test]
@@ -180,6 +188,45 @@ fn summarize_reports_missing_comparison_lhs_variants() {
         issue.case_label == "rep-sample-d13-r13"
             && issue.message.contains("missing `rstim-compiled`")
     }));
+}
+
+#[test]
+fn summarize_reports_non_completed_comparison_variants_as_missing() {
+    let lhs_failed = summarize_jsonl_str(concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"compiled failed\",\"stderr\":\"compiled failed\\n\"}\n"
+    ))
+    .expect("lhs failed summary");
+    assert!(lhs_failed.issues.iter().any(|issue| {
+        issue.case_label == "rep-sample-d13-r13"
+            && issue.message.contains("missing `rstim-compiled`")
+    }));
+    assert!(lhs_failed
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .unwrap()
+        .comparisons
+        .is_empty());
+
+    let rhs_failed = summarize_jsonl_str(concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"interpreted failed\",\"stderr\":\"interpreted failed\\n\"}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":80,\"peak_memory_bytes\":2048,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    ))
+    .expect("rhs failed summary");
+    assert!(rhs_failed.issues.iter().any(|issue| {
+        issue.case_label == "rep-sample-d13-r13"
+            && issue.message.contains("missing `rstim-interpreted`")
+    }));
+    assert!(rhs_failed
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .unwrap()
+        .comparisons
+        .is_empty());
 }
 
 #[test]
@@ -213,6 +260,101 @@ fn report_renders_optional_newline_and_empty_sections() {
     assert!(report.contains("PASS\n\n"));
     assert!(report.contains("## Gating Cases\n\n_None._"));
     assert!(report.contains("## Report-Only Cases\n\n_None._"));
+}
+
+#[test]
+fn legacy_summary_json_defaults_variant_status_to_completed() {
+    let summary: rstim::perf::PerfSummary = serde_json::from_str(
+        r#"{
+            "cases": [
+                {
+                    "case_label": "loss-protection-sample",
+                    "workload": "sample",
+                    "tier": "gating",
+                    "requires_compiled": false,
+                    "requires_fallback": true,
+                    "expected_variants": ["stim-cli", "rstim-interpreted"],
+                    "present_variants": ["stim-cli"],
+                    "variants": [
+                        {
+                            "tool_variant": "stim-cli",
+                            "sample_count": 1,
+                            "median_wall_time_ns": 80,
+                            "median_peak_memory_bytes": null
+                        }
+                    ],
+                    "comparisons": []
+                }
+            ],
+            "issues": []
+        }"#,
+    )
+    .expect("legacy summary json");
+
+    let variant = &summary.cases[0].variants[0];
+    assert_eq!(variant.status, "completed");
+    assert!(variant.failure_reason.is_none());
+    assert!(variant.stderr.is_none());
+}
+
+#[test]
+fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
+    let raw = concat!(
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"stim failed: boom\",\"stderr\":\"boom\\n\"}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = rstim::perf::summarize_jsonl_str_with_options(
+        raw,
+        rstim::perf::PerfSummaryOptions {
+            case_label: Some("loss-protection-sample".to_string()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(summary.cases.len(), 1);
+    assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
+    assert!(!summary
+        .issues
+        .iter()
+        .any(|issue| issue.message.contains("missing benchmark case data")));
+
+    let stim = summary.cases[0]
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "stim-cli")
+        .unwrap();
+    assert_eq!(stim.status, "tool_failed");
+    assert_eq!(stim.sample_count, 0);
+    assert_eq!(stim.failure_reason.as_deref(), Some("stim failed: boom"));
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("stim-cli status: `tool_failed`"));
+    assert!(report.contains("stim failed: boom"));
+}
+
+#[test]
+fn selected_summary_ignores_unrelated_raw_issues() {
+    let raw = concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":999,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = rstim::perf::summarize_jsonl_str_with_options(
+        raw,
+        rstim::perf::PerfSummaryOptions {
+            case_label: Some("loss-protection-sample".to_string()),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(summary.cases.len(), 1);
+    assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
+    assert!(!summary
+        .issues
+        .iter()
+        .any(|issue| issue.case_label == "rep-sample-d13-r13"));
 }
 
 #[test]

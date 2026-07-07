@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    PerfCaseTier, PerfComparisonSummary, PerfSummary, PerfVariantSummary, benchmark_cases,
-    comparison_variant_labels, expected_variant_labels,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfCaseTier,
+    PerfComparisonSummary, PerfRecordStatus, PerfSummary, PerfVariantSummary,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -76,7 +76,9 @@ pub fn evaluate_summary(summary: &PerfSummary, config: PerfGateConfig) -> PerfGa
     let mut summary_cases = BTreeMap::new();
 
     for case in &summary.cases {
-        if summary_cases.insert(case.case_label.as_str(), case).is_some()
+        if summary_cases
+            .insert(case.case_label.as_str(), case)
+            .is_some()
             && gating_case_labels.contains(case.case_label.as_str())
         {
             contract_messages.push(format!(
@@ -102,10 +104,23 @@ pub fn evaluate_summary(summary: &PerfSummary, config: PerfGateConfig) -> PerfGa
             .collect::<BTreeMap<_, _>>();
 
         for expected_variant in expected_variant_labels(case_def) {
-            if !variant_lookup.contains_key(expected_variant) {
+            let Some(variant) = variant_lookup.get(expected_variant).copied() else {
                 contract_messages.push(format!(
                     "{} missing required variant {}",
                     case_def.label, expected_variant
+                ));
+                continue;
+            };
+
+            if variant.status != PerfRecordStatus::Completed.as_str() || variant.sample_count == 0 {
+                let reason = variant
+                    .failure_reason
+                    .as_deref()
+                    .map(|reason| format!(": {reason}"))
+                    .unwrap_or_default();
+                contract_messages.push(format!(
+                    "{} required variant {} did not complete: status {}{}",
+                    case_def.label, expected_variant, variant.status, reason
                 ));
             }
         }

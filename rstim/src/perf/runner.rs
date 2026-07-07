@@ -1,26 +1,44 @@
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 use crate::cli::generate_common_circuit_text;
 use crate::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
 use crate::parser::parse_lines;
-use crate::sampler::{SampleOptions, SamplingBackend, sample_batch_with_options};
+use crate::sampler::{sample_batch_with_options, SampleOptions, SamplingBackend};
 use crate::stats::summarize;
 
 use super::{
-    PerfBenchmarkCase, PerfMeasurementRecord, PerfVariant, PerfWorkload, benchmark_case_variants,
-    benchmark_cases, effective_repeat_count,
+    benchmark_case_variants, benchmark_cases, effective_repeat_count, expected_variant_labels,
+    PerfBenchmarkCase, PerfMeasurementRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PerfRunOptions {
     pub warmup_rounds: usize,
     pub measured_rounds: usize,
+}
+
+#[derive(Debug, Clone)]
+struct PerfVariantFailure {
+    status: PerfRecordStatus,
+    failure_reason: String,
+    stderr: Option<String>,
+}
+
+impl PerfVariantFailure {
+    fn tool_failed(reason: impl Into<String>, stderr: Option<String>) -> Self {
+        Self {
+            status: PerfRecordStatus::ToolFailed,
+            failure_reason: reason.into(),
+            stderr,
+        }
+    }
 }
 
 impl Default for PerfRunOptions {
@@ -97,8 +115,12 @@ fn current_peak_memory_bytes() -> Option<u64> {
     }
 }
 
-fn run_variant(case: PerfBenchmarkCase, text: &str, variant: PerfVariant) -> Result<u128, String> {
-    let instrs = parse_lines(text)?;
+fn run_variant(
+    case: PerfBenchmarkCase,
+    text: &str,
+    variant: PerfVariant,
+) -> Result<u128, PerfVariantFailure> {
+    let instrs = parse_lines(text).map_err(|e| PerfVariantFailure::tool_failed(e, None))?;
     let start = Instant::now();
 
     match case.workload {
@@ -118,7 +140,8 @@ fn run_variant(case: PerfBenchmarkCase, text: &str, variant: PerfVariant) -> Res
                     backend,
                     ..SampleOptions::default()
                 },
-            )?;
+            )
+            .map_err(|e| PerfVariantFailure::tool_failed(e, None))?;
         }
         PerfWorkload::AnalyzeErrors => {
             let backend = match variant {
@@ -133,14 +156,15 @@ fn run_variant(case: PerfBenchmarkCase, text: &str, variant: PerfVariant) -> Res
                     backend,
                     ..AnalyzeOptions::default()
                 },
-            )?;
+            )
+            .map_err(|e| PerfVariantFailure::tool_failed(e, None))?;
         }
     }
 
     Ok(start.elapsed().as_nanos())
 }
 
-fn run_stim_cli(case: PerfBenchmarkCase, text: &str) -> Result<u128, String> {
+fn run_stim_cli(case: PerfBenchmarkCase, text: &str) -> Result<u128, PerfVariantFailure> {
     let stim_cmd = std::env::var("RSTIM_TEST_STIM").unwrap_or_else(|_| "stim".to_string());
     let args = match case.workload {
         PerfWorkload::Sample => vec![
@@ -162,24 +186,34 @@ fn run_stim_cli(case: PerfBenchmarkCase, text: &str) -> Result<u128, String> {
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("failed to spawn stim: {e}"))?;
+        .map_err(|e| PerfVariantFailure::tool_failed(format!("failed to spawn stim: {e}"), None))?;
     child
         .stdin
         .take()
-        .ok_or_else(|| "missing stim stdin".to_string())?
+        .ok_or_else(|| PerfVariantFailure::tool_failed("missing stim stdin", None))?
         .write_all(text.as_bytes())
-        .map_err(|e| format!("failed to write stim stdin: {e}"))?;
+        .map_err(|e| {
+            PerfVariantFailure::tool_failed(format!("failed to write stim stdin: {e}"), None)
+        })?;
     let start = Instant::now();
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("failed to wait for stim: {e}"))?;
+    let output = child.wait_with_output().map_err(|e| {
+        PerfVariantFailure::tool_failed(format!("failed to wait for stim: {e}"), None)
+    })?;
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     if !output.status.success() {
-        return Err(format!(
-            "stim failed: {}",
-            String::from_utf8_lossy(&output.stderr)
+        return Err(PerfVariantFailure::tool_failed(
+            format!("stim failed: {stderr}"),
+            Some(stderr),
         ));
     }
     Ok(start.elapsed().as_nanos())
+}
+
+pub fn benchmark_case_by_label(case_label: &str) -> Result<PerfBenchmarkCase, String> {
+    benchmark_cases()
+        .into_iter()
+        .find(|case| case.label == case_label)
+        .ok_or_else(|| format!("unknown benchmark case: {case_label}"))
 }
 
 pub fn run_case_measurements(
@@ -198,7 +232,8 @@ pub fn run_case_measurements(
     for variant in variants {
         for measurement_index in 0..total_rounds {
             let warmup = measurement_index < options.warmup_rounds;
-            let wall_time_ns = run_variant(case, text, *variant)?;
+            let wall_time_ns =
+                run_variant(case, text, *variant).map_err(|failure| failure.failure_reason)?;
             records.push(PerfMeasurementRecord {
                 case_label: case.label.to_string(),
                 tool_variant: variant.label().to_string(),
@@ -215,6 +250,98 @@ pub fn run_case_measurements(
                 shots: case.shots,
                 wall_time_ns,
                 peak_memory_bytes: current_peak_memory_bytes(),
+                status: PerfRecordStatus::Completed,
+                failure_reason: None,
+                stderr: None,
+            });
+        }
+    }
+
+    Ok(records)
+}
+
+fn run_selected_case_measurements(
+    case: PerfBenchmarkCase,
+    text: &str,
+    variants: &[PerfVariant],
+    options: PerfRunOptions,
+) -> Result<Vec<PerfMeasurementRecord>, String> {
+    let options = options.validate()?;
+    let instrs = parse_lines(text)?;
+    let summary = summarize(&instrs);
+    let mut records = Vec::new();
+    let total_rounds = options.warmup_rounds + options.measured_rounds;
+    let repeat_count = effective_repeat_count(&instrs);
+
+    for variant in variants {
+        for measurement_index in 0..total_rounds {
+            let warmup = measurement_index < options.warmup_rounds;
+            let result = run_variant(case, text, *variant);
+            let (wall_time_ns, status, failure_reason, stderr) = match result {
+                Ok(wall_time_ns) => (wall_time_ns, PerfRecordStatus::Completed, None, None),
+                Err(failure) => (
+                    0,
+                    failure.status,
+                    Some(failure.failure_reason),
+                    failure.stderr,
+                ),
+            };
+            records.push(PerfMeasurementRecord {
+                case_label: case.label.to_string(),
+                tool_variant: variant.label().to_string(),
+                workload: case.workload.as_str().to_string(),
+                tier: case.tier.as_str().to_string(),
+                measurement_index,
+                warmup,
+                qubits: summary.num_qubits,
+                measurements: summary.num_measurements,
+                detectors: summary.num_detectors,
+                observables: summary.num_observables,
+                repeat_depth: summary.max_repeat_depth,
+                repeat_count,
+                shots: case.shots,
+                wall_time_ns,
+                peak_memory_bytes: current_peak_memory_bytes(),
+                status,
+                failure_reason,
+                stderr,
+            });
+        }
+    }
+
+    let available_variants = variants
+        .iter()
+        .map(|variant| variant.label())
+        .collect::<BTreeSet<_>>();
+    for expected_variant in expected_variant_labels(case) {
+        if available_variants.contains(expected_variant) {
+            continue;
+        }
+
+        for measurement_index in 0..total_rounds {
+            let warmup = measurement_index < options.warmup_rounds;
+            records.push(PerfMeasurementRecord {
+                case_label: case.label.to_string(),
+                tool_variant: expected_variant.to_string(),
+                workload: case.workload.as_str().to_string(),
+                tier: case.tier.as_str().to_string(),
+                measurement_index,
+                warmup,
+                qubits: summary.num_qubits,
+                measurements: summary.num_measurements,
+                detectors: summary.num_detectors,
+                observables: summary.num_observables,
+                repeat_depth: summary.max_repeat_depth,
+                repeat_count,
+                shots: case.shots,
+                wall_time_ns: 0,
+                peak_memory_bytes: current_peak_memory_bytes(),
+                status: PerfRecordStatus::MissingVariant,
+                failure_reason: Some(format!(
+                    "variant {expected_variant} is not available for benchmark case {}",
+                    case.label
+                )),
+                stderr: None,
             });
         }
     }
@@ -246,6 +373,23 @@ pub fn run_benchmark_suite_to_writer(
         let instrs = parse_lines(&text)?;
         let variants = benchmark_case_variants(case, &instrs)?;
         write_case_measurements_to_writer(out, case, &text, &variants, options)?;
+    }
+    Ok(())
+}
+
+pub fn run_benchmark_case_to_writer(
+    out: &mut dyn Write,
+    case_label: &str,
+    options: PerfRunOptions,
+) -> Result<(), String> {
+    let case = benchmark_case_by_label(case_label)?;
+    let text = source_text(case.source)?;
+    let instrs = parse_lines(&text)?;
+    let variants = benchmark_case_variants(case, &instrs)?;
+    let records = run_selected_case_measurements(case, &text, &variants, options)?;
+    for record in records {
+        out.write_all(record.to_json_line().as_bytes())
+            .map_err(|e| format!("failed to write perf record: {e}"))?;
     }
     Ok(())
 }
@@ -355,10 +499,59 @@ mod tests {
                 (2, false),
             ]
         );
-        assert!(
-            records
-                .iter()
-                .all(|record| record.case_label == "inline-sample")
-        );
+        assert!(records
+            .iter()
+            .all(|record| record.case_label == "inline-sample"));
+    }
+
+    #[test]
+    fn selected_case_measurements_record_unavailable_expected_variants() {
+        let case = PerfBenchmarkCase {
+            label: "synthetic-selected-missing-compiled",
+            workload: PerfWorkload::Sample,
+            source: PerfCircuitSource::Inline { text: "M 0\n" },
+            shots: Some(1),
+            tier: PerfCaseTier::ReportOnly,
+            requires_compiled: true,
+            requires_fallback: false,
+            comparisons: &[],
+        };
+
+        let records = run_selected_case_measurements(
+            case,
+            "M 0\n",
+            &[PerfVariant::RstimInterpreted],
+            PerfRunOptions {
+                warmup_rounds: 0,
+                measured_rounds: 1,
+            },
+        )
+        .expect("selected records");
+
+        let missing = records
+            .iter()
+            .filter(|record| record.status == PerfRecordStatus::MissingVariant)
+            .collect::<Vec<_>>();
+        assert_eq!(missing.len(), 2);
+        assert!(missing.iter().any(|record| {
+            record.tool_variant == "stim-cli"
+                && record
+                    .failure_reason
+                    .as_deref()
+                    .unwrap()
+                    .contains("variant stim-cli is not available")
+        }));
+        assert!(missing.iter().any(|record| {
+            record.tool_variant == "rstim-compiled"
+                && record
+                    .failure_reason
+                    .as_deref()
+                    .unwrap()
+                    .contains("variant rstim-compiled is not available")
+        }));
+        assert!(records.iter().any(|record| {
+            record.tool_variant == "rstim-interpreted"
+                && record.status == PerfRecordStatus::Completed
+        }));
     }
 }

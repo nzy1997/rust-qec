@@ -3,7 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    PerfMeasurementRecord, benchmark_cases, comparison_variant_labels, expected_variant_labels,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfMeasurementRecord,
+    PerfRecordStatus,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -27,6 +28,14 @@ pub struct PerfVariantSummary {
     pub sample_count: usize,
     pub median_wall_time_ns: u128,
     pub median_peak_memory_bytes: Option<u64>,
+    #[serde(default = "default_perf_variant_summary_status")]
+    pub status: String,
+    pub failure_reason: Option<String>,
+    pub stderr: Option<String>,
+}
+
+fn default_perf_variant_summary_status() -> String {
+    PerfRecordStatus::Completed.as_str().to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -54,6 +63,11 @@ pub struct PerfCaseSummary {
 pub struct PerfSummary {
     pub cases: Vec<PerfCaseSummary>,
     pub issues: Vec<PerfSummaryIssue>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PerfSummaryOptions {
+    pub case_label: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +134,14 @@ fn push_metadata_issue(
 }
 
 pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
+    summarize_jsonl_str_with_options(raw, PerfSummaryOptions::default())
+}
+
+pub fn summarize_jsonl_str_with_options(
+    raw: &str,
+    options: PerfSummaryOptions,
+) -> Result<PerfSummary, String> {
+    let selected_label = options.case_label.as_deref();
     let case_defs = benchmark_cases()
         .into_iter()
         .map(|case| (case.label.to_string(), case))
@@ -133,6 +155,11 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
 
     for line in raw.lines().filter(|line| !line.trim().is_empty()) {
         let record = PerfMeasurementRecord::from_json_line(line)?;
+        if let Some(label) = selected_label {
+            if record.case_label != label {
+                continue;
+            }
+        }
         let Some(case_def) = case_defs.get(&record.case_label) else {
             return Err(format!(
                 "unknown benchmark case label in raw jsonl: {}",
@@ -153,10 +180,7 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
                 &record.case_label,
                 format!(
                     "duplicate measurement slot for case={} variant={} index={} warmup={}",
-                    record.case_label,
-                    record.tool_variant,
-                    record.measurement_index,
-                    record.warmup
+                    record.case_label, record.tool_variant, record.measurement_index, record.warmup
                 ),
             );
             continue;
@@ -206,8 +230,19 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
             .push(record);
     }
 
+    let cases_to_summarize = match selected_label {
+        Some(label) => {
+            let case = case_defs
+                .get(label)
+                .copied()
+                .ok_or_else(|| format!("unknown benchmark case: {label}"))?;
+            vec![case]
+        }
+        None => benchmark_cases(),
+    };
+
     let mut cases = Vec::new();
-    for case in benchmark_cases() {
+    for case in cases_to_summarize {
         let Some(variant_records) = grouped.remove(case.label) else {
             push_issue(
                 &mut issues,
@@ -226,32 +261,50 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
         for (tool_variant, records) in variant_records {
             let measured = records
                 .iter()
-                .filter(|record| !record.warmup)
+                .filter(|record| !record.warmup && record.status == PerfRecordStatus::Completed)
                 .collect::<Vec<_>>();
-            if measured.is_empty() {
-                return Err(format!(
-                    "missing measured records for case {} variant {}",
-                    case.label, tool_variant
-                ));
-            }
-
-            let median_wall_time_ns =
-                median_u128(measured.iter().map(|record| record.wall_time_ns).collect());
-            let memory_samples = measured
-                .iter()
-                .filter_map(|record| record.peak_memory_bytes)
-                .collect::<Vec<_>>();
-            let median_peak_memory_bytes = if memory_samples.is_empty() {
-                None
+            let summary = if measured.is_empty() {
+                if let Some(failed) = records
+                    .iter()
+                    .find(|record| !record.warmup && record.status != PerfRecordStatus::Completed)
+                {
+                    PerfVariantSummary {
+                        tool_variant: tool_variant.clone(),
+                        sample_count: 0,
+                        median_wall_time_ns: 0,
+                        median_peak_memory_bytes: None,
+                        status: failed.status.as_str().to_string(),
+                        failure_reason: failed.failure_reason.clone(),
+                        stderr: failed.stderr.clone(),
+                    }
+                } else {
+                    return Err(format!(
+                        "missing measured records for case {} variant {}",
+                        case.label, tool_variant
+                    ));
+                }
             } else {
-                Some(median_u64(memory_samples))
-            };
+                let median_wall_time_ns =
+                    median_u128(measured.iter().map(|record| record.wall_time_ns).collect());
+                let memory_samples = measured
+                    .iter()
+                    .filter_map(|record| record.peak_memory_bytes)
+                    .collect::<Vec<_>>();
+                let median_peak_memory_bytes = if memory_samples.is_empty() {
+                    None
+                } else {
+                    Some(median_u64(memory_samples))
+                };
 
-            let summary = PerfVariantSummary {
-                tool_variant: tool_variant.clone(),
-                sample_count: measured.len(),
-                median_wall_time_ns,
-                median_peak_memory_bytes,
+                PerfVariantSummary {
+                    tool_variant: tool_variant.clone(),
+                    sample_count: measured.len(),
+                    median_wall_time_ns,
+                    median_peak_memory_bytes,
+                    status: PerfRecordStatus::Completed.as_str().to_string(),
+                    failure_reason: None,
+                    stderr: None,
+                }
             };
             variant_lookup.insert(tool_variant, summary.clone());
             variants.push(summary);
@@ -291,6 +344,36 @@ pub fn summarize_jsonl_str(raw: &str) -> Result<PerfSummary, String> {
                 );
                 continue;
             };
+            if lhs.status != PerfRecordStatus::Completed.as_str() || lhs.sample_count == 0 {
+                push_issue(
+                    &mut issues,
+                    PerfSummaryIssueKind::MissingComparisonVariants,
+                    case.label,
+                    format!(
+                        "missing comparison variants for {}: expected `{}` and `{}`, missing `{}`",
+                        kind.as_str(),
+                        lhs_variant,
+                        rhs_variant,
+                        lhs_variant
+                    ),
+                );
+                continue;
+            }
+            if rhs.status != PerfRecordStatus::Completed.as_str() || rhs.sample_count == 0 {
+                push_issue(
+                    &mut issues,
+                    PerfSummaryIssueKind::MissingComparisonVariants,
+                    case.label,
+                    format!(
+                        "missing comparison variants for {}: expected `{}` and `{}`, missing `{}`",
+                        kind.as_str(),
+                        lhs_variant,
+                        rhs_variant,
+                        rhs_variant
+                    ),
+                );
+                continue;
+            }
             let ratio = if rhs.median_wall_time_ns == 0 {
                 f64::INFINITY
             } else {
