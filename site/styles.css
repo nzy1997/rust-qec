@@ -404,6 +404,38 @@ main {
   color: var(--muted);
 }
 
+.provenance-card-list,
+.provenance-value-list,
+.provenance-hash-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.provenance-row,
+.provenance-value-list li,
+.provenance-hash-list li {
+  min-width: 0;
+}
+
+.provenance-row-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.provenance-muted {
+  color: var(--muted);
+}
+
+.provenance-hash,
+.provenance-hash-list code,
+.provenance-value-list code {
+  overflow-wrap: anywhere;
+}
+
 .result-link-list,
 .result-note-list {
   display: grid;

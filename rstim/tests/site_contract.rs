@@ -94,6 +94,22 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
 }
 
 #[test]
+fn checked_result_provenance_styles_wrap_long_values() {
+    let styles = read_repo_file("site/styles.css");
+
+    assert_contains_all(
+        &styles,
+        &[
+            ".provenance-hash",
+            ".provenance-hash-list code",
+            ".provenance-value-list code",
+            "overflow-wrap: anywhere",
+        ],
+        "checked result provenance wrapping styles",
+    );
+}
+
+#[test]
 fn readme_links_benchmarked_site() {
     let readme = read_repo_file("README.md");
     let showcase_index = read_repo_file("docs/showcases/README.md");

@@ -81,15 +81,15 @@ class SiteAppRenderingTest(unittest.TestCase):
               return elements.get("checked-benchmark-result-cards").innerHTML;
             }
 
-            function surfaceDecoderFull(manifestFixture) {
+            function evidenceItem(manifestFixture, itemId) {
               for (const family of manifestFixture.families) {
                 for (const item of family.evidence_items || []) {
-                  if (item.id === "surface-decoder-full") {
+                  if (item.id === itemId) {
                     return item;
                   }
                 }
               }
-              throw new Error("surface-decoder-full not found");
+              throw new Error(`${itemId} not found`);
             }
 
             function assertIncludes(html, expected) {
@@ -100,10 +100,19 @@ class SiteAppRenderingTest(unittest.TestCase):
 
             (async () => {
               const html = await renderCheckedCards(manifest);
-              const surfaceItem = surfaceDecoderFull(manifest);
+              const surfaceItem = evidenceItem(manifest, "surface-decoder-full");
               const artifactHashes = surfaceItem.provenance.artifact_hashes.value;
               const artifactPath = Object.keys(artifactHashes)[0];
               const sha256 = artifactHashes[artifactPath].sha256;
+              const bbItem = evidenceItem(manifest, "bb-circuit-full");
+              const bbArtifactHashes = bbItem.provenance.artifact_hashes.value;
+              const bbArtifactPath = Object.keys(bbArtifactHashes).find((path) =>
+                path.includes("reference_gap_report.md")
+              );
+              if (!bbArtifactPath) {
+                throw new Error("BB reference gap report hash not found");
+              }
+              const bbSha256 = bbArtifactHashes[bbArtifactPath].sha256;
               for (const expected of [
                 "<h4>Provenance</h4>",
                 "artifact_hashes",
@@ -114,12 +123,15 @@ class SiteAppRenderingTest(unittest.TestCase):
                 artifactPath,
                 sha256,
                 "make surface-decoder-compare-full",
+                bbArtifactPath,
+                bbSha256,
+                "make bb-circuit-bposd-compare-full",
               ]) {
                 assertIncludes(html, expected);
               }
 
               const mutatedManifest = JSON.parse(JSON.stringify(manifest));
-              surfaceDecoderFull(mutatedManifest).provenance.artifact_hashes = {
+              evidenceItem(mutatedManifest, "surface-decoder-full").provenance.artifact_hashes = {
                 status: "not_recorded",
                 reason: "hashes were not captured",
               };
