@@ -330,12 +330,6 @@
     return `<ul class="result-link-list source-links">${links}</ul>`;
   }
 
-  function provenanceFieldLabel(name) {
-    return String(name || "")
-      .replace(/_/g, " ")
-      .replace(/^./, (char) => char.toUpperCase());
-  }
-
   function renderCompactValue(value) {
     if (value === null || value === undefined) {
       return "";
@@ -359,6 +353,9 @@
   }
 
   function renderArtifactHashes(entry) {
+    if (entry && entry.status === "not_recorded") {
+      return `<p class="provenance-muted">${escapeHtml(entry.reason || "reason not recorded")}</p>`;
+    }
     if (!entry || entry.status !== "recorded" || !entry.value || typeof entry.value !== "object") {
       return renderCompactValue(entry && entry.value);
     }
