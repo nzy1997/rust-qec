@@ -104,7 +104,13 @@ fn js_function_body<'a>(source: &'a str, function_name: &str, next_function_mark
         .unwrap_or_else(|| panic!("function {function_name} is missing an opening brace"));
     let body_end = source[body_start..]
         .find(next_function_marker)
-        .map(|offset| body_start + offset)
+        .map(|offset| {
+            let next_function_start = body_start + offset;
+            source[body_start..next_function_start]
+                .rfind("\n  }\n\n")
+                .map(|close_offset| body_start + close_offset)
+                .unwrap_or(next_function_start)
+        })
         .unwrap_or_else(|| {
             panic!("function {function_name} is missing marker {next_function_marker:?} after its body")
         });
