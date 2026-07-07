@@ -7,6 +7,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from benchmarks.rstim_vs_stim_simulator.validate_cases import validate_manifest
+
 
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_DIR = ROOT / "benchmarks" / "rstim_vs_stim_simulator"
@@ -81,6 +83,18 @@ class ValidateCasesTest(unittest.TestCase):
             result.stderr,
         )
         self.assertNotIn("canonical_input_path", result.stderr)
+
+    def test_validate_manifest_accepts_manifest_base_dir_contract(self) -> None:
+        errors = validate_manifest(load_manifest(FIXTURES / "bad_uniform_noise.toml"), FIXTURES)
+
+        self.assertIn(
+            "before_round_data_depolarization must be 0 for stim_surface_d11_r100",
+            errors,
+        )
+        self.assertFalse(
+            any("canonical_input_path" in error for error in errors),
+            errors,
+        )
 
     def test_nested_manifest_falls_back_to_benchmark_root_fixture_path(self) -> None:
         manifest_text = """\
