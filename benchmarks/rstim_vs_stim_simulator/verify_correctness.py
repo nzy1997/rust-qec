@@ -103,7 +103,15 @@ def _failure_result(
     failure_reasons: list[str],
     stim_runs: list[dict[str, object]],
     rstim_runs: list[dict[str, object]],
+    stim_samples: list[list[int]],
+    rstim_samples: list[list[int]],
 ) -> dict[str, object]:
+    comparison = compare_sample_sets(
+        stim_samples,
+        rstim_samples,
+        columns=selected_columns,
+        pairs=selected_pairs,
+    )
     return {
         "case_id": case["case_id"],
         "tier": case["tier"],
@@ -113,10 +121,14 @@ def _failure_result(
         "expected_bits": expected_bits,
         "shots_per_seed": shots,
         "seeds": list(seeds),
-        "sample_count": 0,
+        "sample_count": comparison["sample_count"],
         "selected_columns": selected_columns,
         "selected_pairs": [list(pair) for pair in selected_pairs],
+        "max_delta": comparison["max_delta"],
+        "max_tolerance": comparison["max_tolerance"],
         "failure_reasons": failure_reasons,
+        "marginals": comparison["marginals"],
+        "pairs": comparison["pairs"],
         "stim_runs": stim_runs,
         "rstim_runs": rstim_runs,
     }
@@ -173,6 +185,8 @@ def verify_case(
     rstim_runs: list[dict[str, object]] = []
     stim_samples: list[list[int]] = []
     rstim_samples: list[list[int]] = []
+    stim_failure_reasons: list[str] = []
+    rstim_failure_reasons: list[str] = []
 
     for seed in seeds:
         stim_run = run_tool(
@@ -187,20 +201,8 @@ def verify_case(
         )
         stim_runs.append(stim_run)
         if not bool(stim_run["success"]):
-            return _failure_result(
-                case=case,
-                status=STATUS_STIM_FAILED,
-                mode=mode,
-                input_path=input_path,
-                expected_bits=expected_bits,
-                shots=shots,
-                seeds=seeds,
-                selected_columns=selected_columns,
-                selected_pairs=selected_pairs,
-                failure_reasons=[f"seed {seed}: {stim_run['stderr'] or 'stim failed'}"],
-                stim_runs=stim_runs,
-                rstim_runs=rstim_runs,
-            )
+            stim_failure_reasons.append(f"seed {seed}: {stim_run['stderr'] or 'stim failed'}")
+            continue
         try:
             stim_seed_samples = parse_01_samples(
                 str(stim_run["stdout"]),
@@ -208,20 +210,8 @@ def verify_case(
                 expected_shots=shots,
             )
         except ValueError as error:
-            return _failure_result(
-                case=case,
-                status=STATUS_STIM_FAILED,
-                mode=mode,
-                input_path=input_path,
-                expected_bits=expected_bits,
-                shots=shots,
-                seeds=seeds,
-                selected_columns=selected_columns,
-                selected_pairs=selected_pairs,
-                failure_reasons=[f"seed {seed}: failed to parse stim output: {error}"],
-                stim_runs=stim_runs,
-                rstim_runs=rstim_runs,
-            )
+            stim_failure_reasons.append(f"seed {seed}: failed to parse stim output: {error}")
+            continue
         stim_samples.extend(stim_seed_samples)
 
         rstim_run = run_tool(
@@ -236,20 +226,8 @@ def verify_case(
         )
         rstim_runs.append(rstim_run)
         if not bool(rstim_run["success"]):
-            return _failure_result(
-                case=case,
-                status=STATUS_RSTIM_FAILED,
-                mode=mode,
-                input_path=input_path,
-                expected_bits=expected_bits,
-                shots=shots,
-                seeds=seeds,
-                selected_columns=selected_columns,
-                selected_pairs=selected_pairs,
-                failure_reasons=[f"seed {seed}: {rstim_run['stderr'] or 'rstim failed'}"],
-                stim_runs=stim_runs,
-                rstim_runs=rstim_runs,
-            )
+            rstim_failure_reasons.append(f"seed {seed}: {rstim_run['stderr'] or 'rstim failed'}")
+            continue
         try:
             rstim_seed_samples = parse_01_samples(
                 str(rstim_run["stdout"]),
@@ -257,20 +235,8 @@ def verify_case(
                 expected_shots=shots,
             )
         except ValueError as error:
-            return _failure_result(
-                case=case,
-                status=STATUS_RSTIM_FAILED,
-                mode=mode,
-                input_path=input_path,
-                expected_bits=expected_bits,
-                shots=shots,
-                seeds=seeds,
-                selected_columns=selected_columns,
-                selected_pairs=selected_pairs,
-                failure_reasons=[f"seed {seed}: failed to parse rstim output: {error}"],
-                stim_runs=stim_runs,
-                rstim_runs=rstim_runs,
-            )
+            rstim_failure_reasons.append(f"seed {seed}: failed to parse rstim output: {error}")
+            continue
 
         if inject_rstim_bitflip_rate:
             rstim_seed_samples = inject_bitflip(
@@ -279,6 +245,42 @@ def verify_case(
                 seed=_deterministic_bitflip_seed(case_id, seed),
             )
         rstim_samples.extend(rstim_seed_samples)
+
+    if stim_failure_reasons:
+        return _failure_result(
+            case=case,
+            status=STATUS_STIM_FAILED,
+            mode=mode,
+            input_path=input_path,
+            expected_bits=expected_bits,
+            shots=shots,
+            seeds=seeds,
+            selected_columns=selected_columns,
+            selected_pairs=selected_pairs,
+            failure_reasons=stim_failure_reasons,
+            stim_runs=stim_runs,
+            rstim_runs=rstim_runs,
+            stim_samples=stim_samples,
+            rstim_samples=rstim_samples,
+        )
+
+    if rstim_failure_reasons:
+        return _failure_result(
+            case=case,
+            status=STATUS_RSTIM_FAILED,
+            mode=mode,
+            input_path=input_path,
+            expected_bits=expected_bits,
+            shots=shots,
+            seeds=seeds,
+            selected_columns=selected_columns,
+            selected_pairs=selected_pairs,
+            failure_reasons=rstim_failure_reasons,
+            stim_runs=stim_runs,
+            rstim_runs=rstim_runs,
+            stim_samples=stim_samples,
+            rstim_samples=rstim_samples,
+        )
 
     comparison = compare_sample_sets(
         stim_samples,
