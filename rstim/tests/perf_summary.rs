@@ -191,6 +191,45 @@ fn summarize_reports_missing_comparison_lhs_variants() {
 }
 
 #[test]
+fn summarize_reports_non_completed_comparison_variants_as_missing() {
+    let lhs_failed = summarize_jsonl_str(concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"compiled failed\",\"stderr\":\"compiled failed\\n\"}\n"
+    ))
+    .expect("lhs failed summary");
+    assert!(lhs_failed.issues.iter().any(|issue| {
+        issue.case_label == "rep-sample-d13-r13"
+            && issue.message.contains("missing `rstim-compiled`")
+    }));
+    assert!(lhs_failed
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .unwrap()
+        .comparisons
+        .is_empty());
+
+    let rhs_failed = summarize_jsonl_str(concat!(
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"interpreted failed\",\"stderr\":\"interpreted failed\\n\"}\n",
+        "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":80,\"peak_memory_bytes\":2048,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    ))
+    .expect("rhs failed summary");
+    assert!(rhs_failed.issues.iter().any(|issue| {
+        issue.case_label == "rep-sample-d13-r13"
+            && issue.message.contains("missing `rstim-interpreted`")
+    }));
+    assert!(rhs_failed
+        .cases
+        .iter()
+        .find(|case| case.case_label == "rep-sample-d13-r13")
+        .unwrap()
+        .comparisons
+        .is_empty());
+}
+
+#[test]
 fn summarize_uses_none_when_all_memory_samples_are_missing() {
     let summary = summarize_jsonl_str(concat!(
         "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":null}\n",

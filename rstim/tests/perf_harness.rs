@@ -1,10 +1,10 @@
-use rstim::codegen::{NoiseParams, repetition_code_memory, rotated_memory_x};
-use rstim::compiled::{CompiledPathDecision, choose_analyzer_path, compile_circuit};
+use rstim::codegen::{repetition_code_memory, rotated_memory_x, NoiseParams};
+use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
 use rstim::parser::parse_lines;
 use rstim::perf::{
+    benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
-    PerfRecord, PerfRecordStatus, PerfVariant, PerfWorkload, benchmark_case_variants,
-    benchmark_cases, benchmark_variants, effective_repeat_count,
+    PerfRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
 };
 use serde_json::Value;
 
@@ -164,6 +164,14 @@ fn perf_measurement_record_json_line_contains_status_and_failure_context() {
     assert_eq!(json["failure_reason"], "stim failed: boom");
     assert_eq!(json["stderr"], "boom\n");
     assert_eq!(parsed, record);
+}
+
+#[test]
+fn perf_record_status_labels_are_stable() {
+    assert_eq!(PerfRecordStatus::Completed.as_str(), "completed");
+    assert_eq!(PerfRecordStatus::ToolFailed.as_str(), "tool_failed");
+    assert_eq!(PerfRecordStatus::TimedOut.as_str(), "timed_out");
+    assert_eq!(PerfRecordStatus::MissingVariant.as_str(), "missing_variant");
 }
 
 #[test]

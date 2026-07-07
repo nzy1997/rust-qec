@@ -1606,6 +1606,17 @@ mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    fn write_fake_executable(path: &std::path::Path, body: &str) {
+        std::fs::write(path, body).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(path, perms).unwrap();
+        }
+    }
+
     #[test]
     fn run_export_json_sample_shot_without_seed_exports_annotations_in_process() {
         let mut out = Vec::new();
@@ -1730,6 +1741,113 @@ mod tests {
 
         assert!(infra_err.starts_with("InfrastructureFailure"));
         assert!(infra_err.contains("failed to copy test perf raw artifact"));
+    }
+
+    #[test]
+    fn run_dispatches_perf_run_case_and_suite_paths_in_process() {
+        let _guard = lock_cli_test_env();
+        let dir = tempfile::tempdir().unwrap();
+        let fake_stim = dir.path().join("fake-stim-fail");
+        let selected_out = dir.path().join("selected.jsonl");
+        let suite_out = dir.path().join("suite.jsonl");
+        let ci_raw_path = dir.path().join("ci-raw.jsonl");
+        write_fake_executable(
+            &fake_stim,
+            "#!/bin/sh\ncat >/dev/null\necho 'stim exploded' >&2\nexit 1\n",
+        );
+
+        unsafe {
+            std::env::set_var("RSTIM_TEST_STIM", &fake_stim);
+        }
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Run {
+                    out: Some(selected_out.display().to_string()),
+                    case: Some("loss-protection-sample".to_string()),
+                    warmup_rounds: 0,
+                    measure_rounds: 1,
+                },
+            }),
+        })
+        .unwrap();
+        let suite_err = run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Run {
+                    out: Some(suite_out.display().to_string()),
+                    case: None,
+                    warmup_rounds: 0,
+                    measure_rounds: 1,
+                },
+            }),
+        })
+        .unwrap_err();
+        let ci_err = write_perf_ci_raw_artifact(&ci_raw_path, 0, 1, None).unwrap_err();
+        unsafe {
+            std::env::remove_var("RSTIM_TEST_STIM");
+        }
+
+        let selected_raw = std::fs::read_to_string(selected_out).unwrap();
+        assert!(selected_raw.contains("\"case_label\":\"loss-protection-sample\""));
+        assert!(selected_raw.contains("\"status\":\"tool_failed\""));
+        assert!(suite_err.contains("stim failed: stim exploded"));
+        assert!(matches!(ci_err, PerfCiError::Infrastructure(_)));
+        let ci_message = match ci_err {
+            PerfCiError::Infrastructure(message) | PerfCiError::Gate(message) => message,
+        };
+        assert!(ci_message.contains("stim failed: stim exploded"));
+    }
+
+    #[test]
+    fn selected_perf_ci_override_reports_read_parse_and_write_errors() {
+        let _guard = lock_cli_test_env();
+        let dir = tempfile::tempdir().unwrap();
+        let missing_raw_path = dir.path().join("missing.jsonl");
+        let invalid_raw_path = dir.path().join("invalid.jsonl");
+        let valid_raw_path = dir.path().join("valid.jsonl");
+        let raw_path = dir.path().join("raw.jsonl");
+        let raw_dir_path = dir.path().join("raw-dir");
+        std::fs::write(&invalid_raw_path, "not json\n").unwrap();
+        std::fs::write(
+            &valid_raw_path,
+            "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128}\n",
+        )
+        .unwrap();
+        std::fs::create_dir(&raw_dir_path).unwrap();
+
+        let read_err = write_test_perf_ci_raw_override(
+            missing_raw_path.to_str().unwrap(),
+            &raw_path,
+            Some("loss-protection-sample"),
+        )
+        .unwrap_err();
+        let parse_err = write_test_perf_ci_raw_override(
+            invalid_raw_path.to_str().unwrap(),
+            &raw_path,
+            Some("loss-protection-sample"),
+        )
+        .unwrap_err();
+        let write_err = write_test_perf_ci_raw_override(
+            valid_raw_path.to_str().unwrap(),
+            &raw_dir_path,
+            Some("loss-protection-sample"),
+        )
+        .unwrap_err();
+
+        assert!(matches!(read_err, PerfCiError::Infrastructure(_)));
+        let read_message = match read_err {
+            PerfCiError::Infrastructure(message) | PerfCiError::Gate(message) => message,
+        };
+        assert!(read_message.contains("failed to read test perf raw artifact"));
+        assert!(matches!(parse_err, PerfCiError::Infrastructure(_)));
+        let parse_message = match parse_err {
+            PerfCiError::Infrastructure(message) | PerfCiError::Gate(message) => message,
+        };
+        assert!(parse_message.contains("failed to parse test perf raw artifact"));
+        assert!(matches!(write_err, PerfCiError::Infrastructure(_)));
+        let write_message = match write_err {
+            PerfCiError::Infrastructure(message) | PerfCiError::Gate(message) => message,
+        };
+        assert!(write_message.contains("failed to write filtered test perf raw artifact"));
     }
 
     #[test]

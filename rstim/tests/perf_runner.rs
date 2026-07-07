@@ -1,6 +1,9 @@
 use rstim::codegen::{repetition_code_memory, rotated_memory_x};
 use rstim::ir::circuit_to_string;
-use rstim::perf::{benchmark_cases, run_case_measurements, PerfRunOptions, PerfVariant};
+use rstim::perf::{
+    benchmark_cases, run_case_measurements, PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource,
+    PerfRunOptions, PerfVariant, PerfWorkload,
+};
 use serde_json::Value;
 use std::fs;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -203,6 +206,78 @@ fn runner_propagates_stim_failure_output() {
     }
 
     assert!(err.contains("stim failed: stim exploded"));
+}
+
+#[test]
+fn runner_propagates_analyzer_failures() {
+    let case = PerfBenchmarkCase {
+        label: "synthetic-analyzer-failure",
+        workload: PerfWorkload::AnalyzeErrors,
+        source: PerfCircuitSource::Inline { text: "M 0\n" },
+        shots: None,
+        tier: PerfCaseTier::ReportOnly,
+        requires_compiled: false,
+        requires_fallback: false,
+        comparisons: &[],
+    };
+
+    let err = run_case_measurements(
+        case,
+        "LOSS(0.1) 0\nM 0\nDETECTOR rec[-1]\n",
+        &[PerfVariant::RstimAnalyzerFlattened],
+        PerfRunOptions {
+            warmup_rounds: 0,
+            measured_rounds: 1,
+        },
+    )
+    .unwrap_err();
+
+    assert!(err.contains("LOSS"));
+}
+
+#[test]
+fn runner_reports_stim_stdin_write_failures() {
+    let _guard = lock_stim_env();
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim-close-stdin");
+    fs::write(&fake_stim, "#!/bin/sh\nexec 0<&-\nsleep 1\nexit 0\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&fake_stim).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&fake_stim, perms).unwrap();
+    }
+
+    unsafe {
+        std::env::set_var("RSTIM_TEST_STIM", &fake_stim);
+    }
+    let case = PerfBenchmarkCase {
+        label: "synthetic-sample-write-failure",
+        workload: PerfWorkload::Sample,
+        source: PerfCircuitSource::Inline { text: "M 0\n" },
+        shots: Some(1),
+        tier: PerfCaseTier::ReportOnly,
+        requires_compiled: false,
+        requires_fallback: false,
+        comparisons: &[],
+    };
+    let text = "M 0\n".repeat(200_000);
+    let err = run_case_measurements(
+        case,
+        &text,
+        &[PerfVariant::StimCli],
+        PerfRunOptions {
+            warmup_rounds: 0,
+            measured_rounds: 1,
+        },
+    )
+    .unwrap_err();
+    unsafe {
+        std::env::remove_var("RSTIM_TEST_STIM");
+    }
+
+    assert!(err.contains("failed to write stim stdin"));
 }
 
 #[test]
