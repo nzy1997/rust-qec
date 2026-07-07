@@ -202,13 +202,15 @@ fn summarize_reports_non_completed_comparison_variants_as_missing() {
         issue.case_label == "rep-sample-d13-r13"
             && issue.message.contains("missing `rstim-compiled`")
     }));
-    assert!(lhs_failed
-        .cases
-        .iter()
-        .find(|case| case.case_label == "rep-sample-d13-r13")
-        .unwrap()
-        .comparisons
-        .is_empty());
+    assert!(
+        lhs_failed
+            .cases
+            .iter()
+            .find(|case| case.case_label == "rep-sample-d13-r13")
+            .unwrap()
+            .comparisons
+            .is_empty()
+    );
 
     let rhs_failed = summarize_jsonl_str(concat!(
         "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
@@ -220,13 +222,15 @@ fn summarize_reports_non_completed_comparison_variants_as_missing() {
         issue.case_label == "rep-sample-d13-r13"
             && issue.message.contains("missing `rstim-interpreted`")
     }));
-    assert!(rhs_failed
-        .cases
-        .iter()
-        .find(|case| case.case_label == "rep-sample-d13-r13")
-        .unwrap()
-        .comparisons
-        .is_empty());
+    assert!(
+        rhs_failed
+            .cases
+            .iter()
+            .find(|case| case.case_label == "rep-sample-d13-r13")
+            .unwrap()
+            .comparisons
+            .is_empty()
+    );
 }
 
 #[test]
@@ -242,10 +246,11 @@ fn summarize_uses_none_when_all_memory_samples_are_missing() {
         .iter()
         .find(|case| case.case_label == "loss-protection-sample")
         .expect("loss protection case");
-    assert!(case
-        .variants
-        .iter()
-        .all(|variant| variant.median_peak_memory_bytes.is_none()));
+    assert!(
+        case.variants
+            .iter()
+            .all(|variant| variant.median_peak_memory_bytes.is_none())
+    );
 }
 
 #[test]
@@ -314,10 +319,12 @@ fn selected_summary_keeps_failed_variant_and_omits_unrelated_missing_cases() {
 
     assert_eq!(summary.cases.len(), 1);
     assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
-    assert!(!summary
-        .issues
-        .iter()
-        .any(|issue| issue.message.contains("missing benchmark case data")));
+    assert!(
+        !summary
+            .issues
+            .iter()
+            .any(|issue| issue.message.contains("missing benchmark case data"))
+    );
 
     let stim = summary.cases[0]
         .variants
@@ -351,10 +358,12 @@ fn selected_summary_ignores_unrelated_raw_issues() {
 
     assert_eq!(summary.cases.len(), 1);
     assert_eq!(summary.cases[0].case_label, "loss-protection-sample");
-    assert!(!summary
-        .issues
-        .iter()
-        .any(|issue| issue.case_label == "rep-sample-d13-r13"));
+    assert!(
+        !summary
+            .issues
+            .iter()
+            .any(|issue| issue.case_label == "rep-sample-d13-r13")
+    );
 }
 
 #[test]
@@ -376,4 +385,124 @@ fn legacy_perf_record_omits_tier_for_unknown_case() {
 
     let line = record.to_json_line();
     assert!(!line.contains("\"tier\""));
+}
+
+#[test]
+fn summarize_sample_fixture_reports_shot_rates_and_report_only_stim_ratio() {
+    let raw = include_str!("fixtures/perf/stim_style_sample_raw.jsonl");
+    let summary = summarize_jsonl_str(raw).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("public sample case");
+
+    let stim = case
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "stim-cli")
+        .expect("stim variant");
+    let compiled = case
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "rstim-compiled")
+        .expect("compiled variant");
+
+    assert_eq!(stim.median_shots_per_second, Some(512_000.0));
+    assert_eq!(compiled.median_shots_per_second, Some(256_000.0));
+
+    let comparison = case
+        .rstim_compiled_vs_stim_cli_ratio
+        .as_ref()
+        .expect("report-only stim comparison");
+    assert_eq!(comparison.kind, "rstim_compiled_vs_stim_cli");
+    assert_eq!(comparison.lhs_variant, "rstim-compiled");
+    assert_eq!(comparison.rhs_variant, "stim-cli");
+    assert_eq!(comparison.status, "completed");
+    assert_eq!(comparison.failure_reason, None);
+    assert_eq!(comparison.ratio, Some(2.0));
+
+    let summary_json = serde_json::to_value(&summary).unwrap();
+    let public_case = summary_json["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["case_label"] == "stim-style-surface-sample-d11-r100-b1024")
+        .unwrap();
+    assert!(public_case.to_string().contains("median_shots_per_second"));
+    assert!(
+        public_case
+            .to_string()
+            .contains("rstim_compiled_vs_stim_cli_ratio")
+    );
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("stim-style-surface-sample-d11-r100-b1024"));
+    assert!(report.contains("shots/s"));
+    assert!(report.contains("report-only Stim comparison"));
+    assert!(report.contains("2.000000"));
+}
+
+#[test]
+fn summarize_report_only_stim_comparison_surfaces_failed_variant_status() {
+    let raw = concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":0,\"peak_memory_bytes\":null,\"status\":\"tool_failed\",\"failure_reason\":\"stim failed: boom\",\"stderr\":\"boom\\n\"}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":4000000,\"peak_memory_bytes\":1500,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = summarize_jsonl_str(raw).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("public sample case");
+    let comparison = case
+        .rstim_compiled_vs_stim_cli_ratio
+        .as_ref()
+        .expect("report-only stim comparison");
+
+    assert_eq!(comparison.ratio, None);
+    assert_eq!(comparison.status, "tool_failed");
+    assert_eq!(
+        comparison.failure_reason.as_deref(),
+        Some("stim failed: boom")
+    );
+
+    let report = render_markdown_report(&summary, None);
+    assert!(report.contains("report-only Stim comparison unavailable"));
+    assert!(report.contains("tool_failed"));
+    assert!(report.contains("stim failed: boom"));
+}
+
+#[test]
+fn summarize_report_only_stim_comparison_surfaces_missing_variant_status() {
+    let raw = concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":2000000,\"peak_memory_bytes\":1000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":5000000,\"peak_memory_bytes\":2000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = summarize_jsonl_str(raw).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("public sample case");
+    let comparison = case
+        .rstim_compiled_vs_stim_cli_ratio
+        .as_ref()
+        .expect("report-only stim comparison");
+
+    assert_eq!(comparison.ratio, None);
+    assert_eq!(comparison.status, "missing_variant");
+    assert_eq!(
+        comparison.failure_reason.as_deref(),
+        Some("missing variant rstim-compiled")
+    );
+}
+
+#[test]
+fn summarize_rejects_zero_shot_sample_rate() {
+    let raw = include_str!("fixtures/perf/stim_style_sample_zero_shots_raw.jsonl");
+    let err = summarize_jsonl_str(raw).unwrap_err();
+    assert!(err.contains("shots must be positive for sample rate"));
 }

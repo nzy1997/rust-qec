@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfMeasurementRecord,
-    PerfRecordStatus,
+    PerfMeasurementRecord, PerfRecordStatus, PerfWorkload, benchmark_cases,
+    comparison_variant_labels, expected_variant_labels,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -22,11 +22,13 @@ pub struct PerfSummaryIssue {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PerfVariantSummary {
     pub tool_variant: String,
     pub sample_count: usize,
     pub median_wall_time_ns: u128,
+    #[serde(default)]
+    pub median_shots_per_second: Option<f64>,
     pub median_peak_memory_bytes: Option<u64>,
     #[serde(default = "default_perf_variant_summary_status")]
     pub status: String,
@@ -47,6 +49,16 @@ pub struct PerfComparisonSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PerfReportOnlyComparisonSummary {
+    pub kind: String,
+    pub lhs_variant: String,
+    pub rhs_variant: String,
+    pub ratio: Option<f64>,
+    pub status: String,
+    pub failure_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PerfCaseSummary {
     pub case_label: String,
     pub workload: String,
@@ -57,6 +69,8 @@ pub struct PerfCaseSummary {
     pub present_variants: Vec<String>,
     pub variants: Vec<PerfVariantSummary>,
     pub comparisons: Vec<PerfComparisonSummary>,
+    #[serde(default)]
+    pub rstim_compiled_vs_stim_cli_ratio: Option<PerfReportOnlyComparisonSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -91,6 +105,104 @@ fn median_u128(mut values: Vec<u128>) -> u128 {
 fn median_u64(mut values: Vec<u64>) -> u64 {
     values.sort_unstable();
     values[values.len() / 2]
+}
+
+fn sample_rate_for_variant(
+    case_label: &str,
+    tool_variant: &str,
+    measured: &[&PerfMeasurementRecord],
+    median_wall_time_ns: u128,
+) -> Result<Option<f64>, String> {
+    if measured.first().map(|record| record.workload.as_str())
+        != Some(PerfWorkload::Sample.as_str())
+    {
+        return Ok(None);
+    }
+    let shots = measured[0].shots.ok_or_else(|| {
+        format!(
+            "shots must be present for sample rate for case {case_label} variant {tool_variant}"
+        )
+    })?;
+    if shots == 0 {
+        return Err(format!(
+            "shots must be positive for sample rate for case {case_label} variant {tool_variant}"
+        ));
+    }
+    if median_wall_time_ns == 0 {
+        return Ok(Some(f64::INFINITY));
+    }
+    Ok(Some(
+        shots as f64 * 1_000_000_000.0 / median_wall_time_ns as f64,
+    ))
+}
+
+fn unavailable_stim_comparison(
+    lhs_variant: &str,
+    rhs_variant: &str,
+    status: &str,
+    failure_reason: Option<String>,
+) -> PerfReportOnlyComparisonSummary {
+    PerfReportOnlyComparisonSummary {
+        kind: "rstim_compiled_vs_stim_cli".to_string(),
+        lhs_variant: lhs_variant.to_string(),
+        rhs_variant: rhs_variant.to_string(),
+        ratio: None,
+        status: status.to_string(),
+        failure_reason,
+    }
+}
+
+fn report_only_stim_comparison(
+    case: super::PerfBenchmarkCase,
+    variant_lookup: &BTreeMap<String, PerfVariantSummary>,
+) -> Option<PerfReportOnlyComparisonSummary> {
+    if case.workload != PerfWorkload::Sample || !case.requires_compiled {
+        return None;
+    }
+
+    let lhs_variant = "rstim-compiled";
+    let rhs_variant = "stim-cli";
+    let Some(lhs) = variant_lookup.get(lhs_variant) else {
+        return Some(unavailable_stim_comparison(
+            lhs_variant,
+            rhs_variant,
+            PerfRecordStatus::MissingVariant.as_str(),
+            Some(format!("missing variant {lhs_variant}")),
+        ));
+    };
+    let Some(rhs) = variant_lookup.get(rhs_variant) else {
+        return Some(unavailable_stim_comparison(
+            lhs_variant,
+            rhs_variant,
+            PerfRecordStatus::MissingVariant.as_str(),
+            Some(format!("missing variant {rhs_variant}")),
+        ));
+    };
+
+    for variant in [lhs, rhs] {
+        if variant.status != PerfRecordStatus::Completed.as_str() || variant.sample_count == 0 {
+            return Some(unavailable_stim_comparison(
+                lhs_variant,
+                rhs_variant,
+                &variant.status,
+                variant.failure_reason.clone(),
+            ));
+        }
+    }
+
+    let ratio = if rhs.median_wall_time_ns == 0 {
+        f64::INFINITY
+    } else {
+        lhs.median_wall_time_ns as f64 / rhs.median_wall_time_ns as f64
+    };
+    Some(PerfReportOnlyComparisonSummary {
+        kind: "rstim_compiled_vs_stim_cli".to_string(),
+        lhs_variant: lhs_variant.to_string(),
+        rhs_variant: rhs_variant.to_string(),
+        ratio: Some(ratio),
+        status: PerfRecordStatus::Completed.as_str().to_string(),
+        failure_reason: None,
+    })
 }
 
 fn case_metadata(record: &PerfMeasurementRecord) -> CaseMetadata {
@@ -272,6 +384,7 @@ pub fn summarize_jsonl_str_with_options(
                         tool_variant: tool_variant.clone(),
                         sample_count: 0,
                         median_wall_time_ns: 0,
+                        median_shots_per_second: None,
                         median_peak_memory_bytes: None,
                         status: failed.status.as_str().to_string(),
                         failure_reason: failed.failure_reason.clone(),
@@ -295,11 +408,18 @@ pub fn summarize_jsonl_str_with_options(
                 } else {
                     Some(median_u64(memory_samples))
                 };
+                let median_shots_per_second = sample_rate_for_variant(
+                    case.label,
+                    &tool_variant,
+                    &measured,
+                    median_wall_time_ns,
+                )?;
 
                 PerfVariantSummary {
                     tool_variant: tool_variant.clone(),
                     sample_count: measured.len(),
                     median_wall_time_ns,
+                    median_shots_per_second,
                     median_peak_memory_bytes,
                     status: PerfRecordStatus::Completed.as_str().to_string(),
                     failure_reason: None,
@@ -386,6 +506,7 @@ pub fn summarize_jsonl_str_with_options(
                 ratio,
             });
         }
+        let rstim_compiled_vs_stim_cli_ratio = report_only_stim_comparison(case, &variant_lookup);
 
         cases.push(PerfCaseSummary {
             case_label: case.label.to_string(),
@@ -400,6 +521,7 @@ pub fn summarize_jsonl_str_with_options(
             present_variants,
             variants,
             comparisons,
+            rstim_compiled_vs_stim_cli_ratio,
         });
     }
 
