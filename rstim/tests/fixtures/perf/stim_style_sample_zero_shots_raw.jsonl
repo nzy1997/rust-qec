@@ -1,0 +1,1 @@
+{"case_label":"stim-style-surface-sample-d11-r100-b1024","tool_variant":"stim-cli","workload":"sample","tier":"report_only","measurement_index":0,"warmup":false,"qubits":1,"measurements":1,"detectors":0,"observables":0,"repeat_depth":1,"repeat_count":100,"shots":0,"wall_time_ns":2000000,"peak_memory_bytes":1000,"status":"completed","failure_reason":null,"stderr":null}

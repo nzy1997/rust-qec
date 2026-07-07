@@ -1,6 +1,6 @@
 use rstim::perf::{
-    evaluate_summary, summarize_jsonl_str, PerfComparisonSummary, PerfGateConfig, PerfGateStatus,
-    PerfRecordStatus, PerfSummary, PerfSummaryIssue, PerfSummaryIssueKind,
+    PerfComparisonSummary, PerfGateConfig, PerfGateStatus, PerfRecordStatus, PerfSummary,
+    PerfSummaryIssue, PerfSummaryIssueKind, evaluate_summary, summarize_jsonl_str,
 };
 
 const FULL_RAW_JSONL: &str = concat!(
@@ -190,6 +190,7 @@ fn gate_rejects_fallback_cases_that_report_compiled_analyzer_variant() {
         tool_variant: "rstim-compiled".to_string(),
         sample_count: 1,
         median_wall_time_ns: 10,
+        median_shots_per_second: None,
         median_peak_memory_bytes: None,
         status: PerfRecordStatus::Completed.as_str().to_string(),
         failure_reason: None,
