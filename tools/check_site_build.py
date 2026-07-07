@@ -225,7 +225,7 @@ def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCo
     return pass_("workspace overview", "required anchors and local built-site references are present")
 
 
-def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list[CheckResult], dict[str, object] | None]:
+def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list[CheckResult], dict[str, object] | None, list[str]]:
     results: list[CheckResult] = []
     manifest_path = site_root / "data/benchmark-site.json"
     try:
@@ -248,7 +248,7 @@ def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list
         results.append(fail("manifest and copied artifacts", "; ".join(combined)))
     else:
         results.append(pass_("manifest and copied artifacts", "manifest schema and copied checked artifacts validated"))
-    return results, manifest
+    return results, manifest, combined
 
 
 def check_benchmark_methodology(index_text: str) -> CheckResult:
@@ -281,6 +281,79 @@ def check_checked_artifacts(site_root: Path, index_text: str, app_text: str, man
         "checked benchmark artifacts",
         f"{len(checked)} checked artifacts copied: {', '.join(path for _, path in checked)}",
     )
+
+
+PROVENANCE_ERROR_MARKERS = (
+    "provenance",
+    "artifact_hashes",
+    "sha256",
+    "copied artifact",
+)
+
+
+def relevant_provenance_errors(errors: list[str]) -> list[str]:
+    return [error for error in errors if any(marker in error for marker in PROVENANCE_ERROR_MARKERS)]
+
+
+def plural(count: int, singular: str, plural_form: str | None = None) -> str:
+    if count == 1:
+        return f"{count} {singular}"
+    return f"{count} {plural_form or singular + 's'}"
+
+
+def summarize_provenance_item(item_id: str, item: dict[str, object], checked_paths: set[str]) -> str:
+    provenance = item.get("provenance")
+    if not isinstance(provenance, dict):
+        return f"{item_id} (provenance missing from built manifest)"
+
+    recorded_fields = 0
+    not_recorded_fields = 0
+    for field, value in provenance.items():
+        if field == "schema_version" or not isinstance(value, dict):
+            continue
+        if value.get("status") == "recorded":
+            recorded_fields += 1
+        elif value.get("status") == "not_recorded":
+            not_recorded_fields += 1
+
+    artifact_hash_count = 0
+    artifact_hashes = provenance.get("artifact_hashes")
+    if isinstance(artifact_hashes, dict) and isinstance(artifact_hashes.get("value"), dict):
+        artifact_hash_count = sum(
+            1
+            for path, entry in artifact_hashes["value"].items()
+            if path in checked_paths and isinstance(entry, dict) and isinstance(entry.get("sha256"), str)
+        )
+
+    return (
+        f"{item_id} ({plural(recorded_fields, 'recorded field')}, "
+        f"{plural(not_recorded_fields, 'not_recorded field')}, "
+        f"{plural(artifact_hash_count, 'checked artifact hash', 'checked artifact hashes')})"
+    )
+
+
+def check_checked_provenance(manifest: dict[str, object] | None, delegated_errors: list[str]) -> CheckResult:
+    if delegated_errors:
+        provenance_errors = relevant_provenance_errors(delegated_errors)
+        details = provenance_errors if provenance_errors else delegated_errors
+        return fail(
+            "checked benchmark provenance",
+            "provenance exposure could not be confirmed: " + "; ".join(details),
+        )
+    if manifest is None:
+        return fail("checked benchmark provenance", "manifest could not be loaded")
+
+    checked = check_site_manifest.iter_checked_artifacts(manifest)
+    if not checked:
+        return fail("checked benchmark provenance", "no checked evidence items are listed in the manifest")
+
+    by_item: dict[str, tuple[dict[str, object], set[str]]] = {}
+    for item, item_id, artifact_path in checked:
+        _, paths = by_item.setdefault(item_id, (item, set()))
+        paths.add(artifact_path)
+
+    summaries = [summarize_provenance_item(item_id, item, paths) for item_id, (item, paths) in sorted(by_item.items())]
+    return pass_("checked benchmark provenance", "; ".join(summaries) + " exposed through manifest-backed renderer")
 
 
 def find_family(manifest: dict[str, object], family_id: str) -> dict[str, object] | None:
@@ -358,8 +431,9 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
     elif collector is not None and app_text is not None:
         results.append(check_workspace_overview(site_root, index_text, collector, app_text))
 
-    manifest_results, manifest = check_manifest_and_artifacts(site_root, repo_root)
+    manifest_results, manifest, manifest_site_errors = check_manifest_and_artifacts(site_root, repo_root)
     results.extend(manifest_results)
+    results.append(check_checked_provenance(manifest, manifest_site_errors + workspace_read_errors))
     if index_text is None:
         results.append(fail("benchmark methodology", "could not read built-site files: index.html"))
     else:
@@ -718,6 +792,20 @@ artifact.kind === "image";
     return SiteFixture(tempdir=tempdir, repo_root=repo_root, site_root=site_root)
 
 
+def remove_surface_provenance(manifest_path: Path) -> None:
+    manifest = check_site_manifest.load_json(manifest_path)
+    if isinstance(manifest, dict):
+        families = manifest.get("families")
+        if isinstance(families, list):
+            for family in families:
+                if isinstance(family, dict) and family.get("id") == "surface-decoder-comparison":
+                    items = family.get("evidence_items")
+                    if isinstance(items, list) and items and isinstance(items[0], dict):
+                        items[0].pop("provenance", None)
+                        break
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
 def run_self_test() -> list[str]:
     failures: list[str] = []
     fixture = make_fixture_site()
@@ -749,6 +837,19 @@ def run_self_test() -> list[str]:
                     encoding="utf-8",
                 ),
                 "not listed as a checked manifest artifact",
+            ),
+            (
+                "missing_surface_provenance",
+                lambda f: remove_surface_provenance(f.site_root / "data/benchmark-site.json"),
+                "surface-decoder-full",
+            ),
+            (
+                "corrupt_copied_checked_artifact",
+                lambda f: (f.site_root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text(
+                    "mutated copied artifact\n",
+                    encoding="utf-8",
+                ),
+                "benchmarks/surface_decoder_compare/results/full/results.csv",
             ),
             (
                 "html_escape_outside_site",
@@ -792,7 +893,25 @@ def run_self_test() -> list[str]:
                 mutate(mutated)
                 mutated_results = check_site_build(mutated.site_root, repo_root=mutated.repo_root)
                 summary = format_summary(mutated_results)
-                if not any(result.status == "FAIL" and marker in result.detail for result in mutated_results):
+                if name == "missing_surface_provenance":
+                    mutation_failed = any(
+                        result.status == "FAIL"
+                        and result.area == "checked benchmark provenance"
+                        and "surface-decoder-full" in result.detail
+                        and "provenance" in result.detail
+                        for result in mutated_results
+                    )
+                elif name == "corrupt_copied_checked_artifact":
+                    mutation_failed = any(
+                        result.status == "FAIL"
+                        and result.area == "checked benchmark provenance"
+                        and marker in result.detail
+                        and "sha256" in result.detail
+                        for result in mutated_results
+                    )
+                else:
+                    mutation_failed = any(result.status == "FAIL" and marker in result.detail for result in mutated_results)
+                if not mutation_failed:
                     failures.append(f"{name} did not fail as expected:\n{summary}")
             finally:
                 mutated.cleanup()

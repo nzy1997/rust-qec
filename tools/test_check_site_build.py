@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import unittest
+from unittest import mock
 
 import tools.check_site_build as check_site_build
 
@@ -9,6 +11,19 @@ import tools.check_site_build as check_site_build
 class SiteBuildCheckerTest(unittest.TestCase):
     def test_self_test_exercises_required_mutations(self) -> None:
         self.assertEqual(check_site_build.run_self_test(), [])
+
+    def test_self_test_requires_dedicated_provenance_failure(self) -> None:
+        with mock.patch.object(
+            check_site_build,
+            "check_checked_provenance",
+            return_value=check_site_build.pass_("checked benchmark provenance", "patched out"),
+        ):
+            failures = check_site_build.run_self_test()
+
+        self.assertTrue(
+            any("missing_surface_provenance" in failure for failure in failures),
+            failures,
+        )
 
     def test_valid_fixture_prints_required_pass_summary_areas(self) -> None:
         fixture = check_site_build.make_fixture_site()
@@ -23,10 +38,15 @@ class SiteBuildCheckerTest(unittest.TestCase):
             "PASS workspace overview",
             "PASS benchmark methodology",
             "PASS checked benchmark artifacts",
+            "PASS checked benchmark provenance",
             "PASS local-only/future classifications",
             "SUMMARY: PASS",
         ]:
             self.assertIn(marker, output)
+        self.assertIn("surface-decoder-full", output)
+        self.assertIn("bb-circuit-full", output)
+        self.assertIn("not_recorded", output)
+        self.assertIn("checked artifact hashes", output)
 
     def test_rejects_missing_qp101_schema(self) -> None:
         fixture = check_site_build.make_fixture_site()
@@ -51,6 +71,66 @@ class SiteBuildCheckerTest(unittest.TestCase):
             any("checked benchmark artifacts" in result.area and "surface_decoder_compare.png" in result.detail for result in results),
             check_site_build.format_summary(results),
         )
+
+    def test_rejects_checked_item_missing_built_manifest_provenance(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        manifest_path = fixture.site_root / "data/benchmark-site.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        del manifest["families"][0]["evidence_items"][0]["provenance"]
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark provenance"
+                and "surface-decoder-full" in result.detail
+                and "provenance" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_copied_checked_artifact_hash_mutation(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        artifact_path = "benchmarks/surface_decoder_compare/results/full/results.csv"
+        (fixture.site_root / artifact_path).write_text("mutated copied artifact\n", encoding="utf-8")
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark provenance"
+                and artifact_path in result.detail
+                and "sha256" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_invalid_app_js_blocks_provenance_pass(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        (fixture.site_root / "app.js").write_bytes(b"\xff\xfe\xfa")
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        summary = check_site_build.format_summary(results)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark provenance"
+                and "provenance" in result.detail
+                and "app.js" in result.detail
+                for result in results
+            ),
+            summary,
+        )
+        self.assertNotIn("PASS checked benchmark provenance", summary)
 
     def test_rejects_missing_claims_policy_caveat(self) -> None:
         fixture = check_site_build.make_fixture_site()
