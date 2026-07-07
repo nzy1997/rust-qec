@@ -76,7 +76,7 @@ def select_columns(bit_count: int, *, observable_count: int, limit: int = 16) ->
             if len(selected) >= limit:
                 break
 
-    return sorted(selected)[:limit]
+    return sorted(selected)
 
 
 def select_pairs(

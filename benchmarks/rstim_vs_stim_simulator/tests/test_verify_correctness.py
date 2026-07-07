@@ -22,6 +22,10 @@ class VerifyCorrectnessHelpersTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "expected 2 shots"):
             parse_01_samples("01\n", expected_bits=2, expected_shots=2)
 
+    def test_selectors_include_observable_tail_even_when_limited(self) -> None:
+        columns = select_columns(8, observable_count=2, limit=1)
+        self.assertEqual(columns, [0, 6, 7])
+
     def test_selectors_include_observable_tail_and_pairs(self) -> None:
         columns = select_columns(25, observable_count=2, limit=10)
         self.assertIn(0, columns)
