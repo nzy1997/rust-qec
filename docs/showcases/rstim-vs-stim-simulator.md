@@ -1,0 +1,171 @@
+# rstim-vs-Stim Simulator Evidence
+
+This showcase is the reviewer-facing map for the `rstim`-vs-Stim simulator
+evidence family. It explains the checked workload, the statistical correctness
+workflow, the selected-case speed workflow, and the limits on any claim made
+from those artifacts.
+
+## What This Shows
+
+The workload is the Stim-style surface-code sample case
+`stim-style-surface-sample-d11-r100-b1024`. Its canonical circuit input is the
+checked Stim-generated `.stim` fixture introduced by issue
+[#385](https://github.com/nzy1997/rstim/issues/385), not a circuit regenerated
+by `rstim`. The full fixture is
+[`benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim`](benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim).
+
+The evidence has two independent tracks:
+
+- statistical sample-correctness checks compare Stim and `rstim` observable
+  rates on shared checked circuit text;
+- speed evidence reruns only the selected simulator comparison case and then
+  summarizes raw records into reviewer-readable shots/s and report-only
+  `rstim`-vs-Stim ratios.
+
+The older umbrella issue
+[#38](https://github.com/nzy1997/rstim/issues/38) is historical context for the
+surface-code benchmark direction. This page narrows that umbrella to the
+recorded simulator workloads, commands, and environments below.
+
+## Run It
+
+Validate the smoke fixture catalog:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml
+```
+
+Run the smoke correctness verifier:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
+  --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml \
+  --shots 20000 \
+  --out /tmp/rstim-vs-stim-correctness.json
+```
+
+Run the selected speed case:
+
+```sh
+cargo run -p rstim --bin rstim -- perf run \
+  --case stim-style-surface-sample-d11-r100-b1024 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
+  --out /tmp/rstim-vs-stim-speed.jsonl
+```
+
+Summarize and render the speed evidence:
+
+```sh
+cargo run -p rstim --bin rstim -- perf summarize \
+  --in /tmp/rstim-vs-stim-speed.jsonl \
+  --out /tmp/rstim-vs-stim-summary.json
+cargo run -p rstim --bin rstim -- perf report \
+  --in /tmp/rstim-vs-stim-summary.json \
+  --out /tmp/rstim-vs-stim-report.md
+```
+
+## Expected Result
+
+The catalog validation command exits 0 and confirms that the smoke manifest
+matches the checked fixtures.
+
+The correctness verifier prints `PASS correctness smoke` for the current smoke
+suite and writes `/tmp/rstim-vs-stim-correctness.json`. That JSON records each
+case, selected rates and pair correlations, tolerances, sample counts, tool
+status, stderr, and failure reasons. A future `WARN` or `FAIL` result should be
+read as correctness evidence for that run, not hidden as a documentation
+failure.
+
+The selected speed run writes `/tmp/rstim-vs-stim-speed.jsonl` with records for
+only `stim-style-surface-sample-d11-r100-b1024`. Available variants include
+`stim-cli`, `rstim-interpreted`, and `rstim-compiled`; failed or unavailable
+variants are represented with explicit statuses such as `tool_failed`,
+`timed_out`, or `missing_variant`.
+
+The summary JSON reports `median_shots_per_second` for completed sample
+variants. The Markdown report contains the selected case label, `shots/s`, and
+the phrase `report-only Stim comparison`. If `rstim` is slower than Stim, Stim
+is unavailable, or a result is incomplete, that is still evidence when the
+status and environment are recorded plainly.
+
+## Code
+
+Fixture catalog and canonical circuit input:
+
+- [`benchmarks/rstim_vs_stim_simulator/README.md`](benchmarks/rstim_vs_stim_simulator/README.md)
+- [`benchmarks/rstim_vs_stim_simulator/cases.smoke.toml`](benchmarks/rstim_vs_stim_simulator/cases.smoke.toml)
+- [`benchmarks/rstim_vs_stim_simulator/cases.full.toml`](benchmarks/rstim_vs_stim_simulator/cases.full.toml)
+- [`benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim`](benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim)
+- [`benchmarks/rstim_vs_stim_simulator/validate_cases.py`](benchmarks/rstim_vs_stim_simulator/validate_cases.py)
+
+Correctness evidence:
+
+- [`benchmarks/rstim_vs_stim_simulator/verify_correctness.py`](benchmarks/rstim_vs_stim_simulator/verify_correctness.py)
+- [`benchmarks/rstim_vs_stim_simulator/tests/test_verify_correctness.py`](benchmarks/rstim_vs_stim_simulator/tests/test_verify_correctness.py)
+- [`rstim/tests/sample_correctness_contract.rs`](rstim/tests/sample_correctness_contract.rs)
+
+Speed evidence:
+
+- [`rstim/src/perf/cases.rs`](rstim/src/perf/cases.rs)
+- [`rstim/src/perf/runner.rs`](rstim/src/perf/runner.rs)
+- [`rstim/src/perf/summary.rs`](rstim/src/perf/summary.rs)
+- [`rstim/tests/cli_perf.rs`](rstim/tests/cli_perf.rs)
+- [`rstim/tests/perf_summary.rs`](rstim/tests/perf_summary.rs)
+- [`rstim/tests/fixtures/perf/stim_style_sample_raw.jsonl`](rstim/tests/fixtures/perf/stim_style_sample_raw.jsonl)
+
+Issue context:
+
+- [`#38 Performance Benchmarks on Surface Codes`](https://github.com/nzy1997/rstim/issues/38)
+- [`#385 Add a shared rstim-vs-Stim simulator fixture catalog`](https://github.com/nzy1997/rstim/issues/385)
+- [`#386 Add a statistical sample-correctness verifier against Stim`](https://github.com/nzy1997/rstim/issues/386)
+- [`#390 Report shots/s and rstim-vs-Stim ratios for sample speed evidence`](https://github.com/nzy1997/rstim/issues/390)
+
+## Verification
+
+Run the showcase checker:
+
+```sh
+python3 tools/check_showcase_docs.py docs/showcases/rstim-vs-stim-simulator.md
+```
+
+Expected result: the command exits 0, and this page links to the speed command
+and correctness command.
+
+Negative controls for this page:
+
+- removing the `Limits` section must fail with `missing required section:
+  Limits`;
+- removing `python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness`
+  must fail with `missing rstim-vs-Stim correctness command link`;
+- removing `cargo run -p rstim --bin rstim -- perf run` must fail with
+  `missing rstim-vs-Stim speed command link`.
+
+Run the checker self-test for the negative-control fixtures:
+
+```sh
+python3 tools/check_showcase_docs.py --self-test
+```
+
+## Limits
+
+Evidence applies to recorded workloads and recorded environments only. A local
+run on another machine, toolchain, Stim installation, or thermal state can
+produce different timings and availability statuses.
+
+The smoke correctness command is a statistical wiring and evidence check. It
+does not prove all possible circuits, seeds, detector paths, or simulator
+features agree with Stim.
+
+The selected speed command is report-only `rstim`-vs-Stim context. It does not
+make broad `rstim` performance parity claims, and it does not turn a
+cross-machine Stim ratio into a CI gate. The same-run `rstim`
+compiled-vs-interpreted comparisons remain the gating candidate.
+
+The canonical fixture is checked Stim-generated circuit text. This page does
+not claim that an `rstim` generator reproduces Stim's generator output.
+
+Slow, bad, failed, or incomplete benchmark output is still valid evidence when
+the raw record, summary, report, and environment make that status visible. This
+documentation should publish that status plainly instead of blocking on
+optimization work.
