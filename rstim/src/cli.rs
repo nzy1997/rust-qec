@@ -1,24 +1,24 @@
 use std::io::{self, Read, Write};
 
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
-use crate::codegen::NoiseParams;
 use crate::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
+use crate::codegen::NoiseParams;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8,
+    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
+    write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
-use crate::sampler::{SampleOptions, sample_batch, sample_batch_with_options};
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -234,6 +234,8 @@ pub enum PerfCommands {
     Run {
         #[arg(long)]
         out: Option<String>,
+        #[arg(long = "case")]
+        case: Option<String>,
         #[arg(long, default_value_t = 1)]
         warmup_rounds: usize,
         #[arg(long, default_value_t = 5)]
@@ -266,6 +268,8 @@ pub enum PerfCommands {
     Ci {
         #[arg(long = "out-dir")]
         out_dir: String,
+        #[arg(long = "case")]
+        case: Option<String>,
         #[arg(long, default_value_t = 1)]
         warmup_rounds: usize,
         #[arg(long, default_value_t = 5)]
@@ -576,71 +580,82 @@ pub fn run(cli: Cli) -> Result<(), String> {
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
         }
-        Some(Commands::Perf { command }) => match command {
-            PerfCommands::Run {
-                out,
-                warmup_rounds,
-                measure_rounds,
-            } => {
-                let mut w = open_output(out.as_deref())?;
-                crate::perf::run_benchmark_suite_to_writer(
-                    &mut w,
-                    crate::perf::PerfRunOptions {
+        Some(Commands::Perf { command }) => {
+            match command {
+                PerfCommands::Run {
+                    out,
+                    case,
+                    warmup_rounds,
+                    measure_rounds,
+                } => {
+                    if let Some(case_label) = case.as_deref() {
+                        crate::perf::benchmark_case_by_label(case_label)?;
+                    }
+                    let mut w = open_output(out.as_deref())?;
+                    let options = crate::perf::PerfRunOptions {
                         warmup_rounds,
                         measured_rounds: measure_rounds,
-                    },
-                )
-            }
-            PerfCommands::Summarize { r#in, out } => {
-                let raw = read_input(r#in.as_deref())?;
-                let summary = crate::perf::summarize_jsonl_str(&raw)?;
-                let mut w = open_output(out.as_deref())?;
-                serde_json::to_writer_pretty(&mut *w, &summary)
-                    .map_err(|e| format!("failed to write perf summary: {e}"))?;
-                w.write_all(b"\n")
-                    .map_err(|e| format!("failed to write perf summary newline: {e}"))
-            }
-            PerfCommands::Gate {
-                r#in,
-                sampler_threshold,
-                analyzer_threshold,
-            } => {
-                let text = read_input(r#in.as_deref())?;
-                let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
-                    .map_err(|e| format!("failed to parse perf summary: {e}"))?;
-                let verdict = crate::perf::evaluate_summary(
-                    &summary,
-                    crate::perf::PerfGateConfig {
-                        sampler_ratio_threshold: sampler_threshold,
-                        analyzer_ratio_threshold: analyzer_threshold,
-                    },
-                );
-                if verdict.status == crate::perf::PerfGateStatus::Pass {
-                    Ok(())
-                } else {
-                    Err(verdict.summary_markdown())
+                    };
+                    if let Some(case_label) = case.as_deref() {
+                        crate::perf::run_benchmark_case_to_writer(&mut w, case_label, options)
+                    } else {
+                        crate::perf::run_benchmark_suite_to_writer(&mut w, options)
+                    }
                 }
-            }
-            PerfCommands::Report { r#in, out } => {
-                let text = read_input(r#in.as_deref())?;
-                let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
-                    .map_err(|e| format!("failed to parse perf summary: {e}"))?;
-                let report = crate::perf::render_markdown_report(&summary, None);
-                let mut w = open_output(out.as_deref())?;
-                w.write_all(report.as_bytes())
-                    .map_err(|e| format!("failed to write perf report: {e}"))
-            }
-            PerfCommands::Ci {
-                out_dir,
-                warmup_rounds,
-                measure_rounds,
-            } => run_perf_ci(&out_dir, warmup_rounds, measure_rounds).map_err(|e| match e {
-                PerfCiError::Infrastructure(message) => {
-                    format!("InfrastructureFailure\n- {message}")
+                PerfCommands::Summarize { r#in, out } => {
+                    let raw = read_input(r#in.as_deref())?;
+                    let summary = crate::perf::summarize_jsonl_str(&raw)?;
+                    let mut w = open_output(out.as_deref())?;
+                    serde_json::to_writer_pretty(&mut *w, &summary)
+                        .map_err(|e| format!("failed to write perf summary: {e}"))?;
+                    w.write_all(b"\n")
+                        .map_err(|e| format!("failed to write perf summary newline: {e}"))
                 }
-                PerfCiError::Gate(message) => message,
-            }),
-        },
+                PerfCommands::Gate {
+                    r#in,
+                    sampler_threshold,
+                    analyzer_threshold,
+                } => {
+                    let text = read_input(r#in.as_deref())?;
+                    let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
+                        .map_err(|e| format!("failed to parse perf summary: {e}"))?;
+                    let verdict = crate::perf::evaluate_summary(
+                        &summary,
+                        crate::perf::PerfGateConfig {
+                            sampler_ratio_threshold: sampler_threshold,
+                            analyzer_ratio_threshold: analyzer_threshold,
+                        },
+                    );
+                    if verdict.status == crate::perf::PerfGateStatus::Pass {
+                        Ok(())
+                    } else {
+                        Err(verdict.summary_markdown())
+                    }
+                }
+                PerfCommands::Report { r#in, out } => {
+                    let text = read_input(r#in.as_deref())?;
+                    let summary: crate::perf::PerfSummary = serde_json::from_str(&text)
+                        .map_err(|e| format!("failed to parse perf summary: {e}"))?;
+                    let report = crate::perf::render_markdown_report(&summary, None);
+                    let mut w = open_output(out.as_deref())?;
+                    w.write_all(report.as_bytes())
+                        .map_err(|e| format!("failed to write perf report: {e}"))
+                }
+                PerfCommands::Ci {
+                    out_dir,
+                    case,
+                    warmup_rounds,
+                    measure_rounds,
+                } => run_perf_ci(&out_dir, warmup_rounds, measure_rounds, case.as_deref()).map_err(
+                    |e| match e {
+                        PerfCiError::Infrastructure(message) => {
+                            format!("InfrastructureFailure\n- {message}")
+                        }
+                        PerfCiError::Gate(message) => message,
+                    },
+                ),
+            }
+        }
         None => {
             println!("rstim {}", crate::version());
             Ok(())
@@ -652,7 +667,11 @@ fn run_perf_ci(
     out_dir: &str,
     warmup_rounds: usize,
     measure_rounds: usize,
+    case_label: Option<&str>,
 ) -> Result<(), PerfCiError> {
+    if let Some(label) = case_label {
+        crate::perf::benchmark_case_by_label(label).map_err(PerfCiError::Infrastructure)?;
+    }
     std::fs::create_dir_all(out_dir).map_err(|e| {
         PerfCiError::Infrastructure(format!("failed to create perf out dir {out_dir}: {e}"))
     })?;
@@ -661,7 +680,7 @@ fn run_perf_ci(
     let summary_path = std::path::Path::new(out_dir).join("summary.json");
     let report_path = std::path::Path::new(out_dir).join("report.md");
 
-    write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds)?;
+    write_perf_ci_raw_artifact(&raw_path, warmup_rounds, measure_rounds, case_label)?;
 
     let raw_text = std::fs::read_to_string(&raw_path).map_err(|e| {
         PerfCiError::Infrastructure(format!(
@@ -674,6 +693,7 @@ fn run_perf_ci(
         &summary_path,
         &report_path,
         crate::perf::PerfGateConfig::default(),
+        case_label,
     )
 }
 
@@ -681,6 +701,7 @@ fn write_perf_ci_raw_artifact(
     raw_path: &std::path::Path,
     warmup_rounds: usize,
     measure_rounds: usize,
+    case_label: Option<&str>,
 ) -> Result<(), PerfCiError> {
     if let Ok(source_path) = std::env::var("RSTIM_TEST_PERF_CI_RAW") {
         std::fs::copy(&source_path, raw_path).map_err(|e| {
@@ -693,13 +714,15 @@ fn write_perf_ci_raw_artifact(
     }
 
     let mut raw = open_output(raw_path.to_str()).map_err(PerfCiError::Infrastructure)?;
-    crate::perf::run_benchmark_suite_to_writer(
-        &mut raw,
-        crate::perf::PerfRunOptions {
-            warmup_rounds,
-            measured_rounds: measure_rounds,
-        },
-    )
+    let options = crate::perf::PerfRunOptions {
+        warmup_rounds,
+        measured_rounds: measure_rounds,
+    };
+    if let Some(label) = case_label {
+        crate::perf::run_benchmark_case_to_writer(&mut raw, label, options)
+    } else {
+        crate::perf::run_benchmark_suite_to_writer(&mut raw, options)
+    }
     .map_err(PerfCiError::Infrastructure)
 }
 
@@ -708,9 +731,19 @@ fn finalize_perf_ci_artifacts(
     summary_path: &std::path::Path,
     report_path: &std::path::Path,
     config: crate::perf::PerfGateConfig,
+    case_label: Option<&str>,
 ) -> Result<(), PerfCiError> {
-    let summary =
-        crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?;
+    let summary = if let Some(label) = case_label {
+        crate::perf::summarize_jsonl_str_with_options(
+            raw_text,
+            crate::perf::PerfSummaryOptions {
+                case_label: Some(label.to_string()),
+            },
+        )
+        .map_err(PerfCiError::Infrastructure)?
+    } else {
+        crate::perf::summarize_jsonl_str(raw_text).map_err(PerfCiError::Infrastructure)?
+    };
     let verdict = crate::perf::evaluate_summary(&summary, config);
 
     std::fs::write(
@@ -726,7 +759,11 @@ fn finalize_perf_ci_artifacts(
         ))
     })?;
 
-    let report = crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()));
+    let report = if case_label.is_some() {
+        crate::perf::render_markdown_report(&summary, None)
+    } else {
+        crate::perf::render_markdown_report(&summary, Some(&verdict.summary_markdown()))
+    };
     std::fs::write(report_path, report).map_err(|e| {
         PerfCiError::Infrastructure(format!(
             "failed to write perf report {}: {e}",
@@ -734,7 +771,7 @@ fn finalize_perf_ci_artifacts(
         ))
     })?;
 
-    if verdict.status == crate::perf::PerfGateStatus::Pass {
+    if case_label.is_some() || verdict.status == crate::perf::PerfGateStatus::Pass {
         Ok(())
     } else {
         Err(PerfCiError::Gate(verdict.summary_markdown()))
@@ -1620,6 +1657,7 @@ mod tests {
             command: Some(Commands::Perf {
                 command: PerfCommands::Ci {
                     out_dir: gate_out_dir.display().to_string(),
+                    case: None,
                     warmup_rounds: 1,
                     measure_rounds: 5,
                 },
@@ -1632,11 +1670,9 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(
-            std::fs::read_to_string(gate_out_dir.join("summary.json"))
-                .unwrap()
-                .contains("\"cases\"")
-        );
+        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
+            .unwrap()
+            .contains("\"cases\""));
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -1645,6 +1681,7 @@ mod tests {
             command: Some(Commands::Perf {
                 command: PerfCommands::Ci {
                     out_dir: infra_out_dir.display().to_string(),
+                    case: None,
                     warmup_rounds: 1,
                     measure_rounds: 5,
                 },
@@ -1686,6 +1723,7 @@ mod tests {
                 sampler_ratio_threshold: 1.10,
                 analyzer_ratio_threshold: 1.10,
             },
+            None,
         )
         .unwrap_err();
 
@@ -1720,6 +1758,7 @@ mod tests {
             &summary_path,
             &report_path,
             crate::perf::PerfGateConfig::default(),
+            None,
         )
         .unwrap_or_else(|_| panic!("passing perf ci artifacts"));
 
@@ -1740,11 +1779,9 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(
-                generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                    .unwrap()
-                    .contains("QUBIT_COORDS")
-            );
+            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                .unwrap()
+                .contains("QUBIT_COORDS"));
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)

@@ -6,6 +6,17 @@ fn rstim_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
+fn write_fake_stim(path: &std::path::Path, body: &str) {
+    std::fs::write(path, body).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(path, perms).unwrap();
+    }
+}
+
 const RAW_JSONL: &str = concat!(
     "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":130,\"peak_memory_bytes\":1024}\n",
     "{\"case_label\":\"rep-sample-d13-r13\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":25,\"measurements\":48,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":13,\"shots\":20000,\"wall_time_ns\":100,\"peak_memory_bytes\":4096}\n",
@@ -166,4 +177,117 @@ fn perf_ci_returns_infrastructure_failure_when_override_raw_path_is_missing() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("InfrastructureFailure"));
     assert!(stderr.contains("failed to copy test perf raw artifact"));
+}
+
+#[test]
+fn perf_run_unknown_case_fails_before_creating_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("unused.jsonl");
+
+    let output = rstim_cmd()
+        .args([
+            "perf",
+            "run",
+            "--case",
+            "no-such-case",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown benchmark case"));
+    assert!(!out.exists());
+}
+
+#[test]
+fn perf_run_case_records_tool_failure_without_aborting() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim-fail");
+    let out = dir.path().join("raw.jsonl");
+    write_fake_stim(
+        &fake_stim,
+        "#!/bin/sh\ncat >/dev/null\necho 'stim exploded' >&2\nexit 1\n",
+    );
+
+    let output = rstim_cmd()
+        .env("RSTIM_TEST_STIM", &fake_stim)
+        .args([
+            "perf",
+            "run",
+            "--case",
+            "loss-protection-sample",
+            "--warmup-rounds",
+            "0",
+            "--measure-rounds",
+            "1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let raw = std::fs::read_to_string(out).unwrap();
+    assert!(raw.contains("\"tool_variant\":\"stim-cli\""));
+    assert!(raw.contains("\"status\":\"tool_failed\""));
+    assert!(raw.contains("stim failed: stim exploded"));
+    assert!(raw.contains("\"tool_variant\":\"rstim-interpreted\""));
+    assert!(raw.contains("\"status\":\"completed\""));
+    assert!(raw
+        .lines()
+        .all(|line| line.contains("\"case_label\":\"loss-protection-sample\"")));
+}
+
+#[test]
+fn perf_ci_case_writes_only_selected_artifacts_without_gate_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake_stim = dir.path().join("fake-stim-fail");
+    let out_dir = dir.path().join("focused-ci");
+    write_fake_stim(
+        &fake_stim,
+        "#!/bin/sh\ncat >/dev/null\necho 'stim exploded' >&2\nexit 1\n",
+    );
+
+    let output = rstim_cmd()
+        .env("RSTIM_TEST_STIM", &fake_stim)
+        .args([
+            "perf",
+            "ci",
+            "--case",
+            "loss-protection-sample",
+            "--warmup-rounds",
+            "0",
+            "--measure-rounds",
+            "1",
+            "--out-dir",
+            out_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let raw = std::fs::read_to_string(out_dir.join("raw.jsonl")).unwrap();
+    let summary = std::fs::read_to_string(out_dir.join("summary.json")).unwrap();
+    let report = std::fs::read_to_string(out_dir.join("report.md")).unwrap();
+
+    assert!(raw
+        .lines()
+        .all(|line| line.contains("\"case_label\":\"loss-protection-sample\"")));
+    assert!(summary.contains("\"case_label\": \"loss-protection-sample\""));
+    assert!(!summary.contains("rep-sample-d13-r13"));
+    assert!(report.contains("loss-protection-sample"));
+    assert!(!report.contains("rep-sample-d13-r13"));
+    assert!(report.contains("tool_failed"));
 }
