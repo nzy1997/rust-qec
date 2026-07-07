@@ -501,6 +501,72 @@ fn summarize_report_only_stim_comparison_surfaces_missing_variant_status() {
 }
 
 #[test]
+fn summarize_report_only_stim_comparison_surfaces_missing_stim_cli_status() {
+    let raw = concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":4000000,\"peak_memory_bytes\":1500,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":5000000,\"peak_memory_bytes\":2000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = summarize_jsonl_str(raw).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("public sample case");
+    let comparison = case
+        .rstim_compiled_vs_stim_cli_ratio
+        .as_ref()
+        .expect("report-only stim comparison");
+
+    assert_eq!(comparison.ratio, None);
+    assert_eq!(comparison.status, "missing_variant");
+    assert_eq!(
+        comparison.failure_reason.as_deref(),
+        Some("missing variant stim-cli")
+    );
+}
+
+#[test]
+fn summarize_report_only_stim_comparison_handles_zero_duration_stim_cli() {
+    let raw = concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":0,\"peak_memory_bytes\":1000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":4000000,\"peak_memory_bytes\":1500,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+
+    let summary = summarize_jsonl_str(raw).expect("summary");
+    let case = summary
+        .cases
+        .iter()
+        .find(|case| case.case_label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("public sample case");
+    let stim = case
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "stim-cli")
+        .expect("stim variant");
+    let comparison = case
+        .rstim_compiled_vs_stim_cli_ratio
+        .as_ref()
+        .expect("report-only stim comparison");
+
+    assert_eq!(stim.median_shots_per_second, Some(f64::INFINITY));
+    assert_eq!(comparison.status, "completed");
+    assert_eq!(comparison.ratio, Some(f64::INFINITY));
+}
+
+#[test]
+fn summarize_rejects_missing_sample_shots_for_rate() {
+    let err = summarize_jsonl_str(concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":null,\"wall_time_ns\":2000000,\"peak_memory_bytes\":1000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    ))
+    .unwrap_err();
+
+    assert!(err.contains("shots must be present for sample rate"));
+    assert!(err.contains("stim-style-surface-sample-d11-r100-b1024"));
+    assert!(err.contains("stim-cli"));
+}
+
+#[test]
 fn summarize_rejects_zero_shot_sample_rate() {
     let raw = include_str!("fixtures/perf/stim_style_sample_zero_shots_raw.jsonl");
     let err = summarize_jsonl_str(raw).unwrap_err();
