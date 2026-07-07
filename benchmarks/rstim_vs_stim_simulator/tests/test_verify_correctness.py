@@ -162,7 +162,22 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
         )
         self.assertEqual(
             [run["command"][run["command"].index("--seed") + 1] for run in result["rstim_runs"]],
-            ["1", "3"],
+            ["1", "2", "3"],
+        )
+        expected_input_path = (
+            Path("benchmarks/rstim_vs_stim_simulator") / self.sample_case["canonical_input_path"]
+        ).resolve()
+        invoked_seed_pairs = [
+            (call.kwargs["input_path"], call.args[0][0], call.args[0][call.args[0].index("--seed") + 1])
+            for call in mocked.call_args_list
+        ]
+        self.assertIn(
+            (
+                expected_input_path,
+                "rstim",
+                "2",
+            ),
+            invoked_seed_pairs,
         )
         self.assertEqual(result["sample_count"], 4)
         self.assertIn("stim failed on seed 2", result["failure_reasons"][0])

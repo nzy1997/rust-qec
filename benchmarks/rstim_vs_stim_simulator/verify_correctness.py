@@ -189,6 +189,7 @@ def verify_case(
     rstim_failure_reasons: list[str] = []
 
     for seed in seeds:
+        stim_seed_samples: list[list[int]] | None = None
         stim_run = run_tool(
             build_sample_command(
                 list(stim_command),
@@ -202,18 +203,17 @@ def verify_case(
         stim_runs.append(stim_run)
         if not bool(stim_run["success"]):
             stim_failure_reasons.append(f"seed {seed}: {stim_run['stderr'] or 'stim failed'}")
-            continue
-        try:
-            stim_seed_samples = parse_01_samples(
-                str(stim_run["stdout"]),
-                expected_bits=expected_bits,
-                expected_shots=shots,
-            )
-        except ValueError as error:
-            stim_failure_reasons.append(f"seed {seed}: failed to parse stim output: {error}")
-            continue
-        stim_samples.extend(stim_seed_samples)
+        else:
+            try:
+                stim_seed_samples = parse_01_samples(
+                    str(stim_run["stdout"]),
+                    expected_bits=expected_bits,
+                    expected_shots=shots,
+                )
+            except ValueError as error:
+                stim_failure_reasons.append(f"seed {seed}: failed to parse stim output: {error}")
 
+        rstim_seed_samples: list[list[int]] | None = None
         rstim_run = run_tool(
             build_sample_command(
                 list(rstim_command),
@@ -227,24 +227,26 @@ def verify_case(
         rstim_runs.append(rstim_run)
         if not bool(rstim_run["success"]):
             rstim_failure_reasons.append(f"seed {seed}: {rstim_run['stderr'] or 'rstim failed'}")
-            continue
-        try:
-            rstim_seed_samples = parse_01_samples(
-                str(rstim_run["stdout"]),
-                expected_bits=expected_bits,
-                expected_shots=shots,
-            )
-        except ValueError as error:
-            rstim_failure_reasons.append(f"seed {seed}: failed to parse rstim output: {error}")
-            continue
+        else:
+            try:
+                rstim_seed_samples = parse_01_samples(
+                    str(rstim_run["stdout"]),
+                    expected_bits=expected_bits,
+                    expected_shots=shots,
+                )
+            except ValueError as error:
+                rstim_failure_reasons.append(f"seed {seed}: failed to parse rstim output: {error}")
 
-        if inject_rstim_bitflip_rate:
+        if rstim_seed_samples is not None and inject_rstim_bitflip_rate:
             rstim_seed_samples = inject_bitflip(
                 rstim_seed_samples,
                 rate=inject_rstim_bitflip_rate,
                 seed=_deterministic_bitflip_seed(case_id, seed),
             )
-        rstim_samples.extend(rstim_seed_samples)
+
+        if stim_seed_samples is not None and rstim_seed_samples is not None:
+            stim_samples.extend(stim_seed_samples)
+            rstim_samples.extend(rstim_seed_samples)
 
     if stim_failure_reasons:
         return _failure_result(
