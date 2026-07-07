@@ -408,6 +408,49 @@ def make_fixture_site() -> SiteFixture:
     write_text(repo_root / "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png", "png\n")
     write_text(repo_root / "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md", "# Gaps\n")
 
+    provenance_reason = "historical fixture predates canonical provenance capture"
+
+    def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, object]:
+        return {
+            "schema_version": 1,
+            "artifact_date": {"status": "not_recorded", "reason": provenance_reason},
+            "source_commit": {"status": "not_recorded", "reason": provenance_reason},
+            "commands": {"status": "recorded", "value": commands},
+            "os": {"status": "not_recorded", "reason": provenance_reason},
+            "cpu_model": {"status": "not_recorded", "reason": provenance_reason},
+            "rust_version": {"status": "not_recorded", "reason": provenance_reason},
+            "python_version": {"status": "not_recorded", "reason": provenance_reason},
+            "dependency_versions": {"status": "not_recorded", "reason": provenance_reason},
+            "external_repository_commits": {"status": "not_recorded", "reason": provenance_reason},
+            "seed_policy": {"status": "not_recorded", "reason": provenance_reason},
+            "build_profile": {"status": "not_recorded", "reason": provenance_reason},
+            "shots_or_error_budget": {"status": "not_recorded", "reason": provenance_reason},
+            "artifact_hashes": {"status": "recorded", "value": artifact_hashes},
+        }
+
+    surface_hashes = {
+        "benchmarks/surface_decoder_compare/results/full/results.csv": {
+            "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+        },
+        "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png": {
+            "sha256": "33d8344a7135c42aa3876706b908f95b702d83ff53e05e4aaff17c07bf67a98e"
+        },
+    }
+    bb_hashes = {
+        "benchmarks/bb_circuit_bposd_compare/results/full/results.csv": {
+            "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+        },
+        "benchmarks/bb_circuit_bposd_compare/results/full/summary.md": {
+            "sha256": "88501c2f5e6660af97d9cafe49c86afa7adff4dc92cbe9e27141b4ef45642ee8"
+        },
+        "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png": {
+            "sha256": "33d8344a7135c42aa3876706b908f95b702d83ff53e05e4aaff17c07bf67a98e"
+        },
+        "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md": {
+            "sha256": "f999c0097163daf1dbd5fc72414fa2f5ec0fd43a13ef088f4c7fd32372dc61d4"
+        },
+    }
+
     manifest = {
         "schema_version": 1,
         "families": [
@@ -436,6 +479,7 @@ def make_fixture_site() -> SiteFixture:
                             },
                         ],
                         "commands": ["make surface-decoder-compare-full"],
+                        "provenance": fixture_provenance(["make surface-decoder-compare-full"], surface_hashes),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim.",
@@ -477,6 +521,7 @@ def make_fixture_site() -> SiteFixture:
                             },
                         ],
                         "commands": ["make bb-circuit-bposd-compare-full"],
+                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"], bb_hashes),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim.",
@@ -630,8 +675,10 @@ def make_fixture_site() -> SiteFixture:
         """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full"];
 function renderBenchmarkManifest(manifest) { return manifest; }
 function renderCheckedBenchmarkResults(manifest) { return manifest; }
+function renderProvenance(provenance) { return provenance; }
 const manifestMarkers = ["family.status", "family.claims_limit", "item.status", "item.claims_limit"];
 const checkedMarkers = ["item.artifacts", "item.commands", "item.caveats", "artifact.checked"];
+const provenanceMarkers = ["item.provenance", "renderProvenance(item.provenance)", "artifact_hashes"];
 fetch("data/benchmark-site.json");
 const localRefs = [
   "qp101.schema.json",

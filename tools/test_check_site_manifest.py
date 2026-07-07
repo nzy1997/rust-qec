@@ -192,7 +192,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
             'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
             'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
             'family.status; family.claims_limit; item.status; item.claims_limit; '
-            'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
+            'item.artifacts; item.commands; item.caveats; item.provenance; renderProvenance; '
+            'renderProvenance(item.provenance); artifact.checked; artifact.kind === "image";\n',
             encoding="utf-8",
         )
         (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
@@ -583,7 +584,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
             'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
             'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
             'family.status; family.claims_limit; item.status; item.claims_limit; '
-            'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
+            'item.artifacts; item.commands; item.caveats; item.provenance; renderProvenance; '
+            'renderProvenance(item.provenance); artifact.checked; artifact.kind === "image";\n',
             encoding="utf-8",
         )
         errors = check_site_manifest.validate_manifest(repo, built_manifest_path)
@@ -599,6 +601,23 @@ class SiteManifestValidatorTest(unittest.TestCase):
         )
         errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
         self.assertTrue(any("checked result" in error for error in errors), errors)
+
+    def test_rejects_built_site_without_provenance_renderer_wiring(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        (repo / "_site/app.js").write_text(
+            'fetch("data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
+            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'family.status; family.claims_limit; item.status; item.claims_limit; '
+            'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
+            encoding="utf-8",
+        )
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+
+        self.assertTrue(
+            any("provenance wiring" in error and "item.provenance" in error for error in errors),
+            errors,
+        )
 
     def test_rejects_built_site_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()

@@ -390,6 +390,12 @@ fn checked_benchmark_artifacts_are_linked() {
             "renderArtifactLinks",
             "renderCommandList",
             "renderTextList",
+            "renderProvenance",
+            "renderProvenance(item.provenance)",
+            "item.provenance",
+            "recorded",
+            "not_recorded",
+            "artifact_hashes",
         ],
         "checked benchmark result renderer",
     );
@@ -471,6 +477,33 @@ fn checked_benchmark_artifacts_are_linked() {
             .is_some_and(|value| value.contains("reference-gap report only")),
         "BB checked item must keep its manifest claims limit"
     );
+
+    for (item_id, item) in [
+        ("surface-decoder-full", surface_item),
+        ("bb-circuit-full", bb_item),
+    ] {
+        let provenance = item["provenance"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{item_id} must carry canonical provenance"));
+        for field in [
+            "schema_version",
+            "artifact_date",
+            "source_commit",
+            "commands",
+            "cpu_model",
+            "artifact_hashes",
+        ] {
+            assert!(
+                provenance.contains_key(field),
+                "{item_id} provenance is missing field {field}"
+            );
+        }
+        assert_eq!(
+            provenance["artifact_hashes"]["status"].as_str(),
+            Some("recorded"),
+            "{item_id} artifact hashes must be recorded"
+        );
+    }
 }
 
 #[test]

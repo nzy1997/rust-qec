@@ -330,6 +330,93 @@
     return `<ul class="result-link-list source-links">${links}</ul>`;
   }
 
+  function provenanceFieldLabel(name) {
+    return String(name || "")
+      .replace(/_/g, " ")
+      .replace(/^./, (char) => char.toUpperCase());
+  }
+
+  function renderCompactValue(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    if (Array.isArray(value)) {
+      if (!value.length) {
+        return '<span class="provenance-muted">empty</span>';
+      }
+      return `<ul class="provenance-value-list">${value.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+    }
+    if (typeof value === "object") {
+      const entries = Object.entries(value);
+      if (!entries.length) {
+        return '<span class="provenance-muted">empty</span>';
+      }
+      return `<ul class="provenance-value-list">${entries
+        .map(([key, entryValue]) => `<li><code>${escapeHtml(key)}</code>: ${escapeHtml(JSON.stringify(entryValue))}</li>`)
+        .join("")}</ul>`;
+    }
+    return `<span>${escapeHtml(value)}</span>`;
+  }
+
+  function renderArtifactHashes(entry) {
+    if (!entry || entry.status !== "recorded" || !entry.value || typeof entry.value !== "object") {
+      return renderCompactValue(entry && entry.value);
+    }
+    const rows = Object.entries(entry.value)
+      .map(([path, hashEntry]) => {
+        const sha = hashEntry && typeof hashEntry === "object" ? hashEntry.sha256 : "";
+        return `
+          <li>
+            <code>${escapeHtml(path)}</code>
+            <span class="provenance-hash">${escapeHtml(sha || "sha256 not recorded")}</span>
+          </li>
+        `;
+      })
+      .join("");
+    return `
+      <p class="provenance-muted">${Object.keys(entry.value).length} checked artifact hashes recorded</p>
+      <ul class="provenance-hash-list">${rows}</ul>
+    `;
+  }
+
+  function renderProvenance(provenance) {
+    if (!provenance || typeof provenance !== "object") {
+      return "<p>No canonical provenance is recorded for this checked result.</p>";
+    }
+    const rows = Object.entries(provenance)
+      .map(([field, entry]) => {
+        if (field === "schema_version") {
+          return `
+            <li class="provenance-row">
+              <div class="provenance-row-heading">
+                <code>${escapeHtml(field)}</code>
+                <span class="badge">recorded</span>
+              </div>
+              ${renderCompactValue(entry)}
+            </li>
+          `;
+        }
+        const status = entry && typeof entry === "object" ? entry.status : "unspecified";
+        const body =
+          field === "artifact_hashes"
+            ? renderArtifactHashes(entry)
+            : status === "not_recorded"
+              ? `<p class="provenance-muted">${escapeHtml(entry.reason || "reason not recorded")}</p>`
+              : renderCompactValue(entry && entry.value);
+        return `
+          <li class="provenance-row">
+            <div class="provenance-row-heading">
+              <code>${escapeHtml(field)}</code>
+              <span class="badge">${escapeHtml(status)}</span>
+            </div>
+            ${body}
+          </li>
+        `;
+      })
+      .join("");
+    return `<ul class="provenance-card-list">${rows}</ul>`;
+  }
+
   function renderCheckedBenchmarkResults(manifest) {
     if (!checkedBenchmarkResults) {
       return;
@@ -360,6 +447,8 @@
             ${renderArtifactLinks(item)}
             <h4>Reproduction</h4>
             ${renderCommandList(item.commands)}
+            <h4>Provenance</h4>
+            ${renderProvenance(item.provenance)}
             <h4>Caveats</h4>
             ${renderTextList(item.caveats)}
             <h4>Provenance Sources</h4>
