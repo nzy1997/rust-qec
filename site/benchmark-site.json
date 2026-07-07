@@ -32,6 +32,64 @@
             "make surface-decoder-compare-full",
             "make bench-surface-full"
           ],
+          "provenance": {
+            "schema_version": 1,
+            "artifact_date": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "source_commit": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "commands": {
+              "status": "recorded",
+              "value": [
+                "make surface-decoder-compare-full",
+                "make bench-surface-full"
+              ]
+            },
+            "os": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "cpu_model": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "rust_version": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "python_version": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "dependency_versions": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "external_repository_commits": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "seed_policy": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "build_profile": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "shots_or_error_budget": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "artifact_hashes": {
+              "status": "not_recorded",
+              "reason": "hash-content verification is out of scope for this historical artifact"
+            }
+          },
           "provenance_requirements": [
             "OS",
             "CPU model",
@@ -126,6 +184,63 @@
           "commands": [
             "make bb-circuit-bposd-compare-full"
           ],
+          "provenance": {
+            "schema_version": 1,
+            "artifact_date": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "source_commit": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "commands": {
+              "status": "recorded",
+              "value": [
+                "make bb-circuit-bposd-compare-full"
+              ]
+            },
+            "os": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "cpu_model": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "rust_version": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "python_version": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "dependency_versions": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "external_repository_commits": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "seed_policy": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "build_profile": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "shots_or_error_budget": {
+              "status": "not_recorded",
+              "reason": "historical checked artifact predates canonical provenance capture"
+            },
+            "artifact_hashes": {
+              "status": "not_recorded",
+              "reason": "hash-content verification is out of scope for this historical artifact"
+            }
+          },
           "provenance_requirements": [
             "OS",
             "CPU model",

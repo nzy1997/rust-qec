@@ -36,6 +36,23 @@ ITEM_REQUIRED_FIELDS = {
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
 )
+PROVENANCE_SCHEMA_VERSION = 1
+PROVENANCE_REQUIRED_FIELDS = (
+    "schema_version",
+    "artifact_date",
+    "source_commit",
+    "commands",
+    "os",
+    "cpu_model",
+    "rust_version",
+    "python_version",
+    "dependency_versions",
+    "external_repository_commits",
+    "seed_policy",
+    "build_profile",
+    "shots_or_error_budget",
+    "artifact_hashes",
+)
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -135,6 +152,55 @@ def validate_artifact(repo_root: Path, family_id: str, item_id: str, artifact: d
     validate_repo_path(repo_root, artifact_path, scope, "artifact", errors)
 
 
+def item_has_checked_artifacts(item: dict[str, Any]) -> bool:
+    artifacts = item.get("artifacts")
+    if not isinstance(artifacts, list):
+        return False
+    return any(isinstance(artifact, dict) and artifact.get("checked") is True for artifact in artifacts)
+
+
+def validate_provenance_status_field(scope: str, provenance: dict[str, Any], field: str, errors: list[str]) -> None:
+    if field not in provenance:
+        add_error(errors, scope, f"provenance missing required field {field}")
+        return
+
+    entry = provenance[field]
+    if not isinstance(entry, dict):
+        add_error(errors, scope, f"provenance.{field} must be an object")
+        return
+
+    status = entry.get("status")
+    if status == "recorded":
+        if "value" not in entry:
+            add_error(errors, scope, f"provenance.{field} recorded entry must include value")
+        return
+
+    if status == "not_recorded":
+        if not is_non_empty_string(entry.get("reason")):
+            add_error(errors, scope, f"provenance.{field} not_recorded entry must include non-empty reason")
+        return
+
+    add_error(errors, scope, f"provenance.{field} status must be 'recorded' or 'not_recorded'")
+
+
+def validate_checked_item_provenance(scope: str, item: dict[str, Any], errors: list[str]) -> None:
+    if not item_has_checked_artifacts(item):
+        return
+
+    provenance = item.get("provenance")
+    if not isinstance(provenance, dict):
+        add_error(errors, scope, "provenance must be an object")
+        return
+
+    if provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION:
+        add_error(errors, scope, f"provenance.schema_version must be {PROVENANCE_SCHEMA_VERSION}")
+
+    for field in PROVENANCE_REQUIRED_FIELDS:
+        if field == "schema_version":
+            continue
+        validate_provenance_status_field(scope, provenance, field, errors)
+
+
 def validate_string_list(scope: str, label: str, values: Any, errors: list[str], *, allow_empty: bool) -> None:
     if not isinstance(values, list):
         add_error(errors, scope, f"{label} must be a list")
@@ -212,6 +278,7 @@ def validate_item(repo_root: Path, family_id: str, item: Any, errors: list[str])
                 add_error(errors, scope, "artifact entries must be objects")
     else:
         add_error(errors, scope, "artifacts must be a list")
+    validate_checked_item_provenance(scope, item, errors)
 
 
 def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | None:
@@ -405,6 +472,24 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
     (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
 
+    def fixture_provenance(commands: list[str]) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "artifact_date": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "source_commit": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "commands": {"status": "recorded", "value": commands},
+            "os": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "cpu_model": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "rust_version": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "python_version": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "dependency_versions": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "external_repository_commits": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "seed_policy": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "build_profile": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "shots_or_error_budget": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+            "artifact_hashes": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
+        }
+
     manifest = {
         "schema_version": 1,
         "families": [
@@ -428,6 +513,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                             }
                         ],
                         "commands": ["make surface-decoder-compare-full"],
+                        "provenance": fixture_provenance(["make surface-decoder-compare-full"]),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -448,6 +534,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "tier": "full",
                         "artifacts": [],
                         "commands": ["make bb-circuit-bposd-compare-full"],
+                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"]),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -549,6 +636,10 @@ def run_self_test() -> list[str]:
             ("missing_artifact", "surface-decoder-full", "does not exist"),
             ("missing_claims_limit", "surface-decoder-full", "claims_limit"),
             ("ignored_artifact", "surface-decoder-full", "ignored"),
+            ("missing_provenance", "surface-decoder-full", "provenance"),
+            ("missing_provenance_cpu_model", "surface-decoder-full", "cpu_model"),
+            ("provenance_cpu_model_missing_reason", "surface-decoder-full", "reason"),
+            ("bad_provenance_schema_version", "surface-decoder-full", "schema_version"),
         ]
 
         for mutation, entry_id, rule in mutations:
@@ -559,6 +650,14 @@ def run_self_test() -> list[str]:
                 del manifest["families"][0]["evidence_items"][0]["claims_limit"]
             elif mutation == "ignored_artifact":
                 manifest["families"][0]["evidence_items"][0]["artifacts"][0]["path"] = "benchmarks/out/ignored.csv"
+            elif mutation == "missing_provenance":
+                del manifest["families"][0]["evidence_items"][0]["provenance"]
+            elif mutation == "missing_provenance_cpu_model":
+                del manifest["families"][0]["evidence_items"][0]["provenance"]["cpu_model"]
+            elif mutation == "provenance_cpu_model_missing_reason":
+                manifest["families"][0]["evidence_items"][0]["provenance"]["cpu_model"] = {"status": "not_recorded"}
+            elif mutation == "bad_provenance_schema_version":
+                manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = 2
 
             manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             mutated_errors = validate_manifest(repo_root, manifest_path)

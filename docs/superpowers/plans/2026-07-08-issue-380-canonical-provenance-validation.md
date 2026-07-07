@@ -41,7 +41,7 @@
 - Produces: validator helper `validate_checked_item_provenance(scope: str, item: dict[str, Any], errors: list[str]) -> None`.
 - Produces: canonical `provenance` objects on checked manifest items `surface-decoder-full` and `bb-circuit-full`.
 
-- [ ] **Step 1: Add fixture provenance helper and failing tests**
+- [x] **Step 1: Add fixture provenance helper and failing tests**
 
 In `tools/test_check_site_manifest.py`, add this helper after the imports:
 
@@ -137,7 +137,7 @@ Add these tests after `test_rejects_empty_source_and_provenance_sources`:
             )
 ```
 
-- [ ] **Step 2: Run the new tests and verify the RED state**
+- [x] **Step 2: Run the new tests and verify the RED state**
 
 Run:
 
@@ -147,7 +147,7 @@ python3 -m unittest tools.test_check_site_manifest -q
 
 Expected before implementation: FAIL because the new negative controls still validate successfully without canonical provenance enforcement.
 
-- [ ] **Step 3: Implement canonical provenance validation**
+- [x] **Step 3: Implement canonical provenance validation**
 
 In `tools/check_site_manifest.py`, add these constants after `CHECKED_ARTIFACT_REFERENCE_RE`:
 
@@ -249,7 +249,7 @@ elif mutation == "bad_provenance_schema_version":
     manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = 2
 ```
 
-- [ ] **Step 4: Add canonical provenance to the real manifest**
+- [x] **Step 4: Add canonical provenance to the real manifest**
 
 In `site/benchmark-site.json`, add `provenance` to `surface-decoder-full` after `commands` or after `provenance_sources`. Use this object:
 
@@ -322,7 +322,7 @@ In `site/benchmark-site.json`, add `provenance` to `bb-circuit-full` after `comm
 ]
 ```
 
-- [ ] **Step 5: Run focused GREEN verification**
+- [x] **Step 5: Run focused GREEN verification**
 
 Run:
 
@@ -334,7 +334,7 @@ python3 tools/check_site_manifest.py --repo-root . site/benchmark-site.json
 
 Expected: all commands exit 0. The manifest checker should print one `ok: family ...` line per benchmark family.
 
-- [ ] **Step 6: Run manual negative controls**
+- [x] **Step 6: Run manual negative controls**
 
 Create temporary files without modifying the repository and run these checks:
 
@@ -373,7 +373,7 @@ Remove the temporary file:
 rm -f "$tmp"
 ```
 
-- [ ] **Step 7: Run repository verification**
+- [x] **Step 7: Run repository verification**
 
 Run:
 
@@ -383,7 +383,7 @@ cargo test
 
 Expected: exit 0.
 
-- [ ] **Step 8: Final diff review and commit**
+- [x] **Step 8: Final diff review and commit**
 
 Run:
 
