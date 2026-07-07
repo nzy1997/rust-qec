@@ -192,7 +192,8 @@ def validate_checked_item_provenance(scope: str, item: dict[str, Any], errors: l
         add_error(errors, scope, "provenance must be an object")
         return
 
-    if provenance.get("schema_version") != PROVENANCE_SCHEMA_VERSION:
+    schema_version = provenance.get("schema_version")
+    if type(schema_version) is not int or schema_version != PROVENANCE_SCHEMA_VERSION:
         add_error(errors, scope, f"provenance.schema_version must be {PROVENANCE_SCHEMA_VERSION}")
 
     for field in PROVENANCE_REQUIRED_FIELDS:

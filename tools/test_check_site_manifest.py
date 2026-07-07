@@ -235,6 +235,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = 2
         elif mutation == "bad_provenance_schema_version_type":
             manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = "1"
+        elif mutation == "bad_provenance_schema_version_bool":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = True
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -362,7 +364,11 @@ class SiteManifestValidatorTest(unittest.TestCase):
         )
 
     def test_rejects_unsupported_provenance_schema_version(self) -> None:
-        for mutation in ("bad_provenance_schema_version", "bad_provenance_schema_version_type"):
+        for mutation in (
+            "bad_provenance_schema_version",
+            "bad_provenance_schema_version_type",
+            "bad_provenance_schema_version_bool",
+        ):
             repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(
