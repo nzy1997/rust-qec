@@ -93,6 +93,24 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
     );
 }
 
+fn js_function_body<'a>(source: &'a str, function_name: &str, next_function_marker: &str) -> &'a str {
+    let signature = format!("function {function_name}(");
+    let function_start = source
+        .find(&signature)
+        .unwrap_or_else(|| panic!("missing function {function_name}"));
+    let body_start = source[function_start..]
+        .find('{')
+        .map(|offset| function_start + offset + 1)
+        .unwrap_or_else(|| panic!("function {function_name} is missing an opening brace"));
+    let body_end = source[body_start..]
+        .find(next_function_marker)
+        .map(|offset| body_start + offset)
+        .unwrap_or_else(|| {
+            panic!("function {function_name} is missing marker {next_function_marker:?} after its body")
+        });
+    &source[body_start..body_end]
+}
+
 const CANONICAL_PROVENANCE_KEYS: &[&str] = &[
     "schema_version",
     "artifact_date",
@@ -632,15 +650,15 @@ fn checked_benchmark_provenance_is_manifest_backed() {
     let manifest: Value =
         serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
 
+    let checked_renderer = js_function_body(&app, "renderCheckedBenchmarkResults", "\n  function renderNav(");
+
     assert_contains_all(
-        &app,
+        checked_renderer,
         &[
-            "renderProvenance",
+            "checkedBenchmarkResults.innerHTML",
+            "checkedBenchmarkItems",
+            "findEvidenceItem",
             "renderProvenance(item.provenance)",
-            "item.provenance",
-            "recorded",
-            "not_recorded",
-            "artifact_hashes",
         ],
         "checked benchmark provenance renderer",
     );
