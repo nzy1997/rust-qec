@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::compiled::{
-    choose_analyzer_path, choose_sampler_path, compile_circuit, CompiledPathDecision,
+    CompiledPathDecision, choose_analyzer_path, choose_sampler_path, compile_circuit,
 };
 use crate::ir::StimInstr;
 
@@ -37,9 +37,7 @@ impl PerfComparisonKind {
 
 pub fn comparison_variant_labels(kind: PerfComparisonKind) -> (&'static str, &'static str) {
     match kind {
-        PerfComparisonKind::SamplerCompiledVsInterpreted => {
-            ("rstim-compiled", "rstim-interpreted")
-        }
+        PerfComparisonKind::SamplerCompiledVsInterpreted => ("rstim-compiled", "rstim-interpreted"),
         PerfComparisonKind::AnalyzerCompiledVsFlattened => {
             ("rstim-analyzer-compiled", "rstim-analyzer-flattened")
         }
@@ -103,6 +101,14 @@ pub fn expected_variant_labels(case: PerfBenchmarkCase) -> Vec<&'static str> {
     variants
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PerfNoiseMetadata {
+    pub before_round_data_depolarization: f64,
+    pub after_clifford_depolarization: f64,
+    pub before_measure_flip_probability: f64,
+    pub after_reset_flip_probability: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PerfCircuitSource {
     Generator {
@@ -111,6 +117,11 @@ pub enum PerfCircuitSource {
         distance: usize,
         rounds: usize,
         noise: f64,
+    },
+    Fixture {
+        case_id: &'static str,
+        canonical_input_path: &'static str,
+        noise: PerfNoiseMetadata,
     },
     Inline {
         text: &'static str,
@@ -132,6 +143,14 @@ pub struct PerfBenchmarkCase {
 const SAMPLER_COMPARE: &[PerfComparisonKind] = &[PerfComparisonKind::SamplerCompiledVsInterpreted];
 const ANALYZER_COMPARE: &[PerfComparisonKind] = &[PerfComparisonKind::AnalyzerCompiledVsFlattened];
 const NO_COMPARE: &[PerfComparisonKind] = &[];
+const STIM_SURFACE_D11_R100_FIXTURE_PATH: &str =
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim";
+const STIM_STYLE_SURFACE_NOISE: PerfNoiseMetadata = PerfNoiseMetadata {
+    before_round_data_depolarization: 0.0,
+    after_clifford_depolarization: 0.001,
+    before_measure_flip_probability: 0.001,
+    after_reset_flip_probability: 0.001,
+};
 
 pub fn benchmark_variants() -> Vec<PerfVariant> {
     vec![
@@ -252,6 +271,20 @@ pub fn benchmark_cases() -> Vec<PerfBenchmarkCase> {
             requires_compiled: true,
             requires_fallback: false,
             comparisons: ANALYZER_COMPARE,
+        },
+        PerfBenchmarkCase {
+            label: "stim-style-surface-sample-d11-r100-b1024",
+            workload: PerfWorkload::Sample,
+            source: PerfCircuitSource::Fixture {
+                case_id: "stim_surface_d11_r100",
+                canonical_input_path: STIM_SURFACE_D11_R100_FIXTURE_PATH,
+                noise: STIM_STYLE_SURFACE_NOISE,
+            },
+            shots: Some(1024),
+            tier: PerfCaseTier::ReportOnly,
+            requires_compiled: true,
+            requires_fallback: false,
+            comparisons: SAMPLER_COMPARE,
         },
     ]
 }
