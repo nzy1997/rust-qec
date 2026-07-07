@@ -622,7 +622,14 @@ def _overall_status(case_results: Sequence[dict[str, object]]) -> str:
         return STATUS_MISMATCH
     if STATUS_WARN in statuses:
         return STATUS_WARN
+    if not any(status == STATUS_PASS for status in statuses):
+        return STATUS_WARN
     return STATUS_PASS
+
+
+def _validate_probability(value: float, name: str) -> None:
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"{name} must be between 0 and 1")
 
 
 def _suite_label(summary: dict[str, object]) -> str:
@@ -668,6 +675,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, object]:
     errors = validate_manifest(manifest, args.cases.parent)
     if errors:
         raise ValueError("\n".join(errors))
+    _validate_probability(args.inject_rstim_bitflip_rate, "--inject-rstim-bitflip-rate")
 
     stim_command = _command_from_arg(args.stim)
     rstim_command = _command_from_arg(args.rstim, default=default_rstim_command())

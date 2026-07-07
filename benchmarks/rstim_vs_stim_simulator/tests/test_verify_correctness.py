@@ -312,6 +312,86 @@ class VerifyCorrectnessCliTest(unittest.TestCase):
             self.assertEqual(data["case_count"], 2)
             self.assertTrue(any("PASS correctness smoke" in call.args[0] for call in stdout.call_args_list))
 
+    def test_main_warns_when_all_cases_are_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = Path(temp_dir) / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.verify_case"
+                ) as mocked,
+            ):
+                mocked.return_value = {
+                    "case_id": "doc_case",
+                    "tier": "documentation-only",
+                    "status": "skipped",
+                    "sample_count": 0,
+                    "failure_reasons": ["documentation-only"],
+                    "selected_columns": [],
+                    "selected_pairs": [],
+                    "stim_runs": [],
+                    "rstim_runs": [],
+                }
+                with mock.patch("sys.stdout.write") as stdout:
+                    code = main(
+                        [
+                            "--cases",
+                            "benchmarks/rstim_vs_stim_simulator/cases.smoke.toml",
+                            "--shots",
+                            "4",
+                            "--out",
+                            str(out),
+                        ]
+                    )
+
+            self.assertEqual(code, 0)
+            data = json.loads(out.read_text())
+            self.assertEqual(data["status"], "warn")
+            self.assertTrue(any("WARN correctness smoke" in call.args[0] for call in stdout.call_args_list))
+
+    def test_main_rejects_invalid_bitflip_rate_before_running_tools(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = Path(temp_dir) / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [{}]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_correctness.verify_case"
+                ) as mocked,
+                mock.patch("sys.stderr.write"),
+            ):
+                code = main(
+                    [
+                        "--cases",
+                        "benchmarks/rstim_vs_stim_simulator/cases.smoke.toml",
+                        "--shots",
+                        "4",
+                        "--inject-rstim-bitflip-rate",
+                        "1.5",
+                        "--out",
+                        str(out),
+                    ]
+                )
+
+            self.assertEqual(code, 1)
+            self.assertFalse(out.exists())
+            mocked.assert_not_called()
+
     def test_main_returns_nonzero_for_statistical_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             out = Path(temp_dir) / "summary.json"
