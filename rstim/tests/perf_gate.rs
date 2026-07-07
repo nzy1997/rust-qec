@@ -1,6 +1,6 @@
 use rstim::perf::{
     PerfComparisonSummary, PerfGateConfig, PerfGateStatus, PerfSummary, PerfSummaryIssue,
-    PerfSummaryIssueKind, evaluate_summary, summarize_jsonl_str,
+    PerfRecordStatus, PerfSummaryIssueKind, evaluate_summary, summarize_jsonl_str,
 };
 
 const FULL_RAW_JSONL: &str = concat!(
@@ -192,12 +192,41 @@ fn gate_rejects_fallback_cases_that_report_compiled_analyzer_variant() {
         sample_count: 1,
         median_wall_time_ns: 10,
         median_peak_memory_bytes: None,
+        status: PerfRecordStatus::Completed.as_str().to_string(),
+        failure_reason: None,
+        stderr: None,
     });
 
     let verdict = evaluate_summary(&summary, PerfGateConfig::default());
     assert_eq!(verdict.status, PerfGateStatus::ContractFailure);
     assert!(verdict.messages.iter().any(|message| {
         message.contains("loss-protection-sample unexpectedly produced rstim-compiled")
+    }));
+}
+
+#[test]
+fn gate_rejects_non_completed_required_gating_variant() {
+    let mut summary = full_summary();
+    let fallback = summary
+        .cases
+        .iter_mut()
+        .find(|case| case.case_label == "loss-protection-sample")
+        .expect("fallback sample case");
+    let stim_cli = fallback
+        .variants
+        .iter_mut()
+        .find(|variant| variant.tool_variant == "stim-cli")
+        .expect("stim-cli variant");
+    stim_cli.status = PerfRecordStatus::ToolFailed.as_str().to_string();
+    stim_cli.sample_count = 0;
+    stim_cli.failure_reason = Some("stim exited with status 1".to_string());
+
+    let verdict = evaluate_summary(&summary, PerfGateConfig::default());
+    assert_eq!(verdict.status, PerfGateStatus::ContractFailure);
+    assert!(verdict.messages.iter().any(|message| {
+        message.contains(
+            "loss-protection-sample required variant stim-cli did not complete: status tool_failed",
+        )
     }));
 }
 
