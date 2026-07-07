@@ -152,7 +152,7 @@ def _tolerance(
         return float("inf")
     pooled = (stim_hits + rstim_hits) / (stim_total + rstim_total)
     variance = pooled * (1 - pooled) * (1 / stim_total + 1 / rstim_total)
-    return min(z_score * math.sqrt(max(0.0, variance)) + floor, 1.0 - floor)
+    return z_score * math.sqrt(max(0.0, variance)) + floor
 
 
 def compare_sample_sets(

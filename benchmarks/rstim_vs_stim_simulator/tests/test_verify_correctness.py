@@ -38,8 +38,8 @@ class VerifyCorrectnessHelpersTest(unittest.TestCase):
         self.assertEqual(result["sample_count"], 4)
 
     def test_compare_sample_sets_flags_large_mismatch(self) -> None:
-        stim = [[0], [0], [0], [0], [0], [0], [0], [0]]
-        rstim = [[1], [1], [1], [1], [1], [1], [1], [1]]
+        stim = [[0] for _ in range(100)]
+        rstim = [[1] for _ in range(100)]
         result = compare_sample_sets(stim, rstim, columns=[0], pairs=[])
         self.assertEqual(result["status"], "statistical_mismatch")
         self.assertGreater(result["max_delta"], result["max_tolerance"])
