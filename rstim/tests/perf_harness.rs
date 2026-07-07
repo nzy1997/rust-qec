@@ -1,10 +1,10 @@
-use rstim::codegen::{repetition_code_memory, rotated_memory_x};
-use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
+use rstim::codegen::{NoiseParams, repetition_code_memory, rotated_memory_x};
+use rstim::compiled::{CompiledPathDecision, choose_analyzer_path, compile_circuit};
 use rstim::parser::parse_lines;
 use rstim::perf::{
-    benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
-    PerfRecord, PerfVariant, PerfWorkload,
+    PerfRecord, PerfVariant, PerfWorkload, benchmark_case_variants, benchmark_cases,
+    benchmark_variants, effective_repeat_count,
 };
 use serde_json::Value;
 
@@ -58,6 +58,12 @@ fn benchmark_cases_define_gating_and_report_only_contracts() {
         ("loss-protection-sample", PerfCaseTier::Gating, false, true),
         (
             "repeat-analyze-stress-report",
+            PerfCaseTier::ReportOnly,
+            true,
+            false,
+        ),
+        (
+            "stim-style-surface-sample-d11-r100-b1024",
             PerfCaseTier::ReportOnly,
             true,
             false,
@@ -193,6 +199,15 @@ fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
             ],
             vec![PerfComparisonKind::AnalyzerCompiledVsFlattened],
         ),
+        (
+            "stim-style-surface-sample-d11-r100-b1024",
+            vec![
+                PerfVariant::StimCli,
+                PerfVariant::RstimInterpreted,
+                PerfVariant::RstimCompiled,
+            ],
+            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+        ),
     ];
 
     for (label, expected_variants, expected_comparisons) in expectations {
@@ -212,6 +227,14 @@ fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
                 ("surface_code", "rotated_memory_x") => rotated_memory_x(distance, rounds, noise),
                 _ => panic!("unsupported generator source for {label}"),
             },
+            PerfCircuitSource::Fixture {
+                canonical_input_path,
+                ..
+            } => parse_lines(
+                &std::fs::read_to_string(std::path::Path::new("..").join(canonical_input_path))
+                    .unwrap(),
+            )
+            .unwrap(),
             PerfCircuitSource::Inline { text } => parse_lines(text).unwrap(),
         };
 
@@ -226,6 +249,69 @@ fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
             "unexpected comparisons for {label}"
         );
     }
+}
+
+#[test]
+fn benchmark_cases_include_stim_style_surface_sample_contract() {
+    let case = benchmark_cases()
+        .into_iter()
+        .find(|case| case.label == "stim-style-surface-sample-d11-r100-b1024")
+        .expect("stim-style-surface sample perf case");
+
+    assert_eq!(case.workload, PerfWorkload::Sample);
+    assert_eq!(case.shots, Some(1024));
+    assert_eq!(case.tier, PerfCaseTier::ReportOnly);
+    assert!(case.requires_compiled);
+    assert!(!case.requires_fallback);
+    assert_eq!(
+        case.comparisons,
+        [PerfComparisonKind::SamplerCompiledVsInterpreted].as_slice()
+    );
+
+    let (case_id, canonical_input_path, noise) = match case.source {
+        PerfCircuitSource::Fixture {
+            case_id,
+            canonical_input_path,
+            noise,
+        } => (case_id, canonical_input_path, noise),
+        PerfCircuitSource::Generator { .. } => {
+            panic!(
+                "Stim-style surface sample must use checked Stim fixture, not regenerated rstim source"
+            )
+        }
+        PerfCircuitSource::Inline { .. } => {
+            panic!("Stim-style surface sample must point at checked Stim fixture")
+        }
+    };
+
+    assert_eq!(case_id, "stim_surface_d11_r100");
+    assert_eq!(
+        canonical_input_path,
+        "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+    );
+    assert_eq!(noise.after_clifford_depolarization, 0.001);
+    assert_eq!(noise.after_reset_flip_probability, 0.001);
+    assert_eq!(noise.before_measure_flip_probability, 0.001);
+    assert_eq!(noise.before_round_data_depolarization, 0.0);
+
+    let uniform = NoiseParams::uniform(0.001);
+    assert_ne!(
+        noise.before_round_data_depolarization, uniform.before_round_data_depolarization,
+        "uniform noise would enable before_round_data_depolarization"
+    );
+
+    let fixture_text =
+        std::fs::read_to_string(std::path::Path::new("..").join(canonical_input_path))
+            .expect("checked Stim fixture");
+    let instrs = parse_lines(&fixture_text).expect("fixture parses");
+    assert_eq!(
+        benchmark_case_variants(case, &instrs).unwrap(),
+        vec![
+            PerfVariant::StimCli,
+            PerfVariant::RstimInterpreted,
+            PerfVariant::RstimCompiled,
+        ]
+    );
 }
 
 #[test]
@@ -272,6 +358,7 @@ fn benchmark_cases_include_a_compiled_analyzer_compatible_repeat_case() {
                 choose_analyzer_path(&compiled) == CompiledPathDecision::FastPath
             }
             rstim::perf::PerfCircuitSource::Generator { .. } => false,
+            rstim::perf::PerfCircuitSource::Fixture { .. } => false,
         });
 
     assert!(
