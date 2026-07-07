@@ -267,6 +267,14 @@ def validate_checked_artifact_hashes(
             )
         return
 
+    expected_paths = set(artifact_paths)
+    for unexpected_path in sorted(set(value) - expected_paths):
+        add_error(
+            errors,
+            scope,
+            f"provenance.artifact_hashes has unexpected hash entry for {unexpected_path}",
+        )
+
     for artifact_path in artifact_paths:
         entry = value.get(artifact_path)
         if entry is None:
@@ -765,6 +773,11 @@ def run_self_test() -> list[str]:
             ("bad_provenance_schema_version", "surface-decoder-full", "schema_version"),
             ("bad_artifact_hash", "surface-decoder-full", "sha256"),
             ("missing_artifact_hash", "surface-decoder-full", "results.csv"),
+            (
+                "artifact_hash_extra_path",
+                "surface-decoder-full",
+                "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
+            ),
         ]
 
         for mutation, entry_id, rule in mutations:
@@ -791,6 +804,10 @@ def run_self_test() -> list[str]:
                 del manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
                     "benchmarks/surface_decoder_compare/results/full/results.csv"
                 ]
+            elif mutation == "artifact_hash_extra_path":
+                manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                    "benchmarks/surface_decoder_compare/results/full/unchecked.csv"
+                ] = {"sha256": "a" * 64}
 
             manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             mutated_errors = validate_manifest(repo_root, manifest_path)

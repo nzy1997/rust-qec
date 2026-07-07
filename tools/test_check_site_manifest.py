@@ -277,6 +277,12 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH][
                 "md5"
             ] = "unsupported"
+        elif mutation == "artifact_hash_extra_path":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                "benchmarks/surface_decoder_compare/results/full/unchecked.csv"
+            ] = {
+                "sha256": "a" * 64
+            }
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -487,6 +493,20 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "surface-decoder-full" in error
                 and SURFACE_RESULTS_PATH in error
                 and "recorded sha256 entries" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_checked_artifact_hash_extra_path(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="artifact_hash_extra_path")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "artifact_hashes" in error
+                and "unexpected hash entry" in error
+                and "benchmarks/surface_decoder_compare/results/full/unchecked.csv" in error
                 for error in errors
             ),
             errors,
