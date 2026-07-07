@@ -86,8 +86,15 @@
               "reason": "historical checked artifact predates canonical provenance capture"
             },
             "artifact_hashes": {
-              "status": "not_recorded",
-              "reason": "hash-content verification is out of scope for this historical artifact"
+              "status": "recorded",
+              "value": {
+                "benchmarks/surface_decoder_compare/results/full/results.csv": {
+                  "sha256": "e74ff135e130fc127f7dbfd41d2d431cc800bdb3ab0f038ce512bcf9ab06ccc9"
+                },
+                "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png": {
+                  "sha256": "ce597cd54265ca2116632e864a45f6aad2fc66f021915361a0b9ff8093817cec"
+                }
+              }
             }
           },
           "provenance_requirements": [
@@ -237,8 +244,21 @@
               "reason": "historical checked artifact predates canonical provenance capture"
             },
             "artifact_hashes": {
-              "status": "not_recorded",
-              "reason": "hash-content verification is out of scope for this historical artifact"
+              "status": "recorded",
+              "value": {
+                "benchmarks/bb_circuit_bposd_compare/results/full/results.csv": {
+                  "sha256": "523ff316fa20ee21fca7f0b6ad38daec30898428d15e0385a98aa03c73530e25"
+                },
+                "benchmarks/bb_circuit_bposd_compare/results/full/summary.md": {
+                  "sha256": "e6d17c46cc5e5de99aa6e2d827094de954188cbd25a69513533c9821740c09ab"
+                },
+                "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png": {
+                  "sha256": "a7ccf8cac066c6bd22934028a999ffd68e74ef038060a3fda6be04e5c6e605b3"
+                },
+                "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md": {
+                  "sha256": "9afdea2f0bb45143bd6851bd80c4066735097891ceccf267d859911c645fc274"
+                }
+              }
             }
           },
           "provenance_requirements": [
