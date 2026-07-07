@@ -241,14 +241,30 @@ def validate_checked_artifact_hashes(
     artifact_paths = checked_artifact_paths_for_item(item)
     artifact_hashes = provenance.get("artifact_hashes")
     if not isinstance(artifact_hashes, dict):
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes for {artifact_path} must be an object with recorded sha256 entries",
+            )
         return
     if artifact_hashes.get("status") != "recorded":
-        add_error(errors, scope, "provenance.artifact_hashes must be recorded for checked artifacts")
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes for {artifact_path} must be recorded for checked artifacts",
+            )
         return
 
     value = artifact_hashes.get("value")
     if not isinstance(value, dict):
-        add_error(errors, scope, "provenance.artifact_hashes recorded entry value must be an object")
+        for artifact_path in artifact_paths:
+            add_error(
+                errors,
+                scope,
+                f"provenance.artifact_hashes recorded entry value for {artifact_path} must be an object",
+            )
         return
 
     for artifact_path in artifact_paths:
