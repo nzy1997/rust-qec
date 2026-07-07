@@ -11,6 +11,15 @@ import tools.check_site_manifest as check_site_manifest
 import tools.copy_site_benchmark_data as copy_site_benchmark_data
 
 PROVENANCE_NOT_RECORDED_REASON = "historical fixture predates canonical provenance capture"
+SURFACE_RESULTS_PATH = "benchmarks/surface_decoder_compare/results/full/results.csv"
+SURFACE_IMAGE_PATH = "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png"
+SURFACE_RESULTS_SHA256 = "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+SURFACE_IMAGE_SHA256 = "33d8344a7135c42aa3876706b908f95b702d83ff53e05e4aaff17c07bf67a98e"
+
+FIXTURE_ARTIFACT_HASHES = {
+    SURFACE_RESULTS_PATH: {"sha256": SURFACE_RESULTS_SHA256},
+    SURFACE_IMAGE_PATH: {"sha256": SURFACE_IMAGE_SHA256},
+}
 
 
 def fixture_provenance(commands: list[str]) -> dict[str, object]:
@@ -28,7 +37,7 @@ def fixture_provenance(commands: list[str]) -> dict[str, object]:
         "seed_policy": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
         "build_profile": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
         "shots_or_error_budget": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
-        "artifact_hashes": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
+        "artifact_hashes": {"status": "recorded", "value": FIXTURE_ARTIFACT_HASHES},
     }
 
 
@@ -49,12 +58,12 @@ VALID_MANIFEST = {
                     "tier": "full",
                     "artifacts": [
                         {
-                            "path": "benchmarks/surface_decoder_compare/results/full/results.csv",
+                            "path": SURFACE_RESULTS_PATH,
                             "kind": "csv",
                             "checked": True,
                         },
                         {
-                            "path": "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
+                            "path": SURFACE_IMAGE_PATH,
                             "kind": "image",
                             "checked": True,
                         },
@@ -237,6 +246,35 @@ class SiteManifestValidatorTest(unittest.TestCase):
             manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = "1"
         elif mutation == "bad_provenance_schema_version_bool":
             manifest["families"][0]["evidence_items"][0]["provenance"]["schema_version"] = True
+        elif mutation == "bad_artifact_hash":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH][
+                "sha256"
+            ] = "0" * 64
+        elif mutation == "missing_artifact_hash":
+            del manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH]
+        elif mutation == "artifact_hashes_not_recorded":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"] = {
+                "status": "not_recorded",
+                "reason": PROVENANCE_NOT_RECORDED_REASON,
+            }
+        elif mutation == "artifact_hash_entry_not_object":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH] = (
+                SURFACE_RESULTS_SHA256
+            )
+        elif mutation == "artifact_hash_missing_sha256":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH] = {}
+        elif mutation == "artifact_hash_sha256_not_string":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH][
+                "sha256"
+            ] = 42
+        elif mutation == "artifact_hash_sha256_invalid_hex":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH][
+                "sha256"
+            ] = "g" * 64
+        elif mutation == "artifact_hash_extra_algorithm":
+            manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][SURFACE_RESULTS_PATH][
+                "md5"
+            ] = "unsupported"
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -263,6 +301,13 @@ class SiteManifestValidatorTest(unittest.TestCase):
         if mutation == "force_tracked_ignored_artifact":
             subprocess.run(["git", "add", "-f", "benchmarks/out/ignored.csv"], cwd=root, check=True)
         return root, manifest_path, built_manifest_path
+
+    def copy_checked_artifacts_to_site(self, repo: Path, site_root: Path) -> None:
+        for artifact_path in (SURFACE_RESULTS_PATH, SURFACE_IMAGE_PATH):
+            source = repo / artifact_path
+            destination = site_root / artifact_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
 
     def test_accepts_valid_fixture_and_reports_families(self) -> None:
         repo, manifest_path, _ = self.write_fixture_manifest()
@@ -376,6 +421,52 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 errors,
             )
 
+    def test_rejects_checked_artifact_hash_digest_mismatch(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="bad_artifact_hash")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "results.csv" in error
+                and "sha256" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_checked_artifact_missing_hash_entry(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="missing_artifact_hash")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and SURFACE_RESULTS_PATH in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_unsupported_checked_artifact_hash_shapes(self) -> None:
+        for mutation, rule in [
+            ("artifact_hashes_not_recorded", "recorded"),
+            ("artifact_hash_entry_not_object", "object"),
+            ("artifact_hash_missing_sha256", "sha256"),
+            ("artifact_hash_sha256_not_string", "sha256"),
+            ("artifact_hash_sha256_invalid_hex", "sha256"),
+            ("artifact_hash_extra_algorithm", "unsupported"),
+        ]:
+            repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
+            errors = check_site_manifest.validate_manifest(repo, manifest_path)
+            self.assertTrue(
+                any(
+                    "surface-decoder-full" in error
+                    and "results.csv" in error
+                    and rule in error
+                    for error in errors
+                ),
+                (mutation, errors),
+            )
+
     def test_site_root_validation_rejects_missing_copied_checked_artifact(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         site_root = repo / "_site"
@@ -387,6 +478,24 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "surface-decoder-full" in error
                 and "benchmarks/surface_decoder_compare/results/full/results.csv" in error
                 and "not copied" in error
+                for error in errors
+            ),
+                errors,
+            )
+
+    def test_site_root_validation_rejects_copied_checked_artifact_hash_mismatch(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        site_root = repo / "_site"
+        self.copy_checked_artifacts_to_site(repo, site_root)
+        (site_root / SURFACE_RESULTS_PATH).write_text("mutated copied artifact\n", encoding="utf-8")
+
+        errors = check_site_manifest.validate_manifest(repo, built_manifest_path, site_root=site_root)
+
+        self.assertTrue(
+            any(
+                "surface-decoder-full" in error
+                and "results.csv" in error
+                and "sha256" in error
                 for error in errors
             ),
             errors,
