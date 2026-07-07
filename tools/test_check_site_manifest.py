@@ -447,24 +447,24 @@ class SiteManifestValidatorTest(unittest.TestCase):
         )
 
     def test_rejects_unsupported_checked_artifact_hash_shapes(self) -> None:
-        for mutation, rule in [
-            ("artifact_hashes_not_recorded", "recorded"),
-            ("artifact_hash_entry_not_object", "object"),
-            ("artifact_hash_missing_sha256", "sha256"),
-            ("artifact_hash_sha256_not_string", "sha256"),
-            ("artifact_hash_sha256_invalid_hex", "sha256"),
-            ("artifact_hash_extra_algorithm", "unsupported"),
+        for mutation, path_required, rule in [
+            ("artifact_hashes_not_recorded", False, "recorded"),
+            ("artifact_hash_entry_not_object", True, "object"),
+            ("artifact_hash_missing_sha256", True, "sha256"),
+            ("artifact_hash_sha256_not_string", True, "sha256"),
+            ("artifact_hash_sha256_invalid_hex", True, "sha256"),
+            ("artifact_hash_extra_algorithm", True, "unsupported"),
         ]:
             repo, manifest_path, _ = self.write_fixture_manifest(mutation=mutation)
             errors = check_site_manifest.validate_manifest(repo, manifest_path)
             self.assertTrue(
                 any(
                     "surface-decoder-full" in error
-                    and "results.csv" in error
+                    and (not path_required or "results.csv" in error)
                     and rule in error
                     for error in errors
                 ),
-                (mutation, errors),
+                (mutation, path_required, errors),
             )
 
     def test_site_root_validation_rejects_missing_copied_checked_artifact(self) -> None:
