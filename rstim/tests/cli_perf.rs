@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use rstim::perf::summarize_jsonl_str;
+use rstim::perf::{summarize_jsonl_str, PerfMeasurementRecord, PerfSampleOutputMode};
 
 const PUBLIC_SELECTED_CASE_LABEL: &str = "stim-style-surface-sample-d11-r100-b1024";
 
@@ -387,6 +387,14 @@ fn perf_run_case_with_public_label_writes_only_selected_completed_records() {
         raw.lines()
             .all(|line| line.contains(&format!("\"case_label\":\"{PUBLIC_SELECTED_CASE_LABEL}\"")))
     );
+    let records = raw
+        .lines()
+        .map(|line| PerfMeasurementRecord::from_json_line(line).unwrap())
+        .collect::<Vec<_>>();
+    assert!(!records.is_empty());
+    assert!(records.iter().all(|record| {
+        record.sample_output_mode == Some(PerfSampleOutputMode::MeasurementsOnly)
+    }));
 }
 
 #[test]

@@ -11,7 +11,7 @@ pub use cases::{
     comparison_variant_labels, effective_repeat_count, expected_variant_labels,
 };
 pub use gate::{PerfGateConfig, PerfGateStatus, PerfGateVerdict, evaluate_summary};
-pub use record::{PerfMeasurementRecord, PerfRecord, PerfRecordStatus};
+pub use record::{PerfMeasurementRecord, PerfRecord, PerfRecordStatus, PerfSampleOutputMode};
 pub use report::render_markdown_report;
 pub use runner::{
     PerfRunOptions, benchmark_case_by_label, run_benchmark_case_to_writer,

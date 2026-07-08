@@ -73,12 +73,21 @@ pub struct PerfMeasurementRecord {
     pub shots: Option<usize>,
     pub wall_time_ns: u128,
     pub peak_memory_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sample_output_mode: Option<PerfSampleOutputMode>,
     #[serde(default = "default_perf_record_status")]
     pub status: PerfRecordStatus,
     #[serde(default)]
     pub failure_reason: Option<String>,
     #[serde(default)]
     pub stderr: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PerfSampleOutputMode {
+    Full,
+    MeasurementsOnly,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

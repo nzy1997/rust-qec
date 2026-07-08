@@ -10,12 +10,15 @@ use rand::SeedableRng;
 use crate::cli::generate_common_circuit_text;
 use crate::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
 use crate::parser::parse_lines;
-use crate::sampler::{sample_batch_with_options, SampleOptions, SamplingBackend};
+use crate::sampler::{
+    sample_batch_with_options, SampleOptions, SampleOutputMode, SamplingBackend,
+};
 use crate::stats::summarize;
 
 use super::{
     benchmark_case_variants, benchmark_cases, effective_repeat_count, expected_variant_labels,
-    PerfBenchmarkCase, PerfMeasurementRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
+    PerfBenchmarkCase, PerfMeasurementRecord, PerfRecordStatus, PerfSampleOutputMode,
+    PerfVariant, PerfWorkload,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +118,22 @@ fn current_peak_memory_bytes() -> Option<u64> {
     }
 }
 
+fn sampler_output_mode_for_workload(workload: PerfWorkload) -> Option<SampleOutputMode> {
+    match workload {
+        PerfWorkload::Sample => Some(SampleOutputMode::MeasurementsOnly),
+        PerfWorkload::Detect => Some(SampleOutputMode::Full),
+        PerfWorkload::AnalyzeErrors => None,
+    }
+}
+
+fn perf_sample_output_mode_for_workload(workload: PerfWorkload) -> Option<PerfSampleOutputMode> {
+    match workload {
+        PerfWorkload::Sample => Some(PerfSampleOutputMode::MeasurementsOnly),
+        PerfWorkload::Detect => Some(PerfSampleOutputMode::Full),
+        PerfWorkload::AnalyzeErrors => None,
+    }
+}
+
 fn run_variant(
     case: PerfBenchmarkCase,
     text: &str,
@@ -138,6 +157,8 @@ fn run_variant(
                 &mut rng,
                 SampleOptions {
                     backend,
+                    output_mode: sampler_output_mode_for_workload(case.workload)
+                        .expect("sample and detect workloads have sampler output modes"),
                     ..SampleOptions::default()
                 },
             )
@@ -250,6 +271,7 @@ pub fn run_case_measurements(
                 shots: case.shots,
                 wall_time_ns,
                 peak_memory_bytes: current_peak_memory_bytes(),
+                sample_output_mode: perf_sample_output_mode_for_workload(case.workload),
                 status: PerfRecordStatus::Completed,
                 failure_reason: None,
                 stderr: None,
@@ -302,6 +324,7 @@ fn run_selected_case_measurements(
                 shots: case.shots,
                 wall_time_ns,
                 peak_memory_bytes: current_peak_memory_bytes(),
+                sample_output_mode: perf_sample_output_mode_for_workload(case.workload),
                 status,
                 failure_reason,
                 stderr,
@@ -336,6 +359,7 @@ fn run_selected_case_measurements(
                 shots: case.shots,
                 wall_time_ns: 0,
                 peak_memory_bytes: current_peak_memory_bytes(),
+                sample_output_mode: perf_sample_output_mode_for_workload(case.workload),
                 status: PerfRecordStatus::MissingVariant,
                 failure_reason: Some(format!(
                     "variant {expected_variant} is not available for benchmark case {}",
