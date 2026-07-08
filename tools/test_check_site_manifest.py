@@ -148,7 +148,7 @@ VALID_MANIFEST = {
                 RSTIM_SHOWCASE_PATH,
                 "benchmarks/rstim_vs_stim_simulator/README.md",
             ],
-            "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and smoke correctness evidence only.",
+            "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and full-manifest correctness evidence only; this family does not claim broad rstim-versus-Stim parity.",
             "evidence_items": [
                 {
                     "id": "rstim-vs-stim-full",
@@ -165,18 +165,20 @@ VALID_MANIFEST = {
                     ],
                     "commands": [
                         "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
-                        "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml --shots 20000 --out benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
-                        "cargo run -p rstim --bin rstim -- perf run --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl",
-                        "cargo run -p rstim --bin rstim -- perf summarize --in benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl --out benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
-                        "cargo run -p rstim --bin rstim -- perf report --in benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json --out benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                        "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                        "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                        "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                        "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                        "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                     ],
                     "provenance": fixture_provenance(
                         [
                             "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
-                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml --shots 20000 --out benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
-                            "cargo run -p rstim --bin rstim -- perf run --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl",
-                            "cargo run -p rstim --bin rstim -- perf summarize --in benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl --out benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
-                            "cargo run -p rstim --bin rstim -- perf report --in benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json --out benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                         ],
                         RSTIM_FIXTURE_ARTIFACT_HASHES,
                     ),
@@ -356,6 +358,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
             ] = {
                 "sha256": "a" * 64
             }
+        elif mutation == "rstim_family_future_status":
+            manifest["families"][3]["status"] = "future"
         elif mutation == "rstim_partial_without_checked_artifacts":
             manifest["families"][3]["evidence_items"][0]["artifacts"] = []
             manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"] = {}
@@ -421,6 +425,19 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "rstim-vs-stim-simulator" in error
                 and "partial" in error
                 and "checked artifact" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_family_future_regression(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_family_future_status")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-simulator" in error
+                and "partial" in error
+                and "future" in error
                 for error in errors
             ),
             errors,

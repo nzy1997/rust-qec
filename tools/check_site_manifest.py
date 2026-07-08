@@ -192,9 +192,20 @@ def family_has_checked_artifacts(family: dict[str, Any]) -> bool:
 
 def validate_family_status_policy(scope: str, family: dict[str, Any], errors: list[str]) -> None:
     family_id = family.get("id")
-    if family_id == "rstim-vs-stim-simulator" and family.get("status") == "partial":
-        if not family_has_checked_artifacts(family):
-            add_error(errors, scope, "partial rstim-vs-stim-simulator family must list checked artifacts")
+    if family_id != "rstim-vs-stim-simulator":
+        return
+
+    status = family.get("status")
+    if status != "partial":
+        add_error(
+            errors,
+            scope,
+            f"rstim-vs-stim-simulator family status must be partial, not {status!r}",
+        )
+        return
+
+    if not family_has_checked_artifacts(family):
+        add_error(errors, scope, "partial rstim-vs-stim-simulator family must list checked artifacts")
 
 
 def checked_artifact_paths_for_item(item: dict[str, Any]) -> list[str]:
