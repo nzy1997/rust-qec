@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::compiled::CompiledBlock;
+use crate::compiled::{CompiledBasis, CompiledBlock, CompiledOp};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
@@ -87,7 +87,7 @@ impl FrameSimulator {
             match block {
                 CompiledBlock::Ops(ops) => {
                     for op in ops {
-                        self.exec_op(op.name.as_str(), &op.args, &op.targets, ref_sample, rng)?;
+                        self.exec_compiled_op(op, ref_sample, rng)?;
                     }
                 }
                 CompiledBlock::Repeat(region) => {
@@ -692,6 +692,72 @@ impl FrameSimulator {
         Ok(())
     }
 
+    fn exec_compiled_op(
+        &mut self,
+        op: &CompiledOp,
+        ref_sample: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        let wpr = self.x_table.words_per_row();
+        match op {
+            CompiledOp::Tick | CompiledOp::QubitCoords | CompiledOp::ShiftCoords | CompiledOp::NoOp => {}
+            CompiledOp::H { qubits } => {
+                for &q in qubits {
+                    do_h(&mut self.x_table, &mut self.z_table, q);
+                }
+            }
+            CompiledOp::Reset { basis, qubits } => self.exec_compiled_reset(*basis, qubits, rng),
+            CompiledOp::XError {
+                probability,
+                qubits,
+            } => {
+                for &q in qubits {
+                    let noise = random_bits_with_prob(wpr, self.batch_size, *probability, rng);
+                    let x = self.x_table.row_words_mut(q);
+                    for w in 0..wpr {
+                        x[w] ^= noise[w];
+                    }
+                }
+            }
+            CompiledOp::Depolarize1 {
+                probability,
+                qubits,
+            } => {
+                self.exec_depolarize1_qubits(qubits, *probability, wpr, rng);
+            }
+            CompiledOp::Cx { pairs } => {
+                for &(control, target) in pairs {
+                    do_cx(
+                        &mut self.x_table,
+                        &mut self.z_table,
+                        control,
+                        target,
+                    );
+                }
+            }
+            CompiledOp::Depolarize2 { probability, pairs } => {
+                self.exec_depolarize2_pairs(pairs, *probability, wpr, rng);
+            }
+            CompiledOp::Measure { basis, qubits } => {
+                self.exec_compiled_measure(*basis, qubits, wpr, rng);
+            }
+            CompiledOp::MeasureReset { basis, qubits } => {
+                self.exec_compiled_measure_reset(*basis, qubits, wpr, rng);
+            }
+            CompiledOp::Detector { rec_offsets } => {
+                self.exec_compiled_detector(rec_offsets, ref_sample);
+            }
+            CompiledOp::ObservableInclude {
+                observable_index,
+                rec_offsets,
+            } => self.exec_compiled_observable_include(*observable_index, rec_offsets, ref_sample),
+            CompiledOp::UnsupportedSamplerOp { name } => {
+                return Err(format!("compiled sampler: unsupported instruction {name}"));
+            }
+        }
+        Ok(())
+    }
+
     fn exec_mpp_product(&mut self, product: &PauliProduct, rng: &mut impl Rng) {
         if product.terms.is_empty() {
             if product.inverted {
@@ -789,6 +855,102 @@ impl FrameSimulator {
         }
     }
 
+    fn exec_compiled_measure(
+        &mut self,
+        basis: CompiledBasis,
+        qubits: &[usize],
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) {
+        for &q in qubits {
+            match basis {
+                CompiledBasis::Z => {
+                    self.m_record.push_row(self.x_table.row_words(q));
+                    self.x_table.clear_row(q);
+                    self.z_table.randomize_row(q, rng);
+                }
+                CompiledBasis::X => {
+                    self.m_record.push_row(self.z_table.row_words(q));
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                }
+                CompiledBasis::Y => {
+                    let mut tmp = vec![0u64; wpr];
+                    for (w, word) in tmp.iter_mut().enumerate() {
+                        *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
+                    }
+                    self.m_record.push_row(&tmp);
+                    self.x_table.clear_row(q);
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                    self.z_table.randomize_row(q, rng);
+                }
+            }
+        }
+    }
+
+    fn exec_compiled_measure_reset(
+        &mut self,
+        basis: CompiledBasis,
+        qubits: &[usize],
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) {
+        for &q in qubits {
+            match basis {
+                CompiledBasis::Z => {
+                    self.m_record.push_row(self.x_table.row_words(q));
+                    self.x_table.clear_row(q);
+                    self.z_table.clear_row(q);
+                    self.z_table.randomize_row(q, rng);
+                }
+                CompiledBasis::X => {
+                    self.m_record.push_row(self.z_table.row_words(q));
+                    self.x_table.clear_row(q);
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                }
+                CompiledBasis::Y => {
+                    let mut tmp = vec![0u64; wpr];
+                    for (w, word) in tmp.iter_mut().enumerate() {
+                        *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
+                    }
+                    self.m_record.push_row(&tmp);
+                    self.x_table.clear_row(q);
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                    self.z_table.randomize_row(q, rng);
+                }
+            }
+        }
+    }
+
+    fn exec_compiled_reset(
+        &mut self,
+        basis: CompiledBasis,
+        qubits: &[usize],
+        rng: &mut impl Rng,
+    ) {
+        for &q in qubits {
+            match basis {
+                CompiledBasis::Z => {
+                    self.x_table.clear_row(q);
+                    self.z_table.randomize_row(q, rng);
+                }
+                CompiledBasis::X => {
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                }
+                CompiledBasis::Y => {
+                    self.x_table.clear_row(q);
+                    self.z_table.clear_row(q);
+                    self.x_table.randomize_row(q, rng);
+                    self.z_table.randomize_row(q, rng);
+                }
+            }
+        }
+    }
+
     fn exec_depolarize1(
         &mut self,
         targets: &[StimTarget],
@@ -796,10 +958,34 @@ impl FrameSimulator {
         wpr: usize,
         rng: &mut impl Rng,
     ) -> Result<(), String> {
+        let qubits = qubits(targets)?;
+        self.exec_depolarize1_qubits(&qubits, p, wpr, rng);
+        Ok(())
+    }
+
+    fn exec_depolarize2(
+        &mut self,
+        targets: &[StimTarget],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        let pairs = qubit_pairs(targets)?;
+        self.exec_depolarize2_pairs(&pairs, p, wpr, rng);
+        Ok(())
+    }
+
+    fn exec_depolarize1_qubits(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) {
         if p <= 0.0 {
-            return Ok(());
+            return;
         }
-        for q in qubits(targets)? {
+        for &q in qubits {
             {
                 let scratch = &mut self.depolarize_scratch;
                 scratch.prepare_one(wpr);
@@ -830,20 +1016,19 @@ impl FrameSimulator {
                 z[w] ^= scratch.z_a[w];
             }
         }
-        Ok(())
     }
 
-    fn exec_depolarize2(
+    fn exec_depolarize2_pairs(
         &mut self,
-        targets: &[StimTarget],
+        pairs: &[(usize, usize)],
         p: f64,
         wpr: usize,
         rng: &mut impl Rng,
-    ) -> Result<(), String> {
+    ) {
         if p <= 0.0 {
-            return Ok(());
+            return;
         }
-        for (qa, qb) in qubit_pairs(targets)? {
+        for &(qa, qb) in pairs {
             {
                 let scratch = &mut self.depolarize_scratch;
                 scratch.prepare_two(wpr);
@@ -878,7 +1063,59 @@ impl FrameSimulator {
                 z[w] ^= scratch.z_b[w];
             }
         }
-        Ok(())
+    }
+
+    fn exec_compiled_detector(&mut self, rec_offsets: &[usize], ref_sample: &[bool]) {
+        if !self.materialize_detector_observable_outputs {
+            return;
+        }
+        self.detector_materializations += 1;
+        let wpr = self.m_record.words_per_row();
+        let mut result = vec![0u64; wpr];
+        let mut ref_parity = false;
+        for &k in rec_offsets {
+            self.m_record.xor_lookback_into(k, &mut result);
+            let m_idx = self.m_record.len() - k;
+            if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                ref_parity = !ref_parity;
+            }
+        }
+        if ref_parity {
+            for word in &mut result {
+                *word ^= !0u64;
+            }
+        }
+        self.det_records.push(result);
+    }
+
+    fn exec_compiled_observable_include(
+        &mut self,
+        observable_index: usize,
+        rec_offsets: &[usize],
+        ref_sample: &[bool],
+    ) {
+        if !self.materialize_detector_observable_outputs {
+            return;
+        }
+        self.observable_materializations += 1;
+        let wpr = self.m_record.words_per_row();
+        while self.obs_records.len() <= observable_index {
+            self.obs_records.push(vec![0u64; wpr]);
+        }
+        let mut ref_parity = false;
+        for &k in rec_offsets {
+            self.m_record
+                .xor_lookback_into(k, &mut self.obs_records[observable_index]);
+            let m_idx = self.m_record.len() - k;
+            if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                ref_parity = !ref_parity;
+            }
+        }
+        if ref_parity {
+            for word in &mut self.obs_records[observable_index] {
+                *word ^= !0u64;
+            }
+        }
     }
 
     pub fn measurements(&self, ref_sample: &[bool]) -> BitTable {
