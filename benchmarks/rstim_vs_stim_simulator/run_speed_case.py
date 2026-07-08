@@ -98,6 +98,11 @@ def write_environment(path: Path, environment: dict[str, Any]) -> None:
     path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n")
 
 
+def _require_artifact(path: Path) -> None:
+    if not path.exists():
+        raise RuntimeError(f"missing expected artifact: {path}")
+
+
 def run_speed_case(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> None:
     rstim_binary = build_rstim(args.profile, repo_root=repo_root)
     out_dir = Path(args.out_dir)
@@ -124,6 +129,7 @@ def run_speed_case(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> 
         ],
         cwd=repo_root,
     )
+    _require_artifact(raw_path)
     _run_checked(
         [
             str(rstim_binary),
@@ -136,6 +142,7 @@ def run_speed_case(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> 
         ],
         cwd=repo_root,
     )
+    _require_artifact(summary_path)
     _run_checked(
         [
             str(rstim_binary),
@@ -148,6 +155,7 @@ def run_speed_case(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> 
         ],
         cwd=repo_root,
     )
+    _require_artifact(report_path)
     write_environment(
         environment_path,
         collect_environment(
@@ -176,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         run_speed_case(args)
-    except (OSError, subprocess.CalledProcessError, ValueError) as error:
+    except (OSError, RuntimeError, subprocess.CalledProcessError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
     return 0

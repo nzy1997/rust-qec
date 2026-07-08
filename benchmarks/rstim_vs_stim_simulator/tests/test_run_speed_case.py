@@ -75,6 +75,12 @@ class RunSpeedCaseWorkflowTest(unittest.TestCase):
 
             def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
                 commands.append(command)
+                if command[:3] == [str(binary), "perf", "run"]:
+                    (out_dir / "raw.jsonl").write_text('{"ok":true}\n')
+                elif command[:3] == [str(binary), "perf", "summarize"]:
+                    (out_dir / "summary.json").write_text('{"summary":"ok"}\n')
+                elif command[:3] == [str(binary), "perf", "report"]:
+                    (out_dir / "report.md").write_text("# report\n")
                 if command == ["rustc", "--version"]:
                     return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
                 if command == ["cargo", "--version"]:
@@ -135,7 +141,9 @@ class RunSpeedCaseWorkflowTest(unittest.TestCase):
                 ],
                 commands,
             )
-            self.assertFalse((out_dir / "summary.json").exists())
+            self.assertTrue((out_dir / "raw.jsonl").exists())
+            self.assertTrue((out_dir / "summary.json").exists())
+            self.assertTrue((out_dir / "report.md").exists())
             env = json.loads((out_dir / "environment.json").read_text())
             self.assertEqual(env["profile"], "release")
             self.assertEqual(env["case_label"], "stim-style-surface-sample-d11-r100-b1024")
@@ -145,20 +153,87 @@ class RunSpeedCaseWorkflowTest(unittest.TestCase):
             self.assertEqual(env["stim_cli_status"], "ok")
             self.assertEqual(env["stim_cli_version"], "stim 1.15.0")
 
-    def test_run_speed_case_records_stim_version_failure_status(self) -> None:
+    def test_run_speed_case_raises_when_successful_pipeline_misses_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
-            binary = repo_root / "target/debug/rstim"
+            out_dir = repo_root / "out"
+            binary = repo_root / "target/release/rstim"
             binary.parent.mkdir(parents=True)
             binary.write_text("")
-            env = run_speed_case.collect_environment(
-                profile="debug",
-                case_label="case-a",
+            args = argparse.Namespace(
+                profile="release",
+                case="stim-style-surface-sample-d11-r100-b1024",
                 warmup_rounds=0,
                 measure_rounds=1,
-                rstim_binary_path=binary,
+                out_dir=out_dir,
             )
-            self.assertIn("stim_cli_status", env)
+
+            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+                if command[:3] == [str(binary), "perf", "run"]:
+                    (out_dir / "raw.jsonl").write_text('{"ok":true}\n')
+                elif command[:3] == [str(binary), "perf", "report"]:
+                    (out_dir / "report.md").write_text("# report\n")
+                if command == ["rustc", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
+                if command == ["cargo", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "cargo 1.93.1\n", "")
+                if command == [str(binary)]:
+                    return subprocess.CompletedProcess(command, 0, "rstim 0.1.1\n", "")
+                if command == ["stim", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "stim 1.15.0\n", "")
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.run_speed_case.build_rstim",
+                    return_value=binary,
+                ),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_speed_case.subprocess.run") as mocked,
+            ):
+                mocked.side_effect = fake_run
+                with self.assertRaisesRegex(RuntimeError, "missing expected artifact: .*summary\\.json"):
+                    run_speed_case.run_speed_case(args, repo_root=repo_root)
+
+            self.assertFalse((out_dir / "environment.json").exists())
+
+    def test_collect_environment_records_stim_version_failure_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "target/debug/rstim"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("")
+
+            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+                if command == ["rustc", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
+                if command == ["cargo", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "cargo 1.93.1\n", "")
+                if command == [str(binary)]:
+                    return subprocess.CompletedProcess(command, 0, "rstim 0.1.1\n", "")
+                if command == ["stim", "--version"]:
+                    return subprocess.CompletedProcess(
+                        command,
+                        127,
+                        "",
+                        "stim: command not found\n",
+                    )
+                raise AssertionError(f"unexpected command: {command}")
+
+            with mock.patch("benchmarks.rstim_vs_stim_simulator.run_speed_case.subprocess.run") as mocked:
+                mocked.side_effect = fake_run
+                env = run_speed_case.collect_environment(
+                    profile="debug",
+                    case_label="case-a",
+                    warmup_rounds=0,
+                    measure_rounds=1,
+                    rstim_binary_path=binary,
+                )
+
+            self.assertEqual(env["stim_cli_status"], "failed")
+            self.assertIsNone(env["stim_cli_version"])
+            self.assertEqual(env["stim_cli"]["status"], "failed")
+            self.assertIsNone(env["stim_cli"]["version"])
+            self.assertEqual(env["stim_cli_stderr"], "stim: command not found")
+            self.assertEqual(env["stim_cli"]["stderr"], "stim: command not found")
 
     def test_main_rejects_bogus_profile_before_output_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
