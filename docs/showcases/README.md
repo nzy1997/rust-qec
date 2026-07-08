@@ -77,6 +77,7 @@ Showcases:
 
 - [`Benchmark And Reproduction Evidence`](docs/showcases/benchmark-evidence.md)
 - [`qec-code random-window benchmark`](docs/showcases/qec-code-random-window-benchmark.md)
+- [`rstim-vs-Stim Simulator Evidence`](docs/showcases/rstim-vs-stim-simulator.md)
 
 Primary code and docs:
 
