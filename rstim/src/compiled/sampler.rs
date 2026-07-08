@@ -28,7 +28,12 @@ pub fn sample_compiled_batch(
             frame.observable_materializations(),
         )),
         SampleOutputMode::MeasurementsOnly => {
-            Ok(BatchOutput::measurements_only(measurements, n_shots))
+            Ok(BatchOutput::measurements_only_with_materializations(
+                measurements,
+                n_shots,
+                frame.detector_materializations(),
+                frame.observable_materializations(),
+            ))
         }
     }
 }

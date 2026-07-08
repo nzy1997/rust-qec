@@ -1,13 +1,13 @@
 use rand::Rng;
 
 use crate::compiled::{
-    CompiledPathDecision, choose_sampler_path, compile_circuit, sample_compiled_batch,
+    choose_sampler_path, compile_circuit, sample_compiled_batch, CompiledPathDecision,
 };
 use crate::data_path::build_reference_sample;
-use crate::executor::Executor;
 use crate::executor::max_qubit;
+use crate::executor::Executor;
 use crate::ir::StimInstr;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -39,13 +39,22 @@ impl BatchOutput {
     }
 
     pub(crate) fn measurements_only(measurements: BitTable, n_shots: usize) -> Self {
+        Self::measurements_only_with_materializations(measurements, n_shots, 0, 0)
+    }
+
+    pub(crate) fn measurements_only_with_materializations(
+        measurements: BitTable,
+        n_shots: usize,
+        detector_materializations: usize,
+        observable_materializations: usize,
+    ) -> Self {
         Self {
             measurements,
             detections: BitTable::new(0, n_shots),
             observable_flips: BitTable::new(0, n_shots),
             output_mode: SampleOutputMode::MeasurementsOnly,
-            detector_materializations: 0,
-            observable_materializations: 0,
+            detector_materializations,
+            observable_materializations,
         }
     }
 }
@@ -167,7 +176,12 @@ fn sample_batch_interpreted(
             frame.observable_materializations(),
         )),
         SampleOutputMode::MeasurementsOnly => {
-            Ok(BatchOutput::measurements_only(measurements, n_shots))
+            Ok(BatchOutput::measurements_only_with_materializations(
+                measurements,
+                n_shots,
+                frame.detector_materializations(),
+                frame.observable_materializations(),
+            ))
         }
     }
 }
@@ -246,8 +260,8 @@ fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;
@@ -292,5 +306,19 @@ mod tests {
         ];
 
         assert_eq!(count_output_materialization_ops(&instrs), (4, 3));
+    }
+
+    #[test]
+    fn measurements_only_output_can_report_actual_materialization_counters() {
+        let out =
+            BatchOutput::measurements_only_with_materializations(BitTable::new(1, 4), 4, 2, 3);
+
+        assert_eq!(out.output_mode, SampleOutputMode::MeasurementsOnly);
+        assert_eq!(out.detections.num_major(), 0);
+        assert_eq!(out.detections.num_minor(), 4);
+        assert_eq!(out.observable_flips.num_major(), 0);
+        assert_eq!(out.observable_flips.num_minor(), 4);
+        assert_eq!(out.detector_materializations, 2);
+        assert_eq!(out.observable_materializations, 3);
     }
 }
