@@ -461,6 +461,9 @@ fn benchmark_methodology_lists_required_provenance() {
         "family.claims_limit",
         "item.status",
         "item.claims_limit",
+        "repoSourceHref",
+        "https://github.com/nzy1997/rstim/blob/master/",
+        "repoSourceHref(path)",
     ] {
         let source = if marker.starts_with("id=") { &index } else { &app };
         assert!(
