@@ -43,6 +43,20 @@ RSTIM_FIXTURE_ARTIFACT_HASHES = {
     RSTIM_CANONICAL_STIM_PATH: {"sha256": RSTIM_CANONICAL_STIM_SHA256},
     RSTIM_SHOWCASE_PATH: {"sha256": RSTIM_SHOWCASE_SHA256},
 }
+RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS = [
+    "OS",
+    "CPU model",
+    "Rust version",
+    "Python version",
+    "dependency versions",
+    "Stim version",
+    "external repository commits",
+    "command line",
+    "seeds",
+    "build profile",
+    "shot counts",
+    "date",
+]
 
 
 def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, object]:
@@ -182,18 +196,7 @@ VALID_MANIFEST = {
                         ],
                         RSTIM_FIXTURE_ARTIFACT_HASHES,
                     ),
-                    "provenance_requirements": [
-                        "OS",
-                        "CPU model",
-                        "Rust version",
-                        "Python version",
-                        "dependency versions",
-                        "external repository commits",
-                        "command line",
-                        "build profile",
-                        "shots or error budgets",
-                        "date",
-                    ],
+                    "provenance_requirements": list(RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS),
                     "provenance_sources": [
                         RSTIM_SHOWCASE_PATH,
                         "benchmarks/rstim_vs_stim_simulator/README.md",
@@ -363,6 +366,23 @@ class SiteManifestValidatorTest(unittest.TestCase):
         elif mutation == "rstim_partial_without_checked_artifacts":
             manifest["families"][3]["evidence_items"][0]["artifacts"] = []
             manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"] = {}
+        elif mutation == "rstim_missing_required_artifact":
+            manifest["families"][3]["evidence_items"][0]["artifacts"] = [
+                artifact
+                for artifact in manifest["families"][3]["evidence_items"][0]["artifacts"]
+                if artifact["path"] != RSTIM_CORRECTNESS_SUMMARY_PATH
+            ]
+            del manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                RSTIM_CORRECTNESS_SUMMARY_PATH
+            ]
+        elif mutation == "rstim_wrong_artifact_kind":
+            manifest["families"][3]["evidence_items"][0]["artifacts"][0]["kind"] = "json"
+        elif mutation == "rstim_missing_stim_provenance_requirement":
+            manifest["families"][3]["evidence_items"][0]["provenance_requirements"] = [
+                requirement
+                for requirement in manifest["families"][3]["evidence_items"][0]["provenance_requirements"]
+                if requirement != "Stim version"
+            ]
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -438,6 +458,46 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "rstim-vs-stim-simulator" in error
                 and "partial" in error
                 and "future" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_missing_required_artifact(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_missing_required_artifact")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-simulator" in error
+                and RSTIM_CORRECTNESS_SUMMARY_PATH in error
+                and "required checked artifact" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_wrong_artifact_kind(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_wrong_artifact_kind")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and RSTIM_SPEED_SUMMARY_PATH in error
+                and "kind" in error
+                and "speed-summary" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_missing_stim_provenance_requirement(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_missing_stim_provenance_requirement")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and "Stim version" in error
+                and "provenance_requirements" in error
                 for error in errors
             ),
             errors,
