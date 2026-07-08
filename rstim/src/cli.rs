@@ -2252,6 +2252,34 @@ mod tests {
     }
 
     #[test]
+    fn run_dispatches_perf_summarize_selected_case_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let raw_path = dir.path().join("raw.jsonl");
+        let summary_path = dir.path().join("summary.json");
+        std::fs::write(&raw_path, PERF_PASS_RAW).unwrap();
+
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Summarize {
+                    case: Some("rep-sample-d13-r13".to_string()),
+                    r#in: Some(raw_path.display().to_string()),
+                    out: Some(summary_path.display().to_string()),
+                },
+            }),
+        })
+        .unwrap();
+
+        let summary: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(summary_path).unwrap()).unwrap();
+        let cases = summary["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0]["case_label"], "rep-sample-d13-r13");
+        assert!(summary["issues"].as_array().unwrap().iter().all(|issue| {
+            issue["case_label"].as_str() == Some("rep-sample-d13-r13")
+        }));
+    }
+
+    #[test]
     fn run_dispatches_perf_gate_failure_in_process() {
         let dir = tempfile::tempdir().unwrap();
         let summary_path = dir.path().join("summary.json");
