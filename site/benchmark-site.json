@@ -540,9 +540,9 @@
             "docs/showcases/rstim-vs-stim-simulator.md",
             "benchmarks/rstim_vs_stim_simulator/README.md"
           ],
-          "claims_limit": "Checked artifacts document one recorded surface-code d11/r100 workload and its recorded environment only.",
+          "claims_limit": "Checked artifacts document recorded workloads and recorded environments only, not broad rstim/Stim parity.",
           "caveats": [
-            "The checked speed summary and report are report-only evidence for the selected d11/r100 sample workload; they do not claim broad rstim-versus-Stim performance parity.",
+            "The checked speed summary and report are report-only evidence for the selected d11/r100 sample workload and its recorded workloads and recorded environments; they are not broad rstim/Stim parity evidence.",
             "The correctness summary is statistical evidence on the checked full fixture and recorded seed policy; it does not prove all circuits, seeds, detector paths, or simulator features agree with Stim.",
             "The canonical .stim fixture is Stim-generated checked circuit text, not evidence that rstim reproduces Stim generator output.",
             "Slow, failed, or incomplete variants would still be valid evidence when recorded; this family publishes the checked outcome, not an optimization guarantee."
