@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::compiled::{
-    choose_sampler_path, compile_circuit, sample_compiled_batch, CompiledPathDecision,
+    CompiledPathDecision, choose_sampler_path, compile_circuit, sample_compiled_batch,
 };
 use crate::data_path::build_reference_sample;
 use crate::executor::Executor;
@@ -15,6 +15,46 @@ pub struct BatchOutput {
     pub measurements: BitTable,
     pub detections: BitTable,
     pub observable_flips: BitTable,
+    pub output_mode: SampleOutputMode,
+    pub detector_materializations: usize,
+    pub observable_materializations: usize,
+}
+
+impl BatchOutput {
+    pub(crate) fn full(
+        measurements: BitTable,
+        detections: BitTable,
+        observable_flips: BitTable,
+        detector_materializations: usize,
+        observable_materializations: usize,
+    ) -> Self {
+        Self {
+            measurements,
+            detections,
+            observable_flips,
+            output_mode: SampleOutputMode::Full,
+            detector_materializations,
+            observable_materializations,
+        }
+    }
+
+    pub(crate) fn measurements_only(measurements: BitTable, n_shots: usize) -> Self {
+        Self {
+            measurements,
+            detections: BitTable::new(0, n_shots),
+            observable_flips: BitTable::new(0, n_shots),
+            output_mode: SampleOutputMode::MeasurementsOnly,
+            detector_materializations: 0,
+            observable_materializations: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SampleOutputMode {
+    #[default]
+    Full,
+    MeasurementsOnly,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -29,6 +69,7 @@ pub enum SamplingBackend {
 pub struct SampleOptions {
     pub reference_sample_mode: crate::data_path::ReferenceSampleMode,
     pub backend: SamplingBackend,
+    pub output_mode: SampleOutputMode,
 }
 
 pub fn sample_batch_with_options(
@@ -83,17 +124,23 @@ fn sample_batch_interpreted(
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
     let num_qubits = max_qubit(instrs)?;
     let mut frame = FrameSimulator::new(num_qubits, n_shots);
+    frame
+        .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run(instrs, &ref_sample, rng)?;
 
     let measurements = frame.measurements(&ref_sample);
-    let detections = frame.detections();
-    let observable_flips = frame.observable_flips();
-
-    Ok(BatchOutput {
-        measurements,
-        detections,
-        observable_flips,
-    })
+    match options.output_mode {
+        SampleOutputMode::Full => Ok(BatchOutput::full(
+            measurements,
+            frame.detections(),
+            frame.observable_flips(),
+            frame.detector_materializations(),
+            frame.observable_materializations(),
+        )),
+        SampleOutputMode::MeasurementsOnly => {
+            Ok(BatchOutput::measurements_only(measurements, n_shots))
+        }
+    }
 }
 
 fn sample_batch_with_executor(
@@ -121,6 +168,10 @@ fn sample_batch_with_executor(
         }
     }
 
+    if options.output_mode == SampleOutputMode::MeasurementsOnly {
+        return Ok(BatchOutput::measurements_only(measurements, n_shots));
+    }
+
     let m2d = measurements_to_detections_with_options(
         instrs,
         &measurements,
@@ -131,11 +182,13 @@ fn sample_batch_with_executor(
         },
     )?;
 
-    Ok(BatchOutput {
+    Ok(BatchOutput::full(
         measurements,
-        detections: m2d.detections,
-        observable_flips: m2d.observable_flips,
-    })
+        m2d.detections,
+        m2d.observable_flips,
+        0,
+        0,
+    ))
 }
 
 fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
