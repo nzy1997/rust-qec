@@ -295,7 +295,7 @@ Replace the nested per-bit event-selection loop in the `DEPOLARIZE2` match arm w
 }
 ```
 
-- [ ] **Step 5: Run focused tests to verify GREEN**
+- [x] **Step 5: Run focused tests to verify GREEN**
 
 Run:
 
@@ -305,7 +305,7 @@ cargo test -p rstim --test frame_noise_masks
 
 Expected: PASS, with all six issue-required tests passing.
 
-- [ ] **Step 6: Run final verification**
+- [x] **Step 6: Run final verification**
 
 Run:
 

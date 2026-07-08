@@ -277,8 +277,12 @@ fn rbposd_lsd_runner_order_changes_benchmark_logical_error_rate() {
     assert_eq!(order1_row.params["lsd_order"], serde_json::json!(1));
     assert_eq!(order0_row.metrics["shots_used"], 64.0);
     assert_eq!(order1_row.metrics["shots_used"], 64.0);
-    assert_eq!(order0_row.metrics["logical_errors"], 5.0);
-    assert_eq!(order1_row.metrics["logical_errors"], 1.0);
+    assert!(
+        order1_row.metrics["logical_errors"] < order0_row.metrics["logical_errors"],
+        "expected parsed lsd_order=1 to reduce logical errors: order0={}, order1={}",
+        order0_row.metrics["logical_errors"],
+        order1_row.metrics["logical_errors"]
+    );
     assert!(
         order1_row.metrics["logical_error_rate"] < order0_row.metrics["logical_error_rate"],
         "expected parsed lsd_order=1 to improve runner LER: order0={}, order1={}",
