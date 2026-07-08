@@ -92,7 +92,7 @@ fn depolarize1_and_depolarize2_preserve_distribution_smoke() {
     let dep2_rows = run_frame("DEPOLARIZE2(0.3) 0 1\nM 0 1\n", 2, batch_size, 11);
     let dep2_flips = count_measurement_ones(&dep2_rows);
     assert!(
-        (22_500..=25_000).contains(&dep2_flips),
-        "DEPOLARIZE2(0.3) should flip about 18.7% of measured qubit results; got {dep2_flips}"
+        (19_800..=22_100).contains(&dep2_flips),
+        "DEPOLARIZE2(0.3) should flip about 16% of measured qubit results; got {dep2_flips}"
     );
 }
