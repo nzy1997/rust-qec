@@ -39,7 +39,12 @@ impl FrameSimulator {
     ) -> Result<(), String> {
         for instr in instrs {
             match instr {
-                StimInstr::Op { name, args, targets, .. } => {
+                StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } => {
                     self.exec_op(name.as_str(), args, targets, ref_sample, rng)?;
                 }
                 StimInstr::Repeat { count, body } => {
@@ -313,55 +318,70 @@ impl FrameSimulator {
             }
 
             // --- Noise channels ---
-
             "X_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, p, rng);
+                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= noise[w];
+                    }
                 }
             }
             "Z_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, p, rng);
+                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= noise[w];
+                    }
                 }
             }
             "Y_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, p, rng);
+                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= noise[w];
+                    }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= noise[w];
+                    }
                 }
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                if p <= 0.0 { /* skip */ }
-                else {
+                if p > 0.0 {
                     for q in qubits(targets)? {
+                        let events = random_bits_with_prob(wpr, self.batch_size, p, rng);
                         let mut xf = vec![0u64; wpr];
                         let mut zf = vec![0u64; wpr];
                         for w in 0..wpr {
-                            for bit in 0..64u32 {
-                                if rng.r#gen::<f64>() < p {
-                                    match rng.gen_range(0u8..3) {
-                                        0 => xf[w] |= 1u64 << bit,
-                                        1 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
-                                        _ => zf[w] |= 1u64 << bit,
+                            let mut bits = events[w];
+                            while bits != 0 {
+                                let bit = bits.trailing_zeros();
+                                match rng.gen_range(0u8..3) {
+                                    0 => xf[w] |= 1u64 << bit,
+                                    1 => {
+                                        xf[w] |= 1u64 << bit;
+                                        zf[w] |= 1u64 << bit;
                                     }
+                                    _ => zf[w] |= 1u64 << bit,
                                 }
+                                bits &= bits - 1;
                             }
                         }
                         let x = self.x_table.row_words_mut(q);
-                        for w in 0..wpr { x[w] ^= xf[w]; }
+                        for w in 0..wpr {
+                            x[w] ^= xf[w];
+                        }
                         let z = self.z_table.row_words_mut(q);
-                        for w in 0..wpr { z[w] ^= zf[w]; }
+                        for w in 0..wpr {
+                            z[w] ^= zf[w];
+                        }
                     }
                 }
             }
@@ -369,46 +389,68 @@ impl FrameSimulator {
                 let p = args.first().copied().unwrap_or(0.0);
                 if p > 0.0 {
                     for (qa, qb) in qubit_pairs(targets)? {
+                        let events = random_bits_with_prob(wpr, self.batch_size, p, rng);
                         let mut xa = vec![0u64; wpr];
                         let mut za = vec![0u64; wpr];
                         let mut xb = vec![0u64; wpr];
                         let mut zb = vec![0u64; wpr];
                         for w in 0..wpr {
-                            for bit in 0..64u32 {
-                                if rng.r#gen::<f64>() < p {
-                                    let r = rng.gen_range(0u8..15);
-                                    let (pa, pb) = two_qubit_pauli(r);
-                                    apply_pauli_bits(pa, &mut xa, &mut za, w, bit);
-                                    apply_pauli_bits(pb, &mut xb, &mut zb, w, bit);
-                                }
+                            let mut bits = events[w];
+                            while bits != 0 {
+                                let bit = bits.trailing_zeros();
+                                let r = rng.gen_range(0u8..15);
+                                let (pa, pb) = two_qubit_pauli(r);
+                                apply_pauli_bits(pa, &mut xa, &mut za, w, bit);
+                                apply_pauli_bits(pb, &mut xb, &mut zb, w, bit);
+                                bits &= bits - 1;
                             }
                         }
                         let x = self.x_table.row_words_mut(qa);
-                        for w in 0..wpr { x[w] ^= xa[w]; }
+                        for w in 0..wpr {
+                            x[w] ^= xa[w];
+                        }
                         let z = self.z_table.row_words_mut(qa);
-                        for w in 0..wpr { z[w] ^= za[w]; }
+                        for w in 0..wpr {
+                            z[w] ^= za[w];
+                        }
                         let x = self.x_table.row_words_mut(qb);
-                        for w in 0..wpr { x[w] ^= xb[w]; }
+                        for w in 0..wpr {
+                            x[w] ^= xb[w];
+                        }
                         let z = self.z_table.row_words_mut(qb);
-                        for w in 0..wpr { z[w] ^= zb[w]; }
+                        for w in 0..wpr {
+                            z[w] ^= zb[w];
+                        }
                     }
                 }
             }
 
             "CORRELATED_ERROR" | "E" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                let noise = random_bits_with_prob(wpr, p, rng);
-                apply_pauli_noise_to_targets(&mut self.x_table, &mut self.z_table, targets, &noise, wpr);
+                let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+                apply_pauli_noise_to_targets(
+                    &mut self.x_table,
+                    &mut self.z_table,
+                    targets,
+                    &noise,
+                    wpr,
+                );
                 self.last_correlated_error_occurred = noise;
             }
             "ELSE_CORRELATED_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                let candidate = random_bits_with_prob(wpr, p, rng);
+                let candidate = random_bits_with_prob(wpr, self.batch_size, p, rng);
                 let mut noise = vec![0u64; wpr];
                 for w in 0..wpr {
                     noise[w] = candidate[w] & !self.last_correlated_error_occurred[w];
                 }
-                apply_pauli_noise_to_targets(&mut self.x_table, &mut self.z_table, targets, &noise, wpr);
+                apply_pauli_noise_to_targets(
+                    &mut self.x_table,
+                    &mut self.z_table,
+                    targets,
+                    &noise,
+                    wpr,
+                );
                 for w in 0..wpr {
                     self.last_correlated_error_occurred[w] |= noise[w];
                 }
@@ -435,21 +477,40 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= xf[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= xf[w];
+                    }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= zf[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= zf[w];
+                    }
                 }
             }
             "PAULI_CHANNEL_2" => {
-                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
+                let probs: Vec<f64> = (0..15)
+                    .map(|i| args.get(i).copied().unwrap_or(0.0))
+                    .collect();
                 let mut cum = [0.0f64; 15];
                 cum[0] = probs[0];
-                for i in 1..15 { cum[i] = cum[i - 1] + probs[i]; }
+                for i in 1..15 {
+                    cum[i] = cum[i - 1] + probs[i];
+                }
                 let paulis: [(u8, u8); 15] = [
-                    (0, 1), (0, 2), (0, 3),
-                    (1, 0), (1, 1), (1, 2), (1, 3),
-                    (2, 0), (2, 1), (2, 2), (2, 3),
-                    (3, 0), (3, 1), (3, 2), (3, 3),
+                    (0, 1),
+                    (0, 2),
+                    (0, 3),
+                    (1, 0),
+                    (1, 1),
+                    (1, 2),
+                    (1, 3),
+                    (2, 0),
+                    (2, 1),
+                    (2, 2),
+                    (2, 3),
+                    (3, 0),
+                    (3, 1),
+                    (3, 2),
+                    (3, 3),
                 ];
                 for (qa, qb) in qubit_pairs(targets)? {
                     let mut xa = vec![0u64; wpr];
@@ -469,20 +530,28 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(qa);
-                    for w in 0..wpr { x[w] ^= xa[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= xa[w];
+                    }
                     let z = self.z_table.row_words_mut(qa);
-                    for w in 0..wpr { z[w] ^= za[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= za[w];
+                    }
                     let x = self.x_table.row_words_mut(qb);
-                    for w in 0..wpr { x[w] ^= xb[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= xb[w];
+                    }
                     let z = self.z_table.row_words_mut(qb);
-                    for w in 0..wpr { z[w] ^= zb[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= zb[w];
+                    }
                 }
             }
 
             "HERALDED_ERASE" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let herald = random_bits_with_prob(wpr, p, rng);
+                    let herald = random_bits_with_prob(wpr, self.batch_size, p, rng);
                     self.m_record.push_row(&herald);
                     let mut xf = vec![0u64; wpr];
                     let mut zf = vec![0u64; wpr];
@@ -492,7 +561,10 @@ impl FrameSimulator {
                             let bit = bits.trailing_zeros();
                             match rng.gen_range(0u8..4) {
                                 1 => xf[w] |= 1u64 << bit,
-                                2 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
+                                2 => {
+                                    xf[w] |= 1u64 << bit;
+                                    zf[w] |= 1u64 << bit;
+                                }
                                 3 => zf[w] |= 1u64 << bit,
                                 _ => {}
                             }
@@ -500,9 +572,13 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= xf[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= xf[w];
+                    }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= zf[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= zf[w];
+                    }
                 }
             }
             "HERALDED_PAULI_CHANNEL_1" => {
@@ -512,7 +588,7 @@ impl FrameSimulator {
                 let pz = args.get(3).copied().unwrap_or(0.0);
                 let total = pi + px + py + pz;
                 for q in qubits(targets)? {
-                    let herald = random_bits_with_prob(wpr, total, rng);
+                    let herald = random_bits_with_prob(wpr, self.batch_size, total, rng);
                     self.m_record.push_row(&herald);
                     let mut xf = vec![0u64; wpr];
                     let mut zf = vec![0u64; wpr];
@@ -535,16 +611,19 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= xf[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= xf[w];
+                    }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= zf[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= zf[w];
+                    }
                 }
             }
 
             "I_ERROR" | "II_ERROR" => {}
 
             // --- Multi-qubit Pauli measurements ---
-
             "MPP" => {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
@@ -581,7 +660,6 @@ impl FrameSimulator {
             }
 
             // --- SPP ---
-
             "SPP" | "SPP_DAG" => {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
@@ -604,7 +682,9 @@ impl FrameSimulator {
                     }
                 }
                 if ref_parity {
-                    for w in &mut result { *w ^= !0u64; }
+                    for w in &mut result {
+                        *w ^= !0u64;
+                    }
                 }
                 self.det_records.push(result);
             }
@@ -618,7 +698,8 @@ impl FrameSimulator {
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
                         let k = (-*offset) as usize;
-                        self.m_record.xor_lookback_into(k, &mut self.obs_records[idx]);
+                        self.m_record
+                            .xor_lookback_into(k, &mut self.obs_records[idx]);
                         let m_idx = self.m_record.len() - k;
                         if m_idx < ref_sample.len() && ref_sample[m_idx] {
                             ref_parity = !ref_parity;
@@ -626,7 +707,9 @@ impl FrameSimulator {
                     }
                 }
                 if ref_parity {
-                    for w in &mut self.obs_records[idx] { *w ^= !0u64; }
+                    for w in &mut self.obs_records[idx] {
+                        *w ^= !0u64;
+                    }
                 }
             }
 
@@ -666,8 +749,12 @@ impl FrameSimulator {
 
         // 2. CX fold onto anchor
         let anchor = product.terms.last().unwrap().0;
-        let non_anchor: Vec<usize> = product.terms.iter()
-            .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+        let non_anchor: Vec<usize> = product
+            .terms
+            .iter()
+            .map(|&(q, _)| q)
+            .filter(|&q| q != anchor)
+            .collect();
         for &q in &non_anchor {
             do_cx(&mut self.x_table, &mut self.z_table, q, anchor);
         }
@@ -708,8 +795,12 @@ impl FrameSimulator {
 
         // 2. CX fold onto anchor
         let anchor = product.terms.last().unwrap().0;
-        let non_anchor: Vec<usize> = product.terms.iter()
-            .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
+        let non_anchor: Vec<usize> = product
+            .terms
+            .iter()
+            .map(|&(q, _)| q)
+            .filter(|&q| q != anchor)
+            .collect();
         for &q in &non_anchor {
             do_cx(&mut self.x_table, &mut self.z_table, q, anchor);
         }
@@ -909,18 +1000,48 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 // --- Noise helpers ---
 
-fn random_bits_with_prob(words: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
+fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
-    if p <= 0.0 { return result; }
-    if p >= 1.0 { result.fill(!0u64); return result; }
-    for w in &mut result {
-        for bit in 0..64u32 {
-            if rng.r#gen::<f64>() < p {
-                *w |= 1u64 << bit;
+    if p <= 0.0 {
+        return result;
+    }
+    if p >= 1.0 {
+        result.fill(!0u64);
+        mask_unused_bits(&mut result, valid_bits);
+        return result;
+    }
+
+    let threshold = probability_threshold_u64(p);
+    if threshold == 0 {
+        return result;
+    }
+
+    for (word_idx, word) in result.iter_mut().enumerate() {
+        let valid_in_word = valid_bits.saturating_sub(word_idx * 64).min(64);
+        for bit in 0..valid_in_word {
+            if rng.r#gen::<u64>() < threshold {
+                *word |= 1u64 << bit;
             }
         }
     }
     result
+}
+
+fn probability_threshold_u64(p: f64) -> u64 {
+    (p * 18_446_744_073_709_551_616.0) as u64
+}
+
+fn mask_unused_bits(words: &mut [u64], valid_bits: usize) {
+    if words.is_empty() {
+        return;
+    }
+    let valid_in_last = valid_bits % 64;
+    if valid_in_last != 0 {
+        let mask = (1u64 << valid_in_last) - 1;
+        if let Some(last) = words.last_mut() {
+            *last &= mask;
+        }
+    }
 }
 
 fn apply_pauli_noise_to_targets(
@@ -936,17 +1057,25 @@ fn apply_pauli_noise_to_targets(
             match basis {
                 PauliBasis::X => {
                     let x = x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= noise[w];
+                    }
                 }
                 PauliBasis::Y => {
                     let x = x_table.row_words_mut(q);
-                    for w in 0..wpr { x[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        x[w] ^= noise[w];
+                    }
                     let z = z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= noise[w];
+                    }
                 }
                 PauliBasis::Z => {
                     let z = z_table.row_words_mut(q);
-                    for w in 0..wpr { z[w] ^= noise[w]; }
+                    for w in 0..wpr {
+                        z[w] ^= noise[w];
+                    }
                 }
             }
         }
@@ -957,8 +1086,12 @@ fn two_qubit_pauli(r: u8) -> (u8, u8) {
     let mut idx = 0u8;
     for a in 0..4u8 {
         for b in 0..4u8 {
-            if a == 0 && b == 0 { continue; }
-            if idx == r { return (a, b); }
+            if a == 0 && b == 0 {
+                continue;
+            }
+            if idx == r {
+                return (a, b);
+            }
             idx += 1;
         }
     }
@@ -968,7 +1101,10 @@ fn two_qubit_pauli(r: u8) -> (u8, u8) {
 fn apply_pauli_bits(p: u8, xf: &mut [u64], zf: &mut [u64], w: usize, bit: u32) {
     match p {
         1 => xf[w] |= 1u64 << bit,
-        2 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
+        2 => {
+            xf[w] |= 1u64 << bit;
+            zf[w] |= 1u64 << bit;
+        }
         3 => zf[w] |= 1u64 << bit,
         _ => {}
     }
@@ -989,7 +1125,11 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
 
     for target in targets {
         match target {
-            StimTarget::Pauli { qubit, basis, inverted: inv } => {
+            StimTarget::Pauli {
+                qubit,
+                basis,
+                inverted: inv,
+            } => {
                 if !after_combiner && !current_terms.is_empty() {
                     products.push(PauliProduct {
                         terms: std::mem::take(&mut current_terms),
@@ -1010,7 +1150,10 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
         }
     }
     if !current_terms.is_empty() {
-        products.push(PauliProduct { terms: current_terms, inverted });
+        products.push(PauliProduct {
+            terms: current_terms,
+            inverted,
+        });
     }
     Ok(products)
 }

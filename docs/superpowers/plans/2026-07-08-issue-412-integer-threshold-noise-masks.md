@@ -155,7 +155,7 @@ Expected: FAIL. Before implementation, the `DEPOLARIZE1` and `DEPOLARIZE2` sourc
 - Consumes: existing `random_bits_with_prob` call sites and `FrameSimulator::batch_size`.
 - Produces: `random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64>` and depolarizing match arms that consume event masks from that helper.
 
-- [ ] **Step 1: Update Bernoulli helper signature and call sites**
+- [x] **Step 1: Update Bernoulli helper signature and call sites**
 
 In `rstim/src/sim/frame.rs`, change every simple Bernoulli mask call from:
 
@@ -171,7 +171,7 @@ let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
 
 Apply the same `self.batch_size` argument for correlated, else-correlated, heralded erase, and heralded Pauli channel masks.
 
-- [ ] **Step 2: Replace the helper implementation**
+- [x] **Step 2: Replace the helper implementation**
 
 Replace `random_bits_with_prob` with:
 
@@ -221,7 +221,7 @@ fn mask_unused_bits(words: &mut [u64], valid_bits: usize) {
 }
 ```
 
-- [ ] **Step 3: Route `DEPOLARIZE1` through the helper**
+- [x] **Step 3: Route `DEPOLARIZE1` through the helper**
 
 Replace the nested per-bit event-selection loop in the `DEPOLARIZE1` match arm with:
 
@@ -257,7 +257,7 @@ Replace the nested per-bit event-selection loop in the `DEPOLARIZE1` match arm w
 }
 ```
 
-- [ ] **Step 4: Route `DEPOLARIZE2` through the helper**
+- [x] **Step 4: Route `DEPOLARIZE2` through the helper**
 
 Replace the nested per-bit event-selection loop in the `DEPOLARIZE2` match arm with:
 
