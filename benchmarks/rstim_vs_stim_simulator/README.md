@@ -49,6 +49,13 @@ Inspect the expanded operation load for the checked full fixture:
 
 ```sh
 python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
+  --case stim_surface_d11_r100
+```
+
+Write the same deterministic report as JSON:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
   --case stim_surface_d11_r100 \
   --manifest benchmarks/rstim_vs_stim_simulator/cases.full.toml \
   --format json \

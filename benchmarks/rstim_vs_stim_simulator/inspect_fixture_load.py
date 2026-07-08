@@ -197,6 +197,10 @@ def format_text_report(report: dict[str, object]) -> str:
         f"actual_measurements={report['actual_measurements']}\n"
         f"actual_detectors={report['actual_detectors']}\n"
         f"actual_observables={report['actual_observables']}\n"
+        f"flattened_operation_count={report['flattened_operation_count']}\n"
+        f"repeat_block_count={report['repeat_block_count']}\n"
+        f"repeat_depth={report['repeat_depth']}\n"
+        f"repeat_expansion_count={report['repeat_expansion_count']}\n"
         f"expanded_operation_count={report['expanded_operation_count']}\n"
         "operations:\n"
         + "\n".join(

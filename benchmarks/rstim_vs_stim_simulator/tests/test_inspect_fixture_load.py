@@ -77,6 +77,10 @@ class InspectFixtureLoadReportTest(unittest.TestCase):
         self.assertIn("actual_measurements=12121", result.stdout)
         self.assertIn("actual_detectors=12000", result.stdout)
         self.assertIn("actual_observables=1", result.stdout)
+        self.assertIn("flattened_operation_count=14448", result.stdout)
+        self.assertIn("repeat_block_count=1", result.stdout)
+        self.assertIn("repeat_depth=1", result.stdout)
+        self.assertIn("repeat_expansion_count=99", result.stdout)
 
         found_depola = False
         found_detector = False
