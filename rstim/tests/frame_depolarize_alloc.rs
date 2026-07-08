@@ -5,11 +5,13 @@ use rstim::parser::parse_lines;
 use rstim::sim::frame::FrameSimulator;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 struct CountingAllocator;
 
 static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
 static COUNT_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
+static ALLOCATION_COUNTER_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -26,6 +28,16 @@ unsafe impl GlobalAlloc for CountingAllocator {
 
 #[global_allocator]
 static GLOBAL: CountingAllocator = CountingAllocator;
+
+fn allocation_counter_lock() -> &'static Mutex<()> {
+    ALLOCATION_COUNTER_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn lock_allocation_counter() -> MutexGuard<'static, ()> {
+    allocation_counter_lock()
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+}
 
 fn run_frame(program: &str, num_qubits: usize, batch_size: usize, seed: u64) -> Vec<Vec<u64>> {
     let instrs = parse_lines(program).unwrap();
@@ -57,30 +69,37 @@ fn many_depolarize2_pairs(pair_count: usize) -> String {
     program
 }
 
-#[test]
-fn depolarize2_reuses_scratch_across_many_target_pairs() {
-    let pair_count = 256;
-    let batch_size = 512;
+fn count_depolarize2_run_allocations(pair_count: usize, batch_size: usize, seed: u64) -> usize {
     let program = many_depolarize2_pairs(pair_count);
     let instrs = parse_lines(&program).unwrap();
     let ref_sample = reference_sample(&instrs).unwrap();
-    let mut rng = StdRng::seed_from_u64(19);
+    let mut rng = StdRng::seed_from_u64(seed);
     let mut frame = FrameSimulator::new(pair_count * 2, batch_size);
 
     ALLOC_COUNT.store(0, Ordering::Relaxed);
     COUNT_ALLOCATIONS.store(true, Ordering::Relaxed);
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     COUNT_ALLOCATIONS.store(false, Ordering::Relaxed);
+    ALLOC_COUNT.load(Ordering::Relaxed)
+}
 
-    let allocations = ALLOC_COUNT.load(Ordering::Relaxed);
+#[test]
+fn depolarize2_reuses_scratch_across_many_target_pairs() {
+    let pair_count = 256;
+    let batch_size = 512;
+    let _allocation_lock = lock_allocation_counter();
+
+    let control_allocations = count_depolarize2_run_allocations(1, batch_size, 19);
+    let many_allocations = count_depolarize2_run_allocations(pair_count, batch_size, 19);
     assert!(
-        allocations < 160,
-        "DEPOLARIZE2 should reuse scratch across {pair_count} target pairs; saw {allocations} allocations"
+        many_allocations <= control_allocations + 64,
+        "DEPOLARIZE2 allocations should grow near-linearly with target pairs; control={control_allocations}, many_pairs={many_allocations}"
     );
 }
 
 #[test]
 fn depolarize1_and_depolarize2_preserve_distribution_smoke() {
+    let _allocation_lock = lock_allocation_counter();
     let batch_size = 65_536;
     let dep1_rows = run_frame("DEPOLARIZE1(0.3) 0\nM 0\n", 1, batch_size, 7);
     let dep1_flips = count_measurement_ones(&dep1_rows);
