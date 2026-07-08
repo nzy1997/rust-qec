@@ -1,11 +1,11 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::sim::measure_record_batch::MeasureRecordBatch;
+use rstim::sim::bit_table::BitTable;
+use rstim::sim::frame::FrameSimulator;
 use rstim::executor::{reference_sample, reference_sample_with_sweep_bits};
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
-use rstim::sim::bit_table::BitTable;
-use rstim::sim::frame::FrameSimulator;
-use rstim::sim::measure_record_batch::MeasureRecordBatch;
 
 #[test]
 fn measure_record_batch_push_and_lookback() {
@@ -26,10 +26,10 @@ fn measure_record_batch_multiple_rows() {
     let mut r2 = BitTable::new(1, 64);
     r2.set(0, 1, true);
     mrb.push_row(r2.row_words(0));
-    assert_eq!(mrb.lookback(1, 0), false); // r2, shot 0
-    assert_eq!(mrb.lookback(1, 1), true); // r2, shot 1
-    assert_eq!(mrb.lookback(2, 0), true); // r1, shot 0
-    assert_eq!(mrb.lookback(2, 1), false); // r1, shot 1
+    assert_eq!(mrb.lookback(1, 0), false);  // r2, shot 0
+    assert_eq!(mrb.lookback(1, 1), true);   // r2, shot 1
+    assert_eq!(mrb.lookback(2, 0), true);   // r1, shot 0
+    assert_eq!(mrb.lookback(2, 1), false);  // r1, shot 1
 }
 
 #[test]
@@ -193,9 +193,7 @@ fn frame_sim_x_error_all_flip() {
     let mut frame = FrameSimulator::new(1, 64);
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     let m = frame.measurements(&ref_sample);
-    for shot in 0..64 {
-        assert_eq!(m.get(0, shot), true);
-    }
+    for shot in 0..64 { assert_eq!(m.get(0, shot), true); }
 }
 
 #[test]
@@ -206,9 +204,7 @@ fn frame_sim_z_error_no_flip_z_measurement() {
     let mut frame = FrameSimulator::new(1, 64);
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     let m = frame.measurements(&ref_sample);
-    for shot in 0..64 {
-        assert_eq!(m.get(0, shot), false);
-    }
+    for shot in 0..64 { assert_eq!(m.get(0, shot), false); }
 }
 
 #[test]
@@ -227,8 +223,7 @@ fn frame_sim_correlated_error() {
 
 #[test]
 fn frame_sim_else_correlated_error() {
-    let instrs =
-        parse_lines("CORRELATED_ERROR(1) X0\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\n").unwrap();
+    let instrs = parse_lines("CORRELATED_ERROR(1) X0\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\n").unwrap();
     let ref_sample = reference_sample(&instrs).unwrap();
     let mut rng = StdRng::seed_from_u64(42);
     let mut frame = FrameSimulator::new(2, 64);
@@ -251,10 +246,7 @@ fn frame_sim_depolarize1_statistical() {
     let m = frame.measurements(&ref_sample);
     let count: usize = (0..n).filter(|&s| m.get(0, s)).count();
     // X or Y flip Z measurement: 2/3 of 75% = 50%
-    assert!(
-        (count as f64 / n as f64 - 0.5).abs() < 0.05,
-        "count={count}"
-    );
+    assert!((count as f64 / n as f64 - 0.5).abs() < 0.05, "count={count}");
 }
 
 #[test]
@@ -279,9 +271,7 @@ fn frame_sim_heralded_erase() {
     let mut frame = FrameSimulator::new(1, 64);
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     let m = frame.measurements(&ref_sample);
-    for shot in 0..64 {
-        assert_eq!(m.get(0, shot), true);
-    }
+    for shot in 0..64 { assert_eq!(m.get(0, shot), true); }
 }
 
 #[test]

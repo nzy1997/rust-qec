@@ -11,8 +11,8 @@
 //   returns deterministic result (all same) for these cases
 // - RY/MY combination -- RY randomizes x and z independently, making MY non-deterministic
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
 
@@ -21,10 +21,12 @@ fn rng() -> StdRng {
 }
 
 /// Count how many shots have measurement `m_idx` set to true.
-fn count_meas(out: &rstim::sampler::BatchOutput, m_idx: usize, n_shots: usize) -> usize {
-    (0..n_shots)
-        .filter(|&s| out.measurements.get(m_idx, s))
-        .count()
+fn count_meas(
+    out: &rstim::sampler::BatchOutput,
+    m_idx: usize,
+    n_shots: usize,
+) -> usize {
+    (0..n_shots).filter(|&s| out.measurements.get(m_idx, s)).count()
 }
 
 // === correlated_error ===
@@ -336,26 +338,26 @@ fn resets_vs_measurements_mr_repeated() {
 // === block_results_single_shot ===
 #[test]
 fn block_results_single_shot() {
-    let instrs = parse_lines("REPEAT 1000 {\n    X_ERROR(1) 0\n    MR 0\n    M 0 0\n}\n").unwrap();
+    let instrs = parse_lines(
+        "REPEAT 1000 {\n    X_ERROR(1) 0\n    MR 0\n    M 0 0\n}\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 1, &mut r).unwrap();
     for i in 0..1000 {
         assert!(out.measurements.get(i * 3, 0), "iter {i}: MR should be 1");
-        assert!(
-            !out.measurements.get(i * 3 + 1, 0),
-            "iter {i}: M after R should be 0"
-        );
-        assert!(
-            !out.measurements.get(i * 3 + 2, 0),
-            "iter {i}: second M should be 0"
-        );
+        assert!(!out.measurements.get(i * 3 + 1, 0), "iter {i}: M after R should be 0");
+        assert!(!out.measurements.get(i * 3 + 2, 0), "iter {i}: second M should be 0");
     }
 }
 
 // === block_results_triple_shot ===
 #[test]
 fn block_results_triple_shot() {
-    let instrs = parse_lines("REPEAT 1000 {\n    X_ERROR(1) 0\n    MR 0\n    M 0 0\n}\n").unwrap();
+    let instrs = parse_lines(
+        "REPEAT 1000 {\n    X_ERROR(1) 0\n    MR 0\n    M 0 0\n}\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 3, &mut r).unwrap();
     for shot in 0..3 {
@@ -425,7 +427,8 @@ fn bell_pair_correlated() {
 // === Bell pair detector: XOR of correlated measurements always 0 ===
 #[test]
 fn bell_pair_detector() {
-    let instrs = parse_lines("H 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs =
+        parse_lines("H 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     for s in 0..256 {
@@ -436,7 +439,8 @@ fn bell_pair_detector() {
 // === Detector noiseless ===
 #[test]
 fn detector_noiseless() {
-    let instrs = parse_lines("M 0\nR 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs =
+        parse_lines("M 0\nR 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -447,7 +451,10 @@ fn detector_noiseless() {
 // === Detector with noise ===
 #[test]
 fn detector_with_noise() {
-    let instrs = parse_lines("M 0\nR 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs = parse_lines(
+        "M 0\nR 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -458,7 +465,8 @@ fn detector_with_noise() {
 // === Observable flip ===
 #[test]
 fn observable_flip() {
-    let instrs = parse_lines("X 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let instrs =
+        parse_lines("X 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -469,7 +477,8 @@ fn observable_flip() {
 // === Observable no flip ===
 #[test]
 fn observable_no_flip() {
-    let instrs = parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let instrs =
+        parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -562,7 +571,8 @@ fn mpp_yy_bell() {
 // === MPP EPR relations ===
 #[test]
 fn mpp_epr_relations() {
-    let instrs = parse_lines("MPP X0*X1 Z0*Z1 Y0*Y1\nCNOT 0 1\nH 0\nM 0 1\n").unwrap();
+    let instrs =
+        parse_lines("MPP X0*X1 Z0*Z1 Y0*Y1\nCNOT 0 1\nH 0\nM 0 1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     for s in 0..256 {
@@ -695,7 +705,10 @@ fn pauli_channel_1_z() {
 #[test]
 fn detector_statistical() {
     let n = 10000;
-    let instrs = parse_lines("M 0\nR 0\nX_ERROR(0.3) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs = parse_lines(
+        "M 0\nR 0\nX_ERROR(0.3) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, n, &mut r).unwrap();
     let det_count: usize = (0..n).filter(|&s| out.detections.get(0, s)).count();

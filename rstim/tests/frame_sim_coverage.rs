@@ -1,8 +1,8 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
+use rstim::executor::reference_sample;
 use rstim::sim::bit_table::BitTable;
 use rstim::sim::frame::FrameSimulator;
 use rstim::sim::measure_record_batch::MeasureRecordBatch;
@@ -370,25 +370,23 @@ fn frame_pauli_channel_1_z() {
 fn frame_pauli_channel_2_deterministic() {
     // PAULI_CHANNEL_2 with all weight on IX (index 0): always X on qubit b
     // The 15 paulis are: IX, IY, IZ, XI, XX, XY, XZ, YI, YX, YY, YZ, ZI, ZX, ZY, ZZ
-    let instrs =
-        parse_lines("PAULI_CHANNEL_2(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n").unwrap();
+    let instrs = parse_lines("PAULI_CHANNEL_2(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
         assert_eq!(out.measurements.get(0, s), false); // I on qubit 0
-        assert_eq!(out.measurements.get(1, s), true); // X on qubit 1
+        assert_eq!(out.measurements.get(1, s), true);  // X on qubit 1
     }
 }
 
 #[test]
 fn frame_pauli_channel_2_xi() {
     // All weight on XI (index 3)
-    let instrs =
-        parse_lines("PAULI_CHANNEL_2(0,0,0,1,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n").unwrap();
+    let instrs = parse_lines("PAULI_CHANNEL_2(0,0,0,1,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), true); // X on qubit 0
+        assert_eq!(out.measurements.get(0, s), true);  // X on qubit 0
         assert_eq!(out.measurements.get(1, s), false); // I on qubit 1
     }
 }
@@ -400,8 +398,8 @@ fn frame_heralded_pauli_channel_1() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), true); // herald bit = 1
-        assert_eq!(out.measurements.get(1, s), true); // X error flips Z measurement
+        assert_eq!(out.measurements.get(0, s), true);  // herald bit = 1
+        assert_eq!(out.measurements.get(1, s), true);  // X error flips Z measurement
     }
 }
 
@@ -412,7 +410,7 @@ fn frame_heralded_pauli_channel_1_z_error() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), true); // herald bit = 1
+        assert_eq!(out.measurements.get(0, s), true);  // herald bit = 1
         assert_eq!(out.measurements.get(1, s), false); // Z error doesn't flip Z measurement
     }
 }
@@ -424,7 +422,7 @@ fn frame_heralded_pauli_channel_1_false_positive() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), true); // herald bit = 1
+        assert_eq!(out.measurements.get(0, s), true);  // herald bit = 1
         assert_eq!(out.measurements.get(1, s), false); // I error = no flip
     }
 }
@@ -819,10 +817,7 @@ fn bit_table_randomize_row() {
     bt.randomize_row(0, &mut r);
     let mut any_set = false;
     for i in 0..128 {
-        if bt.get(0, i) {
-            any_set = true;
-            break;
-        }
+        if bt.get(0, i) { any_set = true; break; }
     }
     assert!(any_set, "randomized row should have at least one set bit");
     // Row 1 should still be all zeros
@@ -1058,6 +1053,7 @@ fn frame_observable_multiple_recs() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
+        // rec[-2] is M(q0)=1, rec[-1] is M(q1)=0, XOR = 1
         assert_eq!(out.observable_flips.get(0, s), true);
     }
 }

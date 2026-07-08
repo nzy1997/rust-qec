@@ -49,7 +49,7 @@ use rstim::sim::bit_table::BitTable;
 
 fn circuit_with_measurements_detectors_and_observables() -> Vec<rstim::ir::StimInstr> {
     parse_lines(
-        "X 0\n\
+        "X_ERROR(1) 0\n\
          M 0\n\
          DETECTOR rec[-1]\n\
          OBSERVABLE_INCLUDE(0) rec[-1]\n",

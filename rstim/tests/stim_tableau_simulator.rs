@@ -8,8 +8,8 @@
 // - Direct tableau API (peek_bloch, postselect, set_num_qubits, etc.)
 // - Pair-measure inversions (MXX !0 1) -- frame sim ignores inversions
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
 
@@ -120,11 +120,7 @@ fn simulate_reset() {
     for s in 0..64 {
         assert_eq!(out.measurements.get(0, s), true, "shot {s}: M after X");
         assert_eq!(out.measurements.get(1, s), false, "shot {s}: M after R");
-        assert_eq!(
-            out.measurements.get(2, s),
-            false,
-            "shot {s}: M after R again"
-        );
+        assert_eq!(out.measurements.get(2, s), false, "shot {s}: M after R again");
     }
 }
 
@@ -349,9 +345,10 @@ fn mr_repeated_target() {
 // This does not use classical feedback.
 #[test]
 fn phase_kickback_preserve_s_state() {
-    let instrs =
-        parse_lines("H 1\nS 1\nH 0\nCNOT 0 1\nH 1\nCNOT 0 1\nH 1\nS 0\nH 0\nM 0\nS 1\nH 1\nM 1\n")
-            .unwrap();
+    let instrs = parse_lines(
+        "H 1\nS 1\nH 0\nCNOT 0 1\nH 1\nCNOT 0 1\nH 1\nS 0\nH 0\nM 0\nS 1\nH 1\nM 1\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -432,16 +429,8 @@ fn mrx_then_check_reset_state() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert_eq!(
-            out.measurements.get(0, s),
-            true,
-            "shot {s}: MRX after Z_ERROR"
-        );
-        assert_eq!(
-            out.measurements.get(1, s),
-            false,
-            "shot {s}: MX after reset"
-        );
+        assert_eq!(out.measurements.get(0, s), true, "shot {s}: MRX after Z_ERROR");
+        assert_eq!(out.measurements.get(1, s), false, "shot {s}: MX after reset");
     }
 }
 
@@ -460,11 +449,7 @@ fn mrx_resets_to_plus() {
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
         assert_eq!(out.measurements.get(0, s), true, "shot {s}: MRX on |->");
-        assert_eq!(
-            out.measurements.get(1, s),
-            false,
-            "shot {s}: MX after reset"
-        );
+        assert_eq!(out.measurements.get(1, s), false, "shot {s}: MX after reset");
     }
 }
 
@@ -523,7 +508,8 @@ fn mpad_values() {
 // RX 0, RY 1, RZ 2, then MPP X0 Y1 Z2 X0*Y1*Z2: all should be 0.
 #[test]
 fn mpp_pure_eigenstates() {
-    let instrs = parse_lines("RX 0\nRY 1\nREPEAT 100 {\nMPP X0 Y1 Z2 X0*Y1*Z2\n}\n").unwrap();
+    let instrs =
+        parse_lines("RX 0\nRY 1\nREPEAT 100 {\nMPP X0 Y1 Z2 X0*Y1*Z2\n}\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 1, &mut r).unwrap();
     for i in 0..400 {
@@ -536,7 +522,8 @@ fn mpp_pure_eigenstates() {
 // Should satisfy: m0 == x01, m1 == z01, x01 ^ z01 == y01 ^ 1.
 #[test]
 fn mpp_epr_relations() {
-    let instrs = parse_lines("MPP X0*X1 Z0*Z1 Y0*Y1\nCNOT 0 1\nH 0\nM 0 1\n").unwrap();
+    let instrs =
+        parse_lines("MPP X0*X1 Z0*Z1 Y0*Y1\nCNOT 0 1\nH 0\nM 0 1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     for s in 0..256 {
@@ -712,7 +699,8 @@ fn measure_z_entangled() {
 fn measure_y_entangled_via_mpp() {
     // MPP Y0*Y1 on |Phi+> gives true (eigenvalue -1).
     // Then MX 0 and MX 1 should agree (XX is stabilizer).
-    let instrs = parse_lines("H 0\nCNOT 0 1\nMPP Y0*Y1\nMX 0\nMX 1\n").unwrap();
+    let instrs =
+        parse_lines("H 0\nCNOT 0 1\nMPP Y0*Y1\nMX 0\nMX 1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     for s in 0..256 {
@@ -772,8 +760,14 @@ fn depolarize2_statistical() {
     let rate_0 = flipped_0 as f64 / n as f64;
     let rate_1 = flipped_1 as f64 / n as f64;
     // 8/15 of the 15 non-identity paulis have X or Y on each qubit
-    assert!((rate_0 - 8.0 / 15.0).abs() < 0.05, "q0 flip rate: {rate_0}");
-    assert!((rate_1 - 8.0 / 15.0).abs() < 0.05, "q1 flip rate: {rate_1}");
+    assert!(
+        (rate_0 - 8.0 / 15.0).abs() < 0.05,
+        "q0 flip rate: {rate_0}"
+    );
+    assert!(
+        (rate_1 - 8.0 / 15.0).abs() < 0.05,
+        "q1 flip rate: {rate_1}"
+    );
 }
 
 // === x_error statistical ===
@@ -822,7 +816,8 @@ M 0 1
 // === detectors noiseless ===
 #[test]
 fn detector_noiseless() {
-    let instrs = parse_lines("M 0\nR 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs =
+        parse_lines("M 0\nR 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -833,7 +828,10 @@ fn detector_noiseless() {
 // === detectors with noise ===
 #[test]
 fn detector_with_noise() {
-    let instrs = parse_lines("M 0\nR 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs = parse_lines(
+        "M 0\nR 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\n",
+    )
+    .unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -844,7 +842,8 @@ fn detector_with_noise() {
 // === observable ===
 #[test]
 fn observable_flip() {
-    let instrs = parse_lines("X 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let instrs =
+        parse_lines("X 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
@@ -868,7 +867,8 @@ fn repeat_loop() {
 // === Bell pair via detectors ===
 #[test]
 fn bell_pair_detector() {
-    let instrs = parse_lines("H 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+    let instrs =
+        parse_lines("H 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     for s in 0..256 {
@@ -964,7 +964,11 @@ OBSERVABLE_INCLUDE(0) rec[-1] rec[-2]
             assert_eq!(out.detections.get(d, s), false, "det {d} shot {s}");
         }
         for o in 0..out.observable_flips.num_major() {
-            assert_eq!(out.observable_flips.get(o, s), false, "obs {o} shot {s}");
+            assert_eq!(
+                out.observable_flips.get(o, s),
+                false,
+                "obs {o} shot {s}"
+            );
         }
     }
 }
