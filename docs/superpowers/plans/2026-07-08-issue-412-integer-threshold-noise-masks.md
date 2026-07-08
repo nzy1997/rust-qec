@@ -35,7 +35,7 @@
 - Consumes: `rstim::sim::frame::FrameSimulator`, `rstim::executor::reference_sample`, `rstim::parser::parse_lines`.
 - Produces: Integration tests named `noise_mask_p_zero_is_empty`, `noise_mask_p_one_is_all_ones`, `low_probability_noise_mask_has_expected_frequency_bounds`, `noise_mask_is_reproducible_for_seeded_rng`, `depolarize1_event_mask_uses_integer_threshold_path`, and `depolarize2_event_mask_uses_integer_threshold_path`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `rstim/tests/frame_noise_masks.rs`:
 
@@ -133,7 +133,7 @@ fn depolarize2_event_mask_uses_integer_threshold_path() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify RED**
+- [x] **Step 2: Run the tests to verify RED**
 
 Run:
 
@@ -314,4 +314,3 @@ cargo test
 ```
 
 Expected: PASS for the workspace default test set.
-
