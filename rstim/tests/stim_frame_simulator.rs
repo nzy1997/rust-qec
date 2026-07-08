@@ -462,7 +462,7 @@ fn observable_flip() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(!out.observable_flips.get(0, s), "shot {s}");
+        assert!(out.observable_flips.get(0, s), "shot {s}");
     }
 }
 

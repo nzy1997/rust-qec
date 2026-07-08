@@ -1058,8 +1058,7 @@ fn frame_observable_multiple_recs() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        // rec[-2] matches the deterministic reference sample, so the parity stays false.
-        assert_eq!(out.observable_flips.get(0, s), false);
+        assert_eq!(out.observable_flips.get(0, s), true);
     }
 }
 
@@ -1087,6 +1086,6 @@ fn frame_sim_observable_flips_accessor() {
     frame.run(&instrs, &ref_sample, &mut r).unwrap();
     let obs = frame.observable_flips();
     for s in 0..64 {
-        assert_eq!(obs.get(0, s), false);
+        assert_eq!(obs.get(0, s), true);
     }
 }

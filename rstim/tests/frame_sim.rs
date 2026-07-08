@@ -320,7 +320,7 @@ fn sample_batch_observable() {
     let mut rng = StdRng::seed_from_u64(42);
     let out = sample_batch(&instrs, 64, &mut rng).unwrap();
     for shot in 0..64 {
-        assert_eq!(out.observable_flips.get(0, shot), false);
+        assert_eq!(out.observable_flips.get(0, shot), true);
     }
 }
 

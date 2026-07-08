@@ -103,7 +103,7 @@ impl FrameSimulator {
         name: &str,
         args: &[f64],
         targets: &[StimTarget],
-        _ref_sample: &[bool],
+        ref_sample: &[bool],
         rng: &mut impl Rng,
     ) -> Result<(), String> {
         let wpr = self.x_table.words_per_row();
@@ -692,10 +692,20 @@ impl FrameSimulator {
                 self.detector_materializations += 1;
                 let wpr = self.m_record.words_per_row();
                 let mut result = vec![0u64; wpr];
+                let mut ref_parity = false;
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
                         let k = (-*offset) as usize;
                         self.m_record.xor_lookback_into(k, &mut result);
+                        let m_idx = self.m_record.len() - k;
+                        if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                            ref_parity = !ref_parity;
+                        }
+                    }
+                }
+                if ref_parity {
+                    for w in &mut result {
+                        *w ^= !0u64;
                     }
                 }
                 self.det_records.push(result);
@@ -710,11 +720,21 @@ impl FrameSimulator {
                 while self.obs_records.len() <= idx {
                     self.obs_records.push(vec![0u64; wpr]);
                 }
+                let mut ref_parity = false;
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
                         let k = (-*offset) as usize;
                         self.m_record
                             .xor_lookback_into(k, &mut self.obs_records[idx]);
+                        let m_idx = self.m_record.len() - k;
+                        if m_idx < ref_sample.len() && ref_sample[m_idx] {
+                            ref_parity = !ref_parity;
+                        }
+                    }
+                }
+                if ref_parity {
+                    for w in &mut self.obs_records[idx] {
+                        *w ^= !0u64;
                     }
                 }
             }

@@ -77,8 +77,8 @@ fn full_mode_still_materializes_detector_and_observable_bits() {
     assert_eq!(out.observable_materializations, 1);
     for shot in 0..8 {
         assert!(out.measurements.get(0, shot), "shot {shot}");
-        assert!(!out.detections.get(0, shot), "shot {shot}");
-        assert!(!out.observable_flips.get(0, shot), "shot {shot}");
+        assert!(out.detections.get(0, shot), "shot {shot}");
+        assert!(out.observable_flips.get(0, shot), "shot {shot}");
     }
 }
 
@@ -95,4 +95,9 @@ fn default_sample_options_remain_full_output() {
     assert_eq!(out.observable_flips.num_major(), 1);
     assert_eq!(out.detector_materializations, 1);
     assert_eq!(out.observable_materializations, 1);
+    for shot in 0..8 {
+        assert!(out.measurements.get(0, shot), "shot {shot}");
+        assert!(out.detections.get(0, shot), "shot {shot}");
+        assert!(out.observable_flips.get(0, shot), "shot {shot}");
+    }
 }
