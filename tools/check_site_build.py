@@ -87,7 +87,8 @@ CLAIMS_POLICY_PHRASES = (
     "not a general decoder ordering claim",
 )
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
-    r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare|rstim_vs_stim_simulator)/[A-Za-z0-9._/-]+"
+    r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/full/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 STRING_LITERAL_PATH_RE = re.compile(r"""["']([A-Za-z0-9_./-]+\.[A-Za-z0-9]+(?:[?#][^"']*)?)["']""")
 ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css", "app.js", "index.html"}
