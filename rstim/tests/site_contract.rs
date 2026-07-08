@@ -512,7 +512,7 @@ fn checked_benchmark_artifacts_are_linked() {
         &[
             "id=\"checked-benchmark-results\"",
             "id=\"checked-benchmark-result-cards\"",
-            "data-checked-items=\"surface-decoder-full bb-circuit-full\"",
+            "data-checked-items=\"surface-decoder-full bb-circuit-full rstim-vs-stim-full\"",
             "Checked Benchmark Results",
         ],
         "checked benchmark result section",
@@ -620,9 +620,60 @@ fn checked_benchmark_artifacts_are_linked() {
         "BB checked item must keep its manifest claims limit"
     );
 
+    let (rstim_vs_stim_family, rstim_vs_stim_item) = find_evidence_item(&manifest, "rstim-vs-stim-full");
+    assert_eq!(rstim_vs_stim_family["status"].as_str(), Some("partial"));
+    assert_eq!(rstim_vs_stim_item["status"].as_str(), Some("existing"));
+    assert_eq!(rstim_vs_stim_item["tier"].as_str(), Some("full"));
+    assert_checked_artifacts(
+        rstim_vs_stim_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                "fixture-manifest",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+                "stim-fixture",
+            ),
+            (
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                "showcase",
+            ),
+        ],
+    );
+    assert_item_has_text_list_marker(
+        rstim_vs_stim_item,
+        "commands",
+        "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases",
+    );
+    assert_item_has_text_list_marker(
+        rstim_vs_stim_item,
+        "caveats",
+        "do not claim broad rstim-versus-Stim performance parity",
+    );
+    assert!(
+        rstim_vs_stim_item["claims_limit"]
+            .as_str()
+            .is_some_and(|value| value.contains("recorded environment only")),
+        "rstim-vs-stim checked item must keep its manifest claims limit"
+    );
+
     for (item_id, item) in [
         ("surface-decoder-full", surface_item),
         ("bb-circuit-full", bb_item),
+        ("rstim-vs-stim-full", rstim_vs_stim_item),
     ] {
         let provenance = item["provenance"]
             .as_object()
@@ -718,14 +769,19 @@ fn qec_code_and_future_benchmarks_are_classified() {
             "qec-code-random-window-bench-no-target-ladder-smoke",
             "qec-code-random-window-bench-issue225-readiness-smoke",
             "id=\"future-simulator-benchmarks\"",
+            "id=\"rstim-vs-stim-simulator-benchmarks\"",
             "<code>rstim</code>",
             "versus Stim Simulator Benchmarks",
-            "Future work",
+            "Partial checked evidence",
+            "recorded workloads and recorded environments",
+            "not broad rstim/Stim parity",
             "sampling",
             "detection",
             "DEM extraction",
             "conversion",
-            "memory footprint",
+            "speed/correctness checks",
+            "docs/showcases/rstim-vs-stim-simulator.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
         ],
         "qec-code and future benchmark site sections",
     );
@@ -766,29 +822,65 @@ fn qec_code_and_future_benchmarks_are_classified() {
             .unwrap_or_else(|| panic!("qec-code item {item_id} artifacts must be an array"));
     }
 
-    let future_family = families
+    let rstim_vs_stim_family = families
         .iter()
         .find(|family| family["id"] == "rstim-vs-stim-simulator")
-        .expect("future simulator family must exist");
+        .expect("rstim-vs-stim simulator family must exist");
     assert_eq!(
-        future_family["status"], "future",
-        "rstim versus Stim simulator family must be future"
+        rstim_vs_stim_family["status"], "partial",
+        "rstim versus Stim simulator family must be partial checked evidence"
     );
-    let future_items = future_family["evidence_items"]
+    let rstim_vs_stim_items = rstim_vs_stim_family["evidence_items"]
         .as_array()
-        .expect("future simulator evidence_items must be an array");
-    assert!(!future_items.is_empty(), "future simulator family must list evidence items");
-    for item in future_items {
+        .expect("rstim-vs-stim simulator evidence_items must be an array");
+    assert!(
+        !rstim_vs_stim_items.is_empty(),
+        "rstim-vs-stim simulator family must list evidence items"
+    );
+    let rstim_vs_stim_item = rstim_vs_stim_items
+        .iter()
+        .find(|item| item["id"] == "rstim-vs-stim-full")
+        .expect("rstim-vs-stim checked item must exist");
+    assert_eq!(
+        rstim_vs_stim_item["status"], "existing",
+        "rstim-vs-stim checked item must be existing"
+    );
+    assert_checked_artifacts(
+        rstim_vs_stim_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                "fixture-manifest",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+                "stim-fixture",
+            ),
+            (
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                "showcase",
+            ),
+        ],
+    );
+    for item in rstim_vs_stim_items {
         let item_id = item["id"].as_str().unwrap_or("<missing>");
-        assert_eq!(
-            item["status"], "future",
-            "future simulator item {item_id} must be future"
-        );
         assert!(
             item["artifacts"]
                 .as_array()
-                .is_some_and(|artifacts| artifacts.is_empty()),
-            "future simulator item {item_id} must not list checked artifacts"
+                .is_some_and(|artifacts| !artifacts.is_empty()),
+            "rstim-vs-stim item {item_id} must list checked artifacts"
         );
     }
 

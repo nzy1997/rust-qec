@@ -199,7 +199,7 @@
 
   const benchmarkManifest = document.getElementById("benchmark-manifest");
   const checkedBenchmarkResults = document.getElementById("checked-benchmark-result-cards");
-  const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full"];
+  const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
 
   function renderBadge(label, value) {
     return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;

@@ -45,6 +45,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
             self.assertIn(marker, output)
         self.assertIn("surface-decoder-full", output)
         self.assertIn("bb-circuit-full", output)
+        self.assertIn("rstim-vs-stim-full", output)
         self.assertIn("not_recorded", output)
         self.assertIn("checked artifact hashes", output)
 
@@ -88,6 +89,24 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 and result.area == "checked benchmark provenance"
                 and "surface-decoder-full" in result.detail
                 and "provenance" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_missing_rstim_vs_stim_checked_artifact(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        artifact_path = "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+        (fixture.site_root / artifact_path).unlink()
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark artifacts"
+                and "correctness-summary.json" in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),
