@@ -607,12 +607,10 @@ pub fn run(cli: Cli) -> Result<(), String> {
                 PerfCommands::Summarize { case, r#in, out } => {
                     let raw = read_input(r#in.as_deref())?;
                     let summary = if let Some(label) = case.as_deref() {
-                        crate::perf::summarize_jsonl_str_with_options(
-                            &raw,
-                            crate::perf::PerfSummaryOptions {
-                                case_label: Some(label.to_string()),
-                            },
-                        )?
+                        let options = crate::perf::PerfSummaryOptions {
+                            case_label: Some(label.to_string()),
+                        };
+                        crate::perf::summarize_jsonl_str_with_options(&raw, options)?
                     } else {
                         crate::perf::summarize_jsonl_str(&raw)?
                     };
@@ -2274,9 +2272,7 @@ mod tests {
         let cases = summary["cases"].as_array().unwrap();
         assert_eq!(cases.len(), 1);
         assert_eq!(cases[0]["case_label"], "rep-sample-d13-r13");
-        assert!(summary["issues"].as_array().unwrap().iter().all(|issue| {
-            issue["case_label"].as_str() == Some("rep-sample-d13-r13")
-        }));
+        assert!(summary["issues"].as_array().unwrap().is_empty());
     }
 
     #[test]
