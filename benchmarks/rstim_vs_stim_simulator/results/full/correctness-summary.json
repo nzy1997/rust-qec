@@ -394,7 +394,7 @@
             "--out_format",
             "01",
             "--in",
-            "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-392-run-1-agent-issue-392-publish-checked-speed-and-correctness-evidence-o-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
           ],
           "elapsed_s": 46.19731250000041,
           "exit_code": 0,
@@ -512,7 +512,7 @@
             "--out_format",
             "01",
             "--in",
-            "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-392-run-1-agent-issue-392-publish-checked-speed-and-correctness-evidence-o-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
           ],
           "elapsed_s": 0.16909833400131902,
           "exit_code": 0,
