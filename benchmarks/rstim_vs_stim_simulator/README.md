@@ -99,3 +99,24 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
 ```
 
 The expected negative-control verdict is `FAIL statistical mismatch`.
+
+## Selected Speed Runner
+
+Run a single public speed case with an explicit `rstim` build profile:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case \
+  --profile release \
+  --case stim-style-surface-sample-d11-r100-b1024 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
+  --out-dir /tmp/rstim-speed-release
+```
+
+The runner builds `target/release/rstim` for `--profile release` or
+`target/debug/rstim` for `--profile debug`, then reuses `rstim perf run`,
+`rstim perf summarize`, and `rstim perf report`. It writes `raw.jsonl`,
+`summary.json`, `report.md`, and `environment.json` under `--out-dir`.
+
+This runner is for selected-case evidence only. It does not set a timing
+threshold, update checked results, or optimize sampler internals.

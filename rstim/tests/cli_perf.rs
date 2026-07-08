@@ -122,6 +122,51 @@ fn perf_summarize_and_report_work_from_temp_files() {
 }
 
 #[test]
+fn perf_summarize_selected_case_omits_unrelated_missing_issues() {
+    let dir = tempfile::tempdir().unwrap();
+    let raw_path = dir.path().join("raw.jsonl");
+    let summary_path = dir.path().join("summary.json");
+    let raw = concat!(
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":2000000,\"peak_memory_bytes\":1000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":5000000,\"peak_memory_bytes\":2000,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"stim-style-surface-sample-d11-r100-b1024\",\"tool_variant\":\"rstim-compiled\",\"workload\":\"sample\",\"tier\":\"report_only\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":0,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":100,\"shots\":1024,\"wall_time_ns\":4000000,\"peak_memory_bytes\":1500,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"stim-cli\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":80,\"peak_memory_bytes\":128,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n",
+        "{\"case_label\":\"loss-protection-sample\",\"tool_variant\":\"rstim-interpreted\",\"workload\":\"sample\",\"tier\":\"gating\",\"measurement_index\":0,\"warmup\":false,\"qubits\":1,\"measurements\":1,\"detectors\":1,\"observables\":0,\"repeat_depth\":1,\"repeat_count\":0,\"shots\":128,\"wall_time_ns\":70,\"peak_memory_bytes\":256,\"status\":\"completed\",\"failure_reason\":null,\"stderr\":null}\n"
+    );
+    std::fs::write(&raw_path, raw).unwrap();
+
+    let summarize = rstim_cmd()
+        .args([
+            "perf",
+            "summarize",
+            "--case",
+            PUBLIC_SELECTED_CASE_LABEL,
+            "--in",
+            raw_path.to_str().unwrap(),
+            "--out",
+            summary_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        summarize.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&summarize.stderr)
+    );
+
+    let summary: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(summary_path).unwrap()).unwrap();
+    let cases = summary["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 1);
+    assert_eq!(cases[0]["case_label"], PUBLIC_SELECTED_CASE_LABEL);
+
+    let issues = summary["issues"].as_array().unwrap();
+    assert!(issues.iter().all(|issue| {
+        issue["case_label"].as_str() == Some(PUBLIC_SELECTED_CASE_LABEL)
+    }));
+}
+
+#[test]
 fn perf_gate_returns_nonzero_for_regression_summary() {
     let dir = tempfile::tempdir().unwrap();
     let summary_path = dir.path().join("summary.json");
