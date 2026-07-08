@@ -700,7 +700,7 @@ impl FrameSimulator {
     ) -> Result<(), String> {
         let wpr = self.x_table.words_per_row();
         match op {
-            CompiledOp::Tick | CompiledOp::QubitCoords | CompiledOp::ShiftCoords => {}
+            CompiledOp::Tick | CompiledOp::QubitCoords | CompiledOp::ShiftCoords | CompiledOp::NoOp => {}
             CompiledOp::H { qubits } => {
                 for &q in qubits {
                     do_h(&mut self.x_table, &mut self.z_table, q);
@@ -751,10 +751,9 @@ impl FrameSimulator {
                 observable_index,
                 rec_offsets,
             } => self.exec_compiled_observable_include(*observable_index, rec_offsets, ref_sample),
-            CompiledOp::UnsupportedSamplerOp { name } => match name.as_str() {
-                "I" | "X" | "Y" | "Z" | "I_ERROR" | "II_ERROR" => {}
-                _ => return Err(format!("compiled sampler: unsupported instruction {name}")),
-            },
+            CompiledOp::UnsupportedSamplerOp { name } => {
+                return Err(format!("compiled sampler: unsupported instruction {name}"));
+            }
         }
         Ok(())
     }

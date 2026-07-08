@@ -20,6 +20,7 @@ pub enum CompiledOp {
     Tick,
     QubitCoords,
     ShiftCoords,
+    NoOp,
     H { qubits: Vec<usize> },
     Reset { basis: CompiledBasis, qubits: Vec<usize> },
     XError { probability: f64, qubits: Vec<usize> },
@@ -129,6 +130,7 @@ fn compile_sampler_op(name: &str, args: &[f64], targets: &[StimTarget]) -> Compi
         "TICK" => CompiledOp::Tick,
         "QUBIT_COORDS" => CompiledOp::QubitCoords,
         "SHIFT_COORDS" => CompiledOp::ShiftCoords,
+        "I" | "X" | "Y" | "Z" | "I_ERROR" | "II_ERROR" => CompiledOp::NoOp,
         "H" => qubits(targets)
             .map(|qubits| CompiledOp::H { qubits })
             .unwrap_or_else(|| unsupported(name)),

@@ -20,6 +20,7 @@ struct VariantCounts {
     measure_reset: usize,
     detector: usize,
     observable: usize,
+    noop: usize,
     unsupported: usize,
 }
 
@@ -36,6 +37,7 @@ fn count_variants(blocks: &[CompiledBlock], counts: &mut VariantCounts) {
                         CompiledOp::MeasureReset { .. } => counts.measure_reset += 1,
                         CompiledOp::Detector { .. } => counts.detector += 1,
                         CompiledOp::ObservableInclude { .. } => counts.observable += 1,
+                        CompiledOp::NoOp => counts.noop += 1,
                         CompiledOp::UnsupportedSamplerOp { .. } => counts.unsupported += 1,
                         _ => {}
                     }
@@ -163,4 +165,19 @@ fn unsupported_sampler_ops_do_not_enter_typed_fast_path() {
     let mut counts = VariantCounts::default();
     count_variants(&compiled.blocks, &mut counts);
     assert_eq!(counts.unsupported, 1);
+}
+
+#[test]
+fn ideal_noop_sampler_ops_lower_to_typed_fast_path_ops() {
+    let compiled =
+        compile_circuit(&parse_lines("X 0\nI 0\nI_ERROR(0.25) 0\nII_ERROR(0.125) 0 1\nM 0\n").unwrap())
+            .unwrap();
+
+    assert_eq!(choose_sampler_path(&compiled), CompiledPathDecision::FastPath);
+
+    let mut counts = VariantCounts::default();
+    count_variants(&compiled.blocks, &mut counts);
+
+    assert_eq!(counts.unsupported, 0);
+    assert!(counts.noop > 0, "ideal sampler no-op instructions should lower to CompiledOp::NoOp");
 }

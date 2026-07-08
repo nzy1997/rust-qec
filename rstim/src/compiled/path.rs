@@ -30,12 +30,7 @@ fn contains_unsupported_sampler_op(blocks: &[CompiledBlock]) -> bool {
     blocks.iter().any(|block| match block {
         CompiledBlock::Ops(ops) => ops
             .iter()
-            .any(|op| match op {
-                CompiledOp::UnsupportedSamplerOp { name } => {
-                    !matches!(name.as_str(), "I" | "X" | "Y" | "Z" | "I_ERROR" | "II_ERROR")
-                }
-                _ => false,
-            }),
+            .any(|op| matches!(op, CompiledOp::UnsupportedSamplerOp { .. })),
         CompiledBlock::Repeat(region) => contains_unsupported_sampler_op(&region.body),
     })
 }
