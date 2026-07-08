@@ -36,6 +36,7 @@ ITEM_REQUIRED_FIELDS = {
 }
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/full/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1

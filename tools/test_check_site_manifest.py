@@ -839,6 +839,20 @@ class SiteManifestValidatorTest(unittest.TestCase):
             errors,
         )
 
+    def test_rejects_built_site_rstim_artifact_reference_not_listed_in_manifest(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        index = repo / "_site/index.html"
+        missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/full/not-in-manifest.json"
+        index.write_text(
+            index.read_text(encoding="utf-8") + f'<a href="{missing_artifact}">bad</a>\n',
+            encoding="utf-8",
+        )
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+        self.assertTrue(
+            any(missing_artifact in error and "not listed as a checked manifest artifact" in error for error in errors),
+            errors,
+        )
+
     def test_rejects_built_site_without_manifest_status_wiring(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         (repo / "_site/app.js").write_text('fetch("data/benchmark-site.json");\n', encoding="utf-8")
