@@ -12,6 +12,7 @@ pub struct FrameSimulator {
     pub z_table: BitTable,
     pub m_record: MeasureRecordBatch,
     last_correlated_error_occurred: Vec<u64>,
+    depolarize_scratch: DepolarizeScratch,
     det_records: Vec<Vec<u64>>,
     obs_records: Vec<Vec<u64>>,
 }
@@ -26,6 +27,7 @@ impl FrameSimulator {
             z_table: BitTable::new(num_qubits, batch_size),
             m_record: MeasureRecordBatch::new(batch_size),
             last_correlated_error_occurred: vec![0u64; words_per_row],
+            depolarize_scratch: DepolarizeScratch::new(),
             det_records: Vec::new(),
             obs_records: Vec::new(),
         }
@@ -354,75 +356,13 @@ impl FrameSimulator {
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                if p > 0.0 {
-                    for q in qubits(targets)? {
-                        let events = random_bits_with_prob(wpr, self.batch_size, p, rng);
-                        let mut xf = vec![0u64; wpr];
-                        let mut zf = vec![0u64; wpr];
-                        for w in 0..wpr {
-                            let mut bits = events[w];
-                            while bits != 0 {
-                                let bit = bits.trailing_zeros();
-                                match rng.gen_range(0u8..3) {
-                                    0 => xf[w] |= 1u64 << bit,
-                                    1 => {
-                                        xf[w] |= 1u64 << bit;
-                                        zf[w] |= 1u64 << bit;
-                                    }
-                                    _ => zf[w] |= 1u64 << bit,
-                                }
-                                bits &= bits - 1;
-                            }
-                        }
-                        let x = self.x_table.row_words_mut(q);
-                        for w in 0..wpr {
-                            x[w] ^= xf[w];
-                        }
-                        let z = self.z_table.row_words_mut(q);
-                        for w in 0..wpr {
-                            z[w] ^= zf[w];
-                        }
-                    }
-                }
+                // random_bits_with_prob_into reuses depolarize scratch instead of allocating per target.
+                self.exec_depolarize1(targets, p, wpr, rng)?;
             }
             "DEPOLARIZE2" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                if p > 0.0 {
-                    for (qa, qb) in qubit_pairs(targets)? {
-                        let events = random_bits_with_prob(wpr, self.batch_size, p, rng);
-                        let mut xa = vec![0u64; wpr];
-                        let mut za = vec![0u64; wpr];
-                        let mut xb = vec![0u64; wpr];
-                        let mut zb = vec![0u64; wpr];
-                        for w in 0..wpr {
-                            let mut bits = events[w];
-                            while bits != 0 {
-                                let bit = bits.trailing_zeros();
-                                let r = rng.gen_range(0u8..15);
-                                let (pa, pb) = two_qubit_pauli(r);
-                                apply_pauli_bits(pa, &mut xa, &mut za, w, bit);
-                                apply_pauli_bits(pb, &mut xb, &mut zb, w, bit);
-                                bits &= bits - 1;
-                            }
-                        }
-                        let x = self.x_table.row_words_mut(qa);
-                        for w in 0..wpr {
-                            x[w] ^= xa[w];
-                        }
-                        let z = self.z_table.row_words_mut(qa);
-                        for w in 0..wpr {
-                            z[w] ^= za[w];
-                        }
-                        let x = self.x_table.row_words_mut(qb);
-                        for w in 0..wpr {
-                            x[w] ^= xb[w];
-                        }
-                        let z = self.z_table.row_words_mut(qb);
-                        for w in 0..wpr {
-                            z[w] ^= zb[w];
-                        }
-                    }
-                }
+                // random_bits_with_prob_into reuses depolarize scratch instead of allocating per target pair.
+                self.exec_depolarize2(targets, p, wpr, rng)?;
             }
 
             "CORRELATED_ERROR" | "E" => {
@@ -823,6 +763,98 @@ impl FrameSimulator {
         }
     }
 
+    fn exec_depolarize1(
+        &mut self,
+        targets: &[StimTarget],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        if p <= 0.0 {
+            return Ok(());
+        }
+        for q in qubits(targets)? {
+            {
+                let scratch = &mut self.depolarize_scratch;
+                scratch.prepare_one(wpr);
+                random_bits_with_prob_into(&mut scratch.events, self.batch_size, p, rng);
+                for w in 0..wpr {
+                    let mut bits = scratch.events[w];
+                    while bits != 0 {
+                        let bit = bits.trailing_zeros();
+                        match rng.gen_range(0u8..3) {
+                            0 => scratch.x_a[w] |= 1u64 << bit,
+                            1 => {
+                                scratch.x_a[w] |= 1u64 << bit;
+                                scratch.z_a[w] |= 1u64 << bit;
+                            }
+                            _ => scratch.z_a[w] |= 1u64 << bit,
+                        }
+                        bits &= bits - 1;
+                    }
+                }
+            }
+            let scratch = &self.depolarize_scratch;
+            let x = self.x_table.row_words_mut(q);
+            for w in 0..wpr {
+                x[w] ^= scratch.x_a[w];
+            }
+            let z = self.z_table.row_words_mut(q);
+            for w in 0..wpr {
+                z[w] ^= scratch.z_a[w];
+            }
+        }
+        Ok(())
+    }
+
+    fn exec_depolarize2(
+        &mut self,
+        targets: &[StimTarget],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        if p <= 0.0 {
+            return Ok(());
+        }
+        for (qa, qb) in qubit_pairs(targets)? {
+            {
+                let scratch = &mut self.depolarize_scratch;
+                scratch.prepare_two(wpr);
+                random_bits_with_prob_into(&mut scratch.events, self.batch_size, p, rng);
+                for w in 0..wpr {
+                    let mut bits = scratch.events[w];
+                    while bits != 0 {
+                        let bit = bits.trailing_zeros();
+                        let r = rng.gen_range(0u8..15);
+                        let (pa, pb) = two_qubit_pauli(r);
+                        apply_pauli_bits(pa, &mut scratch.x_a, &mut scratch.z_a, w, bit);
+                        apply_pauli_bits(pb, &mut scratch.x_b, &mut scratch.z_b, w, bit);
+                        bits &= bits - 1;
+                    }
+                }
+            }
+            let scratch = &self.depolarize_scratch;
+            let x = self.x_table.row_words_mut(qa);
+            for w in 0..wpr {
+                x[w] ^= scratch.x_a[w];
+            }
+            let z = self.z_table.row_words_mut(qa);
+            for w in 0..wpr {
+                z[w] ^= scratch.z_a[w];
+            }
+            let x = self.x_table.row_words_mut(qb);
+            for w in 0..wpr {
+                x[w] ^= scratch.x_b[w];
+            }
+            let z = self.z_table.row_words_mut(qb);
+            for w in 0..wpr {
+                z[w] ^= scratch.z_b[w];
+            }
+        }
+        Ok(())
+    }
+
     pub fn measurements(&self, ref_sample: &[bool]) -> BitTable {
         let num_measurements = self.m_record.len();
         let mut result = BitTable::new(num_measurements, self.batch_size);
@@ -1002,18 +1034,24 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
+    random_bits_with_prob_into(&mut result, valid_bits, p, rng);
+    result
+}
+
+fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng: &mut impl Rng) {
+    result.fill(0);
     if p <= 0.0 {
-        return result;
+        return;
     }
     if p >= 1.0 {
         result.fill(!0u64);
-        mask_unused_bits(&mut result, valid_bits);
-        return result;
+        mask_unused_bits(result, valid_bits);
+        return;
     }
 
     let threshold = probability_threshold_u64(p);
     if threshold == 0 {
-        return result;
+        return;
     }
 
     for (word_idx, word) in result.iter_mut().enumerate() {
@@ -1024,7 +1062,38 @@ fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl
             }
         }
     }
-    result
+}
+
+#[derive(Default)]
+struct DepolarizeScratch {
+    events: Vec<u64>,
+    x_a: Vec<u64>,
+    z_a: Vec<u64>,
+    x_b: Vec<u64>,
+    z_b: Vec<u64>,
+}
+
+impl DepolarizeScratch {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn prepare_one(&mut self, words: usize) {
+        resize_and_clear(&mut self.events, words);
+        resize_and_clear(&mut self.x_a, words);
+        resize_and_clear(&mut self.z_a, words);
+    }
+
+    fn prepare_two(&mut self, words: usize) {
+        self.prepare_one(words);
+        resize_and_clear(&mut self.x_b, words);
+        resize_and_clear(&mut self.z_b, words);
+    }
+}
+
+fn resize_and_clear(words: &mut Vec<u64>, len: usize) {
+    words.resize(len, 0);
+    words.fill(0);
 }
 
 fn probability_threshold_u64(p: f64) -> u64 {
