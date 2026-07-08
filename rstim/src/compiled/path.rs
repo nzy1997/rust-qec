@@ -1,4 +1,4 @@
-use crate::compiled::{CompiledBlock, CompiledCircuit, CompiledRepeatRegion};
+use crate::compiled::{CompiledBlock, CompiledCircuit, CompiledOp, CompiledRepeatRegion};
 use crate::ir::{StimInstr, StimTarget};
 use std::collections::BTreeMap;
 
@@ -17,8 +17,22 @@ pub fn choose_sampler_path(compiled: &CompiledCircuit) -> CompiledPathDecision {
             "feedback instructions require the interpreted path",
         );
     }
+    if contains_unsupported_sampler_op(&compiled.blocks) {
+        return CompiledPathDecision::Fallback(
+            "unsupported sampler instructions require the interpreted path",
+        );
+    }
 
     CompiledPathDecision::FastPath
+}
+
+fn contains_unsupported_sampler_op(blocks: &[CompiledBlock]) -> bool {
+    blocks.iter().any(|block| match block {
+        CompiledBlock::Ops(ops) => ops
+            .iter()
+            .any(|op| matches!(op, CompiledOp::UnsupportedSamplerOp { .. })),
+        CompiledBlock::Repeat(region) => contains_unsupported_sampler_op(&region.body),
+    })
 }
 
 pub fn choose_analyzer_path(compiled: &CompiledCircuit) -> CompiledPathDecision {
