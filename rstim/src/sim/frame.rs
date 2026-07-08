@@ -15,6 +15,9 @@ pub struct FrameSimulator {
     depolarize_scratch: DepolarizeScratch,
     det_records: Vec<Vec<u64>>,
     obs_records: Vec<Vec<u64>>,
+    materialize_detector_observable_outputs: bool,
+    detector_materializations: usize,
+    observable_materializations: usize,
 }
 
 impl FrameSimulator {
@@ -30,7 +33,22 @@ impl FrameSimulator {
             depolarize_scratch: DepolarizeScratch::new(),
             det_records: Vec::new(),
             obs_records: Vec::new(),
+            materialize_detector_observable_outputs: true,
+            detector_materializations: 0,
+            observable_materializations: 0,
         }
+    }
+
+    pub(crate) fn set_materialize_detector_observable_outputs(&mut self, enabled: bool) {
+        self.materialize_detector_observable_outputs = enabled;
+    }
+
+    pub(crate) fn detector_materializations(&self) -> usize {
+        self.detector_materializations
+    }
+
+    pub(crate) fn observable_materializations(&self) -> usize {
+        self.observable_materializations
     }
 
     pub fn run(
@@ -608,6 +626,10 @@ impl FrameSimulator {
             }
 
             "DETECTOR" => {
+                if !self.materialize_detector_observable_outputs {
+                    return Ok(());
+                }
+                self.detector_materializations += 1;
                 let wpr = self.m_record.words_per_row();
                 let mut result = vec![0u64; wpr];
                 let mut ref_parity = false;
@@ -629,6 +651,10 @@ impl FrameSimulator {
                 self.det_records.push(result);
             }
             "OBSERVABLE_INCLUDE" => {
+                if !self.materialize_detector_observable_outputs {
+                    return Ok(());
+                }
+                self.observable_materializations += 1;
                 let idx = args.first().copied().unwrap_or(0.0) as usize;
                 let wpr = self.m_record.words_per_row();
                 while self.obs_records.len() <= idx {

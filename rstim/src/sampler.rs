@@ -4,10 +4,10 @@ use crate::compiled::{
     choose_sampler_path, compile_circuit, sample_compiled_batch, CompiledPathDecision,
 };
 use crate::data_path::build_reference_sample;
-use crate::executor::Executor;
 use crate::executor::max_qubit;
+use crate::executor::Executor;
 use crate::ir::StimInstr;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -15,6 +15,55 @@ pub struct BatchOutput {
     pub measurements: BitTable,
     pub detections: BitTable,
     pub observable_flips: BitTable,
+    pub output_mode: SampleOutputMode,
+    pub detector_materializations: usize,
+    pub observable_materializations: usize,
+}
+
+impl BatchOutput {
+    pub(crate) fn full(
+        measurements: BitTable,
+        detections: BitTable,
+        observable_flips: BitTable,
+        detector_materializations: usize,
+        observable_materializations: usize,
+    ) -> Self {
+        Self {
+            measurements,
+            detections,
+            observable_flips,
+            output_mode: SampleOutputMode::Full,
+            detector_materializations,
+            observable_materializations,
+        }
+    }
+
+    pub(crate) fn measurements_only(measurements: BitTable, n_shots: usize) -> Self {
+        Self::measurements_only_with_materializations(measurements, n_shots, 0, 0)
+    }
+
+    pub(crate) fn measurements_only_with_materializations(
+        measurements: BitTable,
+        n_shots: usize,
+        detector_materializations: usize,
+        observable_materializations: usize,
+    ) -> Self {
+        Self {
+            measurements,
+            detections: BitTable::new(0, n_shots),
+            observable_flips: BitTable::new(0, n_shots),
+            output_mode: SampleOutputMode::MeasurementsOnly,
+            detector_materializations,
+            observable_materializations,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SampleOutputMode {
+    #[default]
+    Full,
+    MeasurementsOnly,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -29,6 +78,7 @@ pub enum SamplingBackend {
 pub struct SampleOptions {
     pub reference_sample_mode: crate::data_path::ReferenceSampleMode,
     pub backend: SamplingBackend,
+    pub output_mode: SampleOutputMode,
 }
 
 pub fn sample_batch_with_options(
@@ -70,6 +120,35 @@ pub fn sample_batch(
     sample_batch_with_options(instrs, n_shots, rng, SampleOptions::default())
 }
 
+fn count_output_materialization_ops(instrs: &[StimInstr]) -> (usize, usize) {
+    let mut detector_count = 0usize;
+    let mut observable_count = 0usize;
+
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, .. } => match name.as_str() {
+                "DETECTOR" => {
+                    detector_count = detector_count.saturating_add(1);
+                }
+                "OBSERVABLE_INCLUDE" => {
+                    observable_count = observable_count.saturating_add(1);
+                }
+                _ => {}
+            },
+            StimInstr::Repeat { count, body } => {
+                let (body_detectors, body_observables) = count_output_materialization_ops(body);
+                let repeat_count = usize::try_from(*count).unwrap_or(usize::MAX);
+                detector_count =
+                    detector_count.saturating_add(body_detectors.saturating_mul(repeat_count));
+                observable_count =
+                    observable_count.saturating_add(body_observables.saturating_mul(repeat_count));
+            }
+        }
+    }
+
+    (detector_count, observable_count)
+}
+
 fn sample_batch_interpreted(
     instrs: &[StimInstr],
     n_shots: usize,
@@ -83,17 +162,28 @@ fn sample_batch_interpreted(
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
     let num_qubits = max_qubit(instrs)?;
     let mut frame = FrameSimulator::new(num_qubits, n_shots);
+    frame
+        .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run(instrs, &ref_sample, rng)?;
 
     let measurements = frame.measurements(&ref_sample);
-    let detections = frame.detections();
-    let observable_flips = frame.observable_flips();
-
-    Ok(BatchOutput {
-        measurements,
-        detections,
-        observable_flips,
-    })
+    match options.output_mode {
+        SampleOutputMode::Full => Ok(BatchOutput::full(
+            measurements,
+            frame.detections(),
+            frame.observable_flips(),
+            frame.detector_materializations(),
+            frame.observable_materializations(),
+        )),
+        SampleOutputMode::MeasurementsOnly => {
+            Ok(BatchOutput::measurements_only_with_materializations(
+                measurements,
+                n_shots,
+                frame.detector_materializations(),
+                frame.observable_materializations(),
+            ))
+        }
+    }
 }
 
 fn sample_batch_with_executor(
@@ -121,6 +211,10 @@ fn sample_batch_with_executor(
         }
     }
 
+    if options.output_mode == SampleOutputMode::MeasurementsOnly {
+        return Ok(BatchOutput::measurements_only(measurements, n_shots));
+    }
+
     let m2d = measurements_to_detections_with_options(
         instrs,
         &measurements,
@@ -130,12 +224,16 @@ fn sample_batch_with_executor(
             ran_without_feedback: false,
         },
     )?;
+    let (detector_materializations, observable_materializations) =
+        count_output_materialization_ops(instrs);
 
-    Ok(BatchOutput {
+    Ok(BatchOutput::full(
         measurements,
-        detections: m2d.detections,
-        observable_flips: m2d.observable_flips,
-    })
+        m2d.detections,
+        m2d.observable_flips,
+        detector_materializations,
+        observable_materializations,
+    ))
 }
 
 fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
@@ -162,8 +260,8 @@ fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;
@@ -192,5 +290,35 @@ mod tests {
             err,
             "executor produced 0 measurements but reference sample expects 2"
         );
+    }
+
+    #[test]
+    fn count_output_materialization_ops_expands_repeats_saturating() {
+        let instrs = vec![
+            StimInstr::new("DETECTOR", vec![], vec![StimTarget::Rec(-1)]),
+            StimInstr::Repeat {
+                count: 3,
+                body: vec![
+                    StimInstr::new("DETECTOR", vec![], vec![StimTarget::Rec(-1)]),
+                    StimInstr::new("OBSERVABLE_INCLUDE", vec![0.0], vec![StimTarget::Rec(-1)]),
+                ],
+            },
+        ];
+
+        assert_eq!(count_output_materialization_ops(&instrs), (4, 3));
+    }
+
+    #[test]
+    fn measurements_only_output_can_report_actual_materialization_counters() {
+        let out =
+            BatchOutput::measurements_only_with_materializations(BitTable::new(1, 4), 4, 2, 3);
+
+        assert_eq!(out.output_mode, SampleOutputMode::MeasurementsOnly);
+        assert_eq!(out.detections.num_major(), 0);
+        assert_eq!(out.detections.num_minor(), 4);
+        assert_eq!(out.observable_flips.num_major(), 0);
+        assert_eq!(out.observable_flips.num_minor(), 4);
+        assert_eq!(out.detector_materializations, 2);
+        assert_eq!(out.observable_materializations, 3);
     }
 }
