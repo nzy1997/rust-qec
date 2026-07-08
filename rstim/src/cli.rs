@@ -18,7 +18,7 @@ use crate::output::{
     write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
-use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -1105,20 +1105,25 @@ pub fn run_sample(
     let fmt = OutputFormat::from_str(out_format)?;
     let instrs = parse_lines(circuit_text)?;
     let mut rng = make_rng(seed);
-    let options = SampleOptions {
-        reference_sample_mode: if skip_reference_sample {
-            crate::data_path::ReferenceSampleMode::AssumeAllZero
-        } else {
-            crate::data_path::ReferenceSampleMode::SimulateNoiseless
-        },
-        ..SampleOptions::default()
-    };
+    let options = sample_cli_options(skip_reference_sample);
     let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
     match fmt {
         OutputFormat::Dets => {
             Err("dets format not applicable to sample command; use detect".to_string())
         }
         _ => write_format(fmt, &result.measurements, out),
+    }
+}
+
+pub fn sample_cli_options(skip_reference_sample: bool) -> SampleOptions {
+    SampleOptions {
+        reference_sample_mode: if skip_reference_sample {
+            crate::data_path::ReferenceSampleMode::AssumeAllZero
+        } else {
+            crate::data_path::ReferenceSampleMode::SimulateNoiseless
+        },
+        output_mode: SampleOutputMode::MeasurementsOnly,
+        ..SampleOptions::default()
     }
 }
 
