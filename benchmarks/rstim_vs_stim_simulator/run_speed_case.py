@@ -135,6 +135,8 @@ def run_speed_case(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> 
             str(rstim_binary),
             "perf",
             "summarize",
+            "--case",
+            args.case,
             "--in",
             str(raw_path),
             "--out",

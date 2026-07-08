@@ -122,6 +122,8 @@ class RunSpeedCaseWorkflowTest(unittest.TestCase):
                     str(binary),
                     "perf",
                     "summarize",
+                    "--case",
+                    "stim-style-surface-sample-d11-r100-b1024",
                     "--in",
                     str(out_dir / "raw.jsonl"),
                     "--out",

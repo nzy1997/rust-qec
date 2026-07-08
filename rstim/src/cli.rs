@@ -243,6 +243,8 @@ pub enum PerfCommands {
     },
     /// Aggregate raw JSONL into summary JSON
     Summarize {
+        #[arg(long = "case")]
+        case: Option<String>,
         #[arg(long = "in")]
         r#in: Option<String>,
         #[arg(long)]
@@ -602,9 +604,18 @@ pub fn run(cli: Cli) -> Result<(), String> {
                         crate::perf::run_benchmark_suite_to_writer(&mut w, options)
                     }
                 }
-                PerfCommands::Summarize { r#in, out } => {
+                PerfCommands::Summarize { case, r#in, out } => {
                     let raw = read_input(r#in.as_deref())?;
-                    let summary = crate::perf::summarize_jsonl_str(&raw)?;
+                    let summary = if let Some(label) = case.as_deref() {
+                        crate::perf::summarize_jsonl_str_with_options(
+                            &raw,
+                            crate::perf::PerfSummaryOptions {
+                                case_label: Some(label.to_string()),
+                            },
+                        )?
+                    } else {
+                        crate::perf::summarize_jsonl_str(&raw)?
+                    };
                     let mut w = open_output(out.as_deref())?;
                     serde_json::to_writer_pretty(&mut *w, &summary)
                         .map_err(|e| format!("failed to write perf summary: {e}"))?;
@@ -2206,6 +2217,7 @@ mod tests {
         run(Cli {
             command: Some(Commands::Perf {
                 command: PerfCommands::Summarize {
+                    case: None,
                     r#in: Some(raw_path.display().to_string()),
                     out: Some(summary_path.display().to_string()),
                 },
