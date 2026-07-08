@@ -183,6 +183,20 @@ def item_has_checked_artifacts(item: dict[str, Any]) -> bool:
     return any(isinstance(artifact, dict) and artifact.get("checked") is True for artifact in artifacts)
 
 
+def family_has_checked_artifacts(family: dict[str, Any]) -> bool:
+    items = family.get("evidence_items")
+    if not isinstance(items, list):
+        return False
+    return any(isinstance(item, dict) and item_has_checked_artifacts(item) for item in items)
+
+
+def validate_family_status_policy(scope: str, family: dict[str, Any], errors: list[str]) -> None:
+    family_id = family.get("id")
+    if family_id == "rstim-vs-stim-simulator" and family.get("status") == "partial":
+        if not family_has_checked_artifacts(family):
+            add_error(errors, scope, "partial rstim-vs-stim-simulator family must list checked artifacts")
+
+
 def checked_artifact_paths_for_item(item: dict[str, Any]) -> list[str]:
     artifacts = item.get("artifacts")
     if not isinstance(artifacts, list):
@@ -422,6 +436,7 @@ def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | No
 
     if not isinstance(family.get("status"), str) or family["status"] not in ALLOWED_STATUSES:
         add_error(errors, scope, f"invalid status {family.get('status')!r}")
+    validate_family_status_policy(scope, family, errors)
 
     validate_path_list(repo_root, scope, "source_docs", family.get("source_docs"), errors)
 
@@ -595,17 +610,34 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     (root / "docs/showcases").mkdir(parents=True)
     (root / "benchmarks/surface_decoder_compare/results/full").mkdir(parents=True)
     (root / "benchmarks/qec_code_random_window").mkdir(parents=True)
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full").mkdir(parents=True)
+    (root / "benchmarks/rstim_vs_stim_simulator/fixtures").mkdir(parents=True)
     (root / ".github/workflows").mkdir(parents=True)
     (root / "site").mkdir(parents=True)
     (root / "benchmarks/out").mkdir(parents=True)
 
     (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
+    (root / "docs/showcases/rstim-vs-stim-simulator.md").write_text("# rstim vs Stim\n", encoding="utf-8")
     (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
     (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/README.md").write_text("# rstim fixtures\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json").write_text(
+        '{"case":"d11"}\n', encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md").write_text(
+        "# speed report\n", encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json").write_text(
+        '{"status":"PASS"}\n', encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/cases.full.toml").write_text("[[cases]]\nid = 'd11'\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim").write_text(
+        "M 0\n", encoding="utf-8"
+    )
     (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
     (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
 
-    def fixture_provenance(commands: list[str]) -> dict[str, Any]:
+    def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, Any]:
         return {
             "schema_version": 1,
             "artifact_date": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
@@ -622,11 +654,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "shots_or_error_budget": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
             "artifact_hashes": {
                 "status": "recorded",
-                "value": {
-                    "benchmarks/surface_decoder_compare/results/full/results.csv": {
-                        "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
-                    }
-                },
+                "value": artifact_hashes,
             },
         }
 
@@ -653,7 +681,14 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                             }
                         ],
                         "commands": ["make surface-decoder-compare-full"],
-                        "provenance": fixture_provenance(["make surface-decoder-compare-full"]),
+                        "provenance": fixture_provenance(
+                            ["make surface-decoder-compare-full"],
+                            {
+                                "benchmarks/surface_decoder_compare/results/full/results.csv": {
+                                    "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+                                }
+                            },
+                        ),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -674,7 +709,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "tier": "full",
                         "artifacts": [],
                         "commands": ["make bb-circuit-bposd-compare-full"],
-                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"]),
+                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"], {}),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -704,20 +739,103 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             {
                 "id": "rstim-vs-stim-simulator",
                 "title": "rstim versus Stim Simulator",
-                "status": "future",
-                "source_docs": ["docs/showcases/benchmark-evidence.md"],
-                "claims_limit": "No current site-facing benchmark artifacts.",
+                "status": "partial",
+                "source_docs": [
+                    "docs/showcases/rstim-vs-stim-simulator.md",
+                    "benchmarks/rstim_vs_stim_simulator/README.md",
+                ],
+                "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and smoke correctness evidence only.",
                 "evidence_items": [
                     {
-                        "id": "rstim-stim-future",
-                        "title": "Future simulator benchmark",
-                        "status": "future",
-                        "tier": "future",
-                        "artifacts": [],
-                        "commands": [],
-                        "provenance_requirements": ["command line", "date"],
-                        "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
-                        "claims_limit": "Planning entry only.",
+                        "id": "rstim-vs-stim-full",
+                        "title": "Checked rstim versus Stim simulator artifacts",
+                        "status": "existing",
+                        "tier": "full",
+                        "artifacts": [
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "kind": "speed-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                                "kind": "speed-report",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                                "kind": "correctness-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "kind": "fixture-manifest",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+                                "kind": "stim-fixture",
+                                "checked": True,
+                            },
+                            {
+                                "path": "docs/showcases/rstim-vs-stim-simulator.md",
+                                "kind": "showcase",
+                                "checked": True,
+                            },
+                        ],
+                        "commands": [
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml --shots 20000 --out benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                            "cargo run -p rstim --bin rstim -- perf run --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl",
+                            "cargo run -p rstim --bin rstim -- perf summarize --in benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl --out benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                            "cargo run -p rstim --bin rstim -- perf report --in benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json --out benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                        ],
+                        "provenance": fixture_provenance(
+                            [
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml --shots 20000 --out benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                                "cargo run -p rstim --bin rstim -- perf run --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl",
+                                "cargo run -p rstim --bin rstim -- perf summarize --in benchmarks/rstim_vs_stim_simulator/results/full/speed.jsonl --out benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "cargo run -p rstim --bin rstim -- perf report --in benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json --out benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                            ],
+                            {
+                                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": {
+                                    "sha256": "068c6cda6256254832b1f07979a475a1d747288cbdfaae6291e03697c2b3261d"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": {
+                                    "sha256": "ad2ce5a1a049d02dc3ef15ec90609362b12e580c172fe8a13f6c16071c73a2f4"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": {
+                                    "sha256": "423b0a945a73ecb5ab748c7c796af9328a4639bf6921af982e71ad00924f46e9"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/cases.full.toml": {
+                                    "sha256": "f86f77dff5135b7273d64aa8fd01a8d55901e2222a175ae97922db423cabccd6"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": {
+                                    "sha256": "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"
+                                },
+                                "docs/showcases/rstim-vs-stim-simulator.md": {
+                                    "sha256": "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
+                                },
+                            },
+                        ),
+                        "provenance_requirements": [
+                            "OS",
+                            "CPU model",
+                            "Rust version",
+                            "Python version",
+                            "dependency versions",
+                            "external repository commits",
+                            "command line",
+                            "build profile",
+                            "shots or error budgets",
+                            "date",
+                        ],
+                        "provenance_sources": [
+                            "docs/showcases/rstim-vs-stim-simulator.md",
+                            "benchmarks/rstim_vs_stim_simulator/README.md",
+                        ],
+                        "claims_limit": "Fixture claim limit.",
                     }
                 ],
             },
@@ -753,8 +871,15 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "add",
             ".gitignore",
             "docs/showcases/benchmark-evidence.md",
+            "docs/showcases/rstim-vs-stim-simulator.md",
             "benchmarks/surface_decoder_compare/results/full/results.csv",
             "benchmarks/qec_code_random_window/README.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
             ".github/workflows/ci.yml",
             "site/benchmark-site.json",
         ],
