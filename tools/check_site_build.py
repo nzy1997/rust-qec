@@ -680,7 +680,7 @@ def make_fixture_site() -> SiteFixture:
                     {
                         "id": "rstim-vs-stim-full",
                         "title": "Checked rstim versus Stim full artifacts",
-                        "status": "partial",
+                        "status": "existing",
                         "tier": "full",
                         "artifacts": [
                             {
