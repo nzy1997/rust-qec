@@ -93,7 +93,7 @@ fn depolarize2_reuses_scratch_across_many_target_pairs() {
     let many_allocations = count_depolarize2_run_allocations(pair_count, batch_size, 19);
     assert!(
         many_allocations <= control_allocations + 64,
-        "DEPOLARIZE2 allocations should grow near-linearly with target pairs; control={control_allocations}, many_pairs={many_allocations}"
+        "DEPOLARIZE2 allocations should stay near-constant across many target pairs; control={control_allocations}, many_pairs={many_allocations}"
     );
 }
 
