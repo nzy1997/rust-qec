@@ -111,6 +111,35 @@ pub fn sample_batch(
     sample_batch_with_options(instrs, n_shots, rng, SampleOptions::default())
 }
 
+fn count_output_materialization_ops(instrs: &[StimInstr]) -> (usize, usize) {
+    let mut detector_count = 0usize;
+    let mut observable_count = 0usize;
+
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, .. } => match name.as_str() {
+                "DETECTOR" => {
+                    detector_count = detector_count.saturating_add(1);
+                }
+                "OBSERVABLE_INCLUDE" => {
+                    observable_count = observable_count.saturating_add(1);
+                }
+                _ => {}
+            },
+            StimInstr::Repeat { count, body } => {
+                let (body_detectors, body_observables) = count_output_materialization_ops(body);
+                let repeat_count = usize::try_from(*count).unwrap_or(usize::MAX);
+                detector_count =
+                    detector_count.saturating_add(body_detectors.saturating_mul(repeat_count));
+                observable_count =
+                    observable_count.saturating_add(body_observables.saturating_mul(repeat_count));
+            }
+        }
+    }
+
+    (detector_count, observable_count)
+}
+
 fn sample_batch_interpreted(
     instrs: &[StimInstr],
     n_shots: usize,
@@ -181,13 +210,15 @@ fn sample_batch_with_executor(
             ran_without_feedback: false,
         },
     )?;
+    let (detector_materializations, observable_materializations) =
+        count_output_materialization_ops(instrs);
 
     Ok(BatchOutput::full(
         measurements,
         m2d.detections,
         m2d.observable_flips,
-        0,
-        0,
+        detector_materializations,
+        observable_materializations,
     ))
 }
 
@@ -245,5 +276,21 @@ mod tests {
             err,
             "executor produced 0 measurements but reference sample expects 2"
         );
+    }
+
+    #[test]
+    fn count_output_materialization_ops_expands_repeats_saturating() {
+        let instrs = vec![
+            StimInstr::new("DETECTOR", vec![], vec![StimTarget::Rec(-1)]),
+            StimInstr::Repeat {
+                count: 3,
+                body: vec![
+                    StimInstr::new("DETECTOR", vec![], vec![StimTarget::Rec(-1)]),
+                    StimInstr::new("OBSERVABLE_INCLUDE", vec![0.0], vec![StimTarget::Rec(-1)]),
+                ],
+            },
+        ];
+
+        assert_eq!(count_output_materialization_ops(&instrs), (4, 3));
     }
 }
