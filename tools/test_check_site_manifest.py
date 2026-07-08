@@ -78,6 +78,29 @@ def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str,
     }
 
 
+def rstim_fixture_provenance() -> dict[str, object]:
+    provenance = fixture_provenance(
+        [
+            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+        ],
+        RSTIM_FIXTURE_ARTIFACT_HASHES,
+    )
+    provenance["seed_policy"] = {
+        "status": "recorded",
+        "value": {
+            "correctness_seeds": [12345],
+            "speed_rstim_variants_seed": 1234,
+            "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+        },
+    }
+    return provenance
+
+
 VALID_MANIFEST = {
     "schema_version": 1,
     "families": [
@@ -185,17 +208,7 @@ VALID_MANIFEST = {
                         "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                         "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                     ],
-                    "provenance": fixture_provenance(
-                        [
-                            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
-                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
-                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
-                            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
-                            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
-                            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
-                        ],
-                        RSTIM_FIXTURE_ARTIFACT_HASHES,
-                    ),
+                    "provenance": rstim_fixture_provenance(),
                     "provenance_requirements": list(RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS),
                     "provenance_sources": [
                         RSTIM_SHOWCASE_PATH,
@@ -383,6 +396,14 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 for requirement in manifest["families"][3]["evidence_items"][0]["provenance_requirements"]
                 if requirement != "Stim version"
             ]
+        elif mutation == "rstim_unrecorded_speed_seed":
+            manifest["families"][3]["evidence_items"][0]["provenance"]["seed_policy"] = {
+                "status": "recorded",
+                "value": {
+                    "correctness_seeds": [12345],
+                    "speed_run_seed": "not recorded in the checked speed summary/report artifacts",
+                },
+            }
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -498,6 +519,19 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "rstim-vs-stim-full" in error
                 and "Stim version" in error
                 and "provenance_requirements" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_recorded_seed_policy_with_unrecorded_speed_seed(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_unrecorded_speed_seed")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and "seed_policy" in error
+                and "speed_rstim_variants_seed" in error
                 for error in errors
             ),
             errors,

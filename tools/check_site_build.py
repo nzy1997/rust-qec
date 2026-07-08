@@ -527,6 +527,18 @@ def make_fixture_site() -> SiteFixture:
             "artifact_hashes": {"status": "recorded", "value": artifact_hashes},
         }
 
+    def rstim_vs_stim_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, object]:
+        provenance = fixture_provenance(commands, artifact_hashes)
+        provenance["seed_policy"] = {
+            "status": "recorded",
+            "value": {
+                "correctness_seeds": [12345],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+            },
+        }
+        return provenance
+
     surface_hashes = {
         "benchmarks/surface_decoder_compare/results/full/results.csv": {
             "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
@@ -723,7 +735,7 @@ def make_fixture_site() -> SiteFixture:
                             "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                             "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                         ],
-                        "provenance": fixture_provenance(
+                        "provenance": rstim_vs_stim_provenance(
                             [
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",

@@ -478,7 +478,9 @@
                 "correctness_seeds": [
                   12345
                 ],
-                "speed_run_seed": "not recorded in the checked speed summary/report artifacts"
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+                "speed_seed_scope": "The speed artifacts are report-only timing evidence for the recorded command and environment, not cross-tool sample stream equivalence."
               }
             },
             "build_profile": {
@@ -543,6 +545,7 @@
           "claims_limit": "Checked artifacts document recorded workloads and recorded environments only, not broad rstim/Stim parity.",
           "caveats": [
             "The checked speed summary and report are report-only evidence for the selected d11/r100 sample workload and its recorded workloads and recorded environments; they are not broad rstim/Stim parity evidence.",
+            "The rstim speed variants use StdRng::seed_from_u64(1234); the Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
             "The correctness summary is statistical evidence on the checked full fixture and recorded seed policy; it does not prove all circuits, seeds, detector paths, or simulator features agree with Stim.",
             "The canonical .stim fixture is Stim-generated checked circuit text, not evidence that rstim reproduces Stim generator output.",
             "Slow, failed, or incomplete variants would still be valid evidence when recorded; this family publishes the checked outcome, not an optimization guarantee."

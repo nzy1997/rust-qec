@@ -779,15 +779,23 @@ fn qec_code_and_future_benchmarks_are_classified() {
             "Partial checked evidence",
             "recorded workloads and recorded environments",
             "not broad rstim/Stim parity",
-            "sampling",
-            "detection",
-            "DEM extraction",
-            "conversion",
             "speed/correctness checks",
             "docs/showcases/rstim-vs-stim-simulator.md",
             "benchmarks/rstim_vs_stim_simulator/README.md",
         ],
         "qec-code and future benchmark site sections",
+    );
+    let rstim_section_start = index
+        .find("id=\"future-simulator-benchmarks\"")
+        .expect("rstim-vs-stim site section must exist");
+    let rstim_section_end = index[rstim_section_start..]
+        .find("</article>")
+        .map(|offset| rstim_section_start + offset)
+        .expect("rstim-vs-stim site section must close");
+    let rstim_section = &index[rstim_section_start..rstim_section_end];
+    assert!(
+        !rstim_section.contains("DEM extraction") && !rstim_section.contains("conversion"),
+        "rstim-vs-stim site copy must not claim unchecked DEM extraction or conversion evidence"
     );
 
     let families = manifest["families"]

@@ -78,6 +78,11 @@ RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS = (
     "shot counts",
     "date",
 )
+RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS = {
+    "correctness_seeds",
+    "speed_rstim_variants_seed",
+    "speed_stim_cli_seed_policy",
+}
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -280,10 +285,41 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
                     item_scope,
                     f"provenance_requirements missing required rstim-vs-stim label {required!r}",
                 )
+        validate_rstim_vs_stim_seed_policy(item_scope, item, errors)
 
     for artifact_path in RSTIM_VS_STIM_REQUIRED_ARTIFACTS:
         if artifact_path not in found_required_artifacts:
             add_error(errors, scope, f"required checked artifact {artifact_path} is missing from {RSTIM_VS_STIM_FAMILY_ID}")
+
+
+def validate_rstim_vs_stim_seed_policy(scope: str, item: dict[str, Any], errors: list[str]) -> None:
+    provenance = item.get("provenance")
+    if not isinstance(provenance, dict):
+        return
+    seed_policy = provenance.get("seed_policy")
+    if not isinstance(seed_policy, dict):
+        add_error(errors, scope, "provenance.seed_policy must be an object for rstim-vs-stim checked evidence")
+        return
+    if seed_policy.get("status") != "recorded":
+        add_error(errors, scope, "provenance.seed_policy must be recorded for rstim-vs-stim checked evidence")
+        return
+    value = seed_policy.get("value")
+    if not isinstance(value, dict):
+        add_error(errors, scope, "provenance.seed_policy recorded value must be an object")
+        return
+    missing = sorted(RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS - set(value))
+    if missing:
+        add_error(
+            errors,
+            scope,
+            "provenance.seed_policy missing required rstim-vs-stim seed fields: " + ", ".join(missing),
+        )
+    if "not recorded" in json.dumps(value, sort_keys=True).lower():
+        add_error(
+            errors,
+            scope,
+            "provenance.seed_policy recorded value must describe the actual seed policy instead of saying a seed is not recorded",
+        )
 
 
 def checked_artifact_paths_for_item(item: dict[str, Any]) -> list[str]:
@@ -747,6 +783,18 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             },
         }
 
+    def rstim_fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, Any]:
+        provenance = fixture_provenance(commands, artifact_hashes)
+        provenance["seed_policy"] = {
+            "status": "recorded",
+            "value": {
+                "correctness_seeds": [12345],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+            },
+        }
+        return provenance
+
     manifest = {
         "schema_version": 1,
         "families": [
@@ -880,7 +928,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                             "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                             "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                         ],
-                        "provenance": fixture_provenance(
+                        "provenance": rstim_fixture_provenance(
                             [
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
