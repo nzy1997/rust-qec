@@ -15,14 +15,51 @@ SURFACE_RESULTS_PATH = "benchmarks/surface_decoder_compare/results/full/results.
 SURFACE_IMAGE_PATH = "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png"
 SURFACE_RESULTS_SHA256 = "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
 SURFACE_IMAGE_SHA256 = "33d8344a7135c42aa3876706b908f95b702d83ff53e05e4aaff17c07bf67a98e"
+RSTIM_SPEED_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
+RSTIM_SPEED_REPORT_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md"
+RSTIM_CORRECTNESS_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+RSTIM_CASES_FULL_PATH = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+RSTIM_CANONICAL_STIM_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+)
+RSTIM_SHOWCASE_PATH = "docs/showcases/rstim-vs-stim-simulator.md"
+RSTIM_SPEED_SUMMARY_SHA256 = "068c6cda6256254832b1f07979a475a1d747288cbdfaae6291e03697c2b3261d"
+RSTIM_SPEED_REPORT_SHA256 = "ad2ce5a1a049d02dc3ef15ec90609362b12e580c172fe8a13f6c16071c73a2f4"
+RSTIM_CORRECTNESS_SUMMARY_SHA256 = "423b0a945a73ecb5ab748c7c796af9328a4639bf6921af982e71ad00924f46e9"
+RSTIM_CASES_FULL_SHA256 = "f86f77dff5135b7273d64aa8fd01a8d55901e2222a175ae97922db423cabccd6"
+RSTIM_CANONICAL_STIM_SHA256 = "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"
+RSTIM_SHOWCASE_SHA256 = "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
 
-FIXTURE_ARTIFACT_HASHES = {
+SURFACE_FIXTURE_ARTIFACT_HASHES = {
     SURFACE_RESULTS_PATH: {"sha256": SURFACE_RESULTS_SHA256},
     SURFACE_IMAGE_PATH: {"sha256": SURFACE_IMAGE_SHA256},
 }
 
+RSTIM_FIXTURE_ARTIFACT_HASHES = {
+    RSTIM_SPEED_SUMMARY_PATH: {"sha256": RSTIM_SPEED_SUMMARY_SHA256},
+    RSTIM_SPEED_REPORT_PATH: {"sha256": RSTIM_SPEED_REPORT_SHA256},
+    RSTIM_CORRECTNESS_SUMMARY_PATH: {"sha256": RSTIM_CORRECTNESS_SUMMARY_SHA256},
+    RSTIM_CASES_FULL_PATH: {"sha256": RSTIM_CASES_FULL_SHA256},
+    RSTIM_CANONICAL_STIM_PATH: {"sha256": RSTIM_CANONICAL_STIM_SHA256},
+    RSTIM_SHOWCASE_PATH: {"sha256": RSTIM_SHOWCASE_SHA256},
+}
+RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS = [
+    "OS",
+    "CPU model",
+    "Rust version",
+    "Python version",
+    "dependency versions",
+    "Stim version",
+    "external repository commits",
+    "command line",
+    "seeds",
+    "build profile",
+    "shot counts",
+    "date",
+]
 
-def fixture_provenance(commands: list[str]) -> dict[str, object]:
+
+def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, object]:
     return {
         "schema_version": 1,
         "artifact_date": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
@@ -37,8 +74,31 @@ def fixture_provenance(commands: list[str]) -> dict[str, object]:
         "seed_policy": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
         "build_profile": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
         "shots_or_error_budget": {"status": "not_recorded", "reason": PROVENANCE_NOT_RECORDED_REASON},
-        "artifact_hashes": {"status": "recorded", "value": FIXTURE_ARTIFACT_HASHES},
+        "artifact_hashes": {"status": "recorded", "value": artifact_hashes},
     }
+
+
+def rstim_fixture_provenance() -> dict[str, object]:
+    provenance = fixture_provenance(
+        [
+            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+        ],
+        RSTIM_FIXTURE_ARTIFACT_HASHES,
+    )
+    provenance["seed_policy"] = {
+        "status": "recorded",
+        "value": {
+            "correctness_seeds": [12345],
+            "speed_rstim_variants_seed": 1234,
+            "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+        },
+    }
+    return provenance
 
 
 VALID_MANIFEST = {
@@ -69,7 +129,7 @@ VALID_MANIFEST = {
                         },
                     ],
                     "commands": ["make surface-decoder-compare-full"],
-                    "provenance": fixture_provenance(["make surface-decoder-compare-full"]),
+                    "provenance": fixture_provenance(["make surface-decoder-compare-full"], SURFACE_FIXTURE_ARTIFACT_HASHES),
                     "provenance_requirements": ["command line", "date"],
                     "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                     "claims_limit": "Fixture claim limit.",
@@ -90,7 +150,7 @@ VALID_MANIFEST = {
                     "tier": "full",
                     "artifacts": [],
                     "commands": ["make bb-circuit-bposd-compare-full"],
-                    "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"]),
+                    "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"], {}),
                     "provenance_requirements": ["command line", "date"],
                     "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                     "claims_limit": "Fixture claim limit.",
@@ -120,20 +180,41 @@ VALID_MANIFEST = {
         {
             "id": "rstim-vs-stim-simulator",
             "title": "rstim versus Stim Simulator",
-            "status": "future",
-            "source_docs": ["docs/showcases/benchmark-evidence.md"],
-            "claims_limit": "No current site-facing benchmark artifacts.",
+            "status": "partial",
+            "source_docs": [
+                RSTIM_SHOWCASE_PATH,
+                "benchmarks/rstim_vs_stim_simulator/README.md",
+            ],
+            "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and full-manifest correctness evidence only; this family does not claim broad rstim-versus-Stim parity.",
             "evidence_items": [
                 {
-                    "id": "rstim-stim-future",
-                    "title": "Future simulator benchmark",
-                    "status": "future",
-                    "tier": "future",
-                    "artifacts": [],
-                    "commands": [],
-                    "provenance_requirements": ["command line", "date"],
-                    "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
-                    "claims_limit": "Planning entry only.",
+                    "id": "rstim-vs-stim-full",
+                    "title": "Checked rstim versus Stim simulator artifacts",
+                    "status": "existing",
+                    "tier": "full",
+                    "artifacts": [
+                        {"path": RSTIM_SPEED_SUMMARY_PATH, "kind": "speed-summary", "checked": True},
+                        {"path": RSTIM_SPEED_REPORT_PATH, "kind": "speed-report", "checked": True},
+                        {"path": RSTIM_CORRECTNESS_SUMMARY_PATH, "kind": "correctness-summary", "checked": True},
+                        {"path": RSTIM_CASES_FULL_PATH, "kind": "fixture-manifest", "checked": True},
+                        {"path": RSTIM_CANONICAL_STIM_PATH, "kind": "stim-fixture", "checked": True},
+                        {"path": RSTIM_SHOWCASE_PATH, "kind": "showcase", "checked": True},
+                    ],
+                    "commands": [
+                        "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                        "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                        "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                        "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                        "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                        "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                    ],
+                    "provenance": rstim_fixture_provenance(),
+                    "provenance_requirements": list(RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS),
+                    "provenance_sources": [
+                        RSTIM_SHOWCASE_PATH,
+                        "benchmarks/rstim_vs_stim_simulator/README.md",
+                    ],
+                    "claims_limit": "Fixture claim limit.",
                 }
             ],
         },
@@ -171,6 +252,8 @@ class SiteManifestValidatorTest(unittest.TestCase):
         (root / "docs/showcases").mkdir(parents=True)
         (root / "benchmarks/surface_decoder_compare/results/full").mkdir(parents=True)
         (root / "benchmarks/qec_code_random_window").mkdir(parents=True)
+        (root / "benchmarks/rstim_vs_stim_simulator/results/full").mkdir(parents=True)
+        (root / "benchmarks/rstim_vs_stim_simulator/fixtures").mkdir(parents=True)
         (root / ".github/workflows").mkdir(parents=True)
         (root / "site").mkdir(parents=True)
         (root / "_site/data").mkdir(parents=True)
@@ -181,6 +264,13 @@ class SiteManifestValidatorTest(unittest.TestCase):
         (root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").write_text("png\n", encoding="utf-8")
         (root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").write_text("unchecked\n", encoding="utf-8")
         (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
+        (root / RSTIM_SHOWCASE_PATH).write_text("# rstim vs Stim\n", encoding="utf-8")
+        (root / "benchmarks/rstim_vs_stim_simulator/README.md").write_text("# rstim fixtures\n", encoding="utf-8")
+        (root / RSTIM_SPEED_SUMMARY_PATH).write_text('{"case":"d11"}\n', encoding="utf-8")
+        (root / RSTIM_SPEED_REPORT_PATH).write_text("# speed report\n", encoding="utf-8")
+        (root / RSTIM_CORRECTNESS_SUMMARY_PATH).write_text('{"status":"PASS"}\n', encoding="utf-8")
+        (root / RSTIM_CASES_FULL_PATH).write_text("[[cases]]\nid = 'd11'\n", encoding="utf-8")
+        (root / RSTIM_CANONICAL_STIM_PATH).write_text("M 0\n", encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "_site/index.html").write_text(
             '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
@@ -284,6 +374,36 @@ class SiteManifestValidatorTest(unittest.TestCase):
             ] = {
                 "sha256": "a" * 64
             }
+        elif mutation == "rstim_family_future_status":
+            manifest["families"][3]["status"] = "future"
+        elif mutation == "rstim_partial_without_checked_artifacts":
+            manifest["families"][3]["evidence_items"][0]["artifacts"] = []
+            manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"] = {}
+        elif mutation == "rstim_missing_required_artifact":
+            manifest["families"][3]["evidence_items"][0]["artifacts"] = [
+                artifact
+                for artifact in manifest["families"][3]["evidence_items"][0]["artifacts"]
+                if artifact["path"] != RSTIM_CORRECTNESS_SUMMARY_PATH
+            ]
+            del manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                RSTIM_CORRECTNESS_SUMMARY_PATH
+            ]
+        elif mutation == "rstim_wrong_artifact_kind":
+            manifest["families"][3]["evidence_items"][0]["artifacts"][0]["kind"] = "json"
+        elif mutation == "rstim_missing_stim_provenance_requirement":
+            manifest["families"][3]["evidence_items"][0]["provenance_requirements"] = [
+                requirement
+                for requirement in manifest["families"][3]["evidence_items"][0]["provenance_requirements"]
+                if requirement != "Stim version"
+            ]
+        elif mutation == "rstim_unrecorded_speed_seed":
+            manifest["families"][3]["evidence_items"][0]["provenance"]["seed_policy"] = {
+                "status": "recorded",
+                "value": {
+                    "correctness_seeds": [12345],
+                    "speed_run_seed": "not recorded in the checked speed summary/report artifacts",
+                },
+            }
 
         manifest_path = root / "site/benchmark-site.json"
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -301,6 +421,13 @@ class SiteManifestValidatorTest(unittest.TestCase):
                 "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
                 "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
                 "benchmarks/qec_code_random_window/README.md",
+                RSTIM_SHOWCASE_PATH,
+                "benchmarks/rstim_vs_stim_simulator/README.md",
+                RSTIM_SPEED_SUMMARY_PATH,
+                RSTIM_SPEED_REPORT_PATH,
+                RSTIM_CORRECTNESS_SUMMARY_PATH,
+                RSTIM_CASES_FULL_PATH,
+                RSTIM_CANONICAL_STIM_PATH,
                 ".github/workflows/ci.yml",
                 "site/benchmark-site.json",
             ],
@@ -328,6 +455,85 @@ class SiteManifestValidatorTest(unittest.TestCase):
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertTrue(
             any("manifest" in error and "rstim-vs-stim-simulator" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_rstim_partial_family_without_checked_artifacts(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_partial_without_checked_artifacts")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-simulator" in error
+                and "partial" in error
+                and "checked artifact" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_family_future_regression(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_family_future_status")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-simulator" in error
+                and "partial" in error
+                and "future" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_missing_required_artifact(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_missing_required_artifact")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-simulator" in error
+                and RSTIM_CORRECTNESS_SUMMARY_PATH in error
+                and "required checked artifact" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_wrong_artifact_kind(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_wrong_artifact_kind")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and RSTIM_SPEED_SUMMARY_PATH in error
+                and "kind" in error
+                and "speed-summary" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_missing_stim_provenance_requirement(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_missing_stim_provenance_requirement")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and "Stim version" in error
+                and "provenance_requirements" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_rstim_recorded_seed_policy_with_unrecorded_speed_seed(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest(mutation="rstim_unrecorded_speed_seed")
+        errors = check_site_manifest.validate_manifest(repo, manifest_path)
+        self.assertTrue(
+            any(
+                "rstim-vs-stim-full" in error
+                and "seed_policy" in error
+                and "speed_rstim_variants_seed" in error
+                for error in errors
+            ),
             errors,
         )
 
@@ -630,6 +836,20 @@ class SiteManifestValidatorTest(unittest.TestCase):
         errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
         self.assertTrue(
             any("not listed as a checked manifest artifact" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_built_site_rstim_artifact_reference_not_listed_in_manifest(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        index = repo / "_site/index.html"
+        missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/full/not-in-manifest.json"
+        index.write_text(
+            index.read_text(encoding="utf-8") + f'<a href="{missing_artifact}">bad</a>\n',
+            encoding="utf-8",
+        )
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+        self.assertTrue(
+            any(missing_artifact in error and "not listed as a checked manifest artifact" in error for error in errors),
             errors,
         )
 

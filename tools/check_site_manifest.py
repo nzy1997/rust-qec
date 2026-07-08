@@ -36,6 +36,7 @@ ITEM_REQUIRED_FIELDS = {
 }
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/full/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1
@@ -55,6 +56,34 @@ PROVENANCE_REQUIRED_FIELDS = (
     "shots_or_error_budget",
     "artifact_hashes",
 )
+RSTIM_VS_STIM_FAMILY_ID = "rstim-vs-stim-simulator"
+RSTIM_VS_STIM_REQUIRED_ARTIFACTS = {
+    "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": "correctness-summary",
+    "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "fixture-manifest",
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "stim-fixture",
+    "docs/showcases/rstim-vs-stim-simulator.md": "showcase",
+}
+RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS = (
+    "OS",
+    "CPU model",
+    "Rust version",
+    "Python version",
+    "dependency versions",
+    "Stim version",
+    "external repository commits",
+    "command line",
+    "seeds",
+    "build profile",
+    "shot counts",
+    "date",
+)
+RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS = {
+    "correctness_seeds",
+    "speed_rstim_variants_seed",
+    "speed_stim_cli_seed_policy",
+}
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -181,6 +210,117 @@ def item_has_checked_artifacts(item: dict[str, Any]) -> bool:
     if not isinstance(artifacts, list):
         return False
     return any(isinstance(artifact, dict) and artifact.get("checked") is True for artifact in artifacts)
+
+
+def family_has_checked_artifacts(family: dict[str, Any]) -> bool:
+    items = family.get("evidence_items")
+    if not isinstance(items, list):
+        return False
+    return any(isinstance(item, dict) and item_has_checked_artifacts(item) for item in items)
+
+
+def iter_checked_items(family: dict[str, Any]) -> list[dict[str, Any]]:
+    items = family.get("evidence_items")
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict) and item_has_checked_artifacts(item)]
+
+
+def validate_family_status_policy(scope: str, family: dict[str, Any], errors: list[str]) -> None:
+    family_id = family.get("id")
+    if family_id != RSTIM_VS_STIM_FAMILY_ID:
+        return
+
+    status = family.get("status")
+    if status != "partial":
+        add_error(
+            errors,
+            scope,
+            f"{RSTIM_VS_STIM_FAMILY_ID} family status must be partial, not {status!r}",
+        )
+        return
+
+    checked_items = iter_checked_items(family)
+    if not checked_items:
+        add_error(errors, scope, f"partial {RSTIM_VS_STIM_FAMILY_ID} family must list checked artifacts")
+        return
+
+    found_required_artifacts: dict[str, tuple[str, str, bool]] = {}
+    for item in checked_items:
+        item_id = item.get("id", "<missing>")
+        item_scope = f"evidence item {item_id}"
+        artifacts = item.get("artifacts")
+        if not isinstance(artifacts, list):
+            continue
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            artifact_path = artifact.get("path")
+            if not isinstance(artifact_path, str):
+                continue
+            expected_kind = RSTIM_VS_STIM_REQUIRED_ARTIFACTS.get(artifact_path)
+            if expected_kind is None:
+                continue
+            artifact_checked = artifact.get("checked") is True
+            artifact_kind = artifact.get("kind")
+            found_required_artifacts[artifact_path] = (
+                item_scope,
+                artifact_kind if isinstance(artifact_kind, str) else repr(artifact_kind),
+                artifact_checked,
+            )
+            if not artifact_checked:
+                add_error(errors, item_scope, f"required checked artifact {artifact_path} must set checked=True")
+            if artifact_kind != expected_kind:
+                add_error(
+                    errors,
+                    item_scope,
+                    f"required checked artifact {artifact_path} must have kind {expected_kind!r}, not {artifact_kind!r}",
+                )
+
+        requirements = item.get("provenance_requirements")
+        requirement_set = {value for value in requirements if isinstance(value, str)} if isinstance(requirements, list) else set()
+        for required in RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS:
+            if required not in requirement_set:
+                add_error(
+                    errors,
+                    item_scope,
+                    f"provenance_requirements missing required rstim-vs-stim label {required!r}",
+                )
+        validate_rstim_vs_stim_seed_policy(item_scope, item, errors)
+
+    for artifact_path in RSTIM_VS_STIM_REQUIRED_ARTIFACTS:
+        if artifact_path not in found_required_artifacts:
+            add_error(errors, scope, f"required checked artifact {artifact_path} is missing from {RSTIM_VS_STIM_FAMILY_ID}")
+
+
+def validate_rstim_vs_stim_seed_policy(scope: str, item: dict[str, Any], errors: list[str]) -> None:
+    provenance = item.get("provenance")
+    if not isinstance(provenance, dict):
+        return
+    seed_policy = provenance.get("seed_policy")
+    if not isinstance(seed_policy, dict):
+        add_error(errors, scope, "provenance.seed_policy must be an object for rstim-vs-stim checked evidence")
+        return
+    if seed_policy.get("status") != "recorded":
+        add_error(errors, scope, "provenance.seed_policy must be recorded for rstim-vs-stim checked evidence")
+        return
+    value = seed_policy.get("value")
+    if not isinstance(value, dict):
+        add_error(errors, scope, "provenance.seed_policy recorded value must be an object")
+        return
+    missing = sorted(RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS - set(value))
+    if missing:
+        add_error(
+            errors,
+            scope,
+            "provenance.seed_policy missing required rstim-vs-stim seed fields: " + ", ".join(missing),
+        )
+    if "not recorded" in json.dumps(value, sort_keys=True).lower():
+        add_error(
+            errors,
+            scope,
+            "provenance.seed_policy recorded value must describe the actual seed policy instead of saying a seed is not recorded",
+        )
 
 
 def checked_artifact_paths_for_item(item: dict[str, Any]) -> list[str]:
@@ -422,6 +562,7 @@ def validate_family(repo_root: Path, family: Any, errors: list[str]) -> str | No
 
     if not isinstance(family.get("status"), str) or family["status"] not in ALLOWED_STATUSES:
         add_error(errors, scope, f"invalid status {family.get('status')!r}")
+    validate_family_status_policy(scope, family, errors)
 
     validate_path_list(repo_root, scope, "source_docs", family.get("source_docs"), errors)
 
@@ -595,17 +736,34 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     (root / "docs/showcases").mkdir(parents=True)
     (root / "benchmarks/surface_decoder_compare/results/full").mkdir(parents=True)
     (root / "benchmarks/qec_code_random_window").mkdir(parents=True)
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full").mkdir(parents=True)
+    (root / "benchmarks/rstim_vs_stim_simulator/fixtures").mkdir(parents=True)
     (root / ".github/workflows").mkdir(parents=True)
     (root / "site").mkdir(parents=True)
     (root / "benchmarks/out").mkdir(parents=True)
 
     (root / "docs/showcases/benchmark-evidence.md").write_text("# Benchmark Evidence\n", encoding="utf-8")
+    (root / "docs/showcases/rstim-vs-stim-simulator.md").write_text("# rstim vs Stim\n", encoding="utf-8")
     (root / "benchmarks/surface_decoder_compare/results/full/results.csv").write_text("distance,shots\n", encoding="utf-8")
     (root / "benchmarks/qec_code_random_window/README.md").write_text("# Random Window\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/README.md").write_text("# rstim fixtures\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json").write_text(
+        '{"case":"d11"}\n', encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md").write_text(
+        "# speed report\n", encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json").write_text(
+        '{"status":"PASS"}\n', encoding="utf-8"
+    )
+    (root / "benchmarks/rstim_vs_stim_simulator/cases.full.toml").write_text("[[cases]]\nid = 'd11'\n", encoding="utf-8")
+    (root / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim").write_text(
+        "M 0\n", encoding="utf-8"
+    )
     (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
     (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
 
-    def fixture_provenance(commands: list[str]) -> dict[str, Any]:
+    def fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, Any]:
         return {
             "schema_version": 1,
             "artifact_date": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
@@ -622,13 +780,21 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "shots_or_error_budget": {"status": "not_recorded", "reason": "historical fixture predates canonical provenance capture"},
             "artifact_hashes": {
                 "status": "recorded",
-                "value": {
-                    "benchmarks/surface_decoder_compare/results/full/results.csv": {
-                        "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
-                    }
-                },
+                "value": artifact_hashes,
             },
         }
+
+    def rstim_fixture_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, Any]:
+        provenance = fixture_provenance(commands, artifact_hashes)
+        provenance["seed_policy"] = {
+            "status": "recorded",
+            "value": {
+                "correctness_seeds": [12345],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+            },
+        }
+        return provenance
 
     manifest = {
         "schema_version": 1,
@@ -653,7 +819,14 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                             }
                         ],
                         "commands": ["make surface-decoder-compare-full"],
-                        "provenance": fixture_provenance(["make surface-decoder-compare-full"]),
+                        "provenance": fixture_provenance(
+                            ["make surface-decoder-compare-full"],
+                            {
+                                "benchmarks/surface_decoder_compare/results/full/results.csv": {
+                                    "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
+                                }
+                            },
+                        ),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -674,7 +847,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "tier": "full",
                         "artifacts": [],
                         "commands": ["make bb-circuit-bposd-compare-full"],
-                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"]),
+                        "provenance": fixture_provenance(["make bb-circuit-bposd-compare-full"], {}),
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
                         "claims_limit": "Fixture claim limit.",
@@ -704,20 +877,94 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             {
                 "id": "rstim-vs-stim-simulator",
                 "title": "rstim versus Stim Simulator",
-                "status": "future",
-                "source_docs": ["docs/showcases/benchmark-evidence.md"],
-                "claims_limit": "No current site-facing benchmark artifacts.",
+                "status": "partial",
+                "source_docs": [
+                    "docs/showcases/rstim-vs-stim-simulator.md",
+                    "benchmarks/rstim_vs_stim_simulator/README.md",
+                ],
+                "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and full-manifest correctness evidence only; this family does not claim broad rstim-versus-Stim parity.",
                 "evidence_items": [
                     {
-                        "id": "rstim-stim-future",
-                        "title": "Future simulator benchmark",
-                        "status": "future",
-                        "tier": "future",
-                        "artifacts": [],
-                        "commands": [],
-                        "provenance_requirements": ["command line", "date"],
-                        "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
-                        "claims_limit": "Planning entry only.",
+                        "id": "rstim-vs-stim-full",
+                        "title": "Checked rstim versus Stim simulator artifacts",
+                        "status": "existing",
+                        "tier": "full",
+                        "artifacts": [
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "kind": "speed-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                                "kind": "speed-report",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                                "kind": "correctness-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "kind": "fixture-manifest",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+                                "kind": "stim-fixture",
+                                "checked": True,
+                            },
+                            {
+                                "path": "docs/showcases/rstim-vs-stim-simulator.md",
+                                "kind": "showcase",
+                                "checked": True,
+                            },
+                        ],
+                        "commands": [
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                        ],
+                        "provenance": rstim_fixture_provenance(
+                            [
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                                "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                                "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                                "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                            ],
+                            {
+                                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": {
+                                    "sha256": "068c6cda6256254832b1f07979a475a1d747288cbdfaae6291e03697c2b3261d"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": {
+                                    "sha256": "ad2ce5a1a049d02dc3ef15ec90609362b12e580c172fe8a13f6c16071c73a2f4"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": {
+                                    "sha256": "423b0a945a73ecb5ab748c7c796af9328a4639bf6921af982e71ad00924f46e9"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/cases.full.toml": {
+                                    "sha256": "f86f77dff5135b7273d64aa8fd01a8d55901e2222a175ae97922db423cabccd6"
+                                },
+                                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": {
+                                    "sha256": "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"
+                                },
+                                "docs/showcases/rstim-vs-stim-simulator.md": {
+                                    "sha256": "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
+                                },
+                            },
+                        ),
+                        "provenance_requirements": list(RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS),
+                        "provenance_sources": [
+                            "docs/showcases/rstim-vs-stim-simulator.md",
+                            "benchmarks/rstim_vs_stim_simulator/README.md",
+                        ],
+                        "claims_limit": "Checked artifacts document one recorded surface-code d11/r100 workload and its recorded environment only.",
                     }
                 ],
             },
@@ -753,8 +1000,15 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "add",
             ".gitignore",
             "docs/showcases/benchmark-evidence.md",
+            "docs/showcases/rstim-vs-stim-simulator.md",
             "benchmarks/surface_decoder_compare/results/full/results.csv",
             "benchmarks/qec_code_random_window/README.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
             ".github/workflows/ci.yml",
             "site/benchmark-site.json",
         ],
@@ -787,6 +1041,16 @@ def run_self_test() -> list[str]:
                 "surface-decoder-full",
                 "benchmarks/surface_decoder_compare/results/full/unchecked.csv",
             ),
+            (
+                "rstim_missing_required_artifact",
+                RSTIM_VS_STIM_FAMILY_ID,
+                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+            ),
+            (
+                "rstim_missing_stim_provenance_requirement",
+                "rstim-vs-stim-full",
+                "Stim version",
+            ),
         ]
 
         for mutation, entry_id, rule in mutations:
@@ -817,6 +1081,21 @@ def run_self_test() -> list[str]:
                 manifest["families"][0]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
                     "benchmarks/surface_decoder_compare/results/full/unchecked.csv"
                 ] = {"sha256": "a" * 64}
+            elif mutation == "rstim_missing_required_artifact":
+                manifest["families"][3]["evidence_items"][0]["artifacts"] = [
+                    artifact
+                    for artifact in manifest["families"][3]["evidence_items"][0]["artifacts"]
+                    if artifact["path"] != "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+                ]
+                del manifest["families"][3]["evidence_items"][0]["provenance"]["artifact_hashes"]["value"][
+                    "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+                ]
+            elif mutation == "rstim_missing_stim_provenance_requirement":
+                manifest["families"][3]["evidence_items"][0]["provenance_requirements"] = [
+                    requirement
+                    for requirement in manifest["families"][3]["evidence_items"][0]["provenance_requirements"]
+                    if requirement != "Stim version"
+                ]
 
             manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
             mutated_errors = validate_manifest(repo_root, manifest_path)

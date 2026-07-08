@@ -358,27 +358,198 @@
     {
       "id": "rstim-vs-stim-simulator",
       "title": "rstim versus Stim Simulator",
-      "status": "future",
+      "status": "partial",
       "source_docs": [
-        "rstim/doc/performance_parity.md"
+        "docs/showcases/rstim-vs-stim-simulator.md",
+        "benchmarks/rstim_vs_stim_simulator/README.md"
       ],
-      "claims_limit": "Future work only; no current site-facing benchmark artifacts are tracked for this comparison family.",
+      "claims_limit": "Checked artifacts cover the recorded d11/r100 selected-case speed and full-manifest correctness evidence only; this family does not claim broad rstim-versus-Stim parity.",
       "evidence_items": [
         {
-          "id": "rstim-vs-stim-future",
-          "title": "Future rstim versus Stim simulator benchmark",
-          "status": "future",
-          "tier": "future",
-          "artifacts": [],
-          "commands": [],
+          "id": "rstim-vs-stim-full",
+          "title": "Checked rstim versus Stim simulator artifacts",
+          "status": "existing",
+          "tier": "full",
+          "artifacts": [
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+              "kind": "speed-summary",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+              "kind": "speed-report",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+              "kind": "correctness-summary",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+              "kind": "fixture-manifest",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+              "kind": "stim-fixture",
+              "checked": true
+            },
+            {
+              "path": "docs/showcases/rstim-vs-stim-simulator.md",
+              "kind": "showcase",
+              "checked": true
+            }
+          ],
+          "commands": [
+            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+          ],
+          "provenance": {
+            "schema_version": 1,
+            "artifact_date": {
+              "status": "recorded",
+              "value": {
+                "speed_artifacts_commit_time": "2026-07-08T08:41:43+08:00",
+                "correctness_summary_commit_time": "2026-07-08T08:56:33+08:00",
+                "showcase_commit_time": "2026-07-08T07:58:24+08:00"
+              }
+            },
+            "source_commit": {
+              "status": "recorded",
+              "value": {
+                "speed_artifacts": "83b7efa5aea9b50f7eddd664667a6b1c815f3367",
+                "correctness_summary": "ffb8b51af0f94e19d4cae902e3ac2fe4c81e46b9",
+                "showcase": "9a3a39fb4408f46aba23d6417bb235e15d7fc4b9"
+              }
+            },
+            "commands": {
+              "status": "recorded",
+              "value": [
+                "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+              ]
+            },
+            "os": {
+              "status": "recorded",
+              "value": "macOS 26.5.1 (build 25F80)"
+            },
+            "cpu_model": {
+              "status": "recorded",
+              "value": "Apple M4"
+            },
+            "rust_version": {
+              "status": "recorded",
+              "value": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)"
+            },
+            "python_version": {
+              "status": "recorded",
+              "value": "Python 3.14.3"
+            },
+            "dependency_versions": {
+              "status": "recorded",
+              "value": {
+                "rstim": "0.1.1",
+                "stim": "1.15.0",
+                "clap": "4.6.1",
+                "rand": "0.8.6",
+                "serde": "1.0.228",
+                "serde_json": "1.0.150",
+                "libc": "0.2.186",
+                "toml": "0.8.23"
+              }
+            },
+            "external_repository_commits": {
+              "status": "recorded",
+              "value": []
+            },
+            "seed_policy": {
+              "status": "recorded",
+              "value": {
+                "correctness_seeds": [
+                  12345
+                ],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+                "speed_seed_scope": "The speed artifacts are report-only timing evidence for the recorded command and environment, not cross-tool sample stream equivalence."
+              }
+            },
+            "build_profile": {
+              "status": "recorded",
+              "value": {
+                "correctness_rstim_binary": "target/debug/rstim",
+                "speed_commands": "cargo run default debug profile",
+                "stim_cli": "stim on PATH"
+              }
+            },
+            "shots_or_error_budget": {
+              "status": "recorded",
+              "value": {
+                "full_fixture_shots": 1024,
+                "speed_measure_rounds": 1,
+                "speed_warmup_rounds": 0,
+                "stim_version_from_fixture_manifest": "1.15.0"
+              }
+            },
+            "artifact_hashes": {
+              "status": "recorded",
+              "value": {
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": {
+                  "sha256": "97ae397e598fe447d206c6b07a26ceaa0a3336d1883a7f77bc194f7b4c491805"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": {
+                  "sha256": "4e81fcf6ae163c2660587ecf38df70a107f16315ea139ec0282af237cd0ad08c"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": {
+                  "sha256": "5c9c0b7944801d8652f9364cf6e15642475255c19efae6079c909798b8c3f1ba"
+                },
+                "benchmarks/rstim_vs_stim_simulator/cases.full.toml": {
+                  "sha256": "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+                },
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": {
+                  "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+                },
+                "docs/showcases/rstim-vs-stim-simulator.md": {
+                  "sha256": "4dd89338f0620222a060ce8b2446155b5882bcb8ae25c04e25de9fe9c2c3ce17"
+                }
+              }
+            }
+          },
           "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "Stim version",
+            "external repository commits",
             "command line",
+            "seeds",
+            "build profile",
+            "shot counts",
             "date"
           ],
           "provenance_sources": [
-            "rstim/doc/performance_parity.md"
+            "docs/showcases/rstim-vs-stim-simulator.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md"
           ],
-          "claims_limit": "Future work only; no current site-facing benchmark artifacts are tracked for this comparison family."
+          "claims_limit": "Checked artifacts document recorded workloads and recorded environments only, not broad rstim/Stim parity.",
+          "caveats": [
+            "The checked speed summary and report are report-only evidence for the selected d11/r100 sample workload and its recorded workloads and recorded environments; they are not broad rstim/Stim parity evidence.",
+            "The rstim speed variants use StdRng::seed_from_u64(1234); the Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+            "The correctness summary is statistical evidence on the checked full fixture and recorded seed policy; it does not prove all circuits, seeds, detector paths, or simulator features agree with Stim.",
+            "The canonical .stim fixture is Stim-generated checked circuit text, not evidence that rstim reproduces Stim generator output.",
+            "Slow, failed, or incomplete variants would still be valid evidence when recorded; this family publishes the checked outcome, not an optimization guarantee."
+          ]
         }
       ]
     },

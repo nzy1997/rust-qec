@@ -199,7 +199,7 @@
 
   const benchmarkManifest = document.getElementById("benchmark-manifest");
   const checkedBenchmarkResults = document.getElementById("checked-benchmark-result-cards");
-  const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full"];
+  const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
 
   function renderBadge(label, value) {
     return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;
@@ -320,12 +320,19 @@
     return `<ul class="result-note-list">${values.map((value) => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`;
   }
 
+  function repoSourceHref(path) {
+    if (typeof path !== "string" || /^(?:https?:)?\/\//.test(path) || path.startsWith("#")) {
+      return path;
+    }
+    return `https://github.com/nzy1997/rstim/blob/master/${path}`;
+  }
+
   function renderSourceLinks(paths) {
     if (!Array.isArray(paths) || !paths.length) {
       return "";
     }
     const links = paths
-      .map((path) => `<li><a href="${escapeHtml(path)}">${escapeHtml(path)}</a></li>`)
+      .map((path) => `<li><a href="${escapeHtml(repoSourceHref(path))}">${escapeHtml(path)}</a></li>`)
       .join("");
     return `<ul class="result-link-list source-links">${links}</ul>`;
   }

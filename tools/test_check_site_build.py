@@ -45,6 +45,8 @@ class SiteBuildCheckerTest(unittest.TestCase):
             self.assertIn(marker, output)
         self.assertIn("surface-decoder-full", output)
         self.assertIn("bb-circuit-full", output)
+        self.assertIn("rstim-vs-stim-full", output)
+        self.assertIn("partial checked evidence", output)
         self.assertIn("not_recorded", output)
         self.assertIn("checked artifact hashes", output)
 
@@ -88,6 +90,47 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 and result.area == "checked benchmark provenance"
                 and "surface-decoder-full" in result.detail
                 and "provenance" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_missing_rstim_vs_stim_checked_artifact(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        artifact_path = "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+        (fixture.site_root / artifact_path).unlink()
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark artifacts"
+                and "correctness-summary.json" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_source_doc_readme_links_are_not_checked_artifact_references(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        index_path = fixture.site_root / "index.html"
+        index_path.write_text(
+            index_path.read_text(encoding="utf-8")
+            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/surface_decoder_compare/README.md">surface docs</a>\n'
+            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">rstim docs</a>\n',
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertFalse(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark artifacts"
+                and "README.md" in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),

@@ -1,0 +1,554 @@
+{
+  "case_count": 1,
+  "cases": [
+    {
+      "case_id": "stim_surface_d11_r100",
+      "expected_bits": 12001,
+      "failure_reasons": [],
+      "input_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+      "marginals": [
+        {
+          "column": 0,
+          "delta": 0.0,
+          "rstim_hits": 3,
+          "rstim_rate": 0.0029296875,
+          "sample_count": 1024,
+          "stim_hits": 3,
+          "stim_rate": 0.0029296875,
+          "tolerance": 0.024331439401379024
+        },
+        {
+          "column": 800,
+          "delta": 0.00390625,
+          "rstim_hits": 21,
+          "rstim_rate": 0.0205078125,
+          "sample_count": 1024,
+          "stim_hits": 17,
+          "stim_rate": 0.0166015625,
+          "tolerance": 0.04578295024846812
+        },
+        {
+          "column": 1600,
+          "delta": 0.0048828125,
+          "rstim_hits": 16,
+          "rstim_rate": 0.015625,
+          "sample_count": 1024,
+          "stim_hits": 21,
+          "stim_rate": 0.0205078125,
+          "tolerance": 0.04531776519783564
+        },
+        {
+          "column": 2400,
+          "delta": 0.0,
+          "rstim_hits": 6,
+          "rstim_rate": 0.005859375,
+          "sample_count": 1024,
+          "stim_hits": 6,
+          "stim_rate": 0.005859375,
+          "tolerance": 0.030237917792453273
+        },
+        {
+          "column": 3200,
+          "delta": 0.005859375,
+          "rstim_hits": 22,
+          "rstim_rate": 0.021484375,
+          "sample_count": 1024,
+          "stim_hits": 16,
+          "stim_rate": 0.015625,
+          "tolerance": 0.04578295024846812
+        },
+        {
+          "column": 4000,
+          "delta": 0.01953125,
+          "rstim_hits": 9,
+          "rstim_rate": 0.0087890625,
+          "sample_count": 1024,
+          "stim_hits": 29,
+          "stim_rate": 0.0283203125,
+          "tolerance": 0.04578295024846812
+        },
+        {
+          "column": 4800,
+          "delta": 0.00390625,
+          "rstim_hits": 9,
+          "rstim_rate": 0.0087890625,
+          "sample_count": 1024,
+          "stim_hits": 13,
+          "stim_rate": 0.0126953125,
+          "tolerance": 0.037334893018332815
+        },
+        {
+          "column": 5600,
+          "delta": 0.0048828125,
+          "rstim_hits": 20,
+          "rstim_rate": 0.01953125,
+          "sample_count": 1024,
+          "stim_hits": 15,
+          "stim_rate": 0.0146484375,
+          "tolerance": 0.04436704782057376
+        },
+        {
+          "column": 6399,
+          "delta": 0.00390625,
+          "rstim_hits": 18,
+          "rstim_rate": 0.017578125,
+          "sample_count": 1024,
+          "stim_hits": 14,
+          "stim_rate": 0.013671875,
+          "tolerance": 0.042885660625942845
+        },
+        {
+          "column": 7199,
+          "delta": 0.0068359375,
+          "rstim_hits": 16,
+          "rstim_rate": 0.015625,
+          "sample_count": 1024,
+          "stim_hits": 9,
+          "stim_rate": 0.0087890625,
+          "tolerance": 0.03911751201255356
+        },
+        {
+          "column": 7999,
+          "delta": 0.005859375,
+          "rstim_hits": 21,
+          "rstim_rate": 0.0205078125,
+          "sample_count": 1024,
+          "stim_hits": 15,
+          "stim_rate": 0.0146484375,
+          "tolerance": 0.04484588958603109
+        },
+        {
+          "column": 8799,
+          "delta": 0.0068359375,
+          "rstim_hits": 9,
+          "rstim_rate": 0.0087890625,
+          "sample_count": 1024,
+          "stim_hits": 16,
+          "stim_rate": 0.015625,
+          "tolerance": 0.03911751201255356
+        },
+        {
+          "column": 9599,
+          "delta": 0.0,
+          "rstim_hits": 9,
+          "rstim_rate": 0.0087890625,
+          "sample_count": 1024,
+          "stim_hits": 9,
+          "stim_rate": 0.0087890625,
+          "tolerance": 0.03474973704458479
+        },
+        {
+          "column": 10399,
+          "delta": 0.013671875,
+          "rstim_hits": 11,
+          "rstim_rate": 0.0107421875,
+          "sample_count": 1024,
+          "stim_hits": 25,
+          "stim_rate": 0.0244140625,
+          "tolerance": 0.04484588958603109
+        },
+        {
+          "column": 11199,
+          "delta": 0.0029296875,
+          "rstim_hits": 12,
+          "rstim_rate": 0.01171875,
+          "sample_count": 1024,
+          "stim_hits": 15,
+          "stim_rate": 0.0146484375,
+          "tolerance": 0.04024484453130435
+        },
+        {
+          "column": 12000,
+          "delta": 0.0126953125,
+          "rstim_hits": 500,
+          "rstim_rate": 0.48828125,
+          "sample_count": 1024,
+          "stim_hits": 487,
+          "stim_rate": 0.4755859375,
+          "tolerance": 0.14249594465158671
+        }
+      ],
+      "max_delta": 0.01953125,
+      "max_tolerance": 0.14249594465158671,
+      "mode": "detect",
+      "pairs": [
+        {
+          "delta": 0.0,
+          "pair": [
+            0,
+            800
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0009765625,
+          "pair": [
+            800,
+            1600
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 1,
+          "stim_rate": 0.0009765625,
+          "tolerance": 0.015857944313859763
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            1600,
+            2400
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0009765625,
+          "pair": [
+            2400,
+            3200
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 1,
+          "stim_rate": 0.0009765625,
+          "tolerance": 0.015857944313859763
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            3200,
+            4000
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            4000,
+            4800
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            4800,
+            5600
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            5600,
+            6399
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            6399,
+            7199
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            7199,
+            7999
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.0009765625,
+          "pair": [
+            7999,
+            8799
+          ],
+          "rstim_hits": 1,
+          "rstim_rate": 0.0009765625,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.015857944313859763
+        },
+        {
+          "delta": 0.0009765625,
+          "pair": [
+            8799,
+            9599
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 1,
+          "stim_rate": 0.0009765625,
+          "tolerance": 0.015857944313859763
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            9599,
+            10399
+          ],
+          "rstim_hits": 0,
+          "rstim_rate": 0.0,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "delta": 0.001953125,
+          "pair": [
+            10399,
+            11199
+          ],
+          "rstim_hits": 2,
+          "rstim_rate": 0.001953125,
+          "sample_count": 1024,
+          "stim_hits": 0,
+          "stim_rate": 0.0,
+          "tolerance": 0.018282360506273417
+        },
+        {
+          "delta": 0.0,
+          "pair": [
+            11199,
+            12000
+          ],
+          "rstim_hits": 9,
+          "rstim_rate": 0.0087890625,
+          "sample_count": 1024,
+          "stim_hits": 9,
+          "stim_rate": 0.0087890625,
+          "tolerance": 0.03474973704458479
+        },
+        {
+          "delta": 0.0009765625,
+          "pair": [
+            0,
+            12000
+          ],
+          "rstim_hits": 3,
+          "rstim_rate": 0.0029296875,
+          "sample_count": 1024,
+          "stim_hits": 2,
+          "stim_rate": 0.001953125,
+          "tolerance": 0.023085957427507853
+        }
+      ],
+      "rstim_runs": [
+        {
+          "command": [
+            "target/debug/rstim",
+            "detect",
+            "--append_observables",
+            "--shots",
+            "1024",
+            "--seed",
+            "12345",
+            "--out_format",
+            "01",
+            "--in",
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+          ],
+          "elapsed_s": 46.19731250000041,
+          "exit_code": 0,
+          "input_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+          "stderr": "",
+          "stdout": {
+            "stdout_bytes": 12290048,
+            "stdout_line_count": 1024,
+            "stdout_omitted": true,
+            "stdout_sha256": "7aff5d37287f17c361a87af88edd2c21ac558e70493c59ebe0dbe9eef9c79d25"
+          },
+          "success": true
+        }
+      ],
+      "sample_count": 1024,
+      "seeds": [
+        12345
+      ],
+      "selected_columns": [
+        0,
+        800,
+        1600,
+        2400,
+        3200,
+        4000,
+        4800,
+        5600,
+        6399,
+        7199,
+        7999,
+        8799,
+        9599,
+        10399,
+        11199,
+        12000
+      ],
+      "selected_pairs": [
+        [
+          0,
+          800
+        ],
+        [
+          800,
+          1600
+        ],
+        [
+          1600,
+          2400
+        ],
+        [
+          2400,
+          3200
+        ],
+        [
+          3200,
+          4000
+        ],
+        [
+          4000,
+          4800
+        ],
+        [
+          4800,
+          5600
+        ],
+        [
+          5600,
+          6399
+        ],
+        [
+          6399,
+          7199
+        ],
+        [
+          7199,
+          7999
+        ],
+        [
+          7999,
+          8799
+        ],
+        [
+          8799,
+          9599
+        ],
+        [
+          9599,
+          10399
+        ],
+        [
+          10399,
+          11199
+        ],
+        [
+          11199,
+          12000
+        ],
+        [
+          0,
+          12000
+        ]
+      ],
+      "shots_per_seed": 1024,
+      "status": "pass",
+      "stim_runs": [
+        {
+          "command": [
+            "stim",
+            "detect",
+            "--append_observables",
+            "--shots",
+            "1024",
+            "--seed",
+            "12345",
+            "--out_format",
+            "01",
+            "--in",
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+          ],
+          "elapsed_s": 0.16909833400131902,
+          "exit_code": 0,
+          "input_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+          "stderr": "",
+          "stdout": {
+            "stdout_bytes": 12290048,
+            "stdout_line_count": 1024,
+            "stdout_omitted": true,
+            "stdout_sha256": "39ccf76dabd9a05ab40c2fff0c8af84a7825a36760df31e41136496705c86bf6"
+          },
+          "success": true
+        }
+      ],
+      "tier": "full"
+    }
+  ],
+  "counts": {
+    "pass": 1,
+    "rstim_failed": 0,
+    "skipped": 0,
+    "statistical_mismatch": 0,
+    "stim_failed": 0
+  },
+  "inject_rstim_bitflip_rate": 0.0,
+  "manifest_path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+  "rstim_command": [
+    "target/debug/rstim"
+  ],
+  "seeds": [
+    12345
+  ],
+  "shots": 1024,
+  "status": "pass",
+  "stim_command": [
+    "stim"
+  ],
+  "suite": "rstim_vs_stim_simulator"
+}

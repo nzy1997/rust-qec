@@ -88,6 +88,7 @@ CLAIMS_POLICY_PHRASES = (
 )
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/full/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 STRING_LITERAL_PATH_RE = re.compile(r"""["']([A-Za-z0-9_./-]+\.[A-Za-z0-9]+(?:[?#][^"']*)?)["']""")
 ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css", "app.js", "index.html"}
@@ -377,8 +378,11 @@ def check_local_only_future(site_root: Path, manifest: dict[str, object] | None)
     rstim_status = rstim_vs_stim.get("status")
     if qec_status not in {"local-only", "partial"}:
         return fail("local-only/future classifications", f"qec-code family must stay local-only or partial, got {qec_status!r}")
-    if rstim_status != "future":
-        return fail("local-only/future classifications", f"rstim-vs-stim family must stay future, got {rstim_status!r}")
+    if rstim_status not in {"future", "partial"}:
+        return fail(
+            "local-only/future classifications",
+            f"rstim-vs-stim family must stay future or partial, got {rstim_status!r}",
+        )
 
     checked = check_site_manifest.iter_checked_artifact_paths(manifest)
     forbidden_prefixes = (
@@ -398,9 +402,17 @@ def check_local_only_future(site_root: Path, manifest: dict[str, object] | None)
                 "built site must not publish local-only or future artifacts under benchmarks/out/",
             )
 
+    if rstim_status == "partial":
+        rstim_paths = [path for _, path in checked if path.startswith("benchmarks/rstim_vs_stim_simulator/")]
+        if not rstim_paths:
+            return fail(
+                "local-only/future classifications",
+                "rstim-vs-stim partial family must publish checked artifacts under benchmarks/rstim_vs_stim_simulator/",
+            )
+
     return pass_(
         "local-only/future classifications",
-        "qec-code local-only/partial and rstim-vs-stim future classifications are preserved",
+        "qec-code local-only/partial and rstim-vs-stim future/partial classifications are preserved, including rstim-vs-stim partial checked evidence",
     )
 
 
@@ -481,6 +493,19 @@ def make_fixture_site() -> SiteFixture:
     write_text(repo_root / "benchmarks/bb_circuit_bposd_compare/results/full/summary.md", "# Summary\n")
     write_text(repo_root / "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png", "png\n")
     write_text(repo_root / "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md", "# Gaps\n")
+    write_text(repo_root / "docs/showcases/rstim-vs-stim-simulator.md", "# rstim vs Stim\n")
+    write_text(repo_root / "benchmarks/rstim_vs_stim_simulator/README.md", "# rstim fixtures\n")
+    write_text(repo_root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json", '{"case":"d11"}\n')
+    write_text(repo_root / "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md", "# speed report\n")
+    write_text(
+        repo_root / "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+        '{"status":"PASS"}\n',
+    )
+    write_text(repo_root / "benchmarks/rstim_vs_stim_simulator/cases.full.toml", "[[cases]]\nid = 'd11'\n")
+    write_text(
+        repo_root / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+        "M 0\n",
+    )
 
     provenance_reason = "historical fixture predates canonical provenance capture"
 
@@ -502,6 +527,18 @@ def make_fixture_site() -> SiteFixture:
             "artifact_hashes": {"status": "recorded", "value": artifact_hashes},
         }
 
+    def rstim_vs_stim_provenance(commands: list[str], artifact_hashes: dict[str, dict[str, str]]) -> dict[str, object]:
+        provenance = fixture_provenance(commands, artifact_hashes)
+        provenance["seed_policy"] = {
+            "status": "recorded",
+            "value": {
+                "correctness_seeds": [12345],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+            },
+        }
+        return provenance
+
     surface_hashes = {
         "benchmarks/surface_decoder_compare/results/full/results.csv": {
             "sha256": "5f99836718375eb522c7113382a65ebba0256e8ead0fe2c8c1f0a0aea86ff891"
@@ -522,6 +559,26 @@ def make_fixture_site() -> SiteFixture:
         },
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md": {
             "sha256": "f999c0097163daf1dbd5fc72414fa2f5ec0fd43a13ef088f4c7fd32372dc61d4"
+        },
+    }
+    rstim_vs_stim_hashes = {
+        "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": {
+            "sha256": "068c6cda6256254832b1f07979a475a1d747288cbdfaae6291e03697c2b3261d"
+        },
+        "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": {
+            "sha256": "ad2ce5a1a049d02dc3ef15ec90609362b12e580c172fe8a13f6c16071c73a2f4"
+        },
+        "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": {
+            "sha256": "423b0a945a73ecb5ab748c7c796af9328a4639bf6921af982e71ad00924f46e9"
+        },
+        "benchmarks/rstim_vs_stim_simulator/cases.full.toml": {
+            "sha256": "f86f77dff5135b7273d64aa8fd01a8d55901e2222a175ae97922db423cabccd6"
+        },
+        "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": {
+            "sha256": "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"
+        },
+        "docs/showcases/rstim-vs-stim-simulator.md": {
+            "sha256": "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
         },
     }
 
@@ -625,20 +682,93 @@ def make_fixture_site() -> SiteFixture:
             {
                 "id": "rstim-vs-stim-simulator",
                 "title": "rstim versus Stim Simulator",
-                "status": "future",
-                "source_docs": ["docs/showcases/benchmark-evidence.md"],
-                "claims_limit": "No current site-facing benchmark artifacts.",
+                "status": "partial",
+                "source_docs": [
+                    "docs/showcases/benchmark-evidence.md",
+                    "docs/showcases/rstim-vs-stim-simulator.md",
+                    "benchmarks/rstim_vs_stim_simulator/README.md",
+                ],
+                "claims_limit": "Partial checked evidence for recorded workloads and recorded environments only, not broad rstim/Stim parity.",
                 "evidence_items": [
                     {
-                        "id": "rstim-vs-stim-future",
-                        "title": "Future simulator benchmark",
-                        "status": "future",
-                        "tier": "future",
-                        "artifacts": [],
-                        "commands": [],
-                        "provenance_requirements": ["command line", "date"],
-                        "provenance_sources": ["docs/showcases/benchmark-evidence.md"],
-                        "claims_limit": "Planning entry only.",
+                        "id": "rstim-vs-stim-full",
+                        "title": "Checked rstim versus Stim full artifacts",
+                        "status": "existing",
+                        "tier": "full",
+                        "artifacts": [
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "kind": "speed-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                                "kind": "speed-report",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                                "kind": "correctness-summary",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "kind": "fixture-manifest",
+                                "checked": True,
+                            },
+                            {
+                                "path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+                                "kind": "stim-fixture",
+                                "checked": True,
+                            },
+                            {
+                                "path": "docs/showcases/rstim-vs-stim-simulator.md",
+                                "kind": "showcase",
+                                "checked": True,
+                            },
+                        ],
+                        "commands": [
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                            "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                            "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                            "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                            "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                        ],
+                        "provenance": rstim_vs_stim_provenance(
+                            [
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+                                "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
+                                "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                                "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                                "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                                "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+                            ],
+                            rstim_vs_stim_hashes,
+                        ),
+                        "provenance_requirements": [
+                            "OS",
+                            "CPU model",
+                            "Rust version",
+                            "Python version",
+                            "dependency versions",
+                            "Stim version",
+                            "external repository commits",
+                            "command line",
+                            "seeds",
+                            "build profile",
+                            "shot counts",
+                            "date",
+                        ],
+                        "provenance_sources": [
+                            "docs/showcases/rstim-vs-stim-simulator.md",
+                            "benchmarks/rstim_vs_stim_simulator/README.md",
+                        ],
+                        "caveats": [
+                            "Partial checked evidence for recorded workloads and recorded environments.",
+                            "This is not broad rstim/Stim parity.",
+                        ],
+                        "claims_limit": "Partial checked evidence for recorded workloads and recorded environments only, not broad rstim/Stim parity.",
                     }
                 ],
             },
@@ -684,6 +814,12 @@ def make_fixture_site() -> SiteFixture:
         "benchmarks/bb_circuit_bposd_compare/results/full/summary.md": "# Summary\n",
         "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png": "png\n",
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md": "# Gaps\n",
+        "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": '{"case":"d11"}\n',
+        "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": "# speed report\n",
+        "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": '{"status":"PASS"}\n',
+        "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "[[cases]]\nid = 'd11'\n",
+        "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "M 0\n",
+        "docs/showcases/rstim-vs-stim-simulator.md": "# rstim vs Stim\n",
     }.items():
         write_text(site_root / relative, text)
 
@@ -746,7 +882,7 @@ def make_fixture_site() -> SiteFixture:
     )
     write_text(
         site_root / "app.js",
-        """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full"];
+        """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
 function renderBenchmarkManifest(manifest) { return manifest; }
 function renderCheckedBenchmarkResults(manifest) { return manifest; }
 function renderProvenance(provenance) { return provenance; }
@@ -763,6 +899,7 @@ const localRefs = [
   "gallery/repeat-detector-site.svg",
   "gallery/atom-loss-sample.svg",
   "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+  "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
 ];
 artifact.kind === "image";
 """,
@@ -783,6 +920,13 @@ artifact.kind === "image";
             "benchmarks/bb_circuit_bposd_compare/results/full/summary.md",
             "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
             "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
+            "docs/showcases/rstim-vs-stim-simulator.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+            "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+            "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
             "site/benchmark-site.json",
         ],
         cwd=repo_root,
