@@ -243,6 +243,8 @@ pub enum PerfCommands {
     },
     /// Aggregate raw JSONL into summary JSON
     Summarize {
+        #[arg(long = "case")]
+        case: Option<String>,
         #[arg(long = "in")]
         r#in: Option<String>,
         #[arg(long)]
@@ -602,9 +604,16 @@ pub fn run(cli: Cli) -> Result<(), String> {
                         crate::perf::run_benchmark_suite_to_writer(&mut w, options)
                     }
                 }
-                PerfCommands::Summarize { r#in, out } => {
+                PerfCommands::Summarize { case, r#in, out } => {
                     let raw = read_input(r#in.as_deref())?;
-                    let summary = crate::perf::summarize_jsonl_str(&raw)?;
+                    let summary = if let Some(label) = case.as_deref() {
+                        let options = crate::perf::PerfSummaryOptions {
+                            case_label: Some(label.to_string()),
+                        };
+                        crate::perf::summarize_jsonl_str_with_options(&raw, options)?
+                    } else {
+                        crate::perf::summarize_jsonl_str(&raw)?
+                    };
                     let mut w = open_output(out.as_deref())?;
                     serde_json::to_writer_pretty(&mut *w, &summary)
                         .map_err(|e| format!("failed to write perf summary: {e}"))?;
@@ -2206,6 +2215,7 @@ mod tests {
         run(Cli {
             command: Some(Commands::Perf {
                 command: PerfCommands::Summarize {
+                    case: None,
                     r#in: Some(raw_path.display().to_string()),
                     out: Some(summary_path.display().to_string()),
                 },
@@ -2237,6 +2247,32 @@ mod tests {
         let report_text = std::fs::read_to_string(&report_path).unwrap();
         assert!(report_text.contains("## Gating Cases"));
         assert!(report_text.contains("rep-sample-d13-r13"));
+    }
+
+    #[test]
+    fn run_dispatches_perf_summarize_selected_case_in_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let raw_path = dir.path().join("raw.jsonl");
+        let summary_path = dir.path().join("summary.json");
+        std::fs::write(&raw_path, PERF_PASS_RAW).unwrap();
+
+        run(Cli {
+            command: Some(Commands::Perf {
+                command: PerfCommands::Summarize {
+                    case: Some("rep-sample-d13-r13".to_string()),
+                    r#in: Some(raw_path.display().to_string()),
+                    out: Some(summary_path.display().to_string()),
+                },
+            }),
+        })
+        .unwrap();
+
+        let summary: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(summary_path).unwrap()).unwrap();
+        let cases = summary["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0]["case_label"], "rep-sample-d13-r13");
+        assert!(summary["issues"].as_array().unwrap().is_empty());
     }
 
     #[test]
