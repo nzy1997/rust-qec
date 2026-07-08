@@ -191,6 +191,12 @@ def format_text_report(report: dict[str, object]) -> str:
         f"case_id={report['case_id']}\n"
         f"manifest_path={report['manifest_path']}\n"
         f"input_path={report['input_path']}\n"
+        f"expected_measurements={report['expected_measurements']}\n"
+        f"expected_detectors={report['expected_detectors']}\n"
+        f"expected_observables={report['expected_observables']}\n"
+        f"actual_measurements={report['actual_measurements']}\n"
+        f"actual_detectors={report['actual_detectors']}\n"
+        f"actual_observables={report['actual_observables']}\n"
         f"expanded_operation_count={report['expanded_operation_count']}\n"
         "operations:\n"
         + "\n".join(

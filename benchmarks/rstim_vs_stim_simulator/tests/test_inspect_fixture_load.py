@@ -10,6 +10,7 @@ from pathlib import Path
 import stim
 
 from benchmarks.rstim_vs_stim_simulator.inspect_fixture_load import (
+    find_case,
     build_report,
     summarize_circuit,
 )
@@ -39,7 +40,9 @@ def run_inspector(*args: str) -> subprocess.CompletedProcess[str]:
 class InspectFixtureLoadReportTest(unittest.TestCase):
     def test_full_fixture_report_matches_issue_contract(self) -> None:
         manifest = load_manifest(FULL_MANIFEST)
-        case = manifest["cases"][0]
+        case = find_case(manifest, "stim_surface_d11_r100")
+        if case is None:
+            self.fail("case stim_surface_d11_r100 not found")
 
         report = build_report(case, manifest_path=FULL_MANIFEST, base_dir=FULL_MANIFEST.parent)
 
@@ -57,6 +60,37 @@ class InspectFixtureLoadReportTest(unittest.TestCase):
         self.assertEqual(report["operations"]["DEPOLARIZE2"]["target_count"], 88000)
         self.assertEqual(report["operations"]["DETECTOR"]["operation_count"], 12000)
         self.assertEqual(report["operations"]["REPEAT"]["operation_count"], 99)
+
+    def test_cli_text_report_includes_human_counts(self) -> None:
+        result = run_inspector(
+            "--case",
+            "stim_surface_d11_r100",
+            "--manifest",
+            str(FULL_MANIFEST),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("expected_measurements=12121", result.stdout)
+        self.assertIn("expected_detectors=12000", result.stdout)
+        self.assertIn("expected_observables=1", result.stdout)
+        self.assertIn("expanded_operation_count=14547", result.stdout)
+        self.assertIn("actual_measurements=12121", result.stdout)
+        self.assertIn("actual_detectors=12000", result.stdout)
+        self.assertIn("actual_observables=1", result.stdout)
+
+        found_depola = False
+        found_detector = False
+        for line in result.stdout.splitlines():
+            if line.startswith("  DEPOLARIZE2: "):
+                value = json.loads(line.split(": ", 1)[1])
+                self.assertEqual(value["target_count"], 88000)
+                found_depola = True
+            elif line.startswith("  DETECTOR: "):
+                value = json.loads(line.split(": ", 1)[1])
+                self.assertEqual(value["operation_count"], 12000)
+                found_detector = True
+        self.assertTrue(found_depola, "DEPOLARIZE2 entry missing from text report")
+        self.assertTrue(found_detector, "DETECTOR entry missing from text report")
 
     def test_cli_writes_json_report_and_prints_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
