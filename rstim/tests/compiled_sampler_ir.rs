@@ -1,10 +1,12 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::compiled::{
-    choose_sampler_path, compile_circuit, CompiledBlock, CompiledOp, CompiledPathDecision,
+    CompiledBlock, CompiledOp, CompiledPathDecision, choose_sampler_path, compile_circuit,
+    sample_compiled_batch,
 };
+use rstim::ir::{StimInstr, StimTarget};
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch_with_options, SampleOptions, SamplingBackend};
+use rstim::sampler::{SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options};
 use rstim::sim::bit_table::BitTable;
 
 const SURFACE_D11_R100: &str = include_str!(
@@ -63,7 +65,10 @@ fn selected_surface_fixture_lowers_to_typed_sampler_ops() {
     let instrs = parse_lines(SURFACE_D11_R100).expect("parse selected fixture");
     let compiled = compile_circuit(&instrs).expect("compile selected fixture");
 
-    assert_eq!(choose_sampler_path(&compiled), CompiledPathDecision::FastPath);
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::FastPath
+    );
 
     let mut counts = VariantCounts::default();
     count_variants(&compiled.blocks, &mut counts);
@@ -74,8 +79,14 @@ fn selected_surface_fixture_lowers_to_typed_sampler_ops() {
     assert!(counts.measure_reset > 0, "fixture should lower MR");
     assert!(counts.measure > 0, "fixture should lower M");
     assert!(counts.detector > 0, "fixture should lower DETECTOR");
-    assert!(counts.observable > 0, "fixture should lower OBSERVABLE_INCLUDE");
-    assert_eq!(counts.unsupported, 0, "selected fixture must not contain fallback markers");
+    assert!(
+        counts.observable > 0,
+        "fixture should lower OBSERVABLE_INCLUDE"
+    );
+    assert_eq!(
+        counts.unsupported, 0,
+        "selected fixture must not contain fallback markers"
+    );
 }
 
 #[test]
@@ -96,7 +107,10 @@ fn compiled_sampler_ir_preserves_sample_bits_on_smoke_fixture() {
     .expect("parse smoke circuit");
 
     let compiled = compile_circuit(&instrs).expect("compile smoke circuit");
-    assert_eq!(choose_sampler_path(&compiled), CompiledPathDecision::FastPath);
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::FastPath
+    );
 
     let mut interpreted_rng = StdRng::seed_from_u64(20260709);
     let mut compiled_rng = StdRng::seed_from_u64(20260709);
@@ -169,15 +183,127 @@ fn unsupported_sampler_ops_do_not_enter_typed_fast_path() {
 
 #[test]
 fn ideal_noop_sampler_ops_lower_to_typed_fast_path_ops() {
-    let compiled =
-        compile_circuit(&parse_lines("X 0\nI 0\nI_ERROR(0.25) 0\nII_ERROR(0.125) 0 1\nM 0\n").unwrap())
-            .unwrap();
+    let compiled = compile_circuit(
+        &parse_lines("X 0\nI 0\nI_ERROR(0.25) 0\nII_ERROR(0.125) 0 1\nM 0\n").unwrap(),
+    )
+    .unwrap();
 
-    assert_eq!(choose_sampler_path(&compiled), CompiledPathDecision::FastPath);
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::FastPath
+    );
 
     let mut counts = VariantCounts::default();
     count_variants(&compiled.blocks, &mut counts);
 
     assert_eq!(counts.unsupported, 0);
-    assert!(counts.noop > 0, "ideal sampler no-op instructions should lower to CompiledOp::NoOp");
+    assert!(
+        counts.noop > 0,
+        "ideal sampler no-op instructions should lower to CompiledOp::NoOp"
+    );
+}
+
+#[test]
+fn malformed_sampler_targets_lower_to_unsupported_markers() {
+    let instrs = vec![
+        StimInstr::new("H", vec![], vec![StimTarget::Sweep(0)]),
+        StimInstr::new("H", vec![], vec![StimTarget::Rec(-1)]),
+        StimInstr::new("M", vec![], vec![StimTarget::Sweep(0)]),
+        StimInstr::new("M", vec![], vec![StimTarget::Rec(-1)]),
+        StimInstr::new("CX", vec![], vec![StimTarget::Qubit(0)]),
+        StimInstr::new(
+            "CX",
+            vec![],
+            vec![StimTarget::Qubit(0), StimTarget::Rec(-1)],
+        ),
+        StimInstr::new("DETECTOR", vec![], vec![StimTarget::Qubit(0)]),
+    ];
+    let compiled = compile_circuit(&instrs).unwrap();
+
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::Fallback(
+            "unsupported sampler instructions require the interpreted path",
+        )
+    );
+
+    let mut counts = VariantCounts::default();
+    count_variants(&compiled.blocks, &mut counts);
+    assert_eq!(counts.unsupported, 5);
+}
+
+#[test]
+fn compiled_sampler_runs_y_basis_measurement_and_reset_variants() {
+    let instrs = parse_lines("RY 0\nMY 0\nRY 1\nMRY 1\n").unwrap();
+    let compiled = compile_circuit(&instrs).unwrap();
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::FastPath
+    );
+
+    let mut rng = StdRng::seed_from_u64(415);
+    let out = sample_batch_with_options(
+        &instrs,
+        16,
+        &mut rng,
+        SampleOptions {
+            backend: SamplingBackend::Compiled,
+            output_mode: SampleOutputMode::MeasurementsOnly,
+            ..SampleOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(out.measurements.num_major(), 2);
+    assert_eq!(out.measurements.num_minor(), 16);
+}
+
+#[test]
+fn compiled_sampler_zero_probability_depolarize_ops_are_noops() {
+    let instrs = parse_lines(
+        "R 0 1\n\
+         DEPOLARIZE1(0) 0\n\
+         DEPOLARIZE2(0) 0 1\n\
+         M 0 1\n",
+    )
+    .unwrap();
+    let compiled = compile_circuit(&instrs).unwrap();
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        CompiledPathDecision::FastPath
+    );
+
+    let mut rng = StdRng::seed_from_u64(416);
+    let out = sample_batch_with_options(
+        &instrs,
+        8,
+        &mut rng,
+        SampleOptions {
+            backend: SamplingBackend::Compiled,
+            output_mode: SampleOutputMode::MeasurementsOnly,
+            ..SampleOptions::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(out.measurements.num_major(), 2);
+    for measurement in 0..out.measurements.num_major() {
+        for shot in 0..out.measurements.num_minor() {
+            assert!(!out.measurements.get(measurement, shot));
+        }
+    }
+}
+
+#[test]
+fn compiled_sampler_rejects_unsupported_marker_if_path_gate_is_bypassed() {
+    let instrs = parse_lines("S 0\nM 0\n").unwrap();
+    let compiled = compile_circuit(&instrs).unwrap();
+
+    let mut rng = StdRng::seed_from_u64(417);
+    let err = match sample_compiled_batch(&compiled, 4, &mut rng, SampleOptions::default()) {
+        Ok(_) => panic!("unsupported marker should fail compiled execution"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err, "compiled sampler: unsupported instruction S");
 }
