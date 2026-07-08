@@ -46,6 +46,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertIn("surface-decoder-full", output)
         self.assertIn("bb-circuit-full", output)
         self.assertIn("rstim-vs-stim-full", output)
+        self.assertIn("partial checked evidence", output)
         self.assertIn("not_recorded", output)
         self.assertIn("checked artifact hashes", output)
 

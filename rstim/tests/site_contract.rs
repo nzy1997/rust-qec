@@ -661,12 +661,16 @@ fn checked_benchmark_artifacts_are_linked() {
     assert_item_has_text_list_marker(
         rstim_vs_stim_item,
         "caveats",
-        "do not claim broad rstim-versus-Stim performance parity",
+        "recorded workloads and recorded environments",
     );
+    assert_item_has_text_list_marker(rstim_vs_stim_item, "caveats", "not broad rstim/Stim parity");
     assert!(
         rstim_vs_stim_item["claims_limit"]
             .as_str()
-            .is_some_and(|value| value.contains("recorded environment only")),
+            .is_some_and(|value| {
+                value.contains("recorded workloads and recorded environments")
+                    && value.contains("not broad rstim/Stim parity")
+            }),
         "rstim-vs-stim checked item must keep its manifest claims limit"
     );
 
@@ -843,7 +847,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
         .expect("rstim-vs-stim checked item must exist");
     assert_eq!(
         rstim_vs_stim_item["status"], "existing",
-        "rstim-vs-stim checked item must be existing"
+        "rstim-vs-stim checked item must stay existing inside the partial family"
     );
     assert_checked_artifacts(
         rstim_vs_stim_item,
