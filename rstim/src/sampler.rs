@@ -155,7 +155,7 @@ fn sample_batch_interpreted(
     rng: &mut impl Rng,
     options: SampleOptions,
 ) -> Result<BatchOutput, String> {
-    if uses_loss_sampling_fallback(instrs) {
+    if uses_executor_sampling_fallback(instrs) {
         return sample_batch_with_executor(instrs, n_shots, rng, options);
     }
 
@@ -237,19 +237,28 @@ fn sample_batch_with_executor(
     ))
 }
 
-fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
+fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
     for instr in instrs {
         match instr {
             StimInstr::Op { name, .. } => {
                 if matches!(
                     name.as_str(),
-                    "LOSS" | "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+                    "LOSS"
+                        | "ML"
+                        | "MXL"
+                        | "MYL"
+                        | "MZL"
+                        | "MRL"
+                        | "MRXL"
+                        | "MRYL"
+                        | "MRZL"
+                        | "MPP"
                 ) {
                     return true;
                 }
             }
             StimInstr::Repeat { body, .. } => {
-                if uses_loss_sampling_fallback(body) {
+                if uses_executor_sampling_fallback(body) {
                     return true;
                 }
             }
