@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import copy
+import json
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools import check_rstim_vs_stim_release_dem_speed_case as checker
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CHECKER = REPO_ROOT / "tools" / "check_rstim_vs_stim_release_dem_speed_case.py"
+
+
+class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.results_dir = Path(self.tmpdir.name) / "results"
+        self.results_dir.mkdir(parents=True)
+
+    def run_checker(
+        self,
+        *,
+        results_dir: Path | None = None,
+        case: str = checker.DEFAULT_CASE_LABEL,
+        required_variants: list[str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        args = [
+            "python3",
+            str(CHECKER),
+            "--results-dir",
+            str(results_dir or self.results_dir),
+            "--case",
+            case,
+            "--required-variants",
+            *(required_variants or list(checker.DEFAULT_REQUIRED_VARIANTS)),
+        ]
+        return subprocess.run(
+            args,
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+    def write_valid_fixture(self) -> None:
+        raw_records = [
+            {
+                "case_label": checker.DEFAULT_CASE_LABEL,
+                "workload": checker.EXPECTED_WORKLOAD,
+                "tool_variant": "stim-sample-dem",
+                "phase": "measure",
+                "round_index": 0,
+                "shots": checker.EXPECTED_SHOTS,
+                "status": "completed",
+                "elapsed_ns": 1000,
+                "exit_code": 0,
+                "stderr": None,
+                "command": ["stim", "sample_dem", "--shots", str(checker.EXPECTED_SHOTS)],
+            },
+            {
+                "case_label": checker.DEFAULT_CASE_LABEL,
+                "workload": checker.EXPECTED_WORKLOAD,
+                "tool_variant": "rstim-sample-dem",
+                "phase": "measure",
+                "round_index": 0,
+                "shots": checker.EXPECTED_SHOTS,
+                "status": "completed",
+                "elapsed_ns": 1200,
+                "exit_code": 0,
+                "stderr": None,
+                "command": ["target/release/rstim", "sample_dem", "--shots", str(checker.EXPECTED_SHOTS)],
+            },
+        ]
+        (self.results_dir / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in raw_records),
+            encoding="utf-8",
+        )
+
+        summary = {
+            "cases": [
+                {
+                    "case_label": checker.DEFAULT_CASE_LABEL,
+                    "workload": checker.EXPECTED_WORKLOAD,
+                    "tier": "report_only",
+                    "expected_variants": list(checker.DEFAULT_REQUIRED_VARIANTS),
+                    "present_variants": sorted(checker.DEFAULT_REQUIRED_VARIANTS),
+                    "variants": [
+                        {
+                            "tool_variant": "stim-sample-dem",
+                            "sample_count": 1,
+                            "median_wall_time_ns": 1000,
+                            "median_shots_per_second": 1024.0,
+                            "status": "completed",
+                            "failure_reason": None,
+                            "stderr": None,
+                        },
+                        {
+                            "tool_variant": "rstim-sample-dem",
+                            "sample_count": 1,
+                            "median_wall_time_ns": 1200,
+                            "median_shots_per_second": 853.3333333333334,
+                            "status": "completed",
+                            "failure_reason": None,
+                            "stderr": None,
+                        },
+                    ],
+                }
+            ],
+            "issues": [],
+        }
+        (self.results_dir / "summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (self.results_dir / "report.md").write_text(
+            "# DEM Sampling Report\n\n"
+            f"## {checker.DEFAULT_CASE_LABEL}\n\n"
+            "- workload: sample_dem\n",
+            encoding="utf-8",
+        )
+        environment = {
+            "profile": "release",
+            "case_label": checker.DEFAULT_CASE_LABEL,
+            "case_labels": [checker.DEFAULT_CASE_LABEL],
+            "case_count": 1,
+            "command_line": ["run-dem-speed-case", "--profile", "release"],
+            "dem_path": checker.EXPECTED_DEM_REPO_PATH,
+            "dem_sha256": checker.EXPECTED_DEM_SHA256,
+            "source_circuit_path": checker.EXPECTED_SOURCE_CIRCUIT_REPO_PATH,
+            "source_circuit_sha256": checker.EXPECTED_SOURCE_CIRCUIT_SHA256,
+            "generation_command": checker.EXPECTED_GENERATION_COMMAND,
+            "expected_detectors": checker.EXPECTED_DETECTOR_COUNT,
+            "expected_observables": checker.EXPECTED_OBSERVABLE_COUNT,
+            "warmup_rounds": 0,
+            "measure_rounds": 1,
+            "rstim_binary_path": "target/release/rstim",
+        }
+        (self.results_dir / "environment.json").write_text(
+            json.dumps(environment, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+    def test_accepts_valid_release_dem_speed_fixture(self) -> None:
+        self.write_valid_fixture()
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}\n", result.stdout)
+
+    def test_accepts_comma_separated_required_variants_cli(self) -> None:
+        self.write_valid_fixture()
+        result = self.run_checker(required_variants=["stim-sample-dem,rstim-sample-dem"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}\n", result.stdout)
+
+    def test_rejects_missing_required_variant(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        case_summary = summary["cases"][0]
+        case_summary["present_variants"] = ["stim-sample-dem"]
+        case_summary["variants"] = [
+            variant
+            for variant in case_summary["variants"]
+            if variant["tool_variant"] != "rstim-sample-dem"
+        ]
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing required variant rstim-sample-dem", result.stderr)
+
+    def test_rejects_summary_with_issues(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["issues"] = [{"tool_variant": "stim-sample-dem", "status": "tool_failed"}]
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("summary issues must be []", result.stderr)
+
+    def test_rejects_bad_dem_metadata(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        bad_environment = copy.deepcopy(environment)
+        bad_environment["expected_detectors"] = 999
+        environment_path.write_text(
+            json.dumps(bad_environment, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DEM metadata mismatch", result.stderr)
+
+    def test_rejects_absolute_fixture_paths_in_environment(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["dem_path"] = str(checker.EXPECTED_DEM_PATH)
+        environment["source_circuit_path"] = str(checker.EXPECTED_SOURCE_CIRCUIT_PATH)
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DEM metadata mismatch", result.stderr)
+
+    def test_rejects_bad_generation_command(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["generation_command"] = "stim analyze_errors < wrong.stim > wrong.dem"
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DEM metadata mismatch", result.stderr)
+
+    def test_rejects_missing_raw_jsonl(self) -> None:
+        self.write_valid_fixture()
+        (self.results_dir / "raw.jsonl").unlink()
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing required release file: raw.jsonl", result.stderr)
+
+    def test_rejects_empty_raw_jsonl(self) -> None:
+        self.write_valid_fixture()
+        (self.results_dir / "raw.jsonl").write_text("", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing completed raw record for required variant stim-sample-dem", result.stderr)
+
+    def test_rejects_raw_jsonl_without_requested_case_rows(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            record["case_label"] = "other-release-case"
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing completed raw record for required variant stim-sample-dem", result.stderr)
+
+    def test_rejects_raw_jsonl_without_sample_dem_rows(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            record["workload"] = "other_workload"
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing completed raw record for required variant stim-sample-dem", result.stderr)
+
+    def test_rejects_raw_jsonl_missing_required_variant_record(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = []
+        for line in raw_path.read_text(encoding="utf-8").splitlines():
+            if not line:
+                continue
+            record = json.loads(line)
+            if record["tool_variant"] != "rstim-sample-dem":
+                records.append(record)
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing completed raw record for required variant rstim-sample-dem", result.stderr)
+
+    def test_rejects_raw_jsonl_without_completed_measure_rows(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            record["phase"] = "warmup"
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("missing completed raw record for required variant stim-sample-dem", result.stderr)
+
+    def test_rejects_unexpected_raw_command(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            if record["tool_variant"] == "rstim-sample-dem":
+                record["command"] = ["/tmp/worktree/target/release/rstim", "sample_dem", "--shots", "1024"]
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("raw command mismatch for required variant rstim-sample-dem", result.stderr)
+
+    def test_rejects_wrong_shot_count_in_raw_jsonl(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            record["shots"] = 512
+            record["command"] = record["command"][:-1] + ["512"]
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("shot count must be 1024", result.stderr)
+
+    def test_rejects_wrong_summary_tier(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["cases"][0]["tier"] = "threshold"
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("case stim-style-surface-dem-sample-d11-r100-b1024 tier must be report_only", result.stderr)
+
+    def test_rejects_wrong_sample_count(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["cases"][0]["variants"][0]["sample_count"] = 2
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("required variant stim-sample-dem sample_count must be 1", result.stderr)
+
+    def test_rejects_wrong_release_rounds(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["measure_rounds"] = 2
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("measure rounds does not match", result.stderr)
+
+    def test_rejects_wrong_case_count(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["case_count"] = 2
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("case count does not match", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
