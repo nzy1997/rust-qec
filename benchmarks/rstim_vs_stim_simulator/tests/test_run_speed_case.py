@@ -237,6 +237,45 @@ class RunSpeedCaseWorkflowTest(unittest.TestCase):
             self.assertEqual(env["stim_cli_stderr"], "stim: command not found")
             self.assertEqual(env["stim_cli"]["stderr"], "stim: command not found")
 
+    def test_collect_environment_uses_python_stim_version_when_cli_version_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "target/debug/rstim"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("")
+
+            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+                if command == ["rustc", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
+                if command == ["cargo", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "cargo 1.93.1\n", "")
+                if command == [str(binary)]:
+                    return subprocess.CompletedProcess(command, 0, "rstim 0.1.1\n", "")
+                if command == ["stim", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "", "No mode was given.\n")
+                if command == [
+                    "python3",
+                    "-c",
+                    "import stim; print(stim.__version__)",
+                ]:
+                    return subprocess.CompletedProcess(command, 0, "1.15.0\n", "")
+                raise AssertionError(f"unexpected command: {command}")
+
+            with mock.patch("benchmarks.rstim_vs_stim_simulator.run_speed_case.subprocess.run") as mocked:
+                mocked.side_effect = fake_run
+                env = run_speed_case.collect_environment(
+                    profile="debug",
+                    case_label="case-a",
+                    warmup_rounds=0,
+                    measure_rounds=1,
+                    rstim_binary_path=binary,
+                )
+
+            self.assertEqual(env["stim_cli_status"], "ok")
+            self.assertEqual(env["stim_cli_version"], "1.15.0")
+            self.assertEqual(env["stim_python_version"], "1.15.0")
+            self.assertEqual(env["stim_cli"]["version"], "")
+            self.assertEqual(env["stim_cli_stderr"], "No mode was given.")
+
     def test_main_rejects_bogus_profile_before_output_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             out_dir = Path(temp_dir) / "bogus"

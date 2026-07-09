@@ -11,7 +11,12 @@ REPO_ROOT = SCRIPT_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.check_rstim_vs_stim_gap_artifact import load_json, sha256_file, validate_case
+from tools.check_rstim_vs_stim_gap_artifact import (
+    load_json,
+    recorded_manifest_sha256,
+    sha256_file,
+    validate_case,
+)
 
 
 DEFAULT_OLD_SUMMARY = Path("benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json")
@@ -79,8 +84,15 @@ def validate_environment(environment: dict[str, Any]) -> None:
     for field in required_fields:
         if field not in environment:
             raise ValueError(f"environment.json missing {field}")
+        if not isinstance(environment[field], str) or environment[field].strip() == "":
+            raise ValueError(f"environment.json missing {field}")
 
-    has_stim_version = "stim_cli_version" in environment
+    stim_cli_status = environment["stim_cli_status"]
+    stim_cli_version = environment.get("stim_cli_version")
+    has_stim_version = isinstance(stim_cli_version, str) and stim_cli_version.strip() != ""
+    if stim_cli_status == "ok" and not has_stim_version:
+        raise ValueError("environment.json stim_cli_version is empty for ok Stim CLI")
+
     stim_stderr = environment.get("stim_cli.stderr")
     has_stim_stderr = isinstance(stim_stderr, str) and stim_stderr != ""
     stim_cli = environment.get("stim_cli")
@@ -113,6 +125,38 @@ def validate_docs(docs_path: Path) -> None:
     for pattern in BROAD_CLAIM_PATTERNS:
         if pattern in lower_docs:
             raise ValueError("docs contain forbidden broad parity wording")
+
+
+def validate_old_summary_hash(old_summary_path: Path, manifest: dict[str, Any], repo_root: Path) -> None:
+    candidates: list[str] = []
+    try:
+        candidates.append(str(old_summary_path.resolve().relative_to(repo_root.resolve())))
+    except ValueError:
+        pass
+    candidates.extend([str(old_summary_path), str(DEFAULT_OLD_SUMMARY)])
+
+    recorded: str | None = None
+    for artifact_path in dict.fromkeys(candidates):
+        recorded = recorded_manifest_sha256(manifest, artifact_path)
+        if recorded is not None:
+            break
+    if recorded is None:
+        raise ValueError("site manifest missing recorded hash for old #406 summary")
+    if sha256_file(old_summary_path) != recorded:
+        raise ValueError("checked artifact hash differs from site manifest")
+
+
+def validate_no_broad_claim_text(value: Any, label: str) -> None:
+    text = json_dumps_lower(value)
+    for pattern in BROAD_CLAIM_PATTERNS:
+        if pattern in text:
+            raise ValueError(f"{label} contains forbidden broad parity wording")
+
+
+def json_dumps_lower(value: Any) -> str:
+    import json
+
+    return json.dumps(value, sort_keys=True).lower()
 
 
 def find_family(manifest: dict[str, Any], family_id: str) -> dict[str, Any]:
@@ -162,6 +206,7 @@ def recorded_hashes(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_manifest(manifest: dict[str, Any], repo_root: Path) -> None:
+    validate_no_broad_claim_text(manifest, "site manifest")
     family = find_family(manifest, FAMILY_ID)
     find_evidence_item(family, FULL_ITEM_ID)
     release_item = find_evidence_item(family, RELEASE_ITEM_ID)
@@ -203,12 +248,14 @@ def main(argv: list[str] | None = None) -> int:
     manifest_path = Path(args.manifest)
 
     try:
-        old_summary = require_dict(load_json(old_summary_path), "old summary")
-        validate_case(old_summary)
-
         summary_path, report_path, environment_path = validate_release_files(new_dir)
         if sha256_file(old_summary_path) == sha256_file(summary_path):
             raise ValueError("new summary reuses the checked #406 summary")
+
+        old_summary = require_dict(load_json(old_summary_path), "old summary")
+        validate_case(old_summary)
+        manifest = require_dict(load_json(manifest_path), "site manifest")
+        validate_old_summary_hash(old_summary_path, manifest, Path.cwd())
 
         new_summary = require_dict(load_json(summary_path), "new summary")
         validate_new_summary(new_summary)
@@ -216,7 +263,6 @@ def main(argv: list[str] | None = None) -> int:
         validate_environment(environment)
         validate_report(report_path)
         validate_docs(docs_path)
-        manifest = require_dict(load_json(manifest_path), "site manifest")
         validate_manifest(manifest, Path.cwd())
     except Exception as exc:
         print(f"ERROR post-optimization evidence check failed: {exc}", file=sys.stderr)

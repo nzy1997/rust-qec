@@ -109,7 +109,13 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
         docs.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return docs
 
-    def write_manifest_fixture(self, release: Path, *, include_release_item: bool = True) -> Path:
+    def write_manifest_fixture(
+        self,
+        release: Path,
+        *,
+        include_release_item: bool = True,
+        release_claims_limit: str | None = None,
+    ) -> Path:
         manifest = self.root / DEFAULT_MANIFEST_REL
         manifest.parent.mkdir(parents=True, exist_ok=True)
         release_artifacts = [
@@ -125,7 +131,16 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
             {
                 "id": "rstim-vs-stim-full",
                 "artifacts": [{"path": DEFAULT_OLD_SUMMARY_REL, "kind": "speed-summary", "checked": True}],
-                "provenance": {"artifact_hashes": {"status": "recorded", "value": {}}},
+                "provenance": {
+                    "artifact_hashes": {
+                        "status": "recorded",
+                        "value": {
+                            DEFAULT_OLD_SUMMARY_REL: {
+                                "sha256": sha256_text(self.root / DEFAULT_OLD_SUMMARY_REL)
+                            }
+                        },
+                    }
+                },
             }
         ]
         if include_release_item:
@@ -137,6 +152,8 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
                         for artifact in release_artifacts
                     ],
                     "provenance": {"artifact_hashes": {"status": "recorded", "value": artifact_hashes}},
+                    "claims_limit": release_claims_limit
+                    or "One selected workload and one recorded environment only.",
                 }
             )
         manifest.write_text(
@@ -177,6 +194,18 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("new summary reuses the checked #406 summary", result.stderr)
 
+    def test_rejects_old_summary_hash_mismatch_against_manifest(self) -> None:
+        release = self.write_valid_release_fixture()
+        docs = self.write_docs_fixture()
+        manifest = self.write_manifest_fixture(release)
+        old_summary_path = self.root / DEFAULT_OLD_SUMMARY_REL
+        old_summary = json.loads(old_summary_path.read_text(encoding="utf-8"))
+        old_summary["mutated_after_manifest_hash"] = True
+        old_summary_path.write_text(json.dumps(old_summary), encoding="utf-8")
+        result = self.run_checker(new_dir=release, docs=docs, manifest=manifest)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("checked artifact hash differs from site manifest", result.stderr)
+
     def test_rejects_missing_environment_metadata(self) -> None:
         release = self.write_valid_release_fixture()
         docs = self.write_docs_fixture()
@@ -187,6 +216,20 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker(new_dir=release, docs=docs, manifest=manifest)
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment.json missing rstim_binary_path", result.stderr)
+
+    def test_rejects_empty_successful_stim_version_metadata(self) -> None:
+        release = self.write_valid_release_fixture()
+        docs = self.write_docs_fixture()
+        environment = json.loads((release / "environment.json").read_text(encoding="utf-8"))
+        environment["stim_cli_status"] = "ok"
+        environment["stim_cli_version"] = ""
+        environment["stim_cli.stderr"] = "No mode was given."
+        environment["stim_cli"] = {"status": "ok", "version": "", "stderr": "No mode was given."}
+        (release / "environment.json").write_text(json.dumps(environment), encoding="utf-8")
+        manifest = self.write_manifest_fixture(release)
+        result = self.run_checker(new_dir=release, docs=docs, manifest=manifest)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment.json stim_cli_version is empty for ok Stim CLI", result.stderr)
 
     def test_rejects_missing_report_file(self) -> None:
         release = self.write_valid_release_fixture()
@@ -220,6 +263,17 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker(new_dir=release, docs=docs, manifest=manifest)
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("docs contain forbidden broad parity wording", result.stderr)
+
+    def test_rejects_broad_parity_wording_in_manifest(self) -> None:
+        release = self.write_valid_release_fixture()
+        docs = self.write_docs_fixture()
+        manifest = self.write_manifest_fixture(
+            release,
+            release_claims_limit="This site manifest claims all-workload parity.",
+        )
+        result = self.run_checker(new_dir=release, docs=docs, manifest=manifest)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("site manifest contains forbidden broad parity wording", result.stderr)
 
 
 if __name__ == "__main__":
