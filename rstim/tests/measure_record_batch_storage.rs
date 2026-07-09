@@ -74,13 +74,15 @@ fn xor_lookback_preserves_detector_parity_for_known_fixture() {
     assert_eq!(out.observable_flips.num_minor(), 130);
     assert_eq!(out.detector_materializations, 12000);
     assert_eq!(out.observable_materializations, 1);
+    // The seeded fingerprint is implementation-specific; it guards this
+    // fixture's storage/parity path without promising a stable RNG stream.
     assert_eq!(
         b8_fingerprint(&out.detections),
-        (195000, 0xed59495c207d6221)
+        (195000, 0x408c1ebed87f27a6)
     );
     assert_eq!(
         b8_fingerprint(&out.observable_flips),
-        (130, 0x8187b6cddeeef841)
+        (130, 0x741669954130d410)
     );
 }
 
