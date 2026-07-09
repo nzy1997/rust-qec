@@ -171,10 +171,12 @@ fn low_probability_noise_mask_has_expected_frequency_bounds() {
 
 #[test]
 fn noise_mask_is_reproducible_for_seeded_rng() {
-    let program = "X_ERROR(0.037) 0\nM 0\n";
-    let first = measurement_words(program, 257, 99);
-    let second = measurement_words(program, 257, 99);
-    assert_eq!(first, second);
+    for probability in [0.001, 0.037] {
+        let program = format!("X_ERROR({probability}) 0\nM 0\n");
+        let first = measurement_words(&program, 257, 99);
+        let second = measurement_words(&program, 257, 99);
+        assert_eq!(first, second, "p={probability}");
+    }
 }
 
 #[test]
