@@ -574,34 +574,34 @@
             }
           ],
           "commands": [
-            "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run1",
-            "cp /tmp/rstim-speed-release-issue-416-run1/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
-            "cp /tmp/rstim-speed-release-issue-416-run1/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
-            "cp /tmp/rstim-speed-release-issue-416-run1/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+            "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run2",
+            "cp /tmp/rstim-speed-release-issue-416-run2/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+            "cp /tmp/rstim-speed-release-issue-416-run2/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+            "cp /tmp/rstim-speed-release-issue-416-run2/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
           ],
           "provenance": {
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
               "value": {
-                "release_artifacts_commit_time": "2026-07-09T16:00:44+08:00",
-                "release_run_wall_clock_time": "2026-07-09T15:54:00+08:00"
+                "release_artifacts_commit_time": "2026-07-09T16:47:39+08:00",
+                "release_run_wall_clock_time": "2026-07-09T16:47:39+08:00"
               }
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "104532b3ac7d2d946e0d8b1ea1995a9077f571b1",
+                "runner_source": "902b0473e20de3cc9ea6915c3cc42fb187dd3e45",
                 "published_by_issue": 416
               }
             },
             "commands": {
               "status": "recorded",
               "value": [
-                "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run1",
-                "cp /tmp/rstim-speed-release-issue-416-run1/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
-                "cp /tmp/rstim-speed-release-issue-416-run1/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
-                "cp /tmp/rstim-speed-release-issue-416-run1/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+                "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run2",
+                "cp /tmp/rstim-speed-release-issue-416-run2/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+                "cp /tmp/rstim-speed-release-issue-416-run2/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+                "cp /tmp/rstim-speed-release-issue-416-run2/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
               ]
             },
             "os": {
@@ -625,7 +625,9 @@
               "value": {
                 "rstim": "rstim 0.1.1",
                 "stim_cli_status": "ok",
-                "stim_cli_version": "",
+                "stim_cli_version": "1.15.0",
+                "stim_cli_version_source": "python-stim-module",
+                "stim_python_version": "1.15.0",
                 "cargo": "cargo 1.93.1 (Homebrew)"
               }
             },
@@ -659,20 +661,20 @@
                 "selected_case": "stim-style-surface-sample-d11-r100-b1024",
                 "warmup_rounds": 0,
                 "measure_rounds": 1,
-                "rstim_compiled_vs_stim_cli_ratio": 2.615088486966324
+                "rstim_compiled_vs_stim_cli_ratio": 3.207173771206738
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/release/summary.json": {
-                  "sha256": "4885cce7491585ba617247232998b0775a6d756e8fda8fb1ba0359b42d43c97a"
+                  "sha256": "841be692e05a889126c404d71a3984b9e377f781f455a518c54b710976823f4f"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/release/report.md": {
-                  "sha256": "8510e8397bc47ea49a77f55d916a307084fe44567a1f0ef114eb10e51c6c3943"
+                  "sha256": "0f7f976f86a8175d5b8b54083f194c9264ce1225c4dbf33a100e3630618d2587"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/release/environment.json": {
-                  "sha256": "ff10b5ba62e8ec2d65fa91da2d0c65322361e0f96c76d4d891f4979da2aa8b4f"
+                  "sha256": "9dfd6472aba1880cd42c31864e91076c41cd21115bb4076a7b4240e5f178deae"
                 }
               }
             }

@@ -20,9 +20,9 @@
         {
           "tool_variant": "rstim-compiled",
           "sample_count": 1,
-          "median_wall_time_ns": 566980167,
-          "median_shots_per_second": 1806.0596465272831,
-          "median_peak_memory_bytes": 8077312,
+          "median_wall_time_ns": 586794000,
+          "median_shots_per_second": 1745.0757846876418,
+          "median_peak_memory_bytes": 8011776,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
@@ -30,9 +30,9 @@
         {
           "tool_variant": "rstim-interpreted",
           "sample_count": 1,
-          "median_wall_time_ns": 575145500,
-          "median_shots_per_second": 1780.4190417902948,
-          "median_peak_memory_bytes": 7897088,
+          "median_wall_time_ns": 590138250,
+          "median_shots_per_second": 1735.1866278791454,
+          "median_peak_memory_bytes": 7831552,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
@@ -40,9 +40,9 @@
         {
           "tool_variant": "stim-cli",
           "sample_count": 1,
-          "median_wall_time_ns": 216811083,
-          "median_shots_per_second": 4723.005788407966,
-          "median_peak_memory_bytes": 3784704,
+          "median_wall_time_ns": 182962958,
+          "median_shots_per_second": 5596.761285418221,
+          "median_peak_memory_bytes": 3850240,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
@@ -53,14 +53,14 @@
           "kind": "sampler_compiled_vs_interpreted",
           "lhs_variant": "rstim-compiled",
           "rhs_variant": "rstim-interpreted",
-          "ratio": 0.9858030133244544
+          "ratio": 0.9943331075387843
         }
       ],
       "rstim_compiled_vs_stim_cli_ratio": {
         "kind": "rstim_compiled_vs_stim_cli",
         "lhs_variant": "rstim-compiled",
         "rhs_variant": "stim-cli",
-        "ratio": 2.615088486966324,
+        "ratio": 3.207173771206738,
         "status": "completed",
         "failure_reason": null
       }
