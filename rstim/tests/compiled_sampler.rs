@@ -14,10 +14,16 @@ fn bit_table_rows(table: &BitTable) -> Vec<Vec<bool>> {
         .collect()
 }
 
+fn true_fraction(rows: &[Vec<bool>]) -> f64 {
+    let ones = rows.iter().flatten().filter(|&&bit| bit).count();
+    let total: usize = rows.iter().map(Vec::len).sum();
+    ones as f64 / total as f64
+}
+
 #[test]
 fn compiled_backend_matches_interpreted_for_repeat_circuit() {
     let instrs = parse_lines(
-        "REPEAT 32 {\n  X_ERROR(0.001) 0\n  M 0\n  DETECTOR rec[-1]\n  OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
+        "REPEAT 32 {\n  X_ERROR(0) 0\n  M 0\n  DETECTOR rec[-1]\n  OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
     )
     .unwrap();
 
@@ -56,6 +62,35 @@ fn compiled_backend_matches_interpreted_for_repeat_circuit() {
     assert_eq!(
         bit_table_rows(&compiled.observable_flips),
         bit_table_rows(&interpreted.observable_flips)
+    );
+}
+
+#[test]
+fn compiled_backend_samples_repeat_noise_distribution() {
+    let instrs = parse_lines(
+        "REPEAT 16 {\n  X_ERROR(0.1) 0\n  M 0\n  DETECTOR rec[-1]\n  OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
+    )
+    .unwrap();
+    let mut rng = StdRng::seed_from_u64(7);
+
+    let compiled = sample_batch_with_options(
+        &instrs,
+        512,
+        &mut rng,
+        SampleOptions {
+            backend: SamplingBackend::Compiled,
+            ..SampleOptions::default()
+        },
+    )
+    .unwrap();
+
+    let measurements = bit_table_rows(&compiled.measurements);
+    let detections = bit_table_rows(&compiled.detections);
+    let measurement_rate = true_fraction(&measurements);
+    assert_eq!(detections, measurements);
+    assert!(
+        (0.06..=0.14).contains(&measurement_rate),
+        "compiled repeat X_ERROR(0.1) measurement rate was {measurement_rate}"
     );
 }
 

@@ -13,6 +13,7 @@ pub fn sample_compiled_batch(
 ) -> Result<BatchOutput, String> {
     let ref_sample = build_reference_sample(&compiled.source, options.reference_sample_mode)?;
     let mut frame = FrameSimulator::new(compiled.num_qubits, n_shots);
+    frame.randomize_initial_z_frames(rng);
     frame
         .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run_compiled_blocks(&compiled.blocks, &ref_sample, rng)?;

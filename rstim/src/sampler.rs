@@ -155,13 +155,14 @@ fn sample_batch_interpreted(
     rng: &mut impl Rng,
     options: SampleOptions,
 ) -> Result<BatchOutput, String> {
-    if uses_loss_sampling_fallback(instrs) {
+    if uses_executor_sampling_fallback(instrs) {
         return sample_batch_with_executor(instrs, n_shots, rng, options);
     }
 
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
     let num_qubits = max_qubit(instrs)?;
     let mut frame = FrameSimulator::new(num_qubits, n_shots);
+    frame.randomize_initial_z_frames(rng);
     frame
         .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run(instrs, &ref_sample, rng)?;
@@ -236,19 +237,28 @@ fn sample_batch_with_executor(
     ))
 }
 
-fn uses_loss_sampling_fallback(instrs: &[StimInstr]) -> bool {
+fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
     for instr in instrs {
         match instr {
             StimInstr::Op { name, .. } => {
                 if matches!(
                     name.as_str(),
-                    "LOSS" | "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+                    "LOSS"
+                        | "ML"
+                        | "MXL"
+                        | "MYL"
+                        | "MZL"
+                        | "MRL"
+                        | "MRXL"
+                        | "MRYL"
+                        | "MRZL"
+                        | "MPP"
                 ) {
                     return true;
                 }
             }
             StimInstr::Repeat { body, .. } => {
-                if uses_loss_sampling_fallback(body) {
+                if uses_executor_sampling_fallback(body) {
                     return true;
                 }
             }

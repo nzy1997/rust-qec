@@ -325,6 +325,49 @@ fn sample_batch_bell_correlated() {
 }
 
 #[test]
+fn sample_batch_h_measurement_uses_implicit_zero_state_randomness() {
+    let instrs = parse_lines("H 0\nM 0\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 256, &mut rng).unwrap();
+
+    let ones = (0..256)
+        .filter(|&shot| out.measurements.get(0, shot))
+        .count();
+    assert!(
+        (64..=192).contains(&ones),
+        "expected both H-measurement outcomes, got ones={ones}"
+    );
+}
+
+#[test]
+fn sample_batch_bell_distribution_uses_only_balanced_correlated_support() {
+    let instrs = parse_lines("H 0\nCNOT 0 1\nM 0 1\n").unwrap();
+    let mut rng = StdRng::seed_from_u64(42);
+    let out = sample_batch(&instrs, 512, &mut rng).unwrap();
+
+    let mut count_00 = 0usize;
+    let mut count_11 = 0usize;
+    for shot in 0..512 {
+        let left = out.measurements.get(0, shot);
+        let right = out.measurements.get(1, shot);
+        match (left, right) {
+            (false, false) => count_00 += 1,
+            (true, true) => count_11 += 1,
+            other => panic!("unexpected Bell sample {other:?} at shot {shot}"),
+        }
+    }
+
+    assert!(
+        (160..=352).contains(&count_00),
+        "expected balanced Bell support, count_00={count_00}, count_11={count_11}"
+    );
+    assert!(
+        (160..=352).contains(&count_11),
+        "expected balanced Bell support, count_00={count_00}, count_11={count_11}"
+    );
+}
+
+#[test]
 fn sample_batch_repeat() {
     let instrs = parse_lines("REPEAT 3 {\nX 0\nM 0\nR 0\n}\n").unwrap();
     let mut rng = StdRng::seed_from_u64(42);
