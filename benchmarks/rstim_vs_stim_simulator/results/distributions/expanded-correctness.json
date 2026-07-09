@@ -1,0 +1,20 @@
+{
+  "catalog_path": "benchmarks/rstim_vs_stim_simulator/distribution_cases.toml",
+  "catalog_sha256": "6f28ad3cd13f4464c59548eef5cc135ad68c439ba01292c7132562f748970432",
+  "distribution_case_ids": [
+    "stim_bell_pair_basic_distribution",
+    "stim_sqrt_x_transformed_pair",
+    "stim_sqrt_y_transformed_pair",
+    "stim_x_error_two_measured_qubits",
+    "stim_z_error_h_conjugated_pair",
+    "stim_y_error_two_measured_qubits",
+    "stim_depolarize1_two_measured_qubits",
+    "stim_depolarize2_two_measured_qubits"
+  ],
+  "distribution_summary_path": "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json",
+  "distribution_summary_sha256": "0fda2168deb7340ebb6ff33ca3faa34de6baa0ea2b36c36d92a74cb20589f165",
+  "full_summary_path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+  "full_summary_sha256": "5c9c0b7944801d8652f9364cf6e15642475255c19efae6079c909798b8c3f1ba",
+  "scope": "This evidence covers the source-grounded small-circuit distribution catalog and the existing checked d11/r100 full fixture summary. It does not extend coverage to issue #431 test artifacts or to unlisted Stim workloads.",
+  "status": "pass"
+}

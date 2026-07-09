@@ -82,6 +82,19 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
 
 The expected negative-control verdict is `FAIL statistical mismatch`.
 
+## Expanded Correctness Evidence
+
+Check the published expanded correctness evidence bundle:
+
+```sh
+python3 tools/check_rstim_vs_stim_expanded_correctness.py \
+  --catalog benchmarks/rstim_vs_stim_simulator/distribution_cases.toml \
+  --distribution-dir benchmarks/rstim_vs_stim_simulator/results/distributions \
+  --full-summary benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json
+```
+
+The expected verdict is `PASS expanded rstim-vs-Stim correctness evidence`.
+
 ## Inspect Fixture Load
 
 Inspect the expanded operation load for the checked full fixture:
