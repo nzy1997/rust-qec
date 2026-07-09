@@ -162,6 +162,7 @@ fn sample_batch_interpreted(
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
     let num_qubits = max_qubit(instrs)?;
     let mut frame = FrameSimulator::new(num_qubits, n_shots);
+    frame.randomize_initial_z_frames(rng);
     frame
         .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run(instrs, &ref_sample, rng)?;
