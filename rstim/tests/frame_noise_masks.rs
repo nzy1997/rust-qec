@@ -219,6 +219,13 @@ fn sparse_path_can_set_measurement_bit_zero() {
 }
 
 #[test]
+fn sparse_path_retries_zero_uniform_draw() {
+    let mut rng = ScriptedRng::from_u64s(vec![0, u64::MAX, 1u64 << 11]);
+    let words = measurement_words_with_rng_impl("X_ERROR(0.001) 0\nM 0\n", 1, &mut rng);
+    assert_eq!(words, vec![1]);
+}
+
+#[test]
 fn depolarize1_event_mask_uses_integer_threshold_path() {
     let arm = match_arm(frame_source(), "\"DEPOLARIZE1\"", "\"DEPOLARIZE2\"");
     assert!(arm.contains("random_bits_with_prob"), "{arm}");

@@ -1341,28 +1341,25 @@ fn random_sparse_bits_with_prob_into(
     p: f64,
     rng: &mut impl Rng,
 ) {
+    debug_assert!(p > 0.0 && p <= SPARSE_BERNOULLI_MAX_PROBABILITY);
+    debug_assert!(valid_bits <= result.len().saturating_mul(64));
     let log_one_minus_p = (-p).ln_1p();
     let mut next_candidate = 0usize;
     while next_candidate < valid_bits {
-        let u = loop {
-            let candidate = rng.r#gen::<f64>();
-            if candidate > 0.0 {
-                break candidate;
-            }
-        };
+        let mut u = rng.r#gen::<f64>();
+        while u == 0.0 {
+            u = rng.r#gen::<f64>();
+        }
         let skip = (u.ln() / log_one_minus_p).floor() as usize;
-        let shot = match next_candidate.checked_add(skip) {
-            Some(next) => next,
-            None => break,
-        };
+        let shot = next_candidate.saturating_add(skip);
         if shot >= valid_bits {
             break;
         }
-        result[shot / 64] |= 1u64 << (shot % 64);
-        next_candidate = match shot.checked_add(1) {
-            Some(next) => next,
-            None => break,
-        };
+        let word_idx = shot / 64;
+        let bit = shot % 64;
+        let mask = 1u64 << bit;
+        result[word_idx] |= mask;
+        next_candidate = shot + 1;
     }
 }
 
