@@ -5,17 +5,36 @@ use rstim::parser::parse_lines;
 use rstim::sim::frame::FrameSimulator;
 
 fn measurement_words(program: &str, batch_size: usize, seed: u64) -> Vec<u64> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    measurement_words_with_rng_impl(program, batch_size, &mut rng)
+}
+
+fn measurement_words_with_rng_impl(
+    program: &str,
+    batch_size: usize,
+    rng: &mut impl RngCore,
+) -> Vec<u64> {
     let instrs = parse_lines(program).unwrap();
     let ref_sample = reference_sample(&instrs).unwrap();
-    let mut rng = StdRng::seed_from_u64(seed);
     let mut frame = FrameSimulator::new(1, batch_size);
-    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    frame.run(&instrs, &ref_sample, rng).unwrap();
     frame.measurements(&ref_sample).row_words(0).to_vec()
 }
 
 struct CountingRng {
     inner: StdRng,
     core_calls: usize,
+}
+
+struct ScriptedRng {
+    draws: Vec<u64>,
+    next: usize,
+}
+
+impl ScriptedRng {
+    fn from_u64s(draws: Vec<u64>) -> Self {
+        Self { draws, next: 0 }
+    }
 }
 
 impl CountingRng {
@@ -40,6 +59,31 @@ impl RngCore for CountingRng {
     fn next_u64(&mut self) -> u64 {
         self.core_calls += 1;
         self.inner.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        for chunk in dest.chunks_mut(8) {
+            let bytes = self.next_u64().to_ne_bytes();
+            let len = chunk.len();
+            chunk.copy_from_slice(&bytes[..len]);
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl RngCore for ScriptedRng {
+    fn next_u32(&mut self) -> u32 {
+        self.next_u64() as u32
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let value = self.draws.get(self.next).copied().unwrap_or(0);
+        self.next += 1;
+        value
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
@@ -163,6 +207,13 @@ fn medium_probability_noise_mask_keeps_dense_path() {
         core_calls >= batch_size,
         "medium-probability mask should stay on the dense path; saw {core_calls} RNG core calls for {batch_size} shots"
     );
+}
+
+#[test]
+fn sparse_path_can_set_measurement_bit_zero() {
+    let mut rng = ScriptedRng::from_u64s(vec![u64::MAX, 1u64 << 11]);
+    let words = measurement_words_with_rng_impl("X_ERROR(0.001) 0\nM 0\n", 1, &mut rng);
+    assert_eq!(words, vec![1]);
 }
 
 #[test]

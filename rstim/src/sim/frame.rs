@@ -1349,8 +1349,8 @@ fn random_sparse_bits_with_prob_into(
     rng: &mut impl Rng,
 ) {
     let log_one_minus_p = (-p).ln_1p();
-    let mut shot = 0usize;
-    while shot < valid_bits {
+    let mut next_candidate = 0usize;
+    while next_candidate < valid_bits {
         let u = loop {
             let candidate = rng.r#gen::<f64>();
             if candidate > 0.0 {
@@ -1358,7 +1358,7 @@ fn random_sparse_bits_with_prob_into(
             }
         };
         let skip = (u.ln() / log_one_minus_p).floor() as usize;
-        shot = match shot.checked_add(skip + 1) {
+        let shot = match next_candidate.checked_add(skip) {
             Some(next) => next,
             None => break,
         };
@@ -1366,6 +1366,10 @@ fn random_sparse_bits_with_prob_into(
             break;
         }
         result[shot / 64] |= 1u64 << (shot % 64);
+        next_candidate = match shot.checked_add(1) {
+            Some(next) => next,
+            None => break,
+        };
     }
 }
 
