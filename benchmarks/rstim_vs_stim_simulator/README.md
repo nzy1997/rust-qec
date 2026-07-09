@@ -80,6 +80,34 @@ report records `expanded_operation_count = 14547`,
 `expected_measurements = 12121`, `expected_detectors = 12000`, and
 `expected_observables = 1`.
 
+## Distribution Verification
+
+Run the small-circuit distribution verifier against Stim and `rstim`:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
+  --cases benchmarks/rstim_vs_stim_simulator/distribution_cases.toml \
+  --shots 100000 \
+  --out /tmp/rstim-vs-stim-distributions.json
+```
+
+The expected verdict is `PASS distribution correctness cases=8 mismatch=0`.
+The JSON report records each case's expected probabilities, observed Stim and
+`rstim` frequencies, tolerance, sample count, status, command, exit status,
+stderr, and source URL.
+
+Run the statistical negative control:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
+  --cases benchmarks/rstim_vs_stim_simulator/distribution_cases.toml \
+  --shots 100000 \
+  --inject-rstim-bitflip-rate 0.20 \
+  --out /tmp/rstim-vs-stim-distributions-bad.json
+```
+
+The expected negative-control verdict is `FAIL statistical mismatch`.
+
 ## Correctness Verification
 
 Run the smoke correctness verifier:
