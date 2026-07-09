@@ -147,6 +147,10 @@ class RunSpeedSuiteParserTest(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("unknown benchmark case: does-not-exist", str(mocked_print.call_args.args[0]))
             self.assertFalse(any(command[:3] == [str(binary), "perf", "run"] for command in commands))
+            self.assertFalse((out_dir / "raw.jsonl").exists())
+            self.assertFalse((out_dir / "summary.json").exists())
+            self.assertFalse((out_dir / "report.md").exists())
+            self.assertFalse((out_dir / "environment.json").exists())
 
 
 class RunSpeedSuiteWorkflowTest(unittest.TestCase):

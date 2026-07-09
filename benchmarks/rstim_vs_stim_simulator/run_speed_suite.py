@@ -78,10 +78,7 @@ def run_speed_suite(
     rstim_binary = run_speed_case.build_rstim(args.profile, repo_root=repo_root)
 
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     raw_path = out_dir / "raw.jsonl"
-    raw_path.write_text("")
     summary_path = out_dir / "summary.json"
     report_path = out_dir / "report.md"
     environment_path = out_dir / "environment.json"
@@ -93,6 +90,9 @@ def run_speed_suite(
 
         for index, label in enumerate(case_labels):
             _validate_case_label(rstim_binary, label, cwd=repo_root, temp_root=temp_root, index=index)
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        raw_path.write_text("")
 
         for index, label in enumerate(case_labels):
             case_raw_path = temp_root / f"raw-{index}.jsonl"
