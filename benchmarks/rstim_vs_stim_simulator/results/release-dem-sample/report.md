@@ -8,5 +8,5 @@
 
 | variant | status | samples | median wall time (ns) |
 | --- | --- | ---: | ---: |
-| stim-sample-dem | completed | 1 | 385863083 |
-| rstim-sample-dem | completed | 1 | 3268522667 |
+| stim-sample-dem | completed | 1 | 369253833 |
+| rstim-sample-dem | completed | 1 | 4373287542 |
