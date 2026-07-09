@@ -1,0 +1,70 @@
+{
+  "cases": [
+    {
+      "case_label": "rep-sample-d13-r13",
+      "comparisons": [
+        {
+          "kind": "sampler_compiled_vs_interpreted",
+          "lhs_variant": "rstim-compiled",
+          "ratio": 0.926426133437403,
+          "rhs_variant": "rstim-interpreted"
+        }
+      ],
+      "expected_variants": [
+        "stim-cli",
+        "rstim-interpreted",
+        "rstim-compiled"
+      ],
+      "present_variants": [
+        "rstim-compiled",
+        "rstim-interpreted",
+        "stim-cli"
+      ],
+      "requires_compiled": true,
+      "requires_fallback": false,
+      "rstim_compiled_vs_stim_cli_ratio": {
+        "failure_reason": null,
+        "kind": "rstim_compiled_vs_stim_cli",
+        "lhs_variant": "rstim-compiled",
+        "ratio": 0.020179363526681787,
+        "rhs_variant": "stim-cli",
+        "status": "completed"
+      },
+      "tier": "gating",
+      "variants": [
+        {
+          "failure_reason": null,
+          "median_peak_memory_bytes": 6062080,
+          "median_shots_per_second": 11509691.735926237,
+          "median_wall_time_ns": 1737666,
+          "sample_count": 1,
+          "status": "completed",
+          "stderr": null,
+          "tool_variant": "rstim-compiled"
+        },
+        {
+          "failure_reason": null,
+          "median_peak_memory_bytes": 5488640,
+          "median_shots_per_second": 10662879.211970575,
+          "median_wall_time_ns": 1875666,
+          "sample_count": 1,
+          "status": "completed",
+          "stderr": null,
+          "tool_variant": "rstim-interpreted"
+        },
+        {
+          "failure_reason": null,
+          "median_peak_memory_bytes": 4243456,
+          "median_shots_per_second": 232258.2536193007,
+          "median_wall_time_ns": 86111041,
+          "sample_count": 1,
+          "status": "completed",
+          "stderr": null,
+          "tool_variant": "stim-cli"
+        }
+      ],
+      "workload": "sample"
+    }
+  ],
+  "issues": []
+}
