@@ -9,6 +9,12 @@ from typing import Any
 
 
 REQUIRED_RELEASE_FILES = ("summary.json", "report.md", "environment.json")
+FORBIDDEN_BROAD_REPORT_PATTERNS = (
+    "broad speed superiority",
+    "broad rstim/stim performance parity",
+    "all-workload parity",
+    "all workloads",
+)
 REQUIRED_ENVIRONMENT_FIELDS = (
     "rstim_binary_path",
     "rustc_version",
@@ -36,6 +42,11 @@ def parse_required_variants(raw: str) -> list[str]:
 
 
 def validate_release_files(results_dir: Path) -> tuple[Path, Path, Path]:
+    allowed_filenames = set(REQUIRED_RELEASE_FILES)
+    for path in sorted(results_dir.iterdir(), key=lambda entry: entry.name):
+        if path.is_file() and path.name not in allowed_filenames:
+            raise ValueError(f"unexpected release file: {path.name}")
+
     paths: list[Path] = []
     for filename in REQUIRED_RELEASE_FILES:
         path = results_dir / filename
@@ -107,6 +118,10 @@ def validate_report(report_path: Path, case_label: str) -> None:
     report = report_path.read_text(encoding="utf-8")
     if case_label not in report:
         raise ValueError(f"report.md missing case label {case_label}")
+    report_lower = report.lower()
+    for pattern in FORBIDDEN_BROAD_REPORT_PATTERNS:
+        if pattern in report_lower:
+            raise ValueError("report.md contains forbidden broad performance claim")
 
 
 def main(argv: list[str] | None = None) -> int:

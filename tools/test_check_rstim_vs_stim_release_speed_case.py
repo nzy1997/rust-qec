@@ -59,6 +59,9 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
         (self.results_dir / "environment.json").write_text(json.dumps(environment), encoding="utf-8")
         (self.results_dir / "report.md").write_text(f"# Report\n\n### {CASE_LABEL}\n", encoding="utf-8")
 
+    def write_report(self, report: str) -> None:
+        (self.results_dir / "report.md").write_text(report, encoding="utf-8")
+
     def run_checker(self) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -190,6 +193,27 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("missing required release file: report.md", result.stderr)
+
+    def test_rejects_report_missing_case_label(self) -> None:
+        self.write_report("# Report\n\n### unrelated-case\n")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(f"report.md missing case label {CASE_LABEL}", result.stderr)
+
+    def test_rejects_report_broad_performance_claim(self) -> None:
+        self.write_report(
+            "# Report\n\n### "
+            f"{CASE_LABEL}\n\nThe results show broad speed superiority across all workloads.\n",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("report.md contains forbidden broad performance claim", result.stderr)
+
+    def test_rejects_unexpected_release_file(self) -> None:
+        (self.results_dir / "raw.jsonl").write_text("{}", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("unexpected release file: raw.jsonl", result.stderr)
 
 
 if __name__ == "__main__":
