@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
+      "expected_variants": [
+        "stim-sample-dem",
+        "rstim-sample-dem"
+      ],
+      "present_variants": [
+        "rstim-sample-dem",
+        "stim-sample-dem"
+      ],
+      "tier": "report_only",
+      "variants": [
+        {
+          "failure_reason": null,
+          "median_shots_per_second": 1828.511975810615,
+          "median_wall_time_ns": 560018208,
+          "sample_count": 1,
+          "status": "completed",
+          "stderr": null,
+          "tool_variant": "stim-sample-dem"
+        },
+        {
+          "failure_reason": null,
+          "median_shots_per_second": 257.91741720708535,
+          "median_wall_time_ns": 3970263083,
+          "sample_count": 1,
+          "status": "completed",
+          "stderr": null,
+          "tool_variant": "rstim-sample-dem"
+        }
+      ],
+      "workload": "sample_dem"
+    }
+  ],
+  "issues": []
+}

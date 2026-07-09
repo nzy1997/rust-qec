@@ -132,6 +132,34 @@ The runner builds `target/release/rstim` for `--profile release` or
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 
+## Selected DEM Speed Evidence
+
+Run the checked release-profile DEM sampling evidence case:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.run_dem_speed_case \
+  --profile release \
+  --case stim-style-surface-dem-sample-d11-r100-b1024 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
+  --out-dir benchmarks/rstim_vs_stim_simulator/results/release-dem-sample
+```
+
+Check the committed evidence artifacts:
+
+```sh
+python3 tools/check_rstim_vs_stim_release_dem_speed_case.py \
+  --results-dir benchmarks/rstim_vs_stim_simulator/results/release-dem-sample \
+  --case stim-style-surface-dem-sample-d11-r100-b1024 \
+  --required-variants stim-sample-dem,rstim-sample-dem
+```
+
+The checker prints
+`PASS release DEM speed case stim-style-surface-dem-sample-d11-r100-b1024`
+when the report contains the required case and variants. This is report-only
+speed evidence: it records `raw.jsonl`, `summary.json`, `report.md`, and
+`environment.json` for review and does not enforce a speed threshold.
+
 ## Multi-Case Speed Suite
 
 Run a release-profile suite over exactly the requested perf cases:
