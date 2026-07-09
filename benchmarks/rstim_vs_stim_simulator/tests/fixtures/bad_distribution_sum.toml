@@ -1,0 +1,19 @@
+manifest_version = 1
+suite = "rstim_vs_stim_simulator"
+description = "Negative-control distribution manifest whose probabilities do not sum to 1."
+distribution_tolerance = 1e-9
+
+[[cases]]
+case_id = "bad_distribution_sum"
+source_url = "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc"
+source_commit = "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef"
+source_line_start = 160
+source_line_end = 169
+circuit = """
+H 0
+CNOT 0 1
+M 0 1
+"""
+shots = 10000
+tolerance = 1e-9
+expected_distribution = { "00" = 0.5, "11" = 0.4 }
