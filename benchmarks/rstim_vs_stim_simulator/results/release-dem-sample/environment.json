@@ -1,0 +1,61 @@
+{
+  "cargo_version": "cargo 1.93.1 (Homebrew)",
+  "case_count": 1,
+  "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
+  "case_labels": [
+    "stim-style-surface-dem-sample-d11-r100-b1024"
+  ],
+  "command_line": [
+    "benchmarks/rstim_vs_stim_simulator/run_dem_speed_case.py",
+    "--profile",
+    "release",
+    "--case",
+    "stim-style-surface-dem-sample-d11-r100-b1024",
+    "--warmup-rounds",
+    "0",
+    "--measure-rounds",
+    "1",
+    "--out-dir",
+    "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample"
+  ],
+  "dem_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
+  "dem_sha256": "b25a3e3c70c6010b70cb60e55ca5806939a067366e5c6223061fdfa62417dc98",
+  "expected_detectors": 12000,
+  "expected_observables": 1,
+  "generation_command": "stim analyze_errors --decompose_errors < benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim > benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
+  "measure_rounds": 1,
+  "profile": "release",
+  "rstim_binary_path": "target/release/rstim",
+  "rstim_status": "ok",
+  "rstim_version": "rstim 0.1.1",
+  "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "source_circuit_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+  "source_circuit_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
+  "stim_cli": {
+    "command": [
+      "stim",
+      "--version"
+    ],
+    "exit_code": 0,
+    "status": "ok",
+    "stderr": "\u001b[31mNo mode was given.\n\nAvailable stim commands:\n\n    stim analyze_errors      # Converts a circuit into a detector error model.\n    stim convert             # Convert data between result formats.\n    stim detect              # Sample detection events and observable flips from a circuit.\n    stim diagram             # Produces various kinds of diagrams.\n    stim explain_errors      # Find circuit errors that produce certain detection events.\n    stim gen                 # Generates example circuits.\n    stim help                # Prints helpful information about using stim.\n    stim m2d                 # Convert measurement data into detection event data.\n    stim repl                # Runs stim in interactive read-evaluate-print (REPL) mode.\n    stim sample              # Samples measurements from a circuit.\n    stim sample_dem          # Samples detection events from a detector error model.\n\nUse `stim help [topic]` for help on specific topics. Available topics include:\n\n    stim help commands  # List all tasks performed by stim.\n    stim help gates     # List all circuit instructions supported by stim.\n    stim help formats   # List all result formats supported by stim.\n    stim help [command] # Print information about a command, e.g. \"sample\".\n    stim help [gate]    # Print information about a gate, e.g. \"CNOT\".\n    stim help [format]  # Print information about a result format, e.g. \"01\".\n\u001b[0m",
+    "version": ""
+  },
+  "stim_cli_status": "ok",
+  "stim_cli_stderr": "\u001b[31mNo mode was given.\n\nAvailable stim commands:\n\n    stim analyze_errors      # Converts a circuit into a detector error model.\n    stim convert             # Convert data between result formats.\n    stim detect              # Sample detection events and observable flips from a circuit.\n    stim diagram             # Produces various kinds of diagrams.\n    stim explain_errors      # Find circuit errors that produce certain detection events.\n    stim gen                 # Generates example circuits.\n    stim help                # Prints helpful information about using stim.\n    stim m2d                 # Convert measurement data into detection event data.\n    stim repl                # Runs stim in interactive read-evaluate-print (REPL) mode.\n    stim sample              # Samples measurements from a circuit.\n    stim sample_dem          # Samples detection events from a detector error model.\n\nUse `stim help [topic]` for help on specific topics. Available topics include:\n\n    stim help commands  # List all tasks performed by stim.\n    stim help gates     # List all circuit instructions supported by stim.\n    stim help formats   # List all result formats supported by stim.\n    stim help [command] # Print information about a command, e.g. \"sample\".\n    stim help [gate]    # Print information about a gate, e.g. \"CNOT\".\n    stim help [format]  # Print information about a result format, e.g. \"01\".\n\u001b[0m",
+  "stim_cli_version": "1.15.0",
+  "stim_cli_version_source": "python-stim-module",
+  "stim_python": {
+    "command": [
+      "python3",
+      "-c",
+      "import stim; print(stim.__version__)"
+    ],
+    "exit_code": 0,
+    "status": "ok",
+    "stderr": "",
+    "version": "1.15.0"
+  },
+  "stim_python_version": "1.15.0",
+  "warmup_rounds": 0
+}

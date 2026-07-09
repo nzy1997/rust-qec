@@ -80,8 +80,11 @@ def validate_case(summary: dict[str, Any], case_label: str, workload: str, requi
         raise ValueError(f"case {case_label} must be present exactly once")
 
     case = matches[0]
-    if case.get("workload") != workload:
-        raise ValueError(f"case {case_label} workload must be {workload}")
+    actual_workload = case.get("workload")
+    if actual_workload != workload:
+        raise ValueError(
+            f"workload mismatch for {case_label}: expected {workload}, found {actual_workload!r}"
+        )
 
     present_variants = case.get("present_variants")
     if not isinstance(present_variants, list):

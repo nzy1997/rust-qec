@@ -1,0 +1,11 @@
+{
+  "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
+  "dem_path": "stim_surface_code_rotated_memory_z_d11_r100.dem",
+  "dem_sha256": "b25a3e3c70c6010b70cb60e55ca5806939a067366e5c6223061fdfa62417dc98",
+  "expected_detectors": 12000,
+  "expected_observables": 1,
+  "generation_command": "stim analyze_errors --decompose_errors < benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim > benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
+  "shots": 1024,
+  "source_circuit_path": "stim_surface_code_rotated_memory_z_d11_r100.stim",
+  "source_circuit_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+}
