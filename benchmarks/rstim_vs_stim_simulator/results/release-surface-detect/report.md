@@ -7,10 +7,10 @@
 - workload: `detect`
 - expected variants: `stim-cli`, `rstim-interpreted`, `rstim-compiled`
 - present variants: `rstim-compiled`, `rstim-interpreted`, `stim-cli`
-- rstim-compiled median wall time: `36218708` ns over `1` measured rounds
-- rstim-interpreted median wall time: `35213875` ns over `1` measured rounds
-- stim-cli median wall time: `280754291` ns over `1` measured rounds
-- sampler_compiled_vs_interpreted: `rstim-compiled` / `rstim-interpreted` = `1.028535`
+- rstim-compiled median wall time: `34339167` ns over `1` measured rounds
+- rstim-interpreted median wall time: `32813250` ns over `1` measured rounds
+- stim-cli median wall time: `266171583` ns over `1` measured rounds
+- sampler_compiled_vs_interpreted: `rstim-compiled` / `rstim-interpreted` = `1.046503`
 
 ## Report-Only Cases
 
