@@ -1295,6 +1295,8 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 // --- Noise helpers ---
 
+const SPARSE_BERNOULLI_MAX_PROBABILITY: f64 = 0.02;
+
 fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
     random_bits_with_prob_into(&mut result, valid_bits, p, rng);
@@ -1317,6 +1319,19 @@ fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng
         return;
     }
 
+    if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
+        random_sparse_bits_with_prob_into(result, valid_bits, p, rng);
+    } else {
+        random_dense_bits_with_threshold_into(result, valid_bits, threshold, rng);
+    }
+}
+
+fn random_dense_bits_with_threshold_into(
+    result: &mut [u64],
+    valid_bits: usize,
+    threshold: u64,
+    rng: &mut impl Rng,
+) {
     for (word_idx, word) in result.iter_mut().enumerate() {
         let valid_in_word = valid_bits.saturating_sub(word_idx * 64).min(64);
         for bit in 0..valid_in_word {
@@ -1324,6 +1339,33 @@ fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng
                 *word |= 1u64 << bit;
             }
         }
+    }
+}
+
+fn random_sparse_bits_with_prob_into(
+    result: &mut [u64],
+    valid_bits: usize,
+    p: f64,
+    rng: &mut impl Rng,
+) {
+    let log_one_minus_p = (-p).ln_1p();
+    let mut shot = 0usize;
+    while shot < valid_bits {
+        let u = loop {
+            let candidate = rng.r#gen::<f64>();
+            if candidate > 0.0 {
+                break candidate;
+            }
+        };
+        let skip = (u.ln() / log_one_minus_p).floor() as usize;
+        shot = match shot.checked_add(skip + 1) {
+            Some(next) => next,
+            None => break,
+        };
+        if shot >= valid_bits {
+            break;
+        }
+        result[shot / 64] |= 1u64 << (shot % 64);
     }
 }
 
