@@ -700,7 +700,10 @@ impl FrameSimulator {
     ) -> Result<(), String> {
         let wpr = self.x_table.words_per_row();
         match op {
-            CompiledOp::Tick | CompiledOp::QubitCoords | CompiledOp::ShiftCoords | CompiledOp::NoOp => {}
+            CompiledOp::Tick
+            | CompiledOp::QubitCoords
+            | CompiledOp::ShiftCoords
+            | CompiledOp::NoOp => {}
             CompiledOp::H { qubits } => {
                 for &q in qubits {
                     do_h(&mut self.x_table, &mut self.z_table, q);
@@ -727,12 +730,7 @@ impl FrameSimulator {
             }
             CompiledOp::Cx { pairs } => {
                 for &(control, target) in pairs {
-                    do_cx(
-                        &mut self.x_table,
-                        &mut self.z_table,
-                        control,
-                        target,
-                    );
+                    do_cx(&mut self.x_table, &mut self.z_table, control, target);
                 }
             }
             CompiledOp::Depolarize2 { probability, pairs } => {
@@ -925,12 +923,7 @@ impl FrameSimulator {
         }
     }
 
-    fn exec_compiled_reset(
-        &mut self,
-        basis: CompiledBasis,
-        qubits: &[usize],
-        rng: &mut impl Rng,
-    ) {
+    fn exec_compiled_reset(&mut self, basis: CompiledBasis, qubits: &[usize], rng: &mut impl Rng) {
         for &q in qubits {
             match basis {
                 CompiledBasis::Z => {
@@ -1295,6 +1288,8 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 // --- Noise helpers ---
 
+const SPARSE_BERNOULLI_MAX_PROBABILITY: f64 = 0.02;
+
 fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
     random_bits_with_prob_into(&mut result, valid_bits, p, rng);
@@ -1317,6 +1312,19 @@ fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng
         return;
     }
 
+    if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
+        random_sparse_bits_with_prob_into(result, valid_bits, p, rng);
+    } else {
+        random_dense_bits_with_threshold_into(result, valid_bits, threshold, rng);
+    }
+}
+
+fn random_dense_bits_with_threshold_into(
+    result: &mut [u64],
+    valid_bits: usize,
+    threshold: u64,
+    rng: &mut impl Rng,
+) {
     for (word_idx, word) in result.iter_mut().enumerate() {
         let valid_in_word = valid_bits.saturating_sub(word_idx * 64).min(64);
         for bit in 0..valid_in_word {
@@ -1324,6 +1332,34 @@ fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng
                 *word |= 1u64 << bit;
             }
         }
+    }
+}
+
+fn random_sparse_bits_with_prob_into(
+    result: &mut [u64],
+    valid_bits: usize,
+    p: f64,
+    rng: &mut impl Rng,
+) {
+    debug_assert!(p > 0.0 && p <= SPARSE_BERNOULLI_MAX_PROBABILITY);
+    debug_assert!(valid_bits <= result.len().saturating_mul(64));
+    let log_one_minus_p = (-p).ln_1p();
+    let mut next_candidate = 0usize;
+    while next_candidate < valid_bits {
+        let mut u = rng.r#gen::<f64>();
+        while u == 0.0 {
+            u = rng.r#gen::<f64>();
+        }
+        let skip = (u.ln() / log_one_minus_p).floor() as usize;
+        let shot = next_candidate.saturating_add(skip);
+        if shot >= valid_bits {
+            break;
+        }
+        let word_idx = shot / 64;
+        let bit = shot % 64;
+        let mask = 1u64 << bit;
+        result[word_idx] |= mask;
+        next_candidate = shot + 1;
     }
 }
 
