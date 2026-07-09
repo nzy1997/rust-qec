@@ -44,7 +44,7 @@ def parse_required_variants(raw: str) -> list[str]:
 def validate_release_files(results_dir: Path) -> tuple[Path, Path, Path]:
     allowed_filenames = set(REQUIRED_RELEASE_FILES)
     for path in sorted(results_dir.iterdir(), key=lambda entry: entry.name):
-        if path.is_file() and path.name not in allowed_filenames:
+        if path.name not in allowed_filenames:
             raise ValueError(f"unexpected release file: {path.name}")
 
     paths: list[Path] = []

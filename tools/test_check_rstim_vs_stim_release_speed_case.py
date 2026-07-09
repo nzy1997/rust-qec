@@ -215,6 +215,12 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("unexpected release file: raw.jsonl", result.stderr)
 
+    def test_rejects_unexpected_release_directory(self) -> None:
+        (self.results_dir / "scratch").mkdir()
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("unexpected release file: scratch", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
