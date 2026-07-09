@@ -169,10 +169,11 @@ class RstimVsStimPostOptimizationEvidenceCheckerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             release = Path(tmp) / "release"
             release.mkdir()
+            old_summary = self.root / DEFAULT_OLD_SUMMARY_REL
             shutil.copy(DEFAULT_OLD_SUMMARY, release / "summary.json")
             (release / "environment.json").write_text('{"profile":"release"}\n', encoding="utf-8")
             (release / "report.md").write_text("# pretend report\n", encoding="utf-8")
-            result = self.run_checker(old=release / "summary.json", new_dir=release)
+            result = self.run_checker(old=old_summary, new_dir=release)
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("new summary reuses the checked #406 summary", result.stderr)
 
