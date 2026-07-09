@@ -11,6 +11,21 @@ fn rng() -> StdRng {
     StdRng::seed_from_u64(12345)
 }
 
+fn bit_rate(table: &BitTable, row: usize) -> f64 {
+    let ones = (0..table.num_minor())
+        .filter(|&shot| table.get(row, shot))
+        .count();
+    ones as f64 / table.num_minor() as f64
+}
+
+fn assert_balanced_bit(table: &BitTable, row: usize, context: &str) {
+    let rate = bit_rate(table, row);
+    assert!(
+        (0.35..=0.65).contains(&rate),
+        "{context} bit {row} true rate was {rate}"
+    );
+}
+
 // ========== Two-qubit gate tests ==========
 
 #[test]
@@ -40,14 +55,14 @@ fn frame_cz_gate() {
 
 #[test]
 fn frame_xcx_gate() {
-    // XCX = H(a) CNOT(a,b) H(a). On |00>, XCX = I on computational basis.
-    // On |+0>, XCX makes them entangled. Use: H 0, XCX 0 1, M 0 1 -> correlated.
+    // Stim samples support {00, 10}: the first bit is random and the second
+    // remains false.
     let instrs = parse_lines("H 0\nXCX 0 1\nM 0 1\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 256, &mut r).unwrap();
-    // XCX on |+0> entangles; both outcomes should be correlated
-    for s in 0..256 {
-        assert_eq!(out.measurements.get(0, s), out.measurements.get(1, s));
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "XCX");
+    for s in 0..512 {
+        assert_eq!(out.measurements.get(1, s), false);
     }
 }
 
@@ -212,10 +227,8 @@ fn frame_h_xy_gate() {
 fn frame_h_yz_gate() {
     let instrs = parse_lines("H_YZ 0\nM 0\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "H_YZ");
 }
 
 // ========== MX, MY, MRX, MRY measurement tests ==========
@@ -267,14 +280,12 @@ fn frame_mrx_measurement() {
 
 #[test]
 fn frame_mry_measurement() {
-    // Exercise MRY code path
+    // MRY on |0> has random Y-basis and later Z-basis outcomes.
     let instrs = parse_lines("MRY 0\nM 0\n").unwrap();
-    let ref_sample = reference_sample(&instrs).unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), ref_sample[0]);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "MRY first measurement");
+    assert_balanced_bit(&out.measurements, 1, "MRY second measurement");
 }
 
 // ========== RX, RY reset tests ==========
@@ -452,33 +463,30 @@ fn frame_spp_dag_z_then_measure() {
 
 #[test]
 fn frame_spp_x_product() {
-    // SPP X0 on |0>: S in X basis
+    // SPP X0 on |0> rotates out of the Z basis; MZ is random.
     let instrs = parse_lines("SPP X0\nM 0\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "SPP X0");
 }
 
 #[test]
 fn frame_spp_y_product() {
     let instrs = parse_lines("SPP Y0\nM 0\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "SPP Y0");
 }
 
 #[test]
 fn frame_spp_multi_qubit() {
-    // SPP X0*Z1 — multi-qubit SPP product
+    // Stim samples support {00, 10}: X0 rotates qubit 0 out of the Z basis,
+    // while Z1 leaves qubit 1 in |0>.
     let instrs = parse_lines("SPP X0*Z1\nM 0 1\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "SPP X0*Z1");
+    for s in 0..512 {
         assert_eq!(out.measurements.get(1, s), false);
     }
 }
@@ -969,20 +977,16 @@ fn frame_sqrt_z_alias() {
 fn frame_sqrt_x_dag_alias() {
     let instrs = parse_lines("SQRT_X_DAG 0\nM 0\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "SQRT_X_DAG");
 }
 
 #[test]
 fn frame_sqrt_y_dag_alias() {
     let instrs = parse_lines("SQRT_Y_DAG 0\nM 0\n").unwrap();
     let mut r = rng();
-    let out = sample_batch(&instrs, 64, &mut r).unwrap();
-    for s in 0..64 {
-        assert_eq!(out.measurements.get(0, s), false);
-    }
+    let out = sample_batch(&instrs, 512, &mut r).unwrap();
+    assert_balanced_bit(&out.measurements, 0, "SQRT_Y_DAG");
 }
 
 // ========== ZCX, ZCY, ZCZ aliases ==========
