@@ -148,6 +148,12 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}", result.stdout)
 
+    def test_accepts_comma_separated_required_variants_cli(self) -> None:
+        self.write_valid_fixture()
+        result = self.run_checker(required_variants=["stim-sample-dem,rstim-sample-dem"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}", result.stdout)
+
     def test_rejects_missing_required_variant(self) -> None:
         self.write_valid_fixture()
         summary_path = self.results_dir / "summary.json"

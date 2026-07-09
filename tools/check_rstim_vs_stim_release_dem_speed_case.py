@@ -144,7 +144,14 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--results-dir", default=str(DEFAULT_RESULTS_DIR))
     parser.add_argument("--case", default=DEFAULT_CASE_LABEL)
     parser.add_argument("--required-variants", nargs="+", default=list(DEFAULT_REQUIRED_VARIANTS))
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    args.required_variants = [
+        variant.strip()
+        for raw_variant in args.required_variants
+        for variant in raw_variant.split(",")
+        if variant.strip()
+    ]
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
