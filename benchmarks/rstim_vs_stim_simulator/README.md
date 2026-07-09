@@ -54,32 +54,6 @@ The expected result is `PASS 8 distribution cases`. These cases are borrowed
 from Stim's pinned `command_sample.test.cc` and record expected probabilities
 only; this validator does not run Stim or `rstim`.
 
-## Inspect Fixture Load
-
-Inspect the expanded operation load for the checked full fixture:
-
-```sh
-python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
-  --case stim_surface_d11_r100
-```
-
-Write the same deterministic report as JSON:
-
-```sh
-python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
-  --case stim_surface_d11_r100 \
-  --manifest benchmarks/rstim_vs_stim_simulator/cases.full.toml \
-  --format json \
-  --out /tmp/stim-surface-load.json
-```
-
-The expected summary is `PASS fixture load stim_surface_d11_r100`. The JSON
-report records `expanded_operation_count = 14547`,
-`operations.DEPOLARIZE2.target_count = 88000`,
-`operations.DETECTOR.operation_count = 12000`,
-`expected_measurements = 12121`, `expected_detectors = 12000`, and
-`expected_observables = 1`.
-
 ## Distribution Verification
 
 Run the small-circuit distribution verifier against Stim and `rstim`:
@@ -107,6 +81,32 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
 ```
 
 The expected negative-control verdict is `FAIL statistical mismatch`.
+
+## Inspect Fixture Load
+
+Inspect the expanded operation load for the checked full fixture:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
+  --case stim_surface_d11_r100
+```
+
+Write the same deterministic report as JSON:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.inspect_fixture_load \
+  --case stim_surface_d11_r100 \
+  --manifest benchmarks/rstim_vs_stim_simulator/cases.full.toml \
+  --format json \
+  --out /tmp/stim-surface-load.json
+```
+
+The expected summary is `PASS fixture load stim_surface_d11_r100`. The JSON
+report records `expanded_operation_count = 14547`,
+`operations.DEPOLARIZE2.target_count = 88000`,
+`operations.DETECTOR.operation_count = 12000`,
+`expected_measurements = 12121`, `expected_detectors = 12000`, and
+`expected_observables = 1`.
 
 ## Correctness Verification
 
