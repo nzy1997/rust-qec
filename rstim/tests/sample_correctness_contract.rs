@@ -88,7 +88,8 @@ fn compiled_and_interpreted_sample_paths_agree_on_catalog() {
 fn statistical_contract_rejects_injected_detector_or_observable_mismatch() {
     let parsed = first_compiled_capable_case().expect("compiled-capable catalog case");
     let mut pair = sample_pair(&parsed, DETERMINISTIC_SEEDS[0]).expect("sample pair");
-    inject_comparison_row_mismatch(&mut pair.compiled).expect("comparison row");
+    inject_comparison_row_mismatch(&pair.interpreted, &mut pair.compiled)
+        .expect("comparison row");
 
     let err = assert_streams_agree(
         &parsed.case.case_id,
@@ -413,20 +414,29 @@ fn first_compiled_capable_case() -> Result<ParsedCase, String> {
     Err("no compiled-capable catalog case found".to_string())
 }
 
-fn inject_comparison_row_mismatch(output: &mut BatchOutput) -> Result<(), String> {
+fn inject_comparison_row_mismatch(
+    reference: &BatchOutput,
+    output: &mut BatchOutput,
+) -> Result<(), String> {
     if output.detections.num_major() > 0 && output.detections.num_minor() > 0 {
-        invert_row(&mut output.detections, 0);
+        force_row_to_farthest_constant(&reference.detections, &mut output.detections, 0);
         return Ok(());
     }
     if output.observable_flips.num_major() > 0 && output.observable_flips.num_minor() > 0 {
-        invert_row(&mut output.observable_flips, 0);
+        force_row_to_farthest_constant(
+            &reference.observable_flips,
+            &mut output.observable_flips,
+            0,
+        );
         return Ok(());
     }
     Err("sample output has no detector or observable comparison bit".to_string())
 }
 
-fn invert_row(table: &mut BitTable, row: usize) {
-    for shot in 0..table.num_minor() {
-        table.toggle(row, shot);
+fn force_row_to_farthest_constant(reference: &BitTable, output: &mut BitTable, row: usize) {
+    let reference_ones = row_true_count(reference, row);
+    let forced_value = reference_ones <= reference.num_minor() / 2;
+    for shot in 0..output.num_minor() {
+        output.set(row, shot, forced_value);
     }
 }
