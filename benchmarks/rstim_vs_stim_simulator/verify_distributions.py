@@ -25,6 +25,7 @@ STATUS_PASS = "pass"
 STATUS_MISMATCH = "statistical_mismatch"
 STATUS_STIM_FAILED = "stim_failed"
 STATUS_RSTIM_FAILED = "rstim_failed"
+TOLERANCE_FLOOR = 1e-12
 
 
 def build_sample_command(tool_command: list[str], *, shots: int, seed: int) -> list[str]:
@@ -93,9 +94,11 @@ def _inject_bitflip(samples: list[str], *, rate: float) -> list[str]:
 def _outcome_tolerance(*, sample_count: int, expected_probability: float, z_score: float) -> float:
     if sample_count <= 0:
         return float("inf")
-    variance = expected_probability * (1.0 - expected_probability) / sample_count
-    floor = 1.0 / sample_count
-    return z_score * math.sqrt(max(0.0, variance)) + floor
+    variance_term = expected_probability * (1.0 - expected_probability)
+    if expected_probability in (0.0, 1.0):
+        variance_term = max(variance_term, TOLERANCE_FLOOR)
+    variance = variance_term / sample_count
+    return z_score * math.sqrt(max(0.0, variance))
 
 
 def compare_distribution(
@@ -169,6 +172,7 @@ def _tool_result(
     *,
     case: dict[str, object],
     tool_command: list[str],
+    failure_status: str,
     shots: int,
     seeds: list[int],
     inject_bitflip_rate: float,
@@ -201,9 +205,7 @@ def _tool_result(
 
     comparison = compare_distribution(all_samples, expected_distribution)
     if failure_reasons:
-        status = STATUS_MISMATCH if comparison["status"] == STATUS_MISMATCH else STATUS_RSTIM_FAILED
-        if tool_command and tool_command[0] == "stim":
-            status = STATUS_STIM_FAILED
+        status = STATUS_MISMATCH if comparison["status"] == STATUS_MISMATCH else failure_status
         return {
             "status": status,
             "sample_count": comparison["sample_count"],
@@ -241,6 +243,7 @@ def verify_case(
     stim_result = _tool_result(
         case=case,
         tool_command=stim_command,
+        failure_status=STATUS_STIM_FAILED,
         shots=shots,
         seeds=seeds,
         inject_bitflip_rate=0.0,
@@ -248,6 +251,7 @@ def verify_case(
     rstim_result = _tool_result(
         case=case,
         tool_command=rstim_command,
+        failure_status=STATUS_RSTIM_FAILED,
         shots=shots,
         seeds=seeds,
         inject_bitflip_rate=inject_rstim_bitflip_rate,

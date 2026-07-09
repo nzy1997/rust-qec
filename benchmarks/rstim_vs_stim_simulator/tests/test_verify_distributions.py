@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from benchmarks.rstim_vs_stim_simulator.verify_distributions import (
+    _outcome_tolerance,
     build_sample_command,
     compare_distribution,
     format_report,
@@ -47,6 +48,12 @@ class VerifyDistributionHelpersTest(unittest.TestCase):
         self.assertEqual(result["sample_count"], 100)
         self.assertEqual(result["observed_counts"], {"00": 50, "11": 50})
         self.assertAlmostEqual(result["observed_frequencies"]["00"], 0.5)
+
+    def test_outcome_tolerance_uses_exact_five_sigma_without_one_over_n_floor(self) -> None:
+        self.assertEqual(
+            _outcome_tolerance(sample_count=100, expected_probability=0.5, z_score=5.0),
+            0.25,
+        )
 
     def test_compare_distribution_flags_unexpected_observed_outcome(self) -> None:
         result = compare_distribution(["00"] * 90 + ["01"] * 10, {"00": 1.0})
@@ -164,6 +171,33 @@ class VerifyDistributionRunnerTest(unittest.TestCase):
         self.assertIn("broken rstim", result["failure_reasons"][0])
         self.assertEqual(result["rstim"]["runs"][0]["stderr"], "broken rstim")
 
+    def test_verify_case_labels_custom_stim_command_failure_as_stim_failed(self) -> None:
+        def fake_run_tool(command: list[str], *, circuit: str) -> dict[str, object]:
+            success = command[0] != "/custom/stim"
+            return {
+                "command": command,
+                "exit_code": 0 if success else 2,
+                "stderr": "" if success else "broken stim",
+                "success": success,
+                "stdout": "00\n11\n00\n11\n" if success else "",
+                "stdin_source": "catalog:circuit",
+            }
+
+        with mock.patch("benchmarks.rstim_vs_stim_simulator.verify_distributions.run_tool") as mocked:
+            mocked.side_effect = fake_run_tool
+            result = verify_case(
+                unit_case(),
+                stim_command=["/custom/stim"],
+                rstim_command=["rstim"],
+                shots=4,
+                seeds=[1],
+                inject_rstim_bitflip_rate=0.0,
+            )
+
+        self.assertEqual(result["status"], "stim_failed")
+        self.assertEqual(result["stim"]["status"], "stim_failed")
+        self.assertEqual(result["rstim"]["status"], "pass")
+
 
 class VerifyDistributionCliTest(unittest.TestCase):
     def test_main_writes_json_and_prints_pass_summary(self) -> None:
@@ -215,6 +249,58 @@ class VerifyDistributionCliTest(unittest.TestCase):
                     "PASS distribution correctness cases=1 mismatch=0" in call.args[0]
                     for call in stdout.call_args_list
                 )
+            )
+
+    def test_main_negative_control_bitflip_writes_json_and_reports_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = Path(temp_dir) / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [unit_case()]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.verify_case"
+                ) as mocked,
+            ):
+                mocked.return_value = {
+                    "case_id": "unit_bell",
+                    "status": "statistical_mismatch",
+                    "sample_count": 4,
+                    "failure_reasons": ["outcome 01 exceeds tolerance"],
+                    "expected_distribution": {"00": 0.5, "11": 0.5},
+                    "source_url": "https://example.test/source",
+                    "stim": {"status": "pass"},
+                    "rstim": {"status": "statistical_mismatch"},
+                }
+                with mock.patch("sys.stdout.write") as stdout:
+                    code = main(
+                        [
+                            "--cases",
+                            "benchmarks/rstim_vs_stim_simulator/distribution_cases.toml",
+                            "--shots",
+                            "4",
+                            "--inject-rstim-bitflip-rate",
+                            "0.20",
+                            "--out",
+                            str(out),
+                        ]
+                    )
+
+            self.assertEqual(code, 1)
+            data = json.loads(out.read_text())
+            self.assertEqual(data["status"], "statistical_mismatch")
+            self.assertEqual(data["inject_rstim_bitflip_rate"], 0.2)
+            self.assertTrue(
+                any(case["status"] == "statistical_mismatch" for case in data["cases"])
+            )
+            self.assertTrue(
+                any("FAIL statistical mismatch" in call.args[0] for call in stdout.call_args_list)
             )
 
     def test_format_report_returns_nonzero_for_mismatch(self) -> None:
