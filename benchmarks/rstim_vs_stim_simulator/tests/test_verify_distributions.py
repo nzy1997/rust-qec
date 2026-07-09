@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -7,7 +8,9 @@ from pathlib import Path
 from unittest import mock
 
 from benchmarks.rstim_vs_stim_simulator.verify_distributions import (
+    _direct_binary_path,
     _outcome_tolerance,
+    collect_environment_metadata,
     build_sample_command,
     compare_distribution,
     format_report,
@@ -29,6 +32,12 @@ def unit_case() -> dict[str, object]:
         "tolerance": 1e-9,
         "expected_distribution": {"00": 0.5, "11": 0.5},
     }
+
+
+def sha256_text(path: Path) -> str:
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 class VerifyDistributionHelpersTest(unittest.TestCase):
@@ -75,6 +84,78 @@ class VerifyDistributionHelpersTest(unittest.TestCase):
             build_sample_command(["rstim"], shots=4, seed=7),
             ["rstim", "sample", "--shots", "4", "--seed", "7", "--out_format", "01"],
         )
+
+    def test_collect_environment_metadata_uses_full_stim_command_for_version_probe(self) -> None:
+        fake_completed = mock.Mock(returncode=0, stdout="stim 1.2.3\n", stderr="")
+        with (
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.subprocess.run",
+                return_value=fake_completed,
+            ) as mocked_run,
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+                return_value="/usr/bin/rstim",
+            ),
+        ):
+            metadata = collect_environment_metadata(
+                ["python3", "-m", "stim"],
+                ["rstim"],
+            )
+
+        mocked_run.assert_any_call(
+            ["python3", "-m", "stim", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(metadata["stim_version"], "stim 1.2.3")
+        self.assertEqual(metadata["stim_version_source"], "stim-cli-stdout")
+        self.assertEqual(metadata["stim_version_command"]["command"], ["python3", "-m", "stim", "--version"])
+        self.assertEqual(metadata["rstim_binary_path"], "/usr/bin/rstim")
+
+    def test_collect_environment_metadata_falls_back_to_python_stim_version_when_cli_stdout_is_empty(self) -> None:
+        def fake_run(command: list[str], **kwargs: object) -> mock.Mock:
+            if command == ["stim", "--version"]:
+                return mock.Mock(returncode=0, stdout="", stderr="No mode was given.\n")
+            if command == ["python3", "-c", "import stim; print(stim.__version__)"]:
+                return mock.Mock(returncode=0, stdout="1.15.0\n", stderr="")
+            if command == ["rustc", "--version"]:
+                return mock.Mock(returncode=0, stdout="rustc 1.93.1\n", stderr="")
+            if command == ["cargo", "--version"]:
+                return mock.Mock(returncode=0, stdout="cargo 1.93.1\n", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        with (
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.subprocess.run",
+                side_effect=fake_run,
+            ),
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+                return_value="/usr/bin/rstim",
+            ),
+        ):
+            metadata = collect_environment_metadata(["stim"], ["rstim"])
+
+        self.assertEqual(metadata["stim_version"], "stim python package 1.15.0")
+        self.assertEqual(metadata["stim_version_source"], "python-stim-module")
+        self.assertEqual(metadata["stim_python_version"], "1.15.0")
+        self.assertEqual(
+            metadata["stim_python_version_command"]["command"],
+            ["python3", "-c", "import stim; print(stim.__version__)"],
+        )
+        self.assertEqual(metadata["stim_version_command"]["stderr"], "No mode was given.")
+
+    def test_direct_binary_path_only_accepts_unwrapped_single_token_commands(self) -> None:
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+            return_value="/usr/bin/rstim",
+        ) as mocked_which:
+            self.assertEqual(_direct_binary_path(["rstim"]), "/usr/bin/rstim")
+            self.assertIsNone(_direct_binary_path(["cargo"]))
+            self.assertIsNone(_direct_binary_path(["python3", "-m", "stim"]))
+
+        mocked_which.assert_called_once_with("rstim")
 
 
 class VerifyDistributionRunnerTest(unittest.TestCase):
@@ -352,6 +433,74 @@ class VerifyDistributionCliTest(unittest.TestCase):
             self.assertTrue(
                 any("FAIL statistical mismatch" in call.args[0] for call in stdout.call_args_list)
             )
+
+    def test_main_records_catalog_hash_command_line_and_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            cases = temp / "cases.toml"
+            cases.write_text("manifest_version = 1\nsuite = \"unit\"\n[[cases]]\n", encoding="utf-8")
+            out = temp / "summary.json"
+            manifest = {"suite": "rstim_vs_stim_simulator", "cases": [unit_case()]}
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.load_manifest",
+                    return_value=manifest,
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.validate_manifest",
+                    return_value=[],
+                ),
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.verify_case"
+                ) as mocked_verify,
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.verify_distributions.collect_environment_metadata",
+                    return_value={
+                        "stim_command": ["stim"],
+                        "rstim_command": ["target/debug/rstim"],
+                        "rstim_binary_path": "target/debug/rstim",
+                        "stim_version": "stim test",
+                        "stim_version_source": "stim-cli-stdout",
+                        "rustc_version": "rustc test",
+                        "cargo_version": "cargo test",
+                    },
+                ),
+            ):
+                mocked_verify.return_value = {
+                    "case_id": "unit_bell",
+                    "status": "pass",
+                    "sample_count": 4,
+                    "failure_reasons": [],
+                    "expected_distribution": {"00": 0.5, "11": 0.5},
+                    "source_url": "https://example.test/source",
+                    "source_commit": "abc123",
+                    "source_line_start": 10,
+                    "source_line_end": 20,
+                    "stim": {"status": "pass"},
+                    "rstim": {"status": "pass"},
+                }
+                code = main(
+                    [
+                        "--cases",
+                        str(cases),
+                        "--rstim",
+                        "target/debug/rstim",
+                        "--shots",
+                        "4",
+                        "--out",
+                        str(out),
+                    ]
+                )
+
+            self.assertEqual(code, 0)
+            data = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(data["catalog_sha256"], sha256_text(cases))
+            self.assertEqual(data["distribution_case_ids"], ["unit_bell"])
+            self.assertEqual(data["command_line"][0], "python3")
+            self.assertIn("--cases", data["command_line"])
+            self.assertEqual(data["environment"]["rstim_binary_path"], "target/debug/rstim")
+            self.assertEqual(data["environment"]["stim_version"], "stim test")
+            self.assertEqual(data["environment"]["rustc_version"], "rustc test")
 
     def test_format_report_returns_nonzero_for_mismatch(self) -> None:
         summary = {

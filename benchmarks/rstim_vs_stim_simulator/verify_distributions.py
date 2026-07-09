@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import shlex
 import subprocess
 import sys
+import shutil
 import tomllib
 from collections import Counter
 from collections.abc import Sequence
@@ -315,6 +317,103 @@ def _command_from_arg(raw_command: str | None, *, default: list[str] | None = No
     return command
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _run_version_command(command: list[str]) -> dict[str, object]:
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        return {
+            "command": command,
+            "status": "missing",
+            "stdout": "",
+            "stderr": str(error),
+            "exit_code": None,
+        }
+    return {
+        "command": command,
+        "status": "ok" if completed.returncode == 0 else "failed",
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+        "exit_code": completed.returncode,
+    }
+
+
+def _probe_stim_python_version() -> dict[str, object]:
+    return _run_version_command(["python3", "-c", "import stim; print(stim.__version__)"])
+
+
+def _direct_binary_path(command: list[str]) -> str | None:
+    if len(command) != 1:
+        return None
+    executable = command[0]
+    if executable == "cargo":
+        return None
+    resolved = shutil.which(executable)
+    if resolved is not None:
+        return resolved
+    if Path(executable).exists():
+        return executable
+    return None
+
+
+def collect_environment_metadata(
+    stim_command: list[str],
+    rstim_command: list[str],
+) -> dict[str, object]:
+    if stim_command:
+        stim_version = _run_version_command([*stim_command, "--version"])
+    else:
+        stim_version = {
+            "command": [],
+            "status": "missing",
+            "stdout": "",
+            "stderr": "stim command is empty",
+            "exit_code": None,
+        }
+    stim_python_version: dict[str, object] | None = None
+    resolved_stim_version = ""
+    resolved_stim_version_source: str | None = None
+    if stim_version["status"] == "ok" and stim_version["stdout"]:
+        resolved_stim_version = str(stim_version["stdout"])
+        resolved_stim_version_source = "stim-cli-stdout"
+    elif stim_version["status"] == "ok":
+        stim_python_version = _probe_stim_python_version()
+        if stim_python_version["status"] == "ok" and stim_python_version["stdout"]:
+            resolved_stim_version = f"stim python package {stim_python_version['stdout']}"
+            resolved_stim_version_source = "python-stim-module"
+
+    rustc_version = _run_version_command(["rustc", "--version"])
+    cargo_version = _run_version_command(["cargo", "--version"])
+    metadata = {
+        "stim_command": list(stim_command),
+        "rstim_command": list(rstim_command),
+        "rstim_binary_path": _direct_binary_path(rstim_command),
+        "stim_version": resolved_stim_version,
+        "stim_version_source": resolved_stim_version_source,
+        "stim_version_command": stim_version,
+        "rustc_version": rustc_version["stdout"] if rustc_version["status"] == "ok" else "",
+        "rustc_version_command": rustc_version,
+        "cargo_version": cargo_version["stdout"] if cargo_version["status"] == "ok" else "",
+        "cargo_version_command": cargo_version,
+    }
+    if stim_python_version is not None:
+        metadata["stim_python_version"] = stim_python_version["stdout"]
+        metadata["stim_python_version_command"] = stim_python_version
+    return metadata
+
+
 def build_summary(args: argparse.Namespace) -> dict[str, object]:
     manifest = load_manifest(args.cases)
     errors = validate_manifest(manifest)
@@ -359,11 +458,14 @@ def build_summary(args: argparse.Namespace) -> dict[str, object]:
         "suite": manifest.get("suite"),
         "status": status,
         "case_count": len(case_results),
+        "distribution_case_ids": [str(case["case_id"]) for case in cases],
         "shots": args.shots,
         "seeds": seeds,
         "stim_command": stim_command,
         "rstim_command": rstim_command,
         "inject_rstim_bitflip_rate": args.inject_rstim_bitflip_rate,
+        "catalog_sha256": sha256_file(args.cases),
+        "environment": collect_environment_metadata(stim_command, rstim_command),
         "counts": counts,
         "cases": case_results,
     }
@@ -403,6 +505,14 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         print(f"{args.cases}: {error}", file=sys.stderr)
         return 1
+
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    summary["command_line"] = [
+        "python3",
+        "-m",
+        "benchmarks.rstim_vs_stim_simulator.verify_distributions",
+        *raw_argv,
+    ]
 
     write_summary(args.out, summary)
     exit_code, report = format_report(summary)

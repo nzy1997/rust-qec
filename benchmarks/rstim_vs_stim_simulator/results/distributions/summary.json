@@ -1,0 +1,1240 @@
+{
+  "case_count": 8,
+  "cases": [
+    {
+      "case_id": "stim_bell_pair_basic_distribution",
+      "expected_distribution": {
+        "00": 0.5,
+        "11": 0.5
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.0012900000000000134,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "00": 49871,
+          "11": 50129
+        },
+        "observed_frequencies": {
+          "00": 0.49871,
+          "11": 0.50129
+        },
+        "outcomes": [
+          {
+            "delta": 0.0012900000000000134,
+            "expected_probability": 0.5,
+            "observed_count": 49871,
+            "observed_frequency": 0.49871,
+            "outcome": "00",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.0012900000000000134,
+            "expected_probability": 0.5,
+            "observed_count": 50129,
+            "observed_frequency": 0.50129,
+            "outcome": "11",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 169,
+      "source_line_start": 160,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.00018000000000001348,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "00": 50018,
+          "11": 49982
+        },
+        "observed_frequencies": {
+          "00": 0.50018,
+          "11": 0.49982
+        },
+        "outcomes": [
+          {
+            "delta": 0.00017999999999995797,
+            "expected_probability": 0.5,
+            "observed_count": 50018,
+            "observed_frequency": 0.50018,
+            "outcome": "00",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.00018000000000001348,
+            "expected_probability": 0.5,
+            "observed_count": 49982,
+            "observed_frequency": 0.49982,
+            "outcome": "11",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_sqrt_x_transformed_pair",
+      "expected_distribution": {
+        "01": 0.5,
+        "10": 0.5
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.0013600000000000279,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "01": 49864,
+          "10": 50136
+        },
+        "observed_frequencies": {
+          "01": 0.49864,
+          "10": 0.50136
+        },
+        "outcomes": [
+          {
+            "delta": 0.0013599999999999723,
+            "expected_probability": 0.5,
+            "observed_count": 49864,
+            "observed_frequency": 0.49864,
+            "outcome": "01",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.0013600000000000279,
+            "expected_probability": 0.5,
+            "observed_count": 50136,
+            "observed_frequency": 0.50136,
+            "outcome": "10",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 180,
+      "source_line_start": 171,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0017300000000000093,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "01": 49827,
+          "10": 50173
+        },
+        "observed_frequencies": {
+          "01": 0.49827,
+          "10": 0.50173
+        },
+        "outcomes": [
+          {
+            "delta": 0.0017300000000000093,
+            "expected_probability": 0.5,
+            "observed_count": 49827,
+            "observed_frequency": 0.49827,
+            "outcome": "01",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.0017300000000000093,
+            "expected_probability": 0.5,
+            "observed_count": 50173,
+            "observed_frequency": 0.50173,
+            "outcome": "10",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_sqrt_y_transformed_pair",
+      "expected_distribution": {
+        "00": 0.5,
+        "11": 0.5
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.0021700000000000053,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "00": 49783,
+          "11": 50217
+        },
+        "observed_frequencies": {
+          "00": 0.49783,
+          "11": 0.50217
+        },
+        "outcomes": [
+          {
+            "delta": 0.0021700000000000053,
+            "expected_probability": 0.5,
+            "observed_count": 49783,
+            "observed_frequency": 0.49783,
+            "outcome": "00",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.0021700000000000053,
+            "expected_probability": 0.5,
+            "observed_count": 50217,
+            "observed_frequency": 0.50217,
+            "outcome": "11",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 191,
+      "source_line_start": 182,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0012499999999999734,
+        "max_tolerance": 0.007905694150420948,
+        "observed_counts": {
+          "00": 49875,
+          "11": 50125
+        },
+        "observed_frequencies": {
+          "00": 0.49875,
+          "11": 0.50125
+        },
+        "outcomes": [
+          {
+            "delta": 0.0012499999999999734,
+            "expected_probability": 0.5,
+            "observed_count": 49875,
+            "observed_frequency": 0.49875,
+            "outcome": "00",
+            "tolerance": 0.007905694150420948
+          },
+          {
+            "delta": 0.0012499999999999734,
+            "expected_probability": 0.5,
+            "observed_count": 50125,
+            "observed_frequency": 0.50125,
+            "outcome": "11",
+            "tolerance": 0.007905694150420948
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_x_error_two_measured_qubits",
+      "expected_distribution": {
+        "00": 0.81,
+        "01": 0.09,
+        "10": 0.09,
+        "11": 0.01
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.00021000000000000185,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 81007,
+          "01": 8992,
+          "10": 9021,
+          "11": 980
+        },
+        "observed_frequencies": {
+          "00": 0.81007,
+          "01": 0.08992,
+          "10": 0.09021,
+          "11": 0.0098
+        },
+        "outcomes": [
+          {
+            "delta": 6.999999999990347e-05,
+            "expected_probability": 0.81,
+            "observed_count": 81007,
+            "observed_frequency": 0.81007,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 7.999999999999674e-05,
+            "expected_probability": 0.09,
+            "observed_count": 8992,
+            "observed_frequency": 0.08992,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00021000000000000185,
+            "expected_probability": 0.09,
+            "observed_count": 9021,
+            "observed_frequency": 0.09021,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00020000000000000052,
+            "expected_probability": 0.01,
+            "observed_count": 980,
+            "observed_frequency": 0.0098,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 202,
+      "source_line_start": 194,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0009500000000000064,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 80905,
+          "01": 9090,
+          "10": 9033,
+          "11": 972
+        },
+        "observed_frequencies": {
+          "00": 0.80905,
+          "01": 0.0909,
+          "10": 0.09033,
+          "11": 0.00972
+        },
+        "outcomes": [
+          {
+            "delta": 0.0009500000000000064,
+            "expected_probability": 0.81,
+            "observed_count": 80905,
+            "observed_frequency": 0.80905,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 0.000899999999999998,
+            "expected_probability": 0.09,
+            "observed_count": 9090,
+            "observed_frequency": 0.0909,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00032999999999999696,
+            "expected_probability": 0.09,
+            "observed_count": 9033,
+            "observed_frequency": 0.09033,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00028000000000000073,
+            "expected_probability": 0.01,
+            "observed_count": 972,
+            "observed_frequency": 0.00972,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_z_error_h_conjugated_pair",
+      "expected_distribution": {
+        "00": 0.81,
+        "01": 0.09,
+        "10": 0.09,
+        "11": 0.01
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.00021000000000000185,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 81007,
+          "01": 8992,
+          "10": 9021,
+          "11": 980
+        },
+        "observed_frequencies": {
+          "00": 0.81007,
+          "01": 0.08992,
+          "10": 0.09021,
+          "11": 0.0098
+        },
+        "outcomes": [
+          {
+            "delta": 6.999999999990347e-05,
+            "expected_probability": 0.81,
+            "observed_count": 81007,
+            "observed_frequency": 0.81007,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 7.999999999999674e-05,
+            "expected_probability": 0.09,
+            "observed_count": 8992,
+            "observed_frequency": 0.08992,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00021000000000000185,
+            "expected_probability": 0.09,
+            "observed_count": 9021,
+            "observed_frequency": 0.09021,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00020000000000000052,
+            "expected_probability": 0.01,
+            "observed_count": 980,
+            "observed_frequency": 0.0098,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 226,
+      "source_line_start": 216,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0009500000000000064,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 80905,
+          "01": 9090,
+          "10": 9033,
+          "11": 972
+        },
+        "observed_frequencies": {
+          "00": 0.80905,
+          "01": 0.0909,
+          "10": 0.09033,
+          "11": 0.00972
+        },
+        "outcomes": [
+          {
+            "delta": 0.0009500000000000064,
+            "expected_probability": 0.81,
+            "observed_count": 80905,
+            "observed_frequency": 0.80905,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 0.000899999999999998,
+            "expected_probability": 0.09,
+            "observed_count": 9090,
+            "observed_frequency": 0.0909,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00032999999999999696,
+            "expected_probability": 0.09,
+            "observed_count": 9033,
+            "observed_frequency": 0.09033,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00028000000000000073,
+            "expected_probability": 0.01,
+            "observed_count": 972,
+            "observed_frequency": 0.00972,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_y_error_two_measured_qubits",
+      "expected_distribution": {
+        "00": 0.81,
+        "01": 0.09,
+        "10": 0.09,
+        "11": 0.01
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.00021000000000000185,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 81007,
+          "01": 8992,
+          "10": 9021,
+          "11": 980
+        },
+        "observed_frequencies": {
+          "00": 0.81007,
+          "01": 0.08992,
+          "10": 0.09021,
+          "11": 0.0098
+        },
+        "outcomes": [
+          {
+            "delta": 6.999999999990347e-05,
+            "expected_probability": 0.81,
+            "observed_count": 81007,
+            "observed_frequency": 0.81007,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 7.999999999999674e-05,
+            "expected_probability": 0.09,
+            "observed_count": 8992,
+            "observed_frequency": 0.08992,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00021000000000000185,
+            "expected_probability": 0.09,
+            "observed_count": 9021,
+            "observed_frequency": 0.09021,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00020000000000000052,
+            "expected_probability": 0.01,
+            "observed_count": 980,
+            "observed_frequency": 0.0098,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 246,
+      "source_line_start": 238,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0009500000000000064,
+        "max_tolerance": 0.006202821938440599,
+        "observed_counts": {
+          "00": 80905,
+          "01": 9090,
+          "10": 9033,
+          "11": 972
+        },
+        "observed_frequencies": {
+          "00": 0.80905,
+          "01": 0.0909,
+          "10": 0.09033,
+          "11": 0.00972
+        },
+        "outcomes": [
+          {
+            "delta": 0.0009500000000000064,
+            "expected_probability": 0.81,
+            "observed_count": 80905,
+            "observed_frequency": 0.80905,
+            "outcome": "00",
+            "tolerance": 0.006202821938440599
+          },
+          {
+            "delta": 0.000899999999999998,
+            "expected_probability": 0.09,
+            "observed_count": 9090,
+            "observed_frequency": 0.0909,
+            "outcome": "01",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00032999999999999696,
+            "expected_probability": 0.09,
+            "observed_count": 9033,
+            "observed_frequency": 0.09033,
+            "outcome": "10",
+            "tolerance": 0.004524930938699507
+          },
+          {
+            "delta": 0.00028000000000000073,
+            "expected_probability": 0.01,
+            "observed_count": 972,
+            "observed_frequency": 0.00972,
+            "outcome": "11",
+            "tolerance": 0.0015732132722552274
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_depolarize1_two_measured_qubits",
+      "expected_distribution": {
+        "00": 0.64,
+        "01": 0.16,
+        "10": 0.16,
+        "11": 0.04
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.0027800000000000047,
+        "max_tolerance": 0.0075894663844041105,
+        "observed_counts": {
+          "00": 63722,
+          "01": 16142,
+          "10": 16095,
+          "11": 4041
+        },
+        "observed_frequencies": {
+          "00": 0.63722,
+          "01": 0.16142,
+          "10": 0.16095,
+          "11": 0.04041
+        },
+        "outcomes": [
+          {
+            "delta": 0.0027800000000000047,
+            "expected_probability": 0.64,
+            "observed_count": 63722,
+            "observed_frequency": 0.63722,
+            "outcome": "00",
+            "tolerance": 0.0075894663844041105
+          },
+          {
+            "delta": 0.0014200000000000046,
+            "expected_probability": 0.16,
+            "observed_count": 16142,
+            "observed_frequency": 0.16142,
+            "outcome": "01",
+            "tolerance": 0.005796550698475776
+          },
+          {
+            "delta": 0.0009500000000000064,
+            "expected_probability": 0.16,
+            "observed_count": 16095,
+            "observed_frequency": 0.16095,
+            "outcome": "10",
+            "tolerance": 0.005796550698475776
+          },
+          {
+            "delta": 0.00041000000000000064,
+            "expected_probability": 0.04,
+            "observed_count": 4041,
+            "observed_frequency": 0.04041,
+            "outcome": "11",
+            "tolerance": 0.0030983866769659332
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 268,
+      "source_line_start": 260,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0016800000000000148,
+        "max_tolerance": 0.0075894663844041105,
+        "observed_counts": {
+          "00": 64127,
+          "01": 15832,
+          "10": 16007,
+          "11": 4034
+        },
+        "observed_frequencies": {
+          "00": 0.64127,
+          "01": 0.15832,
+          "10": 0.16007,
+          "11": 0.04034
+        },
+        "outcomes": [
+          {
+            "delta": 0.0012699999999999934,
+            "expected_probability": 0.64,
+            "observed_count": 64127,
+            "observed_frequency": 0.64127,
+            "outcome": "00",
+            "tolerance": 0.0075894663844041105
+          },
+          {
+            "delta": 0.0016800000000000148,
+            "expected_probability": 0.16,
+            "observed_count": 15832,
+            "observed_frequency": 0.15832,
+            "outcome": "01",
+            "tolerance": 0.005796550698475776
+          },
+          {
+            "delta": 6.999999999998674e-05,
+            "expected_probability": 0.16,
+            "observed_count": 16007,
+            "observed_frequency": 0.16007,
+            "outcome": "10",
+            "tolerance": 0.005796550698475776
+          },
+          {
+            "delta": 0.00034,
+            "expected_probability": 0.04,
+            "observed_count": 4034,
+            "observed_frequency": 0.04034,
+            "outcome": "11",
+            "tolerance": 0.0030983866769659332
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    },
+    {
+      "case_id": "stim_depolarize2_two_measured_qubits",
+      "expected_distribution": {
+        "00": 0.92,
+        "01": 0.02666666666666667,
+        "10": 0.02666666666666667,
+        "11": 0.02666666666666667
+      },
+      "failure_reasons": [],
+      "rstim": {
+        "failure_reasons": [],
+        "max_delta": 0.000520000000000076,
+        "max_tolerance": 0.004289522117905443,
+        "observed_counts": {
+          "00": 91948,
+          "01": 2651,
+          "10": 2718,
+          "11": 2683
+        },
+        "observed_frequencies": {
+          "00": 0.91948,
+          "01": 0.02651,
+          "10": 0.02718,
+          "11": 0.02683
+        },
+        "outcomes": [
+          {
+            "delta": 0.000520000000000076,
+            "expected_probability": 0.92,
+            "observed_count": 91948,
+            "observed_frequency": 0.91948,
+            "outcome": "00",
+            "tolerance": 0.004289522117905443
+          },
+          {
+            "delta": 0.00015666666666666954,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2651,
+            "observed_frequency": 0.02651,
+            "outcome": "01",
+            "tolerance": 0.002547329756605707
+          },
+          {
+            "delta": 0.0005133333333333309,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2718,
+            "observed_frequency": 0.02718,
+            "outcome": "10",
+            "tolerance": 0.002547329756605707
+          },
+          {
+            "delta": 0.0001633333333333313,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2683,
+            "observed_frequency": 0.02683,
+            "outcome": "11",
+            "tolerance": 0.002547329756605707
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "target/debug/rstim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      },
+      "sample_count": 100000,
+      "source_commit": "9e225958f9ae1f9c33d1b9a012b7ec4392b43aef",
+      "source_line_end": 301,
+      "source_line_start": 293,
+      "source_url": "https://github.com/quantumlib/Stim/blob/9e225958f9ae1f9c33d1b9a012b7ec4392b43aef/src/stim/cmd/command_sample.test.cc",
+      "status": "pass",
+      "stim": {
+        "failure_reasons": [],
+        "max_delta": 0.0007700000000000484,
+        "max_tolerance": 0.004289522117905443,
+        "observed_counts": {
+          "00": 91923,
+          "01": 2682,
+          "10": 2732,
+          "11": 2663
+        },
+        "observed_frequencies": {
+          "00": 0.91923,
+          "01": 0.02682,
+          "10": 0.02732,
+          "11": 0.02663
+        },
+        "outcomes": [
+          {
+            "delta": 0.0007700000000000484,
+            "expected_probability": 0.92,
+            "observed_count": 91923,
+            "observed_frequency": 0.91923,
+            "outcome": "00",
+            "tolerance": 0.004289522117905443
+          },
+          {
+            "delta": 0.0001533333333333317,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2682,
+            "observed_frequency": 0.02682,
+            "outcome": "01",
+            "tolerance": 0.002547329756605707
+          },
+          {
+            "delta": 0.0006533333333333322,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2732,
+            "observed_frequency": 0.02732,
+            "outcome": "10",
+            "tolerance": 0.002547329756605707
+          },
+          {
+            "delta": 3.6666666666667486e-05,
+            "expected_probability": 0.02666666666666667,
+            "observed_count": 2663,
+            "observed_frequency": 0.02663,
+            "outcome": "11",
+            "tolerance": 0.002547329756605707
+          }
+        ],
+        "runs": [
+          {
+            "command": [
+              "stim",
+              "sample",
+              "--shots",
+              "100000",
+              "--seed",
+              "12345",
+              "--out_format",
+              "01"
+            ],
+            "exit_code": 0,
+            "stderr": "",
+            "stdin_source": "catalog:circuit",
+            "success": true
+          }
+        ],
+        "sample_count": 100000,
+        "status": "pass"
+      }
+    }
+  ],
+  "catalog_sha256": "6f28ad3cd13f4464c59548eef5cc135ad68c439ba01292c7132562f748970432",
+  "command_line": [
+    "python3",
+    "-m",
+    "benchmarks.rstim_vs_stim_simulator.verify_distributions",
+    "--cases",
+    "benchmarks/rstim_vs_stim_simulator/distribution_cases.toml",
+    "--shots",
+    "100000",
+    "--out",
+    "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json"
+  ],
+  "counts": {
+    "pass": 8,
+    "rstim_failed": 0,
+    "statistical_mismatch": 0,
+    "stim_failed": 0
+  },
+  "distribution_case_ids": [
+    "stim_bell_pair_basic_distribution",
+    "stim_sqrt_x_transformed_pair",
+    "stim_sqrt_y_transformed_pair",
+    "stim_x_error_two_measured_qubits",
+    "stim_z_error_h_conjugated_pair",
+    "stim_y_error_two_measured_qubits",
+    "stim_depolarize1_two_measured_qubits",
+    "stim_depolarize2_two_measured_qubits"
+  ],
+  "environment": {
+    "cargo_version": "cargo 1.93.1 (Homebrew)",
+    "cargo_version_command": {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "exit_code": 0,
+      "status": "ok",
+      "stderr": "",
+      "stdout": "cargo 1.93.1 (Homebrew)"
+    },
+    "rstim_binary_path": "target/debug/rstim",
+    "rstim_command": [
+      "target/debug/rstim"
+    ],
+    "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+    "rustc_version_command": {
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "status": "ok",
+      "stderr": "",
+      "stdout": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)"
+    },
+    "stim_command": [
+      "stim"
+    ],
+    "stim_python_version": "1.15.0",
+    "stim_python_version_command": {
+      "command": [
+        "python3",
+        "-c",
+        "import stim; print(stim.__version__)"
+      ],
+      "exit_code": 0,
+      "status": "ok",
+      "stderr": "",
+      "stdout": "1.15.0"
+    },
+    "stim_version": "stim python package 1.15.0",
+    "stim_version_command": {
+      "command": [
+        "stim",
+        "--version"
+      ],
+      "exit_code": 0,
+      "status": "ok",
+      "stderr": "\u001b[31mNo mode was given.\n\nAvailable stim commands:\n\n    stim analyze_errors      # Converts a circuit into a detector error model.\n    stim convert             # Convert data between result formats.\n    stim detect              # Sample detection events and observable flips from a circuit.\n    stim diagram             # Produces various kinds of diagrams.\n    stim explain_errors      # Find circuit errors that produce certain detection events.\n    stim gen                 # Generates example circuits.\n    stim help                # Prints helpful information about using stim.\n    stim m2d                 # Convert measurement data into detection event data.\n    stim repl                # Runs stim in interactive read-evaluate-print (REPL) mode.\n    stim sample              # Samples measurements from a circuit.\n    stim sample_dem          # Samples detection events from a detector error model.\n\nUse `stim help [topic]` for help on specific topics. Available topics include:\n\n    stim help commands  # List all tasks performed by stim.\n    stim help gates     # List all circuit instructions supported by stim.\n    stim help formats   # List all result formats supported by stim.\n    stim help [command] # Print information about a command, e.g. \"sample\".\n    stim help [gate]    # Print information about a gate, e.g. \"CNOT\".\n    stim help [format]  # Print information about a result format, e.g. \"01\".\n\u001b[0m",
+      "stdout": ""
+    },
+    "stim_version_source": "python-stim-module"
+  },
+  "inject_rstim_bitflip_rate": 0.0,
+  "manifest_path": "benchmarks/rstim_vs_stim_simulator/distribution_cases.toml",
+  "rstim_command": [
+    "target/debug/rstim"
+  ],
+  "seeds": [
+    12345
+  ],
+  "shots": 100000,
+  "status": "pass",
+  "stim_command": [
+    "stim"
+  ],
+  "suite": "rstim_vs_stim_simulator"
+}
