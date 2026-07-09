@@ -148,6 +148,7 @@ def run_timed_command(command: list[str], dem_text: str) -> tuple[int, str, int]
 
 def summarize_records(records: list[dict[str, object]], case: DemCase) -> dict[str, object]:
     variants: list[dict[str, object]] = []
+    issues: list[dict[str, object]] = []
     present_variants = sorted({str(record["tool_variant"]) for record in records})
     for tool_variant in EXPECTED_VARIANTS:
         variant_records = [record for record in records if record["tool_variant"] == tool_variant]
@@ -156,8 +157,12 @@ def summarize_records(records: list[dict[str, object]], case: DemCase) -> dict[s
             for record in variant_records
             if record["status"] == "completed" and record.get("phase") == "measure"
         ]
+        failed_records = [record for record in variant_records if record["status"] != "completed"]
         latest_record = variant_records[-1] if variant_records else None
-        status = str(latest_record["status"]) if latest_record is not None else "missing"
+        failed_record = failed_records[0] if failed_records else None
+        status = str(failed_record["status"]) if failed_record is not None else (
+            str(latest_record["status"]) if latest_record is not None else "missing"
+        )
         median_wall_time_ns = statistics.median(measured_completed) if measured_completed else None
         median_shots_per_second = (
             (case.shots * 1_000_000_000) / float(median_wall_time_ns)
@@ -166,12 +171,22 @@ def summarize_records(records: list[dict[str, object]], case: DemCase) -> dict[s
         )
         failure_reason = None
         stderr = None
-        if latest_record is not None and latest_record["status"] != "completed":
-            exit_code = latest_record.get("exit_code")
+        if failed_record is not None:
+            exit_code = failed_record.get("exit_code")
             failure_reason = (
                 f"command exited with code {exit_code}" if exit_code is not None else "command failed"
             )
-            stderr = latest_record.get("stderr")
+            stderr = failed_record.get("stderr")
+            issues.append(
+                {
+                    "case_label": case.label,
+                    "workload": "sample_dem",
+                    "tool_variant": tool_variant,
+                    "status": status,
+                    "failure_reason": failure_reason,
+                    "stderr": stderr,
+                }
+            )
         variants.append(
             {
                 "tool_variant": tool_variant,
@@ -195,7 +210,7 @@ def summarize_records(records: list[dict[str, object]], case: DemCase) -> dict[s
                 "variants": variants,
             }
         ],
-        "issues": [],
+        "issues": issues,
     }
 
 
@@ -324,6 +339,20 @@ def run_dem_speed_case(
         }
     )
     run_speed_case.write_environment(environment_path, environment)
+
+    failed_records = [record for record in records if record["status"] != "completed"]
+    if failed_records:
+        failed_record = failed_records[0]
+        tool_variant = str(failed_record["tool_variant"])
+        exit_code = failed_record.get("exit_code")
+        failure_reason = (
+            f"command exited with code {exit_code}" if exit_code is not None else "command failed"
+        )
+        stderr = failed_record.get("stderr")
+        detail = f"{tool_variant} failed: {failure_reason}"
+        if isinstance(stderr, str) and stderr.strip():
+            detail = f"{detail}: {stderr.strip()}"
+        raise RuntimeError(detail)
 
 
 def build_parser() -> argparse.ArgumentParser:
