@@ -201,6 +201,21 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("missing required release file: raw.jsonl", result.stderr)
 
+    def test_rejects_wrong_shot_count_in_raw_jsonl(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            record["shots"] = 512
+            record["command"] = record["command"][:-1] + ["512"]
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("shot count must be 1024", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

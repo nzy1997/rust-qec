@@ -71,6 +71,17 @@ def validate_required_files(results_dir: Path) -> None:
             raise ValueError(f"missing required release file: {filename}")
 
 
+def validate_raw_shot_count(results_dir: Path) -> None:
+    raw_path = results_dir / "raw.jsonl"
+    with raw_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            record = require_dict(json.loads(line), "raw.jsonl record")
+            if record.get("shots") != EXPECTED_SHOTS:
+                raise ValueError(f"shot count must be {EXPECTED_SHOTS}")
+
+
 def find_case(summary: dict[str, Any], case_label: str) -> dict[str, Any]:
     for case in require_list(summary.get("cases"), "summary cases"):
         if isinstance(case, dict) and case.get("case_label") == case_label:
@@ -159,6 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     results_dir = Path(args.results_dir)
     try:
         validate_required_files(results_dir)
+        validate_raw_shot_count(results_dir)
         summary = require_dict(load_json(results_dir / "summary.json"), "summary.json")
         environment = require_dict(load_json(results_dir / "environment.json"), "environment.json")
         validate_summary(summary, case_label=args.case, required_variants=list(args.required_variants))
