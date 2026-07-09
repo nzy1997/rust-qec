@@ -71,8 +71,10 @@ def validate_required_files(results_dir: Path) -> None:
             raise ValueError(f"missing required release file: {filename}")
 
 
-def validate_raw_shot_count(results_dir: Path) -> None:
+def validate_raw_records(results_dir: Path, *, case_label: str, required_variants: list[str]) -> None:
     raw_path = results_dir / "raw.jsonl"
+    matched_variants: set[str] = set()
+    required_variant_set = set(required_variants)
     with raw_path.open(encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
@@ -80,6 +82,19 @@ def validate_raw_shot_count(results_dir: Path) -> None:
             record = require_dict(json.loads(line), "raw.jsonl record")
             if record.get("shots") != EXPECTED_SHOTS:
                 raise ValueError(f"shot count must be {EXPECTED_SHOTS}")
+            variant = record.get("tool_variant")
+            if (
+                isinstance(variant, str)
+                and record.get("case_label") == case_label
+                and record.get("workload") == EXPECTED_WORKLOAD
+                and variant in required_variant_set
+                and record.get("phase") == "measure"
+                and record.get("status") == "completed"
+            ):
+                matched_variants.add(variant)
+    for required_variant in required_variants:
+        if required_variant not in matched_variants:
+            raise ValueError(f"missing completed raw record for required variant {required_variant}")
 
 
 def find_case(summary: dict[str, Any], case_label: str) -> dict[str, Any]:
@@ -170,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     results_dir = Path(args.results_dir)
     try:
         validate_required_files(results_dir)
-        validate_raw_shot_count(results_dir)
+        validate_raw_records(results_dir, case_label=args.case, required_variants=list(args.required_variants))
         summary = require_dict(load_json(results_dir / "summary.json"), "summary.json")
         environment = require_dict(load_json(results_dir / "environment.json"), "environment.json")
         validate_summary(summary, case_label=args.case, required_variants=list(args.required_variants))
