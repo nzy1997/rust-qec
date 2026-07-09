@@ -350,6 +350,10 @@ def _run_version_command(command: list[str]) -> dict[str, object]:
     }
 
 
+def _probe_stim_python_version() -> dict[str, object]:
+    return _run_version_command(["python3", "-c", "import stim; print(stim.__version__)"])
+
+
 def _direct_binary_path(command: list[str]) -> str | None:
     if len(command) != 1:
         return None
@@ -378,19 +382,36 @@ def collect_environment_metadata(
             "stderr": "stim command is empty",
             "exit_code": None,
         }
+    stim_python_version: dict[str, object] | None = None
+    resolved_stim_version = ""
+    resolved_stim_version_source: str | None = None
+    if stim_version["status"] == "ok" and stim_version["stdout"]:
+        resolved_stim_version = str(stim_version["stdout"])
+        resolved_stim_version_source = "stim-cli-stdout"
+    elif stim_version["status"] == "ok":
+        stim_python_version = _probe_stim_python_version()
+        if stim_python_version["status"] == "ok" and stim_python_version["stdout"]:
+            resolved_stim_version = f"stim python package {stim_python_version['stdout']}"
+            resolved_stim_version_source = "python-stim-module"
+
     rustc_version = _run_version_command(["rustc", "--version"])
     cargo_version = _run_version_command(["cargo", "--version"])
-    return {
+    metadata = {
         "stim_command": list(stim_command),
         "rstim_command": list(rstim_command),
         "rstim_binary_path": _direct_binary_path(rstim_command),
-        "stim_version": stim_version["stdout"] if stim_version["status"] == "ok" else "",
+        "stim_version": resolved_stim_version,
+        "stim_version_source": resolved_stim_version_source,
         "stim_version_command": stim_version,
         "rustc_version": rustc_version["stdout"] if rustc_version["status"] == "ok" else "",
         "rustc_version_command": rustc_version,
         "cargo_version": cargo_version["stdout"] if cargo_version["status"] == "ok" else "",
         "cargo_version_command": cargo_version,
     }
+    if stim_python_version is not None:
+        metadata["stim_python_version"] = stim_python_version["stdout"]
+        metadata["stim_python_version_command"] = stim_python_version
+    return metadata
 
 
 def build_summary(args: argparse.Namespace) -> dict[str, object]:
@@ -437,6 +458,7 @@ def build_summary(args: argparse.Namespace) -> dict[str, object]:
         "suite": manifest.get("suite"),
         "status": status,
         "case_count": len(case_results),
+        "distribution_case_ids": [str(case["case_id"]) for case in cases],
         "shots": args.shots,
         "seeds": seeds,
         "stim_command": stim_command,

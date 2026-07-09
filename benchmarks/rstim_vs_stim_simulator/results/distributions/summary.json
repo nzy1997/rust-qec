@@ -1158,6 +1158,16 @@
     "statistical_mismatch": 0,
     "stim_failed": 0
   },
+  "distribution_case_ids": [
+    "stim_bell_pair_basic_distribution",
+    "stim_sqrt_x_transformed_pair",
+    "stim_sqrt_y_transformed_pair",
+    "stim_x_error_two_measured_qubits",
+    "stim_z_error_h_conjugated_pair",
+    "stim_y_error_two_measured_qubits",
+    "stim_depolarize1_two_measured_qubits",
+    "stim_depolarize2_two_measured_qubits"
+  ],
   "environment": {
     "cargo_version": "cargo 1.93.1 (Homebrew)",
     "cargo_version_command": {
@@ -1188,7 +1198,19 @@
     "stim_command": [
       "stim"
     ],
-    "stim_version": "",
+    "stim_python_version": "1.15.0",
+    "stim_python_version_command": {
+      "command": [
+        "python3",
+        "-c",
+        "import stim; print(stim.__version__)"
+      ],
+      "exit_code": 0,
+      "status": "ok",
+      "stderr": "",
+      "stdout": "1.15.0"
+    },
+    "stim_version": "stim python package 1.15.0",
     "stim_version_command": {
       "command": [
         "stim",
@@ -1198,7 +1220,8 @@
       "status": "ok",
       "stderr": "\u001b[31mNo mode was given.\n\nAvailable stim commands:\n\n    stim analyze_errors      # Converts a circuit into a detector error model.\n    stim convert             # Convert data between result formats.\n    stim detect              # Sample detection events and observable flips from a circuit.\n    stim diagram             # Produces various kinds of diagrams.\n    stim explain_errors      # Find circuit errors that produce certain detection events.\n    stim gen                 # Generates example circuits.\n    stim help                # Prints helpful information about using stim.\n    stim m2d                 # Convert measurement data into detection event data.\n    stim repl                # Runs stim in interactive read-evaluate-print (REPL) mode.\n    stim sample              # Samples measurements from a circuit.\n    stim sample_dem          # Samples detection events from a detector error model.\n\nUse `stim help [topic]` for help on specific topics. Available topics include:\n\n    stim help commands  # List all tasks performed by stim.\n    stim help gates     # List all circuit instructions supported by stim.\n    stim help formats   # List all result formats supported by stim.\n    stim help [command] # Print information about a command, e.g. \"sample\".\n    stim help [gate]    # Print information about a gate, e.g. \"CNOT\".\n    stim help [format]  # Print information about a result format, e.g. \"01\".\n\u001b[0m",
       "stdout": ""
-    }
+    },
+    "stim_version_source": "python-stim-module"
   },
   "inject_rstim_bitflip_rate": 0.0,
   "manifest_path": "benchmarks/rstim_vs_stim_simulator/distribution_cases.toml",

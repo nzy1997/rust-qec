@@ -75,7 +75,28 @@ class ExpandedCorrectnessCheckerTest(unittest.TestCase):
         return {
             "suite": "rstim_vs_stim_simulator",
             "status": "pass",
+            "shots": 100000,
+            "seeds": [11, 29],
+            "command_line": [
+                "python3",
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions",
+                "--cases",
+                str(self.catalog),
+                "--shots",
+                "100000",
+            ],
             "catalog_sha256": sha256_text(self.catalog),
+            "environment": {
+                "stim_command": ["stim"],
+                "rstim_command": ["target/debug/rstim"],
+                "rstim_binary_path": "target/debug/rstim",
+                "stim_version": "stim python package 1.15.0",
+                "stim_version_source": "python-stim-module",
+                "stim_python_version": "1.15.0",
+                "rustc_version": "rustc 1.93.1",
+                "cargo_version": "cargo 1.93.1",
+            },
             "cases": [
                 {"case_id": "case_alpha", "status": "pass"},
                 {"case_id": "case_beta", "status": "pass"},
@@ -92,6 +113,9 @@ class ExpandedCorrectnessCheckerTest(unittest.TestCase):
     def valid_rollup(self) -> dict[str, object]:
         return {
             "status": "pass",
+            "catalog_path": str(self.catalog),
+            "catalog_sha256": sha256_text(self.catalog),
+            "distribution_case_ids": ["case_alpha", "case_beta"],
             "distribution_summary_path": str(self.summary),
             "distribution_summary_sha256": sha256_text(self.summary),
             "full_summary_path": str(self.full_summary),
@@ -143,6 +167,20 @@ class ExpandedCorrectnessCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("distribution evidence for case case_beta did not pass", result.stderr)
 
+    def test_rejects_duplicate_distribution_case_ids(self) -> None:
+        self.write_valid_fixture()
+        summary = copy.deepcopy(json.loads(self.summary.read_text(encoding="utf-8")))
+        assert isinstance(summary, dict)
+        cases = summary["cases"]
+        assert isinstance(cases, list)
+        cases[0]["status"] = "fail"  # type: ignore[index]
+        cases.append({"case_id": "case_alpha", "status": "pass"})
+        self.write_json(self.summary, summary)
+        self.write_json(self.rollup, self.valid_rollup())
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("duplicate distribution evidence case case_alpha", result.stderr)
+
     def test_rejects_stale_catalog_hash(self) -> None:
         self.write_valid_fixture()
         summary = copy.deepcopy(json.loads(self.summary.read_text(encoding="utf-8")))
@@ -153,6 +191,48 @@ class ExpandedCorrectnessCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("distribution summary catalog hash mismatch", result.stderr)
+
+    def test_rejects_missing_summary_command_line(self) -> None:
+        self.write_valid_fixture()
+        summary = self.valid_summary()
+        del summary["command_line"]
+        self.write_json(self.summary, summary)
+        self.write_json(self.rollup, self.valid_rollup())
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("distribution summary missing command_line", result.stderr)
+
+    def test_rejects_empty_stim_version_without_documented_fallback(self) -> None:
+        self.write_valid_fixture()
+        summary = self.valid_summary()
+        environment = summary["environment"]
+        assert isinstance(environment, dict)
+        environment["stim_version"] = ""
+        environment["stim_version_source"] = ""
+        environment["stim_python_version"] = ""
+        self.write_json(self.summary, summary)
+        self.write_json(self.rollup, self.valid_rollup())
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("distribution summary missing environment.stim_version provenance", result.stderr)
+
+    def test_rejects_rollup_distribution_case_ids_mismatch(self) -> None:
+        self.write_valid_fixture()
+        rollup = self.valid_rollup()
+        rollup["distribution_case_ids"] = ["case_alpha"]
+        self.write_json(self.rollup, rollup)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("expanded rollup distribution_case_ids mismatch", result.stderr)
+
+    def test_rejects_rollup_catalog_hash_mismatch(self) -> None:
+        self.write_valid_fixture()
+        rollup = self.valid_rollup()
+        rollup["catalog_sha256"] = "f" * 64
+        self.write_json(self.rollup, rollup)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("expanded rollup catalog hash mismatch", result.stderr)
 
     def test_rejects_full_summary_without_pass_status(self) -> None:
         self.write_valid_fixture()

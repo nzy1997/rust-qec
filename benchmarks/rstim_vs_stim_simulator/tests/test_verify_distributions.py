@@ -109,8 +109,42 @@ class VerifyDistributionHelpersTest(unittest.TestCase):
             check=False,
         )
         self.assertEqual(metadata["stim_version"], "stim 1.2.3")
+        self.assertEqual(metadata["stim_version_source"], "stim-cli-stdout")
         self.assertEqual(metadata["stim_version_command"]["command"], ["python3", "-m", "stim", "--version"])
         self.assertEqual(metadata["rstim_binary_path"], "/usr/bin/rstim")
+
+    def test_collect_environment_metadata_falls_back_to_python_stim_version_when_cli_stdout_is_empty(self) -> None:
+        def fake_run(command: list[str], **kwargs: object) -> mock.Mock:
+            if command == ["stim", "--version"]:
+                return mock.Mock(returncode=0, stdout="", stderr="No mode was given.\n")
+            if command == ["python3", "-c", "import stim; print(stim.__version__)"]:
+                return mock.Mock(returncode=0, stdout="1.15.0\n", stderr="")
+            if command == ["rustc", "--version"]:
+                return mock.Mock(returncode=0, stdout="rustc 1.93.1\n", stderr="")
+            if command == ["cargo", "--version"]:
+                return mock.Mock(returncode=0, stdout="cargo 1.93.1\n", stderr="")
+            raise AssertionError(f"unexpected command: {command}")
+
+        with (
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.subprocess.run",
+                side_effect=fake_run,
+            ),
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+                return_value="/usr/bin/rstim",
+            ),
+        ):
+            metadata = collect_environment_metadata(["stim"], ["rstim"])
+
+        self.assertEqual(metadata["stim_version"], "stim python package 1.15.0")
+        self.assertEqual(metadata["stim_version_source"], "python-stim-module")
+        self.assertEqual(metadata["stim_python_version"], "1.15.0")
+        self.assertEqual(
+            metadata["stim_python_version_command"]["command"],
+            ["python3", "-c", "import stim; print(stim.__version__)"],
+        )
+        self.assertEqual(metadata["stim_version_command"]["stderr"], "No mode was given.")
 
     def test_direct_binary_path_only_accepts_unwrapped_single_token_commands(self) -> None:
         with mock.patch(
@@ -426,6 +460,7 @@ class VerifyDistributionCliTest(unittest.TestCase):
                         "rstim_command": ["target/debug/rstim"],
                         "rstim_binary_path": "target/debug/rstim",
                         "stim_version": "stim test",
+                        "stim_version_source": "stim-cli-stdout",
                         "rustc_version": "rustc test",
                         "cargo_version": "cargo test",
                     },
@@ -460,6 +495,7 @@ class VerifyDistributionCliTest(unittest.TestCase):
             self.assertEqual(code, 0)
             data = json.loads(out.read_text(encoding="utf-8"))
             self.assertEqual(data["catalog_sha256"], sha256_text(cases))
+            self.assertEqual(data["distribution_case_ids"], ["unit_bell"])
             self.assertEqual(data["command_line"][0], "python3")
             self.assertIn("--cases", data["command_line"])
             self.assertEqual(data["environment"]["rstim_binary_path"], "target/debug/rstim")
