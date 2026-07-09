@@ -54,6 +54,34 @@ The expected result is `PASS 8 distribution cases`. These cases are borrowed
 from Stim's pinned `command_sample.test.cc` and record expected probabilities
 only; this validator does not run Stim or `rstim`.
 
+## Distribution Verification
+
+Run the small-circuit distribution verifier against Stim and `rstim`:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
+  --cases benchmarks/rstim_vs_stim_simulator/distribution_cases.toml \
+  --shots 100000 \
+  --out /tmp/rstim-vs-stim-distributions.json
+```
+
+The expected verdict is `PASS distribution correctness cases=8 mismatch=0`.
+The JSON report records each case's expected probabilities, observed Stim and
+`rstim` frequencies, tolerance, sample count, status, command, exit status,
+stderr, and source URL.
+
+Run the statistical negative control:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.verify_distributions \
+  --cases benchmarks/rstim_vs_stim_simulator/distribution_cases.toml \
+  --shots 100000 \
+  --inject-rstim-bitflip-rate 0.20 \
+  --out /tmp/rstim-vs-stim-distributions-bad.json
+```
+
+The expected negative-control verdict is `FAIL statistical mismatch`.
+
 ## Inspect Fixture Load
 
 Inspect the expanded operation load for the checked full fixture:

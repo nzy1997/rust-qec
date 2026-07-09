@@ -39,6 +39,12 @@ impl FrameSimulator {
         }
     }
 
+    pub(crate) fn randomize_initial_z_frames(&mut self, rng: &mut impl Rng) {
+        for q in 0..self.num_qubits {
+            self.z_table.randomize_row(q, rng);
+        }
+    }
+
     pub(crate) fn set_materialize_detector_observable_outputs(&mut self, enabled: bool) {
         self.materialize_detector_observable_outputs = enabled;
     }

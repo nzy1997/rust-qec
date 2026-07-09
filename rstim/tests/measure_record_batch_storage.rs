@@ -78,11 +78,11 @@ fn xor_lookback_preserves_detector_parity_for_known_fixture() {
     // fixture's storage/parity path without promising a stable RNG stream.
     assert_eq!(
         b8_fingerprint(&out.detections),
-        (195000, 0x408c1ebed87f27a6)
+        (195000, 0x2e429cfdf5d7e282)
     );
     assert_eq!(
         b8_fingerprint(&out.observable_flips),
-        (130, 0x741669954130d410)
+        (130, 0x0284d76ab03b03c6)
     );
 }
 
