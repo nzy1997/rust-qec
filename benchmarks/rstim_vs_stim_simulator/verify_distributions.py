@@ -205,9 +205,8 @@ def _tool_result(
 
     comparison = compare_distribution(all_samples, expected_distribution)
     if failure_reasons:
-        status = STATUS_MISMATCH if comparison["status"] == STATUS_MISMATCH else failure_status
         return {
-            "status": status,
+            "status": failure_status,
             "sample_count": comparison["sample_count"],
             "observed_counts": comparison["observed_counts"],
             "observed_frequencies": comparison["observed_frequencies"],

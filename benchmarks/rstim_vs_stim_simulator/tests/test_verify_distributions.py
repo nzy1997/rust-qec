@@ -198,6 +198,56 @@ class VerifyDistributionRunnerTest(unittest.TestCase):
         self.assertEqual(result["stim"]["status"], "stim_failed")
         self.assertEqual(result["rstim"]["status"], "pass")
 
+    def test_verify_case_prioritizes_stim_failure_over_partial_sample_mismatch(self) -> None:
+        mismatch_stdout = ("00\n" * 100)
+        matching_stdout = ("00\n11\n" * 50)
+
+        def fake_run_tool(command: list[str], *, circuit: str) -> dict[str, object]:
+            tool = command[0]
+            seed = command[command.index("--seed") + 1]
+            if tool == "stim" and seed == "1":
+                return {
+                    "command": command,
+                    "exit_code": 0,
+                    "stderr": "",
+                    "success": True,
+                    "stdout": mismatch_stdout,
+                    "stdin_source": "catalog:circuit",
+                }
+            if tool == "stim" and seed == "2":
+                return {
+                    "command": command,
+                    "exit_code": 2,
+                    "stderr": "broken stim on seed 2",
+                    "success": False,
+                    "stdout": "",
+                    "stdin_source": "catalog:circuit",
+                }
+            return {
+                "command": command,
+                "exit_code": 0,
+                "stderr": "",
+                "success": True,
+                "stdout": matching_stdout,
+                "stdin_source": "catalog:circuit",
+            }
+
+        with mock.patch("benchmarks.rstim_vs_stim_simulator.verify_distributions.run_tool") as mocked:
+            mocked.side_effect = fake_run_tool
+            result = verify_case(
+                unit_case(),
+                stim_command=["stim"],
+                rstim_command=["rstim"],
+                shots=100,
+                seeds=[1, 2],
+                inject_rstim_bitflip_rate=0.0,
+            )
+
+        self.assertEqual(result["status"], "stim_failed")
+        self.assertEqual(result["stim"]["status"], "stim_failed")
+        self.assertIn("broken stim on seed 2", result["failure_reasons"][0])
+        self.assertEqual(result["stim"]["observed_counts"], {"00": 100})
+
 
 class VerifyDistributionCliTest(unittest.TestCase):
     def test_main_writes_json_and_prints_pass_summary(self) -> None:
