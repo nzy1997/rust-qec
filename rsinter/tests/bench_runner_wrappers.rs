@@ -280,14 +280,12 @@ fn rbposd_lsd_runner_order_changes_benchmark_logical_error_rate() {
     assert_ne!(
         order1_row.metrics["logical_errors"], order0_row.metrics["logical_errors"],
         "expected parsed lsd_order=1 to change logical errors: order0={}, order1={}",
-        order0_row.metrics["logical_errors"],
-        order1_row.metrics["logical_errors"]
+        order0_row.metrics["logical_errors"], order1_row.metrics["logical_errors"]
     );
     assert_ne!(
         order1_row.metrics["logical_error_rate"], order0_row.metrics["logical_error_rate"],
         "expected parsed lsd_order=1 to change runner LER: order0={}, order1={}",
-        order0_row.metrics["logical_error_rate"],
-        order1_row.metrics["logical_error_rate"]
+        order0_row.metrics["logical_error_rate"], order1_row.metrics["logical_error_rate"]
     );
 }
 

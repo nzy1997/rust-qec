@@ -1,9 +1,9 @@
 use rsinter::bench::registry::{
-    BenchCasePoint, BenchRunContext, RustBenchRunner, build_default_rust_runner_registry,
+    build_default_rust_runner_registry, BenchCasePoint, BenchRunContext, RustBenchRunner,
     RustRunnerRegistry,
 };
-use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
-use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark, run_rust_benchmark_with_options};
+use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
+use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
 use std::collections::BTreeMap;

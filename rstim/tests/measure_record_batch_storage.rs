@@ -1,8 +1,8 @@
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::output::write_shots_b8;
 use rstim::parser::parse_lines;
-use rstim::sampler::{SampleOptions, sample_batch_with_options};
+use rstim::sampler::{sample_batch_with_options, SampleOptions};
 use rstim::sim::bit_table::BitTable;
 use rstim::sim::measure_record_batch::MeasureRecordBatch;
 
@@ -35,11 +35,11 @@ fn contiguous_storage_reports_expected_shape() {
     assert_eq!(batch.batch_size(), 130);
     assert_eq!(batch.words_per_row(), 3);
     assert_eq!(batch.len(), 2);
+    assert_eq!(batch.contiguous_words(), &[0x11, 0x22, 0x33, 0xaa, 0xbb, 0]);
     assert_eq!(
-        batch.contiguous_words(),
-        &[0x11, 0x22, 0x33, 0xaa, 0xbb, 0]
+        batch.contiguous_words().len(),
+        batch.len() * batch.words_per_row()
     );
-    assert_eq!(batch.contiguous_words().len(), batch.len() * batch.words_per_row());
 }
 
 #[test]

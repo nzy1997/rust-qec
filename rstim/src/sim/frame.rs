@@ -700,7 +700,10 @@ impl FrameSimulator {
     ) -> Result<(), String> {
         let wpr = self.x_table.words_per_row();
         match op {
-            CompiledOp::Tick | CompiledOp::QubitCoords | CompiledOp::ShiftCoords | CompiledOp::NoOp => {}
+            CompiledOp::Tick
+            | CompiledOp::QubitCoords
+            | CompiledOp::ShiftCoords
+            | CompiledOp::NoOp => {}
             CompiledOp::H { qubits } => {
                 for &q in qubits {
                     do_h(&mut self.x_table, &mut self.z_table, q);
@@ -727,12 +730,7 @@ impl FrameSimulator {
             }
             CompiledOp::Cx { pairs } => {
                 for &(control, target) in pairs {
-                    do_cx(
-                        &mut self.x_table,
-                        &mut self.z_table,
-                        control,
-                        target,
-                    );
+                    do_cx(&mut self.x_table, &mut self.z_table, control, target);
                 }
             }
             CompiledOp::Depolarize2 { probability, pairs } => {
@@ -925,12 +923,7 @@ impl FrameSimulator {
         }
     }
 
-    fn exec_compiled_reset(
-        &mut self,
-        basis: CompiledBasis,
-        qubits: &[usize],
-        rng: &mut impl Rng,
-    ) {
+    fn exec_compiled_reset(&mut self, basis: CompiledBasis, qubits: &[usize], rng: &mut impl Rng) {
         for &q in qubits {
             match basis {
                 CompiledBasis::Z => {
