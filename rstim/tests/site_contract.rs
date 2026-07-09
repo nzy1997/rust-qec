@@ -515,7 +515,7 @@ fn checked_benchmark_artifacts_are_linked() {
         &[
             "id=\"checked-benchmark-results\"",
             "id=\"checked-benchmark-result-cards\"",
-            "data-checked-items=\"surface-decoder-full bb-circuit-full rstim-vs-stim-full\"",
+            "data-checked-items=\"surface-decoder-full bb-circuit-full rstim-vs-stim-full rstim-vs-stim-release\"",
             "Checked Benchmark Results",
         ],
         "checked benchmark result section",
@@ -677,10 +677,52 @@ fn checked_benchmark_artifacts_are_linked() {
         "rstim-vs-stim checked item must keep its manifest claims limit"
     );
 
+    let (_, rstim_vs_stim_release_item) = find_evidence_item(&manifest, "rstim-vs-stim-release");
+    assert_eq!(rstim_vs_stim_release_item["status"].as_str(), Some("existing"));
+    assert_eq!(rstim_vs_stim_release_item["tier"].as_str(), Some("release"));
+    assert_checked_artifacts(
+        rstim_vs_stim_release_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release/environment.json",
+                "environment",
+            ),
+        ],
+    );
+    assert_item_has_text_list_marker(
+        rstim_vs_stim_release_item,
+        "commands",
+        "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release",
+    );
+    assert_item_has_text_list_marker(
+        rstim_vs_stim_release_item,
+        "caveats",
+        "historical #406 debug-profile artifact remains separate",
+    );
+    assert!(
+        rstim_vs_stim_release_item["claims_limit"]
+            .as_str()
+            .is_some_and(|value| {
+                value.contains("one recorded d11/r100 selected-case workload")
+                    && value.contains("one recorded environment")
+                    && value.contains("not broad rstim/Stim parity")
+            }),
+        "rstim-vs-stim release item must keep its narrow manifest claims limit"
+    );
+
     for (item_id, item) in [
         ("surface-decoder-full", surface_item),
         ("bb-circuit-full", bb_item),
         ("rstim-vs-stim-full", rstim_vs_stim_item),
+        ("rstim-vs-stim-release", rstim_vs_stim_release_item),
     ] {
         let provenance = item["provenance"]
             .as_object()
