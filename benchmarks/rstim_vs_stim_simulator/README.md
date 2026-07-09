@@ -43,6 +43,17 @@ python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs
 python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml
 ```
 
+Validate the source-grounded small-circuit distribution catalog:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.validate_distribution_cases \
+  benchmarks/rstim_vs_stim_simulator/distribution_cases.toml
+```
+
+The expected result is `PASS 8 distribution cases`. These cases are borrowed
+from Stim's pinned `command_sample.test.cc` and record expected probabilities
+only; this validator does not run Stim or `rstim`.
+
 ## Inspect Fixture Load
 
 Inspect the expanded operation load for the checked full fixture:
