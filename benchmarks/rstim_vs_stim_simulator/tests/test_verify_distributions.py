@@ -8,7 +8,9 @@ from pathlib import Path
 from unittest import mock
 
 from benchmarks.rstim_vs_stim_simulator.verify_distributions import (
+    _direct_binary_path,
     _outcome_tolerance,
+    collect_environment_metadata,
     build_sample_command,
     compare_distribution,
     format_report,
@@ -82,6 +84,44 @@ class VerifyDistributionHelpersTest(unittest.TestCase):
             build_sample_command(["rstim"], shots=4, seed=7),
             ["rstim", "sample", "--shots", "4", "--seed", "7", "--out_format", "01"],
         )
+
+    def test_collect_environment_metadata_uses_full_stim_command_for_version_probe(self) -> None:
+        fake_completed = mock.Mock(returncode=0, stdout="stim 1.2.3\n", stderr="")
+        with (
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.subprocess.run",
+                return_value=fake_completed,
+            ) as mocked_run,
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+                return_value="/usr/bin/rstim",
+            ),
+        ):
+            metadata = collect_environment_metadata(
+                ["python3", "-m", "stim"],
+                ["rstim"],
+            )
+
+        mocked_run.assert_any_call(
+            ["python3", "-m", "stim", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(metadata["stim_version"], "stim 1.2.3")
+        self.assertEqual(metadata["stim_version_command"]["command"], ["python3", "-m", "stim", "--version"])
+        self.assertEqual(metadata["rstim_binary_path"], "/usr/bin/rstim")
+
+    def test_direct_binary_path_only_accepts_unwrapped_single_token_commands(self) -> None:
+        with mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.verify_distributions.shutil.which",
+            return_value="/usr/bin/rstim",
+        ) as mocked_which:
+            self.assertEqual(_direct_binary_path(["rstim"]), "/usr/bin/rstim")
+            self.assertIsNone(_direct_binary_path(["cargo"]))
+            self.assertIsNone(_direct_binary_path(["python3", "-m", "stim"]))
+
+        mocked_which.assert_called_once_with("rstim")
 
 
 class VerifyDistributionRunnerTest(unittest.TestCase):

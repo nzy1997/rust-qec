@@ -351,7 +351,7 @@ def _run_version_command(command: list[str]) -> dict[str, object]:
 
 
 def _direct_binary_path(command: list[str]) -> str | None:
-    if not command:
+    if len(command) != 1:
         return None
     executable = command[0]
     if executable == "cargo":
@@ -369,7 +369,7 @@ def collect_environment_metadata(
     rstim_command: list[str],
 ) -> dict[str, object]:
     if stim_command:
-        stim_version = _run_version_command([stim_command[0], "--version"])
+        stim_version = _run_version_command([*stim_command, "--version"])
     else:
         stim_version = {
             "command": [],
