@@ -131,3 +131,21 @@ The runner builds `target/release/rstim` for `--profile release` or
 
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
+
+## Multi-Case Speed Suite
+
+Run a release-profile suite over exactly the requested perf cases:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_suite \
+  --profile release \
+  --cases rep-sample-d13-r13,surface-detect-d13-r13,stim-style-surface-sample-d11-r100-b1024 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
+  --out-dir /tmp/rstim-speed-suite
+```
+
+The suite runner builds the selected `rstim` profile once, writes one
+`raw.jsonl`, one `summary.json`, one `report.md`, and one `environment.json`,
+and keeps the raw and summary artifacts scoped to exactly the comma-separated
+case list.
