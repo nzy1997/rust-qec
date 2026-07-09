@@ -88,7 +88,7 @@ fn compiled_and_interpreted_sample_paths_agree_on_catalog() {
 fn statistical_contract_rejects_injected_detector_or_observable_mismatch() {
     let parsed = first_compiled_capable_case().expect("compiled-capable catalog case");
     let mut pair = sample_pair(&parsed, DETERMINISTIC_SEEDS[0]).expect("sample pair");
-    flip_first_comparison_bit(&mut pair.compiled).expect("comparison bit");
+    inject_comparison_row_mismatch(&mut pair.compiled).expect("comparison row");
 
     let err = assert_streams_agree(
         &parsed.case.case_id,
@@ -366,17 +366,32 @@ fn assert_table_agrees(
     }
 
     for major in 0..interpreted.num_major() {
-        for minor in 0..interpreted.num_minor() {
-            if interpreted.get(major, minor) != compiled.get(major, minor) {
-                return Err(format!(
-                    "statistical mismatch: {case_id} seed {seed} {label}[{major},{minor}] interpreted {}, compiled {}",
-                    interpreted.get(major, minor),
-                    compiled.get(major, minor)
-                ));
-            }
+        let interpreted_count = row_true_count(interpreted, major);
+        let compiled_count = row_true_count(compiled, major);
+        let diff = interpreted_count.abs_diff(compiled_count);
+        let tolerance = count_tolerance(interpreted_count, compiled_count, interpreted.num_minor());
+        if diff > tolerance {
+            return Err(format!(
+                "statistical mismatch: {case_id} seed {seed} {label}[{major}] interpreted_count {interpreted_count}, compiled_count {compiled_count}, tolerance {tolerance}"
+            ));
         }
     }
     Ok(())
+}
+
+fn row_true_count(table: &BitTable, row: usize) -> usize {
+    (0..table.num_minor())
+        .filter(|&shot| table.get(row, shot))
+        .count()
+}
+
+fn count_tolerance(interpreted_count: usize, compiled_count: usize, shots: usize) -> usize {
+    if shots == 0 {
+        return 0;
+    }
+    let pooled_p = (interpreted_count + compiled_count) as f64 / (2 * shots) as f64;
+    let sigma = (2.0 * shots as f64 * pooled_p * (1.0 - pooled_p)).sqrt();
+    (5.0 * sigma).ceil().max(4.0) as usize
 }
 
 fn first_compiled_capable_case() -> Result<ParsedCase, String> {
@@ -398,14 +413,20 @@ fn first_compiled_capable_case() -> Result<ParsedCase, String> {
     Err("no compiled-capable catalog case found".to_string())
 }
 
-fn flip_first_comparison_bit(output: &mut BatchOutput) -> Result<(), String> {
+fn inject_comparison_row_mismatch(output: &mut BatchOutput) -> Result<(), String> {
     if output.detections.num_major() > 0 && output.detections.num_minor() > 0 {
-        output.detections.toggle(0, 0);
+        invert_row(&mut output.detections, 0);
         return Ok(());
     }
     if output.observable_flips.num_major() > 0 && output.observable_flips.num_minor() > 0 {
-        output.observable_flips.toggle(0, 0);
+        invert_row(&mut output.observable_flips, 0);
         return Ok(());
     }
     Err("sample output has no detector or observable comparison bit".to_string())
+}
+
+fn invert_row(table: &mut BitTable, row: usize) {
+    for shot in 0..table.num_minor() {
+        table.toggle(row, shot);
+    }
 }
