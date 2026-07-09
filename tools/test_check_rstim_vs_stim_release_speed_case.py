@@ -83,7 +83,7 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
     def test_accepts_valid_release_case(self) -> None:
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"PASS release speed case {CASE_LABEL}", result.stdout)
+        self.assertEqual(result.stdout, f"PASS release speed case {CASE_LABEL}\n")
 
     def test_rejects_missing_required_variant(self) -> None:
         summary = valid_summary()
@@ -128,6 +128,54 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("required variant rstim-compiled status is not completed", result.stderr)
+
+    def test_rejects_bad_release_profile(self) -> None:
+        environment = valid_environment()
+        environment["profile"] = "debug"
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment.json profile must be release", result.stderr)
+
+    def test_rejects_missing_case_labels(self) -> None:
+        environment = valid_environment()
+        del environment["case_labels"]
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(f"environment.json missing case label {CASE_LABEL}", result.stderr)
+
+    def test_rejects_wrong_case_label(self) -> None:
+        environment = valid_environment()
+        environment["case_labels"] = ["rep-sample-d13-r14"]
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(f"environment.json missing case label {CASE_LABEL}", result.stderr)
+
+    def test_rejects_missing_rustc_version(self) -> None:
+        environment = valid_environment()
+        del environment["rustc_version"]
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment.json missing rustc_version", result.stderr)
+
+    def test_rejects_missing_cargo_version(self) -> None:
+        environment = valid_environment()
+        del environment["cargo_version"]
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment.json missing cargo_version", result.stderr)
+
+    def test_rejects_missing_stim_cli_status(self) -> None:
+        environment = valid_environment()
+        del environment["stim_cli_status"]
+        self.write_bundle(valid_summary(), environment)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment.json missing stim_cli_status", result.stderr)
 
     def test_rejects_missing_environment_metadata(self) -> None:
         environment = valid_environment()
