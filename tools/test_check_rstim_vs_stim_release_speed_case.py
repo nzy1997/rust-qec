@@ -62,7 +62,13 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
     def write_report(self, report: str) -> None:
         (self.results_dir / "report.md").write_text(report, encoding="utf-8")
 
-    def run_checker(self) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        *,
+        case_label: str = CASE_LABEL,
+        workload: str = "sample",
+        required_variants: str = REQUIRED_VARIANTS,
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 "python3",
@@ -70,11 +76,11 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
                 "--results-dir",
                 str(self.results_dir),
                 "--case",
-                CASE_LABEL,
+                case_label,
                 "--workload",
-                "sample",
+                workload,
                 "--required-variants",
-                REQUIRED_VARIANTS,
+                required_variants,
             ],
             cwd=REPO_ROOT,
             text=True,
@@ -118,7 +124,45 @@ class ReleaseSpeedCaseCheckerTest(unittest.TestCase):
         self.write_bundle(summary, valid_environment())
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("case rep-sample-d13-r13 workload must be sample", result.stderr)
+        self.assertIn(f"workload mismatch for {CASE_LABEL}", result.stderr)
+
+    def test_rejects_surface_detect_labeled_as_sample(self) -> None:
+        case_label = "surface-detect-d13-r13"
+        summary: dict[str, object] = {
+            "cases": [
+                {
+                    "case_label": case_label,
+                    "workload": "sample",
+                    "tier": "gating",
+                    "present_variants": ["rstim-compiled", "rstim-interpreted", "stim-cli"],
+                    "variants": [
+                        {
+                            "tool_variant": "rstim-compiled",
+                            "status": "completed",
+                            "median_wall_time_ns": 10,
+                        },
+                        {
+                            "tool_variant": "rstim-interpreted",
+                            "status": "completed",
+                            "median_wall_time_ns": 20,
+                        },
+                        {
+                            "tool_variant": "stim-cli",
+                            "status": "completed",
+                            "median_wall_time_ns": 30,
+                        },
+                    ],
+                }
+            ],
+            "issues": [],
+        }
+        environment = valid_environment()
+        environment["case_labels"] = [case_label]
+        self.write_bundle(summary, environment)
+        self.write_report(f"# Report\n\n### {case_label}\n")
+        result = self.run_checker(case_label=case_label, workload="detect")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("workload mismatch for surface-detect-d13-r13", result.stderr)
 
     def test_rejects_required_variant_not_completed(self) -> None:
         summary = valid_summary()
