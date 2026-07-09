@@ -417,7 +417,7 @@
               "value": {
                 "speed_artifacts_commit_time": "2026-07-08T08:41:43+08:00",
                 "correctness_summary_commit_time": "2026-07-08T08:56:33+08:00",
-                "showcase_commit_time": "2026-07-08T07:58:24+08:00"
+                "showcase_commit_time": "2026-07-09T16:00:44+08:00"
               }
             },
             "source_commit": {
@@ -519,7 +519,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "4dd89338f0620222a060ce8b2446155b5882bcb8ae25c04e25de9fe9c2c3ce17"
+                  "sha256": "8ca69655528b17f93bd8e82ed82dda3167b6585bb5b2153cc0970956d873a4a3"
                 }
               }
             }
@@ -549,6 +549,158 @@
             "The correctness summary is statistical evidence on the checked full fixture and recorded seed policy; it does not prove all circuits, seeds, detector paths, or simulator features agree with Stim.",
             "The canonical .stim fixture is Stim-generated checked circuit text, not evidence that rstim reproduces Stim generator output.",
             "Slow, failed, or incomplete variants would still be valid evidence when recorded; this family publishes the checked outcome, not an optimization guarantee."
+          ]
+        },
+        {
+          "id": "rstim-vs-stim-release",
+          "title": "Checked post-optimization release rstim versus Stim selected-case speed evidence",
+          "status": "existing",
+          "tier": "release",
+          "artifacts": [
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+              "kind": "speed-summary",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+              "kind": "speed-report",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/release/environment.json",
+              "kind": "environment",
+              "checked": true
+            }
+          ],
+          "commands": [
+            "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run1",
+            "cp /tmp/rstim-speed-release-issue-416-run1/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+            "cp /tmp/rstim-speed-release-issue-416-run1/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+            "cp /tmp/rstim-speed-release-issue-416-run1/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+          ],
+          "provenance": {
+            "schema_version": 1,
+            "artifact_date": {
+              "status": "recorded",
+              "value": {
+                "release_artifacts_commit_time": "2026-07-09T16:00:44+08:00",
+                "release_run_wall_clock_time": "2026-07-09T15:54:00+08:00"
+              }
+            },
+            "source_commit": {
+              "status": "recorded",
+              "value": {
+                "runner_source": "104532b3ac7d2d946e0d8b1ea1995a9077f571b1",
+                "published_by_issue": 416
+              }
+            },
+            "commands": {
+              "status": "recorded",
+              "value": [
+                "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run1",
+                "cp /tmp/rstim-speed-release-issue-416-run1/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
+                "cp /tmp/rstim-speed-release-issue-416-run1/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
+                "cp /tmp/rstim-speed-release-issue-416-run1/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+              ]
+            },
+            "os": {
+              "status": "recorded",
+              "value": "macOS 26.5.1 (build 25F80)"
+            },
+            "cpu_model": {
+              "status": "recorded",
+              "value": "Apple M4"
+            },
+            "rust_version": {
+              "status": "recorded",
+              "value": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)"
+            },
+            "python_version": {
+              "status": "recorded",
+              "value": "Python 3.14.3"
+            },
+            "dependency_versions": {
+              "status": "recorded",
+              "value": {
+                "rstim": "rstim 0.1.1",
+                "stim_cli_status": "ok",
+                "stim_cli_version": "",
+                "cargo": "cargo 1.93.1 (Homebrew)"
+              }
+            },
+            "external_repository_commits": {
+              "status": "recorded",
+              "value": []
+            },
+            "seed_policy": {
+              "status": "recorded",
+              "value": {
+                "correctness_seeds": [
+                  12345
+                ],
+                "speed_rstim_variants_seed": 1234,
+                "speed_stim_cli_seed_policy": "Stim CLI speed variant is timed through the recorded perf runner command without a seed-bearing sampler output.",
+                "speed_seed_scope": "The post-optimization release speed artifacts are report-only timing evidence for the recorded selected case and environment, not cross-tool sample stream equivalence."
+              }
+            },
+            "build_profile": {
+              "status": "recorded",
+              "value": {
+                "profile": "release",
+                "rstim_binary_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-416-run-1-agent-issue-416-publish-separated-post-optimization-rstim-vs-sti-run-1/target/release/rstim",
+                "stim_cli": "stim on PATH",
+                "evidence_kind": "post-optimization release speed evidence"
+              }
+            },
+            "shots_or_error_budget": {
+              "status": "recorded",
+              "value": {
+                "selected_case": "stim-style-surface-sample-d11-r100-b1024",
+                "warmup_rounds": 0,
+                "measure_rounds": 1,
+                "rstim_compiled_vs_stim_cli_ratio": 2.615088486966324
+              }
+            },
+            "artifact_hashes": {
+              "status": "recorded",
+              "value": {
+                "benchmarks/rstim_vs_stim_simulator/results/release/summary.json": {
+                  "sha256": "4885cce7491585ba617247232998b0775a6d756e8fda8fb1ba0359b42d43c97a"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/release/report.md": {
+                  "sha256": "8510e8397bc47ea49a77f55d916a307084fe44567a1f0ef114eb10e51c6c3943"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/release/environment.json": {
+                  "sha256": "ff10b5ba62e8ec2d65fa91da2d0c65322361e0f96c76d4d891f4979da2aa8b4f"
+                }
+              }
+            }
+          },
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "Stim version",
+            "external repository commits",
+            "command line",
+            "seeds",
+            "build profile",
+            "shot counts",
+            "date"
+          ],
+          "provenance_sources": [
+            "docs/showcases/rstim-vs-stim-simulator.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+          ],
+          "claims_limit": "Checked post-optimization release evidence for one recorded d11/r100 selected-case workload and one recorded environment only; not broad rstim/Stim parity.",
+          "caveats": [
+            "The release evidence is one selected d11/r100 sample workload and one recorded release-profile environment only.",
+            "The rstim-vs-Stim timing ratio is report-only context and is not a cross-machine CI gate.",
+            "The historical #406 debug-profile artifact remains separate and is not overwritten by this release evidence."
           ]
         }
       ]

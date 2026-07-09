@@ -89,6 +89,22 @@ the phrase `report-only Stim comparison`. If `rstim` is slower than Stim, Stim
 is unavailable, or a result is incomplete, that is still evidence when the
 status and environment are recorded plainly.
 
+Checked historical #406 speed evidence remains at
+[`benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json`](benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json)
+with its companion report
+[`benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md`](benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md).
+That artifact records the earlier debug-profile selected-case gap and is kept
+separate from later release-profile evidence.
+
+Checked post-optimization release evidence is published separately as
+[`benchmarks/rstim_vs_stim_simulator/results/release/summary.json`](benchmarks/rstim_vs_stim_simulator/results/release/summary.json),
+[`benchmarks/rstim_vs_stim_simulator/results/release/report.md`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),
+and
+[`benchmarks/rstim_vs_stim_simulator/results/release/environment.json`](benchmarks/rstim_vs_stim_simulator/results/release/environment.json).
+This release-profile run records only
+`stim-style-surface-sample-d11-r100-b1024` with 0 warmup rounds, 1 measured
+round, and the environment metadata captured by the selected-case runner.
+
 ## Code
 
 Fixture catalog and canonical circuit input:
@@ -113,6 +129,10 @@ Speed evidence:
 - [`rstim/tests/cli_perf.rs`](rstim/tests/cli_perf.rs)
 - [`rstim/tests/perf_summary.rs`](rstim/tests/perf_summary.rs)
 - [`rstim/tests/fixtures/perf/stim_style_sample_raw.jsonl`](rstim/tests/fixtures/perf/stim_style_sample_raw.jsonl)
+- [`benchmarks/rstim_vs_stim_simulator/run_speed_case.py`](benchmarks/rstim_vs_stim_simulator/run_speed_case.py)
+- [`benchmarks/rstim_vs_stim_simulator/results/release/summary.json`](benchmarks/rstim_vs_stim_simulator/results/release/summary.json)
+- [`benchmarks/rstim_vs_stim_simulator/results/release/report.md`](benchmarks/rstim_vs_stim_simulator/results/release/report.md)
+- [`benchmarks/rstim_vs_stim_simulator/results/release/environment.json`](benchmarks/rstim_vs_stim_simulator/results/release/environment.json)
 
 Issue context:
 
