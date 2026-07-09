@@ -51,6 +51,10 @@ def _version_string(command: list[str]) -> str:
     return f"failed: {stderr}" if stderr else "failed"
 
 
+def _probe_stim_python_version() -> dict[str, object]:
+    return _probe(["python3", "-c", "import stim; print(stim.__version__)"])
+
+
 def build_rstim(profile: str, *, repo_root: Path = REPO_ROOT) -> Path:
     if profile == "release":
         command = ["cargo", "build", "--release", "-p", "rstim", "--bin", "rstim"]
@@ -76,8 +80,14 @@ def collect_environment(
     rstim_binary_path: Path,
 ) -> dict[str, Any]:
     stim = _probe(["stim", "--version"])
+    stim_python = _probe_stim_python_version() if stim["status"] == "ok" and not stim.get("version") else None
+    stim_version = stim.get("version")
+    stim_version_source = "stim-cli-stdout"
+    if not stim_version and stim_python is not None and stim_python["status"] == "ok":
+        stim_version = stim_python.get("version")
+        stim_version_source = "python-stim-module"
     rstim = _probe([str(rstim_binary_path)])
-    return {
+    environment: dict[str, Any] = {
         "profile": profile,
         "case_label": case_label,
         "warmup_rounds": warmup_rounds,
@@ -89,9 +99,14 @@ def collect_environment(
         "rstim_status": rstim["status"],
         "stim_cli": stim,
         "stim_cli_status": stim["status"],
-        "stim_cli_version": stim.get("version"),
+        "stim_cli_version": stim_version,
+        "stim_cli_version_source": stim_version_source if stim_version else None,
         "stim_cli_stderr": stim.get("stderr"),
     }
+    if stim_python is not None:
+        environment["stim_python"] = stim_python
+        environment["stim_python_version"] = stim_python.get("version")
+    return environment
 
 
 def write_environment(path: Path, environment: dict[str, Any]) -> None:
