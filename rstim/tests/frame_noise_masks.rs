@@ -1,5 +1,5 @@
 use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{RngCore, SeedableRng};
 use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 use rstim::sim::frame::FrameSimulator;
@@ -11,6 +11,65 @@ fn measurement_words(program: &str, batch_size: usize, seed: u64) -> Vec<u64> {
     let mut frame = FrameSimulator::new(1, batch_size);
     frame.run(&instrs, &ref_sample, &mut rng).unwrap();
     frame.measurements(&ref_sample).row_words(0).to_vec()
+}
+
+struct CountingRng {
+    inner: StdRng,
+    core_calls: usize,
+}
+
+impl CountingRng {
+    fn seed_from_u64(seed: u64) -> Self {
+        Self {
+            inner: StdRng::seed_from_u64(seed),
+            core_calls: 0,
+        }
+    }
+
+    fn core_calls(&self) -> usize {
+        self.core_calls
+    }
+}
+
+impl RngCore for CountingRng {
+    fn next_u32(&mut self) -> u32 {
+        self.core_calls += 1;
+        self.inner.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.core_calls += 1;
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        for chunk in dest.chunks_mut(8) {
+            let bytes = self.next_u64().to_ne_bytes();
+            let len = chunk.len();
+            chunk.copy_from_slice(&bytes[..len]);
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+fn measurement_words_with_counting_rng(
+    program: &str,
+    batch_size: usize,
+    seed: u64,
+) -> (Vec<u64>, usize) {
+    let instrs = parse_lines(program).unwrap();
+    let ref_sample = reference_sample(&instrs).unwrap();
+    let mut rng = CountingRng::seed_from_u64(seed);
+    let mut frame = FrameSimulator::new(1, batch_size);
+    frame.run(&instrs, &ref_sample, &mut rng).unwrap();
+    (
+        frame.measurements(&ref_sample).row_words(0).to_vec(),
+        rng.core_calls(),
+    )
 }
 
 fn count_ones(words: &[u64]) -> u32 {
@@ -72,6 +131,38 @@ fn noise_mask_is_reproducible_for_seeded_rng() {
     let first = measurement_words(program, 257, 99);
     let second = measurement_words(program, 257, 99);
     assert_eq!(first, second);
+}
+
+#[test]
+fn low_probability_noise_mask_uses_sparse_path() {
+    let batch_size = 65_536;
+    let (words, core_calls) =
+        measurement_words_with_counting_rng("X_ERROR(0.001) 0\nM 0\n", batch_size, 123);
+    let hits = count_ones(&words);
+    assert!(
+        (30..=110).contains(&hits),
+        "expected roughly 66 hits for p=0.001 over {batch_size} shots, got {hits}"
+    );
+    assert!(
+        core_calls < 8_192,
+        "low-probability mask should jump between events instead of drawing once per bit; saw {core_calls} RNG core calls for {batch_size} shots"
+    );
+}
+
+#[test]
+fn medium_probability_noise_mask_keeps_dense_path() {
+    let batch_size = 4_096;
+    let (words, core_calls) =
+        measurement_words_with_counting_rng("X_ERROR(0.3) 0\nM 0\n", batch_size, 321);
+    let hits = count_ones(&words);
+    assert!(
+        (1_100..=1_350).contains(&hits),
+        "expected roughly 1229 hits for p=0.3 over {batch_size} shots, got {hits}"
+    );
+    assert!(
+        core_calls >= batch_size,
+        "medium-probability mask should stay on the dense path; saw {core_calls} RNG core calls for {batch_size} shots"
+    );
 }
 
 #[test]
