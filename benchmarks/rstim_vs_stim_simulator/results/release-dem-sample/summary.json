@@ -14,8 +14,8 @@
       "variants": [
         {
           "failure_reason": null,
-          "median_shots_per_second": 1828.511975810615,
-          "median_wall_time_ns": 560018208,
+          "median_shots_per_second": 2619.9968336417173,
+          "median_wall_time_ns": 390840167,
           "sample_count": 1,
           "status": "completed",
           "stderr": null,
@@ -23,8 +23,8 @@
         },
         {
           "failure_reason": null,
-          "median_shots_per_second": 257.91741720708535,
-          "median_wall_time_ns": 3970263083,
+          "median_shots_per_second": 242.09939661765978,
+          "median_wall_time_ns": 4229667708,
           "sample_count": 1,
           "status": "completed",
           "stderr": null,
