@@ -6,7 +6,7 @@
     "stim-style-surface-dem-sample-d11-r100-b1024"
   ],
   "command_line": [
-    "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-436-run-1-agent-issue-436-add-and-publish-a-dem-sampling-benchmark-case-ba-run-1/benchmarks/rstim_vs_stim_simulator/run_dem_speed_case.py",
+    "benchmarks/rstim_vs_stim_simulator/run_dem_speed_case.py",
     "--profile",
     "release",
     "--case",
@@ -18,17 +18,18 @@
     "--out-dir",
     "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample"
   ],
-  "dem_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-436-run-1-agent-issue-436-add-and-publish-a-dem-sampling-benchmark-case-ba-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
+  "dem_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
   "dem_sha256": "b25a3e3c70c6010b70cb60e55ca5806939a067366e5c6223061fdfa62417dc98",
   "expected_detectors": 12000,
   "expected_observables": 1,
+  "generation_command": "stim analyze_errors --decompose_errors < benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim > benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
   "measure_rounds": 1,
   "profile": "release",
-  "rstim_binary_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-436-run-1-agent-issue-436-add-and-publish-a-dem-sampling-benchmark-case-ba-run-1/target/release/rstim",
+  "rstim_binary_path": "target/release/rstim",
   "rstim_status": "ok",
   "rstim_version": "rstim 0.1.1",
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
-  "source_circuit_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-436-run-1-agent-issue-436-add-and-publish-a-dem-sampling-benchmark-case-ba-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+  "source_circuit_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "source_circuit_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
   "stim_cli": {
     "command": [

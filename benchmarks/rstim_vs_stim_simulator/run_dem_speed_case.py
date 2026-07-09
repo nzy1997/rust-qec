@@ -18,6 +18,11 @@ FIXTURES_DIR = PACKAGE_DIR / "fixtures"
 REPO_ROOT = PACKAGE_DIR.parents[1]
 FULL_CASE_LABEL = "stim-style-surface-dem-sample-d11-r100-b1024"
 EXPECTED_VARIANTS = ["stim-sample-dem", "rstim-sample-dem"]
+EXPECTED_GENERATION_COMMAND = (
+    "stim analyze_errors --decompose_errors < "
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim "
+    "> benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem"
+)
 build_rstim = run_speed_case.build_rstim
 
 
@@ -37,6 +42,30 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def repo_relative_path(path: Path, *, repo_root: Path = REPO_ROOT) -> str:
+    resolved_path = path.resolve()
+    resolved_root = repo_root.resolve()
+    try:
+        return resolved_path.relative_to(resolved_root).as_posix()
+    except ValueError:
+        return str(resolved_path)
+
+
+def repo_relative_command(command: list[str], *, repo_root: Path = REPO_ROOT) -> list[str]:
+    normalized: list[str] = []
+    resolved_root = repo_root.resolve()
+    for arg in command:
+        path = Path(arg)
+        if path.is_absolute():
+            try:
+                normalized.append(path.resolve().relative_to(resolved_root).as_posix())
+                continue
+            except ValueError:
+                pass
+        normalized.append(arg)
+    return normalized
 
 
 FULL_CASE = DemCase(
@@ -118,24 +147,32 @@ def load_and_validate_dem_case(case: DemCase) -> tuple[str, dict[str, object]]:
         case.expected_observables,
         "observable count does not match",
     )
+    _require_equal(
+        _require_value(metadata, "generation_command"),
+        EXPECTED_GENERATION_COMMAND,
+        "generation command does not match",
+    )
 
-    source_path_value = metadata.get("source_circuit_path")
-    if isinstance(source_path_value, str) and source_path_value.strip():
-        source_path = _resolve_metadata_path(source_path_value, metadata_path=case.metadata_path)
-        if source_path.exists():
-            _require_equal(
-                _require_value(metadata, "source_circuit_sha256"),
-                sha256_file(source_path),
-                "source circuit hash does not match",
-            )
+    source_path_value = _require_value(metadata, "source_circuit_path")
+    if not isinstance(source_path_value, str) or not source_path_value.strip():
+        raise _mismatch("source circuit path is empty")
+    source_path = _resolve_metadata_path(source_path_value, metadata_path=case.metadata_path)
+    if not source_path.is_file():
+        raise _mismatch("source circuit path does not exist")
+    _require_equal(
+        _require_value(metadata, "source_circuit_sha256"),
+        sha256_file(source_path),
+        "source circuit hash does not match",
+    )
 
     return dem_text, metadata
 
 
-def run_timed_command(command: list[str], dem_text: str) -> tuple[int, str, int]:
+def run_timed_command(command: list[str], dem_text: str, *, cwd: Path | None = None) -> tuple[int, str, int]:
     started_ns = time.perf_counter_ns()
     completed = subprocess.run(
         command,
+        cwd=cwd,
         input=dem_text,
         text=True,
         stdout=subprocess.DEVNULL,
@@ -288,14 +325,15 @@ def run_dem_speed_case(
     report_path = out_dir / "report.md"
     environment_path = out_dir / "environment.json"
 
+    rstim_command_path = repo_relative_path(rstim_binary, repo_root=repo_root)
     commands = [
         ("stim-sample-dem", ["stim", "sample_dem", "--shots", str(case.shots)]),
-        ("rstim-sample-dem", [str(rstim_binary), "sample_dem", "--shots", str(case.shots)]),
+        ("rstim-sample-dem", [rstim_command_path, "sample_dem", "--shots", str(case.shots)]),
     ]
     records: list[dict[str, object]] = []
     for phase, round_index in _iter_rounds(args.warmup_rounds, args.measure_rounds):
         for tool_variant, command in commands:
-            returncode, stderr, elapsed_ns = run_timed_command(command, dem_text)
+            returncode, stderr, elapsed_ns = run_timed_command(command, dem_text, cwd=repo_root)
             records.append(
                 _record_for_variant(
                     case=case,
@@ -320,20 +358,21 @@ def run_dem_speed_case(
         warmup_rounds=args.warmup_rounds,
         measure_rounds=args.measure_rounds,
         rstim_binary_path=rstim_binary,
-        command_line=list(sys.argv if command_line is None else command_line),
+        command_line=repo_relative_command(
+            list(sys.argv if command_line is None else command_line),
+            repo_root=repo_root,
+        ),
     )
-    source_circuit_path = metadata.get("source_circuit_path")
+    source_circuit_path = _resolve_metadata_path(metadata["source_circuit_path"], metadata_path=case.metadata_path)
     environment.update(
         {
             "case_label": case.label,
-            "dem_path": str(case.dem_path.resolve()),
+            "rstim_binary_path": repo_relative_path(rstim_binary, repo_root=repo_root),
+            "dem_path": repo_relative_path(case.dem_path, repo_root=REPO_ROOT),
             "dem_sha256": str(metadata["dem_sha256"]),
-            "source_circuit_path": (
-                str((case.metadata_path.parent / str(source_circuit_path)).resolve())
-                if isinstance(source_circuit_path, str) and source_circuit_path.strip()
-                else None
-            ),
+            "source_circuit_path": repo_relative_path(source_circuit_path, repo_root=REPO_ROOT),
             "source_circuit_sha256": metadata.get("source_circuit_sha256"),
+            "generation_command": metadata.get("generation_command"),
             "expected_detectors": case.expected_detectors,
             "expected_observables": case.expected_observables,
         }

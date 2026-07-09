@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,23 @@ EXPECTED_WORKLOAD = "sample_dem"
 EXPECTED_SHOTS = 1024
 EXPECTED_DETECTOR_COUNT = 12000
 EXPECTED_OBSERVABLE_COUNT = 1
+EXPECTED_WARMUP_ROUNDS = 0
+EXPECTED_MEASURE_ROUNDS = 1
+EXPECTED_DEM_REPO_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem"
+)
+EXPECTED_SOURCE_CIRCUIT_REPO_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+)
+EXPECTED_GENERATION_COMMAND = (
+    "stim analyze_errors --decompose_errors < "
+    "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim "
+    "> benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem"
+)
+EXPECTED_RAW_COMMANDS = {
+    "stim-sample-dem": ["stim", "sample_dem", "--shots", str(EXPECTED_SHOTS)],
+    "rstim-sample-dem": ["target/release/rstim", "sample_dem", "--shots", str(EXPECTED_SHOTS)],
+}
 REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json")
 
 METADATA_PATH = (
@@ -26,6 +44,14 @@ METADATA_PATH = (
 
 def _mismatch(detail: str) -> ValueError:
     return ValueError(f"DEM metadata mismatch: {detail}")
+
+
+def sha256_file(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def load_json(path: Path) -> Any:
@@ -58,10 +84,46 @@ def resolve_metadata_path(raw_path: object) -> Path:
 
 
 _METADATA = metadata()
-EXPECTED_DEM_PATH = resolve_metadata_path(_METADATA["dem_path"])
-EXPECTED_DEM_SHA256 = str(_METADATA["dem_sha256"])
-EXPECTED_SOURCE_CIRCUIT_PATH = resolve_metadata_path(_METADATA["source_circuit_path"])
-EXPECTED_SOURCE_CIRCUIT_SHA256 = str(_METADATA["source_circuit_sha256"])
+EXPECTED_DEM_PATH = REPO_ROOT / EXPECTED_DEM_REPO_PATH
+EXPECTED_SOURCE_CIRCUIT_PATH = REPO_ROOT / EXPECTED_SOURCE_CIRCUIT_REPO_PATH
+EXPECTED_DEM_SHA256 = sha256_file(EXPECTED_DEM_PATH)
+EXPECTED_SOURCE_CIRCUIT_SHA256 = sha256_file(EXPECTED_SOURCE_CIRCUIT_PATH)
+
+
+def validate_pinned_metadata() -> None:
+    require_equal(_METADATA.get("case_label"), DEFAULT_CASE_LABEL, "case label does not match")
+    require_equal(
+        resolve_metadata_path(_METADATA.get("dem_path")),
+        EXPECTED_DEM_PATH.resolve(),
+        "dem path does not match",
+    )
+    require_equal(_METADATA.get("dem_sha256"), EXPECTED_DEM_SHA256, "dem hash does not match")
+    require_equal(
+        resolve_metadata_path(_METADATA.get("source_circuit_path")),
+        EXPECTED_SOURCE_CIRCUIT_PATH.resolve(),
+        "source circuit path does not match",
+    )
+    require_equal(
+        _METADATA.get("source_circuit_sha256"),
+        EXPECTED_SOURCE_CIRCUIT_SHA256,
+        "source circuit hash does not match",
+    )
+    require_equal(
+        _METADATA.get("generation_command"),
+        EXPECTED_GENERATION_COMMAND,
+        "generation command does not match",
+    )
+    require_equal(_METADATA.get("shots"), EXPECTED_SHOTS, "shot count does not match")
+    require_equal(
+        _METADATA.get("expected_detectors"),
+        EXPECTED_DETECTOR_COUNT,
+        "detector count does not match",
+    )
+    require_equal(
+        _METADATA.get("expected_observables"),
+        EXPECTED_OBSERVABLE_COUNT,
+        "observable count does not match",
+    )
 
 
 def validate_required_files(results_dir: Path) -> None:
@@ -91,6 +153,11 @@ def validate_raw_records(results_dir: Path, *, case_label: str, required_variant
                 and record.get("phase") == "measure"
                 and record.get("status") == "completed"
             ):
+                expected_command = EXPECTED_RAW_COMMANDS[variant]
+                if record.get("round_index") != 0:
+                    raise ValueError(f"raw round_index must be 0 for required variant {variant}")
+                if record.get("command") != expected_command:
+                    raise ValueError(f"raw command mismatch for required variant {variant}")
                 matched_variants.add(variant)
     for required_variant in required_variants:
         if required_variant not in matched_variants:
@@ -122,6 +189,8 @@ def validate_summary(summary: dict[str, Any], *, case_label: str, required_varia
     case = find_case(summary, case_label)
     if case.get("workload") != EXPECTED_WORKLOAD:
         raise ValueError(f"case {case_label} workload must be {EXPECTED_WORKLOAD}")
+    if case.get("tier") != "report_only":
+        raise ValueError(f"case {case_label} tier must be report_only")
 
     present_variants = require_list(case.get("present_variants"), "present_variants")
     variant_names = variants_by_name(case)
@@ -131,6 +200,10 @@ def validate_summary(summary: dict[str, Any], *, case_label: str, required_varia
         if variant_names[required_variant].get("status") != "completed":
             status = variant_names[required_variant].get("status")
             raise ValueError(f"required variant {required_variant} status is {status}")
+        if variant_names[required_variant].get("sample_count") != EXPECTED_MEASURE_ROUNDS:
+            raise ValueError(
+                f"required variant {required_variant} sample_count must be {EXPECTED_MEASURE_ROUNDS}"
+            )
 
 
 def require_equal(actual: Any, expected: Any, detail: str) -> None:
@@ -141,17 +214,26 @@ def require_equal(actual: Any, expected: Any, detail: str) -> None:
 def validate_environment(environment: dict[str, Any], *, case_label: str) -> None:
     require_equal(environment.get("profile"), "release", "profile does not match")
     require_equal(environment.get("case_label"), case_label, "case label does not match")
-    require_equal(environment.get("dem_path"), str(EXPECTED_DEM_PATH), "dem path does not match")
+    require_equal(environment.get("case_labels"), [case_label], "case labels do not match")
+    require_equal(environment.get("case_count"), 1, "case count does not match")
+    require_equal(environment.get("warmup_rounds"), EXPECTED_WARMUP_ROUNDS, "warmup rounds does not match")
+    require_equal(environment.get("measure_rounds"), EXPECTED_MEASURE_ROUNDS, "measure rounds does not match")
+    require_equal(environment.get("dem_path"), EXPECTED_DEM_REPO_PATH, "dem path does not match")
     require_equal(environment.get("dem_sha256"), EXPECTED_DEM_SHA256, "dem hash does not match")
     require_equal(
         environment.get("source_circuit_path"),
-        str(EXPECTED_SOURCE_CIRCUIT_PATH),
+        EXPECTED_SOURCE_CIRCUIT_REPO_PATH,
         "source circuit path does not match",
     )
     require_equal(
         environment.get("source_circuit_sha256"),
         EXPECTED_SOURCE_CIRCUIT_SHA256,
         "source circuit hash does not match",
+    )
+    require_equal(
+        environment.get("generation_command"),
+        EXPECTED_GENERATION_COMMAND,
+        "generation command does not match",
     )
     require_equal(
         environment.get("expected_detectors"),
@@ -184,8 +266,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     results_dir = Path(args.results_dir)
     try:
+        validate_pinned_metadata()
         validate_required_files(results_dir)
-        validate_raw_records(results_dir, case_label=args.case, required_variants=list(args.required_variants))
+        validate_raw_records(
+            results_dir,
+            case_label=args.case,
+            required_variants=list(args.required_variants),
+        )
         summary = require_dict(load_json(results_dir / "summary.json"), "summary.json")
         environment = require_dict(load_json(results_dir / "environment.json"), "environment.json")
         validate_summary(summary, case_label=args.case, required_variants=list(args.required_variants))

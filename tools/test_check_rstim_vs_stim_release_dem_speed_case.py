@@ -74,7 +74,7 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
                 "elapsed_ns": 1200,
                 "exit_code": 0,
                 "stderr": None,
-                "command": ["rstim", "sample_dem", "--shots", str(checker.EXPECTED_SHOTS)],
+                "command": ["target/release/rstim", "sample_dem", "--shots", str(checker.EXPECTED_SHOTS)],
             },
         ]
         (self.results_dir / "raw.jsonl").write_text(
@@ -130,12 +130,16 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
             "case_labels": [checker.DEFAULT_CASE_LABEL],
             "case_count": 1,
             "command_line": ["run-dem-speed-case", "--profile", "release"],
-            "dem_path": str(checker.EXPECTED_DEM_PATH),
+            "dem_path": checker.EXPECTED_DEM_REPO_PATH,
             "dem_sha256": checker.EXPECTED_DEM_SHA256,
-            "source_circuit_path": str(checker.EXPECTED_SOURCE_CIRCUIT_PATH),
+            "source_circuit_path": checker.EXPECTED_SOURCE_CIRCUIT_REPO_PATH,
             "source_circuit_sha256": checker.EXPECTED_SOURCE_CIRCUIT_SHA256,
+            "generation_command": checker.EXPECTED_GENERATION_COMMAND,
             "expected_detectors": checker.EXPECTED_DETECTOR_COUNT,
             "expected_observables": checker.EXPECTED_OBSERVABLE_COUNT,
+            "warmup_rounds": 0,
+            "measure_rounds": 1,
+            "rstim_binary_path": "target/release/rstim",
         }
         (self.results_dir / "environment.json").write_text(
             json.dumps(environment, indent=2, sort_keys=True) + "\n",
@@ -146,13 +150,13 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
         self.write_valid_fixture()
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}", result.stdout)
+        self.assertEqual(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}\n", result.stdout)
 
     def test_accepts_comma_separated_required_variants_cli(self) -> None:
         self.write_valid_fixture()
         result = self.run_checker(required_variants=["stim-sample-dem,rstim-sample-dem"])
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}", result.stdout)
+        self.assertEqual(f"PASS release DEM speed case {checker.DEFAULT_CASE_LABEL}\n", result.stdout)
 
     def test_rejects_missing_required_variant(self) -> None:
         self.write_valid_fixture()
@@ -190,6 +194,27 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
             json.dumps(bad_environment, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DEM metadata mismatch", result.stderr)
+
+    def test_rejects_absolute_fixture_paths_in_environment(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["dem_path"] = str(checker.EXPECTED_DEM_PATH)
+        environment["source_circuit_path"] = str(checker.EXPECTED_SOURCE_CIRCUIT_PATH)
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DEM metadata mismatch", result.stderr)
+
+    def test_rejects_bad_generation_command(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["generation_command"] = "stim analyze_errors < wrong.stim > wrong.dem"
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("DEM metadata mismatch", result.stderr)
@@ -268,6 +293,21 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("missing completed raw record for required variant stim-sample-dem", result.stderr)
 
+    def test_rejects_unexpected_raw_command(self) -> None:
+        self.write_valid_fixture()
+        raw_path = self.results_dir / "raw.jsonl"
+        records = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line]
+        for record in records:
+            if record["tool_variant"] == "rstim-sample-dem":
+                record["command"] = ["/tmp/worktree/target/release/rstim", "sample_dem", "--shots", "1024"]
+        raw_path.write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("raw command mismatch for required variant rstim-sample-dem", result.stderr)
+
     def test_rejects_wrong_shot_count_in_raw_jsonl(self) -> None:
         self.write_valid_fixture()
         raw_path = self.results_dir / "raw.jsonl"
@@ -282,6 +322,46 @@ class ReleaseDemSpeedCaseCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("shot count must be 1024", result.stderr)
+
+    def test_rejects_wrong_summary_tier(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["cases"][0]["tier"] = "threshold"
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("case stim-style-surface-dem-sample-d11-r100-b1024 tier must be report_only", result.stderr)
+
+    def test_rejects_wrong_sample_count(self) -> None:
+        self.write_valid_fixture()
+        summary_path = self.results_dir / "summary.json"
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary["cases"][0]["variants"][0]["sample_count"] = 2
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("required variant stim-sample-dem sample_count must be 1", result.stderr)
+
+    def test_rejects_wrong_release_rounds(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["measure_rounds"] = 2
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("measure rounds does not match", result.stderr)
+
+    def test_rejects_wrong_case_count(self) -> None:
+        self.write_valid_fixture()
+        environment_path = self.results_dir / "environment.json"
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+        environment["case_count"] = 2
+        environment_path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("case count does not match", result.stderr)
 
 
 if __name__ == "__main__":

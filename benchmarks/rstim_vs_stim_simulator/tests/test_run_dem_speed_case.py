@@ -13,29 +13,52 @@ from benchmarks.rstim_vs_stim_simulator import run_dem_speed_case
 
 
 class RunDemSpeedCaseValidationTest(unittest.TestCase):
+    def write_case_files(
+        self,
+        root: Path,
+        *,
+        expected_detectors: int = 1,
+        expected_observables: int = 1,
+        source_circuit_path: str = "source.stim",
+        source_circuit_sha256: str | None = None,
+        generation_command: str = (
+            "stim analyze_errors --decompose_errors < "
+            "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim "
+            "> benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem"
+        ),
+    ) -> tuple[Path, Path]:
+        dem_path = root / "case.dem"
+        metadata_path = root / "case.dem.metadata.json"
+        source_path = root / source_circuit_path
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_text("H 0\nM 0\nDETECTOR rec[-1]\n")
+        dem_path.write_text("error(0.1) D0 L0\n")
+        metadata_path.write_text(
+            json.dumps(
+                {
+                    "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
+                    "dem_path": str(dem_path),
+                    "dem_sha256": run_dem_speed_case.sha256_file(dem_path),
+                    "expected_detectors": expected_detectors,
+                    "expected_observables": expected_observables,
+                    "shots": 1024,
+                    "source_circuit_path": source_circuit_path,
+                    "source_circuit_sha256": (
+                        source_circuit_sha256
+                        if source_circuit_sha256 is not None
+                        else run_dem_speed_case.sha256_file(source_path)
+                    ),
+                    "generation_command": generation_command,
+                }
+            )
+            + "\n"
+        )
+        return dem_path, metadata_path
+
     def test_load_and_validate_dem_case_rejects_bad_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            dem_path = root / "case.dem"
-            metadata_path = root / "case.dem.metadata.json"
-            dem_path.write_text("error(0.1) D0 L0\n")
-            dem_hash = run_dem_speed_case.sha256_file(dem_path)
-            metadata_path.write_text(
-                json.dumps(
-                    {
-                        "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
-                        "dem_path": str(dem_path),
-                        "dem_sha256": dem_hash,
-                        "expected_detectors": 11999,
-                        "expected_observables": 1,
-                        "shots": 1024,
-                        "source_circuit_path": "fixtures/source.stim",
-                        "source_circuit_sha256": "0" * 64,
-                        "generation_command": "stim analyze_errors --decompose_errors < source.stim > case.dem",
-                    }
-                )
-                + "\n"
-            )
+            dem_path, metadata_path = self.write_case_files(root, expected_detectors=11999)
             case = run_dem_speed_case.DemCase(
                 label="stim-style-surface-dem-sample-d11-r100-b1024",
                 dem_path=dem_path,
@@ -51,25 +74,42 @@ class RunDemSpeedCaseValidationTest(unittest.TestCase):
     def test_load_and_validate_dem_case_rejects_bad_observable_count(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            dem_path = root / "case.dem"
-            metadata_path = root / "case.dem.metadata.json"
-            dem_path.write_text("error(0.1) D0 L0\n")
-            dem_hash = run_dem_speed_case.sha256_file(dem_path)
-            metadata_path.write_text(
-                json.dumps(
-                    {
-                        "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
-                        "dem_path": str(dem_path),
-                        "dem_sha256": dem_hash,
-                        "expected_detectors": 1,
-                        "expected_observables": 0,
-                        "shots": 1024,
-                        "source_circuit_path": "fixtures/source.stim",
-                        "source_circuit_sha256": "0" * 64,
-                        "generation_command": "stim analyze_errors --decompose_errors < source.stim > case.dem",
-                    }
-                )
-                + "\n"
+            dem_path, metadata_path = self.write_case_files(root, expected_observables=0)
+            case = run_dem_speed_case.DemCase(
+                label="stim-style-surface-dem-sample-d11-r100-b1024",
+                dem_path=dem_path,
+                metadata_path=metadata_path,
+                shots=1024,
+                expected_detectors=1,
+                expected_observables=1,
+            )
+
+            with self.assertRaisesRegex(ValueError, "DEM metadata mismatch"):
+                run_dem_speed_case.load_and_validate_dem_case(case)
+
+    def test_load_and_validate_dem_case_rejects_missing_source_circuit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            dem_path, metadata_path = self.write_case_files(root, source_circuit_path="missing/source.stim")
+            (root / "missing/source.stim").unlink()
+            case = run_dem_speed_case.DemCase(
+                label="stim-style-surface-dem-sample-d11-r100-b1024",
+                dem_path=dem_path,
+                metadata_path=metadata_path,
+                shots=1024,
+                expected_detectors=1,
+                expected_observables=1,
+            )
+
+            with self.assertRaisesRegex(ValueError, "DEM metadata mismatch"):
+                run_dem_speed_case.load_and_validate_dem_case(case)
+
+    def test_load_and_validate_dem_case_rejects_bad_generation_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            dem_path, metadata_path = self.write_case_files(
+                root,
+                generation_command="stim analyze_errors < wrong.stim > wrong.dem",
             )
             case = run_dem_speed_case.DemCase(
                 label="stim-style-surface-dem-sample-d11-r100-b1024",
@@ -86,26 +126,7 @@ class RunDemSpeedCaseValidationTest(unittest.TestCase):
     def test_load_and_validate_dem_case_accepts_matching_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            dem_path = root / "case.dem"
-            metadata_path = root / "case.dem.metadata.json"
-            dem_path.write_text("error(0.1) D0 L0\n")
-            dem_hash = run_dem_speed_case.sha256_file(dem_path)
-            metadata_path.write_text(
-                json.dumps(
-                    {
-                        "case_label": "stim-style-surface-dem-sample-d11-r100-b1024",
-                        "dem_path": str(dem_path),
-                        "dem_sha256": dem_hash,
-                        "expected_detectors": 1,
-                        "expected_observables": 1,
-                        "shots": 1024,
-                        "source_circuit_path": "fixtures/source.stim",
-                        "source_circuit_sha256": "0" * 64,
-                        "generation_command": "stim analyze_errors --decompose_errors < source.stim > case.dem",
-                    }
-                )
-                + "\n"
-            )
+            dem_path, metadata_path = self.write_case_files(root)
             case = run_dem_speed_case.DemCase(
                 label="stim-style-surface-dem-sample-d11-r100-b1024",
                 dem_path=dem_path,
@@ -118,7 +139,7 @@ class RunDemSpeedCaseValidationTest(unittest.TestCase):
             dem_text, metadata = run_dem_speed_case.load_and_validate_dem_case(case)
 
             self.assertEqual(dem_text, "error(0.1) D0 L0\n")
-            self.assertEqual(metadata["dem_sha256"], dem_hash)
+            self.assertEqual(metadata["dem_sha256"], run_dem_speed_case.sha256_file(dem_path))
 
 
 class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
@@ -150,7 +171,7 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 0, "stim 1.15.0\n", "")
                 if command == ["stim", "sample_dem", "--shots", "1024"]:
                     return subprocess.CompletedProcess(command, 0, "", "")
-                if command == [str(binary), "sample_dem", "--shots", "1024"]:
+                if command == ["target/release/rstim", "sample_dem", "--shots", "1024"]:
                     return subprocess.CompletedProcess(command, 0, "", "")
                 raise AssertionError(f"unexpected command: {command}")
 
@@ -170,17 +191,18 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
                     args,
                     repo_root=repo_root,
                     command_line=["run-dem-speed-case", "--profile", "release"],
-                )
+            )
 
             stim_call = next(call for call in calls if call[0] == ["stim", "sample_dem", "--shots", "1024"])
             rstim_call = next(
-                call for call in calls if call[0] == [str(binary), "sample_dem", "--shots", "1024"]
+                call for call in calls if call[0] == ["target/release/rstim", "sample_dem", "--shots", "1024"]
             )
             for _, kwargs in [stim_call, rstim_call]:
                 self.assertEqual(kwargs["input"], run_dem_speed_case.FULL_CASE.dem_path.read_text())
                 self.assertTrue(kwargs["text"])
                 self.assertIs(kwargs["stdout"], subprocess.DEVNULL)
                 self.assertIs(kwargs["stderr"], subprocess.PIPE)
+                self.assertEqual(kwargs["cwd"], repo_root)
 
             raw_records = [
                 json.loads(line) for line in (out_dir / "raw.jsonl").read_text().splitlines() if line.strip()
@@ -191,6 +213,8 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
                 ["rstim-sample-dem", "stim-sample-dem"],
             )
             self.assertTrue(all(record["status"] == "completed" for record in raw_records))
+            rstim_raw = next(record for record in raw_records if record["tool_variant"] == "rstim-sample-dem")
+            self.assertEqual(rstim_raw["command"], ["target/release/rstim", "sample_dem", "--shots", "1024"])
 
             summary = json.loads((out_dir / "summary.json").read_text())
             self.assertEqual(len(summary["cases"]), 1)
@@ -220,22 +244,16 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
             self.assertEqual(environment["case_labels"], [run_dem_speed_case.FULL_CASE_LABEL])
             self.assertEqual(environment["case_count"], 1)
             self.assertEqual(environment["command_line"], ["run-dem-speed-case", "--profile", "release"])
-            self.assertEqual(environment["dem_path"], str(run_dem_speed_case.FULL_CASE.dem_path.resolve()))
+            self.assertEqual(
+                environment["dem_path"],
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
+            )
             self.assertEqual(
                 environment["dem_sha256"], run_dem_speed_case.sha256_file(run_dem_speed_case.FULL_CASE.dem_path)
             )
             self.assertEqual(
                 environment["source_circuit_path"],
-                str(
-                    (
-                        run_dem_speed_case.FULL_CASE.metadata_path.parent
-                        / str(
-                            run_dem_speed_case._load_metadata(run_dem_speed_case.FULL_CASE.metadata_path)[
-                                "source_circuit_path"
-                            ]
-                        )
-                    ).resolve()
-                ),
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
             )
             self.assertEqual(
                 environment["source_circuit_sha256"],
@@ -243,6 +261,8 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
                     "source_circuit_sha256"
                 ],
             )
+            self.assertEqual(environment["generation_command"], run_dem_speed_case.EXPECTED_GENERATION_COMMAND)
+            self.assertEqual(environment["rstim_binary_path"], "target/release/rstim")
             self.assertEqual(environment["expected_detectors"], 12000)
             self.assertEqual(environment["expected_observables"], 1)
 
@@ -272,7 +292,7 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 0, "stim 1.15.0\n", "")
                 if command == ["stim", "sample_dem", "--shots", "1024"]:
                     return subprocess.CompletedProcess(command, 7, "", "stim failed hard\n")
-                if command == [str(binary), "sample_dem", "--shots", "1024"]:
+                if command == ["target/release/rstim", "sample_dem", "--shots", "1024"]:
                     return subprocess.CompletedProcess(command, 0, "", "")
                 raise AssertionError(f"unexpected command: {command}")
 
@@ -322,16 +342,7 @@ class RunDemSpeedCaseWorkflowTest(unittest.TestCase):
             environment = json.loads((out_dir / "environment.json").read_text())
             self.assertEqual(
                 environment["source_circuit_path"],
-                str(
-                    (
-                        run_dem_speed_case.FULL_CASE.metadata_path.parent
-                        / str(
-                            run_dem_speed_case._load_metadata(run_dem_speed_case.FULL_CASE.metadata_path)[
-                                "source_circuit_path"
-                            ]
-                        )
-                    ).resolve()
-                ),
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
             )
             self.assertEqual(
                 environment["source_circuit_sha256"],
