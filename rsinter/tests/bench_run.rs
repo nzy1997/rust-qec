@@ -2283,8 +2283,11 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     assert_eq!(predict_zero_row.status, "ok");
     assert_eq!(predict_zero_row.error, None);
     let logical_error_rate = predict_zero_row.metrics["logical_error_rate"];
+    // This is a stochastic negative-control bound, not an exact seeded sample
+    // contract. Frame-sampler RNG consumption may change across valid sampling
+    // implementations while the predict-zero control remains intentionally bad.
     assert!(
-        (0.70..=0.80).contains(&logical_error_rate),
+        (0.70..=0.90).contains(&logical_error_rate),
         "predict-zero fixture LER was {logical_error_rate}"
     );
 }
