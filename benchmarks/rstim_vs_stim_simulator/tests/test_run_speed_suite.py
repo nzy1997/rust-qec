@@ -108,7 +108,7 @@ class RunSpeedSuiteParserTest(unittest.TestCase):
                             command,
                             1,
                             "",
-                            "unknown benchmark case: does-not-exist\n",
+                            "case registry rejected label\n",
                         )
                 elif command == ["rustc", "--version"]:
                     return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
@@ -142,10 +142,10 @@ class RunSpeedSuiteParserTest(unittest.TestCase):
                         "--out-dir",
                         str(out_dir),
                     ]
-                )
+            )
 
             self.assertEqual(code, 1)
-            self.assertIn("unknown benchmark case", str(mocked_print.call_args))
+            self.assertIn("unknown benchmark case: does-not-exist", str(mocked_print.call_args.args[0]))
             self.assertFalse(any(command[:3] == [str(binary), "perf", "run"] for command in commands))
 
 

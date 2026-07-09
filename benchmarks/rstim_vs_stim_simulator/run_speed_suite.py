@@ -61,7 +61,10 @@ def _validate_case_label(rstim_binary: Path, label: str, *, cwd: Path, temp_root
     except OSError as error:
         raise ValueError(str(error)) from error
     if completed.returncode != 0:
-        message = completed.stderr.strip() or completed.stdout.strip() or f"unknown benchmark case: {label}"
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        message = f"unknown benchmark case: {label}"
+        if detail:
+            message = f"{message}: {detail}"
         raise ValueError(message)
     run_speed_case._require_artifact(validation_summary_path)
 
