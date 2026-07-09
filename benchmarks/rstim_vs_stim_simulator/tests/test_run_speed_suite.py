@@ -92,6 +92,62 @@ class RunSpeedSuiteParserTest(unittest.TestCase):
             self.assertFalse(mocked_build.called)
             self.assertIn("no benchmark cases requested", str(mocked_print.call_args))
 
+    def test_main_unknown_case_prints_child_validation_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "target/release/rstim"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("")
+            out_dir = Path(temp_dir) / "out"
+            commands: list[list[str]] = []
+
+            def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+                commands.append(command)
+                if command[:3] == [str(binary), "perf", "summarize"]:
+                    if command[command.index("--in") + 1].endswith("empty.jsonl"):
+                        return subprocess.CompletedProcess(
+                            command,
+                            1,
+                            "",
+                            "unknown benchmark case: does-not-exist\n",
+                        )
+                elif command == ["rustc", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "rustc 1.93.1\n", "")
+                elif command == ["cargo", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "cargo 1.93.1\n", "")
+                elif command == [str(binary)]:
+                    return subprocess.CompletedProcess(command, 0, "rstim 0.1.1\n", "")
+                elif command == ["stim", "--version"]:
+                    return subprocess.CompletedProcess(command, 0, "stim 1.15.0\n", "")
+                raise AssertionError(f"unexpected command: {command}")
+
+            with (
+                mock.patch(
+                    "benchmarks.rstim_vs_stim_simulator.run_speed_suite.run_speed_case.build_rstim",
+                    return_value=binary,
+                ),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_speed_suite.subprocess.run") as mocked_run,
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_speed_suite.print") as mocked_print,
+            ):
+                mocked_run.side_effect = fake_run
+                code = run_speed_suite.main(
+                    [
+                        "--profile",
+                        "release",
+                        "--cases",
+                        "does-not-exist",
+                        "--warmup-rounds",
+                        "0",
+                        "--measure-rounds",
+                        "1",
+                        "--out-dir",
+                        str(out_dir),
+                    ]
+                )
+
+            self.assertEqual(code, 1)
+            self.assertIn("unknown benchmark case", str(mocked_print.call_args))
+            self.assertFalse(any(command[:3] == [str(binary), "perf", "run"] for command in commands))
+
 
 class RunSpeedSuiteWorkflowTest(unittest.TestCase):
     def test_run_speed_suite_builds_once_and_writes_exact_requested_bundle(self) -> None:

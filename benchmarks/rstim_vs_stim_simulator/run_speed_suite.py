@@ -38,6 +38,34 @@ def _merge_case_summary(summary_path: Path, merged: dict[str, list[Any]]) -> Non
     merged["issues"].extend(summary.get("issues", []))
 
 
+def _validate_case_label(rstim_binary: Path, label: str, *, cwd: Path, temp_root: Path, index: int) -> None:
+    validation_summary_path = temp_root / f"validate-{index}.json"
+    try:
+        completed = subprocess.run(
+            [
+                str(rstim_binary),
+                "perf",
+                "summarize",
+                "--case",
+                label,
+                "--in",
+                str(temp_root / "empty.jsonl"),
+                "--out",
+                str(validation_summary_path),
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise ValueError(str(error)) from error
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or f"unknown benchmark case: {label}"
+        raise ValueError(message)
+    run_speed_case._require_artifact(validation_summary_path)
+
+
 def run_speed_suite(
     args: argparse.Namespace,
     repo_root: Path = REPO_ROOT,
@@ -61,22 +89,7 @@ def run_speed_suite(
         empty_raw_path.write_text("")
 
         for index, label in enumerate(case_labels):
-            validation_summary_path = temp_root / f"validate-{index}.json"
-            run_speed_case._run_checked(
-                [
-                    str(rstim_binary),
-                    "perf",
-                    "summarize",
-                    "--case",
-                    label,
-                    "--in",
-                    str(empty_raw_path),
-                    "--out",
-                    str(validation_summary_path),
-                ],
-                cwd=repo_root,
-            )
-            run_speed_case._require_artifact(validation_summary_path)
+            _validate_case_label(rstim_binary, label, cwd=repo_root, temp_root=temp_root, index=index)
 
         for index, label in enumerate(case_labels):
             case_raw_path = temp_root / f"raw-{index}.jsonl"
