@@ -1,11 +1,46 @@
 use rand::RngCore;
+#[cfg(debug_assertions)]
+use std::cell::Cell;
 
 const F64_UNIT_INTERVAL_SCALE: f64 = 1.0 / ((1u64 << 53) as f64);
 
+#[cfg(debug_assertions)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RareErrorTelemetry {
     pub iterator_builds: usize,
     pub rng_core_draws: usize,
+}
+
+#[cfg(debug_assertions)]
+thread_local! {
+    static ITERATOR_BUILDS: Cell<usize> = const { Cell::new(0) };
+    static RNG_CORE_DRAWS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn reset_rare_error_telemetry() {
+    ITERATOR_BUILDS.with(|builds| builds.set(0));
+    RNG_CORE_DRAWS.with(|draws| draws.set(0));
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn rare_error_telemetry() -> RareErrorTelemetry {
+    RareErrorTelemetry {
+        iterator_builds: ITERATOR_BUILDS.with(Cell::get),
+        rng_core_draws: RNG_CORE_DRAWS.with(Cell::get),
+    }
+}
+
+#[cfg(debug_assertions)]
+fn record_iterator_build() {
+    ITERATOR_BUILDS.with(|builds| builds.set(builds.get().saturating_add(1)));
+}
+
+#[cfg(debug_assertions)]
+fn record_rng_core_draw() {
+    RNG_CORE_DRAWS.with(|draws| draws.set(draws.get().saturating_add(1)));
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -20,7 +55,6 @@ pub struct RareErrorIterator<'a, R: RngCore + ?Sized> {
     attempt_count: usize,
     next_candidate: usize,
     mode: RareErrorMode,
-    telemetry: RareErrorTelemetry,
 }
 
 pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
@@ -33,6 +67,9 @@ pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
 
 impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
     pub fn new(probability: f64, attempt_count: usize, rng: &'a mut R) -> Self {
+        #[cfg(debug_assertions)]
+        record_iterator_build();
+
         let mode = if attempt_count == 0 || probability <= 0.0 || probability.is_nan() {
             RareErrorMode::Empty
         } else if probability >= 1.0 {
@@ -48,21 +85,14 @@ impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
             attempt_count,
             next_candidate: 0,
             mode,
-            telemetry: RareErrorTelemetry {
-                iterator_builds: 1,
-                rng_core_draws: 0,
-            },
         }
-    }
-
-    pub fn telemetry(&self) -> RareErrorTelemetry {
-        self.telemetry
     }
 
     fn draw_open_unit_f64(&mut self) -> f64 {
         loop {
+            #[cfg(debug_assertions)]
+            record_rng_core_draw();
             let raw = self.rng.next_u64();
-            self.telemetry.rng_core_draws += 1;
             let value = ((raw >> 11) as f64) * F64_UNIT_INTERVAL_SCALE;
             if value > 0.0 {
                 return value;

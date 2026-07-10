@@ -4,7 +4,7 @@
 
 **Goal:** Add an internal instruction-wide `RareErrorIterator` over flattened opportunity indices with deterministic geometric skipping and focused acceptance tests.
 
-**Architecture:** Keep the new primitive isolated in `rstim/src/rare_error_iterator.rs` and expose it as a hidden internal module from `rstim/src/lib.rs`. The iterator handles exact empty/all-event boundary modes without RNG draws and uses constant-space geometric skipping for `0.0 < p < 1.0`. Acceptance tests exercise the iterator directly without wiring simulator noise instructions to it.
+**Architecture:** Keep the new primitive isolated in `rstim/src/rare_error_iterator.rs` and expose it as a hidden internal module from `rstim/src/lib.rs`. The iterator handles exact empty/all-event boundary modes without RNG draws and uses constant-space geometric skipping for `0.0 < p < 1.0`. Debug-only thread-local telemetry supports acceptance tests without changing the release iterator layout or hot path. Acceptance tests exercise the iterator directly without wiring simulator noise instructions to it.
 
 **Tech Stack:** Rust 2024, `rand` 0.8, `StdRng::seed_from_u64(123)`, Cargo integration tests, thread-local allocation counting in the focused test binary.
 
@@ -16,7 +16,9 @@
 - Yield nothing for `probability <= 0` or `attempt_count == 0`.
 - Yield exactly `0..attempt_count` for `probability >= 1`.
 - Use geometric skipping for `0.0 < probability < 1.0`.
-- Expose iterator-build and RNG-core-draw telemetry for the acceptance tests.
+- Expose iterator-build and RNG-core-draw telemetry only through hidden,
+  module-level functions in debug builds; release builds omit telemetry state,
+  API, and counter updates.
 - Allocate no dense bitmap or vector proportional to `attempt_count`.
 - Seeded tests must use `rand::rngs::StdRng::seed_from_u64(123)`.
 - For `attempt_count = 1_000_000`, `p = 0.001`, and seed `123`, require 800-1,200 events and fewer than 10,000 RNG-core draws.
@@ -43,22 +45,61 @@
 
 **Interfaces:**
 - Consumes: `rand::RngCore`, `rand::rngs::StdRng`, `rand::SeedableRng`
-- Produces: `rstim::rare_error_iterator::RareErrorIterator<'a, R>`, `rstim::rare_error_iterator::rare_error_indices(probability: f64, attempt_count: usize, rng: &mut R)`, `RareErrorIterator::telemetry()`
+- Produces: `rstim::rare_error_iterator::RareErrorIterator<'a, R>`, `rstim::rare_error_iterator::rare_error_indices(probability: f64, attempt_count: usize, rng: &mut R)`, and, in debug builds, hidden `reset_rare_error_telemetry()` and `rare_error_telemetry()` functions.
 
 - [ ] **Step 1: Write the failing acceptance test**
 
 Create `rstim/tests/rare_error_iterator.rs` with this complete test file:
 
 ```rust
-use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rstim::rare_error_iterator::rare_error_indices;
+use rand::{Error, RngCore, SeedableRng};
+use rstim::rare_error_iterator::{
+    rare_error_indices, rare_error_telemetry, reset_rare_error_telemetry,
+};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::hint::black_box;
 
 struct CountingAllocator;
+
+struct CountingRng<R> {
+    inner: R,
+    core_draws: usize,
+}
+
+impl<R> CountingRng<R> {
+    fn new(inner: R) -> Self {
+        Self { inner, core_draws: 0 }
+    }
+
+    fn core_draws(&self) -> usize {
+        self.core_draws
+    }
+}
+
+impl<R: RngCore> RngCore for CountingRng<R> {
+    fn next_u32(&mut self) -> u32 {
+        self.core_draws += 1;
+        self.inner.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.core_draws += 1;
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.core_draws += 1;
+        self.inner.fill_bytes(dest);
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
+        self.core_draws += 1;
+        self.inner.try_fill_bytes(dest)
+    }
+}
 
 thread_local! {
     static COUNT_ALLOCATIONS: Cell<bool> = const { Cell::new(false) };
@@ -118,7 +159,8 @@ fn collect_seeded(probability: f64, attempt_count: usize) -> Vec<usize> {
 
 #[test]
 fn boundary_probabilities_and_zero_attempts() {
-    let mut rng = StdRng::seed_from_u64(123);
+    reset_rare_error_telemetry();
+    let mut rng = CountingRng::new(StdRng::seed_from_u64(123));
     let empty: Vec<usize> = rare_error_indices(0.0, 8, &mut rng).collect();
     assert!(empty.is_empty(), "p=0 must yield no rare events");
 
@@ -140,13 +182,14 @@ fn boundary_probabilities_and_zero_attempts() {
     let above_one: Vec<usize> = rare_error_indices(2.0, 5, &mut rng).collect();
     assert_eq!(above_one, (0..5).collect::<Vec<_>>());
 
-    let iter = rare_error_indices(1.0, 3, &mut rng);
-    assert_eq!(iter.telemetry().iterator_builds, 1);
+    let telemetry = rare_error_telemetry();
+    assert_eq!(telemetry.iterator_builds, 5);
     assert_eq!(
-        iter.telemetry().rng_core_draws,
+        telemetry.rng_core_draws,
         0,
-        "dense boundary mode must not draw randomness"
+        "empty and dense boundary modes must not draw randomness"
     );
+    assert_eq!(rng.core_draws(), 0, "boundary modes must not call RngCore");
 }
 
 #[test]
@@ -224,23 +267,25 @@ fn sparse_frequency_windows_and_gaps_are_non_periodic() {
 
 #[test]
 fn sparse_draw_count_is_bounded() {
-    let mut rng = StdRng::seed_from_u64(123);
+    reset_rare_error_telemetry();
+    let mut rng = CountingRng::new(StdRng::seed_from_u64(123));
     let mut iter = rare_error_indices(0.001, 1_000_000, &mut rng);
     let mut event_count = 0usize;
     while iter.next().is_some() {
         event_count += 1;
     }
 
-    let telemetry = iter.telemetry();
+    let telemetry = rare_error_telemetry();
     assert_eq!(telemetry.iterator_builds, 1);
+    assert_eq!(telemetry.rng_core_draws, rng.core_draws());
     assert!(
         (800..=1_200).contains(&event_count),
         "draw-count test should exercise the expected sparse event frequency, got {event_count}"
     );
     assert!(
-        telemetry.rng_core_draws < 10_000,
+        rng.core_draws() < 10_000,
         "sparse iterator should not draw once per attempt; saw {} core RNG draws",
-        telemetry.rng_core_draws
+        rng.core_draws()
     );
 }
 
@@ -293,13 +338,48 @@ Create `rstim/src/rare_error_iterator.rs` with this complete implementation:
 
 ```rust
 use rand::RngCore;
+#[cfg(debug_assertions)]
+use std::cell::Cell;
 
 const F64_UNIT_INTERVAL_SCALE: f64 = 1.0 / ((1u64 << 53) as f64);
 
+#[cfg(debug_assertions)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RareErrorTelemetry {
     pub iterator_builds: usize,
     pub rng_core_draws: usize,
+}
+
+#[cfg(debug_assertions)]
+thread_local! {
+    static ITERATOR_BUILDS: Cell<usize> = const { Cell::new(0) };
+    static RNG_CORE_DRAWS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn reset_rare_error_telemetry() {
+    ITERATOR_BUILDS.with(|builds| builds.set(0));
+    RNG_CORE_DRAWS.with(|draws| draws.set(0));
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn rare_error_telemetry() -> RareErrorTelemetry {
+    RareErrorTelemetry {
+        iterator_builds: ITERATOR_BUILDS.with(Cell::get),
+        rng_core_draws: RNG_CORE_DRAWS.with(Cell::get),
+    }
+}
+
+#[cfg(debug_assertions)]
+fn record_iterator_build() {
+    ITERATOR_BUILDS.with(|builds| builds.set(builds.get().saturating_add(1)));
+}
+
+#[cfg(debug_assertions)]
+fn record_rng_core_draw() {
+    RNG_CORE_DRAWS.with(|draws| draws.set(draws.get().saturating_add(1)));
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -314,7 +394,6 @@ pub struct RareErrorIterator<'a, R: RngCore + ?Sized> {
     attempt_count: usize,
     next_candidate: usize,
     mode: RareErrorMode,
-    telemetry: RareErrorTelemetry,
 }
 
 pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
@@ -327,6 +406,9 @@ pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
 
 impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
     pub fn new(probability: f64, attempt_count: usize, rng: &'a mut R) -> Self {
+        #[cfg(debug_assertions)]
+        record_iterator_build();
+
         let mode = if attempt_count == 0 || probability <= 0.0 || probability.is_nan() {
             RareErrorMode::Empty
         } else if probability >= 1.0 {
@@ -342,21 +424,14 @@ impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
             attempt_count,
             next_candidate: 0,
             mode,
-            telemetry: RareErrorTelemetry {
-                iterator_builds: 1,
-                rng_core_draws: 0,
-            },
         }
-    }
-
-    pub fn telemetry(&self) -> RareErrorTelemetry {
-        self.telemetry
     }
 
     fn draw_open_unit_f64(&mut self) -> f64 {
         loop {
+            #[cfg(debug_assertions)]
+            record_rng_core_draw();
             let raw = self.rng.next_u64();
-            self.telemetry.rng_core_draws += 1;
             let value = ((raw >> 11) as f64) * F64_UNIT_INTERVAL_SCALE;
             if value > 0.0 {
                 return value;

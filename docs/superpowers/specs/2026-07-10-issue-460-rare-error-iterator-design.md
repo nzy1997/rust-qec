@@ -57,20 +57,19 @@ The iterator has three modes:
   case, and advances by `floor(ln(u) / ln(1 - p)) + 1`.
 
 Sparse mode stores only the current candidate index, the attempt bound, the
-precomputed log value, a mutable RNG reference, and debug telemetry. It never
+precomputed log value, and a mutable RNG reference. It never
 stores a bitmap or vector of the opportunity domain. Each yielded index is
 checked against `attempt_count` before it is returned, so `attempt_count` itself
 is never yielded.
 
 ## Telemetry
 
-The iterator exposes debug/test telemetry with an iterator-build count and a
-core RNG draw count. The production iterator logic updates this telemetry from
-the same constructor and `RngCore::next_u64` calls used to generate events, so
-the tests verify the actual iterator path rather than a mocked RNG side effect.
-
-The telemetry surface is hidden and intended only for internal acceptance tests.
-It does not allocate and does not participate in simulator wiring.
+Debug builds expose hidden module-level `reset_rare_error_telemetry()` and
+`rare_error_telemetry()` functions, with thread-local iterator-build and core
+RNG-draw counters. The counter updates occur at the iterator constructor and
+the `RngCore::next_u64` call site. Release builds omit the telemetry type,
+surface, storage, and counter updates entirely. Acceptance tests independently
+compare the reported draw count with a counting `RngCore` wrapper.
 
 ## Testing
 
@@ -85,7 +84,7 @@ Add `rstim/tests/rare_error_iterator.rs` with the six required test names:
 
 All seeded tests use `rand::rngs::StdRng::seed_from_u64(123)`. The sparse
 acceptance case uses `attempt_count = 1_000_000` and `p = 0.001`, requires
-800-1,200 events, fewer than 10,000 core RNG draws, at least one event in each
+800-1,200 events, fewer than 10,000 actual `RngCore` calls, at least one event in each
 100,000-attempt window, non-identical window counts, and more than 100 distinct
 gaps. The allocation test uses a thread-local counting global allocator in the
 test binary to compare construction plus the first `next()` for
