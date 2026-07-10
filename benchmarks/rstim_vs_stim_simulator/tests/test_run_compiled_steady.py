@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+
+from benchmarks.rstim_vs_stim_simulator import run_compiled_steady
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -36,8 +40,9 @@ class RunCompiledSteadyTest(unittest.TestCase):
                     args = parser.parse_args()
                     input_bytes = open(args.input, "rb").read()
                     is_preflight = input_bytes == b"X 0\\nM 0\\n"
+                    telemetry_variant = "wrong-variant" if {mode!r} == "wrong-variant" else "{variant}"
                     telemetry = {{
-                        "variant": "{variant}",
+                        "variant": telemetry_variant,
                         "compile_count": 1,
                         "reference_build_count": 1,
                         "sample_call_count": 0,
@@ -146,6 +151,36 @@ class RunCompiledSteadyTest(unittest.TestCase):
         summary = json.loads((out_dir / "summary.json").read_text())
         self.assertEqual(summary["measured_records"], 14)
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})
+        environment = json.loads((out_dir / "environment.json").read_text())
+        for key in (
+            "git_commit",
+            "os",
+            "cpu_model",
+            "profile",
+            "timer_scope",
+            "seed_policy",
+            "stim_version",
+            "rstim_version",
+            "rustc_version",
+            "fair_manifest_path",
+            "fair_manifest_sha256",
+            "source_manifest_path",
+            "source_manifest_sha256",
+            "fixture_path",
+            "fixture_sha256",
+            "worker_argv",
+            "python_executable",
+            "python_executable_sha256",
+            "loaded_stim_extension_path",
+            "loaded_stim_extension_sha256",
+            "rstim_worker_binary_path",
+            "rstim_worker_binary_sha256",
+            "protocol_version",
+            "known_answer_preflight",
+        ):
+            self.assertIn(key, environment)
+        self.assertEqual(environment["protocol_version"], run_compiled_steady.PROTOCOL_VERSION)
+        self.assertEqual(environment["seed_policy"], "seed_once_then_advance_across_9_calls")
 
     def test_sample_timing_includes_delayed_final_result_byte(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("delay-last-byte")
@@ -169,6 +204,42 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((out_dir / "raw.jsonl").exists())
+
+    def test_worker_variant_telemetry_is_validated(self) -> None:
+        result, out_dir, temp_dir = self._run_fake_mode("wrong-variant")
+        self.addCleanup(temp_dir.cleanup)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("worker telemetry variant", result.stderr)
+        self.assertFalse((out_dir / "raw.jsonl").exists())
+
+    def test_default_stim_worker_command_is_canonical_python3_argv(self) -> None:
+        self.assertEqual(
+            run_compiled_steady.default_stim_worker_command(),
+            [
+                "python3",
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            ],
+        )
+
+    def test_profile_argument_accepts_only_release(self) -> None:
+        parser = run_compiled_steady.build_parser()
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(
+                    [
+                        "--manifest",
+                        str(MANIFEST),
+                        "--case",
+                        "stim_surface_d11_r100",
+                        "--profile",
+                        "debug",
+                        "--out-dir",
+                        "/tmp/out",
+                    ]
+                )
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import os
+import platform
+import shutil
 import statistics
 import struct
 import subprocess
@@ -59,7 +61,17 @@ def read_frame(stream: BinaryIO) -> tuple[bytes, bytes]:
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sha256_if_file(path: Path | None) -> str | None:
+    if path is None or not path.is_file():
+        return None
+    return _sha256(path)
 
 
 def _decode_json(payload: bytes, *, context: str) -> dict[str, Any]:
@@ -80,6 +92,109 @@ def _parse_command(value: str) -> list[str]:
     if not isinstance(command, list) or not command or not all(isinstance(item, str) and item for item in command):
         raise argparse.ArgumentTypeError("worker command must be a nonempty JSON string array")
     return command
+
+
+def default_stim_worker_command() -> list[str]:
+    return [
+        "python3",
+        "-m",
+        "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+    ]
+
+
+def default_rstim_worker_command(profile: str) -> list[str]:
+    return [str(REPO_ROOT / "target" / profile / "rstim_compiled_steady_worker")]
+
+
+def _probe(command: list[str]) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {
+            "command": command,
+            "status": "failed",
+            "exit_code": None,
+            "stdout": "",
+            "stderr": str(error),
+        }
+    return {
+        "command": command,
+        "status": "ok" if completed.returncode == 0 else "failed",
+        "exit_code": completed.returncode,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
+
+
+def _version_string(command: list[str]) -> str | None:
+    result = _probe(command)
+    if result["status"] == "ok" and result["stdout"]:
+        return str(result["stdout"])
+    return None
+
+
+def _resolve_executable(raw: str) -> Path | None:
+    resolved = shutil.which(raw)
+    if resolved:
+        return Path(resolved).resolve()
+    candidate = Path(raw)
+    if candidate.is_file():
+        return candidate.resolve()
+    return None
+
+
+def _probe_stim_python() -> dict[str, Any]:
+    result = _probe(
+        [
+            "python3",
+            "-c",
+            (
+                "import json, stim; "
+                "print(json.dumps({'version': stim.__version__, "
+                "'path': getattr(stim, '__file__', None)}))"
+            ),
+        ]
+    )
+    if result["status"] != "ok":
+        return {
+            "status": "failed",
+            "version": None,
+            "path": None,
+            "sha256": None,
+            "stderr": result["stderr"],
+        }
+    try:
+        payload = json.loads(str(result["stdout"]))
+    except json.JSONDecodeError as error:
+        return {
+            "status": "failed",
+            "version": None,
+            "path": None,
+            "sha256": None,
+            "stderr": f"invalid stim probe JSON: {error}",
+        }
+    path = Path(payload["path"]).resolve() if payload.get("path") else None
+    return {
+        "status": "ok",
+        "version": payload.get("version"),
+        "path": str(path) if path is not None else None,
+        "sha256": _sha256_if_file(path),
+        "stderr": "",
+    }
+
+
+def _cpu_model() -> str:
+    sysctl = _probe(["sysctl", "-n", "machdep.cpu.brand_string"])
+    if sysctl["status"] == "ok" and sysctl["stdout"]:
+        return str(sysctl["stdout"])
+    return platform.processor() or platform.machine() or "unknown"
 
 
 class WorkerSession:
@@ -154,12 +269,14 @@ class WorkerSession:
 def _validate_telemetry(
     telemetry: dict[str, Any],
     *,
+    variant: str,
     fixture_sha256: str,
     measurement_count: int,
     bytes_per_shot: int,
     sample_call_count: int,
 ) -> None:
     expected = {
+        "variant": variant,
         "compile_count": 1,
         "reference_build_count": 1,
         "sample_call_count": sample_call_count,
@@ -172,7 +289,7 @@ def _validate_telemetry(
             raise RunnerError(f"worker telemetry {key}: expected {value!r}, got {telemetry.get(key)!r}")
 
 
-def _run_preflight(command: list[str], *, seed: int) -> None:
+def _run_preflight(command: list[str], *, variant: str, seed: int) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as temp_dir:
         fixture = Path(temp_dir) / "known_answer.stim"
         fixture.write_text("X 0\nM 0\n", encoding="utf-8")
@@ -181,6 +298,7 @@ def _run_preflight(command: list[str], *, seed: int) -> None:
             ready = session.read_ready()
             _validate_telemetry(
                 ready,
+                variant=variant,
                 fixture_sha256=_sha256(fixture),
                 measurement_count=1,
                 bytes_per_shot=1,
@@ -192,11 +310,19 @@ def _run_preflight(command: list[str], *, seed: int) -> None:
             final = session.stop()
             _validate_telemetry(
                 final,
+                variant=variant,
                 fixture_sha256=_sha256(fixture),
                 measurement_count=1,
                 bytes_per_shot=1,
                 sample_call_count=1,
             )
+            return {
+                "variant": variant,
+                "argv": session.command,
+                "result_hex": data.hex(),
+                "ready": ready,
+                "final": final,
+            }
         except BaseException:
             session.abort()
             raise
@@ -223,6 +349,7 @@ def _run_variant(
         ready = session.read_ready()
         _validate_telemetry(
             ready,
+            variant=variant,
             fixture_sha256=fixture_sha256,
             measurement_count=measurement_count,
             bytes_per_shot=bytes_per_shot,
@@ -249,6 +376,7 @@ def _run_variant(
         final = session.stop()
         _validate_telemetry(
             final,
+            variant=variant,
             fixture_sha256=fixture_sha256,
             measurement_count=measurement_count,
             bytes_per_shot=bytes_per_shot,
@@ -279,25 +407,86 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {"measured_records": sum(item["sample_count"] for item in variants), "variants": variants}
 
 
+def _collect_environment(
+    *,
+    args: argparse.Namespace,
+    case: dict[str, Any],
+    input_path: Path,
+    stim_command: list[str],
+    rstim_command: list[str],
+    worker_details: list[dict[str, Any]],
+    preflight_results: list[dict[str, Any]],
+    stim_probe: dict[str, Any],
+) -> dict[str, Any]:
+    fair_manifest_path = args.manifest.resolve()
+    source_manifest_path = (REPO_ROOT / case["source_manifest_path"]).resolve()
+    python_executable = _resolve_executable("python3") or Path(sys.executable).resolve()
+    rstim_worker_path = _resolve_executable(rstim_command[0])
+    git_commit = _version_string(["git", "rev-parse", "HEAD"])
+    rstim_version = _version_string(default_rstim_worker_command(args.profile))
+    return {
+        "git_commit": git_commit,
+        "os": platform.platform(),
+        "cpu_model": _cpu_model(),
+        "profile": args.profile,
+        "timer_scope": case["timer_scope"],
+        "seed_policy": "seed_once_then_advance_across_9_calls",
+        "stim_version": case["stim_version"],
+        "stim_python_probe": stim_probe,
+        "rstim_version": rstim_version,
+        "rustc_version": _version_string(["rustc", "--version"]),
+        "fair_manifest_path": str(fair_manifest_path),
+        "fair_manifest_sha256": _sha256(fair_manifest_path),
+        "source_manifest_path": str(source_manifest_path),
+        "source_manifest_sha256": _sha256(source_manifest_path),
+        "fixture_path": str(input_path),
+        "fixture_sha256": case["canonical_input_sha256"],
+        "worker_argv": {
+            "stim": worker_details[0]["command"],
+            "rstim": worker_details[1]["command"],
+        },
+        "canonical_worker_argv": {
+            "stim": [*stim_command, "--input", str(input_path), "--seed", str(args.seed)],
+            "rstim": [*rstim_command, "--input", str(input_path), "--seed", str(args.seed)],
+        },
+        "python_executable": str(python_executable),
+        "python_executable_sha256": _sha256_if_file(python_executable),
+        "loaded_stim_extension_path": stim_probe.get("path"),
+        "loaded_stim_extension_sha256": stim_probe.get("sha256"),
+        "rstim_worker_binary_path": str(rstim_worker_path) if rstim_worker_path is not None else None,
+        "rstim_worker_binary_sha256": _sha256_if_file(rstim_worker_path),
+        "protocol_version": PROTOCOL_VERSION,
+        "seed": args.seed,
+        "warmup_rounds": args.warmup_rounds,
+        "measure_rounds": args.measure_rounds,
+        "known_answer_preflight": preflight_results,
+        "workers": worker_details,
+    }
+
+
 def run_compiled_steady(args: argparse.Namespace) -> None:
     manifest = fair_cli_contract.load_manifest(args.manifest)
     case = fair_cli_contract.find_case(manifest, args.case)
     errors = fair_cli_contract.validate_case(case, manifest_path=args.manifest, repo_root=REPO_ROOT)
     if errors:
         raise RunnerError("fair CLI contract rejected case: " + "; ".join(errors))
+    if case.get("stim_version") != "1.15.0":
+        raise RunnerError("compiled steady-state runner requires stim==1.15.0")
 
     input_path = (REPO_ROOT / case["canonical_input_path"]).resolve()
-    stim_command = args.stim_worker_command or [
-        sys.executable,
-        "-m",
-        "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
-    ]
-    rstim_command = args.rstim_worker_command or [
-        str(REPO_ROOT / "target" / args.profile / "rstim_compiled_steady_worker")
-    ]
+    stim_command = args.stim_worker_command or default_stim_worker_command()
+    rstim_command = args.rstim_worker_command or default_rstim_worker_command(args.profile)
+    stim_probe = _probe_stim_python()
+    if args.stim_worker_command is None and stim_probe.get("version") != "1.15.0":
+        raise RunnerError(
+            "compiled steady-state runner requires stim==1.15.0, "
+            f"got {stim_probe.get('version')!r}"
+        )
 
-    for command in (stim_command, rstim_command):
-        _run_preflight(command, seed=args.seed)
+    preflight_results = [
+        _run_preflight(stim_command, variant="stim", seed=args.seed),
+        _run_preflight(rstim_command, variant="rstim", seed=args.seed),
+    ]
 
     all_records: list[dict[str, Any]] = []
     worker_details: list[dict[str, Any]] = []
@@ -323,19 +512,16 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
     (out_dir / "raw.jsonl").write_text("".join(json.dumps(record, sort_keys=True) + "\n" for record in all_records))
     summary = _summary(all_records)
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
-    environment = {
-        "profile": args.profile,
-        "manifest": str(args.manifest),
-        "case": args.case,
-        "fixture": str(input_path),
-        "fixture_sha256": case["canonical_input_sha256"],
-        "protocol_version": PROTOCOL_VERSION,
-        "seed": args.seed,
-        "seed_policy": "seed_once_then_advance_across_9_calls",
-        "warmup_rounds": args.warmup_rounds,
-        "measure_rounds": args.measure_rounds,
-        "workers": worker_details,
-    }
+    environment = _collect_environment(
+        args=args,
+        case=case,
+        input_path=input_path,
+        stim_command=stim_command,
+        rstim_command=rstim_command,
+        worker_details=worker_details,
+        preflight_results=preflight_results,
+        stim_probe=stim_probe,
+    )
     (out_dir / "environment.json").write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n")
     (out_dir / "report.md").write_text("# Compiled steady-state benchmark\n")
     print(
@@ -348,7 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the compiled steady-state benchmark.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--case", required=True)
-    parser.add_argument("--profile", choices=["debug", "release"], required=True)
+    parser.add_argument("--profile", choices=["release"], required=True)
     parser.add_argument("--warmup-rounds", type=int, default=2)
     parser.add_argument("--measure-rounds", type=int, default=7)
     parser.add_argument("--seed", type=int, default=0)
