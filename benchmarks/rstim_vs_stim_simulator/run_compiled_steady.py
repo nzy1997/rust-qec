@@ -440,6 +440,22 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {"measured_records": sum(item["sample_count"] for item in variants), "variants": variants}
 
 
+def _render_report(summary: dict[str, Any]) -> str:
+    lines = [
+        "# Compiled steady-state benchmark",
+        "",
+        "| variant | sample_count | median_elapsed_ns |",
+        "| --- | ---: | ---: |",
+    ]
+    for variant in summary["variants"]:
+        lines.append(
+            f"| {variant['variant']} | {variant['sample_count']} | "
+            f"{variant['median_elapsed_ns']} |"
+        )
+    lines.extend(["", f"Measured records: {summary['measured_records']}", ""])
+    return "\n".join(lines)
+
+
 def _collect_environment(
     *,
     args: argparse.Namespace,
@@ -556,7 +572,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         stim_probe=stim_probe,
     )
     (out_dir / "environment.json").write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n")
-    (out_dir / "report.md").write_text("# Compiled steady-state benchmark\n")
+    (out_dir / "report.md").write_text(_render_report(summary))
     print(
         "PASS compiled steady-state lifecycle variants=2 compile=1 reference=1 "
         f"calls={args.warmup_rounds + args.measure_rounds} measured={summary['measured_records']}"

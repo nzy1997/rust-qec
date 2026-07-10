@@ -236,6 +236,10 @@ class RunCompiledSteadyTest(unittest.TestCase):
         summary = json.loads((out_dir / "summary.json").read_text())
         self.assertEqual(summary["measured_records"], 14)
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})
+        report = (out_dir / "report.md").read_text(encoding="utf-8")
+        self.assertIn("| variant | sample_count | median_elapsed_ns |", report)
+        self.assertIn("| stim | 7 |", report)
+        self.assertIn("| rstim | 7 |", report)
         environment = json.loads((out_dir / "environment.json").read_text())
         for key in (
             "git_commit",
