@@ -97,7 +97,10 @@ def write_fake_cli(path: Path, *, mode: str) -> Path:
             if input_text == "X 0\\nM 0\\n":
                 if shots != "1":
                     fail("preflight must use --shots 1")
-                sys.stdout.buffer.write(b"\\x00" if MODE == "bad-preflight" else b"\\x01")
+                if MODE == "malformed-preflight":
+                    sys.stdout.buffer.write(b"\\x01\\x00")
+                else:
+                    sys.stdout.buffer.write(b"\\x01")
                 sys.exit(0)
             if shots != "1024":
                 fail("benchmark must use --shots 1024")
@@ -172,15 +175,11 @@ class RunFairCliTest(unittest.TestCase):
         self.assertEqual({record["phase"] for record in records}, {"warmup", "measured"})
         for variant, binary in (("stim-cli-b8", stim), ("rstim-cli-b8", rstim)):
             variant_records = [record for record in records if record["variant"] == variant]
+            self.assertEqual([record["seed"] for record in variant_records], list(range(9)))
             self.assertEqual(
-                sorted(record["round_index"] for record in variant_records if record["phase"] == "warmup"),
-                [0, 1],
+                [(record["phase"], record["round_index"]) for record in variant_records],
+                [("warmup", 0), ("warmup", 1)] + [("measured", index) for index in range(7)],
             )
-            self.assertEqual(
-                sorted(record["round_index"] for record in variant_records if record["phase"] == "measured"),
-                list(range(7)),
-            )
-            self.assertEqual(sorted(record["seed"] for record in variant_records), list(range(9)))
             for record in variant_records:
                 self.assertEqual(record["argv"], expected_argv(binary, record["seed"]))
 
@@ -192,6 +191,13 @@ class RunFairCliTest(unittest.TestCase):
             summary_variant = next(item for item in summary["variants"] if item["variant"] == variant)
             self.assertEqual(summary_variant["sample_count"], 7)
             self.assertEqual(summary_variant["elapsed_ns"]["median"], statistics.median(samples))
+
+        report_text = (out_dir / "report.md").read_text(encoding="utf-8")
+        self.assertIn(CASE_ID, report_text)
+        for summary_variant in summary["variants"]:
+            self.assertIn(summary_variant["variant"], report_text)
+            self.assertIn(str(summary_variant["sample_count"]), report_text)
+        self.assertNotRegex(report_text, r"(?i)warmup.*(?:sample[_ ]?count|samples?).*\\b2\\b")
 
         environment = json.loads((out_dir / "environment.json").read_text(encoding="utf-8"))
         self.assertTrue(environment["git_commit"])
@@ -259,6 +265,7 @@ class RunFairCliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertTrue((out_dir / "raw.jsonl").is_file())
             self.assertTrue((out_dir / "summary.json").is_file())
+            self.assertTrue((out_dir / "report.md").is_file())
             self.assertTrue((out_dir / "environment.json").is_file())
             build.assert_called_once()
             self.assert_artifacts(out_dir, stim, rstim)
@@ -274,10 +281,6 @@ class RunFairCliTest(unittest.TestCase):
             with (
                 mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
                 mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
-                mock.patch(
-                    "benchmarks.rstim_vs_stim_simulator.run_fair_cli.time.perf_counter_ns",
-                    side_effect=[10, 300_000_010, 20, 300_000_020],
-                ),
             ):
                 run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
 
@@ -286,13 +289,13 @@ class RunFairCliTest(unittest.TestCase):
                 measured = next(record for record in records if record["variant"] == variant and record["phase"] == "measured")
                 self.assertGreaterEqual(measured["elapsed_ns"], 300_000_000)
 
-    def test_preflight_attempts_both_variants_and_rejects_rstim_mismatch(self) -> None:
+    def test_preflight_rejects_malformed_known_answer_before_writing_raw_records(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             fake_bin = root / "bin"
             fake_bin.mkdir()
             write_fake_cli(fake_bin / "stim", mode="success")
-            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="bad-preflight")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="malformed-preflight")
             out_dir = root / "out"
             invocations = root / "invocations.txt"
             with (
@@ -305,7 +308,7 @@ class RunFairCliTest(unittest.TestCase):
                 ),
                 mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
             ):
-                with self.assertRaisesRegex(RuntimeError, "rstim|known-answer preflight"):
+                with self.assertRaisesRegex(RuntimeError, "known-answer preflight"):
                     run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
