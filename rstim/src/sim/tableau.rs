@@ -21,6 +21,17 @@ impl StabilizerState {
         Self { n, x, z, phase }
     }
 
+    // BEGIN issue-456 read-only snapshot accessor
+    #[doc(hidden)]
+    pub fn canonical_snapshot(&self) -> crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot {
+        crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot {
+            num_qubits: self.n,
+            x: self.x.clone(),
+            z: self.z.clone(),
+            phase: self.phase.clone(),
+        }
+    }
+    // END issue-456 read-only snapshot accessor
     pub fn h(&mut self, q: usize) {
         for i in 0..2 * self.n {
             if self.x[i][q] && self.z[i][q] {
