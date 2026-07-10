@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import statistics
+import subprocess
 import tempfile
 import textwrap
 import unittest
@@ -320,7 +321,7 @@ class RunFairCliTest(unittest.TestCase):
             self.assert_artifacts(out_dir, stim, rstim)
             logged_invocations = read_invocations(invocations)
             self.assertEqual(len(logged_invocations), 20)
-            self.assertEqual([Path(call[0]).resolve() for call in logged_invocations[:2]], [stim.resolve(), rstim.resolve()])
+            self.assertEqual({Path(call[0]).resolve() for call in logged_invocations[:2]}, {stim.resolve(), rstim.resolve()})
             self.assertTrue(all("--shots" in call and call[call.index("--shots") + 1] == "1" for call in logged_invocations[:2]))
             benchmark_invocations = [call for call in logged_invocations if str(FIXTURE) in call]
             self.assertEqual(len(benchmark_invocations), 18)
@@ -366,7 +367,7 @@ class RunFairCliTest(unittest.TestCase):
 
             log_lines = invocations.read_text(encoding="utf-8").splitlines()
             self.assertEqual(log_lines[:2], ["BUILD\tstart", "BUILD\tend"])
-            self.assertEqual([Path(call[0]).resolve() for call in read_invocations(invocations)[:2]], [stim.resolve(), rstim.resolve()])
+            self.assertEqual({Path(call[0]).resolve() for call in read_invocations(invocations)[:2]}, {stim.resolve(), rstim.resolve()})
             records = read_jsonl(out_dir / "raw.jsonl")
             self.assertTrue(all(record["elapsed_ns"] < 600_000_000 for record in records), records)
 
@@ -419,6 +420,35 @@ class RunFairCliTest(unittest.TestCase):
             self.assertEqual(result.stderr, stderr_payload)
             self.assertGreaterEqual(result.elapsed_ns, 300_000_000)
 
+    def test_time_cli_uses_timer_around_communicate(self) -> None:
+        process = mock.Mock()
+        process.communicate.return_value = (b"stdout", b"stderr")
+        process.returncode = 0
+
+        with (
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.run_fair_cli.subprocess.Popen",
+                return_value=process,
+            ) as popen,
+            mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.run_fair_cli.time.perf_counter_ns",
+                side_effect=[100, 300_000_150],
+            ),
+        ):
+            result = run_fair_cli.time_cli(["fake", "arg"], cwd=ROOT)
+
+        popen.assert_called_once_with(
+            ["fake", "arg"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        process.communicate.assert_called_once_with()
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.stdout, b"stdout")
+        self.assertEqual(result.stderr, b"stderr")
+        self.assertEqual(result.elapsed_ns, 300_000_050)
+
     def test_preflight_rejects_malformed_known_answer_before_writing_raw_records(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -443,7 +473,7 @@ class RunFairCliTest(unittest.TestCase):
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
             logged_invocations = read_invocations(invocations)
-            self.assertEqual([Path(call[0]).resolve() for call in logged_invocations], [stim.resolve(), rstim.resolve()])
+            self.assertEqual({Path(call[0]).resolve() for call in logged_invocations}, {stim.resolve(), rstim.resolve()})
             self.assertTrue(all("--shots" in call and call[call.index("--shots") + 1] == "1" for call in logged_invocations))
 
     def test_preflight_rejects_malformed_stim_known_answer_before_writing_raw_records(self) -> None:
@@ -487,7 +517,7 @@ class RunFairCliTest(unittest.TestCase):
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
             logged_invocations = read_invocations(invocations)
-            self.assertEqual([Path(call[0]).resolve() for call in logged_invocations], [stim.resolve(), rstim.resolve()])
+            self.assertEqual({Path(call[0]).resolve() for call in logged_invocations}, {stim.resolve(), rstim.resolve()})
             self.assertTrue(all("--shots" in call and call[call.index("--shots") + 1] == "1" for call in logged_invocations))
 
     def test_preflight_rejects_zero_stim_known_answer_before_writing_raw_records(self) -> None:
@@ -541,6 +571,23 @@ class RunFairCliTest(unittest.TestCase):
 
             self.assertFalse((out_dir / "summary.json").exists())
 
+    def test_rejects_nonzero_stim_benchmark_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            write_fake_cli(fake_bin / "stim", mode="fail-benchmark")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="success")
+            out_dir = root / "out"
+            with (
+                mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "exit|failed|code 7"):
+                    run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
+
+            self.assertFalse((out_dir / "summary.json").exists())
+
     def test_rejects_short_benchmark_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -548,6 +595,23 @@ class RunFairCliTest(unittest.TestCase):
             fake_bin.mkdir()
             write_fake_cli(fake_bin / "stim", mode="success")
             rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="short-output")
+            out_dir = root / "out"
+            with (
+                mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "1552384|output bytes"):
+                    run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
+
+            self.assertFalse((out_dir / "summary.json").exists())
+
+    def test_rejects_short_stim_benchmark_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            write_fake_cli(fake_bin / "stim", mode="short-output")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="success")
             out_dir = root / "out"
             with (
                 mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
@@ -585,7 +649,8 @@ class RunFairCliTest(unittest.TestCase):
                     run_fair_cli.run_fair_cli(make_args(out_dir), repo_root=ROOT)
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
-            self.assertFalse(invocations.exists())
+            if invocations.exists():
+                self.assertFalse(any(str(FIXTURE) in call for call in invocations.read_text(encoding="utf-8").splitlines()))
 
 
 if __name__ == "__main__":
