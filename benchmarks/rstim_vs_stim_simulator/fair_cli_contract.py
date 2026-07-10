@@ -176,7 +176,7 @@ def validate_case(case: dict[str, Any], *, manifest_path: Path, repo_root: Path)
         if isinstance(template, list) and all(isinstance(value, str) for value in template):
             try:
                 expanded[name] = expand_argv(template, case, seed=0)
-            except (AttributeError, IndexError, KeyError, ValueError) as error:
+            except (AttributeError, IndexError, KeyError, TypeError, ValueError) as error:
                 errors.append(f'argv.{name}: could not expand template: {error}')
 
     if len(expanded) == 2:
