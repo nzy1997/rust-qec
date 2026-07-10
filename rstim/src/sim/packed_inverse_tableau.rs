@@ -161,11 +161,15 @@ impl PackedInverseTableau {
     }
 
     fn set_x_storage_bit(&mut self, row: usize, qubit: usize) {
+        self.check_row(row);
+        self.check_qubit(qubit);
         let word = self.plane_word_index(row, qubit);
         self.x_plane[word] |= 1u64 << (qubit % 64);
     }
 
     fn set_z_storage_bit(&mut self, row: usize, qubit: usize) {
+        self.check_row(row);
+        self.check_qubit(qubit);
         let word = self.plane_word_index(row, qubit);
         self.z_plane[word] |= 1u64 << (qubit % 64);
     }

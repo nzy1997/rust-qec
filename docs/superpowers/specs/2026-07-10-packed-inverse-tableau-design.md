@@ -87,7 +87,7 @@ Index validation is centralized:
 
 Padding is deterministic:
 
-- `padding_mask()` returns the valid low-bit mask for the final row word;
+- `final_word_mask()` returns the valid low-bit mask for the final row word;
 - identity construction never sets padding bits;
 - `copy_row` masks the destination row after copying;
 - `xor_pauli_planes` masks the destination row after XORing.

@@ -1,3 +1,5 @@
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
 use rstim::sim::packed_inverse_tableau::PackedInverseTableau;
 
 fn words_for_bits(bits: usize) -> usize {
@@ -95,6 +97,10 @@ fn boundary_bits_63_64_129_map_to_expected_words() {
     assert!(!tableau.x(129, 130 - 2));
     assert!(tableau.x(129, 129));
     assert!(tableau.z(259, 129));
+
+    assert!(catch_unwind(|| tableau.x(0, 130)).is_err());
+    assert!(catch_unwind(|| tableau.z(0, 130)).is_err());
+    assert!(catch_unwind(|| tableau.sign_bit(260)).is_err());
 }
 
 #[test]
@@ -115,6 +121,8 @@ fn packed_signs_round_trip_positive_and_negative() {
     tableau.set_canonical_phase(64, 2);
     tableau.set_sign_bit(129, true);
 
+    assert!(catch_unwind(AssertUnwindSafe(|| tableau.set_sign_bit(260, false))).is_err());
+
     assert_eq!(tableau.canonical_phase(64), 2);
     assert_eq!(tableau.canonical_phase(129), 2);
     assert_eq!(tableau.sign_words()[1] & 1, 1);
@@ -132,13 +140,14 @@ fn row_copy_and_plane_xor_obey_contract() {
     assert!(!tableau.z(131, 1));
     assert_eq!(tableau.canonical_phase(131), 2);
 
-    tableau.set_canonical_phase(0, 0);
-    tableau.set_canonical_phase(64, 2);
+    tableau.set_canonical_phase(0, 2);
+    tableau.set_canonical_phase(64, 0);
     tableau.xor_pauli_planes(0, 64);
     assert!(tableau.x(64, 0));
     assert!(tableau.x(64, 64));
     assert!(!tableau.z(64, 0));
-    assert_eq!(tableau.canonical_phase(64), 2);
+    assert!(!tableau.sign_bit(64));
+    assert_eq!(tableau.canonical_phase(64), 0);
 
     tableau.set_canonical_phase(194, 2);
     tableau.xor_pauli_planes(130, 194);
@@ -146,6 +155,9 @@ fn row_copy_and_plane_xor_obey_contract() {
     assert!(tableau.z(194, 64));
     assert!(!tableau.x(194, 0));
     assert_eq!(tableau.canonical_phase(194), 2);
+
+    assert!(catch_unwind(AssertUnwindSafe(|| tableau.copy_row(260, 0))).is_err());
+    assert!(catch_unwind(AssertUnwindSafe(|| tableau.xor_pauli_planes(0, 260))).is_err());
 }
 
 #[test]
