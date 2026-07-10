@@ -102,6 +102,10 @@ def write_fake_cli(path: Path, *, mode: str) -> Path:
                     sys.stdout.buffer.write(b"\\x01\\x00")
                 elif MODE == "zero-preflight":
                     sys.stdout.buffer.write(b"\\x00")
+                elif MODE == "fail-preflight":
+                    sys.stdout.buffer.write(b"\\x01")
+                    sys.stderr.write("preflight failed\\n")
+                    sys.exit(7)
                 else:
                     sys.stdout.buffer.write(b"\\x01")
                 sys.exit(0)
@@ -164,7 +168,7 @@ def make_args(out_dir: Path, *, warmup_rounds: int = 2, measure_rounds: int = 7)
 
 def expected_argv(binary: Path, seed: int) -> list[str]:
     return [
-        str(binary),
+        str(binary.resolve()),
         "sample",
         "--shots",
         str(SHOTS),
@@ -233,9 +237,20 @@ class RunFairCliTest(unittest.TestCase):
         self.assertEqual(len(measured), 14)
         for variant in ("stim-cli-b8", "rstim-cli-b8"):
             samples = [record["elapsed_ns"] for record in measured if record["variant"] == variant]
+            variant_records = [record for record in measured if record["variant"] == variant]
             summary_variant = next(item for item in summary["variants"] if item["variant"] == variant)
             self.assertEqual(summary_variant["sample_count"], 7)
+            self.assertEqual(summary_variant["elapsed_ns"]["sample_count"], len(samples))
+            self.assertEqual(summary_variant["elapsed_ns"]["samples"], samples)
+            self.assertEqual(summary_variant["elapsed_ns"]["min"], min(samples))
+            self.assertEqual(summary_variant["elapsed_ns"]["max"], max(samples))
+            self.assertEqual(summary_variant["elapsed_ns"]["mean"], statistics.mean(samples))
             self.assertEqual(summary_variant["elapsed_ns"]["median"], statistics.median(samples))
+            self.assertEqual(summary_variant["total_output_bytes"], EXPECTED_OUTPUT_BYTES * len(samples))
+            self.assertEqual(
+                summary_variant["stdout_sha256"],
+                [record["stdout_sha256"] for record in variant_records],
+            )
 
         report_text = (out_dir / "report.md").read_text(encoding="utf-8")
         self.assertIn(CASE_ID, report_text)
@@ -263,9 +278,9 @@ class RunFairCliTest(unittest.TestCase):
             "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
         )
         self.assertEqual(environment["fixture_sha256"], hashlib.sha256(FIXTURE.read_bytes()).hexdigest())
-        self.assertEqual(environment["stim_binary"], str(stim))
+        self.assertEqual(environment["stim_binary"], str(stim.resolve()))
         self.assertEqual(environment["stim_binary_sha256"], hashlib.sha256(stim.read_bytes()).hexdigest())
-        self.assertEqual(environment["rstim_binary"], str(rstim))
+        self.assertEqual(environment["rstim_binary"], str(rstim.resolve()))
         self.assertEqual(environment["rstim_binary_sha256"], hashlib.sha256(rstim.read_bytes()).hexdigest())
         self.assertEqual(environment["warmup_rounds"], 2)
         self.assertEqual(environment["measure_rounds"], 7)
@@ -330,6 +345,24 @@ class RunFairCliTest(unittest.TestCase):
                     call for call in benchmark_invocations if Path(call[0]).resolve() == binary.resolve()
                 ]
                 self.assertEqual(binary_invocations, [expected_argv(binary, seed) for seed in range(9)])
+
+    def test_main_requires_all_cli_flags(self) -> None:
+        full_args = [
+            "--manifest", str(FAIR_MANIFEST),
+            "--case", CASE_ID,
+            "--profile", "release",
+            "--warmup-rounds", "2",
+            "--measure-rounds", "7",
+            "--out-dir", "/tmp/rstim-fair-cli",
+        ]
+        for flag in ("--manifest", "--case", "--profile", "--warmup-rounds", "--measure-rounds", "--out-dir"):
+            argv = list(full_args)
+            index = argv.index(flag)
+            del argv[index:index + 2]
+            with self.subTest(flag=flag):
+                with self.assertRaises(SystemExit) as raised:
+                    run_fair_cli.main(argv)
+                self.assertNotEqual(raised.exception.code, 0)
 
     def test_build_finishes_before_timed_processes_and_is_not_sample_elapsed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -468,7 +501,7 @@ class RunFairCliTest(unittest.TestCase):
             root = Path(temp_dir)
             fake_bin = root / "bin"
             fake_bin.mkdir()
-            write_fake_cli(fake_bin / "stim", mode="success")
+            stim = write_fake_cli(fake_bin / "stim", mode="success")
             rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="malformed-preflight")
             out_dir = root / "out"
             invocations = root / "invocations.txt"
@@ -507,12 +540,29 @@ class RunFairCliTest(unittest.TestCase):
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
 
-    def test_preflight_rejects_zero_known_answer_before_writing_raw_records(self) -> None:
+    def test_preflight_rejects_nonzero_known_answer_exit_before_writing_raw_records(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             fake_bin = root / "bin"
             fake_bin.mkdir()
             write_fake_cli(fake_bin / "stim", mode="success")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="fail-preflight")
+            out_dir = root / "out"
+            with (
+                mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "known-answer preflight.*code 7"):
+                    run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
+
+            self.assertFalse((out_dir / "raw.jsonl").exists())
+
+    def test_preflight_rejects_zero_known_answer_before_writing_raw_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            stim = write_fake_cli(fake_bin / "stim", mode="success")
             rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="zero-preflight")
             out_dir = root / "out"
             invocations = root / "invocations.txt"
