@@ -421,22 +421,36 @@ class RunFairCliTest(unittest.TestCase):
             self.assertGreaterEqual(result.elapsed_ns, 300_000_000)
 
     def test_time_cli_uses_timer_around_communicate(self) -> None:
+        events: list[str] = []
         process = mock.Mock()
-        process.communicate.return_value = (b"stdout", b"stderr")
         process.returncode = 0
 
+        def fake_popen(*args: object, **kwargs: object) -> mock.Mock:
+            events.append("popen")
+            return process
+
+        def fake_communicate() -> tuple[bytes, bytes]:
+            events.append("communicate")
+            return b"stdout", b"stderr"
+
+        def fake_perf_counter_ns() -> int:
+            events.append("timer-start" if not events else "timer-stop")
+            return 100 if events[-1] == "timer-start" else 300_000_150
+
+        process.communicate.side_effect = fake_communicate
         with (
             mock.patch(
                 "benchmarks.rstim_vs_stim_simulator.run_fair_cli.subprocess.Popen",
-                return_value=process,
+                side_effect=fake_popen,
             ) as popen,
             mock.patch(
                 "benchmarks.rstim_vs_stim_simulator.run_fair_cli.time.perf_counter_ns",
-                side_effect=[100, 300_000_150],
+                side_effect=fake_perf_counter_ns,
             ),
         ):
             result = run_fair_cli.time_cli(["fake", "arg"], cwd=ROOT)
 
+        self.assertEqual(events, ["timer-start", "popen", "communicate", "timer-stop"])
         popen.assert_called_once_with(
             ["fake", "arg"],
             cwd=ROOT,
