@@ -15,6 +15,176 @@ pub struct PackedInverseTableau {
     signs: Vec<u64>,
 }
 
+#[derive(Debug, Clone)]
+struct PackedCanonicalRows {
+    num_qubits: usize,
+    words_per_row: usize,
+    x_plane: Vec<u64>,
+    z_plane: Vec<u64>,
+    signs: Vec<u64>,
+}
+
+impl PackedCanonicalRows {
+    fn new(num_qubits: usize) -> Self {
+        let words_per_row = words_for_bits(num_qubits);
+        let num_rows = num_qubits
+            .checked_mul(2)
+            .expect("packed canonical row count overflow");
+        let plane_len = num_rows
+            .checked_mul(words_per_row)
+            .expect("packed canonical plane length overflow");
+
+        Self {
+            num_qubits,
+            words_per_row,
+            x_plane: vec![0; plane_len],
+            z_plane: vec![0; plane_len],
+            signs: vec![0; words_for_bits(num_rows)],
+        }
+    }
+
+    fn num_rows(&self) -> usize {
+        2 * self.num_qubits
+    }
+
+    fn row_start(&self, row: usize) -> usize {
+        assert!(row < self.num_rows(), "canonical row index out of range");
+        row * self.words_per_row
+    }
+
+    fn x(&self, row: usize, qubit: usize) -> bool {
+        assert!(
+            qubit < self.num_qubits,
+            "canonical qubit index out of range"
+        );
+        bit_is_set(self.x_plane[self.row_start(row) + qubit / 64], qubit % 64)
+    }
+
+    fn sign_bit(&self, row: usize) -> bool {
+        assert!(row < self.num_rows(), "canonical row index out of range");
+        bit_is_set(self.signs[row / 64], row % 64)
+    }
+
+    fn set_sign_bit(&mut self, row: usize, negative: bool) {
+        assert!(row < self.num_rows(), "canonical row index out of range");
+        let mask = 1u64 << (row % 64);
+        if negative {
+            self.signs[row / 64] |= mask;
+        } else {
+            self.signs[row / 64] &= !mask;
+        }
+    }
+
+    fn set_basis_row(&mut self, row: usize) {
+        let start = self.row_start(row);
+        self.x_plane[start..start + self.words_per_row].fill(0);
+        self.z_plane[start..start + self.words_per_row].fill(0);
+
+        if row < self.num_qubits {
+            self.x_plane[start + row / 64] |= 1u64 << (row % 64);
+        } else {
+            let qubit = row - self.num_qubits;
+            self.z_plane[start + qubit / 64] |= 1u64 << (qubit % 64);
+        }
+        self.set_sign_bit(row, false);
+    }
+
+    fn copy_row(&mut self, src: usize, dst: usize) {
+        let src_start = self.row_start(src);
+        let dst_start = self.row_start(dst);
+        if src != dst {
+            self.x_plane
+                .copy_within(src_start..src_start + self.words_per_row, dst_start);
+            self.z_plane
+                .copy_within(src_start..src_start + self.words_per_row, dst_start);
+        }
+        self.set_sign_bit(dst, self.sign_bit(src));
+    }
+
+    fn row_exponent_mod4(&self, row: usize) -> u8 {
+        let start = self.row_start(row);
+        (2 * u8::from(self.sign_bit(row))
+            + words_y_count_mod4(
+                &self.x_plane[start..start + self.words_per_row],
+                &self.z_plane[start..start + self.words_per_row],
+            ))
+            % 4
+    }
+
+    fn multiply_row_into(&mut self, src: usize, dst: usize) {
+        assert_ne!(src, dst, "cannot multiply a canonical row into itself");
+        let src_start = self.row_start(src);
+        let dst_start = self.row_start(dst);
+        let src_exponent = self.row_exponent_mod4(src);
+        let dst_exponent = self.row_exponent_mod4(dst);
+        let anticommutes = z_dot_x_parity(
+            &self.z_plane[dst_start..dst_start + self.words_per_row],
+            &self.x_plane[src_start..src_start + self.words_per_row],
+        );
+
+        for offset in 0..self.words_per_row {
+            let src_x = self.x_plane[src_start + offset];
+            let src_z = self.z_plane[src_start + offset];
+            self.x_plane[dst_start + offset] ^= src_x;
+            self.z_plane[dst_start + offset] ^= src_z;
+        }
+
+        let exponent = (dst_exponent + src_exponent + 2 * u8::from(anticommutes)) % 4;
+        let negative = sign_from_words(
+            &self.x_plane[dst_start..dst_start + self.words_per_row],
+            &self.z_plane[dst_start..dst_start + self.words_per_row],
+            exponent,
+        );
+        self.set_sign_bit(dst, negative);
+    }
+
+    fn multiply_row_into_acc(
+        &self,
+        src: usize,
+        acc_x: &mut [u64],
+        acc_z: &mut [u64],
+        exponent: &mut u8,
+    ) {
+        assert_eq!(acc_x.len(), self.words_per_row);
+        assert_eq!(acc_z.len(), self.words_per_row);
+        let start = self.row_start(src);
+        let src_x = &self.x_plane[start..start + self.words_per_row];
+        let src_z = &self.z_plane[start..start + self.words_per_row];
+
+        if z_dot_x_parity(acc_z, src_x) {
+            *exponent = (*exponent + 2) % 4;
+        }
+        *exponent = (*exponent + self.row_exponent_mod4(src)) % 4;
+
+        for offset in 0..self.words_per_row {
+            acc_x[offset] ^= src_x[offset];
+            acc_z[offset] ^= src_z[offset];
+        }
+    }
+
+    fn evaluate_coeff_words(&self, coeff: &[u64]) -> (Vec<u64>, Vec<u64>, bool) {
+        assert_eq!(coeff.len(), words_for_bits(self.num_rows()));
+        let mut acc_x = vec![0; self.words_per_row];
+        let mut acc_z = vec![0; self.words_per_row];
+        let mut exponent = 0u8;
+        let mut input_y_count = 0u32;
+
+        for qubit in 0..self.num_qubits {
+            if bit_from_words(coeff, qubit) && bit_from_words(coeff, self.num_qubits + qubit) {
+                input_y_count += 1;
+            }
+        }
+        for row in 0..self.num_rows() {
+            if bit_from_words(coeff, row) {
+                self.multiply_row_into_acc(row, &mut acc_x, &mut acc_z, &mut exponent);
+            }
+        }
+        exponent = (exponent + (input_y_count % 4) as u8) % 4;
+        let negative = sign_from_words(&acc_x, &acc_z, exponent);
+        (acc_x, acc_z, negative)
+    }
+}
+
 impl PackedInverseTableau {
     pub fn identity(num_qubits: usize) -> Self {
         let words_per_row = words_for_bits(num_qubits);
@@ -191,6 +361,122 @@ impl PackedInverseTableau {
 
         self.set_row_words(c, &new_x_c, &new_z_c, new_sign_c);
         self.set_row_words(self.num_qubits + t, &new_x_nt, &new_z_nt, new_sign_nt);
+    }
+
+    fn canonical_rows(&self) -> PackedCanonicalRows {
+        let mut rows = PackedCanonicalRows::new(self.num_qubits);
+        let coeff_words = words_for_bits(self.num_rows());
+
+        for target in 0..self.num_rows() {
+            let mut coeff = vec![0; coeff_words];
+            for coeff_index in 0..self.num_rows() {
+                if self.symplectic_inverse_coeff_bit(target, coeff_index) {
+                    set_bit(&mut coeff, coeff_index);
+                }
+            }
+
+            let row_start = rows.row_start(target);
+            for qubit in 0..self.num_qubits {
+                if bit_from_words(&coeff, qubit) {
+                    rows.x_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+                if bit_from_words(&coeff, self.num_qubits + qubit) {
+                    rows.z_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+            }
+
+            let (eval_x, eval_z, negative) = self.evaluate_coeff_words(&coeff, false);
+            debug_assert!(self.is_basis_words(&eval_x, &eval_z, target));
+            rows.set_sign_bit(target, negative);
+        }
+
+        rows
+    }
+
+    fn replace_from_canonical_rows(&mut self, rows: &PackedCanonicalRows) {
+        assert_eq!(rows.num_qubits, self.num_qubits);
+        let coeff_words = words_for_bits(self.num_rows());
+
+        for target in 0..self.num_rows() {
+            let mut coeff = vec![0; coeff_words];
+            for coeff_index in 0..self.num_rows() {
+                let source_row = if coeff_index < self.num_qubits {
+                    self.num_qubits + coeff_index
+                } else {
+                    coeff_index - self.num_qubits
+                };
+                let source_col = if target < self.num_qubits {
+                    self.num_qubits + target
+                } else {
+                    target - self.num_qubits
+                };
+                if canonical_raw_matrix_bit(rows, source_row, source_col) {
+                    set_bit(&mut coeff, coeff_index);
+                }
+            }
+
+            let row_start = self.row_start(target);
+            self.x_plane[row_start..row_start + self.words_per_row].fill(0);
+            self.z_plane[row_start..row_start + self.words_per_row].fill(0);
+            for qubit in 0..self.num_qubits {
+                if bit_from_words(&coeff, qubit) {
+                    self.x_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+                if bit_from_words(&coeff, self.num_qubits + qubit) {
+                    self.z_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+            }
+
+            let (eval_x, eval_z, negative) = rows.evaluate_coeff_words(&coeff);
+            debug_assert!(self.is_basis_words(&eval_x, &eval_z, target));
+            self.set_sign_bit(target, negative);
+            self.mask_row_padding(target);
+        }
+    }
+
+    fn measure_z_raw_biased(&mut self, q: usize) -> bool {
+        self.check_qubit(q);
+        let mut rows = self.canonical_rows();
+        let mut pivot = None;
+        for row in self.num_qubits..self.num_rows() {
+            if rows.x(row, q) {
+                pivot = Some(row);
+                break;
+            }
+        }
+
+        let raw = if let Some(p) = pivot {
+            for row in 0..self.num_rows() {
+                if row != p && rows.x(row, q) {
+                    rows.multiply_row_into(p, row);
+                }
+            }
+            let destabilizer = p - self.num_qubits;
+            rows.copy_row(p, destabilizer);
+            rows.set_basis_row(p);
+            false
+        } else {
+            let mut temp_x = vec![0; self.words_per_row];
+            let mut temp_z = vec![0; self.words_per_row];
+            temp_z[q / 64] |= 1u64 << (q % 64);
+            let mut exponent = 0u8;
+            for row in 0..self.num_qubits {
+                if rows.x(row, q) {
+                    rows.multiply_row_into_acc(
+                        row + self.num_qubits,
+                        &mut temp_x,
+                        &mut temp_z,
+                        &mut exponent,
+                    );
+                }
+            }
+            sign_from_words(&temp_x, &temp_z, exponent)
+        };
+
+        if pivot.is_some() {
+            self.replace_from_canonical_rows(&rows);
+        }
+        raw
     }
 
     pub fn canonical_snapshot(&self) -> CanonicalTableauSnapshot {
@@ -452,6 +738,17 @@ impl PackedInverseTableau {
             }
         }
         true
+    }
+}
+
+fn canonical_raw_matrix_bit(rows: &PackedCanonicalRows, row: usize, col: usize) -> bool {
+    assert!(row < rows.num_rows(), "canonical row index out of range");
+    assert!(col < rows.num_rows(), "canonical column index out of range");
+    if col < rows.num_qubits {
+        bit_is_set(rows.x_plane[rows.row_start(row) + col / 64], col % 64)
+    } else {
+        let qubit = col - rows.num_qubits;
+        bit_is_set(rows.z_plane[rows.row_start(row) + qubit / 64], qubit % 64)
     }
 }
 
