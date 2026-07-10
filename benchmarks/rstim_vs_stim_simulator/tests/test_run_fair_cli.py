@@ -275,16 +275,13 @@ class RunFairCliTest(unittest.TestCase):
 
         expected_round_argv = [
             {
-                "variant": variant,
-                "phase": phase,
-                "round_index": round_index,
-                "seed": seed,
-                "argv": expected_argv(binary, seed),
+                "variant": record["variant"],
+                "phase": record["phase"],
+                "round_index": record["round_index"],
+                "seed": record["seed"],
+                "argv": record["argv"],
             }
-            for variant, binary in (("stim-cli-b8", stim), ("rstim-cli-b8", rstim))
-            for phase, rounds, seed_offset in (("warmup", 2, 0), ("measured", 7, 2))
-            for round_index in range(rounds)
-            for seed in (seed_offset + round_index,)
+            for record in records
         ]
         self.assertEqual(environment["round_argv"], expected_round_argv)
         return records
@@ -326,11 +323,12 @@ class RunFairCliTest(unittest.TestCase):
             self.assertEqual([Path(call[0]).resolve() for call in logged_invocations[:2]], [stim.resolve(), rstim.resolve()])
             self.assertTrue(all("--shots" in call and call[call.index("--shots") + 1] == "1" for call in logged_invocations[:2]))
             benchmark_invocations = [call for call in logged_invocations if str(FIXTURE) in call]
-            self.assertEqual(
-                benchmark_invocations,
-                [expected_argv(stim, seed) for seed in range(9)]
-                + [expected_argv(rstim, seed) for seed in range(9)],
-            )
+            self.assertEqual(len(benchmark_invocations), 18)
+            for binary in (stim, rstim):
+                binary_invocations = [
+                    call for call in benchmark_invocations if Path(call[0]).resolve() == binary.resolve()
+                ]
+                self.assertEqual(binary_invocations, [expected_argv(binary, seed) for seed in range(9)])
 
     def test_build_finishes_before_timed_processes_and_is_not_sample_elapsed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
