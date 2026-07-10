@@ -1,0 +1,21 @@
+manifest_version = 1
+suite = "rstim_vs_stim_simulator"
+
+[[cases]]
+case_id = "stim_surface_d11_r100"
+source_manifest_path = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+source_manifest_case_id = "stim_surface_d11_r100"
+canonical_input_path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+canonical_input_sha256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+stim_version = "1.15.0"
+shots = 1024
+measurement_count = 12121
+output_format = "b8"
+bytes_per_shot = 1516
+expected_output_bytes = 1552384
+timer_scope = "cli_end_to_end"
+seed_policy = "round_index_0_through_8"
+
+[cases.argv]
+stim-cli-b8 = ["stim", "sample", "--shots", "{shots}", "--seed", "{seed}", "--out_format", "b8", "--in", "{canonical_input_path}"]
+rstim-cli-b8 = ["{rstim_binary}", "sample", "--shots", "{shots}", "--seed", "{seed}", "--out_format", "b8", "--in", "{canonical_input_path}"]
