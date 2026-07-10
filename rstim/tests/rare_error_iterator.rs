@@ -1,8 +1,8 @@
 use rand::rngs::StdRng;
 use rand::{Error, RngCore, SeedableRng};
-use rstim::rare_error_iterator::{
-    rare_error_indices, rare_error_telemetry, reset_rare_error_telemetry,
-};
+use rstim::rare_error_iterator::rare_error_indices;
+#[cfg(debug_assertions)]
+use rstim::rare_error_iterator::{rare_error_telemetry, reset_rare_error_telemetry};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::collections::HashSet;
@@ -108,6 +108,7 @@ fn collect_seeded(probability: f64, attempt_count: usize) -> Vec<usize> {
 
 #[test]
 fn boundary_probabilities_and_zero_attempts() {
+    #[cfg(debug_assertions)]
     reset_rare_error_telemetry();
     let mut rng = CountingRng::new(StdRng::seed_from_u64(123));
     let empty: Vec<usize> = rare_error_indices(0.0, 8, &mut rng).collect();
@@ -131,12 +132,15 @@ fn boundary_probabilities_and_zero_attempts() {
     let above_one: Vec<usize> = rare_error_indices(2.0, 5, &mut rng).collect();
     assert_eq!(above_one, (0..5).collect::<Vec<_>>());
 
-    let telemetry = rare_error_telemetry();
-    assert_eq!(telemetry.iterator_builds, 5);
-    assert_eq!(
-        telemetry.rng_core_draws, 0,
-        "empty and dense boundary modes must not draw randomness"
-    );
+    #[cfg(debug_assertions)]
+    {
+        let telemetry = rare_error_telemetry();
+        assert_eq!(telemetry.iterator_builds, 5);
+        assert_eq!(
+            telemetry.rng_core_draws, 0,
+            "empty and dense boundary modes must not draw randomness"
+        );
+    }
     assert_eq!(rng.core_draws(), 0, "boundary modes must not call RngCore");
 }
 
@@ -218,6 +222,7 @@ fn sparse_frequency_windows_and_gaps_are_non_periodic() {
 
 #[test]
 fn sparse_draw_count_is_bounded() {
+    #[cfg(debug_assertions)]
     reset_rare_error_telemetry();
     let mut rng = CountingRng::new(StdRng::seed_from_u64(123));
     let mut iter = rare_error_indices(0.001, 1_000_000, &mut rng);
@@ -226,13 +231,16 @@ fn sparse_draw_count_is_bounded() {
         event_count += 1;
     }
 
-    let telemetry = rare_error_telemetry();
-    assert_eq!(telemetry.iterator_builds, 1);
-    assert_eq!(
-        telemetry.rng_core_draws,
-        rng.core_draws(),
-        "debug telemetry must match actual RngCore calls"
-    );
+    #[cfg(debug_assertions)]
+    {
+        let telemetry = rare_error_telemetry();
+        assert_eq!(telemetry.iterator_builds, 1);
+        assert_eq!(
+            telemetry.rng_core_draws,
+            rng.core_draws(),
+            "debug telemetry must match actual RngCore calls"
+        );
+    }
     assert!(
         (800..=1_200).contains(&event_count),
         "draw-count test should exercise the expected sparse event frequency, got {event_count}"
