@@ -495,8 +495,8 @@ def _collect_environment(
             "rstim": worker_details[1]["command"],
         },
         "canonical_worker_argv": {
-            "stim": [*stim_command, "--input", str(input_path), "--seed", str(args.seed)],
-            "rstim": [*rstim_command, "--input", str(input_path), "--seed", str(args.seed)],
+            "stim": [*default_stim_worker_command(), "--input", str(input_path), "--seed", str(args.seed)],
+            "rstim": [*default_rstim_worker_command(args.profile), "--input", str(input_path), "--seed", str(args.seed)],
         },
         "python_executable": str(python_executable),
         "python_executable_sha256": _sha256_if_file(python_executable),

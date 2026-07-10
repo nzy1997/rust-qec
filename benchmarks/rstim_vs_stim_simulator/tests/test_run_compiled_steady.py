@@ -282,6 +282,24 @@ class RunCompiledSteadyTest(unittest.TestCase):
             "stim": [sys.executable, str(stim_worker), "--input", str(fixture), "--seed", "0"],
             "rstim": [sys.executable, str(rstim_worker), "--input", str(fixture), "--seed", "0"],
         }
+        expected_canonical_argv = {
+            "stim": [
+                "python3",
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+                "--input",
+                str(fixture),
+                "--seed",
+                "0",
+            ],
+            "rstim": [
+                "target/release/rstim_compiled_steady_worker",
+                "--input",
+                str(fixture),
+                "--seed",
+                "0",
+            ],
+        }
         known_answer_sha = hashlib.sha256(b"X 0\nM 0\n").hexdigest()
 
         self.assertEqual(environment["profile"], "release")
@@ -300,7 +318,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual(environment["fixture_sha256"], hashlib.sha256(fixture.read_bytes()).hexdigest())
         self.assertEqual(environment["fixture_sha256"], case["canonical_input_sha256"])
         self.assertEqual(environment["worker_argv"], expected_worker_argv)
-        self.assertEqual(environment["canonical_worker_argv"], expected_worker_argv)
+        self.assertEqual(environment["canonical_worker_argv"], expected_canonical_argv)
         python_executable = Path(environment["python_executable"])
         self.assertTrue(python_executable.is_file(), python_executable)
         self.assertEqual(
