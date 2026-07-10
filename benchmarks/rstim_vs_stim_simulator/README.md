@@ -201,6 +201,21 @@ when the report contains the required case and variants. This is report-only
 speed evidence: it records `raw.jsonl`, `summary.json`, `report.md`, and
 `environment.json` for review and does not enforce a speed threshold.
 
+## Expanded Evidence Pack
+
+Check the complete published correctness, speed, and DEM evidence pack:
+
+```sh
+python3 tools/check_rstim_vs_stim_expanded_evidence.py \
+  --correctness-dir benchmarks/rstim_vs_stim_simulator/results/distributions \
+  --full-correctness benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json \
+  --speed-dirs benchmarks/rstim_vs_stim_simulator/results/release,benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample,benchmarks/rstim_vs_stim_simulator/results/release-surface-detect \
+  --dem-speed-dir benchmarks/rstim_vs_stim_simulator/results/release-dem-sample
+```
+
+The checker prints `PASS expanded rstim-vs-Stim evidence`. It validates
+required case coverage and metadata without enforcing timing thresholds.
+
 ## Multi-Case Speed Suite
 
 Run a release-profile suite over exactly the requested perf cases:
