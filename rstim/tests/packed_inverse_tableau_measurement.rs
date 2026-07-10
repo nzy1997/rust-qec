@@ -358,6 +358,23 @@ fn inverted_measurement_target_only_flips_reported_bit() {
 }
 
 #[test]
+fn inverted_reset_measurement_targets_only_flip_reported_bits() {
+    for (reset, measurement, preparation, expected_bits) in [
+        ("MRX", "MX", "H 0\nZ 0\n", vec![false, false]),
+        ("MRY", "MY", "H 0\nS_DAG 0\n", vec![false, false]),
+    ] {
+        let inverted_circuit = format!("{preparation}{reset} !0\n{measurement} 0\n");
+        let (bits, snapshot) = apply_packed_circuit(1, &inverted_circuit);
+        assert_eq!(bits, expected_bits, "circuit:\n{inverted_circuit}");
+
+        let ordinary_circuit = format!("{preparation}{reset} 0\n{measurement} 0\n");
+        let (ordinary_bits, expected_snapshot) = apply_packed_circuit(1, &ordinary_circuit);
+        assert_eq!(ordinary_bits, vec![true, false]);
+        assert_eq!(snapshot, expected_snapshot);
+    }
+}
+
+#[test]
 fn packed_and_legacy_measurement_sequence_match() {
     let circuit = deterministic_measurement_sequence(0x457, 130, 512);
     let (packed_bits, packed_snapshot) = apply_packed_circuit(130, &circuit);
@@ -365,6 +382,26 @@ fn packed_and_legacy_measurement_sequence_match() {
     assert_eq!(packed_bits, legacy_bits);
     assert_eq!(packed_snapshot, legacy_snapshot);
     println!("PASS packed inverse measurement and reset");
+}
+
+#[test]
+fn deterministic_measurement_sequence_covers_every_operation_after_prefix() {
+    let circuit = deterministic_measurement_sequence(0x457, 130, 512);
+    let operations: Vec<_> = circuit
+        .lines()
+        .skip(16)
+        .filter_map(|line| line.split_whitespace().next())
+        .collect();
+
+    for operation in [
+        "H", "S", "S_DAG", "X", "Y", "Z", "CX", "M", "MX", "MY", "MR", "MRX", "MRY",
+        "R", "RX", "RY",
+    ] {
+        assert!(
+            operations.contains(&operation),
+            "generated operation {operation} did not appear after the fixed prefix"
+        );
+    }
 }
 
 fn deterministic_measurement_sequence(seed: u64, num_qubits: usize, len: usize) -> String {
@@ -395,7 +432,7 @@ fn deterministic_measurement_sequence(seed: u64, num_qubits: usize, len: usize) 
         let q2 = ((state >> 31) as usize) % (num_qubits - 1);
         let t = if q2 >= q { q2 + 1 } else { q2 };
         let inv = if ((state >> 9) & 1) == 1 { "!" } else { "" };
-        lines.push(match ((state >> 61) % 15) as u8 {
+        lines.push(match ((state >> 60) & 0xf) as u8 {
             0 => format!("H {q}"),
             1 => format!("S {q}"),
             2 => format!("S_DAG {q}"),
