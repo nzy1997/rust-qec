@@ -37,7 +37,7 @@
 - Produces:
   - Four issue-required integration tests.
   - Helpers for applying supported gates to packed and legacy tableaus.
-  - Oracle-integrity comparison against audited commit `47ffef302a8a471475a5b954a418880cd192c475`.
+- Oracle-integrity length and FNV-1a checksum comparison against audited commit `47ffef302a8a471475a5b954a418880cd192c475`.
 
 - [ ] **Step 1: Write the failing test file**
 
@@ -75,7 +75,7 @@ Add negative-control assertions:
 
 - raw packed rows converted without inversion diverge after a non-self-inverse `S` sequence;
 - swapped `CX` direction diverges in the exact direction circuit;
-- oracle-integrity comparison strips only the marked accessor block before comparing to the audited file from git.
+- oracle-integrity comparison strips only the marked accessor block before checking the audited source length and FNV-1a checksum.
 
 - [ ] **Step 2: Run the focused test to verify RED**
 
@@ -153,9 +153,9 @@ pub fn cx(&mut self, c: usize, t: usize) { /* row c = X_c X_t, row n+t = Z_c Z_t
 
 - [ ] **Step 4: Implement canonical snapshot inversion**
 
-Build a packed `2n x 2n` matrix from raw inverse rows, row-reduce it with an identity coefficient sidecar, and for each target basis row:
+Use the symplectic identity `M^{-1} = J M^T J` on the raw inverse `[X | Z]` matrix, and for each target basis row:
 
-1. read coefficients from the reduced sidecar;
+1. read coefficients directly from raw inverse columns;
 2. set forward X/Z booleans from coefficient bits;
 3. evaluate those coefficients through the raw inverse tableau with zero input sign;
 4. set canonical phase to `2` if the evaluated basis row is negative, otherwise `0`.

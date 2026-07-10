@@ -65,8 +65,8 @@ pub struct CanonicalTableauSnapshot {
 
 `PackedInverseTableau::canonical_snapshot()` converts inverse rows into the legacy row-major representation by inverting the packed binary basis:
 
-1. Build a packed `2n x 2n` binary matrix whose rows are raw inverse X/Z bits.
-2. Row-reduce that matrix with a packed identity sidecar to get coefficients that express each input basis generator as a product of raw inverse rows.
+1. Treat the raw inverse rows as a symplectic matrix in `[X | Z]` row order.
+2. Use the identity `M^{-1} = J M^T J` to read each forward row's coefficients directly from raw inverse columns, avoiding per-snapshot Gaussian elimination in the 4,096-gate acceptance loop.
 3. Use those coefficients as the canonical forward row X/Z bits.
 4. Evaluate the coefficient Pauli through the raw inverse tableau with zero input sign; the resulting basis sign is the forward canonical phase.
 
@@ -85,7 +85,7 @@ Add `rstim/tests/packed_inverse_tableau_clifford.rs` with the issue-required tes
 
 The tests compare snapshots after every instruction, cover the 130-qubit word-boundary sequence, run 4,096 gates for seeds `0x455`, `0xC0FFEE`, and `0x5EED5EED`, and print `PASS packed inverse Clifford evolution`.
 
-The oracle-integrity assertion reads the audited `tableau.rs` from git and compares it to the current file after stripping the marked snapshot-accessor block. This fails if a legacy gate body changes.
+The oracle-integrity assertion strips the marked snapshot-accessor block and compares the current `tableau.rs` byte length plus FNV-1a checksum against the audited source at `47ffef302a8a471475a5b954a418880cd192c475`. This avoids requiring CI to fetch historical git objects and still fails if a legacy gate body changes.
 
 ## Out Of Scope
 
