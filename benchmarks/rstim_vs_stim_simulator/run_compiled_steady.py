@@ -106,6 +106,24 @@ def default_rstim_worker_command(profile: str) -> list[str]:
     return [f"target/{profile}/rstim_compiled_steady_worker"]
 
 
+def build_rstim_worker(profile: str) -> list[str]:
+    command = ["cargo", "build"]
+    if profile == "release":
+        command.append("--release")
+    command.extend(["-p", "rstim", "--bin", "rstim_compiled_steady_worker"])
+    completed = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise RunnerError(f"failed to build rstim compiled steady worker: {detail}")
+    return default_rstim_worker_command(profile)
+
+
 def _probe(command: list[str]) -> dict[str, Any]:
     try:
         completed = subprocess.run(
@@ -490,7 +508,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
 
     input_path = (REPO_ROOT / case["canonical_input_path"]).resolve()
     stim_command = args.stim_worker_command or default_stim_worker_command()
-    rstim_command = args.rstim_worker_command or default_rstim_worker_command(args.profile)
+    rstim_command = args.rstim_worker_command or build_rstim_worker(args.profile)
     stim_probe = _probe_stim_python()
     if stim_probe.get("version") != "1.15.0":
         raise RunnerError(
@@ -549,7 +567,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the compiled steady-state benchmark.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--case", required=True)
-    parser.add_argument("--profile", choices=["release"], required=True)
+    parser.add_argument("--profile", choices=["release", "debug"], required=True)
     parser.add_argument("--warmup-rounds", type=int, default=2)
     parser.add_argument("--measure-rounds", type=int, default=7)
     parser.add_argument("--seed", type=int, default=0)

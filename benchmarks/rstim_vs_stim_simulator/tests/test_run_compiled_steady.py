@@ -21,6 +21,49 @@ MANIFEST = ROOT / "benchmarks" / "rstim_vs_stim_simulator" / "fair_cli_cases.tom
 
 
 class RunCompiledSteadyTest(unittest.TestCase):
+    def test_rstim_worker_returns_packed_known_answer_and_lifecycle_telemetry(self) -> None:
+        build = subprocess.run(
+            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(build.returncode, 0, build.stderr)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture = Path(temp_dir) / "known_answer.stim"
+            fixture.write_text("X 0\nM 0\n", encoding="utf-8")
+            session = run_compiled_steady.WorkerSession(
+                run_compiled_steady.default_rstim_worker_command("debug"),
+                input_path=fixture,
+                seed=0,
+            )
+            try:
+                ready = session.read_ready()
+                self.assertEqual(ready["variant"], "rstim")
+                self.assertEqual(ready["compile_count"], 1)
+                self.assertEqual(ready["reference_build_count"], 1)
+                self.assertEqual(ready["sample_call_count"], 0)
+                self.assertEqual(ready["fixture_sha256"], hashlib.sha256(fixture.read_bytes()).hexdigest())
+                self.assertEqual(ready["measurement_count"], 1)
+                self.assertEqual(ready["bytes_per_shot"], 1)
+
+                call_count, data, _ = session.sample(0, 1)
+                self.assertEqual(call_count, 1)
+                self.assertEqual(data, b"\x01")
+
+                final = session.stop()
+                self.assertEqual(final["compile_count"], 1)
+                self.assertEqual(final["reference_build_count"], 1)
+                self.assertEqual(final["sample_call_count"], 1)
+            except BaseException:
+                session.abort()
+                raise
+            finally:
+                session.stdout.close()
+                session.stderr.close()
+
     def test_stim_worker_returns_packed_known_answer_when_stim_1_15_0_is_available(self) -> None:
         try:
             import stim
@@ -321,23 +364,21 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertIn("requires stim==1.15.0", stderr.getvalue())
         self.assertFalse((out_dir / "raw.jsonl").exists())
 
-    def test_profile_argument_accepts_only_release(self) -> None:
+    def test_profile_argument_accepts_release_and_debug(self) -> None:
         parser = run_compiled_steady.build_parser()
-
-        with contextlib.redirect_stderr(io.StringIO()):
-            with self.assertRaises(SystemExit):
-                parser.parse_args(
-                    [
-                        "--manifest",
-                        str(MANIFEST),
-                        "--case",
-                        "stim_surface_d11_r100",
-                        "--profile",
-                        "debug",
-                        "--out-dir",
-                        "/tmp/out",
-                    ]
-                )
+        args = parser.parse_args(
+            [
+                "--manifest",
+                str(MANIFEST),
+                "--case",
+                "stim_surface_d11_r100",
+                "--profile",
+                "debug",
+                "--out-dir",
+                "/tmp/out",
+            ]
+        )
+        self.assertEqual(args.profile, "debug")
 
 
 if __name__ == "__main__":
