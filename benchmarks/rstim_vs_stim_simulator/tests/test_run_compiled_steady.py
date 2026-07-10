@@ -461,6 +461,58 @@ class RunCompiledSteadyTest(unittest.TestCase):
         )
         self.assertEqual(args.profile, "debug")
 
+    def test_debug_profile_still_records_release_canonical_worker_argv(self) -> None:
+        parser = run_compiled_steady.build_parser()
+        args = parser.parse_args(
+            [
+                "--manifest",
+                str(MANIFEST),
+                "--case",
+                "stim_surface_d11_r100",
+                "--profile",
+                "debug",
+                "--out-dir",
+                "/tmp/out",
+            ]
+        )
+        manifest = run_compiled_steady.fair_cli_contract.load_manifest(MANIFEST)
+        case = run_compiled_steady.fair_cli_contract.find_case(manifest, "stim_surface_d11_r100")
+        fixture = (ROOT / case["canonical_input_path"]).resolve()
+        worker_details = [
+            {"variant": "stim", "command": ["fake-stim", "--input", str(fixture), "--seed", "0"]},
+            {"variant": "rstim", "command": ["target/debug/rstim_compiled_steady_worker", "--input", str(fixture), "--seed", "0"]},
+        ]
+
+        with (
+            unittest.mock.patch.object(run_compiled_steady, "_version_string", return_value=None),
+            unittest.mock.patch.object(
+                run_compiled_steady,
+                "_resolve_executable",
+                return_value=Path(sys.executable).resolve(),
+            ),
+        ):
+            environment = run_compiled_steady._collect_environment(
+                args=args,
+                case=case,
+                input_path=fixture,
+                rstim_command=run_compiled_steady.default_rstim_worker_command("debug"),
+                worker_details=worker_details,
+                preflight_results=[],
+                stim_probe={"path": None, "sha256": None},
+            )
+
+        self.assertEqual(environment["worker_argv"]["rstim"][0], "target/debug/rstim_compiled_steady_worker")
+        self.assertEqual(
+            environment["canonical_worker_argv"]["rstim"],
+            [
+                "target/release/rstim_compiled_steady_worker",
+                "--input",
+                str(fixture),
+                "--seed",
+                "0",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
