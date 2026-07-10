@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import contextlib
+import hashlib
 import importlib.machinery
 import io
 import subprocess
@@ -20,6 +21,45 @@ MANIFEST = ROOT / "benchmarks" / "rstim_vs_stim_simulator" / "fair_cli_cases.tom
 
 
 class RunCompiledSteadyTest(unittest.TestCase):
+    def test_stim_worker_returns_packed_known_answer_when_stim_1_15_0_is_available(self) -> None:
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("stim is unavailable")
+        if stim.__version__ != "1.15.0":
+            self.skipTest(f"requires stim==1.15.0, got {stim.__version__}")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture = Path(temp_dir) / "known_answer.stim"
+            fixture.write_text("X 0\nM 0\n", encoding="utf-8")
+            session = run_compiled_steady.WorkerSession(
+                run_compiled_steady.default_stim_worker_command(),
+                input_path=fixture,
+                seed=0,
+            )
+            try:
+                ready = session.read_ready()
+                self.assertEqual(ready["variant"], "stim")
+                self.assertEqual(ready["compile_count"], 1)
+                self.assertEqual(ready["reference_build_count"], 1)
+                self.assertEqual(ready["sample_call_count"], 0)
+                self.assertEqual(ready["fixture_sha256"], hashlib.sha256(fixture.read_bytes()).hexdigest())
+                self.assertEqual(ready["measurement_count"], 1)
+                self.assertEqual(ready["bytes_per_shot"], 1)
+
+                call_count, data, _ = session.sample(0, 1)
+                self.assertEqual(call_count, 1)
+                self.assertEqual(data, b"\x01")
+
+                final = session.stop()
+                self.assertEqual(final["sample_call_count"], 1)
+            except BaseException:
+                session.abort()
+                raise
+            finally:
+                session.stdout.close()
+                session.stderr.close()
+
     def _write_fake_workers(self, directory: Path, *, mode: str) -> dict[str, Path]:
         paths: dict[str, Path] = {}
         for variant in ("stim", "rstim"):
