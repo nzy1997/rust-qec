@@ -99,6 +99,8 @@ def write_fake_cli(path: Path, *, mode: str) -> Path:
                     fail("preflight must use --shots 1")
                 if MODE == "malformed-preflight":
                     sys.stdout.buffer.write(b"\\x01\\x00")
+                elif MODE == "zero-preflight":
+                    sys.stdout.buffer.write(b"\\x00")
                 else:
                     sys.stdout.buffer.write(b"\\x01")
                 sys.exit(0)
@@ -114,6 +116,8 @@ def write_fake_cli(path: Path, *, mode: str) -> Path:
                 sys.stdout.buffer.flush()
                 sys.stdout.close()
                 time.sleep(0.15)
+                sys.stderr.write("delayed stderr\\n")
+                sys.stderr.flush()
                 sys.exit(0)
 
             sys.stdout.buffer.write(payload)
@@ -313,6 +317,33 @@ class RunFairCliTest(unittest.TestCase):
 
             self.assertFalse((out_dir / "raw.jsonl").exists())
             self.assertEqual(len(invocations.read_text(encoding="utf-8").splitlines()), 2)
+
+    def test_preflight_rejects_zero_known_answer_before_writing_raw_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            write_fake_cli(fake_bin / "stim", mode="success")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="zero-preflight")
+            out_dir = root / "out"
+            invocations = root / "invocations.txt"
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                        "FAKE_CLI_INVOCATIONS": str(invocations),
+                    },
+                ),
+                mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "known-answer preflight"):
+                    run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
+
+            self.assertFalse((out_dir / "raw.jsonl").exists())
+            invocation_lines = invocations.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(invocation_lines), 2)
+            self.assertTrue(all("--shots 1" in invocation for invocation in invocation_lines))
 
     def test_manifest_validation_precedes_all_benchmark_processes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
