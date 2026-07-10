@@ -109,13 +109,24 @@ def validate_case(case: dict[str, Any], *, manifest_path: Path, repo_root: Path)
         if case.get(field) != expected:
             errors.append(f'{field}: expected {expected!r}, got {case.get(field)!r}')
 
-    expected_bytes_per_shot = (case.get("measurement_count", 0) + 7) // 8
-    if case.get("bytes_per_shot") != expected_bytes_per_shot:
-        errors.append(f'bytes_per_shot: expected {expected_bytes_per_shot}')
-    if case.get("expected_output_bytes") != expected_bytes_per_shot * case.get("shots", 0):
-        errors.append(
-            f'expected_output_bytes: expected {expected_bytes_per_shot * case.get("shots", 0)}'
-        )
+    measurement_count = case.get("measurement_count")
+    shots = case.get("shots")
+    valid_measurement_count = isinstance(measurement_count, int) and not isinstance(
+        measurement_count, bool
+    )
+    valid_shots = isinstance(shots, int) and not isinstance(shots, bool)
+    if not valid_measurement_count:
+        errors.append(f'measurement_count: expected integer, got {measurement_count!r}')
+    if not valid_shots:
+        errors.append(f'shots: expected integer, got {shots!r}')
+    if valid_measurement_count:
+        expected_bytes_per_shot = (measurement_count + 7) // 8
+        if case.get("bytes_per_shot") != expected_bytes_per_shot:
+            errors.append(f'bytes_per_shot: expected {expected_bytes_per_shot}')
+        if valid_shots and case.get("expected_output_bytes") != expected_bytes_per_shot * shots:
+            errors.append(
+                f'expected_output_bytes: expected {expected_bytes_per_shot * shots}'
+            )
 
     canonical_path = case.get("canonical_input_path")
     if isinstance(canonical_path, str):
@@ -143,7 +154,12 @@ def validate_case(case: dict[str, Any], *, manifest_path: Path, repo_root: Path)
             if case.get(fair_field) != source_case.get(source_field):
                 errors.append(f'{fair_field}: does not match source manifest {source_field}')
         source_input = source_case.get("canonical_input_path")
-        if isinstance(source_input, str) and isinstance(canonical_path, str):
+        if not isinstance(source_input, str) or not isinstance(canonical_path, str):
+            errors.append(
+                "canonical_input_path: source manifest must provide a string path "
+                "that resolves to the fair path"
+            )
+        else:
             source_path = (_path_from_repo(repo_root, source_manifest_path).parent / source_input).resolve()
             if source_path != _path_from_repo(repo_root, canonical_path):
                 errors.append("canonical_input_path: source manifest resolves to a different file")

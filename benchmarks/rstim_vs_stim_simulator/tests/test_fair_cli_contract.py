@@ -4,6 +4,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import copy
+import hashlib
 from pathlib import Path
 
 from benchmarks.rstim_vs_stim_simulator import fair_cli_contract
@@ -138,6 +140,61 @@ class FairCliContractTest(unittest.TestCase):
             'canonical_input_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"',
             "canonical_input_sha256",
         )
+
+    def test_rejects_non_integer_measurement_count_with_diagnostic(self) -> None:
+        self._assert_mutation_rejected(
+            "measurement_count = 12121",
+            'measurement_count = "bad"',
+            "measurement_count: expected integer",
+        )
+
+    def test_rejects_missing_or_non_string_source_canonical_input_path(self) -> None:
+        manifest = fair_cli_contract.load_manifest(FAIR_MANIFEST)
+        case = copy.deepcopy(fair_cli_contract.find_case(manifest, "stim_surface_d11_r100"))
+        fixture_bytes = b"temporary fixture\n"
+        fixture_digest = hashlib.sha256(fixture_bytes).hexdigest()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            fixture_path = repo_root / "fixture.stim"
+            fixture_path.write_bytes(fixture_bytes)
+            case["canonical_input_path"] = "fixture.stim"
+            case["canonical_input_sha256"] = fixture_digest
+            case["source_manifest_path"] = "source.toml"
+
+            for source_path_value in (None, 123):
+                source_manifest = {
+                    "cases": [
+                        {
+                            "case_id": case["source_manifest_case_id"],
+                            "canonical_input_path": source_path_value,
+                            "expected_measurements": case["measurement_count"],
+                            "shots": case["shots"],
+                            "stim_version": case["stim_version"],
+                        }
+                    ]
+                }
+                source_lines = [
+                    "[[cases]]",
+                    f'case_id = "{source_manifest["cases"][0]["case_id"]}"',
+                    f'expected_measurements = {case["measurement_count"]}',
+                    f'shots = {case["shots"]}',
+                    f'stim_version = "{case["stim_version"]}"',
+                ]
+                if source_path_value is not None:
+                    source_lines.append(f"canonical_input_path = {source_path_value}")
+                (repo_root / "source.toml").write_text("\n".join(source_lines) + "\n", encoding="utf-8")
+
+                errors = fair_cli_contract.validate_case(
+                    case,
+                    manifest_path=repo_root / "fair.toml",
+                    repo_root=repo_root,
+                )
+
+                self.assertTrue(
+                    any("canonical_input_path: source manifest" in error for error in errors),
+                    errors,
+                )
 
 
 if __name__ == "__main__":
