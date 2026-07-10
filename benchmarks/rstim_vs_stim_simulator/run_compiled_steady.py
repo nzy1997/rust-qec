@@ -159,9 +159,18 @@ def _probe_stim_python() -> dict[str, Any]:
             "python3",
             "-c",
             (
-                "import json, stim; "
+                "import importlib.machinery, json, stim, sys; "
+                "suffixes = tuple(importlib.machinery.EXTENSION_SUFFIXES); "
+                "extensions = [(name, getattr(module, '__file__', None)) "
+                "for name, module in sys.modules.items() "
+                "if name.startswith('stim.') "
+                "and getattr(module, '__file__', None) "
+                "and getattr(module, '__file__', '').endswith(suffixes)]; "
+                "extensions.sort(key=lambda item: (not item[0].startswith('stim._stim'), item[0])); "
                 "print(json.dumps({'version': stim.__version__, "
-                "'path': getattr(stim, '__file__', None)}))"
+                "'package_path': getattr(stim, '__file__', None), "
+                "'path': extensions[0][1] if extensions else None, "
+                "'extension_module': extensions[0][0] if extensions else None}))"
             ),
         ]
     )
@@ -187,6 +196,8 @@ def _probe_stim_python() -> dict[str, Any]:
     return {
         "status": "ok",
         "version": payload.get("version"),
+        "package_path": payload.get("package_path"),
+        "extension_module": payload.get("extension_module"),
         "path": str(path) if path is not None else None,
         "sha256": _sha256_if_file(path),
         "stderr": "",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import contextlib
+import importlib.machinery
 import io
 import subprocess
 import sys
@@ -182,6 +183,12 @@ class RunCompiledSteadyTest(unittest.TestCase):
             self.assertIn(key, environment)
         self.assertEqual(environment["protocol_version"], run_compiled_steady.PROTOCOL_VERSION)
         self.assertEqual(environment["seed_policy"], "seed_once_then_advance_across_9_calls")
+        extension_path = Path(environment["loaded_stim_extension_path"])
+        self.assertNotEqual(extension_path.name, "__init__.py")
+        self.assertTrue(
+            any(str(extension_path).endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES),
+            extension_path,
+        )
 
     def test_sample_timing_includes_delayed_final_result_byte(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("delay-last-byte")
