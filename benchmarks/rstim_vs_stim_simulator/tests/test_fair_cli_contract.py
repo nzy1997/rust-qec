@@ -120,6 +120,22 @@ class FairCliContractTest(unittest.TestCase):
             "asymmetric output_format: expected b8",
         )
 
+    def test_rejects_unknown_argv_placeholder_without_traceback(self) -> None:
+        manifest_text = FAIR_MANIFEST.read_text(encoding="utf-8")
+        old = 'rstim-cli-b8 = ["{rstim_binary}", "sample", "--shots", "{shots}",'
+        new = 'rstim-cli-b8 = ["{rstim_binary}", "sample", "--shots", "{bad}",'
+        self.assertIn(old, manifest_text)
+        mutated = manifest_text.replace(old, new, 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "fair_cli_cases.toml"
+            manifest_path.write_text(mutated, encoding="utf-8")
+            result = run_contract(manifest_path)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("argv", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_rejects_wrong_timer_scope(self) -> None:
         self._assert_mutation_rejected(
             'timer_scope = "cli_end_to_end"',

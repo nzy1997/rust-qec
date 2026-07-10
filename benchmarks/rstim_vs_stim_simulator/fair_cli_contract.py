@@ -174,7 +174,10 @@ def validate_case(case: dict[str, Any], *, manifest_path: Path, repo_root: Path)
         if template != expected_template:
             errors.append(f'argv.{name}: expected canonical template')
         if isinstance(template, list) and all(isinstance(value, str) for value in template):
-            expanded[name] = expand_argv(template, case, seed=0)
+            try:
+                expanded[name] = expand_argv(template, case, seed=0)
+            except (AttributeError, IndexError, KeyError, ValueError) as error:
+                errors.append(f'argv.{name}: could not expand template: {error}')
 
     if len(expanded) == 2:
         formats = [_argv_option(argv, "--out_format", errors) for argv in expanded.values()]
