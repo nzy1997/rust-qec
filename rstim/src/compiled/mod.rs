@@ -8,5 +8,6 @@ pub use circuit::{
     CompiledOp, CompiledRepeatRegion,
 };
 pub use path::{choose_analyzer_path, choose_sampler_path, CompiledPathDecision};
+pub(crate) use sampler::sample_compiled_batch_with_reference;
 pub use sampler::sample_compiled_batch;
 pub use analyzer::analyze_compiled_circuit;

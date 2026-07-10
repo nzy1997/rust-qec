@@ -28,5 +28,7 @@ pub mod sample_trace;
 pub mod perf;
 pub mod compiled;
 
+pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnostics};
+
 #[doc(hidden)]
 pub mod rare_error_iterator;
