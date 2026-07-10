@@ -108,6 +108,33 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertNotEqual(process.returncode, 0)
         self.assertIn("missing.stim", stderr.decode(errors="replace"))
 
+    def test_rstim_worker_emits_error_frame_for_missing_required_args(self) -> None:
+        build = subprocess.run(
+            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(build.returncode, 0, build.stderr)
+
+        process = subprocess.Popen(
+            run_compiled_steady.default_rstim_worker_command("debug"),
+            cwd=ROOT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        frame_type, payload = run_compiled_steady.read_frame(process.stdout)
+        stdout_remainder, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(frame_type, run_compiled_steady.ERROR)
+        self.assertIn("--input", payload.decode(errors="replace"))
+        self.assertEqual(stdout_remainder, b"")
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("--input", stderr.decode(errors="replace"))
+
     def test_stim_worker_returns_packed_known_answer_when_stim_1_15_0_is_available(self) -> None:
         try:
             import stim
@@ -175,6 +202,24 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 session.stdin.close()
                 session.stdout.close()
                 session.stderr.close()
+
+    def test_stim_worker_emits_error_frame_for_missing_required_args(self) -> None:
+        process = subprocess.Popen(
+            run_compiled_steady.default_stim_worker_command(),
+            cwd=ROOT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        frame_type, payload = run_compiled_steady.read_frame(process.stdout)
+        stdout_remainder, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(frame_type, run_compiled_steady.ERROR)
+        self.assertIn("--input", payload.decode(errors="replace"))
+        self.assertEqual(stdout_remainder, b"")
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("--input", stderr.decode(errors="replace"))
 
     def _write_fake_workers(self, directory: Path, *, mode: str) -> dict[str, Path]:
         paths: dict[str, Path] = {}

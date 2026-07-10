@@ -26,7 +26,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as error:
+        if error.code == 0:
+            return 0
+        _write_error(parser.format_usage().strip())
+        return int(error.code) if isinstance(error.code, int) else 2
 
     try:
         import stim

@@ -152,7 +152,19 @@ fn run(args: Args) -> Result<(), String> {
 }
 
 fn main() {
-    if let Err(error) = run(Args::parse()) {
+    let args = match Args::try_parse() {
+        Ok(args) => args,
+        Err(error) => {
+            if error.use_stderr() {
+                let message = error.to_string();
+                let _ = write_error(&message);
+                eprint!("{message}");
+                std::process::exit(error.exit_code());
+            }
+            error.exit();
+        }
+    };
+    if let Err(error) = run(args) {
         let _ = write_error(&error);
         eprintln!("{error}");
         std::process::exit(1);
