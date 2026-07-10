@@ -471,7 +471,7 @@ def _collect_environment(
     python_executable = _resolve_executable("python3") or Path(sys.executable).resolve()
     rstim_worker_path = _resolve_executable(rstim_command[0])
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
-    rstim_version = _version_string(default_rstim_worker_command(args.profile))
+    rstim_version = _version_string([*rstim_command, "--version"])
     return {
         "git_commit": git_commit,
         "os": platform.platform(),

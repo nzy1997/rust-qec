@@ -22,6 +22,7 @@ const FINAL: u8 = b'F';
 const ERROR: u8 = b'E';
 
 #[derive(Parser)]
+#[command(name = "rstim", version)]
 struct Args {
     #[arg(long)]
     input: PathBuf,
@@ -93,7 +94,8 @@ fn write_error(message: impl std::fmt::Display) -> Result<(), String> {
 }
 
 fn run(args: Args) -> Result<(), String> {
-    let input_bytes = fs::read(&args.input).map_err(|error| error.to_string())?;
+    let input_bytes =
+        fs::read(&args.input).map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
     let input_text = std::str::from_utf8(&input_bytes).map_err(|error| error.to_string())?;
     let instructions = parse_lines(input_text)?;
     let mut sampler =
@@ -151,6 +153,7 @@ fn run(args: Args) -> Result<(), String> {
 
 fn main() {
     if let Err(error) = run(Args::parse()) {
+        let _ = write_error(&error);
         eprintln!("{error}");
         std::process::exit(1);
     }

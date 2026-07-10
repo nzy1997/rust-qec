@@ -30,6 +30,15 @@ class RunCompiledSteadyTest(unittest.TestCase):
             text=True,
         )
         self.assertEqual(build.returncode, 0, build.stderr)
+        version = subprocess.run(
+            [*run_compiled_steady.default_rstim_worker_command("debug"), "--version"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(version.returncode, 0, version.stderr)
+        self.assertRegex(version.stdout.strip(), r"^rstim 0\.1\.1")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fixture = Path(temp_dir) / "known_answer.stim"
@@ -63,6 +72,41 @@ class RunCompiledSteadyTest(unittest.TestCase):
             finally:
                 session.stdout.close()
                 session.stderr.close()
+
+    def test_rstim_worker_emits_error_frame_for_missing_input(self) -> None:
+        build = subprocess.run(
+            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(build.returncode, 0, build.stderr)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_fixture = Path(temp_dir) / "missing.stim"
+            process = subprocess.Popen(
+                [
+                    *run_compiled_steady.default_rstim_worker_command("debug"),
+                    "--input",
+                    str(missing_fixture),
+                    "--seed",
+                    "0",
+                ],
+                cwd=ROOT,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            assert process.stdout is not None
+            frame_type, payload = run_compiled_steady.read_frame(process.stdout)
+            stdout_remainder, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(frame_type, run_compiled_steady.ERROR)
+        self.assertIn("missing.stim", payload.decode(errors="replace"))
+        self.assertEqual(stdout_remainder, b"")
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("missing.stim", stderr.decode(errors="replace"))
 
     def test_stim_worker_returns_packed_known_answer_when_stim_1_15_0_is_available(self) -> None:
         try:
@@ -103,6 +147,35 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 session.stdout.close()
                 session.stderr.close()
 
+    def test_stim_worker_emits_error_frame_for_invalid_sample_json(self) -> None:
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("stim is unavailable")
+        if stim.__version__ != "1.15.0":
+            self.skipTest(f"requires stim==1.15.0, got {stim.__version__}")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fixture = Path(temp_dir) / "known_answer.stim"
+            fixture.write_text("X 0\nM 0\n", encoding="utf-8")
+            session = run_compiled_steady.WorkerSession(
+                run_compiled_steady.default_stim_worker_command(),
+                input_path=fixture,
+                seed=0,
+            )
+            try:
+                ready = session.read_ready()
+                self.assertEqual(ready["variant"], "stim")
+                run_compiled_steady.write_frame(session.stdin, run_compiled_steady.SAMPLE, b"{")
+                frame_type, payload = run_compiled_steady.read_frame(session.stdout)
+                self.assertEqual(frame_type, run_compiled_steady.ERROR)
+                self.assertIn("invalid SAMPLE JSON", payload.decode(errors="replace"))
+            finally:
+                session.abort()
+                session.stdin.close()
+                session.stdout.close()
+                session.stderr.close()
+
     def _write_fake_workers(self, directory: Path, *, mode: str) -> dict[str, Path]:
         paths: dict[str, Path] = {}
         for variant in ("stim", "rstim"):
@@ -111,10 +184,15 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 textwrap.dedent(
                     f"""
                     import argparse
+                    import sys
+
+                    if "--version" in sys.argv:
+                        print("rstim 0.1.1" if "{variant}" == "rstim" else "stim fake")
+                        raise SystemExit(0)
+
                     import hashlib
                     import json
                     import struct
-                    import sys
                     import time
 
                     from benchmarks.rstim_vs_stim_simulator import run_compiled_steady as protocol
@@ -305,6 +383,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual(environment["profile"], "release")
         self.assertEqual(environment["timer_scope"], case["timer_scope"])
         self.assertEqual(environment["stim_version"], "1.15.0")
+        self.assertEqual(environment["rstim_version"], "rstim 0.1.1")
         self.assertEqual(environment["seed"], 0)
         self.assertEqual(environment["warmup_rounds"], 2)
         self.assertEqual(environment["measure_rounds"], 7)
