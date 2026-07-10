@@ -175,12 +175,20 @@ class FairCliContractTest(unittest.TestCase):
             "timer_scope",
         )
 
-    def test_rejects_wrong_canonical_input_path(self) -> None:
-        self._assert_mutation_rejected(
-            'canonical_input_path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"',
-            'canonical_input_path = "benchmarks/rstim_vs_stim_simulator/fixtures/missing.stim"',
-            "canonical_input_path",
-        )
+    def test_rejects_asymmetric_canonical_input_path(self) -> None:
+        manifest_text = FAIR_MANIFEST.read_text(encoding="utf-8")
+        old = 'rstim-cli-b8 = ["{rstim_binary}", "sample", "--shots", "{shots}", "--seed", "{seed}", "--out_format", "b8", "--in", "{canonical_input_path}"]'
+        new = 'rstim-cli-b8 = ["{rstim_binary}", "sample", "--shots", "{shots}", "--seed", "{seed}", "--out_format", "b8", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/other.stim"]'
+        self.assertIn(old, manifest_text)
+        mutated = manifest_text.replace(old, new, 1)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "fair_cli_cases.toml"
+            manifest_path.write_text(mutated, encoding="utf-8")
+            result = run_contract(manifest_path)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("canonical_input_path: expanded argv paths differ", result.stderr)
 
     def test_rejects_wrong_canonical_input_sha256(self) -> None:
         self._assert_mutation_rejected(
