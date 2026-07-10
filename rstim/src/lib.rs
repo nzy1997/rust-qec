@@ -27,3 +27,5 @@ pub mod qp101_svg;
 pub mod sample_trace;
 pub mod perf;
 pub mod compiled;
+
+pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnostics};

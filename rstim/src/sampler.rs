@@ -1,9 +1,10 @@
 use rand::Rng;
 
 use crate::compiled::{
-    choose_sampler_path, compile_circuit, sample_compiled_batch, CompiledPathDecision,
+    choose_sampler_path, compile_circuit, sample_compiled_batch,
+    sample_compiled_batch_with_reference, CompiledCircuit, CompiledPathDecision,
 };
-use crate::data_path::build_reference_sample;
+use crate::data_path::{build_reference_sample, ReferenceSampleMode};
 use crate::executor::max_qubit;
 use crate::executor::Executor;
 use crate::ir::StimInstr;
@@ -79,6 +80,69 @@ pub struct SampleOptions {
     pub reference_sample_mode: crate::data_path::ReferenceSampleMode,
     pub backend: SamplingBackend,
     pub output_mode: SampleOutputMode,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CompiledMeasurementSamplerDiagnostics {
+    pub compiled_ir_builds: usize,
+    pub reference_builds: usize,
+    pub sample_calls: usize,
+}
+
+#[derive(Debug)]
+pub struct CompiledMeasurementSampler {
+    compiled: CompiledCircuit,
+    reference_sample: Vec<bool>,
+    diagnostics: CompiledMeasurementSamplerDiagnostics,
+}
+
+impl CompiledMeasurementSampler {
+    pub fn compile(
+        instrs: &[StimInstr],
+        reference_mode: ReferenceSampleMode,
+    ) -> Result<Self, String> {
+        let compiled = compile_circuit(instrs)?;
+        match choose_sampler_path(&compiled) {
+            CompiledPathDecision::FastPath => {}
+            CompiledPathDecision::Fallback(reason) => return Err(reason.to_string()),
+        }
+
+        let reference_sample = build_reference_sample(instrs, reference_mode)?;
+        Ok(Self {
+            compiled,
+            reference_sample,
+            diagnostics: CompiledMeasurementSamplerDiagnostics {
+                compiled_ir_builds: 1,
+                reference_builds: 1,
+                sample_calls: 0,
+            },
+        })
+    }
+
+    pub fn sample(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+        output_mode: SampleOutputMode,
+    ) -> Result<BatchOutput, String> {
+        self.diagnostics.sample_calls += 1;
+        sample_compiled_batch_with_reference(
+            &self.compiled,
+            &self.reference_sample,
+            shots,
+            rng,
+            SampleOptions {
+                output_mode,
+                ..SampleOptions::default()
+            },
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn diagnostics(&self) -> CompiledMeasurementSamplerDiagnostics {
+        self.diagnostics
+    }
 }
 
 pub fn sample_batch_with_options(
