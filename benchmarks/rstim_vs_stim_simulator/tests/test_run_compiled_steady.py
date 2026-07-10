@@ -8,6 +8,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from benchmarks.rstim_vs_stim_simulator import run_compiled_steady
@@ -222,6 +223,56 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
             ],
         )
+
+    def test_default_rstim_worker_command_is_canonical_relative_argv(self) -> None:
+        self.assertEqual(
+            run_compiled_steady.default_rstim_worker_command("release"),
+            ["target/release/rstim_compiled_steady_worker"],
+        )
+
+    def test_stim_version_requirement_is_checked_with_worker_overrides(self) -> None:
+        with unittest.mock.patch.object(
+            run_compiled_steady,
+            "_probe_stim_python",
+            return_value={
+                "status": "ok",
+                "version": "1.14.0",
+                "path": None,
+                "sha256": None,
+                "stderr": "",
+            },
+        ):
+            with tempfile.TemporaryDirectory() as temp_dir:
+                paths = self._write_fake_workers(Path(temp_dir), mode="ok")
+                out_dir = Path(temp_dir) / "out"
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    exit_code = run_compiled_steady.main(
+                        [
+                            "--manifest",
+                            str(MANIFEST),
+                            "--case",
+                            "stim_surface_d11_r100",
+                            "--profile",
+                            "release",
+                            "--warmup-rounds",
+                            "2",
+                            "--measure-rounds",
+                            "7",
+                            "--seed",
+                            "0",
+                            "--out-dir",
+                            str(out_dir),
+                            "--stim-worker-command",
+                            json.dumps([sys.executable, str(paths["stim"])]),
+                            "--rstim-worker-command",
+                            json.dumps([sys.executable, str(paths["rstim"])]),
+                        ]
+                    )
+
+        self.assertNotEqual(exit_code, 0)
+        self.assertIn("requires stim==1.15.0", stderr.getvalue())
+        self.assertFalse((out_dir / "raw.jsonl").exists())
 
     def test_profile_argument_accepts_only_release(self) -> None:
         parser = run_compiled_steady.build_parser()

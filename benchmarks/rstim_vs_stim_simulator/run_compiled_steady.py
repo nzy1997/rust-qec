@@ -103,7 +103,7 @@ def default_stim_worker_command() -> list[str]:
 
 
 def default_rstim_worker_command(profile: str) -> list[str]:
-    return [str(REPO_ROOT / "target" / profile / "rstim_compiled_steady_worker")]
+    return [f"target/{profile}/rstim_compiled_steady_worker"]
 
 
 def _probe(command: list[str]) -> dict[str, Any]:
@@ -147,6 +147,9 @@ def _resolve_executable(raw: str) -> Path | None:
     candidate = Path(raw)
     if candidate.is_file():
         return candidate.resolve()
+    repo_candidate = REPO_ROOT / raw
+    if repo_candidate.is_file():
+        return repo_candidate.resolve()
     return None
 
 
@@ -205,6 +208,7 @@ class WorkerSession:
         environment["PYTHONPATH"] = str(REPO_ROOT) if not python_path else f"{REPO_ROOT}{os.pathsep}{python_path}"
         self.process = subprocess.Popen(
             self.command,
+            cwd=REPO_ROOT,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -477,7 +481,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
     stim_command = args.stim_worker_command or default_stim_worker_command()
     rstim_command = args.rstim_worker_command or default_rstim_worker_command(args.profile)
     stim_probe = _probe_stim_python()
-    if args.stim_worker_command is None and stim_probe.get("version") != "1.15.0":
+    if stim_probe.get("version") != "1.15.0":
         raise RunnerError(
             "compiled steady-state runner requires stim==1.15.0, "
             f"got {stim_probe.get('version')!r}"
