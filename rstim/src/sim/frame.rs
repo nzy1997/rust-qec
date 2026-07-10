@@ -441,7 +441,7 @@ impl FrameSimulator {
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                // random_bits_with_prob_into reuses depolarize scratch instead of allocating per target.
+                // The dense path reuses depolarize scratch instead of allocating per target.
                 self.exec_depolarize1(targets, p, wpr, rng)?;
             }
             "DEPOLARIZE2" => {
