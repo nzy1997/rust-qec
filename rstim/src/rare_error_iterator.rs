@@ -88,6 +88,10 @@ impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
         }
     }
 
+    pub(crate) fn rng_mut(&mut self) -> &mut R {
+        self.rng
+    }
+
     fn draw_open_unit_f64(&mut self) -> f64 {
         loop {
             #[cfg(debug_assertions)]

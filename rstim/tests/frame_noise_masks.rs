@@ -227,10 +227,14 @@ fn sparse_path_retries_zero_uniform_draw() {
 
 #[test]
 fn depolarize1_event_mask_uses_integer_threshold_path() {
-    let arm = match_arm(frame_source(), "\"DEPOLARIZE1\"", "\"DEPOLARIZE2\"");
-    assert!(arm.contains("random_bits_with_prob"), "{arm}");
-    assert!(!arm.contains("gen::<f64>() < p"), "{arm}");
-    assert!(!arm.contains("r#gen::<f64>() < p"), "{arm}");
+    let helper = match_arm(
+        frame_source(),
+        "fn exec_depolarize1_qubits_dense",
+        "fn exec_depolarize1_qubits_sparse",
+    );
+    assert!(helper.contains("random_bits_with_prob_into"), "{helper}");
+    assert!(!helper.contains("gen::<f64>() < p"), "{helper}");
+    assert!(!helper.contains("r#gen::<f64>() < p"), "{helper}");
 }
 
 #[test]
