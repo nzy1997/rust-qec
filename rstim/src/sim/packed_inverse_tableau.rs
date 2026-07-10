@@ -75,17 +75,15 @@ impl PackedCanonicalRows {
         }
     }
 
-    fn set_basis_row(&mut self, row: usize) {
+    fn set_z_row(&mut self, row: usize, qubit: usize) {
+        assert!(
+            qubit < self.num_qubits,
+            "canonical qubit index out of range"
+        );
         let start = self.row_start(row);
         self.x_plane[start..start + self.words_per_row].fill(0);
         self.z_plane[start..start + self.words_per_row].fill(0);
-
-        if row < self.num_qubits {
-            self.x_plane[start + row / 64] |= 1u64 << (row % 64);
-        } else {
-            let qubit = row - self.num_qubits;
-            self.z_plane[start + qubit / 64] |= 1u64 << (qubit % 64);
-        }
+        self.z_plane[start + qubit / 64] |= 1u64 << (qubit % 64);
         self.set_sign_bit(row, false);
     }
 
@@ -459,7 +457,7 @@ impl PackedInverseTableau {
                 }
             }
             rows.copy_row(p, destabilizer);
-            rows.set_basis_row(p);
+            rows.set_z_row(p, q);
             false
         } else {
             let mut temp_x = vec![0; self.words_per_row];
