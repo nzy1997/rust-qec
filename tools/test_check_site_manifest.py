@@ -242,7 +242,7 @@ VALID_MANIFEST = {
 }
 
 
-class SiteManifestValidatorTest(unittest.TestCase):
+class SiteManifestTest(unittest.TestCase):
     def write_fixture_manifest(self, remove_family: str | None = None, mutation: str | None = None):
         tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(tmpdir.cleanup)
@@ -449,6 +449,19 @@ class SiteManifestValidatorTest(unittest.TestCase):
         repo, manifest_path, _ = self.write_fixture_manifest()
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertEqual(errors, [])
+
+    def test_rejects_broad_rstim_vs_stim_claims(self) -> None:
+        for phrase in ("rstim is faster than Stim", "rstim beats Stim", "full Stim parity"):
+            with self.subTest(phrase=phrase):
+                repo, manifest_path, _ = self.write_fixture_manifest()
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["families"][3]["claims_limit"] = phrase
+                manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+                errors = check_site_manifest.validate_manifest(repo, manifest_path)
+                self.assertTrue(
+                    any("broad rstim-vs-Stim claim is not allowed" in error for error in errors),
+                    errors,
+                )
 
     def test_rejects_missing_required_family(self) -> None:
         repo, manifest_path, _ = self.write_fixture_manifest(remove_family="rstim-vs-stim-simulator")

@@ -84,6 +84,29 @@ RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS = {
     "speed_rstim_variants_seed",
     "speed_stim_cli_seed_policy",
 }
+BROAD_RSTIM_VS_STIM_CLAIM_RE = re.compile(
+    r"(?:`?rstim`?\s+is\s+faster\s+than\s+`?stim`?"
+    r"|`?rstim`?\s+beats\s+`?stim`?"
+    r"|full\s+`?stim`?\s+parity)",
+    re.IGNORECASE,
+)
+
+
+def find_broad_rstim_vs_stim_claim(value: Any) -> str | None:
+    if isinstance(value, str):
+        match = BROAD_RSTIM_VS_STIM_CLAIM_RE.search(value)
+        return match.group(0) if match else None
+    if isinstance(value, dict):
+        for child in value.values():
+            match = find_broad_rstim_vs_stim_claim(child)
+            if match is not None:
+                return match
+    if isinstance(value, list):
+        for child in value:
+            match = find_broad_rstim_vs_stim_claim(child)
+            if match is not None:
+                return match
+    return None
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -593,6 +616,20 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
 
     if not isinstance(manifest, dict):
         return ["manifest must be a JSON object"]
+
+    match = find_broad_rstim_vs_stim_claim(manifest)
+    if match is not None:
+        add_error(errors, "manifest", f"broad rstim-vs-Stim claim is not allowed: {match}")
+
+    showcase_path = repo_root / "docs/showcases/rstim-vs-stim-simulator.md"
+    if showcase_path.is_file():
+        match = find_broad_rstim_vs_stim_claim(showcase_path.read_text(encoding="utf-8"))
+        if match is not None:
+            add_error(
+                errors,
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                f"broad rstim-vs-Stim claim is not allowed: {match}",
+            )
 
     if manifest.get("schema_version") != 1:
         add_error(errors, "manifest", "schema_version must be 1")
