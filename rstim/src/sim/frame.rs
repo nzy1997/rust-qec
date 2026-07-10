@@ -4,9 +4,9 @@ use std::cell::{Cell, RefCell};
 
 use crate::compiled::{CompiledBasis, CompiledBlock, CompiledOp};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
+use crate::rare_error_iterator::RareErrorIndexSampler;
 #[cfg(debug_assertions)]
 use crate::rare_error_iterator::rare_error_telemetry;
-use crate::rare_error_iterator::RareErrorIndexSampler;
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
 
@@ -838,6 +838,18 @@ impl FrameSimulator {
             } => {
                 self.exec_x_error_qubits(qubits, *probability, wpr, rng)?;
             }
+            CompiledOp::YError {
+                probability,
+                qubits,
+            } => {
+                self.exec_y_error_qubits(qubits, *probability, wpr, rng);
+            }
+            CompiledOp::ZError {
+                probability,
+                qubits,
+            } => {
+                self.exec_z_error_qubits(qubits, *probability, wpr, rng);
+            }
             CompiledOp::Depolarize1 {
                 probability,
                 qubits,
@@ -1162,6 +1174,30 @@ impl FrameSimulator {
                 builds_after.saturating_sub(builds_before),
                 attempt_count,
             );
+        }
+    }
+
+    fn exec_y_error_qubits(&mut self, qubits: &[usize], p: f64, wpr: usize, rng: &mut impl Rng) {
+        for &q in qubits {
+            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+            let x = self.x_table.row_words_mut(q);
+            for w in 0..wpr {
+                x[w] ^= noise[w];
+            }
+            let z = self.z_table.row_words_mut(q);
+            for w in 0..wpr {
+                z[w] ^= noise[w];
+            }
+        }
+    }
+
+    fn exec_z_error_qubits(&mut self, qubits: &[usize], p: f64, wpr: usize, rng: &mut impl Rng) {
+        for &q in qubits {
+            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+            let z = self.z_table.row_words_mut(q);
+            for w in 0..wpr {
+                z[w] ^= noise[w];
+            }
         }
     }
 

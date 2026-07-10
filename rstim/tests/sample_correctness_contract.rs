@@ -1,14 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::Deserialize;
 
-use rstim::compiled::{choose_sampler_path, compile_circuit, CompiledPathDecision};
+use rstim::compiled::{SamplerPathDecision, choose_sampler_path, compile_circuit};
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch_with_options, BatchOutput, SampleOptions, SamplingBackend};
+use rstim::sampler::{BatchOutput, SampleOptions, SamplingBackend, sample_batch_with_options};
 use rstim::sim::bit_table::BitTable;
 use rstim::stats::summarize;
 
@@ -88,8 +88,7 @@ fn compiled_and_interpreted_sample_paths_agree_on_catalog() {
 fn statistical_contract_rejects_injected_detector_or_observable_mismatch() {
     let parsed = first_compiled_capable_case().expect("compiled-capable catalog case");
     let mut pair = sample_pair(&parsed, DETERMINISTIC_SEEDS[0]).expect("sample pair");
-    inject_comparison_row_mismatch(&pair.interpreted, &mut pair.compiled)
-        .expect("comparison row");
+    inject_comparison_row_mismatch(&pair.interpreted, &mut pair.compiled).expect("comparison row");
 
     let err = assert_streams_agree(
         &parsed.case.case_id,
@@ -203,7 +202,7 @@ fn assert_metadata_count(
 fn compare_sample_paths(parsed: &ParsedCase) -> Result<CaseOutcome, String> {
     let compiled = compile_circuit(&parsed.instrs)?;
     match choose_sampler_path(&compiled) {
-        CompiledPathDecision::FastPath => {
+        SamplerPathDecision::FastPath => {
             for &seed in DETERMINISTIC_SEEDS {
                 let pair = sample_pair(parsed, seed)?;
                 assert_output_metadata(
@@ -227,7 +226,7 @@ fn compare_sample_paths(parsed: &ParsedCase) -> Result<CaseOutcome, String> {
             }
             Ok(CaseOutcome::Checked)
         }
-        CompiledPathDecision::Fallback(reason) => Ok(CaseOutcome::Fallback(reason.to_string())),
+        SamplerPathDecision::Fallback(reason) => Ok(CaseOutcome::Fallback(reason.to_string())),
     }
 }
 
@@ -406,7 +405,7 @@ fn first_compiled_capable_case() -> Result<ParsedCase, String> {
         }
         let parsed = validate_case_metadata(case, manifest_dir)?;
         let compiled = compile_circuit(&parsed.instrs)?;
-        if choose_sampler_path(&compiled) == CompiledPathDecision::FastPath {
+        if choose_sampler_path(&compiled) == SamplerPathDecision::FastPath {
             return Ok(parsed);
         }
     }

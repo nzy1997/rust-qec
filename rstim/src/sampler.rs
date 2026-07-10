@@ -1,14 +1,17 @@
 use rand::Rng;
 
 use crate::compiled::{
-    choose_sampler_path, compile_circuit, sample_compiled_batch,
-    sample_compiled_batch_with_reference, CompiledCircuit, CompiledPathDecision,
+    CompiledCircuit, SamplerPathDecision, SamplingFallbackReason, choose_sampler_path,
+    compile_circuit, sample_compiled_batch_with_reference,
 };
-use crate::data_path::{build_reference_sample, ReferenceSampleMode};
-use crate::executor::max_qubit;
+use crate::data_path::{
+    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample,
+    build_reference_sample_with_decision, build_reference_sample_with_sweep_bits_and_decision,
+};
 use crate::executor::Executor;
+use crate::executor::max_qubit;
 use crate::ir::StimInstr;
-use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -83,6 +86,14 @@ pub struct SampleOptions {
 }
 
 #[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SampleBatchDecision {
+    PackedInverse,
+    Interpreted,
+    InterpretedLegacy(SamplingFallbackReason),
+}
+
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CompiledMeasurementSamplerDiagnostics {
     pub compiled_ir_builds: usize,
@@ -102,13 +113,32 @@ impl CompiledMeasurementSampler {
         instrs: &[StimInstr],
         reference_mode: ReferenceSampleMode,
     ) -> Result<Self, String> {
-        let compiled = compile_circuit(instrs)?;
+        Self::compile_with_decision(instrs, reference_mode).map_err(|reason| reason.to_string())
+    }
+
+    #[doc(hidden)]
+    pub fn compile_with_decision(
+        instrs: &[StimInstr],
+        reference_mode: ReferenceSampleMode,
+    ) -> Result<Self, SamplingFallbackReason> {
+        let compiled =
+            compile_circuit(instrs).map_err(SamplingFallbackReason::UnsupportedOperation)?;
         match choose_sampler_path(&compiled) {
-            CompiledPathDecision::FastPath => {}
-            CompiledPathDecision::Fallback(reason) => return Err(reason.to_string()),
+            SamplerPathDecision::FastPath => {}
+            SamplerPathDecision::Fallback(reason) => return Err(reason),
         }
 
-        let reference_sample = build_reference_sample(instrs, reference_mode)?;
+        let reference_sample = match reference_mode {
+            ReferenceSampleMode::SimulateNoiseless => {
+                let reference = build_reference_sample_with_decision(instrs)
+                    .map_err(SamplingFallbackReason::UnsupportedOperation)?;
+                match reference.decision {
+                    ReferenceSampleDecision::PackedInverse => reference.bits,
+                    ReferenceSampleDecision::LegacyFallback(reason) => return Err(reason),
+                }
+            }
+            ReferenceSampleMode::AssumeAllZero => vec![false; compiled.num_measurements],
+        };
         Ok(Self {
             compiled,
             reference_sample,
@@ -151,25 +181,55 @@ pub fn sample_batch_with_options(
     rng: &mut impl Rng,
     options: SampleOptions,
 ) -> Result<BatchOutput, String> {
+    Ok(sample_batch_with_options_and_decision(instrs, n_shots, rng, options)?.0)
+}
+
+#[doc(hidden)]
+pub fn sample_batch_with_options_and_decision(
+    instrs: &[StimInstr],
+    n_shots: usize,
+    rng: &mut impl Rng,
+    options: SampleOptions,
+) -> Result<(BatchOutput, SampleBatchDecision), String> {
+    sample_batch_with_options_sweep_bits_and_decision(instrs, n_shots, rng, options, None)
+}
+
+#[doc(hidden)]
+pub fn sample_batch_with_options_sweep_bits_and_decision(
+    instrs: &[StimInstr],
+    n_shots: usize,
+    rng: &mut impl Rng,
+    options: SampleOptions,
+    sweep_bits: Option<&[bool]>,
+) -> Result<(BatchOutput, SampleBatchDecision), String> {
     match options.backend {
-        SamplingBackend::Interpreted => sample_batch_interpreted(instrs, n_shots, rng, options),
+        SamplingBackend::Interpreted => Ok((
+            sample_batch_interpreted_with_sweep_bits(instrs, n_shots, rng, options, sweep_bits)?,
+            SampleBatchDecision::Interpreted,
+        )),
         SamplingBackend::Compiled => {
-            let compiled = compile_circuit(instrs)?;
-            match choose_sampler_path(&compiled) {
-                CompiledPathDecision::FastPath => {
-                    sample_compiled_batch(&compiled, n_shots, rng, options)
-                }
-                CompiledPathDecision::Fallback(reason) => Err(reason.to_string()),
-            }
+            let mut sampler = CompiledMeasurementSampler::compile_with_decision(
+                instrs,
+                options.reference_sample_mode,
+            )
+            .map_err(|reason| reason.to_string())?;
+            let out = sampler.sample(n_shots, rng, options.output_mode)?;
+            Ok((out, SampleBatchDecision::PackedInverse))
         }
         SamplingBackend::Auto => {
-            let compiled = compile_circuit(instrs)?;
-            match choose_sampler_path(&compiled) {
-                CompiledPathDecision::FastPath => {
-                    sample_compiled_batch(&compiled, n_shots, rng, options)
+            match CompiledMeasurementSampler::compile_with_decision(
+                instrs,
+                options.reference_sample_mode,
+            ) {
+                Ok(mut sampler) => {
+                    let out = sampler.sample(n_shots, rng, options.output_mode)?;
+                    Ok((out, SampleBatchDecision::PackedInverse))
                 }
-                CompiledPathDecision::Fallback(_) => {
-                    sample_batch_interpreted(instrs, n_shots, rng, options)
+                Err(reason) => {
+                    let out = sample_batch_interpreted_with_sweep_bits(
+                        instrs, n_shots, rng, options, sweep_bits,
+                    )?;
+                    Ok((out, SampleBatchDecision::InterpretedLegacy(reason)))
                 }
             }
         }
@@ -213,14 +273,15 @@ fn count_output_materialization_ops(instrs: &[StimInstr]) -> (usize, usize) {
     (detector_count, observable_count)
 }
 
-fn sample_batch_interpreted(
+fn sample_batch_interpreted_with_sweep_bits(
     instrs: &[StimInstr],
     n_shots: usize,
     rng: &mut impl Rng,
     options: SampleOptions,
+    sweep_bits: Option<&[bool]>,
 ) -> Result<BatchOutput, String> {
-    if uses_executor_sampling_fallback(instrs) {
-        return sample_batch_with_executor(instrs, n_shots, rng, options);
+    if sweep_bits.is_some() || uses_executor_sampling_fallback(instrs) {
+        return sample_batch_with_executor(instrs, n_shots, rng, options, sweep_bits);
     }
 
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
@@ -256,14 +317,20 @@ fn sample_batch_with_executor(
     n_shots: usize,
     rng: &mut impl Rng,
     options: SampleOptions,
+    sweep_bits: Option<&[bool]>,
 ) -> Result<BatchOutput, String> {
-    let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
+    let ref_sample = match options.reference_sample_mode {
+        ReferenceSampleMode::SimulateNoiseless => {
+            build_reference_sample_with_sweep_bits_and_decision(instrs, sweep_bits)?.bits
+        }
+        ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
+    };
     let n_meas = ref_sample.len();
     let mut measurements = BitTable::new(n_meas, n_shots);
 
     for shot in 0..n_shots {
         let mut ex = Executor::from_instrs(instrs.to_vec())?;
-        let out = ex.run(rng)?;
+        let out = ex.run_with_sweep_bits(rng, sweep_bits)?;
         if out.measurements.len() != n_meas {
             return Err(format!(
                 "executor produced {} measurements but reference sample expects {}",
@@ -280,10 +347,11 @@ fn sample_batch_with_executor(
         return Ok(BatchOutput::measurements_only(measurements, n_shots));
     }
 
+    let sweep_table = sweep_bits.map(|bits| repeated_sweep_table(instrs, bits, n_shots));
     let m2d = measurements_to_detections_with_options(
         instrs,
         &measurements,
-        None,
+        sweep_table.as_ref(),
         M2dOptions {
             reference_sample_mode: options.reference_sample_mode,
             ran_without_feedback: false,
@@ -301,10 +369,23 @@ fn sample_batch_with_executor(
     ))
 }
 
+fn repeated_sweep_table(instrs: &[StimInstr], sweep_bits: &[bool], n_shots: usize) -> BitTable {
+    let n_sweep = crate::stats::num_sweep_bits(instrs).max(sweep_bits.len());
+    let mut table = BitTable::new(n_sweep, n_shots);
+    for (sweep_index, bit) in sweep_bits.iter().copied().enumerate() {
+        if bit {
+            for shot in 0..n_shots {
+                table.set(sweep_index, shot, true);
+            }
+        }
+    }
+    table
+}
+
 fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
     for instr in instrs {
         match instr {
-            StimInstr::Op { name, .. } => {
+            StimInstr::Op { name, targets, .. } => {
                 if matches!(
                     name.as_str(),
                     "LOSS"
@@ -320,6 +401,11 @@ fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
                 ) {
                     return true;
                 }
+                if is_feedback_operation(name, targets)
+                    || is_sweep_dependent_operation(name, targets)
+                {
+                    return true;
+                }
             }
             StimInstr::Repeat { body, .. } => {
                 if uses_executor_sampling_fallback(body) {
@@ -331,11 +417,47 @@ fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
     false
 }
 
+fn is_feedback_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool {
+    matches!(name, "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ")
+        && targets
+            .chunks_exact(2)
+            .any(|pair| {
+                matches!(
+                    pair,
+                    [
+                        crate::ir::StimTarget::Rec(_),
+                        crate::ir::StimTarget::Qubit(_)
+                    ]
+                )
+            })
+}
+
+fn is_sweep_dependent_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool {
+    targets
+        .iter()
+        .any(|target| matches!(target, crate::ir::StimTarget::Sweep(_)))
+        && !matches!(
+            name,
+            "I" | "I_ERROR"
+                | "II_ERROR"
+                | "X_ERROR"
+                | "Y_ERROR"
+                | "Z_ERROR"
+                | "DEPOLARIZE1"
+                | "DEPOLARIZE2"
+                | "TICK"
+                | "QUBIT_COORDS"
+                | "SHIFT_COORDS"
+                | "DETECTOR"
+                | "OBSERVABLE_INCLUDE"
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;
@@ -353,6 +475,7 @@ mod tests {
                 reference_sample_mode: ReferenceSampleMode::AssumeAllZero,
                 ..SampleOptions::default()
             },
+            None,
         );
 
         let err = match result {

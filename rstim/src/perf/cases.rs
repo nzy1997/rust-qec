@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::compiled::{
-    CompiledPathDecision, choose_analyzer_path, choose_sampler_path, compile_circuit,
+    CompiledPathDecision, SamplerPathDecision, choose_analyzer_path, choose_sampler_path,
+    compile_circuit,
 };
 use crate::ir::StimInstr;
 
@@ -170,7 +171,7 @@ pub fn benchmark_case_variants(
     let variants = match case.workload {
         PerfWorkload::Sample | PerfWorkload::Detect => {
             let mut variants = vec![PerfVariant::StimCli, PerfVariant::RstimInterpreted];
-            if choose_sampler_path(&compiled) == CompiledPathDecision::FastPath {
+            if choose_sampler_path(&compiled) == SamplerPathDecision::FastPath {
                 variants.push(PerfVariant::RstimCompiled);
             }
             variants
