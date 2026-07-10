@@ -1434,11 +1434,6 @@ const DEPOLARIZE2_BRANCHES: [(u8, u8); 15] = [
     (3, 3),
 ];
 
-#[cfg(debug_assertions)]
-const DEPOLARIZE2_BRANCH_LABELS: [&str; 15] = [
-    "IX", "IY", "IZ", "XI", "XX", "XY", "XZ", "YI", "YX", "YY", "YZ", "ZI", "ZX", "ZY", "ZZ",
-];
-
 fn sample_depolarize2_branch_index(rng: &mut impl Rng) -> usize {
     rng.gen_range(0..DEPOLARIZE2_BRANCHES.len())
 }
@@ -1452,7 +1447,24 @@ pub fn sample_depolarize2_branch_index_for_test(rng: &mut impl Rng) -> usize {
 #[cfg(debug_assertions)]
 #[doc(hidden)]
 pub fn depolarize2_branch_label_for_test(branch_index: usize) -> Option<&'static str> {
-    DEPOLARIZE2_BRANCH_LABELS.get(branch_index).copied()
+    match DEPOLARIZE2_BRANCHES.get(branch_index).copied()? {
+        (0, 1) => Some("IX"),
+        (0, 2) => Some("IY"),
+        (0, 3) => Some("IZ"),
+        (1, 0) => Some("XI"),
+        (1, 1) => Some("XX"),
+        (1, 2) => Some("XY"),
+        (1, 3) => Some("XZ"),
+        (2, 0) => Some("YI"),
+        (2, 1) => Some("YX"),
+        (2, 2) => Some("YY"),
+        (2, 3) => Some("YZ"),
+        (3, 0) => Some("ZI"),
+        (3, 1) => Some("ZX"),
+        (3, 2) => Some("ZY"),
+        (3, 3) => Some("ZZ"),
+        _ => None,
+    }
 }
 
 fn decode_depolarize2_event(event_index: usize, shots: usize) -> (usize, usize) {
