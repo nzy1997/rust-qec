@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -88,7 +89,7 @@ CLAIMS_POLICY_PHRASES = (
 )
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
-    r"|benchmarks/rstim_vs_stim_simulator/(?:results/full/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 STRING_LITERAL_PATH_RE = re.compile(r"""["']([A-Za-z0-9_./-]+\.[A-Za-z0-9]+(?:[?#][^"']*)?)["']""")
 ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css", "app.js", "index.html"}
@@ -482,6 +483,21 @@ def make_fixture_site() -> SiteFixture:
     repo_root = Path(tempdir.name)
     site_root = repo_root / "_site"
     site_root.mkdir(parents=True)
+    expanded_fixture_content = '{"status":"pass"}\n'
+    expanded_fixture_artifacts = {
+        artifact_path: artifact_kind
+        for artifact_path, artifact_kind in check_site_manifest.RSTIM_VS_STIM_REQUIRED_ARTIFACTS.items()
+        if artifact_path.startswith("benchmarks/rstim_vs_stim_simulator/results/")
+        and not artifact_path.startswith("benchmarks/rstim_vs_stim_simulator/results/full/")
+    }
+
+    def fixture_sha256(content: str) -> str:
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    expanded_fixture_hashes = {
+        artifact_path: {"sha256": fixture_sha256(expanded_fixture_content)}
+        for artifact_path in expanded_fixture_artifacts
+    }
 
     write_text(repo_root / ".gitignore", "/benchmarks/out/\n")
     write_text(repo_root / "docs/showcases/benchmark-evidence.md", "# Benchmark Evidence\n")
@@ -506,6 +522,8 @@ def make_fixture_site() -> SiteFixture:
         repo_root / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
         "M 0\n",
     )
+    for artifact_path in expanded_fixture_artifacts:
+        write_text(repo_root / artifact_path, expanded_fixture_content)
 
     provenance_reason = "historical fixture predates canonical provenance capture"
 
@@ -580,6 +598,7 @@ def make_fixture_site() -> SiteFixture:
         "docs/showcases/rstim-vs-stim-simulator.md": {
             "sha256": "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
         },
+        **expanded_fixture_hashes,
     }
 
     manifest = {
@@ -726,6 +745,10 @@ def make_fixture_site() -> SiteFixture:
                                 "kind": "showcase",
                                 "checked": True,
                             },
+                            *[
+                                {"path": artifact_path, "kind": artifact_kind, "checked": True}
+                                for artifact_path, artifact_kind in expanded_fixture_artifacts.items()
+                            ],
                         ],
                         "commands": [
                             "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
@@ -820,6 +843,7 @@ def make_fixture_site() -> SiteFixture:
         "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "[[cases]]\nid = 'd11'\n",
         "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "M 0\n",
         "docs/showcases/rstim-vs-stim-simulator.md": "# rstim vs Stim\n",
+        **{artifact_path: expanded_fixture_content for artifact_path in expanded_fixture_artifacts},
     }.items():
         write_text(site_root / relative, text)
 
@@ -927,6 +951,7 @@ artifact.kind === "image";
             "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
             "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
             "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+            *expanded_fixture_artifacts,
             "site/benchmark-site.json",
         ],
         cwd=repo_root,

@@ -7,6 +7,8 @@ from unittest import mock
 
 import tools.check_site_build as check_site_build
 
+RSTIM_DEM_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json"
+
 
 class SiteBuildCheckerTest(unittest.TestCase):
     def test_self_test_exercises_required_mutations(self) -> None:
@@ -108,6 +110,23 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 result.status == "FAIL"
                 and result.area == "checked benchmark artifacts"
                 and "correctness-summary.json" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_missing_copied_rstim_dem_summary(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        (fixture.site_root / RSTIM_DEM_SUMMARY_PATH).unlink()
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark artifacts"
+                and RSTIM_DEM_SUMMARY_PATH in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),
@@ -302,6 +321,30 @@ class SiteBuildCheckerTest(unittest.TestCase):
 
         self.assertTrue(
             any("not listed as a checked manifest artifact" in result.detail for result in results),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_unmanifested_rstim_dem_artifact_link(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        missing_artifact = (
+            "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
+        )
+        index = fixture.site_root / "index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8") + f'<a href="{missing_artifact}">bad</a>\n',
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "checked benchmark artifacts"
+                and missing_artifact in result.detail
+                for result in results
+            ),
             check_site_build.format_summary(results),
         )
 

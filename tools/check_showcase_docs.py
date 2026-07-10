@@ -11,6 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+try:
+    from tools import check_site_manifest
+except ModuleNotFoundError:
+    import check_site_manifest  # type: ignore[no-redef]
+
 
 REQUIRED_SHOWCASE_SECTIONS = (
     "What This Shows",
@@ -202,11 +207,15 @@ def is_rstim_vs_stim_showcase(path: Path, repo_root: Path) -> bool:
 def validate_rstim_vs_stim_commands(path: Path, repo_root: Path, text: str) -> list[str]:
     if not is_rstim_vs_stim_showcase(path, repo_root):
         return []
-    return [
+    errors = [
         error
         for required_command, error in RSTIM_VS_STIM_COMMAND_REQUIREMENTS
         if required_command not in text
     ]
+    match = check_site_manifest.find_broad_rstim_vs_stim_claim(text)
+    if match is not None:
+        errors.append(f"broad rstim-vs-Stim claim is not allowed: {match}")
+    return errors
 
 
 def validate_showcase_page(path: Path, repo_root: Path) -> list[str]:
@@ -469,6 +478,20 @@ def run_self_test() -> list[str]:
             errors.append("valid showcase fixture should pass")
         if validate_showcase_page(rstim_vs_stim, root):
             errors.append("rstim-vs-Stim showcase fixture should pass")
+        for phrase in ("rstim is faster than Stim", "rstim beats Stim", "full Stim parity"):
+            rstim_vs_stim.write_text(
+                RSTIM_VS_STIM_VALID_SHOWCASE + f"\n{phrase}\n",
+                encoding="utf-8",
+            )
+            broad_claim_errors = validate_showcase_page(rstim_vs_stim, root)
+            if not any(
+                "broad rstim-vs-Stim claim is not allowed" in error
+                for error in broad_claim_errors
+            ):
+                errors.append(
+                    f"rstim-vs-Stim fixture with broad claim {phrase!r} did not fail: "
+                    f"{broad_claim_errors}"
+                )
         rstim_vs_stim.write_text(
             RSTIM_VS_STIM_VALID_SHOWCASE.replace(
                 "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness",

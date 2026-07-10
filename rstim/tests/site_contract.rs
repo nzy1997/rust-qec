@@ -80,6 +80,17 @@ fn assert_checked_artifacts(item: &Value, expected: &[(&str, &str)]) {
     }
 }
 
+fn assert_exact_checked_artifacts(item: &Value, expected: &[(&str, &str)]) {
+    assert_checked_artifacts(item, expected);
+    let actual = checked_artifact_paths(item);
+    assert_eq!(
+        actual.len(),
+        expected.len(),
+        "evidence item {} must list exactly its assigned checked artifacts",
+        item["id"].as_str().unwrap_or("<missing>")
+    );
+}
+
 fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
     let values = item[field]
         .as_array()
@@ -510,16 +521,60 @@ fn checked_benchmark_artifacts_are_linked() {
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
 
+    const CHECKED_ITEM_IDS: &[&str] = &[
+        "surface-decoder-full",
+        "bb-circuit-full",
+        "rstim-vs-stim-correctness",
+        "rstim-vs-stim-full",
+        "rstim-vs-stim-release",
+        "rstim-vs-stim-release-repetition-sample",
+        "rstim-vs-stim-release-surface-detect",
+        "rstim-vs-stim-release-dem-sample",
+    ];
+    const CHECKED_ITEM_ORDER: &str = "surface-decoder-full bb-circuit-full rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample";
+
     assert_contains_all(
         &index,
         &[
             "id=\"checked-benchmark-results\"",
             "id=\"checked-benchmark-result-cards\"",
-            "data-checked-items=\"surface-decoder-full bb-circuit-full rstim-vs-stim-full rstim-vs-stim-release\"",
+            &format!("data-checked-items=\"{CHECKED_ITEM_ORDER}\""),
             "Checked Benchmark Results",
         ],
         "checked benchmark result section",
     );
+
+    for item_id in CHECKED_ITEM_IDS {
+        assert!(
+            index.contains(item_id),
+            "site/index.html is missing checked evidence item ID {item_id}"
+        );
+        assert!(
+            app.contains(item_id),
+            "site/app.js is missing checked evidence item ID {item_id}"
+        );
+    }
+    let app_items_start = app
+        .find("const checkedBenchmarkItems")
+        .expect("site/app.js must define checkedBenchmarkItems");
+    let app_items_end = app[app_items_start..]
+        .find("];\n")
+        .map(|offset| app_items_start + offset)
+        .expect("site/app.js checkedBenchmarkItems must be an array");
+    let app_items = &app[app_items_start..app_items_end];
+    assert_eq!(
+        app_items.matches('"').count() / 2,
+        CHECKED_ITEM_IDS.len(),
+        "site/app.js checkedBenchmarkItems must contain exactly the site/index.html IDs"
+    );
+    let mut ordered_cursor = 0;
+    for item_id in CHECKED_ITEM_IDS {
+        let marker = format!("\"{item_id}\"");
+        let offset = app_items[ordered_cursor..]
+            .find(&marker)
+            .unwrap_or_else(|| panic!("site/app.js checkedBenchmarkItems is out of order at {item_id}"));
+        ordered_cursor += offset + marker.len();
+    }
 
     assert_contains_all(
         &app,
@@ -623,24 +678,29 @@ fn checked_benchmark_artifacts_are_linked() {
         "BB checked item must keep its manifest claims limit"
     );
 
-    let (rstim_vs_stim_family, rstim_vs_stim_item) = find_evidence_item(&manifest, "rstim-vs-stim-full");
+    let (rstim_vs_stim_family, rstim_vs_stim_correctness_item) =
+        find_evidence_item(&manifest, "rstim-vs-stim-correctness");
     assert_eq!(rstim_vs_stim_family["status"].as_str(), Some("partial"));
-    assert_eq!(rstim_vs_stim_item["status"].as_str(), Some("existing"));
-    assert_eq!(rstim_vs_stim_item["tier"].as_str(), Some("full"));
-    assert_checked_artifacts(
-        rstim_vs_stim_item,
+    assert_eq!(rstim_vs_stim_correctness_item["status"].as_str(), Some("existing"));
+    assert_eq!(rstim_vs_stim_correctness_item["tier"].as_str(), Some("full"));
+    assert_exact_checked_artifacts(
+        rstim_vs_stim_correctness_item,
         &[
-            (
-                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
-                "speed-summary",
-            ),
-            (
-                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
-                "speed-report",
-            ),
             (
                 "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                 "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/report.md",
+                "correctness-report",
             ),
             (
                 "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
@@ -657,30 +717,50 @@ fn checked_benchmark_artifacts_are_linked() {
         ],
     );
     assert_item_has_text_list_marker(
-        rstim_vs_stim_item,
+        rstim_vs_stim_correctness_item,
         "commands",
-        "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases",
+        "python3 tools/check_rstim_vs_stim_expanded_correctness.py",
     );
     assert_item_has_text_list_marker(
-        rstim_vs_stim_item,
+        rstim_vs_stim_correctness_item,
         "caveats",
-        "recorded workloads and recorded environments",
+        "eight",
     );
-    assert_item_has_text_list_marker(rstim_vs_stim_item, "caveats", "not broad rstim/Stim parity");
+    assert!(
+        rstim_vs_stim_correctness_item["claims_limit"]
+            .as_str()
+            .is_some_and(|value| value.contains("eight") && value.contains("d11/r100")),
+        "rstim-vs-stim correctness item must keep its bounded manifest claims limit"
+    );
+
+    let (_, rstim_vs_stim_item) = find_evidence_item(&manifest, "rstim-vs-stim-full");
+    assert_eq!(rstim_vs_stim_item["status"].as_str(), Some("existing"));
+    assert_eq!(rstim_vs_stim_item["tier"].as_str(), Some("full"));
+    assert_exact_checked_artifacts(
+        rstim_vs_stim_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
+                "speed-report",
+            ),
+        ],
+    );
+    assert_item_has_text_list_marker(rstim_vs_stim_item, "caveats", "#406");
     assert!(
         rstim_vs_stim_item["claims_limit"]
             .as_str()
-            .is_some_and(|value| {
-                value.contains("recorded workloads and recorded environments")
-                    && value.contains("not broad rstim/Stim parity")
-            }),
-        "rstim-vs-stim checked item must keep its manifest claims limit"
+            .is_some_and(|value| value.contains("#406") && value.contains("debug-profile")),
+        "rstim-vs-stim historical item must keep its narrow manifest claims limit"
     );
 
     let (_, rstim_vs_stim_release_item) = find_evidence_item(&manifest, "rstim-vs-stim-release");
     assert_eq!(rstim_vs_stim_release_item["status"].as_str(), Some("existing"));
     assert_eq!(rstim_vs_stim_release_item["tier"].as_str(), Some("release"));
-    assert_checked_artifacts(
+    assert_exact_checked_artifacts(
         rstim_vs_stim_release_item,
         &[
             (
@@ -718,33 +798,87 @@ fn checked_benchmark_artifacts_are_linked() {
         "rstim-vs-stim release item must keep its narrow manifest claims limit"
     );
 
+    let (_, repetition_item) =
+        find_evidence_item(&manifest, "rstim-vs-stim-release-repetition-sample");
+    assert_eq!(repetition_item["status"].as_str(), Some("existing"));
+    assert_eq!(repetition_item["tier"].as_str(), Some("release"));
+    assert_exact_checked_artifacts(
+        repetition_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/environment.json",
+                "environment",
+            ),
+        ],
+    );
+
+    let (_, surface_detect_item) =
+        find_evidence_item(&manifest, "rstim-vs-stim-release-surface-detect");
+    assert_eq!(surface_detect_item["status"].as_str(), Some("existing"));
+    assert_eq!(surface_detect_item["tier"].as_str(), Some("release"));
+    assert_exact_checked_artifacts(
+        surface_detect_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/environment.json",
+                "environment",
+            ),
+        ],
+    );
+
+    let (_, dem_sample_item) =
+        find_evidence_item(&manifest, "rstim-vs-stim-release-dem-sample");
+    assert_eq!(dem_sample_item["status"].as_str(), Some("existing"));
+    assert_eq!(dem_sample_item["tier"].as_str(), Some("release"));
+    assert_exact_checked_artifacts(
+        dem_sample_item,
+        &[
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/raw.jsonl",
+                "speed-raw",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json",
+                "speed-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md",
+                "speed-report",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/environment.json",
+                "environment",
+            ),
+        ],
+    );
+
     for (item_id, item) in [
         ("surface-decoder-full", surface_item),
         ("bb-circuit-full", bb_item),
+        ("rstim-vs-stim-correctness", rstim_vs_stim_correctness_item),
         ("rstim-vs-stim-full", rstim_vs_stim_item),
         ("rstim-vs-stim-release", rstim_vs_stim_release_item),
+        ("rstim-vs-stim-release-repetition-sample", repetition_item),
+        ("rstim-vs-stim-release-surface-detect", surface_detect_item),
+        ("rstim-vs-stim-release-dem-sample", dem_sample_item),
     ] {
-        let provenance = item["provenance"]
-            .as_object()
-            .unwrap_or_else(|| panic!("{item_id} must carry canonical provenance"));
-        for field in [
-            "schema_version",
-            "artifact_date",
-            "source_commit",
-            "commands",
-            "cpu_model",
-            "artifact_hashes",
-        ] {
-            assert!(
-                provenance.contains_key(field),
-                "{item_id} provenance is missing field {field}"
-            );
-        }
-        assert_eq!(
-            provenance["artifact_hashes"]["status"].as_str(),
-            Some("recorded"),
-            "{item_id} artifact hashes must be recorded"
-        );
+        assert_canonical_provenance(item_id, item);
     }
 }
 
@@ -896,26 +1030,30 @@ fn qec_code_and_future_benchmarks_are_classified() {
     );
     let rstim_vs_stim_item = rstim_vs_stim_items
         .iter()
-        .find(|item| item["id"] == "rstim-vs-stim-full")
-        .expect("rstim-vs-stim checked item must exist");
+        .find(|item| item["id"] == "rstim-vs-stim-correctness")
+        .expect("rstim-vs-stim correctness item must exist");
     assert_eq!(
         rstim_vs_stim_item["status"], "existing",
-        "rstim-vs-stim checked item must stay existing inside the partial family"
+        "rstim-vs-stim correctness item must stay existing inside the partial family"
     );
-    assert_checked_artifacts(
+    assert_exact_checked_artifacts(
         rstim_vs_stim_item,
         &[
             (
-                "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
-                "speed-summary",
-            ),
-            (
-                "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
-                "speed-report",
-            ),
-            (
                 "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
                 "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json",
+                "correctness-summary",
+            ),
+            (
+                "benchmarks/rstim_vs_stim_simulator/results/distributions/report.md",
+                "correctness-report",
             ),
             (
                 "benchmarks/rstim_vs_stim_simulator/cases.full.toml",

@@ -36,7 +36,7 @@ ITEM_REQUIRED_FIELDS = {
 }
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
-    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|release)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1
@@ -61,6 +61,22 @@ RSTIM_VS_STIM_REQUIRED_ARTIFACTS = {
     "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json": "speed-summary",
     "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md": "speed-report",
     "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json": "correctness-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json": "correctness-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json": "correctness-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/distributions/report.md": "correctness-report",
+    "benchmarks/rstim_vs_stim_simulator/results/release/summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/release/report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/release/environment.json": "environment",
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/environment.json": "environment",
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/environment.json": "environment",
+    "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/raw.jsonl": "speed-raw",
+    "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/environment.json": "environment",
     "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "fixture-manifest",
     "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "stim-fixture",
     "docs/showcases/rstim-vs-stim-simulator.md": "showcase",
@@ -84,6 +100,29 @@ RSTIM_VS_STIM_REQUIRED_SEED_POLICY_FIELDS = {
     "speed_rstim_variants_seed",
     "speed_stim_cli_seed_policy",
 }
+BROAD_RSTIM_VS_STIM_CLAIM_RE = re.compile(
+    r"(?:`?rstim`?\s+is\s+faster\s+than\s+`?stim`?"
+    r"|`?rstim`?\s+beats\s+`?stim`?"
+    r"|full\s+`?stim`?\s+parity)",
+    re.IGNORECASE,
+)
+
+
+def find_broad_rstim_vs_stim_claim(value: Any) -> str | None:
+    if isinstance(value, str):
+        match = BROAD_RSTIM_VS_STIM_CLAIM_RE.search(value)
+        return match.group(0) if match else None
+    if isinstance(value, dict):
+        for child in value.values():
+            match = find_broad_rstim_vs_stim_claim(child)
+            if match is not None:
+                return match
+    if isinstance(value, list):
+        for child in value:
+            match = find_broad_rstim_vs_stim_claim(child)
+            if match is not None:
+                return match
+    return None
 
 
 def git_ok(repo_root: Path, args: list[str]) -> bool:
@@ -257,6 +296,13 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
                 continue
             artifact_path = artifact.get("path")
             if not isinstance(artifact_path, str):
+                continue
+            if artifact.get("checked") is True and artifact_path not in RSTIM_VS_STIM_REQUIRED_ARTIFACTS:
+                add_error(
+                    errors,
+                    item_scope,
+                    f"checked artifact {artifact_path} is not accepted by rstim-vs-Stim site policy",
+                )
                 continue
             expected_kind = RSTIM_VS_STIM_REQUIRED_ARTIFACTS.get(artifact_path)
             if expected_kind is None:
@@ -594,6 +640,20 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
     if not isinstance(manifest, dict):
         return ["manifest must be a JSON object"]
 
+    match = find_broad_rstim_vs_stim_claim(manifest)
+    if match is not None:
+        add_error(errors, "manifest", f"broad rstim-vs-Stim claim is not allowed: {match}")
+
+    showcase_path = repo_root / "docs/showcases/rstim-vs-stim-simulator.md"
+    if showcase_path.is_file():
+        match = find_broad_rstim_vs_stim_claim(showcase_path.read_text(encoding="utf-8"))
+        if match is not None:
+            add_error(
+                errors,
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                f"broad rstim-vs-Stim claim is not allowed: {match}",
+            )
+
     if manifest.get("schema_version") != 1:
         add_error(errors, "manifest", "schema_version must be 1")
 
@@ -731,6 +791,21 @@ def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any],
 def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     tmpdir = tempfile.TemporaryDirectory()
     root = Path(tmpdir.name)
+    expanded_fixture_content = '{"status":"pass"}\n'
+    expanded_fixture_artifacts = {
+        artifact_path: artifact_kind
+        for artifact_path, artifact_kind in RSTIM_VS_STIM_REQUIRED_ARTIFACTS.items()
+        if artifact_path.startswith("benchmarks/rstim_vs_stim_simulator/results/")
+        and not artifact_path.startswith("benchmarks/rstim_vs_stim_simulator/results/full/")
+    }
+
+    def fixture_sha256(content: str) -> str:
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    expanded_fixture_hashes = {
+        artifact_path: {"sha256": fixture_sha256(expanded_fixture_content)}
+        for artifact_path in expanded_fixture_artifacts
+    }
 
     (root / ".gitignore").write_text("/benchmarks/out/\n", encoding="utf-8")
     (root / "docs/showcases").mkdir(parents=True)
@@ -760,6 +835,10 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
     (root / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim").write_text(
         "M 0\n", encoding="utf-8"
     )
+    for artifact_path in expanded_fixture_artifacts:
+        path = root / artifact_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(expanded_fixture_content, encoding="utf-8")
     (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
     (root / "benchmarks/out/ignored.csv").write_text("ignored\n", encoding="utf-8")
 
@@ -920,6 +999,10 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                                 "kind": "showcase",
                                 "checked": True,
                             },
+                            *[
+                                {"path": artifact_path, "kind": artifact_kind, "checked": True}
+                                for artifact_path, artifact_kind in expanded_fixture_artifacts.items()
+                            ],
                         ],
                         "commands": [
                             "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
@@ -957,6 +1040,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                                 "docs/showcases/rstim-vs-stim-simulator.md": {
                                     "sha256": "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
                                 },
+                                **expanded_fixture_hashes,
                             },
                         ),
                         "provenance_requirements": list(RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS),
@@ -1009,6 +1093,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
             "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
             "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
             "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+            *expanded_fixture_artifacts,
             ".github/workflows/ci.yml",
             "site/benchmark-site.json",
         ],
@@ -1140,7 +1225,7 @@ def main() -> int:
 
     errors = validate_manifest(args.repo_root, args.manifest, site_root=args.site_root)
     if args.site_root is not None:
-        errors.extend(validate_site_root(args.site_root, args.manifest))
+        errors.extend(validate_site_root(args.site_root, args.site_root / "data/benchmark-site.json"))
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)

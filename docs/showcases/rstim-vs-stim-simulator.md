@@ -105,6 +105,63 @@ This release-profile run records only
 `stim-style-surface-sample-d11-r100-b1024` with 0 warmup rounds, 1 measured
 round, and the environment metadata captured by the selected-case runner.
 
+## Expanded Checked Evidence
+
+### Correctness evidence
+
+The checked correctness area combines the existing d11/r100 full-fixture
+summary with eight source-grounded small-circuit distribution cases. The
+recorded distribution run used 100,000 shots per case and seed 12345; all eight
+catalogued cases and the checked d11/r100 summary record a passing status. This
+is evidence for those cases, commands, seeds, and recorded tool versions only.
+
+- [Full-fixture correctness summary](benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json)
+- [Distribution summary](benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json)
+- [Expanded correctness rollup](benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json)
+- [Expanded correctness report](benchmarks/rstim_vs_stim_simulator/results/distributions/report.md)
+
+### Release speed evidence
+
+The following observations are scoped to the checked release-profile runs,
+their single measured round, and their recorded environments:
+
+- For `stim-style-surface-sample-d11-r100-b1024`, the recorded
+  `rstim-compiled` wall time is higher than the recorded `stim-cli` wall time.
+  See the [summary](benchmarks/rstim_vs_stim_simulator/results/release/summary.json),
+  [report](benchmarks/rstim_vs_stim_simulator/results/release/report.md), and
+  [environment](benchmarks/rstim_vs_stim_simulator/results/release/environment.json).
+- For `rep-sample-d13-r13`, the recorded `rstim-compiled` wall time is lower
+  than the recorded `stim-cli` wall time. See the
+  [summary](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json),
+  [report](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md),
+  and
+  [environment](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/environment.json).
+- For `surface-detect-d13-r13`, the recorded `rstim-compiled` wall time is
+  lower than the recorded `stim-cli` wall time. See the
+  [summary](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json),
+  [report](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
+  and
+  [environment](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/environment.json).
+- For `stim-style-surface-dem-sample-d11-r100-b1024`, the recorded
+  `rstim-sample-dem` wall time is higher than the recorded `stim-sample-dem`
+  wall time. See the
+  [raw timing records](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/raw.jsonl),
+  [summary](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json),
+  [report](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md),
+  and
+  [environment](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/environment.json).
+
+These relationships describe only the named cases under the captured release
+profiles and environments. They are not timing thresholds or cross-machine
+gates.
+
+### Historical debug gap
+
+Issue #406's debug-profile selected d11/r100 sample remains a historical gap
+record. Its checked [speed summary](benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json)
+and [speed report](benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md)
+are kept separate from the correctness area and all release-profile cards.
+
 ## Code
 
 Fixture catalog and canonical circuit input:
