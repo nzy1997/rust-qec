@@ -12,6 +12,7 @@ pub enum CompiledBasis {
 pub struct CompiledFeatureFlags {
     pub has_loss: bool,
     pub has_feedback: bool,
+    pub has_sweep_dependency: bool,
     pub has_nested_repeat: bool,
 }
 
@@ -21,17 +22,54 @@ pub enum CompiledOp {
     QubitCoords,
     ShiftCoords,
     NoOp,
-    H { qubits: Vec<usize> },
-    Reset { basis: CompiledBasis, qubits: Vec<usize> },
-    XError { probability: f64, qubits: Vec<usize> },
-    Depolarize1 { probability: f64, qubits: Vec<usize> },
-    Cx { pairs: Vec<(usize, usize)> },
-    Depolarize2 { probability: f64, pairs: Vec<(usize, usize)> },
-    Measure { basis: CompiledBasis, qubits: Vec<usize> },
-    MeasureReset { basis: CompiledBasis, qubits: Vec<usize> },
-    Detector { rec_offsets: Vec<usize> },
-    ObservableInclude { observable_index: usize, rec_offsets: Vec<usize> },
-    UnsupportedSamplerOp { name: String },
+    H {
+        qubits: Vec<usize>,
+    },
+    Reset {
+        basis: CompiledBasis,
+        qubits: Vec<usize>,
+    },
+    XError {
+        probability: f64,
+        qubits: Vec<usize>,
+    },
+    YError {
+        probability: f64,
+        qubits: Vec<usize>,
+    },
+    ZError {
+        probability: f64,
+        qubits: Vec<usize>,
+    },
+    Depolarize1 {
+        probability: f64,
+        qubits: Vec<usize>,
+    },
+    Cx {
+        pairs: Vec<(usize, usize)>,
+    },
+    Depolarize2 {
+        probability: f64,
+        pairs: Vec<(usize, usize)>,
+    },
+    Measure {
+        basis: CompiledBasis,
+        qubits: Vec<usize>,
+    },
+    MeasureReset {
+        basis: CompiledBasis,
+        qubits: Vec<usize>,
+    },
+    Detector {
+        rec_offsets: Vec<usize>,
+    },
+    ObservableInclude {
+        observable_index: usize,
+        rec_offsets: Vec<usize>,
+    },
+    UnsupportedSamplerOp {
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +130,7 @@ fn compile_blocks(
             } => {
                 flags.has_loss |= is_loss_operation(name);
                 flags.has_feedback |= is_feedback_operation(name, targets);
+                flags.has_sweep_dependency |= is_sweep_dependent_operation(name, targets);
                 pending_ops.push(compile_sampler_op(name, args, targets));
             }
             StimInstr::Repeat { count, body } => {
@@ -100,6 +139,7 @@ fn compile_blocks(
                 let (body_blocks, body_flags) = compile_blocks(body, true);
                 flags.has_loss |= body_flags.has_loss;
                 flags.has_feedback |= body_flags.has_feedback;
+                flags.has_sweep_dependency |= body_flags.has_sweep_dependency;
                 flags.has_nested_repeat |= inside_repeat || body_flags.has_nested_repeat;
 
                 blocks.push(CompiledBlock::Repeat(CompiledRepeatRegion {
@@ -154,6 +194,18 @@ fn compile_sampler_op(name: &str, args: &[f64], targets: &[StimTarget]) -> Compi
             .unwrap_or_else(|| unsupported(name)),
         "X_ERROR" => qubits(targets)
             .map(|qubits| CompiledOp::XError {
+                probability: first_arg(args),
+                qubits,
+            })
+            .unwrap_or_else(|| unsupported(name)),
+        "Y_ERROR" => qubits(targets)
+            .map(|qubits| CompiledOp::YError {
+                probability: first_arg(args),
+                qubits,
+            })
+            .unwrap_or_else(|| unsupported(name)),
+        "Z_ERROR" => qubits(targets)
+            .map(|qubits| CompiledOp::ZError {
                 probability: first_arg(args),
                 qubits,
             })
@@ -307,5 +359,32 @@ fn is_loss_operation(name: &str) -> bool {
 
 fn is_feedback_operation(name: &str, targets: &[StimTarget]) -> bool {
     matches!(name, "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ")
-        && matches!(targets, [StimTarget::Rec(_), StimTarget::Qubit(_)])
+        && targets
+            .chunks_exact(2)
+            .any(|pair| matches!(pair, [StimTarget::Rec(_), StimTarget::Qubit(_)]))
+}
+
+fn is_sweep_dependent_operation(name: &str, targets: &[StimTarget]) -> bool {
+    targets
+        .iter()
+        .any(|target| matches!(target, StimTarget::Sweep(_)))
+        && !is_noiselessly_skipped_or_metadata_operation(name)
+}
+
+fn is_noiselessly_skipped_or_metadata_operation(name: &str) -> bool {
+    matches!(
+        name,
+        "I" | "I_ERROR"
+            | "II_ERROR"
+            | "X_ERROR"
+            | "Y_ERROR"
+            | "Z_ERROR"
+            | "DEPOLARIZE1"
+            | "DEPOLARIZE2"
+            | "TICK"
+            | "QUBIT_COORDS"
+            | "SHIFT_COORDS"
+            | "DETECTOR"
+            | "OBSERVABLE_INCLUDE"
+    )
 }

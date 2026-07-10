@@ -26,7 +26,16 @@ impl Executor {
     }
 
     pub fn run(&mut self, rng: &mut impl Rng) -> Result<ExecOutput, String> {
-        let (out, _) = self.run_internal(rng, false)?;
+        let (out, _) = self.run_internal(rng, false, None)?;
+        Ok(out)
+    }
+
+    pub fn run_with_sweep_bits(
+        &mut self,
+        rng: &mut impl Rng,
+        sweep_bits: Option<&[bool]>,
+    ) -> Result<ExecOutput, String> {
+        let (out, _) = self.run_internal(rng, false, sweep_bits)?;
         Ok(out)
     }
 
@@ -34,13 +43,14 @@ impl Executor {
         &mut self,
         rng: &mut impl Rng,
     ) -> Result<(ExecOutput, SampleTrace), String> {
-        self.run_internal(rng, true)
+        self.run_internal(rng, true, None)
     }
 
     fn run_internal(
         &self,
         rng: &mut impl Rng,
         trace_enabled: bool,
+        sweep_bits: Option<&[bool]>,
     ) -> Result<(ExecOutput, SampleTrace), String> {
         let n = max_qubit(&self.instrs)?;
         let mut exec = ExecutionState::new(n, trace_enabled);
@@ -49,6 +59,7 @@ impl Executor {
             &ExecutionTraversalContext::default(),
             &mut exec,
             rng,
+            sweep_bits,
         )?;
         Ok(exec.into_output())
     }
@@ -211,6 +222,7 @@ fn execute_instrs<R: Rng>(
     context: &ExecutionTraversalContext,
     exec: &mut ExecutionState,
     rng: &mut R,
+    sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     for (op_index, instr) in instrs.iter().enumerate() {
         match instr {
@@ -221,12 +233,12 @@ fn execute_instrs<R: Rng>(
                 ..
             } => {
                 let op_context = context.with_op_index(op_index);
-                execute_op(name, args, targets, &op_context, exec, rng)?;
+                execute_op(name, args, targets, &op_context, exec, rng, sweep_bits)?;
             }
             StimInstr::Repeat { count, body } => {
                 for iteration in 0..*count {
                     let repeat_context = context.with_repeat_iteration(op_index, iteration);
-                    execute_instrs(body, &repeat_context, exec, rng)?;
+                    execute_instrs(body, &repeat_context, exec, rng, sweep_bits)?;
                 }
             }
         }
@@ -241,6 +253,7 @@ fn execute_op<R: Rng>(
     context: &ExecutionTraversalContext,
     exec: &mut ExecutionState,
     rng: &mut R,
+    sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     match name {
         "I" | "I_ERROR" | "II_ERROR" => {}
@@ -360,22 +373,37 @@ fn execute_op<R: Rng>(
             for_each_present_qubit(targets, lost, |q| state.h_nyz(q))?;
         }
         "CX" | "CNOT" | "ZCX" => {
-            let pairs = present_qubit_pairs(targets, &exec.lost)?;
-            for (c, t) in pairs {
-                exec.state.cx(c, t);
-            }
+            apply_runtime_controlled_pairs(
+                &mut exec.state,
+                &exec.lost,
+                &exec.recorder,
+                targets,
+                sweep_bits,
+                |state, c, t| state.cx(c, t),
+                |state, q| state.x_gate(q),
+            )?;
         }
         "CY" | "ZCY" => {
-            let pairs = present_qubit_pairs(targets, &exec.lost)?;
-            for (c, t) in pairs {
-                exec.state.cy(c, t);
-            }
+            apply_runtime_controlled_pairs(
+                &mut exec.state,
+                &exec.lost,
+                &exec.recorder,
+                targets,
+                sweep_bits,
+                |state, c, t| state.cy(c, t),
+                |state, q| state.y_gate(q),
+            )?;
         }
         "CZ" | "ZCZ" => {
-            let pairs = present_qubit_pairs(targets, &exec.lost)?;
-            for (c, t) in pairs {
-                exec.state.cz(c, t);
-            }
+            apply_runtime_controlled_pairs(
+                &mut exec.state,
+                &exec.lost,
+                &exec.recorder,
+                targets,
+                sweep_bits,
+                |state, c, t| state.cz(c, t),
+                |state, q| state.z_gate(q),
+            )?;
         }
         "XCX" => {
             let pairs = present_qubit_pairs(targets, &exec.lost)?;
@@ -1208,13 +1236,13 @@ fn ref_sample_op(
 
         // Two-qubit Cliffords
         "CX" | "CNOT" | "ZCX" => {
-            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
+            apply_reference_controlled_pairs(state, lost, measurements, name, targets, sweep_bits)?;
         }
         "CY" | "ZCY" => {
-            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
+            apply_reference_controlled_pairs(state, lost, measurements, name, targets, sweep_bits)?;
         }
         "CZ" | "ZCZ" => {
-            apply_reference_controlled_pairs(state, name, targets, sweep_bits)?;
+            apply_reference_controlled_pairs(state, lost, measurements, name, targets, sweep_bits)?;
         }
         "XCX" => {
             for (a, b) in present_qubit_pairs(targets, lost)? {
@@ -1451,6 +1479,8 @@ fn ref_sample_op(
 
 fn apply_reference_controlled_pairs(
     state: &mut StabilizerState,
+    lost: &[bool],
+    measurements: &[bool],
     name: &str,
     targets: &[StimTarget],
     sweep_bits: Option<&[bool]>,
@@ -1461,24 +1491,40 @@ fn apply_reference_controlled_pairs(
     let mut it = targets.iter();
     while let (Some(a), Some(b)) = (it.next(), it.next()) {
         match (a, b) {
-            (StimTarget::Qubit(c), StimTarget::Qubit(t)) => match name {
-                "CX" | "CNOT" | "ZCX" => state.cx(*c as usize, *t as usize),
-                "CY" | "ZCY" => state.cy(*c as usize, *t as usize),
-                "CZ" | "ZCZ" => state.cz(*c as usize, *t as usize),
-                _ => return Err(format!("unsupported reference pair op {name}")),
-            },
+            (StimTarget::Qubit(c), StimTarget::Qubit(t)) => {
+                let c = *c as usize;
+                let t = *t as usize;
+                if lost[c] || lost[t] {
+                    continue;
+                }
+                match name {
+                    "CX" | "CNOT" | "ZCX" => state.cx(c, t),
+                    "CY" | "ZCY" => state.cy(c, t),
+                    "CZ" | "ZCZ" => state.cz(c, t),
+                    _ => return Err(format!("unsupported reference pair op {name}")),
+                }
+            }
+            (StimTarget::Rec(offset), StimTarget::Qubit(q)) => {
+                let q = *q as usize;
+                if lost[q] {
+                    continue;
+                }
+                let active = rec_from_measurements(measurements, *offset)?;
+                if active {
+                    apply_reference_feedback_gate(state, name, q)?;
+                }
+            }
             (StimTarget::Sweep(k), StimTarget::Qubit(q)) => {
+                let q = *q as usize;
+                if lost[q] {
+                    continue;
+                }
                 let active = sweep_bits
                     .and_then(|bits| bits.get(*k as usize))
                     .copied()
                     .unwrap_or(false);
                 if active {
-                    match name {
-                        "CX" | "CNOT" | "ZCX" => state.x_gate(*q as usize),
-                        "CY" | "ZCY" => state.y_gate(*q as usize),
-                        "CZ" | "ZCZ" => state.z_gate(*q as usize),
-                        _ => return Err(format!("unsupported reference pair op {name}")),
-                    }
+                    apply_reference_feedback_gate(state, name, q)?;
                 }
             }
             (StimTarget::Sweep(_), _) | (_, StimTarget::Sweep(_)) => {
@@ -1486,6 +1532,34 @@ fn apply_reference_controlled_pairs(
             }
             _ => return Err("expected qubit target in pair".to_string()),
         }
+    }
+    Ok(())
+}
+
+fn rec_from_measurements(measurements: &[bool], offset: i32) -> Result<bool, String> {
+    if offset >= 0 {
+        return Err("rec out of range".to_string());
+    }
+    let idx = measurements.len() as i32 + offset;
+    if idx < 0 {
+        return Err("rec out of range".to_string());
+    }
+    measurements
+        .get(idx as usize)
+        .copied()
+        .ok_or_else(|| "rec out of range".to_string())
+}
+
+fn apply_reference_feedback_gate(
+    state: &mut StabilizerState,
+    name: &str,
+    q: usize,
+) -> Result<(), String> {
+    match name {
+        "CX" | "CNOT" | "ZCX" => state.x_gate(q),
+        "CY" | "ZCY" => state.y_gate(q),
+        "CZ" | "ZCZ" => state.z_gate(q),
+        _ => return Err(format!("unsupported reference pair op {name}")),
     }
     Ok(())
 }
@@ -1710,6 +1784,64 @@ fn present_qubit_pairs(
         .into_iter()
         .filter(|(a, b)| !lost[*a] && !lost[*b])
         .collect())
+}
+
+fn apply_runtime_controlled_pairs<FPair, FSingle>(
+    state: &mut StabilizerState,
+    lost: &[bool],
+    recorder: &Recorder,
+    targets: &[StimTarget],
+    sweep_bits: Option<&[bool]>,
+    mut apply_pair: FPair,
+    mut apply_single: FSingle,
+) -> Result<(), String>
+where
+    FPair: FnMut(&mut StabilizerState, usize, usize),
+    FSingle: FnMut(&mut StabilizerState, usize),
+{
+    if targets.len() % 2 != 0 {
+        return Err("odd number of targets".to_string());
+    }
+    let mut it = targets.iter();
+    while let (Some(control), Some(target)) = (it.next(), it.next()) {
+        match (control, target) {
+            (StimTarget::Qubit(c), StimTarget::Qubit(t)) => {
+                let c = *c as usize;
+                let t = *t as usize;
+                if !lost[c] && !lost[t] {
+                    apply_pair(state, c, t);
+                }
+            }
+            (StimTarget::Rec(offset), StimTarget::Qubit(t)) => {
+                let t = *t as usize;
+                if lost[t] {
+                    continue;
+                }
+                let active = recorder.rec(*offset).ok_or("rec out of range")?;
+                if active {
+                    apply_single(state, t);
+                }
+            }
+            (StimTarget::Sweep(k), StimTarget::Qubit(t)) => {
+                let t = *t as usize;
+                if lost[t] {
+                    continue;
+                }
+                let active = sweep_bits
+                    .and_then(|bits| bits.get(*k as usize))
+                    .copied()
+                    .unwrap_or(false);
+                if active {
+                    apply_single(state, t);
+                }
+            }
+            (StimTarget::Sweep(_), _) | (_, StimTarget::Sweep(_)) => {
+                return Err("unsupported sweep target placement".to_string());
+            }
+            _ => return Err("expected qubit target in pair".to_string()),
+        }
+    }
+    Ok(())
 }
 
 fn present_qubit_pair_slots(
@@ -2587,9 +2719,11 @@ mod tests {
 
     #[test]
     fn executor_helpers_cover_branchy_paths_and_errors() {
-        let mut traced = Executor::from_instrs(parse_lines("H 0\nREPEAT 1 {\n  M 0\n}\n").unwrap())
+        let mut traced =
+            Executor::from_instrs(parse_lines("H 0\nREPEAT 1 {\n  M 0\n}\n").unwrap()).unwrap();
+        let _ = traced
+            .run_with_trace(&mut ScriptRng::new(vec![0, 0]))
             .unwrap();
-        let _ = traced.run_with_trace(&mut ScriptRng::new(vec![0, 0])).unwrap();
 
         let ctx = ExecutionTraversalContext::default();
         let mut exec = ExecutionState::new(4, true);
@@ -2601,6 +2735,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0, 0]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2610,6 +2745,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0, 1]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2619,6 +2755,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0, 2]),
+            None,
         )
         .unwrap();
 
@@ -2630,6 +2767,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2639,6 +2777,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2648,6 +2787,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2657,6 +2797,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0]),
+            None,
         )
         .unwrap();
         execute_op(
@@ -2666,6 +2807,7 @@ mod tests {
             &ctx,
             &mut exec,
             &mut ScriptRng::new(vec![0]),
+            None,
         )
         .unwrap();
 
@@ -2680,15 +2822,31 @@ mod tests {
         assert!(branches.contains(&Some("Y")));
         assert!(branches.contains(&Some("Z")));
 
-        assert!(execute_op("BOGUS", &[], &[], &ctx, &mut exec, &mut ScriptRng::new(vec![0])).is_err());
+        assert!(
+            execute_op(
+                "BOGUS",
+                &[],
+                &[],
+                &ctx,
+                &mut exec,
+                &mut ScriptRng::new(vec![0]),
+                None,
+            )
+            .is_err()
+        );
 
-        assert_eq!(qubits(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(), vec![0]);
-        assert!(qubits(&[StimTarget::Pauli {
-            qubit: 0,
-            basis: PauliBasis::X,
-            inverted: false,
-        }])
-        .is_err());
+        assert_eq!(
+            qubits(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),
+            vec![0]
+        );
+        assert!(
+            qubits(&[StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            }])
+            .is_err()
+        );
 
         assert_eq!(
             qubit_slots(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),
@@ -2700,35 +2858,41 @@ mod tests {
             qubits_with_inversion(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),
             vec![(0, false)]
         );
-        assert!(qubits_with_inversion(&[StimTarget::Pauli {
-            qubit: 0,
-            basis: PauliBasis::X,
-            inverted: false,
-        }])
-        .is_err());
+        assert!(
+            qubits_with_inversion(&[StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            }])
+            .is_err()
+        );
 
         assert_eq!(
             qubits_with_inversion_slots(&[StimTarget::Sweep(0), StimTarget::QubitInv(1)]).unwrap(),
             vec![(1, 1, true)]
         );
-        assert!(qubits_with_inversion_slots(&[StimTarget::Pauli {
-            qubit: 0,
-            basis: PauliBasis::X,
-            inverted: false,
-        }])
-        .is_err());
+        assert!(
+            qubits_with_inversion_slots(&[StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            }])
+            .is_err()
+        );
 
         assert!(qubits_with_inversion_pairs(&[StimTarget::Qubit(0)]).is_err());
 
         assert_eq!(expect_qubit(&StimTarget::Qubit(0)).unwrap(), 0);
         assert!(expect_qubit(&StimTarget::QubitInv(0)).is_err());
         assert!(expect_qubit(&StimTarget::Sweep(0)).is_err());
-        assert!(expect_qubit(&StimTarget::Pauli {
-            qubit: 0,
-            basis: PauliBasis::X,
-            inverted: false,
-        })
-        .is_err());
+        assert!(
+            expect_qubit(&StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            })
+            .is_err()
+        );
 
         assert!(qubit_pairs(&[StimTarget::Qubit(0)]).is_err());
         assert_eq!(
@@ -2736,88 +2900,130 @@ mod tests {
             Vec::<(usize, usize)>::new()
         );
 
-        assert!(present_qubit_pairs(&[StimTarget::Qubit(0), StimTarget::Qubit(1)], &[false, true])
+        assert!(
+            present_qubit_pairs(
+                &[StimTarget::Qubit(0), StimTarget::Qubit(1)],
+                &[false, true]
+            )
             .map(|pairs| pairs.is_empty())
-            .unwrap());
-        assert!(present_qubit_pair_slots(&[StimTarget::Qubit(0)] , &[false]).is_err());
+            .unwrap()
+        );
+        assert!(present_qubit_pair_slots(&[StimTarget::Qubit(0)], &[false]).is_err());
         assert_eq!(
-            present_qubit_pair_slots(&[StimTarget::Sweep(0), StimTarget::Qubit(1)], &[false, false])
-                .unwrap(),
+            present_qubit_pair_slots(
+                &[StimTarget::Sweep(0), StimTarget::Qubit(1)],
+                &[false, false]
+            )
+            .unwrap(),
             Vec::<((usize, usize), (usize, usize))>::new()
         );
 
         let recorder = Recorder::default();
         assert!(xor_recs(&recorder, &[StimTarget::Qubit(0)]).is_err());
-        assert!(apply_pauli_targets(
-            &mut exec.state,
-            &[StimTarget::Qubit(0)]
-        )
-        .is_err());
+        assert!(apply_pauli_targets(&mut exec.state, &[StimTarget::Qubit(0)]).is_err());
         assert_eq!(
             correlated_trace_payload(&[StimTarget::Qubit(0)]).unwrap(),
             None
         );
         assert_eq!(pauli_pair_label(4, 4), "??");
         apply_pauli(&mut exec.state, 0, 4);
-        assert!(measure_pauli_product(&mut exec.state, &[], true, &mut ScriptRng::new(vec![0])));
+        assert!(measure_pauli_product(
+            &mut exec.state,
+            &[],
+            true,
+            &mut ScriptRng::new(vec![0])
+        ));
         apply_spp(&mut exec.state, &[], false, false);
     }
 
     #[test]
     fn reference_controlled_pairs_cover_sweep_and_error_paths() {
         let mut state = StabilizerState::new(2);
+        let lost = vec![false, false];
+        let measurements = Vec::new();
         let sweep_bits = [true];
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "CX",
-            &[StimTarget::Qubit(0)],
-            None,
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "CX",
+                &[StimTarget::Qubit(0)],
+                None,
+            )
+            .is_err()
+        );
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "BAD",
-            &[StimTarget::Qubit(0), StimTarget::Qubit(1)],
-            None,
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "BAD",
+                &[StimTarget::Qubit(0), StimTarget::Qubit(1)],
+                None,
+            )
+            .is_err()
+        );
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "BAD",
-            &[StimTarget::Sweep(0), StimTarget::Qubit(1)],
-            Some(&sweep_bits),
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "BAD",
+                &[StimTarget::Sweep(0), StimTarget::Qubit(1)],
+                Some(&sweep_bits),
+            )
+            .is_err()
+        );
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "CX",
-            &[StimTarget::Qubit(0), StimTarget::Sweep(0)],
-            Some(&sweep_bits),
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "CX",
+                &[StimTarget::Qubit(0), StimTarget::Sweep(0)],
+                Some(&sweep_bits),
+            )
+            .is_err()
+        );
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "CX",
-            &[StimTarget::Pauli {
-                qubit: 0,
-                basis: PauliBasis::X,
-                inverted: false,
-            }, StimTarget::Qubit(1)],
-            None,
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "CX",
+                &[
+                    StimTarget::Pauli {
+                        qubit: 0,
+                        basis: PauliBasis::X,
+                        inverted: false,
+                    },
+                    StimTarget::Qubit(1)
+                ],
+                None,
+            )
+            .is_err()
+        );
 
-        assert!(apply_reference_controlled_pairs(
-            &mut state,
-            "CX",
-            &[StimTarget::Qubit(0), StimTarget::Qubit(1), StimTarget::Qubit(0)],
-            None,
-        )
-        .is_err());
+        assert!(
+            apply_reference_controlled_pairs(
+                &mut state,
+                &lost,
+                &measurements,
+                "CX",
+                &[
+                    StimTarget::Qubit(0),
+                    StimTarget::Qubit(1),
+                    StimTarget::Qubit(0)
+                ],
+                None,
+            )
+            .is_err()
+        );
     }
 }

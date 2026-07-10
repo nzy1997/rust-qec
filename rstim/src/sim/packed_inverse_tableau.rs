@@ -259,11 +259,7 @@ impl PackedInverseTableau {
     }
 
     pub fn canonical_phase(&self, row: usize) -> u8 {
-        if self.sign_bit(row) {
-            2
-        } else {
-            0
-        }
+        if self.sign_bit(row) { 2 } else { 0 }
     }
 
     pub fn set_sign_bit(&mut self, row: usize, negative: bool) {
@@ -441,6 +437,18 @@ impl PackedInverseTableau {
     fn measure_z_raw_biased(&mut self, q: usize) -> bool {
         self.check_qubit(q);
         let mut rows = self.canonical_rows();
+        let (raw, changed) = self.measure_z_raw_biased_in_rows(&mut rows, q);
+        if changed {
+            self.replace_from_canonical_rows(&rows);
+        }
+        raw
+    }
+
+    fn measure_z_raw_biased_in_rows(
+        &self,
+        rows: &mut PackedCanonicalRows,
+        q: usize,
+    ) -> (bool, bool) {
         let mut pivot = None;
         for row in self.num_qubits..self.num_rows() {
             if rows.x(row, q) {
@@ -449,7 +457,7 @@ impl PackedInverseTableau {
             }
         }
 
-        let raw = if let Some(p) = pivot {
+        if let Some(p) = pivot {
             let destabilizer = p - self.num_qubits;
             for row in 0..self.num_rows() {
                 if row != p && row != destabilizer && rows.x(row, q) {
@@ -458,33 +466,62 @@ impl PackedInverseTableau {
             }
             rows.copy_row(p, destabilizer);
             rows.set_z_row(p, q);
-            false
-        } else {
-            let mut temp_x = vec![0; self.words_per_row];
-            let mut temp_z = vec![0; self.words_per_row];
-            temp_z[q / 64] |= 1u64 << (q % 64);
-            let mut exponent = 0u8;
-            for row in 0..self.num_qubits {
-                if rows.x(row, q) {
-                    rows.multiply_row_into_acc(
-                        row + self.num_qubits,
-                        &mut temp_x,
-                        &mut temp_z,
-                        &mut exponent,
-                    );
-                }
-            }
-            sign_from_words(&temp_x, &temp_z, exponent)
-        };
+            return (false, true);
+        }
 
-        if pivot.is_some() {
+        let mut temp_x = vec![0; self.words_per_row];
+        let mut temp_z = vec![0; self.words_per_row];
+        temp_z[q / 64] |= 1u64 << (q % 64);
+        let mut exponent = 0u8;
+        for row in 0..self.num_qubits {
+            if rows.x(row, q) {
+                rows.multiply_row_into_acc(
+                    row + self.num_qubits,
+                    &mut temp_x,
+                    &mut temp_z,
+                    &mut exponent,
+                );
+            }
+        }
+        (sign_from_words(&temp_x, &temp_z, exponent), false)
+    }
+
+    fn measure_z_raw_many_biased(&mut self, qubits: &[usize]) -> Vec<bool> {
+        if qubits.len() <= 1 || has_duplicate_qubits(qubits) {
+            return qubits
+                .iter()
+                .map(|&q| self.measure_z_raw_biased(q))
+                .collect();
+        }
+
+        for &q in qubits {
+            self.check_qubit(q);
+        }
+        let mut rows = self.canonical_rows();
+        let mut changed = false;
+        let mut bits = Vec::with_capacity(qubits.len());
+        for &q in qubits {
+            let (raw, measurement_changed) = self.measure_z_raw_biased_in_rows(&mut rows, q);
+            changed |= measurement_changed;
+            bits.push(raw);
+        }
+        if changed {
             self.replace_from_canonical_rows(&rows);
         }
-        raw
+        bits
     }
 
     pub fn measure_z_biased(&mut self, q: usize, inverted: bool) -> bool {
         self.measure_z_raw_biased(q) ^ inverted
+    }
+
+    pub fn measure_z_many_biased(&mut self, targets: &[(usize, bool)]) -> Vec<bool> {
+        let qubits: Vec<usize> = targets.iter().map(|(q, _)| *q).collect();
+        self.measure_z_raw_many_biased(&qubits)
+            .into_iter()
+            .zip(targets)
+            .map(|(raw, (_, inverted))| raw ^ *inverted)
+            .collect()
     }
 
     pub fn measure_x_biased(&mut self, q: usize, inverted: bool) -> bool {
@@ -511,6 +548,27 @@ impl PackedInverseTableau {
         raw ^ inverted
     }
 
+    pub fn measure_reset_z_many_biased(&mut self, targets: &[(usize, bool)]) -> Vec<bool> {
+        let qubits: Vec<usize> = targets.iter().map(|(q, _)| *q).collect();
+        if targets.len() <= 1 || has_duplicate_qubits(&qubits) {
+            return targets
+                .iter()
+                .map(|&(q, inverted)| self.measure_reset_z_biased(q, inverted))
+                .collect();
+        }
+
+        let raws = self.measure_z_raw_many_biased(&qubits);
+        for (&q, &raw) in qubits.iter().zip(&raws) {
+            if raw {
+                self.x_gate(q);
+            }
+        }
+        raws.into_iter()
+            .zip(targets)
+            .map(|(raw, (_, inverted))| raw ^ *inverted)
+            .collect()
+    }
+
     pub fn measure_reset_x_biased(&mut self, q: usize, inverted: bool) -> bool {
         self.h(q);
         let bit = self.measure_reset_z_biased(q, inverted);
@@ -531,6 +589,22 @@ impl PackedInverseTableau {
         let raw = self.measure_z_raw_biased(q);
         if raw {
             self.x_gate(q);
+        }
+    }
+
+    pub fn reset_z_many_biased(&mut self, qubits: &[usize]) {
+        if qubits.len() <= 1 || has_duplicate_qubits(qubits) {
+            for &q in qubits {
+                self.reset_z_biased(q);
+            }
+            return;
+        }
+
+        let raws = self.measure_z_raw_many_biased(qubits);
+        for (&q, &raw) in qubits.iter().zip(&raws) {
+            if raw {
+                self.x_gate(q);
+            }
         }
     }
 
@@ -819,6 +893,12 @@ fn canonical_raw_matrix_bit(rows: &PackedCanonicalRows, row: usize, col: usize) 
         let qubit = col - rows.num_qubits;
         bit_is_set(rows.z_plane[rows.row_start(row) + qubit / 64], qubit % 64)
     }
+}
+
+fn has_duplicate_qubits(qubits: &[usize]) -> bool {
+    let mut sorted = qubits.to_vec();
+    sorted.sort_unstable();
+    sorted.windows(2).any(|pair| pair[0] == pair[1])
 }
 
 fn words_for_bits(bits: usize) -> usize {

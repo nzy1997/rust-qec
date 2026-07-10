@@ -1,8 +1,8 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rstim::compiled::{
-    CompiledBlock, CompiledOp, CompiledPathDecision, choose_sampler_path, compile_circuit,
-    sample_compiled_batch,
+    CompiledBlock, CompiledOp, SamplerPathDecision, SamplingFallbackReason, choose_sampler_path,
+    compile_circuit, sample_compiled_batch,
 };
 use rstim::ir::{StimInstr, StimTarget};
 use rstim::parser::parse_lines;
@@ -67,7 +67,7 @@ fn selected_surface_fixture_lowers_to_typed_sampler_ops() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::FastPath
+        SamplerPathDecision::FastPath
     );
 
     let mut counts = VariantCounts::default();
@@ -109,7 +109,7 @@ fn compiled_sampler_ir_preserves_sample_bits_on_smoke_fixture() {
     let compiled = compile_circuit(&instrs).expect("compile smoke circuit");
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::FastPath
+        SamplerPathDecision::FastPath
     );
 
     let mut interpreted_rng = StdRng::seed_from_u64(20260709);
@@ -157,11 +157,11 @@ fn loss_and_feedback_circuits_still_choose_fallback() {
 
     assert_eq!(
         choose_sampler_path(&loss),
-        CompiledPathDecision::Fallback("loss instructions require the interpreted path")
+        SamplerPathDecision::Fallback(SamplingFallbackReason::Loss)
     );
     assert_eq!(
         choose_sampler_path(&feedback),
-        CompiledPathDecision::Fallback("feedback instructions require the interpreted path")
+        SamplerPathDecision::Fallback(SamplingFallbackReason::MeasurementRecordFeedback)
     );
 }
 
@@ -171,9 +171,9 @@ fn unsupported_sampler_ops_do_not_enter_typed_fast_path() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::Fallback(
-            "unsupported sampler instructions require the interpreted path",
-        )
+        SamplerPathDecision::Fallback(SamplingFallbackReason::UnsupportedOperation(
+            "S".to_string()
+        ))
     );
 
     let mut counts = VariantCounts::default();
@@ -190,7 +190,7 @@ fn ideal_noop_sampler_ops_lower_to_typed_fast_path_ops() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::FastPath
+        SamplerPathDecision::FastPath
     );
 
     let mut counts = VariantCounts::default();
@@ -222,9 +222,7 @@ fn malformed_sampler_targets_lower_to_unsupported_markers() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::Fallback(
-            "unsupported sampler instructions require the interpreted path",
-        )
+        SamplerPathDecision::Fallback(SamplingFallbackReason::SweepDependent)
     );
 
     let mut counts = VariantCounts::default();
@@ -238,7 +236,7 @@ fn compiled_sampler_runs_y_basis_measurement_and_reset_variants() {
     let compiled = compile_circuit(&instrs).unwrap();
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::FastPath
+        SamplerPathDecision::FastPath
     );
 
     let mut rng = StdRng::seed_from_u64(415);
@@ -264,13 +262,15 @@ fn compiled_sampler_zero_probability_depolarize_ops_are_noops() {
         "R 0 1\n\
          DEPOLARIZE1(0) 0\n\
          DEPOLARIZE2(0) 0 1\n\
+         Y_ERROR(0) 0\n\
+         Z_ERROR(0) 1\n\
          M 0 1\n",
     )
     .unwrap();
     let compiled = compile_circuit(&instrs).unwrap();
     assert_eq!(
         choose_sampler_path(&compiled),
-        CompiledPathDecision::FastPath
+        SamplerPathDecision::FastPath
     );
 
     let mut rng = StdRng::seed_from_u64(416);

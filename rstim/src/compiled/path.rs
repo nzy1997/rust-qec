@@ -1,6 +1,7 @@
 use crate::compiled::{CompiledBlock, CompiledCircuit, CompiledOp, CompiledRepeatRegion};
 use crate::ir::{StimInstr, StimTarget};
 use std::collections::BTreeMap;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompiledPathDecision {
@@ -8,30 +9,63 @@ pub enum CompiledPathDecision {
     Fallback(&'static str),
 }
 
-pub fn choose_sampler_path(compiled: &CompiledCircuit) -> CompiledPathDecision {
-    if compiled.flags.has_loss {
-        return CompiledPathDecision::Fallback("loss instructions require the interpreted path");
-    }
-    if compiled.flags.has_feedback {
-        return CompiledPathDecision::Fallback(
-            "feedback instructions require the interpreted path",
-        );
-    }
-    if contains_unsupported_sampler_op(&compiled.blocks) {
-        return CompiledPathDecision::Fallback(
-            "unsupported sampler instructions require the interpreted path",
-        );
-    }
-
-    CompiledPathDecision::FastPath
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SamplingFallbackReason {
+    Loss,
+    MeasurementRecordFeedback,
+    SweepDependent,
+    UnsupportedOperation(String),
 }
 
-fn contains_unsupported_sampler_op(blocks: &[CompiledBlock]) -> bool {
-    blocks.iter().any(|block| match block {
-        CompiledBlock::Ops(ops) => ops
-            .iter()
-            .any(|op| matches!(op, CompiledOp::UnsupportedSamplerOp { .. })),
-        CompiledBlock::Repeat(region) => contains_unsupported_sampler_op(&region.body),
+impl SamplingFallbackReason {
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::Loss => "loss instructions require the interpreted path",
+            Self::MeasurementRecordFeedback => "feedback instructions require the interpreted path",
+            Self::SweepDependent => "sweep-dependent instructions require the interpreted path",
+            Self::UnsupportedOperation(_) => {
+                "unsupported sampler instructions require the interpreted path"
+            }
+        }
+    }
+}
+
+impl fmt::Display for SamplingFallbackReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SamplerPathDecision {
+    FastPath,
+    Fallback(SamplingFallbackReason),
+}
+
+pub fn choose_sampler_path(compiled: &CompiledCircuit) -> SamplerPathDecision {
+    if compiled.flags.has_loss {
+        return SamplerPathDecision::Fallback(SamplingFallbackReason::Loss);
+    }
+    if compiled.flags.has_feedback {
+        return SamplerPathDecision::Fallback(SamplingFallbackReason::MeasurementRecordFeedback);
+    }
+    if compiled.flags.has_sweep_dependency {
+        return SamplerPathDecision::Fallback(SamplingFallbackReason::SweepDependent);
+    }
+    if let Some(name) = first_unsupported_sampler_op(&compiled.blocks) {
+        return SamplerPathDecision::Fallback(SamplingFallbackReason::UnsupportedOperation(name));
+    }
+
+    SamplerPathDecision::FastPath
+}
+
+fn first_unsupported_sampler_op(blocks: &[CompiledBlock]) -> Option<String> {
+    blocks.iter().find_map(|block| match block {
+        CompiledBlock::Ops(ops) => ops.iter().find_map(|op| match op {
+            CompiledOp::UnsupportedSamplerOp { name } => Some(name.clone()),
+            _ => None,
+        }),
+        CompiledBlock::Repeat(region) => first_unsupported_sampler_op(&region.body),
     })
 }
 
@@ -103,13 +137,15 @@ fn supports_reset_periodic_body(region: &CompiledRepeatRegion) -> bool {
 
     has_reset_measurement
         && !last_touch_was_reset_measurement.is_empty()
-        && last_touch_was_reset_measurement.values().all(|was_reset| *was_reset)
+        && last_touch_was_reset_measurement
+            .values()
+            .all(|was_reset| *was_reset)
 }
 
 #[cfg(test)]
 mod tests {
     use super::supports_reset_periodic_body;
-    use crate::compiled::{compile_circuit, CompiledBlock, CompiledRepeatRegion};
+    use crate::compiled::{CompiledBlock, CompiledRepeatRegion, compile_circuit};
     use crate::parser::parse_lines;
 
     fn top_level_repeat_region<'a>(blocks: &'a [CompiledBlock]) -> &'a CompiledRepeatRegion {
