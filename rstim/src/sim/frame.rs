@@ -1,9 +1,71 @@
 use rand::Rng;
+#[cfg(debug_assertions)]
+use std::cell::RefCell;
 
 use crate::compiled::{CompiledBasis, CompiledBlock, CompiledOp};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
+use crate::rare_error_iterator::RareErrorIndexSampler;
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Depolarize2SamplingTelemetry {
+    pub sampling_path: &'static str,
+    pub iterator_builds: usize,
+    pub attempt_count: usize,
+}
+
+#[cfg(debug_assertions)]
+impl Default for Depolarize2SamplingTelemetry {
+    fn default() -> Self {
+        Self {
+            sampling_path: "none",
+            iterator_builds: 0,
+            attempt_count: 0,
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+thread_local! {
+    static DEPOLARIZE2_SAMPLING_TELEMETRY: RefCell<Depolarize2SamplingTelemetry> =
+        const { RefCell::new(Depolarize2SamplingTelemetry {
+            sampling_path: "none",
+            iterator_builds: 0,
+            attempt_count: 0,
+        }) };
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn reset_depolarize2_sampling_telemetry() {
+    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| {
+        *telemetry.borrow_mut() = Depolarize2SamplingTelemetry::default();
+    });
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn depolarize2_sampling_telemetry() -> Depolarize2SamplingTelemetry {
+    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| *telemetry.borrow())
+}
+
+#[cfg(debug_assertions)]
+fn record_depolarize2_sampling(
+    sampling_path: &'static str,
+    iterator_builds: usize,
+    attempt_count: usize,
+) {
+    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| {
+        *telemetry.borrow_mut() = Depolarize2SamplingTelemetry {
+            sampling_path,
+            iterator_builds,
+            attempt_count,
+        };
+    });
+}
 
 pub struct FrameSimulator {
     pub num_qubits: usize,
@@ -1024,9 +1086,54 @@ impl FrameSimulator {
         wpr: usize,
         rng: &mut impl Rng,
     ) {
-        if p <= 0.0 {
+        if p <= 0.0 || pairs.is_empty() || self.batch_size == 0 {
+            #[cfg(debug_assertions)]
+            record_depolarize2_sampling("empty", 0, pairs.len().saturating_mul(self.batch_size));
             return;
         }
+
+        let attempt_count = pairs.len() * self.batch_size;
+        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
+            self.exec_depolarize2_pairs_sparse_instruction_wide(pairs, p, attempt_count, rng);
+        } else {
+            self.exec_depolarize2_pairs_dense(pairs, p, wpr, rng);
+        }
+    }
+
+    fn exec_depolarize2_pairs_sparse_instruction_wide(
+        &mut self,
+        pairs: &[(usize, usize)],
+        p: f64,
+        attempt_count: usize,
+        rng: &mut impl Rng,
+    ) {
+        #[cfg(debug_assertions)]
+        record_depolarize2_sampling("sparse", 1, attempt_count);
+
+        let mut events = RareErrorIndexSampler::new(p, attempt_count);
+        while let Some(event_index) = events.next_index(rng) {
+            let (pair_index, shot_index) = decode_depolarize2_event(event_index, self.batch_size);
+            let (qa, qb) = pairs[pair_index];
+            let branch = sample_depolarize2_branch_index(rng);
+            let (pa, pb) = two_qubit_pauli(branch);
+            let word = shot_index / 64;
+            let bit = (shot_index % 64) as u32;
+            let mask = 1u64 << bit;
+            apply_pauli_mask_to_tables(pa, &mut self.x_table, &mut self.z_table, qa, word, mask);
+            apply_pauli_mask_to_tables(pb, &mut self.x_table, &mut self.z_table, qb, word, mask);
+        }
+    }
+
+    fn exec_depolarize2_pairs_dense(
+        &mut self,
+        pairs: &[(usize, usize)],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) {
+        #[cfg(debug_assertions)]
+        record_depolarize2_sampling("dense", 0, pairs.len() * self.batch_size);
+
         for &(qa, qb) in pairs {
             {
                 let scratch = &mut self.depolarize_scratch;
@@ -1036,8 +1143,8 @@ impl FrameSimulator {
                     let mut bits = scratch.events[w];
                     while bits != 0 {
                         let bit = bits.trailing_zeros();
-                        let r = rng.gen_range(0u8..15);
-                        let (pa, pb) = two_qubit_pauli(r);
+                        let branch = sample_depolarize2_branch_index(rng);
+                        let (pa, pb) = two_qubit_pauli(branch);
                         apply_pauli_bits(pa, &mut scratch.x_a, &mut scratch.z_a, w, bit);
                         apply_pauli_bits(pb, &mut scratch.x_b, &mut scratch.z_b, w, bit);
                         bits &= bits - 1;
@@ -1296,6 +1403,56 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 const SPARSE_BERNOULLI_MAX_PROBABILITY: f64 = 0.02;
 
+const DEPOLARIZE2_BRANCHES: [(u8, u8); 15] = [
+    (0, 1),
+    (0, 2),
+    (0, 3),
+    (1, 0),
+    (1, 1),
+    (1, 2),
+    (1, 3),
+    (2, 0),
+    (2, 1),
+    (2, 2),
+    (2, 3),
+    (3, 0),
+    (3, 1),
+    (3, 2),
+    (3, 3),
+];
+
+#[cfg(debug_assertions)]
+const DEPOLARIZE2_BRANCH_LABELS: [&str; 15] = [
+    "IX", "IY", "IZ", "XI", "XX", "XY", "XZ", "YI", "YX", "YY", "YZ", "ZI", "ZX", "ZY", "ZZ",
+];
+
+fn sample_depolarize2_branch_index(rng: &mut impl Rng) -> usize {
+    rng.gen_range(0..DEPOLARIZE2_BRANCHES.len())
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn sample_depolarize2_branch_index_for_test(rng: &mut impl Rng) -> usize {
+    sample_depolarize2_branch_index(rng)
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn depolarize2_branch_label_for_test(branch_index: usize) -> Option<&'static str> {
+    DEPOLARIZE2_BRANCH_LABELS.get(branch_index).copied()
+}
+
+fn decode_depolarize2_event(event_index: usize, shots: usize) -> (usize, usize) {
+    debug_assert!(shots > 0);
+    (event_index / shots, event_index % shots)
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn depolarize2_decode_event_for_test(event_index: usize, shots: usize) -> (usize, usize) {
+    decode_depolarize2_event(event_index, shots)
+}
+
 fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
     random_bits_with_prob_into(&mut result, valid_bits, p, rng);
@@ -1456,20 +1613,8 @@ fn apply_pauli_noise_to_targets(
     }
 }
 
-fn two_qubit_pauli(r: u8) -> (u8, u8) {
-    let mut idx = 0u8;
-    for a in 0..4u8 {
-        for b in 0..4u8 {
-            if a == 0 && b == 0 {
-                continue;
-            }
-            if idx == r {
-                return (a, b);
-            }
-            idx += 1;
-        }
-    }
-    (0, 0)
+fn two_qubit_pauli(branch: usize) -> (u8, u8) {
+    DEPOLARIZE2_BRANCHES.get(branch).copied().unwrap_or((0, 0))
 }
 
 fn apply_pauli_bits(p: u8, xf: &mut [u64], zf: &mut [u64], w: usize, bit: u32) {
@@ -1480,6 +1625,25 @@ fn apply_pauli_bits(p: u8, xf: &mut [u64], zf: &mut [u64], w: usize, bit: u32) {
             zf[w] |= 1u64 << bit;
         }
         3 => zf[w] |= 1u64 << bit,
+        _ => {}
+    }
+}
+
+fn apply_pauli_mask_to_tables(
+    p: u8,
+    x_table: &mut BitTable,
+    z_table: &mut BitTable,
+    q: usize,
+    word: usize,
+    mask: u64,
+) {
+    match p {
+        1 => x_table.row_words_mut(q)[word] ^= mask,
+        2 => {
+            x_table.row_words_mut(q)[word] ^= mask;
+            z_table.row_words_mut(q)[word] ^= mask;
+        }
+        3 => z_table.row_words_mut(q)[word] ^= mask,
         _ => {}
     }
 }
