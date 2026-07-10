@@ -50,23 +50,14 @@ enum RareErrorMode {
     Sparse { log_one_minus_p: f64 },
 }
 
-pub struct RareErrorIterator<'a, R: RngCore + ?Sized> {
-    rng: &'a mut R,
+pub(crate) struct RareErrorIndexSampler {
     attempt_count: usize,
     next_candidate: usize,
     mode: RareErrorMode,
 }
 
-pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
-    probability: f64,
-    attempt_count: usize,
-    rng: &'a mut R,
-) -> RareErrorIterator<'a, R> {
-    RareErrorIterator::new(probability, attempt_count, rng)
-}
-
-impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
-    pub fn new(probability: f64, attempt_count: usize, rng: &'a mut R) -> Self {
+impl RareErrorIndexSampler {
+    pub(crate) fn new(probability: f64, attempt_count: usize) -> Self {
         #[cfg(debug_assertions)]
         record_iterator_build();
 
@@ -81,34 +72,13 @@ impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
         };
 
         Self {
-            rng,
             attempt_count,
             next_candidate: 0,
             mode,
         }
     }
 
-    pub(crate) fn rng_mut(&mut self) -> &mut R {
-        self.rng
-    }
-
-    fn draw_open_unit_f64(&mut self) -> f64 {
-        loop {
-            #[cfg(debug_assertions)]
-            record_rng_core_draw();
-            let raw = self.rng.next_u64();
-            let value = ((raw >> 11) as f64) * F64_UNIT_INTERVAL_SCALE;
-            if value > 0.0 {
-                return value;
-            }
-        }
-    }
-}
-
-impl<R: RngCore + ?Sized> Iterator for RareErrorIterator<'_, R> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    pub(crate) fn next_index<R: RngCore + ?Sized>(&mut self, rng: &mut R) -> Option<usize> {
         match self.mode {
             RareErrorMode::Empty => None,
             RareErrorMode::Dense => {
@@ -121,7 +91,7 @@ impl<R: RngCore + ?Sized> Iterator for RareErrorIterator<'_, R> {
             }
             RareErrorMode::Sparse { log_one_minus_p } => {
                 while self.next_candidate < self.attempt_count {
-                    let uniform = self.draw_open_unit_f64();
+                    let uniform = draw_open_unit_f64(rng);
                     let skip = (uniform.ln() / log_one_minus_p).floor();
                     let skip = if skip.is_finite() && skip >= 0.0 {
                         skip as usize
@@ -138,6 +108,48 @@ impl<R: RngCore + ?Sized> Iterator for RareErrorIterator<'_, R> {
                 }
                 None
             }
+        }
+    }
+}
+
+pub struct RareErrorIterator<'a, R: RngCore + ?Sized> {
+    rng: &'a mut R,
+    sampler: RareErrorIndexSampler,
+}
+
+pub fn rare_error_indices<'a, R: RngCore + ?Sized>(
+    probability: f64,
+    attempt_count: usize,
+    rng: &'a mut R,
+) -> RareErrorIterator<'a, R> {
+    RareErrorIterator::new(probability, attempt_count, rng)
+}
+
+impl<'a, R: RngCore + ?Sized> RareErrorIterator<'a, R> {
+    pub fn new(probability: f64, attempt_count: usize, rng: &'a mut R) -> Self {
+        Self {
+            rng,
+            sampler: RareErrorIndexSampler::new(probability, attempt_count),
+        }
+    }
+}
+
+impl<R: RngCore + ?Sized> Iterator for RareErrorIterator<'_, R> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.sampler.next_index(self.rng)
+    }
+}
+
+fn draw_open_unit_f64<R: RngCore + ?Sized>(rng: &mut R) -> f64 {
+    loop {
+        #[cfg(debug_assertions)]
+        record_rng_core_draw();
+        let raw = rng.next_u64();
+        let value = ((raw >> 11) as f64) * F64_UNIT_INTERVAL_SCALE;
+        if value > 0.0 {
+            return value;
         }
     }
 }
