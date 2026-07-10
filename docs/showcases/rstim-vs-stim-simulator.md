@@ -125,31 +125,19 @@ is evidence for those cases, commands, seeds, and recorded tool versions only.
 The following observations are scoped to the checked release-profile runs,
 their single measured round, and their recorded environments:
 
-- For `stim-style-surface-sample-d11-r100-b1024`, the recorded
-  `rstim-compiled` wall time is higher than the recorded `stim-cli` wall time.
-  See the [summary](benchmarks/rstim_vs_stim_simulator/results/release/summary.json),
-  [report](benchmarks/rstim_vs_stim_simulator/results/release/report.md), and
-  [environment](benchmarks/rstim_vs_stim_simulator/results/release/environment.json).
-- For `rep-sample-d13-r13`, the recorded `rstim-compiled` wall time is lower
-  than the recorded `stim-cli` wall time. See the
-  [summary](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json),
-  [report](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md),
-  and
-  [environment](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/environment.json).
-- For `surface-detect-d13-r13`, the recorded `rstim-compiled` wall time is
-  lower than the recorded `stim-cli` wall time. See the
-  [summary](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json),
-  [report](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
-  and
-  [environment](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/environment.json).
-- For `stim-style-surface-dem-sample-d11-r100-b1024`, the recorded
-  `rstim-sample-dem` wall time is higher than the recorded `stim-sample-dem`
-  wall time. See the
-  [raw timing records](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/raw.jsonl),
-  [summary](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json),
-  [report](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md),
-  and
-  [environment](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/environment.json).
+| Case | Workload | `rstim` variant | `rstim` median wall time | Stim variant | Stim median wall time | Throughput | Case-scoped result |
+|---|---:|---|---:|---|---:|---:|---|
+| [`stim-style-surface-sample-d11-r100-b1024`](benchmarks/rstim_vs_stim_simulator/results/release/summary.json) | sample | `rstim-compiled` | 586.794 ms | `stim-cli` | 182.963 ms | 1,745 vs 5,597 shots/s | `rstim` recorded 3.21x slower |
+| [`rep-sample-d13-r13`](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json) | sample | `rstim-compiled` | 1.738 ms | `stim-cli` | 86.111 ms | 11.51M vs 232k shots/s | `rstim` recorded 49.6x faster |
+| [`surface-detect-d13-r13`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json) | detect | `rstim-compiled` | 34.339 ms | `stim-cli` | 266.172 ms | n/a | `rstim` recorded 7.75x faster |
+| [`stim-style-surface-dem-sample-d11-r100-b1024`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json) | sample_dem | `rstim-sample-dem` | 3,112.766 ms | `stim-sample-dem` | 383.724 ms | 329 vs 2,669 shots/s | `rstim` recorded 8.11x slower |
+
+Companion reports and environments are checked at
+[`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),
+[`results/release-repetition-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md),
+[`results/release-surface-detect/`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
+and
+[`results/release-dem-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md).
 
 These relationships describe only the named cases under the captured release
 profiles and environments. They are not timing thresholds or cross-machine
