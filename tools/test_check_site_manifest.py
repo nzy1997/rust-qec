@@ -874,6 +874,32 @@ class SiteManifestTest(unittest.TestCase):
         self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").exists())
         self.assertFalse((site_root / "benchmarks/surface_decoder_compare/results/full/unchecked.csv").exists())
 
+    def test_cli_accepts_source_manifest_with_built_site_root(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest()
+        site_root = repo / "_site"
+        self.assertEqual(
+            copy_site_benchmark_data.copy_benchmark_site_data(repo, manifest_path, site_root),
+            [],
+        )
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(Path(check_site_manifest.__file__).resolve()),
+                "--repo-root",
+                ".",
+                "--site-root",
+                "_site",
+                "site/benchmark-site.json",
+            ],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_accepts_built_site_manifest_when_site_root_is_wired(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         (repo / "_site/index.html").write_text(

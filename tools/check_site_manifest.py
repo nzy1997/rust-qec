@@ -1225,7 +1225,7 @@ def main() -> int:
 
     errors = validate_manifest(args.repo_root, args.manifest, site_root=args.site_root)
     if args.site_root is not None:
-        errors.extend(validate_site_root(args.site_root, args.manifest))
+        errors.extend(validate_site_root(args.site_root, args.site_root / "data/benchmark-site.json"))
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
