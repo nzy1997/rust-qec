@@ -1108,9 +1108,22 @@ impl FrameSimulator {
         rng: &mut impl Rng,
     ) {
         #[cfg(debug_assertions)]
-        record_depolarize2_sampling("sparse", 1, attempt_count);
+        let iterator_builds_before =
+            crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
 
         let mut events = RareErrorIndexSampler::new(p, attempt_count);
+
+        #[cfg(debug_assertions)]
+        {
+            let iterator_builds_after =
+                crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
+            record_depolarize2_sampling(
+                "sparse",
+                iterator_builds_after.saturating_sub(iterator_builds_before),
+                attempt_count,
+            );
+        }
+
         while let Some(event_index) = events.next_index(rng) {
             let (pair_index, shot_index) = decode_depolarize2_event(event_index, self.batch_size);
             let (qa, qb) = pairs[pair_index];
@@ -1614,7 +1627,10 @@ fn apply_pauli_noise_to_targets(
 }
 
 fn two_qubit_pauli(branch: usize) -> (u8, u8) {
-    DEPOLARIZE2_BRANCHES.get(branch).copied().unwrap_or((0, 0))
+    DEPOLARIZE2_BRANCHES
+        .get(branch)
+        .copied()
+        .expect("DEPOLARIZE2 branch index must be in 0..15")
 }
 
 fn apply_pauli_bits(p: u8, xf: &mut [u64], zf: &mut [u64], w: usize, bit: u32) {
