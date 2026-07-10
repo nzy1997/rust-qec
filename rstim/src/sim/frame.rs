@@ -1,12 +1,38 @@
 use rand::Rng;
 #[cfg(debug_assertions)]
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::compiled::{CompiledBasis, CompiledBlock, CompiledOp};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
+#[cfg(debug_assertions)]
+use crate::rare_error_iterator::rare_error_telemetry;
 use crate::rare_error_iterator::RareErrorIndexSampler;
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
+
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OneQubitNoiseSamplingPath {
+    None,
+    Sparse,
+    Dense,
+}
+
+#[cfg(debug_assertions)]
+impl Default for OneQubitNoiseSamplingPath {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OneQubitNoiseInstructionTelemetry {
+    pub sampling_path: OneQubitNoiseSamplingPath,
+    pub iterator_builds: usize,
+    pub attempt_count: usize,
+}
 
 #[cfg(debug_assertions)]
 #[doc(hidden)]
@@ -30,12 +56,45 @@ impl Default for Depolarize2SamplingTelemetry {
 
 #[cfg(debug_assertions)]
 thread_local! {
+    static ONE_QUBIT_NOISE_SAMPLING_PATH: Cell<OneQubitNoiseSamplingPath> =
+        const { Cell::new(OneQubitNoiseSamplingPath::None) };
+    static ONE_QUBIT_NOISE_ITERATOR_BUILDS: Cell<usize> = const { Cell::new(0) };
+    static ONE_QUBIT_NOISE_ATTEMPT_COUNT: Cell<usize> = const { Cell::new(0) };
     static DEPOLARIZE2_SAMPLING_TELEMETRY: RefCell<Depolarize2SamplingTelemetry> =
         const { RefCell::new(Depolarize2SamplingTelemetry {
             sampling_path: "none",
             iterator_builds: 0,
             attempt_count: 0,
         }) };
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn reset_one_qubit_noise_instruction_telemetry() {
+    ONE_QUBIT_NOISE_SAMPLING_PATH.with(|path| path.set(OneQubitNoiseSamplingPath::None));
+    ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(|builds| builds.set(0));
+    ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(|attempts| attempts.set(0));
+}
+
+#[cfg(debug_assertions)]
+#[doc(hidden)]
+pub fn one_qubit_noise_instruction_telemetry() -> OneQubitNoiseInstructionTelemetry {
+    OneQubitNoiseInstructionTelemetry {
+        sampling_path: ONE_QUBIT_NOISE_SAMPLING_PATH.with(Cell::get),
+        iterator_builds: ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(Cell::get),
+        attempt_count: ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(Cell::get),
+    }
+}
+
+#[cfg(debug_assertions)]
+fn record_one_qubit_noise_instruction(
+    sampling_path: OneQubitNoiseSamplingPath,
+    iterator_builds: usize,
+    attempt_count: usize,
+) {
+    ONE_QUBIT_NOISE_SAMPLING_PATH.with(|path| path.set(sampling_path));
+    ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(|builds| builds.set(iterator_builds));
+    ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(|attempts| attempts.set(attempt_count));
 }
 
 #[cfg(debug_assertions)]
@@ -408,13 +467,8 @@ impl FrameSimulator {
             // --- Noise channels ---
             "X_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
-                    let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= noise[w];
-                    }
-                }
+                let qubits = qubits(targets)?;
+                self.exec_x_error_qubits(&qubits, p, wpr, rng)?;
             }
             "Z_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
@@ -442,7 +496,7 @@ impl FrameSimulator {
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                // random_bits_with_prob_into reuses depolarize scratch instead of allocating per target.
+                // The dense path reuses depolarize scratch instead of allocating per target.
                 self.exec_depolarize1(targets, p, wpr, rng)?;
             }
             "DEPOLARIZE2" => {
@@ -782,19 +836,13 @@ impl FrameSimulator {
                 probability,
                 qubits,
             } => {
-                for &q in qubits {
-                    let noise = random_bits_with_prob(wpr, self.batch_size, *probability, rng);
-                    let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= noise[w];
-                    }
-                }
+                self.exec_x_error_qubits(qubits, *probability, wpr, rng)?;
             }
             CompiledOp::Depolarize1 {
                 probability,
                 qubits,
             } => {
-                self.exec_depolarize1_qubits(qubits, *probability, wpr, rng);
+                self.exec_depolarize1_qubits(qubits, *probability, wpr, rng)?;
             }
             CompiledOp::Cx { pairs } => {
                 for &(control, target) in pairs {
@@ -1020,8 +1068,7 @@ impl FrameSimulator {
         rng: &mut impl Rng,
     ) -> Result<(), String> {
         let qubits = qubits(targets)?;
-        self.exec_depolarize1_qubits(&qubits, p, wpr, rng);
-        Ok(())
+        self.exec_depolarize1_qubits(&qubits, p, wpr, rng)
     }
 
     fn exec_depolarize2(
@@ -1042,7 +1089,93 @@ impl FrameSimulator {
         p: f64,
         wpr: usize,
         rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        let attempt_count = instruction_wide_attempt_count(qubits.len(), self.batch_size)?;
+        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
+            self.exec_depolarize1_qubits_sparse(qubits, p, attempt_count, rng);
+        } else {
+            self.exec_depolarize1_qubits_dense(qubits, p, wpr, rng);
+        }
+        Ok(())
+    }
+
+    fn exec_x_error_qubits(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        let attempt_count = instruction_wide_attempt_count(qubits.len(), self.batch_size)?;
+        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
+            self.exec_x_error_qubits_sparse(qubits, p, attempt_count, rng);
+        } else {
+            self.exec_x_error_qubits_dense(qubits, p, wpr, rng);
+        }
+        Ok(())
+    }
+
+    fn exec_x_error_qubits_dense(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
     ) {
+        #[cfg(debug_assertions)]
+        let attempt_count = qubits.len().saturating_mul(self.batch_size);
+        #[cfg(debug_assertions)]
+        record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
+        for &q in qubits {
+            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+            let x = self.x_table.row_words_mut(q);
+            for w in 0..wpr {
+                x[w] ^= noise[w];
+            }
+        }
+    }
+
+    fn exec_x_error_qubits_sparse(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        attempt_count: usize,
+        rng: &mut impl Rng,
+    ) {
+        #[cfg(debug_assertions)]
+        let builds_before = rare_error_telemetry().iterator_builds;
+        let mut events = RareErrorIndexSampler::new(p, attempt_count);
+        while let Some(event_index) = events.next_index(rng) {
+            let Some((target_index, shot_index)) =
+                decode_instruction_wide_event_index(event_index, self.batch_size)
+            else {
+                continue;
+            };
+            let q = qubits[target_index];
+            toggle_row_bit(self.x_table.row_words_mut(q), shot_index);
+        }
+        #[cfg(debug_assertions)]
+        {
+            let builds_after = rare_error_telemetry().iterator_builds;
+            record_one_qubit_noise_instruction(
+                OneQubitNoiseSamplingPath::Sparse,
+                builds_after.saturating_sub(builds_before),
+                attempt_count,
+            );
+        }
+    }
+
+    fn exec_depolarize1_qubits_dense(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        wpr: usize,
+        rng: &mut impl Rng,
+    ) {
+        #[cfg(debug_assertions)]
+        let attempt_count = qubits.len().saturating_mul(self.batch_size);
+        #[cfg(debug_assertions)]
+        record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
         if p <= 0.0 {
             return;
         }
@@ -1076,6 +1209,43 @@ impl FrameSimulator {
             for w in 0..wpr {
                 z[w] ^= scratch.z_a[w];
             }
+        }
+    }
+
+    fn exec_depolarize1_qubits_sparse(
+        &mut self,
+        qubits: &[usize],
+        p: f64,
+        attempt_count: usize,
+        rng: &mut impl Rng,
+    ) {
+        #[cfg(debug_assertions)]
+        let builds_before = rare_error_telemetry().iterator_builds;
+        let mut events = RareErrorIndexSampler::new(p, attempt_count);
+        while let Some(event_index) = events.next_index(rng) {
+            let Some((target_index, shot_index)) =
+                decode_instruction_wide_event_index(event_index, self.batch_size)
+            else {
+                continue;
+            };
+            let q = qubits[target_index];
+            match rng.gen_range(0u8..3) {
+                0 => toggle_row_bit(self.x_table.row_words_mut(q), shot_index),
+                1 => {
+                    toggle_row_bit(self.x_table.row_words_mut(q), shot_index);
+                    toggle_row_bit(self.z_table.row_words_mut(q), shot_index);
+                }
+                _ => toggle_row_bit(self.z_table.row_words_mut(q), shot_index),
+            }
+        }
+        #[cfg(debug_assertions)]
+        {
+            let builds_after = rare_error_telemetry().iterator_builds;
+            record_one_qubit_noise_instruction(
+                OneQubitNoiseSamplingPath::Sparse,
+                builds_after.saturating_sub(builds_before),
+                attempt_count,
+            );
         }
     }
 
@@ -1415,6 +1585,29 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 // --- Noise helpers ---
 
 const SPARSE_BERNOULLI_MAX_PROBABILITY: f64 = 0.02;
+
+#[doc(hidden)]
+pub fn decode_instruction_wide_event_index(
+    event_index: usize,
+    shots: usize,
+) -> Option<(usize, usize)> {
+    if shots == 0 {
+        return None;
+    }
+    Some((event_index / shots, event_index % shots))
+}
+
+fn instruction_wide_attempt_count(target_count: usize, shots: usize) -> Result<usize, String> {
+    target_count
+        .checked_mul(shots)
+        .ok_or_else(|| "instruction-wide noise attempt count overflowed usize".to_string())
+}
+
+fn toggle_row_bit(row: &mut [u64], shot_index: usize) {
+    let word = shot_index / 64;
+    let bit = shot_index % 64;
+    row[word] ^= 1u64 << bit;
+}
 
 const DEPOLARIZE2_BRANCHES: [(u8, u8); 15] = [
     (0, 1),
