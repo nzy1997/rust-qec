@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import tools.check_site_manifest as check_site_manifest
 import tools.copy_site_benchmark_data as copy_site_benchmark_data
@@ -18,6 +20,36 @@ SURFACE_IMAGE_SHA256 = "33d8344a7135c42aa3876706b908f95b702d83ff53e05e4aaff17c07
 RSTIM_SPEED_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
 RSTIM_SPEED_REPORT_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md"
 RSTIM_CORRECTNESS_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+RSTIM_DISTRIBUTIONS_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json"
+RSTIM_DISTRIBUTIONS_EXPANDED_CORRECTNESS_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json"
+)
+RSTIM_DISTRIBUTIONS_REPORT_PATH = "benchmarks/rstim_vs_stim_simulator/results/distributions/report.md"
+RSTIM_RELEASE_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release/summary.json"
+RSTIM_RELEASE_REPORT_PATH = "benchmarks/rstim_vs_stim_simulator/results/release/report.md"
+RSTIM_RELEASE_ENVIRONMENT_PATH = "benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+RSTIM_REPETITION_SUMMARY_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json"
+)
+RSTIM_REPETITION_REPORT_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md"
+)
+RSTIM_REPETITION_ENVIRONMENT_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/environment.json"
+)
+RSTIM_SURFACE_DETECT_SUMMARY_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json"
+)
+RSTIM_SURFACE_DETECT_REPORT_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md"
+)
+RSTIM_SURFACE_DETECT_ENVIRONMENT_PATH = (
+    "benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/environment.json"
+)
+RSTIM_DEM_RAW_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/raw.jsonl"
+RSTIM_DEM_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json"
+RSTIM_DEM_REPORT_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md"
+RSTIM_DEM_ENVIRONMENT_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/environment.json"
 RSTIM_CASES_FULL_PATH = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
 RSTIM_CANONICAL_STIM_PATH = (
     "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
@@ -29,6 +61,31 @@ RSTIM_CORRECTNESS_SUMMARY_SHA256 = "423b0a945a73ecb5ab748c7c796af9328a4639bf6921
 RSTIM_CASES_FULL_SHA256 = "f86f77dff5135b7273d64aa8fd01a8d55901e2222a175ae97922db423cabccd6"
 RSTIM_CANONICAL_STIM_SHA256 = "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"
 RSTIM_SHOWCASE_SHA256 = "382c8ba936ac311bfbf2b2d3da55618cd551f2840a4f284f12980986f992a72b"
+RSTIM_EXPANDED_FIXTURE_CONTENT = '{"status":"pass"}\n'
+
+
+def fixture_sha256(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+RSTIM_EXPANDED_FIXTURE_ARTIFACTS = {
+    RSTIM_DISTRIBUTIONS_SUMMARY_PATH: "correctness-summary",
+    RSTIM_DISTRIBUTIONS_EXPANDED_CORRECTNESS_PATH: "correctness-summary",
+    RSTIM_DISTRIBUTIONS_REPORT_PATH: "correctness-report",
+    RSTIM_RELEASE_SUMMARY_PATH: "speed-summary",
+    RSTIM_RELEASE_REPORT_PATH: "speed-report",
+    RSTIM_RELEASE_ENVIRONMENT_PATH: "environment",
+    RSTIM_REPETITION_SUMMARY_PATH: "speed-summary",
+    RSTIM_REPETITION_REPORT_PATH: "speed-report",
+    RSTIM_REPETITION_ENVIRONMENT_PATH: "environment",
+    RSTIM_SURFACE_DETECT_SUMMARY_PATH: "speed-summary",
+    RSTIM_SURFACE_DETECT_REPORT_PATH: "speed-report",
+    RSTIM_SURFACE_DETECT_ENVIRONMENT_PATH: "environment",
+    RSTIM_DEM_RAW_PATH: "speed-raw",
+    RSTIM_DEM_SUMMARY_PATH: "speed-summary",
+    RSTIM_DEM_REPORT_PATH: "speed-report",
+    RSTIM_DEM_ENVIRONMENT_PATH: "environment",
+}
 
 SURFACE_FIXTURE_ARTIFACT_HASHES = {
     SURFACE_RESULTS_PATH: {"sha256": SURFACE_RESULTS_SHA256},
@@ -42,6 +99,10 @@ RSTIM_FIXTURE_ARTIFACT_HASHES = {
     RSTIM_CASES_FULL_PATH: {"sha256": RSTIM_CASES_FULL_SHA256},
     RSTIM_CANONICAL_STIM_PATH: {"sha256": RSTIM_CANONICAL_STIM_SHA256},
     RSTIM_SHOWCASE_PATH: {"sha256": RSTIM_SHOWCASE_SHA256},
+    **{
+        artifact_path: {"sha256": fixture_sha256(RSTIM_EXPANDED_FIXTURE_CONTENT)}
+        for artifact_path in RSTIM_EXPANDED_FIXTURE_ARTIFACTS
+    },
 }
 RSTIM_REQUIRED_PROVENANCE_REQUIREMENTS = [
     "OS",
@@ -199,6 +260,10 @@ VALID_MANIFEST = {
                         {"path": RSTIM_CASES_FULL_PATH, "kind": "fixture-manifest", "checked": True},
                         {"path": RSTIM_CANONICAL_STIM_PATH, "kind": "stim-fixture", "checked": True},
                         {"path": RSTIM_SHOWCASE_PATH, "kind": "showcase", "checked": True},
+                        *[
+                            {"path": artifact_path, "kind": artifact_kind, "checked": True}
+                            for artifact_path, artifact_kind in RSTIM_EXPANDED_FIXTURE_ARTIFACTS.items()
+                        ],
                     ],
                     "commands": [
                         "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
@@ -271,6 +336,10 @@ class SiteManifestTest(unittest.TestCase):
         (root / RSTIM_CORRECTNESS_SUMMARY_PATH).write_text('{"status":"PASS"}\n', encoding="utf-8")
         (root / RSTIM_CASES_FULL_PATH).write_text("[[cases]]\nid = 'd11'\n", encoding="utf-8")
         (root / RSTIM_CANONICAL_STIM_PATH).write_text("M 0\n", encoding="utf-8")
+        for artifact_path in RSTIM_EXPANDED_FIXTURE_ARTIFACTS:
+            path = root / artifact_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(RSTIM_EXPANDED_FIXTURE_CONTENT, encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "_site/index.html").write_text(
             '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
@@ -428,6 +497,7 @@ class SiteManifestTest(unittest.TestCase):
                 RSTIM_CORRECTNESS_SUMMARY_PATH,
                 RSTIM_CASES_FULL_PATH,
                 RSTIM_CANONICAL_STIM_PATH,
+                *RSTIM_EXPANDED_FIXTURE_ARTIFACTS,
                 ".github/workflows/ci.yml",
                 "site/benchmark-site.json",
             ],
@@ -449,6 +519,19 @@ class SiteManifestTest(unittest.TestCase):
         repo, manifest_path, _ = self.write_fixture_manifest()
         errors = check_site_manifest.validate_manifest(repo, manifest_path)
         self.assertEqual(errors, [])
+
+    def test_rejects_checked_rstim_artifact_when_allow_policy_is_stale(self) -> None:
+        repo, manifest_path, _ = self.write_fixture_manifest()
+        allowed = dict(check_site_manifest.RSTIM_VS_STIM_REQUIRED_ARTIFACTS)
+        del allowed[RSTIM_DEM_SUMMARY_PATH]
+
+        with mock.patch.object(check_site_manifest, "RSTIM_VS_STIM_REQUIRED_ARTIFACTS", allowed):
+            errors = check_site_manifest.validate_manifest(repo, manifest_path)
+
+        self.assertTrue(
+            any(RSTIM_DEM_SUMMARY_PATH in error and "not accepted" in error for error in errors),
+            errors,
+        )
 
     def test_rejects_broad_rstim_vs_stim_claims(self) -> None:
         for phrase in ("rstim is faster than Stim", "rstim beats Stim", "full Stim parity"):
@@ -855,7 +938,7 @@ class SiteManifestTest(unittest.TestCase):
     def test_rejects_built_site_rstim_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         index = repo / "_site/index.html"
-        missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/full/not-in-manifest.json"
+        missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
         index.write_text(
             index.read_text(encoding="utf-8") + f'<a href="{missing_artifact}">bad</a>\n',
             encoding="utf-8",
