@@ -115,12 +115,20 @@ impl PackedCanonicalRows {
         assert_ne!(src, dst, "cannot multiply a canonical row into itself");
         let src_start = self.row_start(src);
         let dst_start = self.row_start(dst);
-        let src_exponent = self.row_exponent_mod4(src);
-        let dst_exponent = self.row_exponent_mod4(dst);
-        let anticommutes = z_dot_x_parity(
+        let forward_phase = words_dot_count_mod4(
+            &self.x_plane[dst_start..dst_start + self.words_per_row],
+            &self.z_plane[src_start..src_start + self.words_per_row],
+        );
+        let reverse_phase = words_dot_count_mod4(
             &self.z_plane[dst_start..dst_start + self.words_per_row],
             &self.x_plane[src_start..src_start + self.words_per_row],
         );
+        let exponent = (2 * u8::from(self.sign_bit(dst))
+            + 2 * u8::from(self.sign_bit(src))
+            + forward_phase
+            + 4
+            - reverse_phase)
+            % 4;
 
         for offset in 0..self.words_per_row {
             let src_x = self.x_plane[src_start + offset];
@@ -129,13 +137,11 @@ impl PackedCanonicalRows {
             self.z_plane[dst_start + offset] ^= src_z;
         }
 
-        let exponent = (dst_exponent + src_exponent + 2 * u8::from(anticommutes)) % 4;
-        let negative = sign_from_words(
-            &self.x_plane[dst_start..dst_start + self.words_per_row],
-            &self.z_plane[dst_start..dst_start + self.words_per_row],
-            exponent,
+        assert!(
+            exponent == 0 || exponent == 2,
+            "packed canonical rows must remain Hermitian",
         );
-        self.set_sign_bit(dst, negative);
+        self.set_sign_bit(dst, exponent == 2);
     }
 
     fn multiply_row_into_acc(
@@ -446,12 +452,12 @@ impl PackedInverseTableau {
         }
 
         let raw = if let Some(p) = pivot {
+            let destabilizer = p - self.num_qubits;
             for row in 0..self.num_rows() {
-                if row != p && rows.x(row, q) {
+                if row != p && row != destabilizer && rows.x(row, q) {
                     rows.multiply_row_into(p, row);
                 }
             }
-            let destabilizer = p - self.num_qubits;
             rows.copy_row(p, destabilizer);
             rows.set_basis_row(p);
             false
@@ -477,6 +483,71 @@ impl PackedInverseTableau {
             self.replace_from_canonical_rows(&rows);
         }
         raw
+    }
+
+    pub fn measure_z_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.measure_z_raw_biased(q) ^ inverted
+    }
+
+    pub fn measure_x_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.h(q);
+        let bit = self.measure_z_biased(q, inverted);
+        self.h(q);
+        bit
+    }
+
+    pub fn measure_y_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.s_dag(q);
+        self.h(q);
+        let bit = self.measure_z_biased(q, inverted);
+        self.h(q);
+        self.s(q);
+        bit
+    }
+
+    pub fn measure_reset_z_biased(&mut self, q: usize, inverted: bool) -> bool {
+        let raw = self.measure_z_raw_biased(q);
+        if raw {
+            self.x_gate(q);
+        }
+        raw ^ inverted
+    }
+
+    pub fn measure_reset_x_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.h(q);
+        let bit = self.measure_reset_z_biased(q, inverted);
+        self.h(q);
+        bit
+    }
+
+    pub fn measure_reset_y_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.s_dag(q);
+        self.h(q);
+        let bit = self.measure_reset_z_biased(q, inverted);
+        self.h(q);
+        self.s(q);
+        bit
+    }
+
+    pub fn reset_z_biased(&mut self, q: usize) {
+        let raw = self.measure_z_raw_biased(q);
+        if raw {
+            self.x_gate(q);
+        }
+    }
+
+    pub fn reset_x_biased(&mut self, q: usize) {
+        self.h(q);
+        self.reset_z_biased(q);
+        self.h(q);
+    }
+
+    pub fn reset_y_biased(&mut self, q: usize) {
+        self.s_dag(q);
+        self.h(q);
+        self.reset_z_biased(q);
+        self.h(q);
+        self.s(q);
     }
 
     pub fn canonical_snapshot(&self) -> CanonicalTableauSnapshot {
@@ -776,6 +847,14 @@ fn z_dot_x_parity(z: &[u64], x: &[u64]) -> bool {
     z.iter().zip(x).fold(0u32, |parity, (z_word, x_word)| {
         parity ^ ((z_word & x_word).count_ones() & 1)
     }) == 1
+}
+
+fn words_dot_count_mod4(left: &[u64], right: &[u64]) -> u8 {
+    left.iter()
+        .zip(right)
+        .fold(0u32, |sum, (left_word, right_word)| {
+            (sum + (left_word & right_word).count_ones()) % 4
+        }) as u8
 }
 
 fn words_y_count_mod4(x: &[u64], z: &[u64]) -> u8 {
