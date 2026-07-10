@@ -238,8 +238,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})
         report = (out_dir / "report.md").read_text(encoding="utf-8")
         self.assertIn("| variant | sample_count | median_elapsed_ns |", report)
-        self.assertIn("| stim | 7 |", report)
-        self.assertIn("| rstim | 7 |", report)
+        for variant in summary["variants"]:
+            self.assertIn(
+                f"| {variant['variant']} | {variant['sample_count']} | {variant['median_elapsed_ns']} |",
+                report,
+            )
         environment = json.loads((out_dir / "environment.json").read_text())
         for key in (
             "git_commit",
@@ -268,14 +271,70 @@ class RunCompiledSteadyTest(unittest.TestCase):
             "known_answer_preflight",
         ):
             self.assertIn(key, environment)
+
+        manifest = run_compiled_steady.fair_cli_contract.load_manifest(MANIFEST)
+        case = run_compiled_steady.fair_cli_contract.find_case(manifest, "stim_surface_d11_r100")
+        fixture = (ROOT / case["canonical_input_path"]).resolve()
+        source_manifest = (ROOT / case["source_manifest_path"]).resolve()
+        stim_worker = Path(temp_dir.name) / "stim_worker.py"
+        rstim_worker = Path(temp_dir.name) / "rstim_worker.py"
+        expected_worker_argv = {
+            "stim": [sys.executable, str(stim_worker), "--input", str(fixture), "--seed", "0"],
+            "rstim": [sys.executable, str(rstim_worker), "--input", str(fixture), "--seed", "0"],
+        }
+        known_answer_sha = hashlib.sha256(b"X 0\nM 0\n").hexdigest()
+
+        self.assertEqual(environment["profile"], "release")
+        self.assertEqual(environment["timer_scope"], case["timer_scope"])
+        self.assertEqual(environment["stim_version"], "1.15.0")
+        self.assertEqual(environment["seed"], 0)
+        self.assertEqual(environment["warmup_rounds"], 2)
+        self.assertEqual(environment["measure_rounds"], 7)
         self.assertEqual(environment["protocol_version"], run_compiled_steady.PROTOCOL_VERSION)
         self.assertEqual(environment["seed_policy"], "seed_once_then_advance_across_9_calls")
+        self.assertEqual(environment["fair_manifest_path"], str(MANIFEST.resolve()))
+        self.assertEqual(environment["fair_manifest_sha256"], hashlib.sha256(MANIFEST.read_bytes()).hexdigest())
+        self.assertEqual(environment["source_manifest_path"], str(source_manifest))
+        self.assertEqual(environment["source_manifest_sha256"], hashlib.sha256(source_manifest.read_bytes()).hexdigest())
+        self.assertEqual(environment["fixture_path"], str(fixture))
+        self.assertEqual(environment["fixture_sha256"], hashlib.sha256(fixture.read_bytes()).hexdigest())
+        self.assertEqual(environment["fixture_sha256"], case["canonical_input_sha256"])
+        self.assertEqual(environment["worker_argv"], expected_worker_argv)
+        self.assertEqual(environment["canonical_worker_argv"], expected_worker_argv)
+        python_executable = Path(environment["python_executable"])
+        self.assertTrue(python_executable.is_file(), python_executable)
+        self.assertEqual(
+            environment["python_executable_sha256"],
+            hashlib.sha256(python_executable.read_bytes()).hexdigest(),
+        )
         extension_path = Path(environment["loaded_stim_extension_path"])
         self.assertNotEqual(extension_path.name, "__init__.py")
         self.assertTrue(
             any(str(extension_path).endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES),
             extension_path,
         )
+        self.assertEqual(
+            environment["loaded_stim_extension_sha256"],
+            hashlib.sha256(extension_path.read_bytes()).hexdigest(),
+        )
+        rstim_binary = Path(environment["rstim_worker_binary_path"])
+        self.assertEqual(rstim_binary, Path(sys.executable).resolve())
+        self.assertEqual(
+            environment["rstim_worker_binary_sha256"],
+            hashlib.sha256(rstim_binary.read_bytes()).hexdigest(),
+        )
+        preflight = environment["known_answer_preflight"]
+        self.assertEqual([record["variant"] for record in preflight], ["stim", "rstim"])
+        self.assertEqual([record["result_hex"] for record in preflight], ["01", "01"])
+        for record in preflight:
+            self.assertEqual(record["ready"]["fixture_sha256"], known_answer_sha)
+            self.assertEqual(record["ready"]["compile_count"], 1)
+            self.assertEqual(record["ready"]["reference_build_count"], 1)
+            self.assertEqual(record["ready"]["sample_call_count"], 0)
+            self.assertEqual(record["ready"]["measurement_count"], 1)
+            self.assertEqual(record["ready"]["bytes_per_shot"], 1)
+            self.assertEqual(record["final"]["fixture_sha256"], known_answer_sha)
+            self.assertEqual(record["final"]["sample_call_count"], 1)
 
     def test_sample_timing_includes_delayed_final_result_byte(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("delay-last-byte")
