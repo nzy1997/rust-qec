@@ -1,7 +1,9 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rstim::CompiledMeasurementSampler;
-use rstim::compiled::SamplingFallbackReason;
+use rstim::compiled::{
+    SamplerPathDecision, SamplingFallbackReason, choose_sampler_path, compile_circuit,
+};
 use rstim::data_path::{
     ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample_with_decision,
     build_reference_sample_with_sweep_bits_and_decision,
@@ -207,6 +209,112 @@ fn assert_all_false(bits: &[bool], label: &str) {
     assert!(
         bits.iter().all(|bit| !*bit),
         "{label}: expected every reference bit to be false"
+    );
+}
+
+#[test]
+fn noiseless_sweep_targets_do_not_force_sweep_fallback() {
+    let instrs = parse_circuit(
+        "X_ERROR(0) sweep[0]\nY_ERROR(0) sweep[1]\nZ_ERROR(0) sweep[2]\nDEPOLARIZE1(0) sweep[3]\nDEPOLARIZE2(0) sweep[4] sweep[5]\nM 0\n",
+    );
+    let compiled = compile_circuit(&instrs).expect("compiled circuit builds");
+    assert_eq!(
+        choose_sampler_path(&compiled),
+        SamplerPathDecision::FastPath
+    );
+
+    let reference = build_reference_sample_with_decision(&instrs)
+        .expect("reference sample skips noiseless sweep-target noise");
+    assert_packed_reference_decision(&reference.decision);
+    assert_eq!(reference.bits, vec![false]);
+}
+
+#[test]
+fn packed_reference_covers_y_and_batched_reset_branches() {
+    let y_reference = build_reference_sample_with_decision(&parse_circuit("Y 0\nM 0\n"))
+        .expect("Y reference sample builds");
+    assert_packed_reference_decision(&y_reference.decision);
+    assert_eq!(y_reference.bits, vec![true]);
+
+    let measure_reset_reference =
+        build_reference_sample_with_decision(&parse_circuit("X 0 1\nMR 0 1\nM 0 1\n"))
+            .expect("batched measure-reset reference sample builds");
+    assert_packed_reference_decision(&measure_reset_reference.decision);
+    assert_eq!(measure_reset_reference.bits, vec![true, true, false, false]);
+
+    let reset_reference =
+        build_reference_sample_with_decision(&parse_circuit("X 0 1\nR 0 1\nM 0 1\n"))
+            .expect("batched reset reference sample builds");
+    assert_packed_reference_decision(&reset_reference.decision);
+    assert_eq!(reset_reference.bits, vec![false, false]);
+}
+
+#[test]
+fn packed_reference_invalid_targets_report_legacy_errors() {
+    let odd_target_err = build_reference_sample_with_decision(&parse_circuit("CX 0\n"))
+        .expect_err("odd pair count should fail legacy construction too");
+    assert!(
+        odd_target_err.contains("odd"),
+        "unexpected odd target error: {odd_target_err}"
+    );
+
+    let non_qubit_pair_err = build_reference_sample_with_decision(&parse_circuit("CX 0 rec[-1]\n"))
+        .expect_err("non-qubit pair should fail legacy construction too");
+    assert!(
+        non_qubit_pair_err.contains("expected qubit target in pair"),
+        "unexpected target error: {non_qubit_pair_err}"
+    );
+}
+
+#[test]
+fn auto_full_output_uses_sweep_table_for_interpreted_legacy_recovery() {
+    let instrs =
+        parse_circuit("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
+    let mut rng = StdRng::seed_from_u64(458);
+    let options = SampleOptions {
+        backend: SamplingBackend::Auto,
+        output_mode: SampleOutputMode::Full,
+        ..SampleOptions::default()
+    };
+
+    let (output, decision) = sample_batch_with_options_sweep_bits_and_decision(
+        &instrs,
+        2,
+        &mut rng,
+        options,
+        Some(SWEEP_TRUE),
+    )
+    .expect("auto sweep fallback with full output succeeds");
+
+    assert_interpreted_legacy_decision(&decision, ExpectedReason::SweepDependent);
+    assert_bit_table_matches_rows(&output.measurements, &[true], 2, "sweep full output");
+    assert_bit_table_matches_rows(&output.detections, &[false], 2, "sweep detector output");
+    assert_bit_table_matches_rows(
+        &output.observable_flips,
+        &[false],
+        2,
+        "sweep observable output",
+    );
+}
+
+#[test]
+fn auto_feedback_recovery_handles_cy_and_cz_pair_lists() {
+    let cy_instrs = parse_circuit("X 0\nM 0\nCY rec[-1] 1\nM 1\n");
+    let (cy_output, cy_decision) = sample_auto_for_case(&cy_instrs, 2, None);
+    assert_interpreted_legacy_decision(&cy_decision, ExpectedReason::MeasurementRecordFeedback);
+    assert_measurements_match_bits(&cy_output, &[true, true], 2, "CY feedback");
+
+    let cz_instrs = parse_circuit("X 0\nM 0\nH 1\nCZ rec[-1] 1\nMX 1\n");
+    let (cz_output, cz_decision) = sample_auto_for_case(&cz_instrs, 2, None);
+    assert_interpreted_legacy_decision(&cz_decision, ExpectedReason::MeasurementRecordFeedback);
+    assert_measurements_match_bits(&cz_output, &[true, true], 2, "CZ feedback");
+}
+
+#[test]
+fn sampler_fallback_reason_messages_remain_stable() {
+    assert_eq!(
+        SamplingFallbackReason::SweepDependent.to_string(),
+        "sweep-dependent instructions require the interpreted path"
     );
 }
 
