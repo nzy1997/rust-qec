@@ -261,23 +261,20 @@ def _normalize_runtime_identity(raw_identity: Any, label: str) -> dict[str, str]
 
 def load_catalog_runtime_identity() -> dict[str, str]:
     catalog = load_catalog(CATALOG_PATH)
+    if catalog.get("schema") != 2:
+        raise ValueError("evidence catalog schema must be 2")
     bundles = catalog.get("bundles")
     if not isinstance(bundles, list):
         raise ValueError("evidence catalog bundles must be an array")
-    for bundle in bundles:
-        if isinstance(bundle, dict) and bundle.get("id") == BUNDLE_ID:
-            identities = bundle.get("runtime_identities")
-            if not isinstance(identities, list):
-                raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" runtime_identities must be an array')
-            matches = [
-                _normalize_runtime_identity(identity, f'evidence catalog bundle "{BUNDLE_ID}" runtime identity')
-                for identity in identities
-                if isinstance(identity, dict) and identity.get("role") == RUNTIME_ROLE
-            ]
-            if len(matches) != 1:
-                raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" must contain exactly one {RUNTIME_ROLE} identity')
-            return matches[0]
-    raise ValueError(f'evidence catalog missing bundle "{BUNDLE_ID}"')
+    matching_bundles = [bundle for bundle in bundles if isinstance(bundle, dict) and bundle.get("id") == BUNDLE_ID]
+    if len(matching_bundles) != 1:
+        raise ValueError(f'evidence catalog must contain exactly one bundle "{BUNDLE_ID}"')
+    identities = matching_bundles[0].get("runtime_identities")
+    if not isinstance(identities, list):
+        raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" runtime_identities must be an array')
+    if len(identities) != 1:
+        raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" must contain exactly one runtime identity')
+    return _normalize_runtime_identity(identities[0], f'evidence catalog bundle "{BUNDLE_ID}" runtime identity')
 
 
 def validate_environment_runtime_identity(environment: dict[str, Any]) -> dict[str, str]:
@@ -331,6 +328,11 @@ def validate_environment(
     fixture = _validate_path_hash(environment, "fixture", "fixture_sha256")
     manifest = _validate_path_hash(environment, "manifest", "manifest_sha256")
     runtime_identity = validate_environment_runtime_identity(environment)
+    _require_equal(
+        environment["rstim_version"],
+        runtime_identity["version"],
+        "environment rstim_version must match runtime identity version",
+    )
     if verify_runtime_binary is not None:
         validate_runtime_binary(verify_runtime_binary, runtime_identity)
     if fixture != CANONICAL_FIXTURE.resolve():

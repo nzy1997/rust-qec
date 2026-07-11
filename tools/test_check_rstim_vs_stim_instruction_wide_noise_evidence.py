@@ -52,7 +52,11 @@ def rewrite_hashes(bundle: Path) -> None:
     )
 
 
-def write_checker_repo_fixture(repo_root: Path, runtime_identity: dict[str, str]) -> Path:
+def write_checker_repo_fixture(
+    repo_root: Path,
+    runtime_identity: dict[str, str],
+    mutate_catalog_text: Callable[[str], str] | None = None,
+) -> Path:
     tools_dir = repo_root / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(CHECKER, tools_dir / CHECKER.name)
@@ -67,10 +71,10 @@ def write_checker_repo_fixture(repo_root: Path, runtime_identity: dict[str, str]
 
     catalog_path = benchmarks_dir / "rstim_vs_stim_simulator/evidence_bundles.toml"
     catalog_text = catalog_path.read_text(encoding="utf-8")
-    catalog_path.write_text(
-        catalog_text.replace(PUBLISHED_RSTIM_RUNTIME_IDENTITY["sha256"], runtime_identity["sha256"]),
-        encoding="utf-8",
-    )
+    catalog_text = catalog_text.replace(PUBLISHED_RSTIM_RUNTIME_IDENTITY["sha256"], runtime_identity["sha256"])
+    if mutate_catalog_text is not None:
+        catalog_text = mutate_catalog_text(catalog_text)
+    catalog_path.write_text(catalog_text, encoding="utf-8")
     return tools_dir / CHECKER.name
 
 
@@ -205,7 +209,7 @@ def write_valid_bundle(bundle: Path) -> None:
         "measure_rounds": 1,
         "timer_scope": "process_spawn_stdout_stderr_drain_exit",
         "stim_version": "1.15.0",
-        "rstim_version": "rstim 0.1.1-test",
+        "rstim_version": PUBLISHED_RSTIM_RUNTIME_IDENTITY["version"],
         "rustc_version": "rustc test",
         "os": "test-os",
         "cpu_model": "test-cpu",
@@ -307,6 +311,78 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("runtime binary SHA-256 does not match recorded identity", result.stderr)
+
+    def test_rejects_catalog_schema_other_than_v2(self) -> None:
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(
+            repo_root,
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+            lambda text: text.replace("schema = 2", "schema = 1", 1),
+        )
+
+        result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("evidence catalog schema must be 2", result.stderr)
+
+    def test_rejects_duplicate_frame_catalog_bundle(self) -> None:
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(
+            repo_root,
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+            lambda text: text + '\n[[bundles]]\nid = "frame-instruction-wide-release"\n',
+        )
+
+        result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('evidence catalog must contain exactly one bundle "frame-instruction-wide-release"', result.stderr)
+
+    def test_rejects_malformed_or_extra_catalog_runtime_identity(self) -> None:
+        for mutation in (
+            lambda text: text + (
+                '\n[[bundles.runtime_identities]]\n'
+                'role = "tool://extra"\n'
+                'version = "extra 1.0"\n'
+                'basename = "extra"\n'
+                'sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"\n'
+                'unexpected = "field"\n'
+            ),
+            lambda text: text + (
+                '\n[[bundles.runtime_identities]]\n'
+                'role = "tool://extra"\n'
+                'version = "extra 1.0"\n'
+                'basename = "extra"\n'
+                'sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"\n'
+            ),
+        ):
+            with self.subTest(mutation=mutation):
+                repo_root = Path(self.tmpdir.name) / f"checker-repo-{id(mutation)}"
+                checker_path = write_checker_repo_fixture(
+                    repo_root,
+                    PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+                    mutation,
+                )
+
+                result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(
+                    'evidence catalog bundle "frame-instruction-wide-release" must contain exactly one runtime identity',
+                    result.stderr,
+                )
+
+    def test_rejects_rstim_version_disagreeing_with_runtime_identity(self) -> None:
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: payload.update({"rstim_version": "rstim 0.1.1-other"}),
+        )
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment rstim_version must match runtime identity version", result.stderr)
 
     def test_rejects_legacy_runtime_binary_path_fields_without_hashing_them(self) -> None:
         rewrite_json(
