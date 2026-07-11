@@ -185,8 +185,14 @@ def write_valid_bundle(bundle: Path) -> None:
         "fixture_sha256": sha256_file(FIXTURE),
         "manifest": str(MANIFEST),
         "manifest_sha256": sha256_file(MANIFEST),
-        "rstim_binary": str(rstim_binary),
-        "rstim_binary_sha256": sha256_file(rstim_binary),
+        "runtime_identities": [
+            {
+                "role": "tool://rstim",
+                "version": "rstim 0.1.1",
+                "basename": "rstim",
+                "sha256": sha256_file(rstim_binary),
+            }
+        ],
         "runner_argv": ["python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_frame_instruction_wide_benchmark"],
         "child_argv": {
             "measurement": ["rstim", "sample"],
@@ -215,9 +221,9 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.bundle = Path(self.tmpdir.name) / "bundle"
         write_valid_bundle(self.bundle)
 
-    def run_checker(self) -> subprocess.CompletedProcess[str]:
+    def run_checker(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(CHECKER), "--dir", str(self.bundle)],
+            ["python3", str(CHECKER), "--dir", str(self.bundle), *extra_args],
             cwd=REPO_ROOT,
             text=True,
             stdout=subprocess.PIPE,
@@ -232,6 +238,53 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
             result.stdout,
             "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
         )
+
+    def test_default_validation_does_not_require_live_runtime_binary(self) -> None:
+        (self.bundle / "rstim").unlink()
+
+        result = self.run_checker()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
+        )
+
+    def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:
+        result = self.run_checker("--verify-runtime-binary", str(self.bundle / "rstim"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS instruction-wide frame-noise evidence", result.stdout)
+
+    def test_verify_runtime_binary_rejects_different_supplied_binary(self) -> None:
+        other_binary = self.bundle / "other-rstim"
+        other_binary.write_bytes(b"different runtime binary\n")
+
+        result = self.run_checker("--verify-runtime-binary", str(other_binary))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("runtime binary SHA-256 does not match recorded identity", result.stderr)
+
+    def test_rejects_legacy_runtime_binary_path_fields_without_hashing_them(self) -> None:
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: (
+                payload.pop("runtime_identities"),
+                payload.update(
+                    {
+                        "rstim_binary": str(self.bundle / "missing-rstim"),
+                        "rstim_binary_sha256": "0" * 64,
+                    }
+                ),
+            ),
+        )
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runtime_identities must contain exactly one tool://rstim identity", result.stderr)
+        self.assertNotIn("does not exist", result.stderr)
 
     def test_rejects_fixture_load_count_substituted_for_iterator_builds_before_hash_error(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
@@ -280,11 +333,10 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertIn("raw measurement field stdout_sha256 must be identical", result.stderr)
         self.assertNotIn("artifact", result.stderr.lower())
 
-    def test_rejects_mismatched_fixture_manifest_binary_or_artifact_hash(self) -> None:
+    def test_rejects_mismatched_fixture_manifest_or_artifact_hash(self) -> None:
         for field, message in (
             ("fixture_sha256", "environment fixture_sha256 does not match fixture"),
             ("manifest_sha256", "environment manifest_sha256 does not match manifest"),
-            ("rstim_binary_sha256", "environment rstim_binary_sha256 does not match rstim_binary"),
         ):
             with self.subTest(field=field):
                 write_valid_bundle(self.bundle)

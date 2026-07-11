@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from benchmarks.rstim_vs_stim_simulator import run_frame_instruction_wide_benchmark as runner
+from benchmarks.rstim_vs_stim_simulator.portable_provenance import load_catalog
 
 
 REQUIRED_FILES = (
@@ -31,6 +32,10 @@ SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 GIT_COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
 CANONICAL_FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+CATALOG_PATH = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml"
+BUNDLE_ID = "frame-instruction-wide-release"
+RUNTIME_ROLE = "tool://rstim"
+RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
 
 
 def sha256_file(path: Path) -> str:
@@ -230,7 +235,79 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
     return path
 
 
-def validate_environment(environment: dict[str, Any], results_dir: Path) -> None:
+def _normalize_runtime_identity(raw_identity: Any, label: str) -> dict[str, str]:
+    if not isinstance(raw_identity, dict):
+        raise ValueError(f"{label} must be an object")
+    unsupported = sorted(set(raw_identity) - RUNTIME_IDENTITY_FIELDS)
+    if unsupported:
+        raise ValueError(f"{label} unsupported field(s): {', '.join(unsupported)}")
+    missing = [field for field in ("role", "version", "basename", "sha256") if field not in raw_identity]
+    if missing:
+        raise ValueError(f"{label} missing required field(s): {', '.join(missing)}")
+    role = raw_identity["role"]
+    version = raw_identity["version"]
+    basename = raw_identity["basename"]
+    digest = _require_digest(raw_identity["sha256"], f"{label} sha256")
+    if role != RUNTIME_ROLE:
+        raise ValueError(f"{label} role must be {RUNTIME_ROLE}")
+    if not isinstance(version, str) or not version:
+        raise ValueError(f'{label} field "version" must be a nonempty string')
+    if not isinstance(basename, str) or not basename:
+        raise ValueError(f'{label} field "basename" must be a nonempty string')
+    if "/" in basename or "\\" in basename:
+        raise ValueError(f'{label} field "basename" must not contain path separators')
+    return {"role": role, "version": version, "basename": basename, "sha256": digest}
+
+
+def load_catalog_runtime_identity() -> dict[str, str]:
+    catalog = load_catalog(CATALOG_PATH)
+    bundles = catalog.get("bundles")
+    if not isinstance(bundles, list):
+        raise ValueError("evidence catalog bundles must be an array")
+    for bundle in bundles:
+        if isinstance(bundle, dict) and bundle.get("id") == BUNDLE_ID:
+            identities = bundle.get("runtime_identities")
+            if not isinstance(identities, list):
+                raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" runtime_identities must be an array')
+            matches = [
+                _normalize_runtime_identity(identity, f'evidence catalog bundle "{BUNDLE_ID}" runtime identity')
+                for identity in identities
+                if isinstance(identity, dict) and identity.get("role") == RUNTIME_ROLE
+            ]
+            if len(matches) != 1:
+                raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" must contain exactly one {RUNTIME_ROLE} identity')
+            return matches[0]
+    raise ValueError(f'evidence catalog missing bundle "{BUNDLE_ID}"')
+
+
+def validate_environment_runtime_identity(environment: dict[str, Any]) -> dict[str, str]:
+    identities = environment.get("runtime_identities")
+    if not isinstance(identities, list):
+        raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
+    matches = [
+        _normalize_runtime_identity(identity, f"environment runtime_identities[{index}]")
+        for index, identity in enumerate(identities)
+        if isinstance(identity, dict) and identity.get("role") == RUNTIME_ROLE
+    ]
+    if len(matches) != 1:
+        raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
+    identity = matches[0]
+    catalog_identity = load_catalog_runtime_identity()
+    if identity != catalog_identity:
+        raise ValueError("environment runtime identity must match schema-v2 catalog identity")
+    return identity
+
+
+def validate_runtime_binary(runtime_binary: Path, identity: dict[str, str]) -> None:
+    if not runtime_binary.is_file():
+        raise ValueError(f"runtime binary path does not exist: {runtime_binary}")
+    if sha256_file(runtime_binary) != identity["sha256"]:
+        raise ValueError("runtime binary SHA-256 does not match recorded identity")
+
+
+def validate_environment(
+    environment: dict[str, Any], results_dir: Path, verify_runtime_binary: Path | None = None
+) -> None:
     if not isinstance(environment.get("git_commit"), str) or GIT_COMMIT_RE.fullmatch(environment["git_commit"]) is None:
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
     if not isinstance(environment.get("git_dirty"), bool):
@@ -253,7 +330,9 @@ def validate_environment(environment: dict[str, Any], results_dir: Path) -> None
             raise ValueError(f"environment {field} must be nonempty")
     fixture = _validate_path_hash(environment, "fixture", "fixture_sha256")
     manifest = _validate_path_hash(environment, "manifest", "manifest_sha256")
-    _validate_path_hash(environment, "rstim_binary", "rstim_binary_sha256")
+    runtime_identity = validate_environment_runtime_identity(environment)
+    if verify_runtime_binary is not None:
+        validate_runtime_binary(verify_runtime_binary, runtime_identity)
     if fixture != CANONICAL_FIXTURE.resolve():
         raise ValueError("environment fixture must name the canonical fixture")
     if manifest != CANONICAL_MANIFEST.resolve():
@@ -292,7 +371,7 @@ def validate_artifact_hashes(results_dir: Path) -> None:
             raise ValueError(f"artifact-sha256.json {filename} does not match {filename}")
 
 
-def validate_bundle(results_dir: Path) -> tuple[int, int, int]:
+def validate_bundle(results_dir: Path, verify_runtime_binary: Path | None = None) -> tuple[int, int, int]:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
     raw_totals = validate_raw_semantics(records)
@@ -301,7 +380,9 @@ def validate_bundle(results_dir: Path) -> tuple[int, int, int]:
     validate_summary_and_report(records, summary, report)
     legacy_setups = validate_fixture_load(load_json_object(results_dir / "fixture-load.json", "fixture-load.json"))
     validate_correctness(load_json_object(results_dir / "correctness-summary.json", "correctness-summary.json"))
-    validate_environment(load_json_object(results_dir / "environment.json", "environment.json"), results_dir)
+    validate_environment(
+        load_json_object(results_dir / "environment.json", "environment.json"), results_dir, verify_runtime_binary
+    )
     validate_artifact_hashes(results_dir)
     return raw_totals["iterator_builds"], raw_totals["attempt_count"], legacy_setups
 
@@ -309,13 +390,14 @@ def validate_bundle(results_dir: Path) -> tuple[int, int, int]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check instruction-wide frame-noise evidence bundle.")
     parser.add_argument("--dir", type=Path, required=True)
+    parser.add_argument("--verify-runtime-binary", type=Path)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        builds, attempts, legacy_setups = validate_bundle(args.dir)
+        builds, attempts, legacy_setups = validate_bundle(args.dir, args.verify_runtime_binary)
     except (OSError, ValueError, runner.RunnerError) as error:
         print(error, file=sys.stderr)
         return 1
