@@ -17,8 +17,11 @@ EXPECTED_BUNDLE_IDS = (
 )
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_POSIX_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[(])/(?!/)")
-_WINDOWS_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,\[(])([A-Za-z]:[\\/]|\\\\)")
+_POSIX_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{])/(?!/)")
+_WINDOWS_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{])([A-Za-z]:[\\/]|\\\\)")
+_RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
+_CHECKED_COMMAND_FIELDS = frozenset({"name", "argv"})
+_CHECKED_PROVENANCE_FIELDS = frozenset({"name", "value"})
 
 
 def load_catalog(path: Path) -> dict[str, Any]:
@@ -72,17 +75,18 @@ def validate_catalog(catalog: dict[str, Any], catalog_path: Path) -> list[str]:
             "repository",
             errors,
         )
-        _validate_path_hash_entries(
+        artifact_paths = _validate_path_hash_entries(
             raw_bundle.get("artifacts"),
             bundle_root,
             "artifacts",
             "bundle artifact",
             errors,
         )
+        _validate_artifact_completeness(artifact_paths, bundle_root, errors)
 
-        _validate_logical_executables(raw_bundle.get("logical_executables"), bundle_label, errors)
+        logical_roles = _validate_logical_executables(raw_bundle.get("logical_executables"), bundle_label, errors)
         _validate_runtime_identities(raw_bundle.get("runtime_identities"), bundle_label, errors)
-        _validate_checked_commands(raw_bundle.get("checked_commands"), bundle_label, errors)
+        _validate_checked_commands(raw_bundle.get("checked_commands"), logical_roles, bundle_label, errors)
         _validate_checked_provenance(raw_bundle.get("checked_provenance"), bundle_label, errors)
 
     return errors
@@ -129,15 +133,18 @@ def _validate_path_hash_entries(
     field: str,
     path_label: str,
     errors: list[str],
-) -> None:
+) -> set[PurePosixPath]:
+    relative_paths: set[PurePosixPath] = set()
     entries = list(_path_hash_entries(raw_entries, field, errors))
     if raw_entries is None:
         errors.append(f'field "{field}" must be an array or table')
-        return
+        return relative_paths
 
     for entry_label, raw_path, raw_sha256 in entries:
         relative_path = _validate_relative_posix_path(raw_path, path_label, errors)
         _validate_sha256(raw_sha256, f"{entry_label} sha256", errors)
+        if relative_path is not None:
+            relative_paths.add(relative_path)
         if relative_path is None or not isinstance(raw_sha256, str):
             continue
 
@@ -151,6 +158,34 @@ def _validate_path_hash_entries(
             continue
         if actual_sha256 != raw_sha256:
             errors.append(f"{entry_label} sha256 mismatch")
+
+    return relative_paths
+
+
+def _validate_artifact_completeness(
+    catalog_paths: set[PurePosixPath],
+    bundle_root: Path | None,
+    errors: list[str],
+) -> None:
+    if bundle_root is None or not bundle_root.exists():
+        return
+    if not bundle_root.is_dir():
+        errors.append("bundle path must identify an artifact directory")
+        return
+
+    try:
+        bundle_files = {
+            path.relative_to(bundle_root).as_posix()
+            for path in bundle_root.rglob("*")
+            if path.is_file()
+        }
+    except OSError as error:
+        errors.append(f"bundle artifact directory could not be read: {error}")
+        return
+
+    catalog_files = {path.as_posix() for path in catalog_paths}
+    for missing_path in sorted(bundle_files - catalog_files):
+        errors.append(f"artifact catalog missing bundle file: {missing_path}")
 
 
 def _path_hash_entries(
@@ -179,24 +214,32 @@ def _path_hash_entries(
         errors.append(f'field "{field}" must be an array or table')
 
 
-def _validate_logical_executables(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
+def _validate_logical_executables(raw_entries: object, bundle_label: str, errors: list[str]) -> set[str]:
+    roles: set[str] = set()
     if raw_entries is None:
         errors.append(f'{bundle_label} field "logical_executables" must be an array or table')
-        return
+        return roles
 
     if isinstance(raw_entries, list):
         for index, entry in enumerate(raw_entries):
             role = entry.get("role") if isinstance(entry, dict) else entry
-            _validate_tool_role(role, f'{bundle_label} logical_executables[{index}] role', errors)
-        return
+            if isinstance(entry, dict):
+                _validate_allowed_keys(entry, {"role"}, f'{bundle_label} logical_executables[{index}]', errors)
+            if _validate_tool_role(role, f'{bundle_label} logical_executables[{index}] role', errors):
+                roles.add(role)
+        return roles
 
     if isinstance(raw_entries, dict):
         for name, entry in raw_entries.items():
             role = entry.get("role") if isinstance(entry, dict) else entry
-            _validate_tool_role(role, f'{bundle_label} logical_executables["{name}"] role', errors)
-        return
+            if isinstance(entry, dict):
+                _validate_allowed_keys(entry, {"role"}, f'{bundle_label} logical_executables["{name}"]', errors)
+            if _validate_tool_role(role, f'{bundle_label} logical_executables["{name}"] role', errors):
+                roles.add(role)
+        return roles
 
     errors.append(f'{bundle_label} field "logical_executables" must be an array or table')
+    return roles
 
 
 def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
@@ -211,6 +254,7 @@ def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors:
             errors.append(f"{identity_label} must be a TOML table")
             continue
 
+        _validate_allowed_keys(identity, _RUNTIME_IDENTITY_FIELDS, f"{identity_label} runtime identity", errors)
         missing = [field for field in required_fields if field not in identity]
         if missing:
             errors.append(f"{identity_label} missing required field(s): {', '.join(missing)}")
@@ -229,7 +273,12 @@ def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors:
             errors.append("checked evidence must not require a live runtime path")
 
 
-def _validate_checked_commands(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
+def _validate_checked_commands(
+    raw_entries: object,
+    logical_roles: set[str],
+    bundle_label: str,
+    errors: list[str],
+) -> None:
     if not isinstance(raw_entries, list):
         errors.append(f'{bundle_label} field "checked_commands" must be an array')
         return
@@ -239,11 +288,18 @@ def _validate_checked_commands(raw_entries: object, bundle_label: str, errors: l
         if not isinstance(command, dict):
             errors.append(f"{command_label} must be a TOML table")
             continue
+        _validate_allowed_keys(command, _CHECKED_COMMAND_FIELDS, f"{command_label} checked command", errors)
+        if _contains_host_absolute_path(command):
+            errors.append("checked command contains host-absolute path")
         if "argv" not in command:
             errors.append(f'{command_label} field "argv" is required')
             continue
-        if _contains_host_absolute_path(command["argv"]):
-            errors.append("checked command contains host-absolute path")
+        argv = command["argv"]
+        if not isinstance(argv, list) or not argv or not all(isinstance(arg, str) for arg in argv):
+            errors.append(f'{command_label} field "argv" must be a non-empty array of strings')
+            continue
+        if argv[0] not in logical_roles:
+            errors.append("checked command executable must be declared tool:// role")
 
 
 def _validate_checked_provenance(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
@@ -256,16 +312,35 @@ def _validate_checked_provenance(raw_entries: object, bundle_label: str, errors:
         if not isinstance(provenance, dict):
             errors.append(f"{provenance_label} must be a TOML table")
             continue
+        _validate_allowed_keys(
+            provenance,
+            _CHECKED_PROVENANCE_FIELDS,
+            f"{provenance_label} checked provenance",
+            errors,
+        )
+        if _contains_host_absolute_path(provenance):
+            errors.append("checked provenance contains host-absolute path")
         if "value" not in provenance:
             errors.append(f'{provenance_label} field "value" is required')
             continue
-        if _contains_host_absolute_path(provenance["value"]):
-            errors.append("checked provenance contains host-absolute path")
 
 
-def _validate_tool_role(raw_role: object, label: str, errors: list[str]) -> None:
+def _validate_tool_role(raw_role: object, label: str, errors: list[str]) -> bool:
     if not isinstance(raw_role, str) or not raw_role.startswith("tool://") or not raw_role[7:]:
         errors.append(f"{label} must be a non-empty tool:// role")
+        return False
+    return True
+
+
+def _validate_allowed_keys(
+    table: dict[str, object],
+    allowed_fields: frozenset[str] | set[str],
+    label: str,
+    errors: list[str],
+) -> None:
+    unsupported = sorted(set(table) - set(allowed_fields))
+    if unsupported:
+        errors.append(f"{label} unsupported field(s): {', '.join(unsupported)}")
 
 
 def _validate_sha256(raw_sha256: object, label: str, errors: list[str]) -> None:
