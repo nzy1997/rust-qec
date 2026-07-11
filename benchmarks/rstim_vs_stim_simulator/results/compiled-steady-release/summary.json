@@ -2,12 +2,12 @@
   "measured_records": 14,
   "variants": [
     {
-      "median_elapsed_ns": 13466875,
+      "median_elapsed_ns": 13671583,
       "sample_count": 7,
       "variant": "stim"
     },
     {
-      "median_elapsed_ns": 11234750,
+      "median_elapsed_ns": 11547000,
       "sample_count": 7,
       "variant": "rstim"
     }

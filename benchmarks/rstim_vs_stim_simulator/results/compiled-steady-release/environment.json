@@ -22,7 +22,7 @@
   "fair_manifest_sha256": "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb",
   "fixture_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-454-run-1-agent-issue-454-publish-compiled-steady-state-sampling-evidence-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
-  "git_commit": "68f2b4e228d14cdee61e2b510114be734918e636",
+  "git_commit": "b15b4224f51f73a190d86d24f377994c0f48e71b",
   "known_answer_preflight": [
     {
       "argv": [
@@ -30,7 +30,7 @@
         "-m",
         "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
         "--input",
-        "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/tmpcaf0zofa/known_answer.stim",
+        "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/tmpv4tsmkyl/known_answer.stim",
         "--seed",
         "0"
       ],
@@ -59,7 +59,7 @@
       "argv": [
         "target/release/rstim_compiled_steady_worker",
         "--input",
-        "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/tmphna5j67e/known_answer.stim",
+        "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/tmpb9ccu1c4/known_answer.stim",
         "--seed",
         "0"
       ],

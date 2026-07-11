@@ -356,6 +356,10 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual(sum(1 for record in raw if record["record_type"] == "ready"), 2)
         self.assertEqual(sum(1 for record in raw if record["record_type"] == "sample"), 18)
         self.assertEqual(sum(1 for record in raw if record["record_type"] == "final"), 2)
+        for record in raw:
+            if record["record_type"] == "sample":
+                self.assertEqual(record["shots"], 1024)
+                self.assertEqual(record["output_format"], "b8")
         summary = json.loads((out_dir / "summary.json").read_text())
         self.assertEqual(summary["measured_records"], 14)
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})

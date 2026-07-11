@@ -2,7 +2,7 @@
 
 | variant | sample_count | median_elapsed_ns |
 | --- | ---: | ---: |
-| stim | 7 | 13466875 |
-| rstim | 7 | 11234750 |
+| stim | 7 | 13671583 |
+| rstim | 7 | 11547000 |
 
 Measured records: 14

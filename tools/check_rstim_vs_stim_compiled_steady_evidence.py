@@ -86,6 +86,13 @@ def _require_equal(actual: Any, expected: Any, message: str) -> None:
         raise ValueError(f"{message}, got {actual!r}")
 
 
+def _require_int_equal(actual: Any, expected: int, message: str) -> None:
+    if not isinstance(actual, int) or isinstance(actual, bool):
+        raise ValueError(f"{message} must be integer {expected}, got {actual!r}")
+    if actual != expected:
+        raise ValueError(f"{message} must be {expected}, got {actual!r}")
+
+
 def _require_json_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be a JSON object")
@@ -103,15 +110,15 @@ def _validate_telemetry(
     label = _release_variant(variant)
     if not isinstance(telemetry, dict):
         raise ValueError(f"{label} {stage} telemetry must be a JSON object")
+    _require_equal(telemetry.get("variant"), variant, f"{label} {stage} variant must be {variant}")
     for field, expected in (
-        ("variant", variant),
         ("compile_count", 1),
         ("reference_build_count", 1),
         ("sample_call_count", sample_call_count),
         ("measurement_count", fair_cli_contract.EXPECTED_CASE["measurement_count"]),
         ("bytes_per_shot", fair_cli_contract.EXPECTED_CASE["bytes_per_shot"]),
     ):
-        _require_equal(telemetry.get(field), expected, f"{label} {stage} {field} must be {expected}")
+        _require_int_equal(telemetry.get(field), expected, f"{label} {stage} {field}")
     digest = telemetry.get("fixture_sha256")
     if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
         raise ValueError(f"{label} {stage} fixture_sha256 must be a lowercase SHA-256 digest")
@@ -148,21 +155,33 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
         )
         ready_telemetry = ready["telemetry"]
         request_ids = [record.get("request_id") for record in sample_records]
+        if any(not isinstance(request_id, int) or isinstance(request_id, bool) for request_id in request_ids):
+            raise ValueError(f"{label} request IDs must be integers 0 through 8")
         if request_ids != list(range(9)):
             raise ValueError(f"{label} request IDs must be 0 through 8")
         if [record.get("warmup") for record in sample_records] != [True, True] + [False] * 7:
             raise ValueError(f"{label} samples must contain two warmups followed by seven measured records")
         for request_id, record in enumerate(sample_records):
-            _require_equal(
+            _require_int_equal(
                 record.get("sample_call_count"), request_id + 1,
-                f"{label} sample_call_count for request {request_id} must be {request_id + 1}",
+                f"{label} sample_call_count for request {request_id}",
+            )
+            _require_int_equal(
+                record.get("shots"),
+                case["shots"],
+                f"{label} shots for request {request_id}",
+            )
+            _require_equal(
+                record.get("output_format"),
+                case["output_format"],
+                f"{label} output_format for request {request_id} must be {case['output_format']}",
             )
             elapsed_ns = record.get("elapsed_ns")
             if not isinstance(elapsed_ns, int) or isinstance(elapsed_ns, bool) or elapsed_ns < 0:
                 raise ValueError(f"{label} elapsed_ns for request {request_id} must be a nonnegative integer")
-            _require_equal(
+            _require_int_equal(
                 record.get("output_bytes"), case["expected_output_bytes"],
-                f"{label} output_bytes for request {request_id} must be {case['expected_output_bytes']}",
+                f"{label} output_bytes for request {request_id}",
             )
         _validate_telemetry(
             final_records[0].get("telemetry"),
@@ -263,15 +282,15 @@ def _validate_preflight_telemetry(
     fixture_sha256: str | None,
 ) -> str:
     payload = _require_json_object(telemetry, f"environment {variant} preflight {stage}")
+    _require_equal(payload.get("variant"), variant, f"environment {variant} preflight {stage} variant must be {variant}")
     for field, expected in (
-        ("variant", variant),
         ("compile_count", 1),
         ("reference_build_count", 1),
         ("sample_call_count", sample_call_count),
         ("measurement_count", 1),
         ("bytes_per_shot", 1),
     ):
-        _require_equal(payload.get(field), expected, f"environment {variant} preflight {stage} {field} must be {expected}")
+        _require_int_equal(payload.get(field), expected, f"environment {variant} preflight {stage} {field}")
     digest = payload.get("fixture_sha256")
     if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
         raise ValueError(f"environment {variant} preflight {stage} fixture_sha256 must be a lowercase SHA-256 digest")
@@ -291,13 +310,16 @@ def _validate_preflight_argv(item: dict[str, Any], *, variant: str) -> None:
         if variant == "stim"
         else run_compiled_steady.default_rstim_worker_command("release")
     )
-    if argv[: len(command_prefix)] != command_prefix:
-        raise ValueError(f"environment {variant} preflight argv must use the canonical worker command")
-    if "--input" not in argv or "--seed" not in argv:
-        raise ValueError(f"environment {variant} preflight argv must contain --input and --seed")
-    seed_index = argv.index("--seed")
-    if seed_index + 1 >= len(argv) or argv[seed_index + 1] != "0":
-        raise ValueError(f"environment {variant} preflight argv seed must be 0")
+    tail = argv[len(command_prefix):]
+    if (
+        argv[: len(command_prefix)] != command_prefix
+        or len(tail) != 4
+        or tail[0] != "--input"
+        or not isinstance(tail[1], str)
+        or not tail[1]
+        or tail[2:] != ["--seed", "0"]
+    ):
+        raise ValueError(f"environment {variant} preflight argv must match canonical shape")
 
 
 def validate_environment(environment: dict[str, Any], derived: dict[str, Any], records: list[dict[str, Any]]) -> None:

@@ -86,6 +86,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                     "variant": variant,
                     "request_id": request_id,
                     "sample_call_count": request_id + 1,
+                    "shots": case["shots"],
+                    "output_format": case["output_format"],
                     "warmup": request_id < 2,
                     "elapsed_ns": elapsed_base + request_id,
                     "output_bytes": case["expected_output_bytes"],
@@ -260,6 +262,30 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("stim-compiled-steady-b8 sample_call_count for request 4 must be 5, got 9", result.stderr)
 
+    def test_rejects_changed_sample_shots(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        next(record for record in records if record["variant"] == "stim" and record.get("request_id") == 3)["shots"] = 512
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-compiled-steady-b8 shots for request 3 must be 1024, got 512", result.stderr)
+
+    def test_rejects_changed_sample_output_format(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        next(record for record in records if record["variant"] == "rstim" and record.get("request_id") == 3)["output_format"] = "01"
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("rstim-compiled-steady-b8 output_format for request 3 must be b8, got '01'", result.stderr)
+
+    def test_rejects_boolean_lifecycle_counter(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        next(record for record in records if record["variant"] == "stim" and record["record_type"] == "ready")["telemetry"]["compile_count"] = True
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-compiled-steady-b8 ready compile_count must be integer 1, got True", result.stderr)
+
     def test_rejects_out_of_order_lifecycle_records(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         final_index = next(
@@ -376,6 +402,16 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment stim preflight ready must be a JSON object", result.stderr)
+
+    def test_rejects_preflight_argv_with_duplicate_seed_flag(self) -> None:
+        def duplicate_seed(environment: dict[str, Any]) -> None:
+            environment["known_answer_preflight"][0]["argv"].extend(["--seed", "1"])
+
+        rewrite_json(self.bundle / "environment.json", duplicate_seed)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment stim preflight argv must match canonical shape", result.stderr)
 
     def test_rejects_extra_bundle_file(self) -> None:
         (self.bundle / "extra.txt").write_text("unexpected\n", encoding="utf-8")
