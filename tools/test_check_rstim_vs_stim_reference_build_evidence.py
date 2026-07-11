@@ -270,25 +270,31 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         records = load_raw(self.bundle / "raw.jsonl")
         next(record for record in records if record["variant"] == RSTIM_VARIANT)["backend"] = "tableau"
         rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("rstim-packed-reference-b8 backend must be packed_inverse", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_timer_scope_including_parsing(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         records[0]["timer_scope"] = "reference_build_including_parse"
         rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("timer_scope must be reference_build_only", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_parse_count_not_one(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         records[0]["parse_count"] = 2
         rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("parse_count must be integer 1", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_missing_final_reference_build_count_nine(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
@@ -298,9 +304,11 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
             if record["variant"] == RSTIM_VARIANT and record["round"] == 8
         )["reference_build_count"] = 8
         rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("final reference_build_count must be 9", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_summary_variant_stats_not_derived_from_raw(self) -> None:
         def mutate(summary: dict[str, Any]) -> None:

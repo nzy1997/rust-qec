@@ -10,6 +10,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from statistics import median
 
 from benchmarks.rstim_vs_stim_simulator import run_reference_build_benchmark
 
@@ -173,6 +174,8 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
 
+            expected_git_commit = command_stdout(["git", "rev-parse", "HEAD"])
+            expected_git_dirty = bool(command_stdout(["git", "status", "--porcelain"]))
             result = self._run_runner(
                 out_dir,
                 manifest=MANIFEST,
@@ -232,9 +235,26 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(summary["protocol"], PROTOCOL)
             self.assertEqual(summary["timer_scope"], TIMER_SCOPE)
             self.assertEqual(summary["measured_records"], 14)
-            self.assertEqual({variant["variant"] for variant in summary["variants"]}, {STIM_VARIANT, RSTIM_VARIANT})
-            for variant in summary["variants"]:
-                self.assertEqual(variant["count"], 7)
+            summary_by_variant = {variant["variant"]: variant for variant in summary["variants"]}
+            self.assertEqual(set(summary_by_variant), {STIM_VARIANT, RSTIM_VARIANT})
+            expected_backends = {
+                STIM_VARIANT: "stim_reference",
+                RSTIM_VARIANT: "packed_inverse",
+            }
+            for variant_name, expected_backend in expected_backends.items():
+                variant = summary_by_variant[variant_name]
+                measured_rows = [
+                    record
+                    for record in raw
+                    if record["variant"] == variant_name and record["phase"] == "measured"
+                ]
+                measured_elapsed_ns = [record["elapsed_ns"] for record in measured_rows]
+                self.assertEqual(len(measured_rows), 7)
+                self.assertEqual(variant["count"], len(measured_rows))
+                self.assertEqual(variant["min_elapsed_ns"], min(measured_elapsed_ns))
+                self.assertEqual(variant["median_elapsed_ns"], int(median(measured_elapsed_ns)))
+                self.assertEqual(variant["max_elapsed_ns"], max(measured_elapsed_ns))
+                self.assertEqual(variant["backend"], expected_backend)
                 self.assertEqual(variant["measurement_bits"], MEASUREMENT_BITS)
                 self.assertEqual(variant["packed_bytes"], PACKED_BYTES)
                 self.assertEqual(variant["byte_sha256"], REFERENCE_DIGEST)
@@ -247,6 +267,13 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 report,
             )
             self.assertIn(REFERENCE_DIGEST, report)
+            for variant in summary["variants"]:
+                report_row = (
+                    f"| {variant['variant']} | {variant['count']} | {variant['min_elapsed_ns']} | "
+                    f"{variant['median_elapsed_ns']} | {variant['max_elapsed_ns']} | {variant['backend']} | "
+                    f"{variant['parse_count']} | {variant['final_reference_build_count']} | {variant['byte_sha256']} |"
+                )
+                self.assertIn(report_row, report)
 
             environment = json.loads((out_dir / "environment.json").read_text(encoding="utf-8"))
             for key in (
@@ -344,7 +371,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertTrue(environment["cpu_model"].strip())
             self.assertIsInstance(environment["git_commit"], str)
             self.assertRegex(environment["git_commit"], r"^[0-9a-f]{40}$")
+            self.assertEqual(environment["git_commit"], expected_git_commit)
             self.assertIsInstance(environment["git_dirty"], bool)
+            self.assertEqual(environment["git_dirty"], expected_git_dirty)
             self.assertEqual(environment["warmup_rounds"], 2)
             self.assertEqual(environment["measure_rounds"], 7)
 
