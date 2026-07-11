@@ -22,6 +22,8 @@ REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", 
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
 RAW_VARIANTS = ("stim", "rstim")
 RELEASE_VARIANTS = {"stim": "stim-compiled-steady-b8", "rstim": "rstim-compiled-steady-b8"}
+CANONICAL_FAIR_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+CANONICAL_STIM_WORKER_MODULE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -63,6 +65,13 @@ def load_raw_records(path: Path) -> list[dict[str, Any]]:
 
 
 def validate_required_files(results_dir: Path) -> None:
+    try:
+        entries = sorted(path.name for path in results_dir.iterdir())
+    except OSError as error:
+        raise ValueError(f"could not read bundle directory: {error}") from error
+    unexpected = sorted(set(entries) - set(REQUIRED_FILES))
+    if unexpected:
+        raise ValueError(f"unexpected bundle file: {unexpected[0]}")
     for filename in REQUIRED_FILES:
         if not (results_dir / filename).is_file():
             raise ValueError(f"missing required bundle file: {filename}")
@@ -196,6 +205,29 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
         raise ValueError(f"environment {hash_field} does not match {path_field}")
 
 
+def _validate_canonical_path(
+    environment: dict[str, Any],
+    field: str,
+    canonical_path: Path,
+    description: str,
+) -> Path:
+    path = _resolve_environment_path(environment, field)
+    if path != canonical_path.resolve():
+        raise ValueError(f"environment {field} must name the canonical {description}")
+    return path
+
+
+def _validate_fair_manifest_contract(path: Path) -> None:
+    try:
+        manifest = fair_cli_contract.load_manifest(path)
+        case = fair_cli_contract.find_case(manifest, fair_cli_contract.EXPECTED_CASE["case_id"])
+        errors = fair_cli_contract.validate_case(case, manifest_path=path, repo_root=REPO_ROOT)
+    except Exception as error:
+        raise ValueError(f"environment fair_manifest_path must contain the canonical fair manifest case: {error}") from error
+    if errors:
+        raise ValueError("environment fair_manifest_path must contain the canonical fair manifest case: " + "; ".join(errors))
+
+
 def _validate_command(value: Any, label: str) -> list[str]:
     if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
         raise ValueError(f"{label} must be a nonempty string array")
@@ -286,18 +318,22 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         _require_equal(environment.get(field), expected, f"environment {field} must be {expected!r}")
 
     canonical_paths = (
-        ("fair_manifest_path", REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"),
-        ("source_manifest_path", REPO_ROOT / case["source_manifest_path"]),
-        ("fixture_path", REPO_ROOT / case["canonical_input_path"]),
+        ("fair_manifest_path", CANONICAL_FAIR_MANIFEST, "fair manifest"),
+        ("source_manifest_path", REPO_ROOT / case["source_manifest_path"], "source manifest"),
+        ("fixture_path", REPO_ROOT / case["canonical_input_path"], "fixture"),
+        ("stim_worker_module_path", CANONICAL_STIM_WORKER_MODULE, "Stim worker module"),
     )
-    for field, canonical_path in canonical_paths:
-        if _resolve_environment_path(environment, field) != canonical_path.resolve():
-            raise ValueError(f"environment {field} must name the canonical provenance input")
+    for field, canonical_path, description in canonical_paths:
+        _validate_canonical_path(environment, field, canonical_path, description)
     fixture_path = _resolve_environment_path(environment, "fixture_path")
+    if environment.get("fixture_sha256") != case["canonical_input_sha256"]:
+        raise ValueError("fixture_sha256 must match canonical fixture SHA-256")
+    _validate_fair_manifest_contract(_resolve_environment_path(environment, "fair_manifest_path"))
     for path_field, hash_field in (
         ("fair_manifest_path", "fair_manifest_sha256"),
         ("source_manifest_path", "source_manifest_sha256"),
         ("fixture_path", "fixture_sha256"),
+        ("stim_worker_module_path", "stim_worker_module_sha256"),
         ("python_executable", "python_executable_sha256"),
         ("loaded_stim_extension_path", "loaded_stim_extension_sha256"),
         ("rstim_worker_binary_path", "rstim_worker_binary_sha256"),

@@ -468,6 +468,7 @@ def _collect_environment(
 ) -> dict[str, Any]:
     fair_manifest_path = args.manifest.resolve()
     source_manifest_path = (REPO_ROOT / case["source_manifest_path"]).resolve()
+    stim_worker_module_path = (PACKAGE_DIR / "workers/stim_compiled_steady.py").resolve()
     python_executable = _resolve_executable("python3") or Path(sys.executable).resolve()
     rstim_worker_path = _resolve_executable(rstim_command[0])
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
@@ -497,6 +498,8 @@ def _collect_environment(
             "stim": [*default_stim_worker_command(), "--input", str(input_path), "--seed", str(args.seed)],
             "rstim": [*default_rstim_worker_command("release"), "--input", str(input_path), "--seed", str(args.seed)],
         },
+        "stim_worker_module_path": str(stim_worker_module_path),
+        "stim_worker_module_sha256": _sha256(stim_worker_module_path),
         "python_executable": str(python_executable),
         "python_executable_sha256": _sha256_if_file(python_executable),
         "loaded_stim_extension_path": stim_probe.get("path"),

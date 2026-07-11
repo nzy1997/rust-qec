@@ -384,6 +384,8 @@ class RunCompiledSteadyTest(unittest.TestCase):
             "fixture_path",
             "fixture_sha256",
             "worker_argv",
+            "stim_worker_module_path",
+            "stim_worker_module_sha256",
             "python_executable",
             "python_executable_sha256",
             "loaded_stim_extension_path",
@@ -399,6 +401,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
         case = run_compiled_steady.fair_cli_contract.find_case(manifest, "stim_surface_d11_r100")
         fixture = (ROOT / case["canonical_input_path"]).resolve()
         source_manifest = (ROOT / case["source_manifest_path"]).resolve()
+        stim_worker_module = (ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py").resolve()
         stim_worker = Path(temp_dir.name) / "stim_worker.py"
         rstim_worker = Path(temp_dir.name) / "rstim_worker.py"
         expected_worker_argv = {
@@ -443,6 +446,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual(environment["fixture_sha256"], case["canonical_input_sha256"])
         self.assertEqual(environment["worker_argv"], expected_worker_argv)
         self.assertEqual(environment["canonical_worker_argv"], expected_canonical_argv)
+        self.assertEqual(environment["stim_worker_module_path"], str(stim_worker_module))
+        self.assertEqual(
+            environment["stim_worker_module_sha256"],
+            hashlib.sha256(stim_worker_module.read_bytes()).hexdigest(),
+        )
         python_executable = Path(environment["python_executable"])
         self.assertTrue(python_executable.is_file(), python_executable)
         self.assertEqual(

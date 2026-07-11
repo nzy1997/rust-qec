@@ -59,8 +59,9 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     fixture = (REPO_ROOT / case["canonical_input_path"]).resolve()
     fair_manifest = (REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml").resolve()
     source_manifest = (REPO_ROOT / case["source_manifest_path"]).resolve()
+    stim_worker_module = (REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py").resolve()
     python_executable = Path(shutil.which("python3") or sys.executable).resolve()
-    stim_extension = path / "_stim.so"
+    stim_extension = path.parent / "_stim.so"
     for artifact, contents in (
         (stim_extension, b"stim extension\n"),
     ):
@@ -132,6 +133,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "fixture_sha256": sha256_file(fixture),
         "worker_argv": worker_argv,
         "canonical_worker_argv": worker_argv,
+        "stim_worker_module_path": str(stim_worker_module),
+        "stim_worker_module_sha256": sha256_file(stim_worker_module),
         "python_executable": str(python_executable),
         "python_executable_sha256": sha256_file(python_executable),
         "loaded_stim_extension_path": str(stim_extension),
@@ -290,6 +293,13 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("summary.json does not match summary derived from raw.jsonl", result.stderr)
 
+    def test_rejects_rehashed_report_not_derived_from_raw(self) -> None:
+        (self.bundle / "report.md").write_text("not the canonical report\n", encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("report.md does not match report derived from raw.jsonl", result.stderr)
+
     def test_rejects_noncanonical_worker_argv_even_when_hashes_match(self) -> None:
         def make_noncanonical(environment: dict[str, Any]) -> None:
             fixture = environment["fixture_path"]
@@ -314,6 +324,49 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment canonical_worker_argv must match release worker commands", result.stderr)
 
+    def test_rejects_noncanonical_stim_worker_module_hash(self) -> None:
+        substitute = self.bundle.parent / "stim_compiled_steady.py"
+        substitute.write_text("# not the canonical worker module\n", encoding="utf-8")
+
+        def replace_module(environment: dict[str, Any]) -> None:
+            environment["stim_worker_module_path"] = str(substitute)
+            environment["stim_worker_module_sha256"] = sha256_file(substitute)
+
+        rewrite_json(self.bundle / "environment.json", replace_module)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment stim_worker_module_path must name the canonical Stim worker module", result.stderr)
+
+    def test_rejects_fixture_sha_that_is_not_canonical_even_when_self_consistent(self) -> None:
+        def replace_fixture_hash(environment: dict[str, Any]) -> None:
+            environment["fixture_sha256"] = "1" * 64
+
+        records = load_raw(self.bundle / "raw.jsonl")
+        for record in records:
+            if "telemetry" in record:
+                record["telemetry"]["fixture_sha256"] = "1" * 64
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_json(self.bundle / "environment.json", replace_fixture_hash)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("fixture_sha256 must match canonical fixture SHA-256", result.stderr)
+
+    def test_rejects_noncanonical_fair_manifest_even_when_hashes_match(self) -> None:
+        substitute = self.bundle.parent / "fair_cli_cases.toml"
+        substitute.write_text("[[cases]]\ncase_id = \"wrong\"\n", encoding="utf-8")
+
+        def replace_manifest(environment: dict[str, Any]) -> None:
+            environment["fair_manifest_path"] = str(substitute)
+            environment["fair_manifest_sha256"] = sha256_file(substitute)
+
+        rewrite_json(self.bundle / "environment.json", replace_manifest)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment fair_manifest_path must name the canonical fair manifest", result.stderr)
+
     def test_rejects_malformed_preflight_telemetry(self) -> None:
         def replace_ready(environment: dict[str, Any]) -> None:
             environment["known_answer_preflight"][0]["ready"] = "not an object"
@@ -323,6 +376,12 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment stim preflight ready must be a JSON object", result.stderr)
+
+    def test_rejects_extra_bundle_file(self) -> None:
+        (self.bundle / "extra.txt").write_text("unexpected\n", encoding="utf-8")
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("unexpected bundle file: extra.txt", result.stderr)
 
     def test_rejects_missing_hash_manifest(self) -> None:
         (self.bundle / "artifact-sha256.json").unlink()
