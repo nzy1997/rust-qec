@@ -16,6 +16,12 @@ from benchmarks.rstim_vs_stim_simulator.portable_provenance import (
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_DIR = ROOT / "benchmarks" / "rstim_vs_stim_simulator"
 CATALOG = PACKAGE_DIR / "evidence_bundles.toml"
+REQUIRED_BUNDLE_IDS = (
+    "fair-cli-release",
+    "compiled-steady-release",
+    "reference-build-release",
+    "frame-instruction-wide-release",
+)
 
 
 def run_validator(path: Path) -> subprocess.CompletedProcess[str]:
@@ -47,7 +53,8 @@ class ValidateEvidenceBundlesTest(unittest.TestCase):
         bundles = catalog["bundles"]
 
         self.assertEqual(catalog["schema"], 2)
-        self.assertEqual(tuple(bundle["id"] for bundle in bundles), EXPECTED_BUNDLE_IDS)
+        self.assertEqual(tuple(bundle["id"] for bundle in bundles), REQUIRED_BUNDLE_IDS)
+        self.assertEqual(EXPECTED_BUNDLE_IDS, REQUIRED_BUNDLE_IDS)
 
     def test_repository_inputs_reject_host_absolute_paths(self) -> None:
         catalog = load_catalog(CATALOG)
