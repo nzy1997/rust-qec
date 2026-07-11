@@ -257,7 +257,7 @@ sha256 = "87d9a6e90e0131a4aff3723dd5844c5b2e081e590d5e2a3da8fdfbd977d9181b"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "f53d09a556ff5290332dc20ab3e5992771eea56080aa4961947f14a0f634241e"
+sha256 = "35e7d08db617afbe424ec037e7e612aa00afd3e11c77a21755d62d8ba9917ecb"
 
 [[bundles.artifacts]]
 path = "correctness-summary.json"
@@ -265,7 +265,7 @@ sha256 = "42d4e8ae02c8787292b4b16fc0e66f79c805fb04685d64630fd1778351b57484"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "75c05179184f5bc2f5f840663ac0407d27bc7c0e17d8e4018c6f3cb64583a2d1"
+sha256 = "3ea74cd3685c929883441c0016c9182ca96ba8af0e305cd4ffd6ff282fa51e17"
 
 [[bundles.artifacts]]
 path = "fixture-load.json"

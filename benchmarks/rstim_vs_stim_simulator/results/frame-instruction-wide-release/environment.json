@@ -59,8 +59,14 @@
   "measure_rounds": 1,
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
-  "rstim_binary": "target/release/rstim",
-  "rstim_binary_sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
+  "runtime_identities": [
+    {
+      "basename": "rstim",
+      "role": "tool://rstim",
+      "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
+      "version": "rstim 0.1.1"
+    }
+  ],
   "rstim_version": "rstim 0.1.1",
   "runner_argv": [
     "/opt/homebrew/opt/python@3.14/bin/python3.14",
