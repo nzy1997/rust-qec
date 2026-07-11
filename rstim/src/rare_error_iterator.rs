@@ -1,30 +1,30 @@
 use rand::RngCore;
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 use std::cell::Cell;
 
 const F64_UNIT_INTERVAL_SCALE: f64 = 1.0 / ((1u64 << 53) as f64);
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RareErrorTelemetry {
     pub iterator_builds: usize,
     pub rng_core_draws: usize,
 }
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 thread_local! {
     static ITERATOR_BUILDS: Cell<usize> = const { Cell::new(0) };
     static RNG_CORE_DRAWS: Cell<usize> = const { Cell::new(0) };
 }
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 #[doc(hidden)]
 pub fn reset_rare_error_telemetry() {
     ITERATOR_BUILDS.with(|builds| builds.set(0));
     RNG_CORE_DRAWS.with(|draws| draws.set(0));
 }
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 #[doc(hidden)]
 pub fn rare_error_telemetry() -> RareErrorTelemetry {
     RareErrorTelemetry {
@@ -33,12 +33,12 @@ pub fn rare_error_telemetry() -> RareErrorTelemetry {
     }
 }
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 fn record_iterator_build() {
     ITERATOR_BUILDS.with(|builds| builds.set(builds.get().saturating_add(1)));
 }
 
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 fn record_rng_core_draw() {
     RNG_CORE_DRAWS.with(|draws| draws.set(draws.get().saturating_add(1)));
 }
@@ -58,7 +58,7 @@ pub(crate) struct RareErrorIndexSampler {
 
 impl RareErrorIndexSampler {
     pub(crate) fn new(probability: f64, attempt_count: usize) -> Self {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         record_iterator_build();
 
         let mode = if attempt_count == 0 || probability <= 0.0 || probability.is_nan() {
@@ -144,7 +144,7 @@ impl<R: RngCore + ?Sized> Iterator for RareErrorIterator<'_, R> {
 
 fn draw_open_unit_f64<R: RngCore + ?Sized>(rng: &mut R) -> f64 {
     loop {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         record_rng_core_draw();
         let raw = rng.next_u64();
         let value = ((raw >> 11) as f64) * F64_UNIT_INTERVAL_SCALE;

@@ -1,4 +1,4 @@
-#[cfg(debug_assertions)]
+#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 use crate::rare_error_iterator::rare_error_telemetry;
 use rand::Rng;
 #[cfg(debug_assertions)]
@@ -16,8 +16,12 @@ use crate::sim::measure_record_batch::MeasureRecordBatch;
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct FrameNoiseTelemetryRecord {
-    pub name: &'static str,
+    pub operation: &'static str,
     pub sampling_path: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pairs: Option<usize>,
     pub iterator_builds: usize,
     pub attempt_count: usize,
 }
@@ -100,15 +104,19 @@ pub fn take_frame_noise_telemetry() -> Vec<FrameNoiseTelemetryRecord> {
 
 #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
 fn record_frame_noise_instruction(
-    name: &'static str,
+    operation: &'static str,
     sampling_path: &'static str,
+    targets: Option<usize>,
+    pairs: Option<usize>,
     iterator_builds: usize,
     attempt_count: usize,
 ) {
     FRAME_NOISE_TELEMETRY.with(|telemetry| {
         telemetry.borrow_mut().push(FrameNoiseTelemetryRecord {
-            name,
+            operation,
             sampling_path,
+            targets,
+            pairs,
             iterator_builds,
             attempt_count,
         });
@@ -1186,7 +1194,14 @@ impl FrameSimulator {
         #[cfg(debug_assertions)]
         record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
         #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction("X_ERROR", "dense", 0, attempt_count);
+        record_frame_noise_instruction(
+            "X_ERROR",
+            "dense",
+            Some(qubits.len()),
+            None,
+            0,
+            attempt_count,
+        );
         for &q in qubits {
             let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
             let x = self.x_table.row_words_mut(q);
@@ -1203,7 +1218,7 @@ impl FrameSimulator {
         attempt_count: usize,
         rng: &mut impl Rng,
     ) {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let builds_before = rare_error_telemetry().iterator_builds;
         let mut events = RareErrorIndexSampler::new(p, attempt_count);
         while let Some(event_index) = events.next_index(rng) {
@@ -1215,13 +1230,11 @@ impl FrameSimulator {
             let q = qubits[target_index];
             toggle_row_bit(self.x_table.row_words_mut(q), shot_index);
         }
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let iterator_builds = {
             let builds_after = rare_error_telemetry().iterator_builds;
             builds_after.saturating_sub(builds_before)
         };
-        #[cfg(all(not(debug_assertions), feature = "benchmark-telemetry"))]
-        let iterator_builds = 1;
         #[cfg(debug_assertions)]
         record_one_qubit_noise_instruction(
             OneQubitNoiseSamplingPath::Sparse,
@@ -1229,7 +1242,14 @@ impl FrameSimulator {
             attempt_count,
         );
         #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction("X_ERROR", "sparse", iterator_builds, attempt_count);
+        record_frame_noise_instruction(
+            "X_ERROR",
+            "sparse",
+            Some(qubits.len()),
+            None,
+            iterator_builds,
+            attempt_count,
+        );
     }
 
     fn exec_y_error_qubits(&mut self, qubits: &[usize], p: f64, wpr: usize, rng: &mut impl Rng) {
@@ -1268,7 +1288,14 @@ impl FrameSimulator {
         #[cfg(debug_assertions)]
         record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
         #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction("DEPOLARIZE1", "dense", 0, attempt_count);
+        record_frame_noise_instruction(
+            "DEPOLARIZE1",
+            "dense",
+            Some(qubits.len()),
+            None,
+            0,
+            attempt_count,
+        );
         if p <= 0.0 {
             return;
         }
@@ -1312,7 +1339,7 @@ impl FrameSimulator {
         attempt_count: usize,
         rng: &mut impl Rng,
     ) {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let builds_before = rare_error_telemetry().iterator_builds;
         let mut events = RareErrorIndexSampler::new(p, attempt_count);
         while let Some(event_index) = events.next_index(rng) {
@@ -1331,13 +1358,11 @@ impl FrameSimulator {
                 _ => toggle_row_bit(self.z_table.row_words_mut(q), shot_index),
             }
         }
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let iterator_builds = {
             let builds_after = rare_error_telemetry().iterator_builds;
             builds_after.saturating_sub(builds_before)
         };
-        #[cfg(all(not(debug_assertions), feature = "benchmark-telemetry"))]
-        let iterator_builds = 1;
         #[cfg(debug_assertions)]
         record_one_qubit_noise_instruction(
             OneQubitNoiseSamplingPath::Sparse,
@@ -1345,7 +1370,14 @@ impl FrameSimulator {
             attempt_count,
         );
         #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction("DEPOLARIZE1", "sparse", iterator_builds, attempt_count);
+        record_frame_noise_instruction(
+            "DEPOLARIZE1",
+            "sparse",
+            Some(qubits.len()),
+            None,
+            iterator_builds,
+            attempt_count,
+        );
     }
 
     fn exec_depolarize2_pairs(
@@ -1360,7 +1392,14 @@ impl FrameSimulator {
             #[cfg(debug_assertions)]
             record_depolarize2_sampling("empty", 0, attempt_count);
             #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-            record_frame_noise_instruction("DEPOLARIZE2", "empty", 0, attempt_count);
+            record_frame_noise_instruction(
+                "DEPOLARIZE2",
+                "empty",
+                None,
+                Some(pairs.len()),
+                0,
+                attempt_count,
+            );
             return;
         }
 
@@ -1379,24 +1418,29 @@ impl FrameSimulator {
         attempt_count: usize,
         rng: &mut impl Rng,
     ) {
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let iterator_builds_before =
             crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
 
         let mut events = RareErrorIndexSampler::new(p, attempt_count);
 
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
         let iterator_builds = {
             let iterator_builds_after =
                 crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
             iterator_builds_after.saturating_sub(iterator_builds_before)
         };
-        #[cfg(all(not(debug_assertions), feature = "benchmark-telemetry"))]
-        let iterator_builds = 1;
         #[cfg(debug_assertions)]
         record_depolarize2_sampling("sparse", iterator_builds, attempt_count);
         #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction("DEPOLARIZE2", "sparse", iterator_builds, attempt_count);
+        record_frame_noise_instruction(
+            "DEPOLARIZE2",
+            "sparse",
+            None,
+            Some(pairs.len()),
+            iterator_builds,
+            attempt_count,
+        );
 
         while let Some(event_index) = events.next_index(rng) {
             let (pair_index, shot_index) = decode_depolarize2_event(event_index, self.batch_size);
@@ -1424,6 +1468,8 @@ impl FrameSimulator {
         record_frame_noise_instruction(
             "DEPOLARIZE2",
             "dense",
+            None,
+            Some(pairs.len()),
             0,
             pairs.len().saturating_mul(self.batch_size),
         );

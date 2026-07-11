@@ -262,15 +262,19 @@ fn frame_noise_telemetry_accumulates_depolarize2_operations() {
 
         let telemetry = take_frame_noise_telemetry();
         assert_eq!(telemetry.len(), 2, "{backend}");
-        assert_eq!(telemetry[0].name, "DEPOLARIZE2", "{backend}");
+        assert_eq!(telemetry[0].operation, "DEPOLARIZE2", "{backend}");
         assert_eq!(telemetry[0].sampling_path, "sparse", "{backend}");
+        assert_eq!(telemetry[0].targets, None, "{backend}");
+        assert_eq!(telemetry[0].pairs, Some(pair_count), "{backend}");
         assert_eq!(telemetry[0].iterator_builds, 1, "{backend}");
         assert_eq!(
             telemetry[0].attempt_count, expected_attempt_count,
             "{backend}"
         );
-        assert_eq!(telemetry[1].name, "DEPOLARIZE2", "{backend}");
+        assert_eq!(telemetry[1].operation, "DEPOLARIZE2", "{backend}");
         assert_eq!(telemetry[1].sampling_path, "dense", "{backend}");
+        assert_eq!(telemetry[1].targets, None, "{backend}");
+        assert_eq!(telemetry[1].pairs, Some(pair_count), "{backend}");
         assert_eq!(telemetry[1].iterator_builds, 0, "{backend}");
         assert_eq!(
             telemetry[1].attempt_count, expected_attempt_count,

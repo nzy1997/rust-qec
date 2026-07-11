@@ -359,15 +359,19 @@ mod tests {
 
             let telemetry = take_frame_noise_telemetry();
             assert_eq!(telemetry.len(), 2, "{backend:?}");
-            assert_eq!(telemetry[0].name, "X_ERROR", "{backend:?}");
+            assert_eq!(telemetry[0].operation, "X_ERROR", "{backend:?}");
             assert_eq!(telemetry[0].sampling_path, "sparse", "{backend:?}");
+            assert_eq!(telemetry[0].targets, Some(3), "{backend:?}");
+            assert_eq!(telemetry[0].pairs, None, "{backend:?}");
             assert_eq!(telemetry[0].iterator_builds, 1, "{backend:?}");
             assert_eq!(
                 telemetry[0].attempt_count, expected_attempt_count,
                 "{backend:?}"
             );
-            assert_eq!(telemetry[1].name, "DEPOLARIZE1", "{backend:?}");
+            assert_eq!(telemetry[1].operation, "DEPOLARIZE1", "{backend:?}");
             assert_eq!(telemetry[1].sampling_path, "dense", "{backend:?}");
+            assert_eq!(telemetry[1].targets, Some(3), "{backend:?}");
+            assert_eq!(telemetry[1].pairs, None, "{backend:?}");
             assert_eq!(telemetry[1].iterator_builds, 0, "{backend:?}");
             assert_eq!(
                 telemetry[1].attempt_count, expected_attempt_count,

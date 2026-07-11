@@ -1733,12 +1733,16 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(telemetry_path).unwrap()).unwrap();
         let operations = telemetry["operations"].as_array().unwrap();
         assert_eq!(operations.len(), 2);
-        assert_eq!(operations[0]["name"], "X_ERROR");
+        assert_eq!(operations[0]["operation"], "X_ERROR");
         assert_eq!(operations[0]["sampling_path"], "sparse");
+        assert_eq!(operations[0]["targets"], 3);
+        assert!(operations[0].get("pairs").is_none());
         assert_eq!(operations[0]["iterator_builds"], 1);
         assert_eq!(operations[0]["attempt_count"], 51);
-        assert_eq!(operations[1]["name"], "DEPOLARIZE1");
+        assert_eq!(operations[1]["operation"], "DEPOLARIZE1");
         assert_eq!(operations[1]["sampling_path"], "dense");
+        assert_eq!(operations[1]["targets"], 3);
+        assert!(operations[1].get("pairs").is_none());
         assert_eq!(operations[1]["iterator_builds"], 0);
         assert_eq!(operations[1]["attempt_count"], 51);
     }
