@@ -1,0 +1,305 @@
+schema = 2
+suite = "rstim_vs_stim_simulator"
+
+[[bundles]]
+id = "fair-cli-release"
+bundle_path = "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+sha256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/run_fair_cli.py"
+sha256 = "5ee7ada92ddaf6b8e5001cf8abf38ca125a51c783e1dc89a27451ad67f556ea1"
+
+[[bundles.artifacts]]
+path = "artifact-sha256.json"
+sha256 = "3e7467149b7eb0fe469a8819b710bce1b8da05fe67cf761b43d3b03f6365e663"
+
+[[bundles.artifacts]]
+path = "environment.json"
+sha256 = "a63e02bb1703cc3af537bf300fe5daba49519b7e4467996b456c85691a7d5b8f"
+
+[[bundles.artifacts]]
+path = "raw.jsonl"
+sha256 = "7548768a65425c55ca51480a4bdbb45b0a7e2462810f05498a195c02a8318a48"
+
+[[bundles.artifacts]]
+path = "report.md"
+sha256 = "1b28385ccf1523fac930feb4dc11542751884bdf99416e98815e0591d1960e51"
+
+[[bundles.artifacts]]
+path = "summary.json"
+sha256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+
+[[bundles.logical_executables]]
+role = "tool://stim"
+
+[[bundles.logical_executables]]
+role = "tool://rstim"
+
+[[bundles.runtime_identities]]
+role = "tool://stim"
+version = "1.15.0"
+basename = "stim"
+sha256 = "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323"
+
+[[bundles.runtime_identities]]
+role = "tool://rstim"
+version = "rstim 0.1.1"
+basename = "rstim"
+sha256 = "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a"
+
+[[bundles.checked_commands]]
+name = "stim-cli-b8"
+argv = ["tool://stim", "sample", "--shots", "1024", "--seed", "{seed}", "--out_format", "b8", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
+
+[[bundles.checked_commands]]
+name = "rstim-cli-b8"
+argv = ["tool://rstim", "sample", "--shots", "1024", "--seed", "{seed}", "--out_format", "b8", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
+
+[[bundles.checked_provenance]]
+name = "release-contract"
+value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "cli_end_to_end", source_manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", fair_manifest = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml" }
+
+[[bundles]]
+id = "compiled-steady-release"
+bundle_path = "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+sha256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
+sha256 = "166b1227b71bfb89313fe78a4ac46017f8092aa30f08c6537aa3875c211f5909"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
+sha256 = "2c8fd5c9ad1e72534e12641f6f241d3cb10a7d64b5a546264246b1c793c3bdaf"
+
+[[bundles.artifacts]]
+path = "artifact-sha256.json"
+sha256 = "9a5139aeb39c4cc7afa0d986d4d73904a64d662334d5dcddf63cd97aeea45919"
+
+[[bundles.artifacts]]
+path = "environment.json"
+sha256 = "2bc714f36e55fe9b2f6051198b65a4287ec558152ada166f77fe9a11f9772629"
+
+[[bundles.artifacts]]
+path = "raw.jsonl"
+sha256 = "7bb10e3751c6568ff9533994d798a7a6c9f2fe664b7e3968f766f03dbb0d05b9"
+
+[[bundles.artifacts]]
+path = "report.md"
+sha256 = "84b730190bf7554f63dea3fe7629eb8e787db01cbe9ae387a242c2339605d6f4"
+
+[[bundles.artifacts]]
+path = "summary.json"
+sha256 = "2228e5460be43775d45f30861f28bc36c888557add981eeab8e47deadbfb8680"
+
+[[bundles.logical_executables]]
+role = "tool://python"
+
+[[bundles.logical_executables]]
+role = "tool://stim-worker"
+
+[[bundles.logical_executables]]
+role = "tool://rstim-worker"
+
+[[bundles.runtime_identities]]
+role = "tool://python"
+version = "3.14.3"
+basename = "python3.14"
+sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
+
+[[bundles.runtime_identities]]
+role = "tool://stim-extension"
+version = "1.15.0"
+basename = "_stim_polyfill.cpython-314-darwin.so"
+sha256 = "1905320bed01fa545b5c35e5f584089dc3d9c93625a3b04a4323509ed03f7a3a"
+
+[[bundles.runtime_identities]]
+role = "tool://stim-worker"
+version = "1.15.0"
+basename = "stim_compiled_steady.py"
+sha256 = "2c8fd5c9ad1e72534e12641f6f241d3cb10a7d64b5a546264246b1c793c3bdaf"
+
+[[bundles.runtime_identities]]
+role = "tool://rstim-worker"
+version = "rstim 0.1.1"
+basename = "rstim_compiled_steady_worker"
+sha256 = "e3cadbc979a5a30c0f20dab6acf9329f50872c1f732dc87ebd54c8c192b878d4"
+
+[[bundles.checked_commands]]
+name = "stim-compiled-worker"
+argv = ["tool://python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady", "--input", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "--seed", "0"]
+
+[[bundles.checked_commands]]
+name = "rstim-compiled-worker"
+argv = ["tool://rstim-worker", "--input", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "--seed", "0"]
+
+[[bundles.checked_provenance]]
+name = "release-contract"
+value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "cli_end_to_end", protocol_version = "1", source_manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", fair_manifest = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml" }
+
+[[bundles]]
+id = "reference-build-release"
+bundle_path = "benchmarks/rstim_vs_stim_simulator/results/reference-build-release"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+sha256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/run_reference_build_benchmark.py"
+sha256 = "a55c223de05397f373cebd2fb8b570fa5226ea999ecc3fbf8bfdcaaa346d8988"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
+sha256 = "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9"
+
+[[bundles.artifacts]]
+path = "artifact-sha256.json"
+sha256 = "d4a774b40bd58bab832465ebb35973593fd4316f7b093966c9e1ccf59ef2c246"
+
+[[bundles.artifacts]]
+path = "environment.json"
+sha256 = "5a022f3286552f883455bf2741ee50645a69fde4cb1b8d53f353337622781253"
+
+[[bundles.artifacts]]
+path = "raw.jsonl"
+sha256 = "90f6020744e902426e09c0a1dfa0ea10cda3a5c322a1dafce36aba2c5fccab5d"
+
+[[bundles.artifacts]]
+path = "report.md"
+sha256 = "4a6a2dae36b546be472990651a27be20bfd11f1a3c15e9963a1e212bade1f6ef"
+
+[[bundles.artifacts]]
+path = "summary.json"
+sha256 = "614658cf8213b486752f1fe53b7d864561abbe41c2eefd799fc8fa34883270a5"
+
+[[bundles.logical_executables]]
+role = "tool://python"
+
+[[bundles.logical_executables]]
+role = "tool://stim-reference-worker"
+
+[[bundles.logical_executables]]
+role = "tool://rstim-reference-worker"
+
+[[bundles.runtime_identities]]
+role = "tool://python"
+version = "3.14.3"
+basename = "python3.14"
+sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
+
+[[bundles.runtime_identities]]
+role = "tool://stim-reference-worker"
+version = "1.15.0"
+basename = "stim_reference_build.py"
+sha256 = "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9"
+
+[[bundles.runtime_identities]]
+role = "tool://rstim-reference-worker"
+version = "rstim 0.1.1"
+basename = "rstim_reference_build_worker"
+sha256 = "82d395176ebe76d6890bb9e747771fac46a019867287f69b0da8d6d5075e1265"
+
+[[bundles.checked_commands]]
+name = "stim-reference-worker"
+argv = ["tool://python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", "reference-build-v1"]
+
+[[bundles.checked_commands]]
+name = "rstim-reference-worker"
+argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1"]
+
+[[bundles.checked_provenance]]
+name = "release-contract"
+value = { profile = "release", protocol = "reference-build-v1", timer_scope = "reference_build_only", manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml" }
+
+[[bundles]]
+id = "frame-instruction-wide-release"
+bundle_path = "benchmarks/rstim_vs_stim_simulator/results/frame-instruction-wide-release"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+sha256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/run_frame_instruction_wide_benchmark.py"
+sha256 = "87d9a6e90e0131a4aff3723dd5844c5b2e081e590d5e2a3da8fdfbd977d9181b"
+
+[[bundles.artifacts]]
+path = "artifact-sha256.json"
+sha256 = "f53d09a556ff5290332dc20ab3e5992771eea56080aa4961947f14a0f634241e"
+
+[[bundles.artifacts]]
+path = "correctness-summary.json"
+sha256 = "42d4e8ae02c8787292b4b16fc0e66f79c805fb04685d64630fd1778351b57484"
+
+[[bundles.artifacts]]
+path = "environment.json"
+sha256 = "75c05179184f5bc2f5f840663ac0407d27bc7c0e17d8e4018c6f3cb64583a2d1"
+
+[[bundles.artifacts]]
+path = "fixture-load.json"
+sha256 = "c953d134c601568b9be1d73036ca652bb90438148adeb6c6942fca788435d27f"
+
+[[bundles.artifacts]]
+path = "raw.jsonl"
+sha256 = "c257e436be785cb48a8847f042883fe066501b479ecad72f781b6f82232494a6"
+
+[[bundles.artifacts]]
+path = "report.md"
+sha256 = "fd1e291c7848599c9d06f48d3e139210c7daef25a51b1d1ba301ca3c37afbde4"
+
+[[bundles.artifacts]]
+path = "summary.json"
+sha256 = "1b41f2b1f8ad1730ac61f62cd707225f547b42d6f65ac0752b22a6cfbc6cb422"
+
+[[bundles.logical_executables]]
+role = "tool://rstim"
+
+[[bundles.runtime_identities]]
+role = "tool://rstim"
+version = "rstim 0.1.1"
+basename = "rstim"
+sha256 = "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568"
+
+[[bundles.checked_commands]]
+name = "measurement"
+argv = ["tool://rstim", "--benchmark-telemetry-json", "rstim-telemetry.json", "sample", "--shots", "1024", "--seed", "7", "--out_format", "b8", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
+
+[[bundles.checked_commands]]
+name = "correctness-rstim"
+argv = ["tool://rstim", "detect", "--shots", "1024", "--seed", "7", "--out_format", "01", "--append_observables", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
+
+[[bundles.checked_provenance]]
+name = "release-contract"
+value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "process_spawn_stdout_stderr_drain_exit", manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", stim_version = "1.15.0" }
