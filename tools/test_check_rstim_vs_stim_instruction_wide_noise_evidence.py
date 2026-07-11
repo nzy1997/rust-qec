@@ -3,14 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Callable
-
-from tools import check_rstim_vs_stim_instruction_wide_noise_evidence as checker_module
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools/check_rstim_vs_stim_instruction_wide_noise_evidence.py"
@@ -52,6 +50,28 @@ def rewrite_hashes(bundle: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
+
+
+def write_checker_repo_fixture(repo_root: Path, runtime_identity: dict[str, str]) -> Path:
+    tools_dir = repo_root / "tools"
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(CHECKER, tools_dir / CHECKER.name)
+
+    benchmarks_dir = repo_root / "benchmarks"
+    benchmarks_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO_ROOT / "benchmarks/__init__.py", benchmarks_dir / "__init__.py")
+    shutil.copytree(
+        REPO_ROOT / "benchmarks/rstim_vs_stim_simulator",
+        benchmarks_dir / "rstim_vs_stim_simulator",
+    )
+
+    catalog_path = benchmarks_dir / "rstim_vs_stim_simulator/evidence_bundles.toml"
+    catalog_text = catalog_path.read_text(encoding="utf-8")
+    catalog_path.write_text(
+        catalog_text.replace(PUBLISHED_RSTIM_RUNTIME_IDENTITY["sha256"], runtime_identity["sha256"]),
+        encoding="utf-8",
+    )
+    return tools_dir / CHECKER.name
 
 
 def write_valid_bundle(bundle: Path) -> None:
@@ -189,9 +209,9 @@ def write_valid_bundle(bundle: Path) -> None:
         "rustc_version": "rustc test",
         "os": "test-os",
         "cpu_model": "test-cpu",
-        "fixture": str(FIXTURE),
+        "fixture": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
         "fixture_sha256": sha256_file(FIXTURE),
-        "manifest": str(MANIFEST),
+        "manifest": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
         "manifest_sha256": sha256_file(MANIFEST),
         "runtime_identities": [
             PUBLISHED_RSTIM_RUNTIME_IDENTITY,
@@ -224,10 +244,15 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.bundle = Path(self.tmpdir.name) / "bundle"
         write_valid_bundle(self.bundle)
 
-    def run_checker(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        *extra_args: str,
+        checker_path: Path = CHECKER,
+        cwd: Path = REPO_ROOT,
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(CHECKER), "--dir", str(self.bundle), *extra_args],
-            cwd=REPO_ROOT,
+            ["python3", str(checker_path), "--dir", str(self.bundle), *extra_args],
+            cwd=cwd,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -253,11 +278,26 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
             "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
         )
 
-    def test_verify_runtime_binary_accepts_matching_identity(self) -> None:
+    def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:
         identity = dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY)
         identity["sha256"] = sha256_file(self.bundle / "rstim")
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: payload.update({"runtime_identities": [identity]}),
+        )
+        rewrite_hashes(self.bundle)
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(repo_root, identity)
 
-        checker_module.validate_runtime_binary(self.bundle / "rstim", identity)
+        result = self.run_checker(
+            "--verify-runtime-binary",
+            str(self.bundle / "rstim"),
+            checker_path=checker_path,
+            cwd=repo_root,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS instruction-wide frame-noise evidence", result.stdout)
 
     def test_verify_runtime_binary_rejects_different_supplied_binary(self) -> None:
         other_binary = self.bundle / "other-rstim"
@@ -304,6 +344,7 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
     def test_rejects_failed_or_sample_mode_correctness(self) -> None:
         for field, value, message in (
             ("status", "fail", "correctness-summary status must be pass"),
+            ("status", "failed", "correctness-summary status must be pass"),
             ("mode", "sample", "correctness-summary mode must be detect"),
         ):
             with self.subTest(field=field):
