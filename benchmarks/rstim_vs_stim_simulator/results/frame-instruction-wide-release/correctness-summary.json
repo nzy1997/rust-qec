@@ -7,7 +7,7 @@
   "mode": "detect",
   "observables": 1,
   "output_format": "01",
-  "rstim_elapsed_ns": 135015792,
+  "rstim_elapsed_ns": 132321583,
   "rstim_output_bytes": 12290048,
   "rstim_stdout_sha256": "961aa7a6caa8cda3f754c08254926438d32f4994b12bd7b38928a62e616f5040",
   "sample_count": 1024,
@@ -98,7 +98,7 @@
   ],
   "shots": 1024,
   "status": "pass",
-  "stim_elapsed_ns": 178620000,
+  "stim_elapsed_ns": 176044666,
   "stim_output_bytes": 12290048,
   "stim_stdout_sha256": "0f50514d2aa326873d4b8793059a33b948697fe1e5688909b0e96b2a97f3f2be"
 }

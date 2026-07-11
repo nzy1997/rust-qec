@@ -1,10 +1,10 @@
 {
   "artifact_sha256": {
-    "correctness-summary.json": "745c5e3aa4f0b4c722c602d4c165fa98a137af2fd78519daca8bd028045dd432",
+    "correctness-summary.json": "8afe955c8edf5ea0f3080284647fe56989628745db252095c2fc9d8214a335b0",
     "fixture-load.json": "c953d134c601568b9be1d73036ca652bb90438148adeb6c6942fca788435d27f",
-    "raw.jsonl": "12e74510af1eccfcadcfc94d276c5d74ce83c84c286118488237ac3f715c2b4c",
+    "raw.jsonl": "c3366ad41723de02ebb48655bd00750639cf393f5fbfab0351bc338807f0947d",
     "report.md": "fd1e291c7848599c9d06f48d3e139210c7daef25a51b1d1ba301ca3c37afbde4",
-    "summary.json": "90fc21eac3a7a2d1de209b0ccbf70e76861ef90566099a4f98f9060aae9f3cb7"
+    "summary.json": "4708ed96037debfb82aa40b9e9af8691b037d6507467db66ab14e88e40fb6b54"
   },
   "case_id": "stim_surface_d11_r100",
   "child_argv": {
@@ -37,7 +37,7 @@
     "measurement": [
       "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-463-run-1-agent-issue-463-publish-instruction-wide-frame-noise-evidence-run-1/target/release/rstim",
       "--benchmark-telemetry-json",
-      "/tmp/rstim-frame-instruction-wide-release/tmpoy9ixzm3/rstim-telemetry.json",
+      "/tmp/rstim-frame-instruction-wide-release/tmpl6emffzi/rstim-telemetry.json",
       "sample",
       "--shots",
       "1024",
@@ -52,8 +52,8 @@
   "cpu_model": "arm",
   "fixture": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-463-run-1-agent-issue-463-publish-instruction-wide-frame-noise-evidence-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
-  "git_commit": "b7c65a3e4c58dfa522aaacdf5363b74691578938",
-  "git_dirty": true,
+  "git_commit": "3909fa3fa5394fadd7aa2af836a33c6cc7e6bdc5",
+  "git_dirty": false,
   "manifest": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-463-run-1-agent-issue-463-publish-instruction-wide-frame-noise-evidence-run-1/benchmarks/rstim_vs_stim_simulator/cases.full.toml",
   "manifest_sha256": "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921",
   "measure_rounds": 1,

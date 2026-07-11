@@ -3,7 +3,7 @@
   "measurement": {
     "actual_output_bytes": 1552384,
     "bytes_per_shot": 1516,
-    "elapsed_ns": 1137786417,
+    "elapsed_ns": 2739226334,
     "expected_output_bytes": 1552384,
     "output_bits": 12121,
     "output_format": "b8",
