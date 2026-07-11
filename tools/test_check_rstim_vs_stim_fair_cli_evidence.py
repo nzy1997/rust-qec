@@ -279,7 +279,7 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "environment fair_manifest_path must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            "environment manifest must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
             result.stderr,
         )
 
@@ -307,7 +307,10 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment manifest must match fair_manifest_path", result.stderr)
+        self.assertIn(
+            "environment manifest must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
 
     def test_rejects_output_bytes_not_derived_from_measurements_and_shots(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
