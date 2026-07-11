@@ -7,9 +7,10 @@ use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 use rstim::rare_error_iterator::{rare_error_telemetry, reset_rare_error_telemetry};
 use rstim::sim::frame::{
-    FrameSimulator, depolarize2_branch_label_for_test, depolarize2_decode_event_for_test,
+    depolarize2_branch_label_for_test, depolarize2_decode_event_for_test,
     depolarize2_sampling_telemetry, reset_depolarize2_sampling_telemetry,
-    sample_depolarize2_branch_index_for_test,
+    reset_frame_noise_telemetry, sample_depolarize2_branch_index_for_test,
+    take_frame_noise_telemetry, FrameSimulator,
 };
 
 struct ScriptedRng {
@@ -240,4 +241,40 @@ fn probability_above_sparse_threshold_uses_dense_fallback() {
     assert_eq!(telemetry.iterator_builds, 0);
     assert_eq!(telemetry.attempt_count, pair_count * shots);
     assert_eq!(rare_error_telemetry().iterator_builds, 0);
+}
+
+#[test]
+fn frame_noise_telemetry_accumulates_depolarize2_operations() {
+    let pair_count = 3;
+    let shots = 17;
+    let sparse_program = many_depolarize2_pairs(pair_count, 0.001);
+    let dense_program = many_depolarize2_pairs(pair_count, 0.3);
+    let program = format!("{sparse_program}{dense_program}M 0 1\n");
+    let expected_attempt_count = pair_count * shots;
+
+    for backend in ["interpreted", "compiled"] {
+        reset_frame_noise_telemetry();
+        match backend {
+            "interpreted" => run_interpreted(&program, pair_count * 2, shots, 463),
+            "compiled" => run_compiled(&program, shots, 463),
+            _ => unreachable!(),
+        }
+
+        let telemetry = take_frame_noise_telemetry();
+        assert_eq!(telemetry.len(), 2, "{backend}");
+        assert_eq!(telemetry[0].name, "DEPOLARIZE2", "{backend}");
+        assert_eq!(telemetry[0].sampling_path, "sparse", "{backend}");
+        assert_eq!(telemetry[0].iterator_builds, 1, "{backend}");
+        assert_eq!(
+            telemetry[0].attempt_count, expected_attempt_count,
+            "{backend}"
+        );
+        assert_eq!(telemetry[1].name, "DEPOLARIZE2", "{backend}");
+        assert_eq!(telemetry[1].sampling_path, "dense", "{backend}");
+        assert_eq!(telemetry[1].iterator_builds, 0, "{backend}");
+        assert_eq!(
+            telemetry[1].attempt_count, expected_attempt_count,
+            "{backend}"
+        );
+    }
 }

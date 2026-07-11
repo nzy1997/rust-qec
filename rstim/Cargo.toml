@@ -3,6 +3,9 @@ name = "rstim"
 version = "0.1.1"
 edition = "2024"
 
+[features]
+benchmark-telemetry = []
+
 [dependencies]
 rand = "0.8"
 clap = { version = "4", features = ["derive"] }
