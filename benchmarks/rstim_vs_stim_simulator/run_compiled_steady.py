@@ -369,6 +369,7 @@ def _run_variant(
     fixture_sha256: str,
     seed: int,
     shots: int,
+    output_format: str,
     measurement_count: int,
     bytes_per_shot: int,
     expected_output_bytes: int,
@@ -401,6 +402,8 @@ def _run_variant(
                     "variant": variant,
                     "request_id": request_id,
                     "sample_call_count": call_count,
+                    "shots": shots,
+                    "output_format": output_format,
                     "warmup": request_id < warmup_rounds,
                     "elapsed_ns": elapsed_ns,
                     "output_bytes": len(data),
@@ -468,6 +471,7 @@ def _collect_environment(
 ) -> dict[str, Any]:
     fair_manifest_path = args.manifest.resolve()
     source_manifest_path = (REPO_ROOT / case["source_manifest_path"]).resolve()
+    stim_worker_module_path = (PACKAGE_DIR / "workers/stim_compiled_steady.py").resolve()
     python_executable = _resolve_executable("python3") or Path(sys.executable).resolve()
     rstim_worker_path = _resolve_executable(rstim_command[0])
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
@@ -497,6 +501,8 @@ def _collect_environment(
             "stim": [*default_stim_worker_command(), "--input", str(input_path), "--seed", str(args.seed)],
             "rstim": [*default_rstim_worker_command("release"), "--input", str(input_path), "--seed", str(args.seed)],
         },
+        "stim_worker_module_path": str(stim_worker_module_path),
+        "stim_worker_module_sha256": _sha256(stim_worker_module_path),
         "python_executable": str(python_executable),
         "python_executable_sha256": _sha256_if_file(python_executable),
         "loaded_stim_extension_path": stim_probe.get("path"),
@@ -546,6 +552,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
             fixture_sha256=case["canonical_input_sha256"],
             seed=args.seed,
             shots=case["shots"],
+            output_format=case["output_format"],
             measurement_count=case["measurement_count"],
             bytes_per_shot=case["bytes_per_shot"],
             expected_output_bytes=case["expected_output_bytes"],
