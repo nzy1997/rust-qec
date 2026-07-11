@@ -174,7 +174,7 @@ sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_reference_build_benchmark.py"
-sha256 = "7de70a50588e8b2c95288058325796ded8236d87f8ce71849d28b102caa83daa"
+sha256 = "d3d24ec2ec29f5aebb91216df64839c2c999150601e1ab4325d7f0738814ca74"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
@@ -182,11 +182,11 @@ sha256 = "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "54e3f72ada402665dbf22a2f026d7ee320d3cc8cbe686effcfa78be73789d111"
+sha256 = "a635c767c8daf2a274b24ede1fc954f318b72078cbd47a9a505368f7d198711a"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "0116030b59408ff60bef3c4c664ab74d6bb2d3411c848d2ce6a62d5ee513864e"
+sha256 = "594d4cc17d4c6b427cd4c98d32c53eb64941d682ea6355128ffbee81832dcc3d"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"
@@ -204,7 +204,7 @@ sha256 = "614658cf8213b486752f1fe53b7d864561abbe41c2eefd799fc8fa34883270a5"
 role = "tool://python"
 
 [[bundles.logical_executables]]
-role = "tool://stim-reference-worker"
+role = "tool://stim-python"
 
 [[bundles.logical_executables]]
 role = "tool://rstim-reference-worker"
@@ -216,10 +216,10 @@ basename = "python3.14"
 sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
 
 [[bundles.runtime_identities]]
-role = "tool://stim-reference-worker"
+role = "tool://stim-python"
 version = "1.15.0"
-basename = "stim_reference_build.py"
-sha256 = "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9"
+basename = "python3.14"
+sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
 
 [[bundles.runtime_identities]]
 role = "tool://rstim-reference-worker"
@@ -229,7 +229,7 @@ sha256 = "82d395176ebe76d6890bb9e747771fac46a019867287f69b0da8d6d5075e1265"
 
 [[bundles.checked_commands]]
 name = "stim-reference-worker"
-argv = ["tool://python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", "reference-build-v1"]
+argv = ["tool://stim-python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", "reference-build-v1"]
 
 [[bundles.checked_commands]]
 name = "rstim-reference-worker"

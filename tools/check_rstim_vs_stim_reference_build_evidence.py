@@ -32,10 +32,9 @@ EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a61506
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 GIT_COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
 PYTHON_ROLE = "tool://python"
-STIM_WORKER_ROLE = "tool://stim-reference-worker"
+STIM_PYTHON_ROLE = "tool://stim-python"
 RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
-EXPECTED_RUNTIME_ROLES = frozenset({PYTHON_ROLE, STIM_WORKER_ROLE, RSTIM_WORKER_ROLE})
-EXPECTED_STIM_WORKER = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
+EXPECTED_RUNTIME_ROLES = frozenset({PYTHON_ROLE, STIM_PYTHON_ROLE, RSTIM_WORKER_ROLE})
 EXPECTED_RSTIM_WORKER_VERSION = "rstim 0.1.1"
 RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
 LEGACY_RUNTIME_PATH_FIELDS = frozenset(
@@ -274,13 +273,9 @@ def _validate_runtime_identities(environment: dict[str, Any]) -> dict[str, dict[
         raise ValueError(f"environment runtime_identities must contain exactly: {roles}")
     if by_role[PYTHON_ROLE]["version"] != environment.get("python_version"):
         raise ValueError("environment runtime_identities tool://python version must match python_version")
-    stim_identity = by_role[STIM_WORKER_ROLE]
+    stim_identity = by_role[STIM_PYTHON_ROLE]
     if stim_identity["version"] != environment.get("stim_version"):
-        raise ValueError("environment runtime_identities tool://stim-reference-worker version must match stim_version")
-    if stim_identity["basename"] != "stim_reference_build.py":
-        raise ValueError("environment runtime_identities tool://stim-reference-worker basename must be stim_reference_build.py")
-    if stim_identity["sha256"] != sha256_file(EXPECTED_STIM_WORKER):
-        raise ValueError("environment runtime_identities tool://stim-reference-worker sha256 must match canonical Stim worker")
+        raise ValueError("environment runtime_identities tool://stim-python version must match stim_version")
     rstim_identity = by_role[RSTIM_WORKER_ROLE]
     if rstim_identity["version"] != EXPECTED_RSTIM_WORKER_VERSION:
         raise ValueError(f"environment runtime_identities tool://rstim-reference-worker version must be {EXPECTED_RSTIM_WORKER_VERSION}")
@@ -311,7 +306,7 @@ def _validate_worker_argv(environment: dict[str, Any]) -> None:
         raise ValueError("environment canonical_worker_argv must contain both reference-build variants")
 
     expected_canonical = {
-        runner.STIM_VARIANT: runner.default_stim_worker_argv(PYTHON_ROLE),
+        runner.STIM_VARIANT: runner.default_stim_worker_argv(STIM_PYTHON_ROLE),
         runner.RSTIM_VARIANT: runner.default_rstim_worker_argv(RSTIM_WORKER_ROLE),
     }
     if canonical_worker_argv != expected_canonical:
@@ -341,7 +336,7 @@ def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> Non
 
     expected_tail = [
         "--stim-python",
-        PYTHON_ROLE,
+        STIM_PYTHON_ROLE,
         "--rstim-worker",
         RSTIM_WORKER_ROLE,
         "--warmup-rounds",

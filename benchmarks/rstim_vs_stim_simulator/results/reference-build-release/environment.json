@@ -6,7 +6,7 @@
       "reference-build-v1"
     ],
     "stim-reference-b8": [
-      "tool://python",
+      "tool://stim-python",
       "-m",
       "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
       "--protocol",
@@ -35,7 +35,7 @@
     "--manifest",
     "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
     "--stim-python",
-    "tool://python",
+    "tool://stim-python",
     "--rstim-worker",
     "tool://rstim-reference-worker",
     "--warmup-rounds",
@@ -53,9 +53,9 @@
       "version": "3.14.3"
     },
     {
-      "basename": "stim_reference_build.py",
-      "role": "tool://stim-reference-worker",
-      "sha256": "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9",
+      "basename": "python3.14",
+      "role": "tool://stim-python",
+      "sha256": "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43",
       "version": "1.15.0"
     },
     {
@@ -77,7 +77,7 @@
       "reference-build-v1"
     ],
     "stim-reference-b8": [
-      "tool://python",
+      "tool://stim-python",
       "-m",
       "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
       "--protocol",

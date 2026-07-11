@@ -27,9 +27,8 @@ RSTIM_VARIANT = "rstim-packed-reference-b8"
 FIXTURE_REL = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 MANIFEST_REL = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
 PYTHON_ROLE = "tool://python"
-STIM_WORKER_ROLE = "tool://stim-reference-worker"
+STIM_PYTHON_ROLE = "tool://stim-python"
 RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
-STIM_WORKER_REL = "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
 RSTIM_WORKER_VERSION = "rstim 0.1.1"
 
 
@@ -136,7 +135,6 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     fixture = REPO_ROOT / FIXTURE_REL
     manifest = REPO_ROOT / MANIFEST_REL
     runner_python = Path(sys.executable).resolve()
-    stim_worker_module = REPO_ROOT / STIM_WORKER_REL
 
     records: list[dict[str, Any]] = []
     for variant, backend, elapsed_base in (
@@ -179,11 +177,11 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "manifest_sha256": MANIFEST_DIGEST,
         "stim_version": "1.15.0",
         "worker_argv": {
-            STIM_VARIANT: [PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
+            STIM_VARIANT: [STIM_PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
             RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
         "canonical_worker_argv": {
-            STIM_VARIANT: [PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
+            STIM_VARIANT: [STIM_PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
             RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
         "runner_argv": [
@@ -195,7 +193,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             "--manifest",
             MANIFEST_REL,
             "--stim-python",
-            PYTHON_ROLE,
+            STIM_PYTHON_ROLE,
             "--rstim-worker",
             RSTIM_WORKER_ROLE,
             "--warmup-rounds",
@@ -213,10 +211,10 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                 "sha256": sha256_file(runner_python),
             },
             {
-                "role": STIM_WORKER_ROLE,
+                "role": STIM_PYTHON_ROLE,
                 "version": "1.15.0",
-                "basename": "stim_reference_build.py",
-                "sha256": sha256_file(stim_worker_module),
+                "basename": runner_python.name,
+                "sha256": sha256_file(runner_python),
             },
             {
                 "role": RSTIM_WORKER_ROLE,
