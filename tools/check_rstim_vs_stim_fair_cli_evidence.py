@@ -20,8 +20,10 @@ REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", 
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
 VARIANTS = ("stim-cli-b8", "rstim-cli-b8")
 CANONICAL_FAIR_MANIFEST_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
-CANONICAL_SOURCE_MANIFEST = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
-CANONICAL_FIXTURE = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
+CANONICAL_SOURCE_MANIFEST_PATH = fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
+CANONICAL_FIXTURE_PATH = fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
+CANONICAL_SOURCE_MANIFEST = REPO_ROOT / CANONICAL_SOURCE_MANIFEST_PATH
+CANONICAL_FIXTURE = REPO_ROOT / CANONICAL_FIXTURE_PATH
 OLD_FULL_SUMMARY = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
 OLD_FULL_SUMMARY_SHA256 = "97ae397e598fe447d206c6b07a26ceaa0a3336d1883a7f77bc194f7b4c491805"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
@@ -224,16 +226,6 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
         raise ValueError(f"environment {hash_field} does not match {path_field}")
 
 
-def _validate_canonical_path(
-    environment: dict[str, Any],
-    path_field: str,
-    expected_path: Path,
-    description: str,
-) -> None:
-    if _resolve_recorded_path(environment.get(path_field), path_field) != expected_path.resolve():
-        raise ValueError(f"environment {path_field} must name the canonical {description}")
-
-
 def _validate_runtime_identities(environment: dict[str, Any]) -> None:
     forbidden = sorted(set(environment) & LIVE_RUNTIME_PATH_FIELDS)
     if forbidden:
@@ -302,11 +294,15 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
             f"environment {path_field} must be {CANONICAL_FAIR_MANIFEST_PATH}",
         )
 
-    for path_field, expected_path, description in (
-        ("source_manifest_path", CANONICAL_SOURCE_MANIFEST, "source manifest"),
-        ("fixture_path", CANONICAL_FIXTURE, "fixture"),
+    for path_field, expected in (
+        ("source_manifest_path", CANONICAL_SOURCE_MANIFEST_PATH),
+        ("fixture_path", CANONICAL_FIXTURE_PATH),
     ):
-        _validate_canonical_path(environment, path_field, expected_path, description)
+        require_equal(
+            environment.get(path_field),
+            expected,
+            f"environment {path_field} must be {expected}",
+        )
 
     for path_field, hash_field in (
         ("fair_manifest_path", "fair_manifest_sha256"),

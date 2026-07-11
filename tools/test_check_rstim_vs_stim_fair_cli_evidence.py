@@ -298,6 +298,38 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
             result.stderr,
         )
 
+    def test_rejects_absolute_source_manifest_provenance_aliases(self) -> None:
+        source_manifest = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
+
+        def record_absolute_source_manifest(environment: dict[str, Any]) -> None:
+            environment["source_manifest"] = str(source_manifest)
+            environment["source_manifest_path"] = str(source_manifest)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_source_manifest)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            f"environment source_manifest_path must be {fair_cli_contract.EXPECTED_CASE['source_manifest_path']}",
+            result.stderr,
+        )
+
+    def test_rejects_absolute_fixture_provenance_aliases(self) -> None:
+        fixture = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
+
+        def record_absolute_fixture(environment: dict[str, Any]) -> None:
+            environment["fixture"] = str(fixture)
+            environment["fixture_path"] = str(fixture)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_fixture)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            f"environment fixture_path must be {fair_cli_contract.EXPECTED_CASE['canonical_input_path']}",
+            result.stderr,
+        )
+
     def test_rejects_missing_manifest_alias_provenance(self) -> None:
         def remove_manifest_aliases(environment: dict[str, Any]) -> None:
             del environment["manifest"]
