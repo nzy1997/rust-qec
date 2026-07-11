@@ -525,3 +525,12 @@ python3 -m unittest benchmarks.rstim_vs_stim_simulator.tests.test_run_reference_
 ```
 
 Result: both commands passed.
+
+### Task 4 Checker Final Review - 2026-07-11
+
+Status: no findings from the focused read-only review of the checker and runner
+provenance changes.
+
+Residual risk noted by reviewer: the checker validates declared timer scope and
+provenance fields, but cannot independently prove worker-internal timer
+boundaries beyond the worker code and reported `timer_scope`.
