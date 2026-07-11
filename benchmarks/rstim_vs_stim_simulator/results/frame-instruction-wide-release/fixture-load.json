@@ -1,0 +1,84 @@
+{
+  "actual_detectors": 12000,
+  "actual_measurements": 12121,
+  "actual_observables": 1,
+  "case_id": "stim_surface_d11_r100",
+  "expanded_operation_count": 14547,
+  "expected_detectors": 12000,
+  "expected_measurements": 12121,
+  "expected_observables": 1,
+  "flattened_operation_count": 14448,
+  "input_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-463-run-1-agent-issue-463-publish-instruction-wide-frame-noise-evidence-run-1/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+  "manifest_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-463-run-1-agent-issue-463-publish-instruction-wide-frame-noise-evidence-run-1/benchmarks/rstim_vs_stim_simulator/cases.full.toml",
+  "operations": {
+    "CX": {
+      "measurement_count": 0,
+      "operation_count": 400,
+      "target_count": 88000
+    },
+    "DEPOLARIZE1": {
+      "measurement_count": 0,
+      "operation_count": 200,
+      "target_count": 12000
+    },
+    "DEPOLARIZE2": {
+      "measurement_count": 0,
+      "operation_count": 400,
+      "target_count": 88000
+    },
+    "DETECTOR": {
+      "measurement_count": 0,
+      "operation_count": 12000,
+      "target_count": 24100
+    },
+    "H": {
+      "measurement_count": 0,
+      "operation_count": 200,
+      "target_count": 12000
+    },
+    "M": {
+      "measurement_count": 121,
+      "operation_count": 1,
+      "target_count": 121
+    },
+    "MR": {
+      "measurement_count": 12000,
+      "operation_count": 100,
+      "target_count": 12000
+    },
+    "OBSERVABLE_INCLUDE": {
+      "measurement_count": 0,
+      "operation_count": 1,
+      "target_count": 11
+    },
+    "QUBIT_COORDS": {
+      "measurement_count": 0,
+      "operation_count": 241,
+      "target_count": 241
+    },
+    "R": {
+      "measurement_count": 0,
+      "operation_count": 2,
+      "target_count": 241
+    },
+    "REPEAT": {
+      "measurement_count": 0,
+      "operation_count": 99,
+      "target_count": 0
+    },
+    "TICK": {
+      "measurement_count": 0,
+      "operation_count": 700,
+      "target_count": 0
+    },
+    "X_ERROR": {
+      "measurement_count": 0,
+      "operation_count": 203,
+      "target_count": 24362
+    }
+  },
+  "repeat_block_count": 1,
+  "repeat_depth": 1,
+  "repeat_expansion_count": 99,
+  "status": "pass"
+}
