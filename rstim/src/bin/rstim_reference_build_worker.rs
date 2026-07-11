@@ -155,12 +155,11 @@ fn handle_build_reference(
 
     let started = Instant::now();
     let reference = build_reference_sample_with_decision(instructions)?;
-    let packed = pack_b8(&reference.bits);
+    let packed = match reference.decision {
+        ReferenceSampleDecision::PackedInverse => pack_b8(&reference.bits),
+        other => return Err(format!("unsupported reference sample decision: {other:?}")),
+    };
     let elapsed_ns = started.elapsed().as_nanos() as u64;
-
-    if let ReferenceSampleDecision::LegacyFallback(reason) = reference.decision {
-        return Err(format!("reference build used legacy fallback: {reason}"));
-    }
 
     state.reference_build_count += 1;
     Ok(ReferenceBuiltResponse {

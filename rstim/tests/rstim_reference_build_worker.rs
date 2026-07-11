@@ -63,3 +63,56 @@ fn rstim_reference_build_worker_parses_once_and_builds_references() {
     drop(stdin);
     assert!(child.wait().expect("wait").success());
 }
+
+#[test]
+fn rstim_reference_build_worker_errors_when_reference_requires_legacy_fallback() {
+    const PROTOCOL: &str = "reference-build-v1";
+
+    let worker = env!("CARGO_BIN_EXE_rstim_reference_build_worker");
+    let mut child = Command::new(worker)
+        .arg("--protocol")
+        .arg(PROTOCOL)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("worker starts");
+    let mut stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    let mut reader = BufReader::new(stdout);
+    let fixture = tempfile::NamedTempFile::new().expect("fixture");
+    std::fs::write(fixture.path(), "H 1\nX 0\nCZ 0 1\nH 1\nM 0 1\n").expect("write fixture");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    reader.read_line(&mut line).expect("read load");
+    let loaded: serde_json::Value = serde_json::from_str(&line).expect("load json");
+    assert_eq!(loaded["protocol"], PROTOCOL);
+    assert_eq!(loaded["type"], "loaded");
+    assert_eq!(loaded["parse_count"], json!(1));
+    assert_eq!(loaded["measurement_bits"], json!(2));
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":7})
+    )
+    .expect("send build");
+    line.clear();
+    reader.read_line(&mut line).expect("read build");
+    let error: serde_json::Value = serde_json::from_str(&line).expect("error json");
+    assert_eq!(error["protocol"], PROTOCOL);
+    assert_eq!(error["type"], "error");
+    assert_ne!(error["type"], "reference_built");
+    let message = error["message"].as_str().expect("error message");
+    assert!(
+        message.contains("unsupported reference sample decision"),
+        "unexpected message: {message}"
+    );
+
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
