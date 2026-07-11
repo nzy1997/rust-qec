@@ -1,0 +1,15 @@
+{
+  "measured_records": 14,
+  "variants": [
+    {
+      "median_elapsed_ns": 13652500,
+      "sample_count": 7,
+      "variant": "stim"
+    },
+    {
+      "median_elapsed_ns": 11565125,
+      "sample_count": 7,
+      "variant": "rstim"
+    }
+  ]
+}
