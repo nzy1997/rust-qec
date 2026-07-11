@@ -324,6 +324,49 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("checked evidence must not require a live runtime path", result.stderr)
 
+    def test_rejects_obsolete_top_level_live_runtime_provenance_fields(self) -> None:
+        obsolete_fields = (
+            "python_executable",
+            "loaded_stim_extension_path",
+            "rstim_worker_binary_path",
+            "python_executable_sha256",
+            "loaded_stim_extension_sha256",
+            "rstim_worker_binary_sha256",
+        )
+        for field in obsolete_fields:
+            with self.subTest(field=field):
+                write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
+
+                def mutate(environment: dict[str, Any], *, field: str = field) -> None:
+                    environment[field] = "0" * 64 if field.endswith("_sha256") else "/obsolete/live/path"
+
+                rewrite_json(self.bundle / "environment.json", mutate)
+                rehash_bundle(self.bundle)
+                result = self.run_checker()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(
+                    f"environment contains obsolete live runtime provenance field: {field}",
+                    result.stderr,
+                )
+
+    def test_rejects_obsolete_stim_python_probe_live_runtime_provenance_fields(self) -> None:
+        obsolete_fields = ("path", "package_path", "sha256")
+        for field in obsolete_fields:
+            with self.subTest(field=field):
+                write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
+
+                def mutate(environment: dict[str, Any], *, field: str = field) -> None:
+                    environment["stim_python_probe"][field] = "0" * 64 if field == "sha256" else "/obsolete/live/path"
+
+                rewrite_json(self.bundle / "environment.json", mutate)
+                rehash_bundle(self.bundle)
+                result = self.run_checker()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(
+                    f"environment stim_python_probe contains obsolete live runtime provenance field: {field}",
+                    result.stderr,
+                )
+
     def test_rejects_host_absolute_worker_argv(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
             environment["worker_argv"]["stim"][0] = "/usr/bin/python3"

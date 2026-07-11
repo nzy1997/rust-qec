@@ -32,6 +32,46 @@ REQUIRED_RUNTIME_IDENTITY_ROLES = (
     "tool://rstim-worker",
 )
 RUNTIME_IDENTITY_KEYS = {"role", "version", "basename", "sha256"}
+ENVIRONMENT_KEYS = {
+    "git_commit",
+    "os",
+    "cpu_model",
+    "profile",
+    "timer_scope",
+    "seed_policy",
+    "stim_version",
+    "stim_python_probe",
+    "rstim_version",
+    "rustc_version",
+    "fair_manifest_path",
+    "fair_manifest_sha256",
+    "source_manifest_path",
+    "source_manifest_sha256",
+    "fixture_path",
+    "fixture_sha256",
+    "worker_argv",
+    "canonical_worker_argv",
+    "stim_worker_module_path",
+    "stim_worker_module_sha256",
+    "runtime_identities",
+    "protocol_version",
+    "seed",
+    "warmup_rounds",
+    "measure_rounds",
+    "known_answer_preflight",
+    "workers",
+    "lifecycle",
+}
+OBSOLETE_LIVE_ENVIRONMENT_KEYS = {
+    "python_executable",
+    "loaded_stim_extension_path",
+    "rstim_worker_binary_path",
+    "python_executable_sha256",
+    "loaded_stim_extension_sha256",
+    "rstim_worker_binary_sha256",
+}
+STIM_PYTHON_PROBE_KEYS = {"status", "version", "extension_module"}
+OBSOLETE_LIVE_STIM_PYTHON_PROBE_KEYS = {"path", "package_path", "sha256"}
 
 
 def sha256_file(path: Path) -> str:
@@ -348,6 +388,30 @@ def _validate_runtime_identities(environment: dict[str, Any], *, stim_worker_mod
     )
 
 
+def _validate_environment_keys(environment: dict[str, Any]) -> None:
+    for field in sorted(set(environment) - ENVIRONMENT_KEYS):
+        if field in OBSOLETE_LIVE_ENVIRONMENT_KEYS:
+            raise ValueError(f"environment contains obsolete live runtime provenance field: {field}")
+        raise ValueError(f"environment contains unsupported field: {field}")
+
+
+def _validate_stim_python_probe(probe: Any, *, expected_version: str) -> None:
+    if probe is None:
+        return
+    if not isinstance(probe, dict):
+        raise ValueError("environment stim_python_probe must be a JSON object")
+    for field in sorted(set(probe) - STIM_PYTHON_PROBE_KEYS):
+        if field in OBSOLETE_LIVE_STIM_PYTHON_PROBE_KEYS:
+            raise ValueError(f"environment stim_python_probe contains obsolete live runtime provenance field: {field}")
+        raise ValueError(f"environment stim_python_probe contains unsupported field: {field}")
+    _require_equal(probe.get("status"), "ok", "environment stim_python_probe status must be 'ok'")
+    _require_equal(
+        probe.get("version"),
+        expected_version,
+        f"environment stim_python_probe version must be {expected_version!r}",
+    )
+
+
 def _validate_preflight_telemetry(
     telemetry: Any,
     *,
@@ -386,6 +450,7 @@ def _validate_preflight_argv(item: dict[str, Any], *, variant: str) -> None:
 
 def validate_environment(environment: dict[str, Any], derived: dict[str, Any], records: list[dict[str, Any]]) -> None:
     case = fair_cli_contract.EXPECTED_CASE
+    _validate_environment_keys(environment)
     for field in ("git_commit", "os", "cpu_model", "rstim_version", "rustc_version"):
         if not isinstance(environment.get(field), str) or not environment[field]:
             raise ValueError(f"environment {field} must be nonempty")
@@ -422,17 +487,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     ):
         _validate_path_hash(environment, path_field, hash_field)
     _validate_runtime_identities(environment, stim_worker_module_path=stim_worker_module_path)
-
-    probe = environment.get("stim_python_probe")
-    if probe is not None and not isinstance(probe, dict):
-        raise ValueError("environment stim_python_probe must be a JSON object")
-    if isinstance(probe, dict):
-        _require_equal(probe.get("status"), "ok", "environment stim_python_probe status must be 'ok'")
-        _require_equal(
-            probe.get("version"),
-            case["stim_version"],
-            f"environment stim_python_probe version must be {case['stim_version']!r}",
-        )
+    _validate_stim_python_probe(environment.get("stim_python_probe"), expected_version=case["stim_version"])
 
     worker_argv = environment.get("worker_argv")
     workers = environment.get("workers")
