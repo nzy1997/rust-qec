@@ -23,6 +23,11 @@ REPO_ROOT = PACKAGE_DIR.parents[1]
 EXPECTED_STIM_VERSION = "1.15.0"
 KNOWN_ANSWER_CIRCUIT = "X 0\nM 0\n"
 KNOWN_ANSWER_OUTPUT = b"\x01"
+KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
+TOOL_ROLES = {
+    "stim-cli-b8": "tool://stim",
+    "rstim-cli-b8": "tool://rstim",
+}
 
 build_rstim = run_speed_case.build_rstim
 
@@ -205,6 +210,39 @@ def _expand_argv(
     return argv
 
 
+def _recorded_argv(
+    *,
+    variant: str,
+    case: dict[str, Any],
+    shots: int,
+    seed: int,
+    input_token: str | None = None,
+) -> list[str]:
+    if variant not in TOOL_ROLES:
+        raise RuntimeError(f"unsupported fair CLI variant: {variant}")
+    return [
+        TOOL_ROLES[variant],
+        "sample",
+        "--shots",
+        str(shots),
+        "--seed",
+        str(seed),
+        "--out_format",
+        case["output_format"],
+        "--in",
+        input_token if input_token is not None else case["canonical_input_path"],
+    ]
+
+
+def _runtime_identity(*, role: str, version: str, binary: Path) -> dict[str, str]:
+    return {
+        "role": role,
+        "version": version,
+        "basename": binary.name,
+        "sha256": _sha256_file(binary),
+    }
+
+
 def _variant_templates(case: dict[str, Any]) -> list[tuple[str, list[str]]]:
     argv = case.get("argv")
     if not isinstance(argv, dict):
@@ -249,7 +287,13 @@ def _run_known_answer_preflight(
             results.append(
                 {
                     "variant": variant,
-                    "argv": argv,
+                    "argv": _recorded_argv(
+                        variant=variant,
+                        case=case,
+                        shots=1,
+                        seed=0,
+                        input_token=KNOWN_ANSWER_INPUT_TOKEN,
+                    ),
                     "exit_code": result.exit_code,
                     "stdout_hex": result.stdout.hex(),
                     "stdout_sha256": hashlib.sha256(result.stdout).hexdigest(),
@@ -331,7 +375,12 @@ def _run_rounds(
                         phase=phase,
                         round_index=round_index,
                         seed=round_seed,
-                        argv=argv,
+                        argv=_recorded_argv(
+                            variant=variant,
+                            case=case,
+                            shots=case["shots"],
+                            seed=round_seed,
+                        ),
                         result=result,
                     )
                 )
@@ -433,10 +482,10 @@ def _collect_environment(
         "fixture": fixture,
         "fixture_sha256": _sha256_file(input_path),
         "fixture_path": fixture,
-        "stim_binary": str(stim_binary),
-        "stim_binary_sha256": _sha256_file(stim_binary),
-        "rstim_binary": str(rstim_binary),
-        "rstim_binary_sha256": _sha256_file(rstim_binary),
+        "runtime_identities": [
+            _runtime_identity(role="tool://stim", version=stim_version, binary=stim_binary),
+            _runtime_identity(role="tool://rstim", version=rstim_version, binary=rstim_binary),
+        ],
         "round_argv": [
             {
                 "variant": record["variant"],
