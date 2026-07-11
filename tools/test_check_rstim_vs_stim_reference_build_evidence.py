@@ -424,8 +424,60 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment fixture_path must name the canonical reference-build fixture", result.stderr)
+        self.assertIn("environment fixture_path must be a repo-relative POSIX path", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_absolute_repository_paths_before_artifact_hash_validation(self) -> None:
+        cases = (
+            ("fixture_path", str(REPO_ROOT / FIXTURE_REL), "environment fixture_path"),
+            ("manifest_path", str(REPO_ROOT / MANIFEST_REL), "environment manifest_path"),
+            ("runner_fixture", str(REPO_ROOT / FIXTURE_REL), "environment runner_argv fixture"),
+            ("runner_manifest", str(REPO_ROOT / MANIFEST_REL), "environment runner_argv manifest"),
+        )
+        for field, value, label in cases:
+            with self.subTest(field=field):
+                write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
+
+                def mutate(environment: dict[str, Any]) -> None:
+                    if field == "runner_fixture":
+                        environment["runner_argv"][4] = value
+                    elif field == "runner_manifest":
+                        environment["runner_argv"][6] = value
+                    else:
+                        environment[field] = value
+
+                rewrite_json(self.bundle / "environment.json", mutate)
+                rewrite_artifact_hashes(self.bundle)
+                result = self.run_checker()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(f"{label} must be a repo-relative POSIX path", result.stderr)
+                self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_non_normalized_repository_paths_before_artifact_hash_validation(self) -> None:
+        cases = (
+            ("fixture_path", "benchmarks/rstim_vs_stim_simulator/fixtures/../fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "environment fixture_path"),
+            ("manifest_path", "benchmarks/rstim_vs_stim_simulator/cases/../cases.full.toml", "environment manifest_path"),
+            ("runner_fixture", "benchmarks/rstim_vs_stim_simulator/fixtures/../fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "environment runner_argv fixture"),
+            ("runner_manifest", "benchmarks/rstim_vs_stim_simulator/cases/../cases.full.toml", "environment runner_argv manifest"),
+        )
+        for field, value, label in cases:
+            with self.subTest(field=field):
+                write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
+
+                def mutate(environment: dict[str, Any]) -> None:
+                    if field == "runner_fixture":
+                        environment["runner_argv"][4] = value
+                    elif field == "runner_manifest":
+                        environment["runner_argv"][6] = value
+                    else:
+                        environment[field] = value
+
+                rewrite_json(self.bundle / "environment.json", mutate)
+                rewrite_artifact_hashes(self.bundle)
+                result = self.run_checker()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(f"{label} must be a repo-relative POSIX path", result.stderr)
+                self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_environment_noncanonical_worker_argv_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:

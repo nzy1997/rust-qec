@@ -203,6 +203,16 @@ def _resolve_recorded_path(raw: Any, field: str) -> Path:
     return path.resolve() if path.is_absolute() else (REPO_ROOT / path).resolve()
 
 
+def _require_repo_relative_posix_path(raw: Any, field: str) -> str:
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    if raw.startswith("/") or "\\" in raw or re.match(r"^[A-Za-z]:", raw):
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    if any(segment in {"", ".", ".."} for segment in raw.split("/")):
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    return raw
+
+
 def _validate_git_commit(value: Any) -> None:
     if not isinstance(value, str) or GIT_COMMIT_RE.fullmatch(value) is None:
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
@@ -225,7 +235,7 @@ def _validate_canonical_path(
     canonical_path: Path,
     description: str,
 ) -> Path:
-    path = _resolve_recorded_path(environment.get(field), field)
+    path = _resolve_recorded_path(_require_repo_relative_posix_path(environment.get(field), field), field)
     if path != canonical_path.resolve():
         raise ValueError(f"environment {field} must name the canonical {description}")
     return path
@@ -334,9 +344,11 @@ def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> Non
         raise ValueError("environment runner_argv executable must be tool://python")
     if argv[1:4] != ["-m", runner.MODULE_NAME, "--fixture"] or argv[5] != "--manifest":
         raise ValueError("environment runner_argv must invoke the canonical runner module")
-    if _resolve_recorded_path(argv[4], "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
+    fixture_arg = _require_repo_relative_posix_path(argv[4], "runner_argv fixture")
+    manifest_arg = _require_repo_relative_posix_path(argv[6], "runner_argv manifest")
+    if _resolve_recorded_path(fixture_arg, "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
         raise ValueError("environment runner_argv fixture must match fixture_path")
-    if _resolve_recorded_path(argv[6], "runner_argv manifest") != _resolve_recorded_path(environment.get("manifest_path"), "manifest_path"):
+    if _resolve_recorded_path(manifest_arg, "runner_argv manifest") != _resolve_recorded_path(environment.get("manifest_path"), "manifest_path"):
         raise ValueError("environment runner_argv manifest must match manifest_path")
 
     expected_tail = [
