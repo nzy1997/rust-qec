@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
+import platform
 import subprocess
 import sys
 import tempfile
@@ -33,6 +33,19 @@ def sha256_file(path: Path) -> str:
 
 def load_jsonl(path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def command_stdout(command: list[str]) -> str:
+    result = subprocess.run(
+        command,
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"{command!r} failed: {result.stderr}")
+    return result.stdout.strip()
 
 
 class RunReferenceBuildBenchmarkTest(unittest.TestCase):
@@ -248,12 +261,65 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 "stim_version",
                 "worker_argv",
                 "canonical_worker_argv",
+                "runner_argv",
                 "warmup_rounds",
                 "measure_rounds",
                 "git_commit",
                 "git_dirty",
+                "os",
+                "cpu_model",
+                "python_executable",
+                "python_executable_sha256",
+                "rstim_worker_binary_path",
+                "rstim_worker_binary_sha256",
+                "rustc_version",
+                "cargo_version",
+                "python_version",
             ):
                 self.assertIn(key, environment)
+            expected_runner_argv = [
+                sys.executable,
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark",
+                "--fixture",
+                str(FIXTURE),
+                "--manifest",
+                str(MANIFEST),
+                "--stim-python",
+                str(stim_python),
+                "--rstim-worker",
+                str(rstim_worker),
+                "--warmup-rounds",
+                "2",
+                "--measure-rounds",
+                "7",
+                "--out-dir",
+                str(out_dir),
+            ]
+            expected_worker_argv = {
+                STIM_VARIANT: [
+                    str(stim_python),
+                    "-m",
+                    "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
+                    "--protocol",
+                    PROTOCOL,
+                ],
+                RSTIM_VARIANT: [str(rstim_worker), "--protocol", PROTOCOL],
+            }
+            expected_canonical_worker_argv = {
+                STIM_VARIANT: [
+                    "python3",
+                    "-m",
+                    "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
+                    "--protocol",
+                    PROTOCOL,
+                ],
+                RSTIM_VARIANT: [
+                    "target/release/rstim_reference_build_worker",
+                    "--protocol",
+                    PROTOCOL,
+                ],
+            }
             self.assertEqual(environment["profile"], "release")
             self.assertEqual(environment["protocol"], PROTOCOL)
             self.assertEqual(environment["timer_scope"], TIMER_SCOPE)
@@ -262,6 +328,23 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["fixture_sha256"], sha256_file(FIXTURE))
             self.assertEqual(environment["manifest_path"], str(MANIFEST.resolve()))
             self.assertEqual(environment["manifest_sha256"], MANIFEST_DIGEST)
+            self.assertEqual(environment["stim_version"], "1.15.0")
+            self.assertEqual(environment["runner_argv"], expected_runner_argv)
+            self.assertEqual(environment["worker_argv"], expected_worker_argv)
+            self.assertEqual(environment["canonical_worker_argv"], expected_canonical_worker_argv)
+            self.assertEqual(environment["python_executable"], str(stim_python.resolve()))
+            self.assertEqual(environment["python_executable_sha256"], sha256_file(stim_python))
+            self.assertEqual(environment["rstim_worker_binary_path"], str(rstim_worker.resolve()))
+            self.assertEqual(environment["rstim_worker_binary_sha256"], sha256_file(rstim_worker))
+            self.assertEqual(environment["rustc_version"], command_stdout(["rustc", "--version"]))
+            self.assertEqual(environment["cargo_version"], command_stdout(["cargo", "--version"]))
+            self.assertEqual(environment["python_version"], platform.python_version())
+            self.assertEqual(environment["os"], platform.platform())
+            self.assertIsInstance(environment["cpu_model"], str)
+            self.assertTrue(environment["cpu_model"].strip())
+            self.assertIsInstance(environment["git_commit"], str)
+            self.assertRegex(environment["git_commit"], r"^[0-9a-f]{40}$")
+            self.assertIsInstance(environment["git_dirty"], bool)
             self.assertEqual(environment["warmup_rounds"], 2)
             self.assertEqual(environment["measure_rounds"], 7)
 

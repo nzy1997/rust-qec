@@ -4,10 +4,14 @@ use std::process::{Command, Stdio};
 
 #[test]
 fn rstim_reference_build_worker_parses_once_and_builds_references() {
+    const PROTOCOL: &str = "reference-build-v1";
+    const TIMER_SCOPE: &str = "reference_build_only";
+    const BYTE_SHA256: &str = "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a";
+
     let worker = env!("CARGO_BIN_EXE_rstim_reference_build_worker");
     let mut child = Command::new(worker)
         .arg("--protocol")
-        .arg("reference-build-v1")
+        .arg(PROTOCOL)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -20,31 +24,41 @@ fn rstim_reference_build_worker_parses_once_and_builds_references() {
     writeln!(
         stdin,
         "{}",
-        json!({"protocol":"reference-build-v1","type":"load","fixture_path":fixture.path()})
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
     )
     .expect("send load");
     let mut line = String::new();
     reader.read_line(&mut line).expect("read load");
     let loaded: serde_json::Value = serde_json::from_str(&line).expect("load json");
+    assert_eq!(loaded["protocol"], PROTOCOL);
     assert_eq!(loaded["type"], "loaded");
-    assert_eq!(loaded["parse_count"], 1);
-    for request_id in 0..2 {
+    assert_eq!(loaded["parse_count"], json!(1));
+    assert_eq!(loaded["measurement_bits"], json!(1));
+    for request_id in 0..9 {
         writeln!(
             stdin,
             "{}",
-            json!({"protocol":"reference-build-v1","type":"build_reference","request_id":request_id})
+            json!({"protocol":PROTOCOL,"type":"build_reference","request_id":request_id})
         )
         .expect("send build");
         line.clear();
         reader.read_line(&mut line).expect("read build");
         let built: serde_json::Value = serde_json::from_str(&line).expect("build json");
+        assert_eq!(built["protocol"], PROTOCOL);
         assert_eq!(built["type"], "reference_built");
+        assert_eq!(built["request_id"], json!(request_id));
         assert_eq!(built["backend"], "packed_inverse");
-        assert_eq!(built["parse_count"], 1);
-        assert_eq!(built["reference_build_count"], request_id + 1);
-        assert_eq!(built["measurement_bits"], 1);
-        assert_eq!(built["packed_bytes"], 1);
+        assert_eq!(built["parse_count"], json!(1));
+        assert_eq!(built["reference_build_count"], json!(request_id + 1));
+        assert_eq!(built["measurement_bits"], json!(1));
+        assert_eq!(built["packed_bytes"], json!(1));
         assert_eq!(built["packed_base64"], "AQ==");
+        assert_eq!(built["byte_sha256"], BYTE_SHA256);
+        assert_eq!(built["timer_scope"], TIMER_SCOPE);
+        let elapsed_ns = built["elapsed_ns"]
+            .as_u64()
+            .expect("elapsed_ns is unsigned");
+        assert!(elapsed_ns > 0, "elapsed_ns must be positive");
     }
     drop(stdin);
     assert!(child.wait().expect("wait").success());

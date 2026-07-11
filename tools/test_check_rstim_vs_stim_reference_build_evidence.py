@@ -302,12 +302,71 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("final reference_build_count must be 9", result.stderr)
 
-    def test_rejects_rehashed_summary_not_derived_from_raw(self) -> None:
-        rewrite_json(self.bundle / "summary.json", lambda summary: summary.update({"measured_records": 13}))
+    def test_rejects_rehashed_summary_variant_stats_not_derived_from_raw(self) -> None:
+        def mutate(summary: dict[str, Any]) -> None:
+            summary["variants"][0]["median_elapsed_ns"] += 1
+            summary["variants"][0]["final_reference_build_count"] = 8
+
+        rewrite_json(self.bundle / "summary.json", mutate)
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("summary.json does not match summary derived from raw.jsonl", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_report_not_derived_from_summary(self) -> None:
+        report_path = self.bundle / "report.md"
+        report = report_path.read_text(encoding="utf-8")
+        report_path.write_text(report.replace(f"| {STIM_VARIANT} | 7 |", f"| {STIM_VARIANT} | 6 |", 1), encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("report.md does not match summary.json", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_wrong_runner_argv_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["runner_argv"] = [*environment["runner_argv"], "--unchecked"]
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runner_argv", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_noncanonical_worker_argv_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["canonical_worker_argv"][RSTIM_VARIANT][0] = "target/debug/rstim_reference_build_worker"
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment canonical_worker_argv", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_bad_executable_hash_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["rstim_worker_binary_sha256"] = "0" * 64
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment rstim_worker_binary_sha256", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_missing_provenance_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            del environment["stim_version"]
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment stim_version", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_missing_hash_manifest(self) -> None:
         (self.bundle / "artifact-sha256.json").unlink()
