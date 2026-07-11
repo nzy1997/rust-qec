@@ -89,7 +89,7 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
-sha256 = "166b1227b71bfb89313fe78a4ac46017f8092aa30f08c6537aa3875c211f5909"
+sha256 = "e031453140415432022b34533fd7f2f7c2bdc143d4541791d208af9f9c871596"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
@@ -97,11 +97,11 @@ sha256 = "2c8fd5c9ad1e72534e12641f6f241d3cb10a7d64b5a546264246b1c793c3bdaf"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "9a5139aeb39c4cc7afa0d986d4d73904a64d662334d5dcddf63cd97aeea45919"
+sha256 = "7f21f16c1bf214ac546a1c87f8cd27a6d26f790efcfbb536dcf23e7b78692222"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "2bc714f36e55fe9b2f6051198b65a4287ec558152ada166f77fe9a11f9772629"
+sha256 = "6812b7ef7f3d4b02da32e79662dac14fcbf2f1433ec933031027df903a0e7454"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"
