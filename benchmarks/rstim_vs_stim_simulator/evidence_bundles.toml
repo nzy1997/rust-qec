@@ -89,7 +89,7 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
-sha256 = "e031453140415432022b34533fd7f2f7c2bdc143d4541791d208af9f9c871596"
+sha256 = "ac9e1a0c4e70a1202b265433db80cfbf10257a26da729177d9659af6a6649a5a"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"

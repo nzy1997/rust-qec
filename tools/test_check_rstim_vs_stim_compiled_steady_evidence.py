@@ -588,7 +588,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         args = SimpleNamespace(
             manifest=REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
             profile="release",
-            seed=0,
+            seed=7,
             warmup_rounds=2,
             measure_rounds=7,
         )
@@ -617,6 +617,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
 
         fixture_rel = fixture.relative_to(REPO_ROOT).as_posix()
         self.assertEqual(environment["fixture_path"], fixture_rel)
+        self.assertEqual(environment["seed"], 7)
         self.assertEqual(
             environment["worker_argv"]["stim"],
             [
@@ -626,13 +627,14 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
                 "--input",
                 fixture_rel,
                 "--seed",
-                "0",
+                "7",
             ],
         )
         self.assertEqual(
             environment["known_answer_preflight"][1]["argv"],
-            ["tool://rstim-worker", "--input", "fixture://compiled-steady-known-answer", "--seed", "0"],
+            ["tool://rstim-worker", "--input", "fixture://compiled-steady-known-answer", "--seed", "7"],
         )
+        self.assertEqual(environment["workers"][1]["command"], environment["worker_argv"]["rstim"])
         self.assertNotIn("python_executable", environment)
         self.assertNotIn("loaded_stim_extension_path", environment)
         self.assertNotIn("rstim_worker_binary_path", environment)

@@ -85,7 +85,7 @@ def _repo_relative(path: Path) -> str:
     return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
 
 
-def _portable_worker_argv(role: str, input_path: str) -> list[str]:
+def _portable_worker_argv(role: str, input_path: str, *, seed: int) -> list[str]:
     if role == "stim":
         return [
             "tool://python",
@@ -94,9 +94,9 @@ def _portable_worker_argv(role: str, input_path: str) -> list[str]:
             "--input",
             input_path,
             "--seed",
-            "0",
+            str(seed),
         ]
-    return ["tool://rstim-worker", "--input", input_path, "--seed", "0"]
+    return ["tool://rstim-worker", "--input", input_path, "--seed", str(seed)]
 
 
 def _decode_json(payload: bytes, *, context: str) -> dict[str, Any]:
@@ -503,11 +503,18 @@ def _collect_environment(
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
     rstim_version = _version_string([*rstim_command, "--version"])
     input_path_relative = _repo_relative(input_path)
-    worker_argv = {variant: _portable_worker_argv(variant, input_path_relative) for variant in ("stim", "rstim")}
+    worker_argv = {
+        variant: _portable_worker_argv(variant, input_path_relative, seed=args.seed)
+        for variant in ("stim", "rstim")
+    }
     portable_preflight_results = []
     for item in preflight_results:
         portable = {**item}
-        portable["argv"] = _portable_worker_argv(str(item["variant"]), "fixture://compiled-steady-known-answer")
+        portable["argv"] = _portable_worker_argv(
+            str(item["variant"]),
+            "fixture://compiled-steady-known-answer",
+            seed=args.seed,
+        )
         portable_preflight_results.append(portable)
     runtime_identities = [
         {
