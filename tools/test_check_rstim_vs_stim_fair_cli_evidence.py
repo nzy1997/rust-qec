@@ -60,6 +60,7 @@ def write_valid_bundle(path: Path) -> None:
                     rstim_binary=str(rstim_binary),
                 )
                 argv[0] = str(executable)
+                argv[argv.index("--in") + 1] = str(fixture.resolve())
                 records.append(
                     {
                         "case_id": case["case_id"],

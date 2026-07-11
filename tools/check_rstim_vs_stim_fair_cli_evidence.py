@@ -77,9 +77,11 @@ def require_equal(actual: Any, expected: Any, message: str) -> None:
 
 def _expected_argv(variant: str, *, seed: int, environment: dict[str, Any]) -> list[str]:
     template = fair_cli_contract.EXPECTED_ARGV[variant]
+    argv_case = dict(fair_cli_contract.EXPECTED_CASE)
+    argv_case["canonical_input_path"] = str(CANONICAL_FIXTURE.resolve())
     argv = fair_cli_contract.expand_argv(
         template,
-        fair_cli_contract.EXPECTED_CASE,
+        argv_case,
         seed=seed,
         rstim_binary=str(environment["rstim_binary"]),
     )
