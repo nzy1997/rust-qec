@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +25,30 @@ CANONICAL_FIXTURE = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input
 OLD_FULL_SUMMARY = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
 OLD_FULL_SUMMARY_SHA256 = "97ae397e598fe447d206c6b07a26ceaa0a3336d1883a7f77bc194f7b4c491805"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
+TOOL_ROLES = {
+    "stim-cli-b8": "tool://stim",
+    "rstim-cli-b8": "tool://rstim",
+}
+EXPECTED_RUNTIME_IDENTITIES = (
+    {
+        "role": "tool://stim",
+        "version": "1.15.0",
+        "basename": "stim",
+        "sha256": "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323",
+    },
+    {
+        "role": "tool://rstim",
+        "version": "rstim 0.1.1",
+        "basename": "rstim",
+        "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+    },
+)
+LIVE_RUNTIME_PATH_FIELDS = frozenset(
+    {"stim_binary", "stim_binary_sha256", "rstim_binary", "rstim_binary_sha256"}
+)
+POSIX_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{;|&<>])/(?!/)")
+WINDOWS_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{;|&<>])([A-Za-z]:[\\/]|\\\\)")
 
 
 def sha256_file(path: Path) -> str:
@@ -75,21 +99,59 @@ def require_equal(actual: Any, expected: Any, message: str) -> None:
         raise ValueError(message)
 
 
-def _expected_argv(variant: str, *, seed: int, environment: dict[str, Any]) -> list[str]:
-    template = fair_cli_contract.EXPECTED_ARGV[variant]
-    argv_case = dict(fair_cli_contract.EXPECTED_CASE)
-    argv_case["canonical_input_path"] = str(CANONICAL_FIXTURE.resolve())
-    argv = fair_cli_contract.expand_argv(
-        template,
-        argv_case,
-        seed=seed,
-        rstim_binary=str(environment["rstim_binary"]),
-    )
-    argv[0] = str(environment["stim_binary"] if variant == "stim-cli-b8" else environment["rstim_binary"])
-    return argv
+def contains_host_absolute_path(value: object) -> bool:
+    if isinstance(value, str):
+        return (
+            PurePosixPath(value).is_absolute()
+            or bool(PureWindowsPath(value).drive and PureWindowsPath(value).is_absolute())
+            or POSIX_ABSOLUTE_RE.search(value) is not None
+            or WINDOWS_ABSOLUTE_RE.search(value) is not None
+        )
+    if isinstance(value, list):
+        return any(contains_host_absolute_path(item) for item in value)
+    if isinstance(value, tuple):
+        return any(contains_host_absolute_path(item) for item in value)
+    if isinstance(value, dict):
+        return any(
+            contains_host_absolute_path(key) or contains_host_absolute_path(item)
+            for key, item in value.items()
+        )
+    return False
 
 
-def validate_raw_semantics(records: list[dict[str, Any]], environment: dict[str, Any]) -> None:
+def _expected_argv(variant: str, *, seed: int) -> list[str]:
+    case = fair_cli_contract.EXPECTED_CASE
+    return [
+        TOOL_ROLES[variant],
+        "sample",
+        "--shots",
+        str(case["shots"]),
+        "--seed",
+        str(seed),
+        "--out_format",
+        case["output_format"],
+        "--in",
+        case["canonical_input_path"],
+    ]
+
+
+def _expected_preflight_argv(variant: str) -> list[str]:
+    case = fair_cli_contract.EXPECTED_CASE
+    return [
+        TOOL_ROLES[variant],
+        "sample",
+        "--shots",
+        "1",
+        "--seed",
+        "0",
+        "--out_format",
+        case["output_format"],
+        "--in",
+        KNOWN_ANSWER_INPUT_TOKEN,
+    ]
+
+
+def validate_raw_semantics(records: list[dict[str, Any]]) -> None:
     case = fair_cli_contract.EXPECTED_CASE
     derived_bytes_per_shot = (case["measurement_count"] + 7) // 8
     if derived_bytes_per_shot != case["bytes_per_shot"] or derived_bytes_per_shot != 1516:
@@ -129,8 +191,11 @@ def validate_raw_semantics(records: list[dict[str, Any]], environment: dict[str,
             stdout_sha256 = record.get("stdout_sha256")
             if not isinstance(stdout_sha256, str) or SHA256_RE.fullmatch(stdout_sha256) is None:
                 raise ValueError(f"{variant} stdout_sha256 must be a lowercase SHA-256 digest")
-            expected_argv = _expected_argv(variant, seed=record["seed"], environment=environment)
-            require_equal(record.get("argv"), expected_argv, f"{variant} argv must match canonical argv")
+            argv = record.get("argv")
+            if contains_host_absolute_path(argv):
+                raise ValueError(f"{variant} argv contains a host-absolute path")
+            expected_argv = _expected_argv(variant, seed=record["seed"])
+            require_equal(argv, expected_argv, f"{variant} argv must match canonical argv")
 
 
 def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -169,29 +234,37 @@ def _validate_canonical_path(
         raise ValueError(f"environment {path_field} must name the canonical {description}")
 
 
-def _validate_preflight_detail(variant: str, detail: dict[str, Any], environment: dict[str, Any]) -> None:
+def _validate_runtime_identities(environment: dict[str, Any]) -> None:
+    forbidden = sorted(set(environment) & LIVE_RUNTIME_PATH_FIELDS)
+    if forbidden:
+        raise ValueError("environment must not contain live runtime path fields")
+    identities = environment.get("runtime_identities")
+    if not isinstance(identities, list):
+        raise ValueError("environment runtime_identities must be a list")
+    if identities != list(EXPECTED_RUNTIME_IDENTITIES):
+        raise ValueError("environment runtime_identities must match canonical runtime identities")
+    for identity in identities:
+        if set(identity) != {"role", "version", "basename", "sha256"}:
+            raise ValueError(
+                "environment runtime identity must contain only role, version, basename, and sha256"
+            )
+        if contains_host_absolute_path(identity):
+            raise ValueError("environment runtime identity contains a host-absolute path")
+        digest = identity.get("sha256")
+        if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+            raise ValueError("environment runtime identity sha256 must be a lowercase SHA-256 digest")
+
+
+def _validate_preflight_detail(variant: str, detail: dict[str, Any]) -> None:
     require_equal(detail.get("variant"), variant, f"{variant} known-answer preflight variant must be {variant}")
-    executable = str(environment["stim_binary"] if variant == "stim-cli-b8" else environment["rstim_binary"])
     argv = detail.get("argv")
-    expected_prefix = [
-        executable,
-        "sample",
-        "--shots",
-        "1",
-        "--seed",
-        "0",
-        "--out_format",
-        "b8",
-        "--in",
-    ]
-    if (
-        not isinstance(argv, list)
-        or len(argv) != len(expected_prefix) + 1
-        or not all(isinstance(value, str) for value in argv)
-        or argv[: len(expected_prefix)] != expected_prefix
-        or not argv[-1]
-    ):
-        raise ValueError(f"{variant} known-answer preflight argv must match canonical shape")
+    if contains_host_absolute_path(argv):
+        raise ValueError(f"{variant} known-answer preflight argv contains a host-absolute path")
+    require_equal(
+        argv,
+        _expected_preflight_argv(variant),
+        f"{variant} known-answer preflight argv must match canonical shape",
+    )
     require_equal(detail.get("exit_code"), 0, f"{variant} known-answer preflight exit_code must be 0")
     require_equal(detail.get("stdout_hex"), "01", f"{variant} known-answer preflight stdout_hex must be 01")
     digest = detail.get("stdout_sha256")
@@ -220,6 +293,7 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         ("known_answer_preflight", "passed"),
     ):
         require_equal(environment.get(field), expected, f"environment {field} must be {expected}")
+    _validate_runtime_identities(environment)
 
     for path_field, expected_path, description in (
         ("fair_manifest_path", CANONICAL_FAIR_MANIFEST, "fair CLI manifest"),
@@ -232,8 +306,6 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         ("fair_manifest_path", "fair_manifest_sha256"),
         ("source_manifest_path", "source_manifest_sha256"),
         ("fixture_path", "fixture_sha256"),
-        ("stim_binary", "stim_binary_sha256"),
-        ("rstim_binary", "rstim_binary_sha256"),
     ):
         _validate_path_hash(environment, path_field, hash_field)
 
@@ -250,6 +322,8 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         {key: record[key] for key in ("variant", "phase", "round_index", "seed", "argv")}
         for record in records
     ]
+    if contains_host_absolute_path(environment.get("round_argv")):
+        raise ValueError("environment round_argv contains a host-absolute path")
     require_equal(environment.get("round_argv"), expected_round_argv, "environment round_argv must mirror raw.jsonl")
     details = environment.get("known_answer_preflight_details")
     if not isinstance(details, list) or len(details) != 2:
@@ -258,7 +332,7 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
     if set(by_variant) != set(VARIANTS):
         raise ValueError("environment known_answer_preflight_details must contain both variants")
     for variant in VARIANTS:
-        _validate_preflight_detail(variant, by_variant[variant], environment)
+        _validate_preflight_detail(variant, by_variant[variant])
 
     require_equal(environment.get("timer_scope"), case["timer_scope"], "environment timer_scope must match case")
 
@@ -286,7 +360,7 @@ def validate_bundle(results_dir: Path) -> tuple[int, int]:
     validate_required_files(results_dir)
     environment = load_json_object(results_dir / "environment.json", "environment.json")
     records = load_raw_records(results_dir / "raw.jsonl")
-    validate_raw_semantics(records, environment)
+    validate_raw_semantics(records)
     summary = derive_summary(records)
     if load_json_object(results_dir / "summary.json", "summary.json") != summary:
         raise ValueError("summary.json does not match summary derived from raw.jsonl")
