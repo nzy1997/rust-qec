@@ -19,7 +19,7 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_fair_cli
 REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
 VARIANTS = ("stim-cli-b8", "rstim-cli-b8")
-CANONICAL_FAIR_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+CANONICAL_FAIR_MANIFEST_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 CANONICAL_SOURCE_MANIFEST = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
 CANONICAL_FIXTURE = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
 OLD_FULL_SUMMARY = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
@@ -295,8 +295,14 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         require_equal(environment.get(field), expected, f"environment {field} must be {expected}")
     _validate_runtime_identities(environment)
 
+    for path_field in ("manifest", "fair_manifest_path"):
+        require_equal(
+            environment.get(path_field),
+            CANONICAL_FAIR_MANIFEST_PATH,
+            f"environment {path_field} must be {CANONICAL_FAIR_MANIFEST_PATH}",
+        )
+
     for path_field, expected_path, description in (
-        ("fair_manifest_path", CANONICAL_FAIR_MANIFEST, "fair CLI manifest"),
         ("source_manifest_path", CANONICAL_SOURCE_MANIFEST, "source manifest"),
         ("fixture_path", CANONICAL_FIXTURE, "fixture"),
     ):

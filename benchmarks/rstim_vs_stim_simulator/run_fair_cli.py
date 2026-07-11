@@ -24,6 +24,7 @@ EXPECTED_STIM_VERSION = "1.15.0"
 KNOWN_ANSWER_CIRCUIT = "X 0\nM 0\n"
 KNOWN_ANSWER_OUTPUT = b"\x01"
 KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
+FAIR_MANIFEST_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 TOOL_ROLES = {
     "stim-cli-b8": "tool://stim",
     "rstim-cli-b8": "tool://rstim",
@@ -472,9 +473,9 @@ def _collect_environment(
         "stim_version": stim_version,
         "rstim_version": rstim_version,
         "rustc_version": _version_or_failed(["rustc", "--version"], cwd=repo_root),
-        "manifest": str(args.manifest),
+        "manifest": FAIR_MANIFEST_REPO_PATH,
         "manifest_sha256": _sha256_file(manifest_path),
-        "fair_manifest_path": str(args.manifest),
+        "fair_manifest_path": FAIR_MANIFEST_REPO_PATH,
         "fair_manifest_sha256": _sha256_file(manifest_path),
         "source_manifest": source_manifest,
         "source_manifest_sha256": _sha256_file(source_manifest_path),

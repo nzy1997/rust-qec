@@ -31,6 +31,7 @@ MEASUREMENT_COUNT = 12121
 OUTPUT_FORMAT = "b8"
 TIMER_SCOPE = "cli_end_to_end"
 FIXTURE_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+FAIR_MANIFEST_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
 TOOL_ROLES = {
     "stim-cli-b8": "tool://stim",
@@ -303,8 +304,12 @@ class RunFairCliTest(unittest.TestCase):
         self.assertEqual(environment["stim_version"], "1.15.0")
         self.assertEqual(environment["rstim_version"], "rstim 0.0.0-test")
         self.assertTrue(environment["rustc_version"])
-        self.assertEqual(environment["manifest"], str(FAIR_MANIFEST))
+        self.assertEqual(environment["manifest"], FAIR_MANIFEST_REPO_PATH)
         self.assertEqual(environment["manifest_sha256"], hashlib.sha256(FAIR_MANIFEST.read_bytes()).hexdigest())
+        self.assertEqual(environment["fair_manifest_path"], FAIR_MANIFEST_REPO_PATH)
+        self.assertEqual(
+            environment["fair_manifest_sha256"], hashlib.sha256(FAIR_MANIFEST.read_bytes()).hexdigest()
+        )
         self.assertEqual(environment["source_manifest"], "benchmarks/rstim_vs_stim_simulator/cases.full.toml")
         self.assertEqual(
             environment["source_manifest_sha256"], hashlib.sha256(SOURCE_MANIFEST.read_bytes()).hexdigest()

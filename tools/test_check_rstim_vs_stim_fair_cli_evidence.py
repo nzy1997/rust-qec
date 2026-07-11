@@ -128,9 +128,9 @@ def write_valid_bundle(path: Path) -> None:
         "stim_version": case["stim_version"],
         "rstim_version": "rstim test",
         "rustc_version": "rustc test",
-        "manifest": str(fair_manifest),
+        "manifest": "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
         "manifest_sha256": sha256_file(fair_manifest),
-        "fair_manifest_path": str(fair_manifest),
+        "fair_manifest_path": "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
         "fair_manifest_sha256": sha256_file(fair_manifest),
         "source_manifest": case["source_manifest_path"],
         "source_manifest_sha256": sha256_file(source_manifest),
@@ -278,7 +278,25 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment fair_manifest_path must name the canonical fair CLI manifest", result.stderr)
+        self.assertIn(
+            "environment fair_manifest_path must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
+
+    def test_rejects_absolute_fair_manifest_provenance(self) -> None:
+        fair_manifest = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+
+        def record_absolute_manifest(environment: dict[str, Any]) -> None:
+            environment["fair_manifest_path"] = str(fair_manifest)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_manifest)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "environment fair_manifest_path must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
 
     def test_rejects_missing_manifest_alias_provenance(self) -> None:
         def remove_manifest_aliases(environment: dict[str, Any]) -> None:
