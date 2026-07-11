@@ -1,17 +1,18 @@
 #[cfg(debug_assertions)]
 mod tests {
+    use rand::rngs::StdRng;
     use rand::RngCore;
     use rand::SeedableRng;
-    use rand::rngs::StdRng;
     use rstim::compiled::compile_circuit;
     use rstim::parser::parse_lines;
     use rstim::sampler::{
-        SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options,
+        sample_batch_with_options, SampleOptions, SampleOutputMode, SamplingBackend,
     };
     use rstim::sim::bit_table::BitTable;
     use rstim::sim::frame::{
-        FrameSimulator, OneQubitNoiseSamplingPath, decode_instruction_wide_event_index,
-        one_qubit_noise_instruction_telemetry, reset_one_qubit_noise_instruction_telemetry,
+        decode_instruction_wide_event_index, one_qubit_noise_instruction_telemetry,
+        reset_frame_noise_telemetry, reset_one_qubit_noise_instruction_telemetry,
+        take_frame_noise_telemetry, FrameSimulator, OneQubitNoiseSamplingPath,
     };
 
     #[derive(Debug, Clone)]
@@ -339,5 +340,43 @@ mod tests {
             }
         }
         println!("PASS instruction-wide one-qubit noise telemetry");
+    }
+
+    #[test]
+    fn frame_noise_telemetry_accumulates_one_qubit_noise_operations() {
+        let program = concat!(
+            "X_ERROR(0.001) 0 1 2\n",
+            "DEPOLARIZE1(0.3) 0 1 2\n",
+            "M 0 1 2\n",
+        );
+        let expected_attempt_count = 3 * 17;
+
+        for backend in [SamplingBackend::Interpreted, SamplingBackend::Compiled] {
+            reset_frame_noise_telemetry();
+            let mut rng = StdRng::seed_from_u64(463);
+            let measurements = run_direct_measurements(program, 17, backend, &mut rng);
+            assert_eq!(measurements.num_major(), 3);
+
+            let telemetry = take_frame_noise_telemetry();
+            assert_eq!(telemetry.len(), 2, "{backend:?}");
+            assert_eq!(telemetry[0].operation, "X_ERROR", "{backend:?}");
+            assert_eq!(telemetry[0].sampling_path, "sparse", "{backend:?}");
+            assert_eq!(telemetry[0].targets, Some(3), "{backend:?}");
+            assert_eq!(telemetry[0].pairs, None, "{backend:?}");
+            assert_eq!(telemetry[0].iterator_builds, 1, "{backend:?}");
+            assert_eq!(
+                telemetry[0].attempt_count, expected_attempt_count,
+                "{backend:?}"
+            );
+            assert_eq!(telemetry[1].operation, "DEPOLARIZE1", "{backend:?}");
+            assert_eq!(telemetry[1].sampling_path, "dense", "{backend:?}");
+            assert_eq!(telemetry[1].targets, Some(3), "{backend:?}");
+            assert_eq!(telemetry[1].pairs, None, "{backend:?}");
+            assert_eq!(telemetry[1].iterator_builds, 0, "{backend:?}");
+            assert_eq!(
+                telemetry[1].attempt_count, expected_attempt_count,
+                "{backend:?}"
+            );
+        }
     }
 }

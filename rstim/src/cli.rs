@@ -24,6 +24,8 @@ use crate::sim::bit_table::BitTable;
 #[derive(Parser)]
 #[command(name = "rstim", version, about = "Rust stabilizer circuit simulator")]
 pub struct Cli {
+    #[arg(long = "benchmark-telemetry-json", global = true)]
+    pub benchmark_telemetry_json: Option<String>,
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -306,7 +308,27 @@ fn parse_json_output_format(format: &str) -> Result<JsonOutputFormat, String> {
 }
 
 pub fn run(cli: Cli) -> Result<(), String> {
-    match cli.command {
+    let Cli {
+        benchmark_telemetry_json,
+        command,
+    } = cli;
+    if benchmark_telemetry_json.is_some() && !cfg!(feature = "benchmark-telemetry") {
+        return Err(
+            "--benchmark-telemetry-json requires building rstim with --features benchmark-telemetry"
+                .to_string(),
+        );
+    }
+    #[cfg(feature = "benchmark-telemetry")]
+    if benchmark_telemetry_json.is_some() {
+        crate::sim::frame::reset_frame_noise_telemetry();
+    }
+
+    let result = run_command(command);
+    finish_benchmark_telemetry(benchmark_telemetry_json.as_deref(), result)
+}
+
+fn run_command(command: Option<Commands>) -> Result<(), String> {
+    match command {
         Some(Commands::Stats { r#in, out, json }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
@@ -670,6 +692,46 @@ pub fn run(cli: Cli) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+fn finish_benchmark_telemetry(
+    path: Option<&str>,
+    result: Result<(), String>,
+) -> Result<(), String> {
+    if result.is_err() || path.is_none() {
+        return result;
+    }
+
+    #[cfg(feature = "benchmark-telemetry")]
+    {
+        write_benchmark_telemetry_json(path.unwrap())?;
+    }
+    #[cfg(not(feature = "benchmark-telemetry"))]
+    {
+        let _ = path;
+    }
+    result
+}
+
+#[cfg(feature = "benchmark-telemetry")]
+#[derive(serde::Serialize)]
+struct BenchmarkTelemetryJson {
+    operations: Vec<crate::sim::frame::FrameNoiseTelemetryRecord>,
+}
+
+#[cfg(feature = "benchmark-telemetry")]
+fn write_benchmark_telemetry_json(path: &str) -> Result<(), String> {
+    let file =
+        std::fs::File::create(path).map_err(|error| format!("failed to create {path}: {error}"))?;
+    let mut writer = io::BufWriter::new(file);
+    let telemetry = BenchmarkTelemetryJson {
+        operations: crate::sim::frame::take_frame_noise_telemetry(),
+    };
+    serde_json::to_writer_pretty(&mut writer, &telemetry)
+        .map_err(|error| format!("failed to write benchmark telemetry JSON: {error}"))?;
+    writer
+        .write_all(b"\n")
+        .map_err(|error| format!("failed to write benchmark telemetry JSON newline: {error}"))
 }
 
 fn run_perf_ci(
@@ -1620,6 +1682,71 @@ mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    #[test]
+    #[cfg(not(feature = "benchmark-telemetry"))]
+    fn benchmark_telemetry_flag_requires_feature() {
+        let dir = tempfile::tempdir().unwrap();
+        let telemetry_path = dir.path().join("telemetry.json");
+
+        let err = run(Cli {
+            benchmark_telemetry_json: Some(telemetry_path.display().to_string()),
+            command: Some(Commands::Stats {
+                r#in: None,
+                out: None,
+                json: false,
+            }),
+        })
+        .unwrap_err();
+
+        assert!(err.contains("--benchmark-telemetry-json"));
+        assert!(err.contains("benchmark-telemetry"));
+        assert!(!telemetry_path.exists());
+    }
+
+    #[test]
+    #[cfg(feature = "benchmark-telemetry")]
+    fn benchmark_telemetry_json_records_sample_noise_operations() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("input.stim");
+        let output_path = dir.path().join("shots.01");
+        let telemetry_path = dir.path().join("telemetry.json");
+        std::fs::write(
+            &input_path,
+            "X_ERROR(0.001) 0 1 2\nDEPOLARIZE1(0.3) 0 1 2\nM 0 1 2\n",
+        )
+        .unwrap();
+
+        run(Cli {
+            benchmark_telemetry_json: Some(telemetry_path.display().to_string()),
+            command: Some(Commands::Sample {
+                shots: Some(17),
+                out_format: "01".to_string(),
+                r#in: Some(input_path.display().to_string()),
+                out: Some(output_path.display().to_string()),
+                seed: Some(463),
+                skip_reference_sample: false,
+            }),
+        })
+        .unwrap();
+
+        let telemetry: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(telemetry_path).unwrap()).unwrap();
+        let operations = telemetry["operations"].as_array().unwrap();
+        assert_eq!(operations.len(), 2);
+        assert_eq!(operations[0]["operation"], "X_ERROR");
+        assert_eq!(operations[0]["sampling_path"], "sparse");
+        assert_eq!(operations[0]["targets"], 3);
+        assert!(operations[0].get("pairs").is_none());
+        assert_eq!(operations[0]["iterator_builds"], 1);
+        assert_eq!(operations[0]["attempt_count"], 51);
+        assert_eq!(operations[1]["operation"], "DEPOLARIZE1");
+        assert_eq!(operations[1]["sampling_path"], "dense");
+        assert_eq!(operations[1]["targets"], 3);
+        assert!(operations[1].get("pairs").is_none());
+        assert_eq!(operations[1]["iterator_builds"], 0);
+        assert_eq!(operations[1]["attempt_count"], 51);
+    }
+
     fn write_fake_executable(path: &std::path::Path, body: &str) {
         std::fs::write(path, body).unwrap();
         #[cfg(unix)]
@@ -1674,6 +1801,7 @@ mod tests {
         std::fs::write(input.path(), "LOSS(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::ExportJson {
                 r#in: Some(input.path().display().to_string()),
                 out: Some(output.path().display().to_string()),
@@ -1693,7 +1821,11 @@ mod tests {
 
     #[test]
     fn run_without_subcommand_reports_version() {
-        run(Cli { command: None }).unwrap();
+        run(Cli {
+            benchmark_telemetry_json: None,
+            command: None,
+        })
+        .unwrap();
     }
 
     #[test]
@@ -1715,6 +1847,7 @@ mod tests {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &regression_raw_path);
         }
         let gate_err = run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Ci {
                     out_dir: gate_out_dir.display().to_string(),
@@ -1739,6 +1872,7 @@ mod tests {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
         }
         let infra_err = run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Ci {
                     out_dir: infra_out_dir.display().to_string(),
@@ -1774,6 +1908,7 @@ mod tests {
             std::env::set_var("RSTIM_TEST_STIM", &fake_stim);
         }
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Run {
                     out: Some(selected_out.display().to_string()),
@@ -1785,6 +1920,7 @@ mod tests {
         })
         .unwrap();
         let suite_err = run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Run {
                     out: Some(suite_out.display().to_string()),
@@ -1985,6 +2121,7 @@ mod tests {
         let out = dir.path().join("memory.stim");
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Gen {
                 code: "css".to_string(),
                 task: "memory".to_string(),
@@ -2185,6 +2322,7 @@ mod tests {
         std::fs::write(&out, "keep me").unwrap();
 
         let err = run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Gen {
                 code: "repetition_code".to_string(),
                 task: "memory".to_string(),
@@ -2218,6 +2356,7 @@ mod tests {
         std::fs::write(&raw_path, PERF_PASS_RAW).unwrap();
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Summarize {
                     case: None,
@@ -2229,6 +2368,7 @@ mod tests {
         .unwrap();
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Gate {
                     r#in: Some(summary_path.display().to_string()),
@@ -2240,6 +2380,7 @@ mod tests {
         .unwrap();
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Report {
                     r#in: Some(summary_path.display().to_string()),
@@ -2262,6 +2403,7 @@ mod tests {
         std::fs::write(&raw_path, PERF_PASS_RAW).unwrap();
 
         run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Summarize {
                     case: Some("rep-sample-d13-r13".to_string()),
@@ -2301,6 +2443,7 @@ mod tests {
         std::fs::write(&summary_path, serde_json::to_vec_pretty(&summary).unwrap()).unwrap();
 
         let err = run(Cli {
+            benchmark_telemetry_json: None,
             command: Some(Commands::Perf {
                 command: PerfCommands::Gate {
                     r#in: Some(summary_path.display().to_string()),

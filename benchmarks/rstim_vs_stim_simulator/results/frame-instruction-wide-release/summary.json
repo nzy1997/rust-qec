@@ -1,0 +1,48 @@
+{
+  "case_id": "stim_surface_d11_r100",
+  "measurement": {
+    "actual_output_bytes": 1552384,
+    "bytes_per_shot": 1516,
+    "elapsed_ns": 2720373000,
+    "expected_output_bytes": 1552384,
+    "output_bits": 12121,
+    "output_format": "b8",
+    "stdout_sha256": "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b",
+    "timer_scope": "process_spawn_stdout_stderr_drain_exit"
+  },
+  "operations": [
+    {
+      "attempt_count": 24946688,
+      "instructions": 203,
+      "iterator_builds": 203,
+      "operation": "X_ERROR",
+      "sampling_path": "sparse",
+      "targets": 24362
+    },
+    {
+      "attempt_count": 12288000,
+      "instructions": 200,
+      "iterator_builds": 200,
+      "operation": "DEPOLARIZE1",
+      "sampling_path": "sparse",
+      "targets": 12000
+    },
+    {
+      "attempt_count": 45056000,
+      "instructions": 400,
+      "iterator_builds": 400,
+      "operation": "DEPOLARIZE2",
+      "pairs": 44000,
+      "sampling_path": "sparse"
+    }
+  ],
+  "phase": "measured",
+  "round_index": 0,
+  "seed": 7,
+  "shots": 1024,
+  "totals": {
+    "attempt_count": 82290688,
+    "instructions": 803,
+    "iterator_builds": 803
+  }
+}
