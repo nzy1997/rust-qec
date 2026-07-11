@@ -1,0 +1,70 @@
+{
+  "case_id": "stim_surface_d11_r100",
+  "measured_record_count": 14,
+  "measurement_count": 12121,
+  "output_format": "b8",
+  "shots": 1024,
+  "timer_scope": "cli_end_to_end",
+  "variants": [
+    {
+      "elapsed_ns": {
+        "max": 29394916,
+        "mean": 28920767.85714286,
+        "median": 28879750,
+        "min": 28728125,
+        "sample_count": 7,
+        "samples": [
+          29056750,
+          28879750,
+          28733333,
+          29394916,
+          28918709,
+          28728125,
+          28733792
+        ]
+      },
+      "sample_count": 7,
+      "stdout_sha256": [
+        "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6",
+        "d3d17385d752c32ab76cba4ab6edec6a680647f4f5d9383ed6eb674f8a923de4",
+        "fcf21128fae5a4442439cdfb6b0b34e608b1e8987136e864ef3a6e07823a08c8",
+        "811af7911d050e11c1f99ed7e404db915308cad09f15970b5d36e5ae3857128a",
+        "3fb25656b06b57f2da08ed1d95d099af30a654c1e9e870c0005bdcfe88b2a9bc",
+        "784f2c473e251965990b9af9c7ecaf605f2b2db4fb21966cfb55e9938ed70ec9",
+        "785df90e5ec658740a713737c84c57c0e85f7a8c455b4335121fc7ae35f119c5"
+      ],
+      "total_output_bytes": 10866688,
+      "variant": "stim-cli-b8"
+    },
+    {
+      "elapsed_ns": {
+        "max": 103508542,
+        "mean": 103138345.14285715,
+        "median": 103262541,
+        "min": 102557083,
+        "sample_count": 7,
+        "samples": [
+          103329958,
+          102557083,
+          103508542,
+          102607625,
+          103243125,
+          103262541,
+          103459542
+        ]
+      },
+      "sample_count": 7,
+      "stdout_sha256": [
+        "6314be588285f4df03c16e888b9e0a1f219a0808afcf54152500ded9d19bd173",
+        "ddf41f04a02e9b7cc87fab2bf32e3d609af3c529159eff27c48606dfe621785b",
+        "0b099effb699fc854b95d5f065dab52b4d7c195c4dea24821e5a56556f76f33d",
+        "c7ec89b045163fb945ce6ea29f369528fcabcafae3683122cfe2c5ed1c66e376",
+        "4e5274473a1ef006e6b88836eaea4798caa908b7efacc4c85b1fac9c06defde6",
+        "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b",
+        "f5e31923515549ad333eae0cad1238003d36999281e242db73e8f9fa8007d3b2"
+      ],
+      "total_output_bytes": 10866688,
+      "variant": "rstim-cli-b8"
+    }
+  ]
+}
