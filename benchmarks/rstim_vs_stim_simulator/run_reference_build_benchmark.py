@@ -396,6 +396,7 @@ def collect_environment(
 ) -> dict[str, Any]:
     stim_worker_argv = default_stim_worker_argv(str(args.stim_python))
     rstim_worker_argv = default_rstim_worker_argv(str(args.rstim_worker))
+    runner_python_path = Path(sys.executable).resolve()
     stim_python_path = _resolve_executable(str(args.stim_python))
     rstim_worker_path = _resolve_executable(str(args.rstim_worker))
     return {
@@ -417,6 +418,8 @@ def collect_environment(
             RSTIM_VARIANT: default_rstim_worker_argv("target/release/rstim_reference_build_worker"),
         },
         "runner_argv": _runner_argv(args),
+        "runner_python_executable": str(runner_python_path),
+        "runner_python_executable_sha256": sha256_file(runner_python_path),
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
         "git_commit": git_commit,

@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ CANONICAL_FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/sti
 CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
 EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+GIT_COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
 
 
 def sha256_file(path: Path) -> str:
@@ -197,6 +199,22 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
     return path
 
 
+def _validate_git_commit(value: Any) -> None:
+    if not isinstance(value, str) or GIT_COMMIT_RE.fullmatch(value) is None:
+        raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
+    completed = subprocess.run(
+        ["git", "cat-file", "-e", f"{value}^{{commit}}"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip()
+        suffix = f": {detail}" if detail else ""
+        raise ValueError(f"environment git_commit must exist in the local git object database{suffix}")
+
+
 def _validate_canonical_path(
     environment: dict[str, Any],
     field: str,
@@ -271,11 +289,13 @@ def _validate_runner_executable(raw: str) -> None:
         raise ValueError("environment runner_argv executable must be python3 or an absolute Python executable")
 
 
-def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> None:
+def _validate_runner_argv(environment: dict[str, Any], results_dir: Path, runner_python_path: Path) -> None:
     argv = _validate_string_list(environment.get("runner_argv"), "environment runner_argv")
     if len(argv) != 17:
         raise ValueError("environment runner_argv must match the full canonical runner command")
     _validate_runner_executable(argv[0])
+    if _resolve_command_executable(argv[0], "environment runner_argv") != runner_python_path:
+        raise ValueError("environment runner_argv executable must match runner_python_executable")
     if argv[1:4] != ["-m", runner.MODULE_NAME, "--fixture"] or argv[5] != "--manifest":
         raise ValueError("environment runner_argv must invoke the canonical runner module")
     if _resolve_recorded_path(argv[4], "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
@@ -307,7 +327,8 @@ def validate_environment(
     results_dir: Path,
 ) -> None:
     del derived, records
-    for field in ("git_commit", "os", "cpu_model", "rustc_version", "cargo_version", "python_version"):
+    _validate_git_commit(environment.get("git_commit"))
+    for field in ("os", "cpu_model", "rustc_version", "cargo_version", "python_version"):
         if not isinstance(environment.get(field), str) or not environment[field]:
             raise ValueError(f"environment {field} must be nonempty")
     if not isinstance(environment.get("git_dirty"), bool):
@@ -334,8 +355,13 @@ def validate_environment(
         raise ValueError("environment manifest_sha256 does not match manifest_path")
     _validate_path_hash(environment, "python_executable", "python_executable_sha256")
     _validate_path_hash(environment, "rstim_worker_binary_path", "rstim_worker_binary_sha256")
+    runner_python_path = _validate_path_hash(
+        environment,
+        "runner_python_executable",
+        "runner_python_executable_sha256",
+    )
     _validate_worker_argv(environment)
-    _validate_runner_argv(environment, results_dir)
+    _validate_runner_argv(environment, results_dir, runner_python_path)
 
 
 def validate_artifact_hashes(results_dir: Path) -> None:

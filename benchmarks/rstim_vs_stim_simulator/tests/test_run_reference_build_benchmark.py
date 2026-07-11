@@ -314,6 +314,8 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 "worker_argv",
                 "canonical_worker_argv",
                 "runner_argv",
+                "runner_python_executable",
+                "runner_python_executable_sha256",
                 "warmup_rounds",
                 "measure_rounds",
                 "git_commit",
@@ -382,6 +384,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["manifest_sha256"], MANIFEST_DIGEST)
             self.assertEqual(environment["stim_version"], "1.15.0")
             self.assertEqual(environment["runner_argv"], expected_runner_argv)
+            expected_runner_python = Path(sys.executable).resolve()
+            self.assertEqual(environment["runner_python_executable"], str(expected_runner_python))
+            self.assertEqual(environment["runner_python_executable_sha256"], sha256_file(expected_runner_python))
             self.assertEqual(environment["worker_argv"], expected_worker_argv)
             self.assertEqual(environment["canonical_worker_argv"], expected_canonical_worker_argv)
             self.assertEqual(environment["python_executable"], str(stim_python.resolve()))

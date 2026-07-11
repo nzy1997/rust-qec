@@ -33,6 +33,19 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def command_stdout(command: list[str]) -> str:
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"{command!r} failed: {result.stderr}")
+    return result.stdout.strip()
+
+
 def rewrite_json(path: Path, mutate: Callable[[dict[str, Any]], None]) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     mutate(payload)
@@ -123,6 +136,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     fixture = REPO_ROOT / FIXTURE_REL
     manifest = REPO_ROOT / MANIFEST_REL
     stim_python = Path(shutil.which("python3") or sys.executable).resolve()
+    runner_python = Path(shutil.which("python3") or sys.executable).resolve()
 
     records: list[dict[str, Any]] = []
     for variant, backend, elapsed_base in (
@@ -190,7 +204,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         },
         "warmup_rounds": 2,
         "measure_rounds": 7,
-        "git_commit": "test-commit",
+        "git_commit": command_stdout(["git", "rev-parse", "HEAD"]),
         "git_dirty": False,
         "os": "test-os",
         "cpu_model": "test-cpu",
@@ -198,6 +212,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "python_executable_sha256": sha256_file(stim_python),
         "rstim_worker_binary_path": str(rstim_worker),
         "rstim_worker_binary_sha256": sha256_file(rstim_worker),
+        "runner_python_executable": str(runner_python),
+        "runner_python_executable_sha256": sha256_file(runner_python),
         "runner_argv": [
             "python3",
             "-m",
@@ -410,6 +426,44 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment rstim_worker_binary_sha256", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_runner_python_path_mismatch_before_hash_mismatch(self) -> None:
+        fake_python = self.bundle.parent / "python-fake"
+        fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        fake_python.chmod(0o755)
+
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["runner_python_executable"] = str(fake_python)
+            environment["runner_python_executable_sha256"] = sha256_file(fake_python)
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runner_argv executable must match runner_python_executable", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_bad_runner_python_hash_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["runner_python_executable_sha256"] = "0" * 64
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runner_python_executable_sha256", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_invalid_git_commit_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["git_commit"] = "0" * 40
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment git_commit", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_environment_missing_provenance_before_hash_mismatch(self) -> None:
