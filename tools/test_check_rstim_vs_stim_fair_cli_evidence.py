@@ -181,6 +181,68 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("missing required bundle file: artifact-sha256.json", result.stderr)
 
+    def test_rejects_self_consistent_substituted_provenance_paths(self) -> None:
+        substitute = self.bundle / "unrelated-input"
+        substitute.write_bytes(b"unrelated provenance input\n")
+
+        def substitute_provenance(environment: dict[str, Any]) -> None:
+            digest = sha256_file(substitute)
+            for path_field, hash_field in (
+                ("fair_manifest_path", "fair_manifest_sha256"),
+                ("source_manifest_path", "source_manifest_sha256"),
+                ("fixture_path", "fixture_sha256"),
+            ):
+                environment[path_field] = str(substitute)
+                environment[hash_field] = digest
+            environment["manifest"] = str(substitute)
+            environment["manifest_sha256"] = digest
+            environment["source_manifest"] = str(substitute)
+            environment["source_manifest_sha256"] = digest
+            environment["fixture"] = str(substitute)
+            environment["fixture_sha256"] = digest
+
+        rewrite_json(self.bundle / "environment.json", substitute_provenance)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment fair_manifest_path must name the canonical fair CLI manifest", result.stderr)
+
+    def test_rejects_output_bytes_not_derived_from_measurements_and_shots(self) -> None:
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        records[2]["actual_output_bytes"] -= 1
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "stim-cli-b8 actual_output_bytes must be 1552384 (1516 bytes per shot * 1024 shots)",
+            result.stderr,
+        )
+
+    def test_raw_aggregate_changes_require_regeneration_and_accept_regenerated_artifacts(self) -> None:
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        records[2]["elapsed_ns"] += 10_000
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+
+        stale_result = self.run_checker()
+        self.assertNotEqual(stale_result.returncode, 0, stale_result.stdout)
+        self.assertIn("summary.json does not match summary derived from raw.jsonl", stale_result.stderr)
+        self.assertNotIn("artifact-sha256.json", stale_result.stderr)
+
+        summary = run_fair_cli._summary(records, case=fair_cli_contract.EXPECTED_CASE)
+        (self.bundle / "summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (self.bundle / "report.md").write_text(run_fair_cli._render_report(summary), encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+
+        regenerated_result = self.run_checker()
+        self.assertEqual(regenerated_result.returncode, 0, regenerated_result.stderr)
+        self.assertEqual("PASS fair CLI sampling evidence variants=2 measured=14\n", regenerated_result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

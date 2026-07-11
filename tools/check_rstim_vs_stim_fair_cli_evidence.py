@@ -19,6 +19,9 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_fair_cli
 REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
 VARIANTS = ("stim-cli-b8", "rstim-cli-b8")
+CANONICAL_FAIR_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+CANONICAL_SOURCE_MANIFEST = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
+CANONICAL_FIXTURE = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
 OLD_FULL_SUMMARY = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json"
 OLD_FULL_SUMMARY_SHA256 = "97ae397e598fe447d206c6b07a26ceaa0a3336d1883a7f77bc194f7b4c491805"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
@@ -86,6 +89,12 @@ def _expected_argv(variant: str, *, seed: int, environment: dict[str, Any]) -> l
 
 def validate_raw_semantics(records: list[dict[str, Any]], environment: dict[str, Any]) -> None:
     case = fair_cli_contract.EXPECTED_CASE
+    derived_bytes_per_shot = (case["measurement_count"] + 7) // 8
+    if derived_bytes_per_shot != case["bytes_per_shot"] or derived_bytes_per_shot != 1516:
+        raise ValueError("canonical measurement count must derive 1516 bytes per shot")
+    derived_output_bytes = derived_bytes_per_shot * case["shots"]
+    if derived_output_bytes != case["expected_output_bytes"] or derived_output_bytes != 1552384:
+        raise ValueError("canonical bytes per shot and shots must derive 1552384 bytes per run")
     if len(records) != 18:
         raise ValueError("raw.jsonl must contain exactly 18 records")
     if set(record.get("variant") for record in records) != set(VARIANTS):
@@ -108,8 +117,9 @@ def validate_raw_semantics(records: list[dict[str, Any]], environment: dict[str,
                 require_equal(record.get(field), case[field], f"{variant} {field} must be {case[field]}")
             require_equal(
                 record.get("actual_output_bytes"),
-                case["expected_output_bytes"],
-                f"{variant} actual_output_bytes must be {case['expected_output_bytes']}",
+                derived_output_bytes,
+                f"{variant} actual_output_bytes must be {derived_output_bytes} "
+                f"({derived_bytes_per_shot} bytes per shot * {case['shots']} shots)",
             )
             require_equal(record.get("exit_code"), 0, f"{variant} exit_code must be 0")
             if not isinstance(record.get("elapsed_ns"), int) or isinstance(record["elapsed_ns"], bool):
@@ -147,6 +157,16 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
         raise ValueError(f"environment {hash_field} does not match {path_field}")
 
 
+def _validate_canonical_path(
+    environment: dict[str, Any],
+    path_field: str,
+    expected_path: Path,
+    description: str,
+) -> None:
+    if _resolve_recorded_path(environment.get(path_field), path_field) != expected_path.resolve():
+        raise ValueError(f"environment {path_field} must name the canonical {description}")
+
+
 def validate_environment(environment: dict[str, Any], records: list[dict[str, Any]]) -> None:
     required_nonempty = ("git_commit", "os", "cpu_model", "rstim_version", "rustc_version")
     for field in required_nonempty:
@@ -163,6 +183,13 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         ("known_answer_preflight", "passed"),
     ):
         require_equal(environment.get(field), expected, f"environment {field} must be {expected}")
+
+    for path_field, expected_path, description in (
+        ("fair_manifest_path", CANONICAL_FAIR_MANIFEST, "fair CLI manifest"),
+        ("source_manifest_path", CANONICAL_SOURCE_MANIFEST, "source manifest"),
+        ("fixture_path", CANONICAL_FIXTURE, "fixture"),
+    ):
+        _validate_canonical_path(environment, path_field, expected_path, description)
 
     for path_field, hash_field in (
         ("fair_manifest_path", "fair_manifest_sha256"),
