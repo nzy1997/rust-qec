@@ -196,7 +196,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             hash_manifest = json.loads((out_dir / "artifact-sha256.json").read_text(encoding="utf-8"))
             self.assertEqual(set(hash_manifest), expected_files - {"artifact-sha256.json"})
             for name, digest in hash_manifest.items():
-                self.assertRegex(digest, r"^[0-9a-f]{{64}}$")
+                self.assertRegex(digest, r"^[0-9a-f]{64}$")
                 self.assertEqual(digest, sha256_file(out_dir / name))
 
             raw = load_jsonl(out_dir / "raw.jsonl")
