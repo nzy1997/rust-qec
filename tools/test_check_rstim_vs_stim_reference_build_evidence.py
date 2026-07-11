@@ -20,6 +20,7 @@ PROTOCOL = "reference-build-v1"
 TIMER_SCOPE = "reference_build_only"
 REFERENCE_DIGEST = "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d"
 MANIFEST_DIGEST = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+FIXTURE_DIGEST = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
 MEASUREMENT_BITS = 12121
 PACKED_BYTES = 1516
 STIM_VARIANT = "stim-reference-b8"
@@ -159,7 +160,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "timer_scope": TIMER_SCOPE,
         "seed_policy": "deterministic_no_seed_reference_builds",
         "fixture_path": FIXTURE_REL,
-        "fixture_sha256": sha256_file(fixture),
+        "fixture_sha256": FIXTURE_DIGEST,
         "manifest_path": MANIFEST_REL,
         "manifest_sha256": MANIFEST_DIGEST,
         "stim_version": "1.15.0",
@@ -205,6 +206,16 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             FIXTURE_REL,
             "--manifest",
             MANIFEST_REL,
+            "--stim-python",
+            str(stim_python),
+            "--rstim-worker",
+            str(rstim_worker),
+            "--warmup-rounds",
+            "2",
+            "--measure-rounds",
+            "7",
+            "--out-dir",
+            str(path),
         ],
         "rustc_version": "rustc test",
         "cargo_version": "cargo test",
@@ -213,6 +224,9 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     self_check_manifest = sha256_file(manifest)
     if self_check_manifest != MANIFEST_DIGEST:
         raise AssertionError(f"manifest digest drifted: {self_check_manifest}")
+    self_check_fixture = sha256_file(fixture)
+    if self_check_fixture != FIXTURE_DIGEST:
+        raise AssertionError(f"fixture digest drifted: {self_check_fixture}")
     (path / "environment.json").write_text(
         json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -341,6 +355,28 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment runner_argv", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_short_runner_argv_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["runner_argv"] = environment["runner_argv"][:7]
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runner_argv must match the full canonical runner command", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_rehashed_environment_noncanonical_fixture_digest_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["fixture_sha256"] = "0" * 64
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment fixture_sha256 must be canonical reference-build fixture SHA-256", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_environment_noncanonical_worker_argv_before_hash_mismatch(self) -> None:

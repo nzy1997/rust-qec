@@ -29,6 +29,7 @@ BACKENDS = {
 }
 CANONICAL_FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -262,18 +263,25 @@ def _validate_worker_argv(environment: dict[str, Any]) -> None:
         raise ValueError("environment worker_argv rstim executable must match rstim_worker_binary_path")
 
 
+def _validate_runner_executable(raw: str) -> None:
+    if raw == "python3":
+        return
+    path = Path(raw)
+    if not path.is_absolute() or not path.name.lower().startswith("python"):
+        raise ValueError("environment runner_argv executable must be python3 or an absolute Python executable")
+
+
 def _validate_runner_argv(environment: dict[str, Any]) -> None:
     argv = _validate_string_list(environment.get("runner_argv"), "environment runner_argv")
-    if len(argv) not in (7, 17):
-        raise ValueError("environment runner_argv must match the canonical runner command")
+    if len(argv) != 17:
+        raise ValueError("environment runner_argv must match the full canonical runner command")
+    _validate_runner_executable(argv[0])
     if argv[1:4] != ["-m", runner.MODULE_NAME, "--fixture"] or argv[5] != "--manifest":
         raise ValueError("environment runner_argv must invoke the canonical runner module")
     if _resolve_recorded_path(argv[4], "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
         raise ValueError("environment runner_argv fixture must match fixture_path")
     if _resolve_recorded_path(argv[6], "runner_argv manifest") != _resolve_recorded_path(environment.get("manifest_path"), "manifest_path"):
         raise ValueError("environment runner_argv manifest must match manifest_path")
-    if len(argv) == 7:
-        return
 
     expected_tail = [
         "--stim-python",
@@ -287,7 +295,7 @@ def _validate_runner_argv(environment: dict[str, Any]) -> None:
         "--out-dir",
     ]
     if argv[7:16] != expected_tail or not argv[16]:
-        raise ValueError("environment runner_argv must match the canonical runner command")
+        raise ValueError("environment runner_argv must match the full canonical runner command")
 
 
 def validate_environment(environment: dict[str, Any], derived: dict[str, Any], records: list[dict[str, Any]]) -> None:
@@ -311,8 +319,10 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
 
     fixture_path = _validate_canonical_path(environment, "fixture_path", CANONICAL_FIXTURE, "reference-build fixture")
     manifest_path = _validate_canonical_path(environment, "manifest_path", CANONICAL_MANIFEST, "full case manifest")
-    if sha256_file(fixture_path) != environment.get("fixture_sha256"):
-        raise ValueError("environment fixture_sha256 does not match fixture_path")
+    if environment.get("fixture_sha256") != EXPECTED_FIXTURE_SHA256:
+        raise ValueError("environment fixture_sha256 must be canonical reference-build fixture SHA-256")
+    if sha256_file(fixture_path) != EXPECTED_FIXTURE_SHA256:
+        raise ValueError("canonical reference-build fixture file SHA-256 does not match expected digest")
     if sha256_file(manifest_path) != environment.get("manifest_sha256"):
         raise ValueError("environment manifest_sha256 does not match manifest_path")
     _validate_path_hash(environment, "python_executable", "python_executable_sha256")
