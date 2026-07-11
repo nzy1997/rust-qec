@@ -3,17 +3,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Callable
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools/check_rstim_vs_stim_instruction_wide_noise_evidence.py"
 FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+PUBLISHED_RSTIM_RUNTIME_IDENTITY = {
+    "role": "tool://rstim",
+    "version": "rstim 0.1.1",
+    "basename": "rstim",
+    "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
+}
 REQUIRED_ARTIFACTS = (
     "raw.jsonl",
     "summary.json",
@@ -44,6 +50,32 @@ def rewrite_hashes(bundle: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
+
+
+def write_checker_repo_fixture(
+    repo_root: Path,
+    runtime_identity: dict[str, str],
+    mutate_catalog_text: Callable[[str], str] | None = None,
+) -> Path:
+    tools_dir = repo_root / "tools"
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(CHECKER, tools_dir / CHECKER.name)
+
+    benchmarks_dir = repo_root / "benchmarks"
+    benchmarks_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO_ROOT / "benchmarks/__init__.py", benchmarks_dir / "__init__.py")
+    shutil.copytree(
+        REPO_ROOT / "benchmarks/rstim_vs_stim_simulator",
+        benchmarks_dir / "rstim_vs_stim_simulator",
+    )
+
+    catalog_path = benchmarks_dir / "rstim_vs_stim_simulator/evidence_bundles.toml"
+    catalog_text = catalog_path.read_text(encoding="utf-8")
+    catalog_text = catalog_text.replace(PUBLISHED_RSTIM_RUNTIME_IDENTITY["sha256"], runtime_identity["sha256"])
+    if mutate_catalog_text is not None:
+        catalog_text = mutate_catalog_text(catalog_text)
+    catalog_path.write_text(catalog_text, encoding="utf-8")
+    return tools_dir / CHECKER.name
 
 
 def write_valid_bundle(bundle: Path) -> None:
@@ -177,16 +209,17 @@ def write_valid_bundle(bundle: Path) -> None:
         "measure_rounds": 1,
         "timer_scope": "process_spawn_stdout_stderr_drain_exit",
         "stim_version": "1.15.0",
-        "rstim_version": "rstim 0.1.1-test",
+        "rstim_version": PUBLISHED_RSTIM_RUNTIME_IDENTITY["version"],
         "rustc_version": "rustc test",
         "os": "test-os",
         "cpu_model": "test-cpu",
-        "fixture": str(FIXTURE),
+        "fixture": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
         "fixture_sha256": sha256_file(FIXTURE),
-        "manifest": str(MANIFEST),
+        "manifest": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
         "manifest_sha256": sha256_file(MANIFEST),
-        "rstim_binary": str(rstim_binary),
-        "rstim_binary_sha256": sha256_file(rstim_binary),
+        "runtime_identities": [
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+        ],
         "runner_argv": ["python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_frame_instruction_wide_benchmark"],
         "child_argv": {
             "measurement": ["rstim", "sample"],
@@ -215,10 +248,15 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.bundle = Path(self.tmpdir.name) / "bundle"
         write_valid_bundle(self.bundle)
 
-    def run_checker(self) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        *extra_args: str,
+        checker_path: Path = CHECKER,
+        cwd: Path = REPO_ROOT,
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(CHECKER), "--dir", str(self.bundle)],
-            cwd=REPO_ROOT,
+            ["python3", str(checker_path), "--dir", str(self.bundle), *extra_args],
+            cwd=cwd,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -232,6 +270,184 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
             result.stdout,
             "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
         )
+
+    def test_default_validation_does_not_require_live_runtime_binary(self) -> None:
+        (self.bundle / "rstim").unlink()
+
+        result = self.run_checker()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
+        )
+
+    def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:
+        identity = dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY)
+        identity["sha256"] = sha256_file(self.bundle / "rstim")
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: payload.update({"runtime_identities": [identity]}),
+        )
+        rewrite_hashes(self.bundle)
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(repo_root, identity)
+
+        result = self.run_checker(
+            "--verify-runtime-binary",
+            str(self.bundle / "rstim"),
+            checker_path=checker_path,
+            cwd=repo_root,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS instruction-wide frame-noise evidence", result.stdout)
+
+    def test_verify_runtime_binary_rejects_different_supplied_binary(self) -> None:
+        other_binary = self.bundle / "other-rstim"
+        other_binary.write_bytes(b"different runtime binary\n")
+
+        result = self.run_checker("--verify-runtime-binary", str(other_binary))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("runtime binary SHA-256 does not match recorded identity", result.stderr)
+
+    def test_rejects_catalog_schema_other_than_v2(self) -> None:
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(
+            repo_root,
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+            lambda text: text.replace("schema = 2", "schema = 1", 1),
+        )
+
+        result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("evidence catalog schema must be 2", result.stderr)
+
+    def test_rejects_duplicate_frame_catalog_bundle(self) -> None:
+        repo_root = Path(self.tmpdir.name) / "checker-repo"
+        checker_path = write_checker_repo_fixture(
+            repo_root,
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+            lambda text: text + '\n[[bundles]]\nid = "frame-instruction-wide-release"\n',
+        )
+
+        result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('evidence catalog must contain exactly one bundle "frame-instruction-wide-release"', result.stderr)
+
+    def test_rejects_malformed_or_extra_catalog_runtime_identity(self) -> None:
+        for mutation in (
+            lambda text: text + (
+                '\n[[bundles.runtime_identities]]\n'
+                'role = "tool://extra"\n'
+                'version = "extra 1.0"\n'
+                'basename = "extra"\n'
+                'sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"\n'
+                'unexpected = "field"\n'
+            ),
+            lambda text: text + (
+                '\n[[bundles.runtime_identities]]\n'
+                'role = "tool://extra"\n'
+                'version = "extra 1.0"\n'
+                'basename = "extra"\n'
+                'sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"\n'
+            ),
+        ):
+            with self.subTest(mutation=mutation):
+                repo_root = Path(self.tmpdir.name) / f"checker-repo-{id(mutation)}"
+                checker_path = write_checker_repo_fixture(
+                    repo_root,
+                    PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+                    mutation,
+                )
+
+                result = self.run_checker(checker_path=checker_path, cwd=repo_root)
+
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(
+                    'evidence catalog bundle "frame-instruction-wide-release" must contain exactly one runtime identity',
+                    result.stderr,
+                )
+
+    def test_rejects_rstim_version_disagreeing_with_runtime_identity(self) -> None:
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: payload.update({"rstim_version": "rstim 0.1.1-other"}),
+        )
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment rstim_version must match runtime identity version", result.stderr)
+
+    def test_rejects_malformed_or_extra_environment_runtime_identity(self) -> None:
+        for identities, message in (
+            (
+                [
+                    PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+                    {
+                        "role": "tool://extra",
+                        "version": "extra 1.0",
+                        "basename": "extra",
+                        "sha256": "d" * 64,
+                    },
+                ],
+                "environment runtime_identities must contain exactly one tool://rstim identity",
+            ),
+            (
+                ["not an identity"],
+                "environment runtime_identities[0] must be an object",
+            ),
+            (
+                [{"role": "tool://rstim", "version": "rstim 0.1.1", "basename": "rstim"}],
+                "environment runtime_identities[0] missing required field(s): sha256",
+            ),
+            (
+                [dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY, unexpected="field")],
+                "environment runtime_identities[0] unsupported field(s): unexpected",
+            ),
+            (
+                [dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY, role="tool://extra")],
+                "environment runtime_identities[0] role must be tool://rstim",
+            ),
+        ):
+            with self.subTest(message=message):
+                write_valid_bundle(self.bundle)
+                rewrite_json(
+                    self.bundle / "environment.json",
+                    lambda payload, identities=identities: payload.update({"runtime_identities": identities}),
+                )
+                rewrite_hashes(self.bundle)
+
+                result = self.run_checker()
+
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(message, result.stderr)
+
+    def test_rejects_legacy_runtime_binary_path_fields_without_hashing_them(self) -> None:
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: (
+                payload.pop("runtime_identities"),
+                payload.update(
+                    {
+                        "rstim_binary": str(self.bundle / "missing-rstim"),
+                        "rstim_binary_sha256": "0" * 64,
+                    }
+                ),
+            ),
+        )
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runtime_identities must contain exactly one tool://rstim identity", result.stderr)
+        self.assertNotIn("does not exist", result.stderr)
 
     def test_rejects_fixture_load_count_substituted_for_iterator_builds_before_hash_error(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
@@ -248,15 +464,16 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
     def test_rejects_failed_or_sample_mode_correctness(self) -> None:
         for field, value, message in (
             ("status", "fail", "correctness-summary status must be pass"),
+            ("status", "failed", "correctness-summary status must be pass"),
             ("mode", "sample", "correctness-summary mode must be detect"),
         ):
             with self.subTest(field=field):
                 write_valid_bundle(self.bundle)
                 rewrite_json(self.bundle / "correctness-summary.json", lambda payload: payload.update({field: value}))
-                rewrite_hashes(self.bundle)
                 result = self.run_checker()
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertIn(message, result.stderr)
+                self.assertNotIn("artifact", result.stderr.lower())
 
     def test_rejects_mismatched_correctness_output_bytes(self) -> None:
         for field in ("stim_output_bytes", "rstim_output_bytes"):
@@ -280,11 +497,10 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertIn("raw measurement field stdout_sha256 must be identical", result.stderr)
         self.assertNotIn("artifact", result.stderr.lower())
 
-    def test_rejects_mismatched_fixture_manifest_binary_or_artifact_hash(self) -> None:
+    def test_rejects_mismatched_fixture_manifest_or_artifact_hash(self) -> None:
         for field, message in (
             ("fixture_sha256", "environment fixture_sha256 does not match fixture"),
             ("manifest_sha256", "environment manifest_sha256 does not match manifest"),
-            ("rstim_binary_sha256", "environment rstim_binary_sha256 does not match rstim_binary"),
         ):
             with self.subTest(field=field):
                 write_valid_bundle(self.bundle)
