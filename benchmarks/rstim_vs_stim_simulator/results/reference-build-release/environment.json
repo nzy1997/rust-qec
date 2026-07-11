@@ -1,12 +1,12 @@
 {
   "canonical_worker_argv": {
     "rstim-packed-reference-b8": [
-      "target/release/rstim_reference_build_worker",
+      "tool://rstim-reference-worker",
       "--protocol",
       "reference-build-v1"
     ],
     "stim-reference-b8": [
-      "python3",
+      "tool://python",
       "-m",
       "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
       "--protocol",
@@ -25,13 +25,9 @@
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
   "protocol": "reference-build-v1",
-  "python_executable": "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
-  "python_executable_sha256": "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43",
   "python_version": "3.14.3",
-  "rstim_worker_binary_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-459-run-1-agent-issue-459-publish-packed-reference-sampling-phase-evidence-run-1/target/release/rstim_reference_build_worker",
-  "rstim_worker_binary_sha256": "82d395176ebe76d6890bb9e747771fac46a019867287f69b0da8d6d5075e1265",
   "runner_argv": [
-    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "tool://python",
     "-m",
     "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark",
     "--fixture",
@@ -39,9 +35,9 @@
     "--manifest",
     "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
     "--stim-python",
-    "/opt/homebrew/bin/python3",
+    "tool://python",
     "--rstim-worker",
-    "target/release/rstim_reference_build_worker",
+    "tool://rstim-reference-worker",
     "--warmup-rounds",
     "2",
     "--measure-rounds",
@@ -49,8 +45,26 @@
     "--out-dir",
     "benchmarks/rstim_vs_stim_simulator/results/reference-build-release"
   ],
-  "runner_python_executable": "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
-  "runner_python_executable_sha256": "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43",
+  "runtime_identities": [
+    {
+      "basename": "python3.14",
+      "role": "tool://python",
+      "sha256": "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43",
+      "version": "3.14.3"
+    },
+    {
+      "basename": "stim_reference_build.py",
+      "role": "tool://stim-reference-worker",
+      "sha256": "04de9822e624e5b08094ae3bd213b118aaf3ad296cb0aab2e0b9492c9aa32ec9",
+      "version": "1.15.0"
+    },
+    {
+      "basename": "rstim_reference_build_worker",
+      "role": "tool://rstim-reference-worker",
+      "sha256": "82d395176ebe76d6890bb9e747771fac46a019867287f69b0da8d6d5075e1265",
+      "version": "rstim 0.1.1"
+    }
+  ],
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
   "seed_policy": "deterministic_no_seed_reference_builds",
   "stim_version": "1.15.0",
@@ -58,12 +72,12 @@
   "warmup_rounds": 2,
   "worker_argv": {
     "rstim-packed-reference-b8": [
-      "target/release/rstim_reference_build_worker",
+      "tool://rstim-reference-worker",
       "--protocol",
       "reference-build-v1"
     ],
     "stim-reference-b8": [
-      "/opt/homebrew/bin/python3",
+      "tool://python",
       "-m",
       "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
       "--protocol",
