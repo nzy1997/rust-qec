@@ -284,16 +284,7 @@ path = "summary.json"
 sha256 = "1b41f2b1f8ad1730ac61f62cd707225f547b42d6f65ac0752b22a6cfbc6cb422"
 
 [[bundles.logical_executables]]
-role = "tool://stim"
-
-[[bundles.logical_executables]]
 role = "tool://rstim"
-
-[[bundles.runtime_identities]]
-role = "tool://stim"
-version = "1.15.0"
-basename = "stim"
-sha256 = "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323"
 
 [[bundles.runtime_identities]]
 role = "tool://rstim"
@@ -306,13 +297,9 @@ name = "measurement"
 argv = ["tool://rstim", "--benchmark-telemetry-json", "rstim-telemetry.json", "sample", "--shots", "1024", "--seed", "7", "--out_format", "b8", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
 
 [[bundles.checked_commands]]
-name = "correctness-stim"
-argv = ["tool://stim", "detect", "--shots", "1024", "--seed", "7", "--out_format", "01", "--append_observables", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
-
-[[bundles.checked_commands]]
 name = "correctness-rstim"
 argv = ["tool://rstim", "detect", "--shots", "1024", "--seed", "7", "--out_format", "01", "--append_observables", "--in", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"]
 
 [[bundles.checked_provenance]]
 name = "release-contract"
-value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "process_spawn_stdout_stderr_drain_exit", manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml" }
+value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "process_spawn_stdout_stderr_drain_exit", manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", stim_version = "1.15.0" }
