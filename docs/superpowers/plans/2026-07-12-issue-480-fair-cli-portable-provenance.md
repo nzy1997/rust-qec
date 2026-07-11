@@ -218,26 +218,26 @@ def expected_preflight_argv(variant: str) -> list[str]:
     ]
 ```
 
-Change `write_valid_bundle` so raw records and `environment["round_argv"]` use `expected_recorded_argv(variant, seed)`, and environment uses:
+Change `write_valid_bundle` so raw records and `environment["round_argv"]` use `expected_recorded_argv(variant, seed)`, and environment uses the checked bundle's published canonical runtime identities:
 
 ```python
 "runtime_identities": [
     {
         "role": "tool://stim",
-        "version": case["stim_version"],
+        "version": "1.15.0",
         "basename": "stim",
-        "sha256": sha256_file(stim_binary),
+        "sha256": "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323",
     },
     {
         "role": "tool://rstim",
-        "version": "rstim test",
+        "version": "rstim 0.1.1",
         "basename": "rstim",
-        "sha256": sha256_file(rstim_binary),
+        "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
     },
 ],
 ```
 
-Remove `stim_binary`, `stim_binary_sha256`, `rstim_binary`, and `rstim_binary_sha256` from the temporary environment. Change preflight detail argv to `expected_preflight_argv(variant)`.
+The temporary fake binaries remain useful for artifact construction, but the checker fixture models the committed checked bundle rather than a fresh local run. Remove `stim_binary`, `stim_binary_sha256`, `rstim_binary`, and `rstim_binary_sha256` from the temporary environment. Change preflight detail argv to `expected_preflight_argv(variant)`.
 
 - [ ] **Step 5: Add checker negative controls**
 
