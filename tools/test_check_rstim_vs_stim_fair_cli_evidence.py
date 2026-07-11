@@ -88,6 +88,7 @@ def write_valid_bundle(path: Path) -> None:
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (path / "report.md").write_text(run_fair_cli._render_report(summary), encoding="utf-8")
+    preflight_path = path / "known_answer.stim"
     environment = {
         "git_commit": "test-commit",
         "os": "test-os",
@@ -120,7 +121,25 @@ def write_valid_bundle(path: Path) -> None:
         "measure_rounds": 7,
         "known_answer_preflight": "passed",
         "known_answer_preflight_details": [
-            {"variant": variant, "exit_code": 0, "stdout_hex": "01", "stdout_sha256": "c" * 64}
+            {
+                "variant": variant,
+                "argv": [
+                    str(stim_binary if variant == "stim-cli-b8" else rstim_binary),
+                    "sample",
+                    "--shots",
+                    "1",
+                    "--seed",
+                    "0",
+                    "--out_format",
+                    "b8",
+                    "--in",
+                    str(preflight_path),
+                ],
+                "exit_code": 0,
+                "stdout_hex": "01",
+                "stdout_sha256": hashlib.sha256(bytes.fromhex("01")).hexdigest(),
+                "elapsed_ns": 1,
+            }
             for variant in ("stim-cli-b8", "rstim-cli-b8")
         ],
     }
@@ -220,6 +239,26 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
             "stim-cli-b8 actual_output_bytes must be 1552384 (1516 bytes per shot * 1024 shots)",
             result.stderr,
         )
+
+    def test_rejects_preflight_detail_without_canonical_argv(self) -> None:
+        def remove_argv(environment: dict[str, Any]) -> None:
+            del environment["known_answer_preflight_details"][0]["argv"]
+
+        rewrite_json(self.bundle / "environment.json", remove_argv)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 known-answer preflight argv must match canonical shape", result.stderr)
+
+    def test_rejects_preflight_detail_with_wrong_stdout_hash(self) -> None:
+        def replace_stdout_hash(environment: dict[str, Any]) -> None:
+            environment["known_answer_preflight_details"][0]["stdout_sha256"] = "d" * 64
+
+        rewrite_json(self.bundle / "environment.json", replace_stdout_hash)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 known-answer preflight stdout_sha256 must hash stdout_hex", result.stderr)
 
     def test_raw_aggregate_changes_require_regeneration_and_accept_regenerated_artifacts(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]

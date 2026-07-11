@@ -169,6 +169,41 @@ def _validate_canonical_path(
         raise ValueError(f"environment {path_field} must name the canonical {description}")
 
 
+def _validate_preflight_detail(variant: str, detail: dict[str, Any], environment: dict[str, Any]) -> None:
+    require_equal(detail.get("variant"), variant, f"{variant} known-answer preflight variant must be {variant}")
+    executable = str(environment["stim_binary"] if variant == "stim-cli-b8" else environment["rstim_binary"])
+    argv = detail.get("argv")
+    expected_prefix = [
+        executable,
+        "sample",
+        "--shots",
+        "1",
+        "--seed",
+        "0",
+        "--out_format",
+        "b8",
+        "--in",
+    ]
+    if (
+        not isinstance(argv, list)
+        or len(argv) != len(expected_prefix) + 1
+        or not all(isinstance(value, str) for value in argv)
+        or argv[: len(expected_prefix)] != expected_prefix
+        or not argv[-1]
+    ):
+        raise ValueError(f"{variant} known-answer preflight argv must match canonical shape")
+    require_equal(detail.get("exit_code"), 0, f"{variant} known-answer preflight exit_code must be 0")
+    require_equal(detail.get("stdout_hex"), "01", f"{variant} known-answer preflight stdout_hex must be 01")
+    digest = detail.get("stdout_sha256")
+    if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+        raise ValueError(f"{variant} known-answer preflight stdout_sha256 must be a lowercase SHA-256 digest")
+    if digest != hashlib.sha256(bytes.fromhex(detail["stdout_hex"])).hexdigest():
+        raise ValueError(f"{variant} known-answer preflight stdout_sha256 must hash stdout_hex")
+    elapsed_ns = detail.get("elapsed_ns")
+    if not isinstance(elapsed_ns, int) or isinstance(elapsed_ns, bool) or elapsed_ns < 0:
+        raise ValueError(f"{variant} known-answer preflight elapsed_ns must be a nonnegative integer")
+
+
 def validate_environment(environment: dict[str, Any], records: list[dict[str, Any]]) -> None:
     required_nonempty = ("git_commit", "os", "cpu_model", "rstim_version", "rustc_version")
     for field in required_nonempty:
@@ -224,12 +259,7 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
     if set(by_variant) != set(VARIANTS):
         raise ValueError("environment known_answer_preflight_details must contain both variants")
     for variant in VARIANTS:
-        detail = by_variant[variant]
-        require_equal(detail.get("exit_code"), 0, f"{variant} known-answer preflight exit_code must be 0")
-        require_equal(detail.get("stdout_hex"), "01", f"{variant} known-answer preflight stdout_hex must be 01")
-        digest = detail.get("stdout_sha256")
-        if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
-            raise ValueError(f"{variant} known-answer preflight stdout_sha256 must be a lowercase SHA-256 digest")
+        _validate_preflight_detail(variant, by_variant[variant], environment)
 
     require_equal(environment.get("timer_scope"), case["timer_scope"], "environment timer_scope must match case")
 
