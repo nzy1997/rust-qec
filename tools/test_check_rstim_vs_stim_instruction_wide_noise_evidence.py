@@ -350,10 +350,10 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
             with self.subTest(field=field):
                 write_valid_bundle(self.bundle)
                 rewrite_json(self.bundle / "correctness-summary.json", lambda payload: payload.update({field: value}))
-                rewrite_hashes(self.bundle)
                 result = self.run_checker()
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertIn(message, result.stderr)
+                self.assertNotIn("artifact", result.stderr.lower())
 
     def test_rejects_mismatched_correctness_output_bytes(self) -> None:
         for field in ("stim_output_bytes", "rstim_output_bytes"):
