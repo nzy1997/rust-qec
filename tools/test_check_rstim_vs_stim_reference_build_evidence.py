@@ -406,6 +406,20 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         self.assertIn("environment fixture_sha256 must be canonical reference-build fixture SHA-256", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
+    def test_rejects_rehashed_environment_noncanonical_fixture_path_before_hash_mismatch(self) -> None:
+        substitute = self.bundle.parent / "same-fixture-bytes.stim"
+        substitute.write_bytes((REPO_ROOT / FIXTURE_REL).read_bytes())
+
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["fixture_path"] = str(substitute)
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment fixture_path must name the canonical reference-build fixture", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
     def test_rejects_rehashed_environment_noncanonical_worker_argv_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
             environment["canonical_worker_argv"][RSTIM_VARIANT][0] = "target/debug/rstim_reference_build_worker"

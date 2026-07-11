@@ -16,8 +16,10 @@ from benchmarks.rstim_vs_stim_simulator import run_reference_build_benchmark
 
 
 ROOT = Path(__file__).resolve().parents[3]
-FIXTURE = ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
-MANIFEST = ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+FIXTURE_REL = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+MANIFEST_REL = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+FIXTURE = ROOT / FIXTURE_REL
+MANIFEST = ROOT / MANIFEST_REL
 PROTOCOL = "reference-build-v1"
 TIMER_SCOPE = "reference_build_only"
 REFERENCE_DIGEST = "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d"
@@ -378,9 +380,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["protocol"], PROTOCOL)
             self.assertEqual(environment["timer_scope"], TIMER_SCOPE)
             self.assertEqual(environment["seed_policy"], "deterministic_no_seed_reference_builds")
-            self.assertEqual(environment["fixture_path"], str(FIXTURE.resolve()))
+            self.assertEqual(environment["fixture_path"], FIXTURE_REL)
             self.assertEqual(environment["fixture_sha256"], sha256_file(FIXTURE))
-            self.assertEqual(environment["manifest_path"], str(MANIFEST.resolve()))
+            self.assertEqual(environment["manifest_path"], MANIFEST_REL)
             self.assertEqual(environment["manifest_sha256"], MANIFEST_DIGEST)
             self.assertEqual(environment["stim_version"], "1.15.0")
             self.assertEqual(environment["runner_argv"], expected_runner_argv)

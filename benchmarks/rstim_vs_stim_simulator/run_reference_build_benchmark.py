@@ -384,6 +384,14 @@ def _runner_argv(args: argparse.Namespace) -> list[str]:
     ]
 
 
+def _repo_relative_or_abs(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(resolved)
+
+
 def collect_environment(
     *,
     args: argparse.Namespace,
@@ -404,9 +412,9 @@ def collect_environment(
         "protocol": PROTOCOL,
         "timer_scope": TIMER_SCOPE,
         "seed_policy": SEED_POLICY,
-        "fixture_path": str(fixture),
+        "fixture_path": _repo_relative_or_abs(fixture),
         "fixture_sha256": fixture_sha256,
-        "manifest_path": str(manifest),
+        "manifest_path": _repo_relative_or_abs(manifest),
         "manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "stim_version": stim_version,
         "worker_argv": {
