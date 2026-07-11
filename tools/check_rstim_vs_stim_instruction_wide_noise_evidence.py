@@ -113,6 +113,21 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
         elapsed = record.get("elapsed_ns")
         if not isinstance(elapsed, int) or isinstance(elapsed, bool) or elapsed <= 0:
             raise ValueError(f"raw elapsed_ns must be a positive integer, got {elapsed!r}")
+    measurement_fields = (
+        "elapsed_ns",
+        "stdout_sha256",
+        "actual_output_bytes",
+        "expected_output_bytes",
+        "output_bits",
+        "bytes_per_shot",
+        "output_format",
+        "timer_scope",
+    )
+    first = records[0]
+    for record in records[1:]:
+        for field in measurement_fields:
+            if record.get(field) != first.get(field):
+                raise ValueError(f"raw measurement field {field} must be identical across operation rows")
 
     for operation, expected in runner.EXPECTED_OPERATION_TOTALS.items():
         row = next(record for record in records if record.get("operation") == operation)
@@ -180,7 +195,9 @@ def validate_correctness(payload: dict[str, Any]) -> None:
     _require_int(payload.get("observables"), 1, "correctness-summary observables")
     expected_bytes = (12_000 + 1 + 1) * 1024
     _require_int(payload.get("expected_output_bytes"), expected_bytes, "correctness-summary expected_output_bytes")
-    stim_hash = _require_digest(payload.get("stim_stdout_sha256"), "correctness-summary stim_stdout_sha256")
+    _require_int(payload.get("stim_output_bytes"), expected_bytes, "correctness-summary stim_output_bytes")
+    _require_int(payload.get("rstim_output_bytes"), expected_bytes, "correctness-summary rstim_output_bytes")
+    _require_digest(payload.get("stim_stdout_sha256"), "correctness-summary stim_stdout_sha256")
     _require_digest(payload.get("rstim_stdout_sha256"), "correctness-summary rstim_stdout_sha256")
     _require_int(payload.get("sample_count"), 1024, "correctness-summary sample_count")
     failure_reasons = payload.get("failure_reasons")
@@ -218,6 +235,8 @@ def validate_environment(environment: dict[str, Any], results_dir: Path) -> None
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
     if not isinstance(environment.get("git_dirty"), bool):
         raise ValueError("environment git_dirty must be boolean")
+    if environment["git_dirty"]:
+        raise ValueError("environment git_dirty must be false for published release evidence")
     for field, expected in (
         ("profile", "release"),
         ("case_id", runner.EXPECTED_CASE_ID),

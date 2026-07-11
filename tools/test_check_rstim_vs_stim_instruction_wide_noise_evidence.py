@@ -152,6 +152,8 @@ def write_valid_bundle(bundle: Path) -> None:
         "observables": 1,
         "output_format": "01",
         "expected_output_bytes": (12_000 + 1 + 1) * 1024,
+        "stim_output_bytes": (12_000 + 1 + 1) * 1024,
+        "rstim_output_bytes": (12_000 + 1 + 1) * 1024,
         "stim_stdout_sha256": "b" * 64,
         "rstim_stdout_sha256": "c" * 64,
         "sample_count": 1024,
@@ -256,6 +258,28 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertIn(message, result.stderr)
 
+    def test_rejects_mismatched_correctness_output_bytes(self) -> None:
+        for field in ("stim_output_bytes", "rstim_output_bytes"):
+            with self.subTest(field=field):
+                write_valid_bundle(self.bundle)
+                rewrite_json(self.bundle / "correctness-summary.json", lambda payload: payload.update({field: 1}))
+                rewrite_hashes(self.bundle)
+                result = self.run_checker()
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(f"correctness-summary {field} must be 12290048", result.stderr)
+
+    def test_rejects_inconsistent_raw_measurement_metadata_before_hash_error(self) -> None:
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        records[1]["stdout_sha256"] = "d" * 64
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("raw measurement field stdout_sha256 must be identical", result.stderr)
+        self.assertNotIn("artifact", result.stderr.lower())
+
     def test_rejects_mismatched_fixture_manifest_binary_or_artifact_hash(self) -> None:
         for field, message in (
             ("fixture_sha256", "environment fixture_sha256 does not match fixture"),
@@ -275,6 +299,13 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("artifact-sha256.json raw.jsonl does not match raw.jsonl", result.stderr)
+
+    def test_rejects_dirty_published_provenance(self) -> None:
+        rewrite_json(self.bundle / "environment.json", lambda payload: payload.update({"git_dirty": True}))
+        rewrite_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment git_dirty must be false for published release evidence", result.stderr)
 
     def test_rejects_missing_hash_manifest(self) -> None:
         (self.bundle / "artifact-sha256.json").unlink()
