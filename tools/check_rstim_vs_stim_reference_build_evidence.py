@@ -7,7 +7,6 @@ import binascii
 import hashlib
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -216,17 +215,6 @@ def _require_repo_relative_posix_path(raw: Any, field: str) -> str:
 def _validate_git_commit(value: Any) -> None:
     if not isinstance(value, str) or GIT_COMMIT_RE.fullmatch(value) is None:
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
-    completed = subprocess.run(
-        ["git", "cat-file", "-e", f"{value}^{{commit}}"],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.strip()
-        suffix = f": {detail}" if detail else ""
-        raise ValueError(f"environment git_commit must exist in the local git object database{suffix}")
 
 
 def _validate_canonical_path(

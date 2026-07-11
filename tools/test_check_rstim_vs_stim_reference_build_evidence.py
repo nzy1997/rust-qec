@@ -276,6 +276,16 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
 
+    def test_accepts_recorded_git_commit_without_local_object(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["git_commit"] = "f" * 40
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+
     def test_rejects_supplied_runtime_binary_with_different_sha(self) -> None:
         other = write_runtime_binary(Path(self.temp_dir.name) / "different-worker", b"different worker\n")
         result = self.run_checker("--verify-runtime-binary", str(other))
@@ -518,7 +528,7 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
 
     def test_rejects_rehashed_environment_invalid_git_commit_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            environment["git_commit"] = "0" * 40
+            environment["git_commit"] = "not-a-commit"
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rewrite_artifact_hashes(self.bundle)
