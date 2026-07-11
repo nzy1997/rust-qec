@@ -74,6 +74,31 @@ def _sha256_if_file(path: Path | None) -> str | None:
     return _sha256(path)
 
 
+def _sha256_required(path: Path | None, label: str) -> str:
+    digest = _sha256_if_file(path)
+    if digest is None:
+        raise RunnerError(f"could not identify {label} for portable provenance")
+    return digest
+
+
+def _repo_relative(path: Path) -> str:
+    return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+
+
+def _portable_worker_argv(role: str, input_path: str) -> list[str]:
+    if role == "stim":
+        return [
+            "tool://python",
+            "-m",
+            "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            "--input",
+            input_path,
+            "--seed",
+            "0",
+        ]
+    return ["tool://rstim-worker", "--input", input_path, "--seed", "0"]
+
+
 def _decode_json(payload: bytes, *, context: str) -> dict[str, Any]:
     try:
         decoded = json.loads(payload)
@@ -474,8 +499,42 @@ def _collect_environment(
     stim_worker_module_path = (PACKAGE_DIR / "workers/stim_compiled_steady.py").resolve()
     python_executable = _resolve_executable("python3") or Path(sys.executable).resolve()
     rstim_worker_path = _resolve_executable(rstim_command[0])
+    stim_extension_path = Path(str(stim_probe.get("path"))).resolve() if stim_probe.get("path") else None
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
     rstim_version = _version_string([*rstim_command, "--version"])
+    input_path_relative = _repo_relative(input_path)
+    worker_argv = {variant: _portable_worker_argv(variant, input_path_relative) for variant in ("stim", "rstim")}
+    portable_preflight_results = []
+    for item in preflight_results:
+        portable = {**item}
+        portable["argv"] = _portable_worker_argv(str(item["variant"]), "fixture://compiled-steady-known-answer")
+        portable_preflight_results.append(portable)
+    runtime_identities = [
+        {
+            "role": "tool://python",
+            "version": _version_string([str(python_executable), "--version"]) or f"Python {platform.python_version()}",
+            "basename": python_executable.name,
+            "sha256": _sha256_required(python_executable, "Python executable"),
+        },
+        {
+            "role": "tool://stim-extension",
+            "version": str(stim_probe.get("version") or case["stim_version"]),
+            "basename": stim_extension_path.name if stim_extension_path is not None else "",
+            "sha256": _sha256_required(stim_extension_path, "Stim extension"),
+        },
+        {
+            "role": "tool://stim-worker",
+            "version": case["stim_version"],
+            "basename": stim_worker_module_path.name,
+            "sha256": _sha256(stim_worker_module_path),
+        },
+        {
+            "role": "tool://rstim-worker",
+            "version": str(rstim_version or ""),
+            "basename": rstim_worker_path.name if rstim_worker_path is not None else "",
+            "sha256": _sha256_required(rstim_worker_path, "rstim worker"),
+        },
+    ]
     return {
         "git_commit": git_commit,
         "os": platform.platform(),
@@ -484,37 +543,30 @@ def _collect_environment(
         "timer_scope": case["timer_scope"],
         "seed_policy": "seed_once_then_advance_across_9_calls",
         "stim_version": case["stim_version"],
-        "stim_python_probe": stim_probe,
+        "stim_python_probe": {
+            "status": stim_probe.get("status"),
+            "version": stim_probe.get("version"),
+            "extension_module": stim_probe.get("extension_module"),
+        },
         "rstim_version": rstim_version,
         "rustc_version": _version_string(["rustc", "--version"]),
-        "fair_manifest_path": str(fair_manifest_path),
+        "fair_manifest_path": _repo_relative(fair_manifest_path),
         "fair_manifest_sha256": _sha256(fair_manifest_path),
-        "source_manifest_path": str(source_manifest_path),
+        "source_manifest_path": _repo_relative(source_manifest_path),
         "source_manifest_sha256": _sha256(source_manifest_path),
-        "fixture_path": str(input_path),
+        "fixture_path": input_path_relative,
         "fixture_sha256": case["canonical_input_sha256"],
-        "worker_argv": {
-            "stim": worker_details[0]["command"],
-            "rstim": worker_details[1]["command"],
-        },
-        "canonical_worker_argv": {
-            "stim": [*default_stim_worker_command(), "--input", str(input_path), "--seed", str(args.seed)],
-            "rstim": [*default_rstim_worker_command("release"), "--input", str(input_path), "--seed", str(args.seed)],
-        },
-        "stim_worker_module_path": str(stim_worker_module_path),
+        "worker_argv": worker_argv,
+        "canonical_worker_argv": worker_argv,
+        "stim_worker_module_path": _repo_relative(stim_worker_module_path),
         "stim_worker_module_sha256": _sha256(stim_worker_module_path),
-        "python_executable": str(python_executable),
-        "python_executable_sha256": _sha256_if_file(python_executable),
-        "loaded_stim_extension_path": stim_probe.get("path"),
-        "loaded_stim_extension_sha256": stim_probe.get("sha256"),
-        "rstim_worker_binary_path": str(rstim_worker_path) if rstim_worker_path is not None else None,
-        "rstim_worker_binary_sha256": _sha256_if_file(rstim_worker_path),
+        "runtime_identities": runtime_identities,
         "protocol_version": PROTOCOL_VERSION,
         "seed": args.seed,
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
-        "known_answer_preflight": preflight_results,
-        "workers": worker_details,
+        "known_answer_preflight": portable_preflight_results,
+        "workers": [{"variant": variant, "command": worker_argv[variant]} for variant in ("stim", "rstim")],
     }
 
 

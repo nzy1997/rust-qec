@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 from typing import Any, Callable
 
 from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_compiled_steady
@@ -106,6 +107,10 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             }
         )
 
+    fixture_rel = fixture.relative_to(REPO_ROOT).as_posix()
+    fair_manifest_rel = fair_manifest.relative_to(REPO_ROOT).as_posix()
+    source_manifest_rel = source_manifest.relative_to(REPO_ROOT).as_posix()
+    stim_worker_module_rel = stim_worker_module.relative_to(REPO_ROOT).as_posix()
     rewrite_raw(path / "raw.jsonl", records)
     summary = run_compiled_steady._summary(records)
     (path / "summary.json").write_text(
@@ -113,8 +118,16 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     )
     (path / "report.md").write_text(run_compiled_steady._render_report(summary), encoding="utf-8")
     worker_argv = {
-        "stim": [*run_compiled_steady.default_stim_worker_command(), "--input", str(fixture), "--seed", "0"],
-        "rstim": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(fixture), "--seed", "0"],
+        "stim": [
+            "tool://python",
+            "-m",
+            "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            "--input",
+            fixture_rel,
+            "--seed",
+            "0",
+        ],
+        "rstim": ["tool://rstim-worker", "--input", fixture_rel, "--seed", "0"],
     }
     environment = {
         "git_commit": "test-commit",
@@ -127,27 +140,45 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "stim_python_probe": {
             "status": "ok",
             "version": case["stim_version"],
-            "path": str(stim_extension),
-            "sha256": sha256_file(stim_extension),
         },
         "rstim_version": "rstim test",
         "rustc_version": "rustc test",
-        "fair_manifest_path": str(fair_manifest),
+        "fair_manifest_path": fair_manifest_rel,
         "fair_manifest_sha256": sha256_file(fair_manifest),
-        "source_manifest_path": str(source_manifest),
+        "source_manifest_path": source_manifest_rel,
         "source_manifest_sha256": sha256_file(source_manifest),
-        "fixture_path": str(fixture),
+        "fixture_path": fixture_rel,
         "fixture_sha256": sha256_file(fixture),
         "worker_argv": worker_argv,
         "canonical_worker_argv": worker_argv,
-        "stim_worker_module_path": str(stim_worker_module),
+        "stim_worker_module_path": stim_worker_module_rel,
         "stim_worker_module_sha256": sha256_file(stim_worker_module),
-        "python_executable": str(python_executable),
-        "python_executable_sha256": sha256_file(python_executable),
-        "loaded_stim_extension_path": str(stim_extension),
-        "loaded_stim_extension_sha256": sha256_file(stim_extension),
-        "rstim_worker_binary_path": str(rstim_worker),
-        "rstim_worker_binary_sha256": sha256_file(rstim_worker),
+        "runtime_identities": [
+            {
+                "role": "tool://python",
+                "version": "Python test",
+                "basename": python_executable.name,
+                "sha256": sha256_file(python_executable),
+            },
+            {
+                "role": "tool://stim-extension",
+                "version": case["stim_version"],
+                "basename": stim_extension.name,
+                "sha256": sha256_file(stim_extension),
+            },
+            {
+                "role": "tool://stim-worker",
+                "version": case["stim_version"],
+                "basename": stim_worker_module.name,
+                "sha256": sha256_file(stim_worker_module),
+            },
+            {
+                "role": "tool://rstim-worker",
+                "version": "rstim test",
+                "basename": rstim_worker.name,
+                "sha256": sha256_file(rstim_worker),
+            },
+        ],
         "protocol_version": 1,
         "seed": 0,
         "warmup_rounds": 2,
@@ -155,7 +186,15 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "known_answer_preflight": [
             {
                 "variant": "stim",
-                "argv": [*run_compiled_steady.default_stim_worker_command(), "--input", str(path / "known_answer.stim"), "--seed", "0"],
+                "argv": [
+                    "tool://python",
+                    "-m",
+                    "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+                    "--input",
+                    "fixture://compiled-steady-known-answer",
+                    "--seed",
+                    "0",
+                ],
                 "result_hex": "01",
                 "ready": {
                     "variant": "stim",
@@ -178,7 +217,13 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             },
             {
                 "variant": "rstim",
-                "argv": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(path / "known_answer.stim"), "--seed", "0"],
+                "argv": [
+                    "tool://rstim-worker",
+                    "--input",
+                    "fixture://compiled-steady-known-answer",
+                    "--seed",
+                    "0",
+                ],
                 "result_hex": "01",
                 "ready": {
                     "variant": "rstim",
@@ -271,8 +316,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
 
     def test_rejects_runtime_identity_required_live_path(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            runtime_identities = environment.setdefault("runtime_identities", [{}])
-            runtime_identities[0]["required_live_path"] = True
+            environment["runtime_identities"][0]["required_live_path"] = True
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rehash_bundle(self.bundle)
@@ -386,7 +430,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         def make_noncanonical(environment: dict[str, Any]) -> None:
             fixture = environment["fixture_path"]
             command = [
-                str(Path(environment["python_executable"]).resolve()),
+                "tool://python",
                 "-m",
                 "benchmarks.rstim_vs_stim_simulator.workers.not_the_steady_worker",
                 "--input",
@@ -407,11 +451,10 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertIn("environment canonical_worker_argv must match release worker commands", result.stderr)
 
     def test_rejects_noncanonical_stim_worker_module_hash(self) -> None:
-        substitute = self.bundle.parent / "stim_compiled_steady.py"
-        substitute.write_text("# not the canonical worker module\n", encoding="utf-8")
+        substitute = REPO_ROOT / "Cargo.toml"
 
         def replace_module(environment: dict[str, Any]) -> None:
-            environment["stim_worker_module_path"] = str(substitute)
+            environment["stim_worker_module_path"] = substitute.relative_to(REPO_ROOT).as_posix()
             environment["stim_worker_module_sha256"] = sha256_file(substitute)
 
         rewrite_json(self.bundle / "environment.json", replace_module)
@@ -436,11 +479,10 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertIn("fixture_sha256 must match canonical fixture SHA-256", result.stderr)
 
     def test_rejects_noncanonical_fair_manifest_even_when_hashes_match(self) -> None:
-        substitute = self.bundle.parent / "fair_cli_cases.toml"
-        substitute.write_text("[[cases]]\ncase_id = \"wrong\"\n", encoding="utf-8")
+        substitute = REPO_ROOT / "Cargo.toml"
 
         def replace_manifest(environment: dict[str, Any]) -> None:
-            environment["fair_manifest_path"] = str(substitute)
+            environment["fair_manifest_path"] = substitute.relative_to(REPO_ROOT).as_posix()
             environment["fair_manifest_sha256"] = sha256_file(substitute)
 
         rewrite_json(self.bundle / "environment.json", replace_manifest)
@@ -494,6 +536,67 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("missing required bundle file: artifact-sha256.json", result.stderr)
+
+    def test_runner_collect_environment_emits_portable_provenance(self) -> None:
+        case = fair_cli_contract.EXPECTED_CASE
+        fixture = (REPO_ROOT / case["canonical_input_path"]).resolve()
+        stim_extension = self.bundle.parent / "_runner_stim.so"
+        stim_extension.write_bytes(b"runner stim extension\n")
+        args = SimpleNamespace(
+            manifest=REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            profile="release",
+            seed=0,
+            warmup_rounds=2,
+            measure_rounds=7,
+        )
+
+        environment = run_compiled_steady._collect_environment(
+            args=args,
+            case=case,
+            input_path=fixture,
+            rstim_command=[str(self.rstim_worker)],
+            worker_details=[
+                {"variant": "stim", "command": ["python3", "--input", str(fixture), "--seed", "0"]},
+                {"variant": "rstim", "command": [str(self.rstim_worker), "--input", str(fixture), "--seed", "0"]},
+            ],
+            preflight_results=[
+                {"variant": "stim", "argv": ["python3", "--input", str(stim_extension), "--seed", "0"]},
+                {"variant": "rstim", "argv": [str(self.rstim_worker), "--input", str(stim_extension), "--seed", "0"]},
+            ],
+            stim_probe={
+                "status": "ok",
+                "version": case["stim_version"],
+                "extension_module": "stim._stim_sse2",
+                "path": str(stim_extension),
+                "sha256": sha256_file(stim_extension),
+            },
+        )
+
+        fixture_rel = fixture.relative_to(REPO_ROOT).as_posix()
+        self.assertEqual(environment["fixture_path"], fixture_rel)
+        self.assertEqual(
+            environment["worker_argv"]["stim"],
+            [
+                "tool://python",
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+                "--input",
+                fixture_rel,
+                "--seed",
+                "0",
+            ],
+        )
+        self.assertEqual(
+            environment["known_answer_preflight"][1]["argv"],
+            ["tool://rstim-worker", "--input", "fixture://compiled-steady-known-answer", "--seed", "0"],
+        )
+        self.assertNotIn("python_executable", environment)
+        self.assertNotIn("loaded_stim_extension_path", environment)
+        self.assertNotIn("rstim_worker_binary_path", environment)
+        self.assertEqual(
+            {identity["role"] for identity in environment["runtime_identities"]},
+            {"tool://python", "tool://stim-extension", "tool://stim-worker", "tool://rstim-worker"},
+        )
 
 
 if __name__ == "__main__":

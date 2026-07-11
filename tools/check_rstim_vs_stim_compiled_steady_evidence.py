@@ -5,9 +5,8 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -25,6 +24,14 @@ RELEASE_VARIANTS = {"stim": "stim-compiled-steady-b8", "rstim": "rstim-compiled-
 CANONICAL_FAIR_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 CANONICAL_STIM_WORKER_MODULE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+WINDOWS_ABSOLUTE_RE = re.compile(r"[A-Za-z]:[\\/]")
+REQUIRED_RUNTIME_IDENTITY_ROLES = (
+    "tool://python",
+    "tool://stim-extension",
+    "tool://stim-worker",
+    "tool://rstim-worker",
+)
+RUNTIME_IDENTITY_KEYS = {"role", "version", "basename", "sha256"}
 
 
 def sha256_file(path: Path) -> str:
@@ -97,6 +104,37 @@ def _require_json_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be a JSON object")
     return value
+
+
+def _repo_relative_path(raw: Any, field: str) -> Path:
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(f"{field} must be repository-relative")
+    path = PurePosixPath(raw)
+    if path.is_absolute() or "\\" in raw or any(part in {"", ".", ".."} for part in raw.split("/")):
+        raise ValueError(f"{field} must be repository-relative")
+    return REPO_ROOT / path
+
+
+def _portable_worker_argv(role: str, input_path: str) -> list[str]:
+    if role == "stim":
+        return [
+            "tool://python",
+            "-m",
+            "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            "--input",
+            input_path,
+            "--seed",
+            "0",
+        ]
+    return ["tool://rstim-worker", "--input", input_path, "--seed", "0"]
+
+
+def _contains_host_absolute_path(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.startswith(("/", "\\")) or WINDOWS_ABSOLUTE_RE.match(value) is not None
+    if isinstance(value, list):
+        return any(_contains_host_absolute_path(item) for item in value)
+    return False
 
 
 def _validate_telemetry(
@@ -206,11 +244,7 @@ def render_report(summary: dict[str, Any]) -> str:
 
 
 def _resolve_environment_path(environment: dict[str, Any], field: str) -> Path:
-    raw = environment.get(field)
-    if not isinstance(raw, str) or not raw:
-        raise ValueError(f"environment {field} must be a nonempty path")
-    path = Path(raw)
-    return path.resolve() if path.is_absolute() else (REPO_ROOT / path).resolve()
+    return _repo_relative_path(environment.get(field), field).resolve()
 
 
 def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field: str) -> None:
@@ -248,29 +282,70 @@ def _validate_fair_manifest_contract(path: Path) -> None:
 
 
 def _validate_command(value: Any, label: str) -> list[str]:
+    if isinstance(value, list) and _contains_host_absolute_path(value):
+        raise ValueError("worker argv contains host-absolute path")
     if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
         raise ValueError(f"{label} must be a nonempty string array")
     return value
 
 
-def _resolve_command_executable(raw: str, label: str) -> Path:
-    resolved = shutil.which(raw)
-    if resolved:
-        return Path(resolved).resolve()
-    path = Path(raw)
-    if path.is_file():
-        return path.resolve()
-    repo_path = REPO_ROOT / raw
-    if repo_path.is_file():
-        return repo_path.resolve()
-    raise ValueError(f"{label} executable does not exist: {raw}")
+def _expected_worker_argv(input_path: str) -> dict[str, list[str]]:
+    return {variant: _portable_worker_argv(variant, input_path) for variant in RAW_VARIANTS}
 
 
-def _expected_worker_argv(input_path: Path) -> dict[str, list[str]]:
-    return {
-        "stim": [*run_compiled_steady.default_stim_worker_command(), "--input", str(input_path), "--seed", "0"],
-        "rstim": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(input_path), "--seed", "0"],
-    }
+def _validate_runtime_identities(environment: dict[str, Any], *, stim_worker_module_path: Path) -> None:
+    identities = environment.get("runtime_identities")
+    if not isinstance(identities, list):
+        raise ValueError("environment runtime_identities must contain logical runtime identities")
+
+    by_role: dict[str, dict[str, Any]] = {}
+    for identity in identities:
+        if not isinstance(identity, dict):
+            raise ValueError("environment runtime_identities entries must be JSON objects")
+        if identity.get("required_live_path") is True:
+            raise ValueError("checked evidence must not require a live runtime path")
+        if set(identity) != RUNTIME_IDENTITY_KEYS:
+            raise ValueError(
+                "environment runtime_identities entries must contain exactly role, version, basename, and sha256"
+            )
+        role = identity.get("role")
+        version = identity.get("version")
+        basename = identity.get("basename")
+        digest = identity.get("sha256")
+        if not isinstance(role, str) or not role:
+            raise ValueError("environment runtime_identities role must be nonempty")
+        if role in by_role:
+            raise ValueError("environment runtime_identities must not contain duplicate roles")
+        if not isinstance(version, str) or not version:
+            raise ValueError(f"environment runtime identity {role} version must be nonempty")
+        if not isinstance(basename, str) or not basename or "/" in basename or "\\" in basename:
+            raise ValueError(f"environment runtime identity {role} basename must be a filename")
+        if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+            raise ValueError(f"environment runtime identity {role} sha256 must be a lowercase SHA-256 digest")
+        by_role[role] = identity
+
+    if set(by_role) != set(REQUIRED_RUNTIME_IDENTITY_ROLES):
+        raise ValueError("environment runtime_identities must contain exactly the required logical roles")
+    _require_equal(
+        by_role["tool://stim-extension"]["version"],
+        "1.15.0",
+        "environment runtime identity tool://stim-extension version must be '1.15.0'",
+    )
+    _require_equal(
+        by_role["tool://stim-worker"]["version"],
+        "1.15.0",
+        "environment runtime identity tool://stim-worker version must be '1.15.0'",
+    )
+    _require_equal(
+        by_role["tool://rstim-worker"]["version"],
+        environment["rstim_version"],
+        "environment runtime identity tool://rstim-worker version must match rstim_version",
+    )
+    _require_equal(
+        by_role["tool://stim-worker"]["sha256"],
+        sha256_file(stim_worker_module_path),
+        "environment runtime identity tool://stim-worker sha256 must match stim_worker_module_path",
+    )
 
 
 def _validate_preflight_telemetry(
@@ -305,20 +380,7 @@ def _validate_preflight_telemetry(
 
 def _validate_preflight_argv(item: dict[str, Any], *, variant: str) -> None:
     argv = _validate_command(item.get("argv"), f"environment {variant} preflight argv")
-    command_prefix = (
-        run_compiled_steady.default_stim_worker_command()
-        if variant == "stim"
-        else run_compiled_steady.default_rstim_worker_command("release")
-    )
-    tail = argv[len(command_prefix):]
-    if (
-        argv[: len(command_prefix)] != command_prefix
-        or len(tail) != 4
-        or tail[0] != "--input"
-        or not isinstance(tail[1], str)
-        or not tail[1]
-        or tail[2:] != ["--seed", "0"]
-    ):
+    if argv != _portable_worker_argv(variant, "fixture://compiled-steady-known-answer"):
         raise ValueError(f"environment {variant} preflight argv must match canonical shape")
 
 
@@ -347,7 +409,8 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     )
     for field, canonical_path, description in canonical_paths:
         _validate_canonical_path(environment, field, canonical_path, description)
-    fixture_path = _resolve_environment_path(environment, "fixture_path")
+    fixture_input = environment.get("fixture_path")
+    stim_worker_module_path = _resolve_environment_path(environment, "stim_worker_module_path")
     if environment.get("fixture_sha256") != case["canonical_input_sha256"]:
         raise ValueError("fixture_sha256 must match canonical fixture SHA-256")
     _validate_fair_manifest_contract(_resolve_environment_path(environment, "fair_manifest_path"))
@@ -356,26 +419,20 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         ("source_manifest_path", "source_manifest_sha256"),
         ("fixture_path", "fixture_sha256"),
         ("stim_worker_module_path", "stim_worker_module_sha256"),
-        ("python_executable", "python_executable_sha256"),
-        ("loaded_stim_extension_path", "loaded_stim_extension_sha256"),
-        ("rstim_worker_binary_path", "rstim_worker_binary_sha256"),
     ):
         _validate_path_hash(environment, path_field, hash_field)
+    _validate_runtime_identities(environment, stim_worker_module_path=stim_worker_module_path)
 
     probe = environment.get("stim_python_probe")
-    if not isinstance(probe, dict):
+    if probe is not None and not isinstance(probe, dict):
         raise ValueError("environment stim_python_probe must be a JSON object")
-    _require_equal(probe.get("status"), "ok", "environment stim_python_probe status must be 'ok'")
-    _require_equal(probe.get("version"), case["stim_version"], f"environment stim_python_probe version must be {case['stim_version']!r}")
-    _require_equal(
-        str(Path(str(probe.get("path"))).resolve()), str(_resolve_environment_path(environment, "loaded_stim_extension_path")),
-        "environment stim_python_probe path must match loaded_stim_extension_path",
-    )
-    _require_equal(
-        probe.get("sha256"),
-        environment.get("loaded_stim_extension_sha256"),
-        "environment stim_python_probe sha256 must match loaded_stim_extension_sha256",
-    )
+    if isinstance(probe, dict):
+        _require_equal(probe.get("status"), "ok", "environment stim_python_probe status must be 'ok'")
+        _require_equal(
+            probe.get("version"),
+            case["stim_version"],
+            f"environment stim_python_probe version must be {case['stim_version']!r}",
+        )
 
     worker_argv = environment.get("worker_argv")
     workers = environment.get("workers")
@@ -383,7 +440,14 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         raise ValueError("environment worker_argv must contain stim and rstim")
     if not isinstance(workers, list) or len(workers) != 2:
         raise ValueError("environment workers must contain both variants")
-    worker_commands = {worker.get("variant"): worker.get("command") for worker in workers if isinstance(worker, dict)}
+    worker_commands: dict[Any, list[str]] = {}
+    for worker in workers:
+        if not isinstance(worker, dict):
+            raise ValueError("environment workers entries must be JSON objects")
+        worker_commands[worker.get("variant")] = _validate_command(
+            worker.get("command"),
+            f"environment workers {worker.get('variant')} command",
+        )
     if worker_commands != worker_argv:
         raise ValueError("environment workers must match worker_argv")
     canonical_worker_argv = environment.get("canonical_worker_argv")
@@ -394,12 +458,8 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         _validate_command(canonical_worker_argv[variant], f"environment canonical_worker_argv {variant}")
     if worker_argv != canonical_worker_argv:
         raise ValueError("environment worker_argv must match canonical_worker_argv")
-    if canonical_worker_argv != _expected_worker_argv(fixture_path):
+    if canonical_worker_argv != _expected_worker_argv(str(fixture_input)):
         raise ValueError("environment canonical_worker_argv must match release worker commands")
-    if _resolve_command_executable(worker_argv["stim"][0], "environment worker_argv stim") != _resolve_environment_path(environment, "python_executable"):
-        raise ValueError("environment worker_argv stim executable must match python_executable")
-    if _resolve_command_executable(worker_argv["rstim"][0], "environment worker_argv rstim") != _resolve_environment_path(environment, "rstim_worker_binary_path"):
-        raise ValueError("environment worker_argv rstim executable must match rstim_worker_binary_path")
 
     preflight = environment.get("known_answer_preflight")
     if not isinstance(preflight, list) or len(preflight) != 2:
