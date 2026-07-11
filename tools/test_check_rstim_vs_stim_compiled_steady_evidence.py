@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+import sys
 from typing import Any, Callable
 
 from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_compiled_steady
@@ -41,19 +43,26 @@ def rewrite_artifact_hashes(bundle: Path) -> None:
     )
 
 
-def write_valid_bundle(path: Path) -> None:
+def ensure_canonical_rstim_worker_binary() -> tuple[Path, bool]:
+    worker = (REPO_ROOT / "target/release/rstim_compiled_steady_worker").resolve()
+    if worker.is_file():
+        return worker, False
+    worker.parent.mkdir(parents=True, exist_ok=True)
+    worker.write_bytes(b"test rstim compiled steady worker\n")
+    worker.chmod(0o755)
+    return worker, True
+
+
+def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     case = fair_cli_contract.EXPECTED_CASE
     fixture = (REPO_ROOT / case["canonical_input_path"]).resolve()
     fair_manifest = (REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml").resolve()
     source_manifest = (REPO_ROOT / case["source_manifest_path"]).resolve()
-    python_executable = path / "python3"
+    python_executable = Path(shutil.which("python3") or sys.executable).resolve()
     stim_extension = path / "_stim.so"
-    rstim_worker = path / "rstim_compiled_steady_worker"
     for artifact, contents in (
-        (python_executable, b"python test executable\n"),
         (stim_extension, b"stim extension\n"),
-        (rstim_worker, b"rstim worker\n"),
     ):
         artifact.write_bytes(contents)
 
@@ -95,6 +104,10 @@ def write_valid_bundle(path: Path) -> None:
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (path / "report.md").write_text(run_compiled_steady._render_report(summary), encoding="utf-8")
+    worker_argv = {
+        "stim": [*run_compiled_steady.default_stim_worker_command(), "--input", str(fixture), "--seed", "0"],
+        "rstim": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(fixture), "--seed", "0"],
+    }
     environment = {
         "git_commit": "test-commit",
         "os": "test-os",
@@ -103,7 +116,12 @@ def write_valid_bundle(path: Path) -> None:
         "timer_scope": case["timer_scope"],
         "seed_policy": "seed_once_then_advance_across_9_calls",
         "stim_version": case["stim_version"],
-        "stim_python_probe": {"status": "ok", "version": case["stim_version"], "path": str(stim_extension)},
+        "stim_python_probe": {
+            "status": "ok",
+            "version": case["stim_version"],
+            "path": str(stim_extension),
+            "sha256": sha256_file(stim_extension),
+        },
         "rstim_version": "rstim test",
         "rustc_version": "rustc test",
         "fair_manifest_path": str(fair_manifest),
@@ -112,8 +130,8 @@ def write_valid_bundle(path: Path) -> None:
         "source_manifest_sha256": sha256_file(source_manifest),
         "fixture_path": str(fixture),
         "fixture_sha256": sha256_file(fixture),
-        "worker_argv": {"stim": ["python3", "stim_worker"], "rstim": [str(rstim_worker)]},
-        "canonical_worker_argv": {"stim": ["python3", "stim_worker"], "rstim": [str(rstim_worker)]},
+        "worker_argv": worker_argv,
+        "canonical_worker_argv": worker_argv,
         "python_executable": str(python_executable),
         "python_executable_sha256": sha256_file(python_executable),
         "loaded_stim_extension_path": str(stim_extension),
@@ -125,12 +143,56 @@ def write_valid_bundle(path: Path) -> None:
         "warmup_rounds": 2,
         "measure_rounds": 7,
         "known_answer_preflight": [
-            {"variant": "stim", "result_hex": "01", "ready": {"sample_call_count": 0}, "final": {"sample_call_count": 1}},
-            {"variant": "rstim", "result_hex": "01", "ready": {"sample_call_count": 0}, "final": {"sample_call_count": 1}},
+            {
+                "variant": "stim",
+                "argv": [*run_compiled_steady.default_stim_worker_command(), "--input", str(path / "known_answer.stim"), "--seed", "0"],
+                "result_hex": "01",
+                "ready": {
+                    "variant": "stim",
+                    "compile_count": 1,
+                    "reference_build_count": 1,
+                    "sample_call_count": 0,
+                    "measurement_count": 1,
+                    "bytes_per_shot": 1,
+                    "fixture_sha256": "0" * 64,
+                },
+                "final": {
+                    "variant": "stim",
+                    "compile_count": 1,
+                    "reference_build_count": 1,
+                    "sample_call_count": 1,
+                    "measurement_count": 1,
+                    "bytes_per_shot": 1,
+                    "fixture_sha256": "0" * 64,
+                },
+            },
+            {
+                "variant": "rstim",
+                "argv": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(path / "known_answer.stim"), "--seed", "0"],
+                "result_hex": "01",
+                "ready": {
+                    "variant": "rstim",
+                    "compile_count": 1,
+                    "reference_build_count": 1,
+                    "sample_call_count": 0,
+                    "measurement_count": 1,
+                    "bytes_per_shot": 1,
+                    "fixture_sha256": "0" * 64,
+                },
+                "final": {
+                    "variant": "rstim",
+                    "compile_count": 1,
+                    "reference_build_count": 1,
+                    "sample_call_count": 1,
+                    "measurement_count": 1,
+                    "bytes_per_shot": 1,
+                    "fixture_sha256": "0" * 64,
+                },
+            },
         ],
         "workers": [
-            {"variant": "stim", "command": ["python3", "stim_worker"]},
-            {"variant": "rstim", "command": [str(rstim_worker)]},
+            {"variant": "stim", "command": worker_argv["stim"]},
+            {"variant": "rstim", "command": worker_argv["rstim"]},
         ],
         "lifecycle": {"compile_count": 1, "reference_build_count": 1, "sample_call_count": 9},
     }
@@ -144,7 +206,10 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.bundle = Path(self.temp_dir.name) / "bundle"
-        write_valid_bundle(self.bundle)
+        self.rstim_worker, created_worker = ensure_canonical_rstim_worker_binary()
+        if created_worker:
+            self.addCleanup(self.rstim_worker.unlink, missing_ok=True)
+        write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
@@ -192,6 +257,23 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("stim-compiled-steady-b8 sample_call_count for request 4 must be 5, got 9", result.stderr)
 
+    def test_rejects_out_of_order_lifecycle_records(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        final_index = next(
+            index
+            for index, record in enumerate(records)
+            if record["variant"] == "stim" and record["record_type"] == "final"
+        )
+        final = records.pop(final_index)
+        records.insert(1, final)
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "stim-compiled-steady-b8 records must appear as ready, nine samples, then final",
+            result.stderr,
+        )
+
     def test_rejects_final_compile_count_semantically_before_hashes(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         next(record for record in records if record["variant"] == "rstim" and record["record_type"] == "final")["telemetry"]["compile_count"] = 9
@@ -207,6 +289,40 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("summary.json does not match summary derived from raw.jsonl", result.stderr)
+
+    def test_rejects_noncanonical_worker_argv_even_when_hashes_match(self) -> None:
+        def make_noncanonical(environment: dict[str, Any]) -> None:
+            fixture = environment["fixture_path"]
+            command = [
+                str(Path(environment["python_executable"]).resolve()),
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.workers.not_the_steady_worker",
+                "--input",
+                fixture,
+                "--seed",
+                "0",
+            ]
+            environment["worker_argv"]["stim"] = command
+            environment["canonical_worker_argv"]["stim"] = command
+            for worker in environment["workers"]:
+                if worker["variant"] == "stim":
+                    worker["command"] = command
+
+        rewrite_json(self.bundle / "environment.json", make_noncanonical)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment canonical_worker_argv must match release worker commands", result.stderr)
+
+    def test_rejects_malformed_preflight_telemetry(self) -> None:
+        def replace_ready(environment: dict[str, Any]) -> None:
+            environment["known_answer_preflight"][0]["ready"] = "not an object"
+
+        rewrite_json(self.bundle / "environment.json", replace_ready)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment stim preflight ready must be a JSON object", result.stderr)
 
     def test_rejects_missing_hash_manifest(self) -> None:
         (self.bundle / "artifact-sha256.json").unlink()

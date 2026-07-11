@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,12 @@ def _require_equal(actual: Any, expected: Any, message: str) -> None:
         raise ValueError(f"{message}, got {actual!r}")
 
 
+def _require_json_object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
 def _validate_telemetry(
     telemetry: Any,
     *,
@@ -123,6 +130,8 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
             raise ValueError(f"{label} must contain exactly one final record")
         if len(variant_records) != 11:
             raise ValueError(f"{label} must contain exactly 11 lifecycle records")
+        if [record.get("record_type") for record in variant_records] != ["ready"] + ["sample"] * 9 + ["final"]:
+            raise ValueError(f"{label} records must appear as ready, nine samples, then final")
 
         ready = ready_records[0]
         _validate_telemetry(
@@ -187,6 +196,78 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
         raise ValueError(f"environment {hash_field} does not match {path_field}")
 
 
+def _validate_command(value: Any, label: str) -> list[str]:
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+        raise ValueError(f"{label} must be a nonempty string array")
+    return value
+
+
+def _resolve_command_executable(raw: str, label: str) -> Path:
+    resolved = shutil.which(raw)
+    if resolved:
+        return Path(resolved).resolve()
+    path = Path(raw)
+    if path.is_file():
+        return path.resolve()
+    repo_path = REPO_ROOT / raw
+    if repo_path.is_file():
+        return repo_path.resolve()
+    raise ValueError(f"{label} executable does not exist: {raw}")
+
+
+def _expected_worker_argv(input_path: Path) -> dict[str, list[str]]:
+    return {
+        "stim": [*run_compiled_steady.default_stim_worker_command(), "--input", str(input_path), "--seed", "0"],
+        "rstim": [*run_compiled_steady.default_rstim_worker_command("release"), "--input", str(input_path), "--seed", "0"],
+    }
+
+
+def _validate_preflight_telemetry(
+    telemetry: Any,
+    *,
+    variant: str,
+    stage: str,
+    sample_call_count: int,
+    fixture_sha256: str | None,
+) -> str:
+    payload = _require_json_object(telemetry, f"environment {variant} preflight {stage}")
+    for field, expected in (
+        ("variant", variant),
+        ("compile_count", 1),
+        ("reference_build_count", 1),
+        ("sample_call_count", sample_call_count),
+        ("measurement_count", 1),
+        ("bytes_per_shot", 1),
+    ):
+        _require_equal(payload.get(field), expected, f"environment {variant} preflight {stage} {field} must be {expected}")
+    digest = payload.get("fixture_sha256")
+    if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+        raise ValueError(f"environment {variant} preflight {stage} fixture_sha256 must be a lowercase SHA-256 digest")
+    if fixture_sha256 is not None:
+        _require_equal(
+            digest,
+            fixture_sha256,
+            f"environment {variant} preflight {stage} fixture_sha256 must match ready telemetry",
+        )
+    return digest
+
+
+def _validate_preflight_argv(item: dict[str, Any], *, variant: str) -> None:
+    argv = _validate_command(item.get("argv"), f"environment {variant} preflight argv")
+    command_prefix = (
+        run_compiled_steady.default_stim_worker_command()
+        if variant == "stim"
+        else run_compiled_steady.default_rstim_worker_command("release")
+    )
+    if argv[: len(command_prefix)] != command_prefix:
+        raise ValueError(f"environment {variant} preflight argv must use the canonical worker command")
+    if "--input" not in argv or "--seed" not in argv:
+        raise ValueError(f"environment {variant} preflight argv must contain --input and --seed")
+    seed_index = argv.index("--seed")
+    if seed_index + 1 >= len(argv) or argv[seed_index + 1] != "0":
+        raise ValueError(f"environment {variant} preflight argv seed must be 0")
+
+
 def validate_environment(environment: dict[str, Any], derived: dict[str, Any], records: list[dict[str, Any]]) -> None:
     case = fair_cli_contract.EXPECTED_CASE
     for field in ("git_commit", "os", "cpu_model", "rstim_version", "rustc_version"):
@@ -212,6 +293,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     for field, canonical_path in canonical_paths:
         if _resolve_environment_path(environment, field) != canonical_path.resolve():
             raise ValueError(f"environment {field} must name the canonical provenance input")
+    fixture_path = _resolve_environment_path(environment, "fixture_path")
     for path_field, hash_field in (
         ("fair_manifest_path", "fair_manifest_sha256"),
         ("source_manifest_path", "source_manifest_sha256"),
@@ -231,6 +313,11 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         str(Path(str(probe.get("path"))).resolve()), str(_resolve_environment_path(environment, "loaded_stim_extension_path")),
         "environment stim_python_probe path must match loaded_stim_extension_path",
     )
+    _require_equal(
+        probe.get("sha256"),
+        environment.get("loaded_stim_extension_sha256"),
+        "environment stim_python_probe sha256 must match loaded_stim_extension_sha256",
+    )
 
     worker_argv = environment.get("worker_argv")
     workers = environment.get("workers")
@@ -244,6 +331,17 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     canonical_worker_argv = environment.get("canonical_worker_argv")
     if not isinstance(canonical_worker_argv, dict) or set(canonical_worker_argv) != set(RAW_VARIANTS):
         raise ValueError("environment canonical_worker_argv must contain stim and rstim")
+    for variant in RAW_VARIANTS:
+        _validate_command(worker_argv[variant], f"environment worker_argv {variant}")
+        _validate_command(canonical_worker_argv[variant], f"environment canonical_worker_argv {variant}")
+    if worker_argv != canonical_worker_argv:
+        raise ValueError("environment worker_argv must match canonical_worker_argv")
+    if canonical_worker_argv != _expected_worker_argv(fixture_path):
+        raise ValueError("environment canonical_worker_argv must match release worker commands")
+    if _resolve_command_executable(worker_argv["stim"][0], "environment worker_argv stim") != _resolve_environment_path(environment, "python_executable"):
+        raise ValueError("environment worker_argv stim executable must match python_executable")
+    if _resolve_command_executable(worker_argv["rstim"][0], "environment worker_argv rstim") != _resolve_environment_path(environment, "rstim_worker_binary_path"):
+        raise ValueError("environment worker_argv rstim executable must match rstim_worker_binary_path")
 
     preflight = environment.get("known_answer_preflight")
     if not isinstance(preflight, list) or len(preflight) != 2:
@@ -254,8 +352,21 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     for variant in RAW_VARIANTS:
         item = preflight_by_variant[variant]
         _require_equal(item.get("result_hex"), "01", f"environment {variant} preflight result_hex must be '01'")
-        _require_equal(item.get("ready", {}).get("sample_call_count"), 0, f"environment {variant} preflight ready sample_call_count must be 0")
-        _require_equal(item.get("final", {}).get("sample_call_count"), 1, f"environment {variant} preflight final sample_call_count must be 1")
+        _validate_preflight_argv(item, variant=variant)
+        preflight_fixture_sha256 = _validate_preflight_telemetry(
+            item.get("ready"),
+            variant=variant,
+            stage="ready",
+            sample_call_count=0,
+            fixture_sha256=None,
+        )
+        _validate_preflight_telemetry(
+            item.get("final"),
+            variant=variant,
+            stage="final",
+            sample_call_count=1,
+            fixture_sha256=preflight_fixture_sha256,
+        )
 
     expected_lifecycle = derived["lifecycle"]
     lifecycle = environment.get("lifecycle")
