@@ -15,6 +15,7 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_compiled_s
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools" / "check_rstim_vs_stim_compiled_steady_evidence.py"
+COMMITTED_BUNDLE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
 ARTIFACT_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json")
 
 
@@ -41,6 +42,10 @@ def rewrite_artifact_hashes(bundle: Path) -> None:
     (bundle / "artifact-sha256.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def rehash_bundle(bundle: Path) -> None:
+    rewrite_artifact_hashes(bundle)
 
 
 def ensure_canonical_rstim_worker_binary() -> tuple[Path, bool]:
@@ -235,6 +240,57 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
             result.stdout,
             "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9\n",
         )
+
+    def test_accepts_committed_bundle(self) -> None:
+        result = subprocess.run(
+            ["python3", str(CHECKER), "--dir", str(COMMITTED_BUNDLE)],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout,
+            "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9\n",
+        )
+
+    def test_rejects_absolute_fair_manifest_path_with_required_message(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["fair_manifest_path"] = (
+                "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/"
+                "nzy1997-rstim/issue-454-run-1-agent-issue-454-publish-compiled-steady-state-sampling-evidence-run-1/"
+                "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+            )
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rehash_bundle(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("fair_manifest_path must be repository-relative", result.stderr)
+
+    def test_rejects_runtime_identity_required_live_path(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            runtime_identities = environment.setdefault("runtime_identities", [{}])
+            runtime_identities[0]["required_live_path"] = True
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rehash_bundle(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("checked evidence must not require a live runtime path", result.stderr)
+
+    def test_rejects_host_absolute_worker_argv(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["worker_argv"]["stim"][0] = "/usr/bin/python3"
+            environment["canonical_worker_argv"]["stim"] = environment["worker_argv"]["stim"]
+            environment["workers"][0]["command"] = environment["worker_argv"]["stim"]
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rehash_bundle(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("worker argv contains host-absolute path", result.stderr)
 
     def test_rejects_missing_raw_request_even_when_environment_claims_lifecycle(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
