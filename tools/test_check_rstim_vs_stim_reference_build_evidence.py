@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +26,11 @@ STIM_VARIANT = "stim-reference-b8"
 RSTIM_VARIANT = "rstim-packed-reference-b8"
 FIXTURE_REL = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 MANIFEST_REL = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+PYTHON_ROLE = "tool://python"
+STIM_WORKER_ROLE = "tool://stim-reference-worker"
+RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
+STIM_WORKER_REL = "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
+RSTIM_WORKER_VERSION = "rstim 0.1.1"
 
 
 def sha256_file(path: Path) -> str:
@@ -119,14 +123,10 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def ensure_canonical_rstim_worker_binary() -> tuple[Path, bool]:
-    worker = (REPO_ROOT / "target/release/rstim_reference_build_worker").resolve()
-    if worker.is_file():
-        return worker, False
-    worker.parent.mkdir(parents=True, exist_ok=True)
-    worker.write_bytes(b"test rstim reference build worker\n")
-    worker.chmod(0o755)
-    return worker, True
+def write_runtime_binary(path: Path, content: bytes = b"test rstim reference build worker\n") -> Path:
+    path.write_bytes(content)
+    path.chmod(0o755)
+    return path
 
 
 def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
@@ -135,8 +135,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     packed_base64 = base64.b64encode(packed).decode("ascii")
     fixture = REPO_ROOT / FIXTURE_REL
     manifest = REPO_ROOT / MANIFEST_REL
-    stim_python = Path(shutil.which("python3") or sys.executable).resolve()
-    runner_python = Path(shutil.which("python3") or sys.executable).resolve()
+    runner_python = Path(sys.executable).resolve()
+    stim_worker_module = REPO_ROOT / STIM_WORKER_REL
 
     records: list[dict[str, Any]] = []
     for variant, backend, elapsed_base in (
@@ -179,43 +179,15 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "manifest_sha256": MANIFEST_DIGEST,
         "stim_version": "1.15.0",
         "worker_argv": {
-            STIM_VARIANT: [
-                str(stim_python),
-                "-m",
-                "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
-                "--protocol",
-                PROTOCOL,
-            ],
-            RSTIM_VARIANT: [str(rstim_worker), "--protocol", PROTOCOL],
+            STIM_VARIANT: [PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
+            RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
         "canonical_worker_argv": {
-            STIM_VARIANT: [
-                "python3",
-                "-m",
-                "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
-                "--protocol",
-                PROTOCOL,
-            ],
-            RSTIM_VARIANT: [
-                "target/release/rstim_reference_build_worker",
-                "--protocol",
-                PROTOCOL,
-            ],
+            STIM_VARIANT: [PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
+            RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
-        "warmup_rounds": 2,
-        "measure_rounds": 7,
-        "git_commit": command_stdout(["git", "rev-parse", "HEAD"]),
-        "git_dirty": False,
-        "os": "test-os",
-        "cpu_model": "test-cpu",
-        "python_executable": str(stim_python),
-        "python_executable_sha256": sha256_file(stim_python),
-        "rstim_worker_binary_path": str(rstim_worker),
-        "rstim_worker_binary_sha256": sha256_file(rstim_worker),
-        "runner_python_executable": str(runner_python),
-        "runner_python_executable_sha256": sha256_file(runner_python),
         "runner_argv": [
-            "python3",
+            PYTHON_ROLE,
             "-m",
             "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark",
             "--fixture",
@@ -223,9 +195,9 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             "--manifest",
             MANIFEST_REL,
             "--stim-python",
-            str(stim_python),
+            PYTHON_ROLE,
             "--rstim-worker",
-            str(rstim_worker),
+            RSTIM_WORKER_ROLE,
             "--warmup-rounds",
             "2",
             "--measure-rounds",
@@ -233,6 +205,32 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
             "--out-dir",
             str(path),
         ],
+        "runtime_identities": [
+            {
+                "role": PYTHON_ROLE,
+                "version": sys.version.split()[0],
+                "basename": runner_python.name,
+                "sha256": sha256_file(runner_python),
+            },
+            {
+                "role": STIM_WORKER_ROLE,
+                "version": "1.15.0",
+                "basename": "stim_reference_build.py",
+                "sha256": sha256_file(stim_worker_module),
+            },
+            {
+                "role": RSTIM_WORKER_ROLE,
+                "version": RSTIM_WORKER_VERSION,
+                "basename": "rstim_reference_build_worker",
+                "sha256": sha256_file(rstim_worker),
+            },
+        ],
+        "warmup_rounds": 2,
+        "measure_rounds": 7,
+        "git_commit": command_stdout(["git", "rev-parse", "HEAD"]),
+        "git_dirty": False,
+        "os": "test-os",
+        "cpu_model": "test-cpu",
         "rustc_version": "rustc test",
         "cargo_version": "cargo test",
         "python_version": sys.version.split()[0],
@@ -253,17 +251,15 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.bundle = Path(self.temp_dir.name) / "bundle"
-        self.rstim_worker, created_worker = ensure_canonical_rstim_worker_binary()
-        if created_worker:
-            self.addCleanup(self.rstim_worker.unlink, missing_ok=True)
+        self.rstim_worker = write_runtime_binary(Path(self.temp_dir.name) / "rstim_reference_build_worker")
         write_valid_bundle(self.bundle, rstim_worker=self.rstim_worker)
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    def run_checker(self) -> subprocess.CompletedProcess[str]:
+    def run_checker(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(CHECKER), "--dir", str(self.bundle)],
+            ["python3", str(CHECKER), "--dir", str(self.bundle), *extra_args],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
@@ -274,6 +270,17 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+
+    def test_accepts_matching_runtime_binary_when_supplied(self) -> None:
+        result = self.run_checker("--verify-runtime-binary", str(self.rstim_worker))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+
+    def test_rejects_supplied_runtime_binary_with_different_sha(self) -> None:
+        other = write_runtime_binary(Path(self.temp_dir.name) / "different-worker", b"different worker\n")
+        result = self.run_checker("--verify-runtime-binary", str(other))
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("runtime binary SHA-256 does not match recorded identity", result.stderr)
 
     def test_rejects_changed_decoded_byte_before_hash_mismatch(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
@@ -431,42 +438,30 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         self.assertIn("environment canonical_worker_argv", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
-    def test_rejects_rehashed_environment_bad_executable_hash_before_hash_mismatch(self) -> None:
+    def test_rejects_rehashed_environment_bad_runtime_identity_sha_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            environment["rstim_worker_binary_sha256"] = "0" * 64
+            environment["runtime_identities"][0]["sha256"] = "not-a-sha"
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment rstim_worker_binary_sha256", result.stderr)
+        self.assertIn("environment runtime_identities tool://python sha256", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
-    def test_rejects_rehashed_environment_runner_python_path_mismatch_before_hash_mismatch(self) -> None:
-        fake_python = self.bundle.parent / "python-fake"
-        fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-        fake_python.chmod(0o755)
-
+    def test_rejects_rehashed_environment_missing_runtime_identity_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            environment["runner_python_executable"] = str(fake_python)
-            environment["runner_python_executable_sha256"] = sha256_file(fake_python)
+            environment["runtime_identities"] = [
+                identity
+                for identity in environment["runtime_identities"]
+                if identity["role"] != RSTIM_WORKER_ROLE
+            ]
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment runner_argv executable must match runner_python_executable", result.stderr)
-        self.assertNotIn("artifact-sha256.json", result.stderr)
-
-    def test_rejects_rehashed_environment_bad_runner_python_hash_before_hash_mismatch(self) -> None:
-        def mutate(environment: dict[str, Any]) -> None:
-            environment["runner_python_executable_sha256"] = "0" * 64
-
-        rewrite_json(self.bundle / "environment.json", mutate)
-        rewrite_artifact_hashes(self.bundle)
-        result = self.run_checker()
-        self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment runner_python_executable_sha256", result.stderr)
+        self.assertIn("environment runtime_identities must contain exactly", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_environment_invalid_git_commit_before_hash_mismatch(self) -> None:
