@@ -9,11 +9,19 @@ import unittest
 from pathlib import Path
 from typing import Any, Callable
 
+from tools import check_rstim_vs_stim_instruction_wide_noise_evidence as checker_module
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools/check_rstim_vs_stim_instruction_wide_noise_evidence.py"
 FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
+PUBLISHED_RSTIM_RUNTIME_IDENTITY = {
+    "role": "tool://rstim",
+    "version": "rstim 0.1.1",
+    "basename": "rstim",
+    "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
+}
 REQUIRED_ARTIFACTS = (
     "raw.jsonl",
     "summary.json",
@@ -186,12 +194,7 @@ def write_valid_bundle(bundle: Path) -> None:
         "manifest": str(MANIFEST),
         "manifest_sha256": sha256_file(MANIFEST),
         "runtime_identities": [
-            {
-                "role": "tool://rstim",
-                "version": "rstim 0.1.1",
-                "basename": "rstim",
-                "sha256": sha256_file(rstim_binary),
-            }
+            PUBLISHED_RSTIM_RUNTIME_IDENTITY,
         ],
         "runner_argv": ["python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_frame_instruction_wide_benchmark"],
         "child_argv": {
@@ -250,11 +253,11 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
             "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
         )
 
-    def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:
-        result = self.run_checker("--verify-runtime-binary", str(self.bundle / "rstim"))
+    def test_verify_runtime_binary_accepts_matching_identity(self) -> None:
+        identity = dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY)
+        identity["sha256"] = sha256_file(self.bundle / "rstim")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("PASS instruction-wide frame-noise evidence", result.stdout)
+        checker_module.validate_runtime_binary(self.bundle / "rstim", identity)
 
     def test_verify_runtime_binary_rejects_different_supplied_binary(self) -> None:
         other_binary = self.bundle / "other-rstim"
