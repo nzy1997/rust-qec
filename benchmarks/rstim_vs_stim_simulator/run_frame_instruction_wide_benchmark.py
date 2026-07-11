@@ -220,6 +220,14 @@ def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     )
 
 
+def _record_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
 def _load_telemetry(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         raise RunnerError(f"missing benchmark telemetry: {path}")
@@ -618,11 +626,11 @@ def run_benchmark(args: argparse.Namespace) -> None:
         "rustc_version": _probe_stdout_or_failed(["rustc", "--version"]),
         "os": platform.platform(),
         "cpu_model": _cpu_model(),
-        "fixture": str(fixture),
+        "fixture": _record_path(fixture),
         "fixture_sha256": sha256_file(fixture),
-        "manifest": str(manifest_path),
+        "manifest": _record_path(manifest_path),
         "manifest_sha256": sha256_file(manifest_path),
-        "rstim_binary": str(rstim_binary),
+        "rstim_binary": _record_path(rstim_binary),
         "rstim_binary_sha256": sha256_file(rstim_binary),
         "runner_argv": [sys.executable, "-m", MODULE_NAME, *sys.argv[1:]],
         "child_argv": {"measurement": measurement_argv, **correctness_argv},

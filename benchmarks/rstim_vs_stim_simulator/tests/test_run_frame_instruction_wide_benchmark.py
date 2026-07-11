@@ -212,6 +212,14 @@ class RunFrameInstructionWideBenchmarkTest(unittest.TestCase):
             self.assertEqual(correctness["detectors"], 12_000)
             self.assertEqual(correctness["observables"], 1)
 
+            environment = json.loads((out_dir / "environment.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                environment["fixture"],
+                "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+            )
+            self.assertEqual(environment["manifest"], "benchmarks/rstim_vs_stim_simulator/cases.full.toml")
+            self.assertEqual(environment["rstim_binary"], str(rstim.resolve()))
+
             hash_manifest = json.loads((out_dir / "artifact-sha256.json").read_text(encoding="utf-8"))
             self.assertEqual(set(hash_manifest), expected - {"artifact-sha256.json"})
             for name, digest in hash_manifest.items():
