@@ -413,6 +413,20 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment stim preflight argv must match canonical shape", result.stderr)
 
+    def test_rejects_boolean_environment_lifecycle_counter(self) -> None:
+        def replace_lifecycle(environment: dict[str, Any]) -> None:
+            environment["lifecycle"] = {
+                "compile_count": True,
+                "reference_build_count": 1,
+                "sample_call_count": 9,
+            }
+
+        rewrite_json(self.bundle / "environment.json", replace_lifecycle)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment lifecycle compile_count must be integer 1, got True", result.stderr)
+
     def test_rejects_extra_bundle_file(self) -> None:
         (self.bundle / "extra.txt").write_text("unexpected\n", encoding="utf-8")
         result = self.run_checker()

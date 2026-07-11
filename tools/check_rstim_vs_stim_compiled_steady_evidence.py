@@ -428,8 +428,13 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
 
     expected_lifecycle = derived["lifecycle"]
     lifecycle = environment.get("lifecycle")
-    if lifecycle is not None and lifecycle != {"compile_count": 1, "reference_build_count": 1, "sample_call_count": 9}:
-        raise ValueError("environment lifecycle must agree with raw lifecycle 1/1/9")
+    if lifecycle is not None:
+        lifecycle_payload = _require_json_object(lifecycle, "environment lifecycle")
+        if set(lifecycle_payload) != {"compile_count", "reference_build_count", "sample_call_count"}:
+            raise ValueError("environment lifecycle must contain exactly compile_count, reference_build_count, and sample_call_count")
+        _require_int_equal(lifecycle_payload.get("compile_count"), 1, "environment lifecycle compile_count")
+        _require_int_equal(lifecycle_payload.get("reference_build_count"), 1, "environment lifecycle reference_build_count")
+        _require_int_equal(lifecycle_payload.get("sample_call_count"), 9, "environment lifecycle sample_call_count")
     for variant in RAW_VARIANTS:
         telemetry = next(record["telemetry"] for record in records if record.get("variant") == variant and record.get("record_type") == "ready")
         _require_equal(
