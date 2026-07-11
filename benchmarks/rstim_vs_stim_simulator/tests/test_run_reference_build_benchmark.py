@@ -50,7 +50,17 @@ def command_stdout(command: list[str]) -> str:
 
 
 class RunReferenceBuildBenchmarkTest(unittest.TestCase):
-    def _write_fake_worker(self, directory: Path, *, backend: str) -> Path:
+    def _write_fake_worker(
+        self,
+        directory: Path,
+        *,
+        backend: str,
+        packed: bytes | None = None,
+        launched_marker: Path | None = None,
+    ) -> Path:
+        if packed is None:
+            packed = b"\x00" * PACKED_BYTES
+        marker_value = str(launched_marker) if launched_marker is not None else None
         path = directory / f"{backend}_worker.py"
         path.write_text(
             textwrap.dedent(
@@ -60,16 +70,20 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 import base64
                 import json
                 import sys
+                from pathlib import Path
 
                 PROTOCOL = {PROTOCOL!r}
                 DIGEST = {REFERENCE_DIGEST!r}
-                PACKED = b"\\x00" * {PACKED_BYTES}
+                PACKED = {packed!r}
+                LAUNCHED_MARKER = {marker_value!r}
 
                 parser = argparse.ArgumentParser()
                 parser.add_argument("--protocol", required=True)
                 args = parser.parse_args()
                 if args.protocol != PROTOCOL:
                     raise SystemExit(f"wrong protocol: {{args.protocol}}")
+                if LAUNCHED_MARKER is not None:
+                    Path(LAUNCHED_MARKER).write_text("launched", encoding="utf-8")
 
                 load = json.loads(sys.stdin.readline())
                 if load.get("protocol") != PROTOCOL or load.get("type") != "load":
@@ -112,7 +126,13 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         path.chmod(0o755)
         return path
 
-    def _write_stim_python_launcher(self, directory: Path, worker: Path) -> Path:
+    def _write_stim_python_launcher(
+        self,
+        directory: Path,
+        worker: Path,
+        *,
+        stim_version: str = "1.15.0",
+    ) -> Path:
         launcher = directory / "stim_python.py"
         launcher.write_text(
             textwrap.dedent(
@@ -122,6 +142,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 import sys
 
                 argv = sys.argv[1:]
+                if argv and argv[0] == "-c":
+                    print({stim_version!r})
+                    raise SystemExit(0)
                 if len(argv) >= 2 and argv[0] == "-m":
                     argv = argv[2:]
                 os.execv(sys.executable, [sys.executable, {str(worker)!r}, *argv])
@@ -139,6 +162,8 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         manifest: Path,
         stim_python: Path,
         rstim_worker: Path,
+        warmup_rounds: int = 2,
+        measure_rounds: int = 7,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -154,9 +179,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 "--rstim-worker",
                 str(rstim_worker),
                 "--warmup-rounds",
-                "2",
+                str(warmup_rounds),
                 "--measure-rounds",
-                "7",
+                str(measure_rounds),
                 "--out-dir",
                 str(out_dir),
             ],
@@ -376,6 +401,86 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["git_dirty"], expected_git_dirty)
             self.assertEqual(environment["warmup_rounds"], 2)
             self.assertEqual(environment["measure_rounds"], 7)
+
+    def test_runner_rejects_bad_decoded_packed_payload_before_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            bad_payload = b"\x01" + (b"\x00" * (PACKED_BYTES - 1))
+            stim_worker = self._write_fake_worker(
+                directory,
+                backend="stim_reference",
+                packed=bad_payload,
+            )
+            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            stim_python = self._write_stim_python_launcher(directory, stim_worker)
+            out_dir = directory / "out"
+
+            result = self._run_runner(
+                out_dir,
+                manifest=MANIFEST,
+                stim_python=stim_python,
+                rstim_worker=rstim_worker,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("decoded packed bytes SHA-256", result.stderr)
+            self.assertFalse(out_dir.exists(), "runner wrote artifacts after rejecting packed bytes")
+
+    def test_runner_rejects_noncanonical_round_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            stim_worker = self._write_fake_worker(directory, backend="stim_reference")
+            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            stim_python = self._write_stim_python_launcher(directory, stim_worker)
+
+            for warmup_rounds, measure_rounds in ((1, 7), (2, 6)):
+                with self.subTest(warmup_rounds=warmup_rounds, measure_rounds=measure_rounds):
+                    out_dir = directory / f"out-{warmup_rounds}-{measure_rounds}"
+                    result = self._run_runner(
+                        out_dir,
+                        manifest=MANIFEST,
+                        stim_python=stim_python,
+                        rstim_worker=rstim_worker,
+                        warmup_rounds=warmup_rounds,
+                        measure_rounds=measure_rounds,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertIn("requires --warmup-rounds 2 --measure-rounds 7", result.stderr)
+                    self.assertFalse(out_dir.exists(), "runner wrote artifacts for noncanonical counts")
+
+    def test_runner_rejects_wrong_stim_version_before_launching_workers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            launched = directory / "worker-launched"
+            stim_worker = self._write_fake_worker(
+                directory,
+                backend="stim_reference",
+                launched_marker=launched,
+            )
+            rstim_worker = self._write_fake_worker(
+                directory,
+                backend="packed_inverse",
+                launched_marker=launched,
+            )
+            stim_python = self._write_stim_python_launcher(
+                directory,
+                stim_worker,
+                stim_version="1.14.0",
+            )
+            out_dir = directory / "out"
+
+            result = self._run_runner(
+                out_dir,
+                manifest=MANIFEST,
+                stim_python=stim_python,
+                rstim_worker=rstim_worker,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("requires stim==1.15.0, got 1.14.0", result.stderr)
+            self.assertFalse(launched.exists(), "runner launched workers before rejecting Stim version")
+            self.assertFalse(out_dir.exists(), "runner wrote artifacts after rejecting Stim version")
 
     def test_default_worker_argvs_match_reference_build_protocol(self) -> None:
         self.assertEqual(run_reference_build_benchmark.PROTOCOL, PROTOCOL)

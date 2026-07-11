@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -20,6 +22,8 @@ EXPECTED_REFERENCE_SHA256 = "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba
 EXPECTED_MEASUREMENT_BITS = 12121
 EXPECTED_PACKED_BYTES = 1516
 EXPECTED_STIM_VERSION = "1.15.0"
+CANONICAL_WARMUP_ROUNDS = 2
+CANONICAL_MEASURE_ROUNDS = 7
 STIM_VARIANT = "stim-reference-b8"
 RSTIM_VARIANT = "rstim-packed-reference-b8"
 STIM_BACKEND = "stim_reference"
@@ -96,6 +100,10 @@ def _probe_stdout_or_failed(command: list[str]) -> str:
         return _probe_stdout(command)
     except (OSError, RunnerError) as error:
         return f"failed: {error}"
+
+
+def _probe_stim_version(stim_python: str) -> str:
+    return _probe_stdout([stim_python, "-c", "import stim; print(stim.__version__)"])
 
 
 def _git_commit() -> str:
@@ -188,11 +196,46 @@ def _require_positive_int(value: Any, message: str) -> int:
     return value
 
 
+def _require_canonical_round_counts(args: argparse.Namespace) -> None:
+    if (
+        args.warmup_rounds != CANONICAL_WARMUP_ROUNDS
+        or args.measure_rounds != CANONICAL_MEASURE_ROUNDS
+    ):
+        raise RunnerError(
+            "reference-build evidence requires "
+            f"--warmup-rounds {CANONICAL_WARMUP_ROUNDS} "
+            f"--measure-rounds {CANONICAL_MEASURE_ROUNDS}"
+        )
+
+
 def _validate_loaded(response: dict[str, Any], *, variant: str) -> None:
     _require_equal(response.get("protocol"), PROTOCOL, f"{variant} loaded protocol")
     _require_equal(response.get("type"), "loaded", f"{variant} loaded type")
     _require_equal(response.get("parse_count"), 1, f"{variant} parse_count")
     _require_equal(response.get("measurement_bits"), EXPECTED_MEASUREMENT_BITS, f"{variant} measurement_bits")
+
+
+def _validate_packed_payload(response: dict[str, Any], *, variant: str) -> None:
+    packed_base64 = response.get("packed_base64")
+    if not isinstance(packed_base64, str) or not packed_base64:
+        raise RunnerError(f"{variant} packed_base64 must be a nonempty string")
+    try:
+        decoded = base64.b64decode(packed_base64, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise RunnerError(f"{variant} packed_base64 must be strict base64") from error
+
+    _require_equal(
+        len(decoded),
+        EXPECTED_PACKED_BYTES,
+        f"{variant} decoded packed byte length",
+    )
+    decoded_sha256 = hashlib.sha256(decoded).hexdigest()
+    _require_equal(
+        decoded_sha256,
+        EXPECTED_REFERENCE_SHA256,
+        f"{variant} decoded packed bytes SHA-256",
+    )
+    _require_equal(response.get("byte_sha256"), decoded_sha256, f"{variant} byte_sha256")
 
 
 def _validate_build_response(
@@ -214,11 +257,9 @@ def _validate_build_response(
     )
     _require_equal(response.get("measurement_bits"), EXPECTED_MEASUREMENT_BITS, f"{variant} measurement_bits")
     _require_equal(response.get("packed_bytes"), EXPECTED_PACKED_BYTES, f"{variant} packed_bytes")
-    _require_equal(response.get("byte_sha256"), EXPECTED_REFERENCE_SHA256, f"{variant} byte_sha256")
     _require_equal(response.get("timer_scope"), TIMER_SCOPE, f"{variant} timer_scope")
     _require_positive_int(response.get("elapsed_ns"), f"{variant} elapsed_ns")
-    if not isinstance(response.get("packed_base64"), str) or not response["packed_base64"]:
-        raise RunnerError(f"{variant} packed_base64 must be a nonempty string")
+    _validate_packed_payload(response, variant=variant)
 
 
 def _run_variant(
@@ -351,6 +392,7 @@ def collect_environment(
     fixture_sha256: str,
     git_commit: str,
     git_dirty: bool,
+    stim_version: str,
 ) -> dict[str, Any]:
     stim_worker_argv = default_stim_worker_argv(str(args.stim_python))
     rstim_worker_argv = default_rstim_worker_argv(str(args.rstim_worker))
@@ -365,7 +407,7 @@ def collect_environment(
         "fixture_sha256": fixture_sha256,
         "manifest_path": str(manifest),
         "manifest_sha256": EXPECTED_MANIFEST_SHA256,
-        "stim_version": EXPECTED_STIM_VERSION,
+        "stim_version": stim_version,
         "worker_argv": {
             STIM_VARIANT: stim_worker_argv,
             RSTIM_VARIANT: rstim_worker_argv,
@@ -392,6 +434,7 @@ def collect_environment(
 
 
 def run_reference_build_benchmark(args: argparse.Namespace) -> None:
+    _require_canonical_round_counts(args)
     fixture = args.fixture.resolve()
     manifest = args.manifest.resolve()
     if not fixture.is_file():
@@ -408,6 +451,9 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
 
     git_commit = _git_commit()
     git_dirty = _git_dirty()
+    stim_version = _probe_stim_version(str(args.stim_python))
+    if stim_version != EXPECTED_STIM_VERSION:
+        raise RunnerError(f"requires stim=={EXPECTED_STIM_VERSION}, got {stim_version}")
     stim_command = default_stim_worker_argv(str(args.stim_python))
     rstim_command = default_rstim_worker_argv(str(args.rstim_worker))
 
@@ -452,6 +498,7 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
         fixture_sha256=fixture_sha256,
         git_commit=git_commit,
         git_dirty=git_dirty,
+        stim_version=stim_version,
     )
     (out_dir / "environment.json").write_text(
         json.dumps(environment, indent=2, sort_keys=True) + "\n",
@@ -478,9 +525,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.warmup_rounds < 0 or args.measure_rounds < 1:
-        print("warmup rounds must be nonnegative and measure rounds must be positive", file=sys.stderr)
-        return 1
     try:
         run_reference_build_benchmark(args)
     except (OSError, RunnerError, ValueError, subprocess.TimeoutExpired) as error:
