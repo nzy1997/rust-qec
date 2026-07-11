@@ -357,6 +357,17 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         self.assertIn("environment runner_argv", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
+    def test_rejects_rehashed_environment_runner_argv_wrong_out_dir_before_hash_mismatch(self) -> None:
+        def mutate(environment: dict[str, Any]) -> None:
+            environment["runner_argv"][-1] = str(self.bundle.parent / "unrelated-output")
+
+        rewrite_json(self.bundle / "environment.json", mutate)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment runner_argv --out-dir", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
     def test_rejects_rehashed_environment_short_runner_argv_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
             environment["runner_argv"] = environment["runner_argv"][:7]

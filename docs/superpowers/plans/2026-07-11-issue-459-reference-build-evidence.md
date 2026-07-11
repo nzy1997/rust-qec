@@ -503,3 +503,25 @@ gh pr create --base master \
 ```
 
 Expected: PR URL is printed.
+
+### Task 4 Checker Review Follow-Up - 2026-07-11
+
+Status: fixed final checker review finding for rehashed environments whose
+`environment.runner_argv[-1]` points at an unrelated output directory.
+
+Regression: added a rehashed negative control that mutates only the recorded
+`--out-dir` value, rewrites `artifact-sha256.json`, and requires the checker to
+fail with `environment runner_argv --out-dir` before any artifact hash error.
+
+Implementation: `validate_bundle()` now passes the checked `results_dir` into
+environment validation, and `_validate_runner_argv()` compares the resolved
+recorded `--out-dir` value with `results_dir.resolve()`.
+
+Verification:
+
+```sh
+python3 -m unittest tools.test_check_rstim_vs_stim_reference_build_evidence -q
+python3 -m unittest benchmarks.rstim_vs_stim_simulator.tests.test_run_reference_build_benchmark tools.test_check_rstim_vs_stim_reference_build_evidence -q
+```
+
+Result: both commands passed.

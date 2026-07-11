@@ -271,7 +271,7 @@ def _validate_runner_executable(raw: str) -> None:
         raise ValueError("environment runner_argv executable must be python3 or an absolute Python executable")
 
 
-def _validate_runner_argv(environment: dict[str, Any]) -> None:
+def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> None:
     argv = _validate_string_list(environment.get("runner_argv"), "environment runner_argv")
     if len(argv) != 17:
         raise ValueError("environment runner_argv must match the full canonical runner command")
@@ -296,9 +296,16 @@ def _validate_runner_argv(environment: dict[str, Any]) -> None:
     ]
     if argv[7:16] != expected_tail or not argv[16]:
         raise ValueError("environment runner_argv must match the full canonical runner command")
+    if _resolve_recorded_path(argv[16], "runner_argv --out-dir") != results_dir.resolve():
+        raise ValueError("environment runner_argv --out-dir must match checked bundle directory")
 
 
-def validate_environment(environment: dict[str, Any], derived: dict[str, Any], records: list[dict[str, Any]]) -> None:
+def validate_environment(
+    environment: dict[str, Any],
+    derived: dict[str, Any],
+    records: list[dict[str, Any]],
+    results_dir: Path,
+) -> None:
     del derived, records
     for field in ("git_commit", "os", "cpu_model", "rustc_version", "cargo_version", "python_version"):
         if not isinstance(environment.get(field), str) or not environment[field]:
@@ -328,7 +335,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     _validate_path_hash(environment, "python_executable", "python_executable_sha256")
     _validate_path_hash(environment, "rstim_worker_binary_path", "rstim_worker_binary_sha256")
     _validate_worker_argv(environment)
-    _validate_runner_argv(environment)
+    _validate_runner_argv(environment, results_dir)
 
 
 def validate_artifact_hashes(results_dir: Path) -> None:
@@ -353,7 +360,7 @@ def validate_bundle(results_dir: Path) -> None:
     if (results_dir / "report.md").read_text(encoding="utf-8") != render_report(summary):
         raise ValueError("report.md does not match summary.json")
     environment = load_json_object(results_dir / "environment.json", "environment.json")
-    validate_environment(environment, derived, records)
+    validate_environment(environment, derived, records, results_dir)
     validate_artifact_hashes(results_dir)
 
 
