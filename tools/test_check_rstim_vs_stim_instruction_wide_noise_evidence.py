@@ -384,6 +384,50 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment rstim_version must match runtime identity version", result.stderr)
 
+    def test_rejects_malformed_or_extra_environment_runtime_identity(self) -> None:
+        for identities, message in (
+            (
+                [
+                    PUBLISHED_RSTIM_RUNTIME_IDENTITY,
+                    {
+                        "role": "tool://extra",
+                        "version": "extra 1.0",
+                        "basename": "extra",
+                        "sha256": "d" * 64,
+                    },
+                ],
+                "environment runtime_identities must contain exactly one tool://rstim identity",
+            ),
+            (
+                ["not an identity"],
+                "environment runtime_identities[0] must be an object",
+            ),
+            (
+                [{"role": "tool://rstim", "version": "rstim 0.1.1", "basename": "rstim"}],
+                "environment runtime_identities[0] missing required field(s): sha256",
+            ),
+            (
+                [dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY, unexpected="field")],
+                "environment runtime_identities[0] unsupported field(s): unexpected",
+            ),
+            (
+                [dict(PUBLISHED_RSTIM_RUNTIME_IDENTITY, role="tool://extra")],
+                "environment runtime_identities[0] role must be tool://rstim",
+            ),
+        ):
+            with self.subTest(message=message):
+                write_valid_bundle(self.bundle)
+                rewrite_json(
+                    self.bundle / "environment.json",
+                    lambda payload, identities=identities: payload.update({"runtime_identities": identities}),
+                )
+                rewrite_hashes(self.bundle)
+
+                result = self.run_checker()
+
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(message, result.stderr)
+
     def test_rejects_legacy_runtime_binary_path_fields_without_hashing_them(self) -> None:
         rewrite_json(
             self.bundle / "environment.json",

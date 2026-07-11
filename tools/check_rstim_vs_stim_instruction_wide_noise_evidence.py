@@ -281,14 +281,9 @@ def validate_environment_runtime_identity(environment: dict[str, Any]) -> dict[s
     identities = environment.get("runtime_identities")
     if not isinstance(identities, list):
         raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
-    matches = [
-        _normalize_runtime_identity(identity, f"environment runtime_identities[{index}]")
-        for index, identity in enumerate(identities)
-        if isinstance(identity, dict) and identity.get("role") == RUNTIME_ROLE
-    ]
-    if len(matches) != 1:
+    if len(identities) != 1:
         raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
-    identity = matches[0]
+    identity = _normalize_runtime_identity(identities[0], "environment runtime_identities[0]")
     catalog_identity = load_catalog_runtime_identity()
     if identity != catalog_identity:
         raise ValueError("environment runtime identity must match schema-v2 catalog identity")
