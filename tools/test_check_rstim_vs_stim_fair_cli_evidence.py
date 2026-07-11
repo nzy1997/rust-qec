@@ -15,6 +15,12 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_fair_cli
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools" / "check_rstim_vs_stim_fair_cli_evidence.py"
 REQUIRED_ARTIFACTS = ("raw.jsonl", "summary.json", "report.md", "environment.json")
+FIXTURE_REPO_PATH = fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
+KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
+TOOL_ROLES = {
+    "stim-cli-b8": "tool://stim",
+    "rstim-cli-b8": "tool://rstim",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -34,6 +40,38 @@ def rewrite_artifact_hashes(bundle: Path) -> None:
     )
 
 
+def expected_recorded_argv(variant: str, seed: int) -> list[str]:
+    case = fair_cli_contract.EXPECTED_CASE
+    return [
+        TOOL_ROLES[variant],
+        "sample",
+        "--shots",
+        str(case["shots"]),
+        "--seed",
+        str(seed),
+        "--out_format",
+        case["output_format"],
+        "--in",
+        FIXTURE_REPO_PATH,
+    ]
+
+
+def expected_preflight_argv(variant: str) -> list[str]:
+    case = fair_cli_contract.EXPECTED_CASE
+    return [
+        TOOL_ROLES[variant],
+        "sample",
+        "--shots",
+        "1",
+        "--seed",
+        "0",
+        "--out_format",
+        case["output_format"],
+        "--in",
+        KNOWN_ANSWER_INPUT_TOKEN,
+    ]
+
+
 def write_valid_bundle(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     case = fair_cli_contract.EXPECTED_CASE
@@ -46,21 +84,13 @@ def write_valid_bundle(path: Path) -> None:
     rstim_binary.write_bytes(b"temporary rstim binary\n")
 
     records: list[dict[str, Any]] = []
-    for variant, executable, elapsed_base, stdout_hash in (
-        ("stim-cli-b8", stim_binary, 1000, "a" * 64),
-        ("rstim-cli-b8", rstim_binary, 2000, "b" * 64),
+    for variant, elapsed_base, stdout_hash in (
+        ("stim-cli-b8", 1000, "a" * 64),
+        ("rstim-cli-b8", 2000, "b" * 64),
     ):
         for phase, count in (("warmup", 2), ("measured", 7)):
             for round_index in range(count):
                 seed = len([record for record in records if record["variant"] == variant])
-                argv = fair_cli_contract.expand_argv(
-                    fair_cli_contract.EXPECTED_ARGV[variant],
-                    case,
-                    seed=seed,
-                    rstim_binary=str(rstim_binary),
-                )
-                argv[0] = str(executable)
-                argv[argv.index("--in") + 1] = str(fixture.resolve())
                 records.append(
                     {
                         "case_id": case["case_id"],
@@ -68,7 +98,7 @@ def write_valid_bundle(path: Path) -> None:
                         "phase": phase,
                         "round_index": round_index,
                         "seed": seed,
-                        "argv": argv,
+                        "argv": expected_recorded_argv(variant, seed),
                         "shots": case["shots"],
                         "measurement_count": case["measurement_count"],
                         "output_format": case["output_format"],
@@ -88,7 +118,6 @@ def write_valid_bundle(path: Path) -> None:
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (path / "report.md").write_text(run_fair_cli._render_report(summary), encoding="utf-8")
-    preflight_path = path / "known_answer.stim"
     environment = {
         "git_commit": "test-commit",
         "os": "test-os",
@@ -99,9 +128,9 @@ def write_valid_bundle(path: Path) -> None:
         "stim_version": case["stim_version"],
         "rstim_version": "rstim test",
         "rustc_version": "rustc test",
-        "manifest": str(fair_manifest),
+        "manifest": "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
         "manifest_sha256": sha256_file(fair_manifest),
-        "fair_manifest_path": str(fair_manifest),
+        "fair_manifest_path": "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
         "fair_manifest_sha256": sha256_file(fair_manifest),
         "source_manifest": case["source_manifest_path"],
         "source_manifest_sha256": sha256_file(source_manifest),
@@ -109,10 +138,20 @@ def write_valid_bundle(path: Path) -> None:
         "fixture": case["canonical_input_path"],
         "fixture_sha256": sha256_file(fixture),
         "fixture_path": case["canonical_input_path"],
-        "stim_binary": str(stim_binary),
-        "stim_binary_sha256": sha256_file(stim_binary),
-        "rstim_binary": str(rstim_binary),
-        "rstim_binary_sha256": sha256_file(rstim_binary),
+        "runtime_identities": [
+            {
+                "role": "tool://stim",
+                "version": "1.15.0",
+                "basename": "stim",
+                "sha256": "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323",
+            },
+            {
+                "role": "tool://rstim",
+                "version": "rstim 0.1.1",
+                "basename": "rstim",
+                "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+            },
+        ],
         "round_argv": [
             {key: record[key] for key in ("variant", "phase", "round_index", "seed", "argv")}
             for record in records
@@ -123,18 +162,7 @@ def write_valid_bundle(path: Path) -> None:
         "known_answer_preflight_details": [
             {
                 "variant": variant,
-                "argv": [
-                    str(stim_binary if variant == "stim-cli-b8" else rstim_binary),
-                    "sample",
-                    "--shots",
-                    "1",
-                    "--seed",
-                    "0",
-                    "--out_format",
-                    "b8",
-                    "--in",
-                    str(preflight_path),
-                ],
+                "argv": expected_preflight_argv(variant),
                 "exit_code": 0,
                 "stdout_hex": "01",
                 "stdout_sha256": hashlib.sha256(bytes.fromhex("01")).hexdigest(),
@@ -181,6 +209,31 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("stim-cli-b8 output_format must be b8", result.stderr)
 
+    def test_rejects_host_absolute_raw_fixture_argument_before_artifact_hashes(self) -> None:
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        records[0]["argv"][records[0]["argv"].index("--in") + 1] = "/tmp/copied-fixture.stim"
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 argv contains a host-absolute path", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_legacy_environment_binary_paths(self) -> None:
+        def add_live_paths(environment: dict[str, Any]) -> None:
+            environment["stim_binary"] = "/opt/homebrew/bin/stim"
+            environment["stim_binary_sha256"] = "a" * 64
+            environment["rstim_binary"] = "/tmp/rstim"
+            environment["rstim_binary_sha256"] = "b" * 64
+
+        rewrite_json(self.bundle / "environment.json", add_live_paths)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment must not contain live runtime path fields", result.stderr)
+
     def test_rejects_summary_not_derived_from_raw(self) -> None:
         rewrite_json(self.bundle / "summary.json", lambda summary: summary.update(measured_record_count=999))
         rewrite_artifact_hashes(self.bundle)
@@ -225,7 +278,57 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment fair_manifest_path must name the canonical fair CLI manifest", result.stderr)
+        self.assertIn(
+            "environment manifest must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
+
+    def test_rejects_absolute_fair_manifest_provenance(self) -> None:
+        fair_manifest = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
+
+        def record_absolute_manifest(environment: dict[str, Any]) -> None:
+            environment["fair_manifest_path"] = str(fair_manifest)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_manifest)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "environment fair_manifest_path must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
+
+    def test_rejects_absolute_source_manifest_provenance_aliases(self) -> None:
+        source_manifest = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
+
+        def record_absolute_source_manifest(environment: dict[str, Any]) -> None:
+            environment["source_manifest"] = str(source_manifest)
+            environment["source_manifest_path"] = str(source_manifest)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_source_manifest)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            f"environment source_manifest_path must be {fair_cli_contract.EXPECTED_CASE['source_manifest_path']}",
+            result.stderr,
+        )
+
+    def test_rejects_absolute_fixture_provenance_aliases(self) -> None:
+        fixture = REPO_ROOT / fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
+
+        def record_absolute_fixture(environment: dict[str, Any]) -> None:
+            environment["fixture"] = str(fixture)
+            environment["fixture_path"] = str(fixture)
+
+        rewrite_json(self.bundle / "environment.json", record_absolute_fixture)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            f"environment fixture_path must be {fair_cli_contract.EXPECTED_CASE['canonical_input_path']}",
+            result.stderr,
+        )
 
     def test_rejects_missing_manifest_alias_provenance(self) -> None:
         def remove_manifest_aliases(environment: dict[str, Any]) -> None:
@@ -236,7 +339,10 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment manifest must match fair_manifest_path", result.stderr)
+        self.assertIn(
+            "environment manifest must be benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
+            result.stderr,
+        )
 
     def test_rejects_output_bytes_not_derived_from_measurements_and_shots(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
