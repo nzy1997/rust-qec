@@ -118,6 +118,22 @@ class ValidateEvidenceBundlesTest(unittest.TestCase):
             errors,
         )
 
+    def test_checked_command_executable_must_have_runtime_identity(self) -> None:
+        catalog = load_catalog(CATALOG)
+        mutated = copy.deepcopy(catalog)
+        mutated["bundles"][0]["runtime_identities"] = [
+            identity
+            for identity in mutated["bundles"][0]["runtime_identities"]
+            if identity["role"] != "tool://stim"
+        ]
+
+        errors = validate_catalog(mutated, CATALOG)
+
+        self.assertTrue(
+            any("checked command executable must have runtime identity" in error for error in errors),
+            errors,
+        )
+
     def test_checked_commands_reject_host_absolute_paths(self) -> None:
         catalog = load_catalog(CATALOG)
         mutated = copy.deepcopy(catalog)
@@ -127,6 +143,15 @@ class ValidateEvidenceBundlesTest(unittest.TestCase):
             "--in",
             "/tmp/fixture.stim",
         ]
+
+        errors = validate_catalog(mutated, CATALOG)
+
+        self.assertTrue(any("checked command contains host-absolute path" in error for error in errors), errors)
+
+    def test_checked_commands_reject_semicolon_embedded_host_paths(self) -> None:
+        catalog = load_catalog(CATALOG)
+        mutated = copy.deepcopy(catalog)
+        mutated["bundles"][0]["checked_commands"][0]["argv"].append("x;/tmp/fixture.stim")
 
         errors = validate_catalog(mutated, CATALOG)
 
@@ -160,6 +185,19 @@ class ValidateEvidenceBundlesTest(unittest.TestCase):
         errors = validate_catalog(mutated, CATALOG)
 
         self.assertTrue(any("artifact catalog missing bundle file: summary.json" in error for error in errors), errors)
+
+    def test_bundle_path_must_exist_even_without_artifacts(self) -> None:
+        catalog = load_catalog(CATALOG)
+        mutated = copy.deepcopy(catalog)
+        mutated["bundles"][0]["bundle_path"] = "benchmarks/rstim_vs_stim_simulator/results/does-not-exist"
+        mutated["bundles"][0]["artifacts"] = []
+
+        errors = validate_catalog(mutated, CATALOG)
+
+        self.assertTrue(
+            any("bundle path must identify an existing artifact directory" in error for error in errors),
+            errors,
+        )
 
     def test_rejects_windows_and_unc_host_paths(self) -> None:
         catalog = valid_catalog_fixture()

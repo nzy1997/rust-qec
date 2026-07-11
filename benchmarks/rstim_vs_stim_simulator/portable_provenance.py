@@ -17,8 +17,8 @@ EXPECTED_BUNDLE_IDS = (
 )
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_POSIX_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{])/(?!/)")
-_WINDOWS_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{])([A-Za-z]:[\\/]|\\\\)")
+_POSIX_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{;|&<>])/(?!/)")
+_WINDOWS_ABSOLUTE_RE = re.compile(r"(^|[\s\"'=,:\[\(\{;|&<>])([A-Za-z]:[\\/]|\\\\)")
 _RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
 _CHECKED_COMMAND_FIELDS = frozenset({"name", "argv"})
 _CHECKED_PROVENANCE_FIELDS = frozenset({"name", "value"})
@@ -85,8 +85,8 @@ def validate_catalog(catalog: dict[str, Any], catalog_path: Path) -> list[str]:
         _validate_artifact_completeness(artifact_paths, bundle_root, errors)
 
         logical_roles = _validate_logical_executables(raw_bundle.get("logical_executables"), bundle_label, errors)
-        _validate_runtime_identities(raw_bundle.get("runtime_identities"), bundle_label, errors)
-        _validate_checked_commands(raw_bundle.get("checked_commands"), logical_roles, bundle_label, errors)
+        runtime_roles = _validate_runtime_identities(raw_bundle.get("runtime_identities"), bundle_label, errors)
+        _validate_checked_commands(raw_bundle.get("checked_commands"), logical_roles, runtime_roles, bundle_label, errors)
         _validate_checked_provenance(raw_bundle.get("checked_provenance"), bundle_label, errors)
 
     return errors
@@ -167,10 +167,10 @@ def _validate_artifact_completeness(
     bundle_root: Path | None,
     errors: list[str],
 ) -> None:
-    if bundle_root is None or not bundle_root.exists():
+    if bundle_root is None:
         return
     if not bundle_root.is_dir():
-        errors.append("bundle path must identify an artifact directory")
+        errors.append("bundle path must identify an existing artifact directory")
         return
 
     try:
@@ -242,10 +242,14 @@ def _validate_logical_executables(raw_entries: object, bundle_label: str, errors
     return roles
 
 
-def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
+def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors: list[str]) -> set[str]:
+    roles: set[str] = set()
     if not isinstance(raw_entries, list):
         errors.append(f'{bundle_label} field "runtime_identities" must be an array')
-        return
+        return roles
+    if not raw_entries:
+        errors.append(f'{bundle_label} field "runtime_identities" must contain at least one identity')
+        return roles
 
     required_fields = ("role", "version", "basename", "sha256")
     for index, identity in enumerate(raw_entries):
@@ -259,7 +263,8 @@ def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors:
         if missing:
             errors.append(f"{identity_label} missing required field(s): {', '.join(missing)}")
 
-        _validate_tool_role(identity.get("role"), f"{identity_label} role", errors)
+        if _validate_tool_role(identity.get("role"), f"{identity_label} role", errors):
+            roles.add(identity["role"])
         if not isinstance(identity.get("version"), str) or not identity.get("version"):
             errors.append(f'{identity_label} field "version" must be a non-empty string')
         basename = identity.get("basename")
@@ -272,10 +277,13 @@ def _validate_runtime_identities(raw_entries: object, bundle_label: str, errors:
         if identity.get("required_live_path") is True:
             errors.append("checked evidence must not require a live runtime path")
 
+    return roles
+
 
 def _validate_checked_commands(
     raw_entries: object,
     logical_roles: set[str],
+    runtime_roles: set[str],
     bundle_label: str,
     errors: list[str],
 ) -> None:
@@ -300,6 +308,8 @@ def _validate_checked_commands(
             continue
         if argv[0] not in logical_roles:
             errors.append("checked command executable must be declared tool:// role")
+        if argv[0] not in runtime_roles:
+            errors.append("checked command executable must have runtime identity")
 
 
 def _validate_checked_provenance(raw_entries: object, bundle_label: str, errors: list[str]) -> None:
