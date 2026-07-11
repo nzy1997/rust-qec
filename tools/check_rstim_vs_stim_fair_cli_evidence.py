@@ -243,9 +243,8 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         ("fixture", "fixture_sha256", "fixture_path", "fixture_sha256"),
     )
     for alias_path, alias_hash, path_field, hash_field in aliases:
-        if alias_path in environment or alias_hash in environment:
-            require_equal(environment.get(alias_path), environment.get(path_field), f"environment {alias_path} must match {path_field}")
-            require_equal(environment.get(alias_hash), environment.get(hash_field), f"environment {alias_hash} must match {hash_field}")
+        require_equal(environment.get(alias_path), environment.get(path_field), f"environment {alias_path} must match {path_field}")
+        require_equal(environment.get(alias_hash), environment.get(hash_field), f"environment {alias_hash} must match {hash_field}")
 
     expected_round_argv = [
         {key: record[key] for key in ("variant", "phase", "round_index", "seed", "argv")}

@@ -227,6 +227,17 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("environment fair_manifest_path must name the canonical fair CLI manifest", result.stderr)
 
+    def test_rejects_missing_manifest_alias_provenance(self) -> None:
+        def remove_manifest_aliases(environment: dict[str, Any]) -> None:
+            del environment["manifest"]
+            del environment["manifest_sha256"]
+
+        rewrite_json(self.bundle / "environment.json", remove_manifest_aliases)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("environment manifest must match fair_manifest_path", result.stderr)
+
     def test_rejects_output_bytes_not_derived_from_measurements_and_shots(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
         records[2]["actual_output_bytes"] -= 1
@@ -259,6 +270,39 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("stim-cli-b8 known-answer preflight stdout_sha256 must hash stdout_hex", result.stderr)
+
+    def test_rejects_preflight_detail_with_nonzero_exit_code(self) -> None:
+        def replace_exit_code(environment: dict[str, Any]) -> None:
+            environment["known_answer_preflight_details"][0]["exit_code"] = 1
+
+        rewrite_json(self.bundle / "environment.json", replace_exit_code)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 known-answer preflight exit_code must be 0", result.stderr)
+
+    def test_rejects_preflight_detail_with_wrong_stdout_hex(self) -> None:
+        def replace_stdout_hex(environment: dict[str, Any]) -> None:
+            environment["known_answer_preflight_details"][0]["stdout_hex"] = "00"
+            environment["known_answer_preflight_details"][0]["stdout_sha256"] = hashlib.sha256(
+                bytes.fromhex("00")
+            ).hexdigest()
+
+        rewrite_json(self.bundle / "environment.json", replace_stdout_hex)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 known-answer preflight stdout_hex must be 01", result.stderr)
+
+    def test_rejects_preflight_detail_without_elapsed_ns(self) -> None:
+        def remove_elapsed_ns(environment: dict[str, Any]) -> None:
+            del environment["known_answer_preflight_details"][0]["elapsed_ns"]
+
+        rewrite_json(self.bundle / "environment.json", remove_elapsed_ns)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stim-cli-b8 known-answer preflight elapsed_ns must be a nonnegative integer", result.stderr)
 
     def test_raw_aggregate_changes_require_regeneration_and_accept_regenerated_artifacts(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
