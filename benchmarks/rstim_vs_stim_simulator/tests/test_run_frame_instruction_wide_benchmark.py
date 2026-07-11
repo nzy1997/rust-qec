@@ -17,7 +17,7 @@ CASE_ID = "stim_surface_d11_r100"
 SHOTS = 1024
 SEED = 7
 MEASUREMENT_BYTES = 1_552_384
-DETECT_BYTES = ((12_000 + 1 + 7) // 8) * SHOTS
+DETECT_BITS = 12_000 + 1
 
 
 def sha256_file(path: Path) -> str:
@@ -35,7 +35,7 @@ def write_fake_cli(path: Path, *, emit_telemetry: bool) -> Path:
 
             EMIT_TELEMETRY = {emit_telemetry!r}
             MEASUREMENT_BYTES = {MEASUREMENT_BYTES}
-            DETECT_BYTES = {DETECT_BYTES}
+            DETECT_BITS = {DETECT_BITS}
 
             def fail(message):
                 print(message, file=sys.stderr)
@@ -106,9 +106,10 @@ def write_fake_cli(path: Path, *, emit_telemetry: bool) -> Path:
             if command == "detect":
                 if "--append_observables" not in argv:
                     fail("detect must append observables")
-                if argv[argv.index("--out_format") + 1] != "b8":
-                    fail("detect must use b8")
-                sys.stdout.buffer.write(b"\\0" * DETECT_BYTES)
+                if argv[argv.index("--out_format") + 1] != "01":
+                    fail("detect must use 01")
+                line = ("0" * DETECT_BITS + "\\n").encode("ascii")
+                sys.stdout.buffer.write(line * 1024)
                 sys.exit(0)
 
             fail(f"unsupported command: {{command}}")

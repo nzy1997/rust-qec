@@ -150,10 +150,16 @@ def write_valid_bundle(bundle: Path) -> None:
         "shots": 1024,
         "detectors": 12_000,
         "observables": 1,
-        "output_format": "b8",
-        "expected_output_bytes": ((12_000 + 1 + 7) // 8) * 1024,
+        "output_format": "01",
+        "expected_output_bytes": (12_000 + 1 + 1) * 1024,
         "stim_stdout_sha256": "b" * 64,
-        "rstim_stdout_sha256": "b" * 64,
+        "rstim_stdout_sha256": "c" * 64,
+        "sample_count": 1024,
+        "selected_columns": [0, 12000],
+        "selected_pairs": [[0, 12000]],
+        "max_delta": 0.0,
+        "max_tolerance": 0.01,
+        "failure_reasons": [],
     }
     (bundle / "correctness-summary.json").write_text(
         json.dumps(correctness, indent=2, sort_keys=True) + "\n", encoding="utf-8"

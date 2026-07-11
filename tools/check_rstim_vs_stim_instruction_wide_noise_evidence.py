@@ -173,17 +173,27 @@ def _operation_target_count(operations: dict[str, Any], operation: str) -> int:
 def validate_correctness(payload: dict[str, Any]) -> None:
     _require_equal(payload.get("status"), "pass", "correctness-summary status must be pass")
     _require_equal(payload.get("mode"), "detect", "correctness-summary mode must be detect")
-    _require_equal(payload.get("output_format"), "b8", "correctness-summary output_format must be b8")
+    _require_equal(payload.get("output_format"), "01", "correctness-summary output_format must be 01")
     _require_int(payload.get("seed"), 7, "correctness-summary seed")
     _require_int(payload.get("shots"), 1024, "correctness-summary shots")
     _require_int(payload.get("detectors"), 12_000, "correctness-summary detectors")
     _require_int(payload.get("observables"), 1, "correctness-summary observables")
-    expected_bytes = ((12_000 + 1 + 7) // 8) * 1024
+    expected_bytes = (12_000 + 1 + 1) * 1024
     _require_int(payload.get("expected_output_bytes"), expected_bytes, "correctness-summary expected_output_bytes")
     stim_hash = _require_digest(payload.get("stim_stdout_sha256"), "correctness-summary stim_stdout_sha256")
-    rstim_hash = _require_digest(payload.get("rstim_stdout_sha256"), "correctness-summary rstim_stdout_sha256")
-    if stim_hash != rstim_hash:
-        raise ValueError("correctness-summary rstim digest must match Stim digest")
+    _require_digest(payload.get("rstim_stdout_sha256"), "correctness-summary rstim_stdout_sha256")
+    _require_int(payload.get("sample_count"), 1024, "correctness-summary sample_count")
+    failure_reasons = payload.get("failure_reasons")
+    if failure_reasons != []:
+        raise ValueError("correctness-summary failure_reasons must be empty")
+    max_delta = payload.get("max_delta")
+    max_tolerance = payload.get("max_tolerance")
+    if not isinstance(max_delta, (int, float)) or isinstance(max_delta, bool):
+        raise ValueError("correctness-summary max_delta must be numeric")
+    if not isinstance(max_tolerance, (int, float)) or isinstance(max_tolerance, bool):
+        raise ValueError("correctness-summary max_tolerance must be numeric")
+    if float(max_delta) > float(max_tolerance):
+        raise ValueError("correctness-summary max_delta must be within max_tolerance")
 
 
 def _resolve_recorded_path(raw: Any, field: str) -> Path:

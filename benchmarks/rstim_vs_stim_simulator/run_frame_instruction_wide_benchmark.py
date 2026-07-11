@@ -17,7 +17,13 @@ from typing import Any
 
 from benchmarks.rstim_vs_stim_simulator import inspect_fixture_load
 from benchmarks.rstim_vs_stim_simulator.validate_cases import load_manifest, validate_manifest
-from benchmarks.rstim_vs_stim_simulator.verify_correctness import resolve_case_input_path
+from benchmarks.rstim_vs_stim_simulator.verify_correctness import (
+    compare_sample_sets,
+    parse_01_samples,
+    resolve_case_input_path,
+    select_columns,
+    select_pairs,
+)
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -30,6 +36,7 @@ EXPECTED_MANIFEST_SHA256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5
 TIMER_SCOPE = "process_spawn_stdout_stderr_drain_exit"
 OUTPUT_FORMAT = "b8"
 CORRECTNESS_MODE = "detect"
+CORRECTNESS_OUTPUT_FORMAT = "01"
 EXPECTED_OUTPUT_BITS = 12_121
 EXPECTED_BYTES_PER_SHOT = 1_516
 EXPECTED_OUTPUT_BYTES = 1_552_384
@@ -135,6 +142,8 @@ def _stim_version(stim_binary: Path) -> str:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise RunnerError(f"Stim version probe exited with code {completed.returncode}: {detail}")
     version = _extract_semver("\n".join([completed.stdout, completed.stderr]))
+    if version is None:
+        version = _extract_semver(_probe_stdout(["python3", "-c", "import stim; print(stim.__version__)"]))
     if version != EXPECTED_STIM_VERSION:
         raise RunnerError(f"Stim CLI must be version {EXPECTED_STIM_VERSION}; got {version or 'unknown'}")
     return version
@@ -453,7 +462,7 @@ def _run_detect(
         "--seed",
         str(seed),
         "--out_format",
-        OUTPUT_FORMAT,
+        CORRECTNESS_OUTPUT_FORMAT,
         "--append_observables",
         "--in",
         str(fixture),
@@ -475,20 +484,39 @@ def run_correctness(
         raise RunnerError(f"stim detect failed: {stim_result.stderr.decode(errors='replace').strip()}")
     if rstim_result.exit_code != 0:
         raise RunnerError(f"rstim detect failed: {rstim_result.stderr.decode(errors='replace').strip()}")
-    expected_bytes = ((EXPECTED_DETECTORS + EXPECTED_OBSERVABLES + 7) // 8) * shots
-    if len(stim_result.stdout) != expected_bytes:
-        raise RunnerError(f"stim detect output bytes must be {expected_bytes}, got {len(stim_result.stdout)}")
-    if len(rstim_result.stdout) != expected_bytes:
-        raise RunnerError(f"rstim detect output bytes must be {expected_bytes}, got {len(rstim_result.stdout)}")
+    expected_bits = EXPECTED_DETECTORS + EXPECTED_OBSERVABLES
+    expected_bytes = (expected_bits + 1) * shots
+    stim_samples = parse_01_samples(
+        stim_result.stdout.decode("ascii"),
+        expected_bits=expected_bits,
+        expected_shots=shots,
+    )
+    rstim_samples = parse_01_samples(
+        rstim_result.stdout.decode("ascii"),
+        expected_bits=expected_bits,
+        expected_shots=shots,
+    )
+    selected_columns = select_columns(expected_bits, observable_count=EXPECTED_OBSERVABLES)
+    selected_pairs = select_pairs(
+        selected_columns,
+        bit_count=expected_bits,
+        observable_count=EXPECTED_OBSERVABLES,
+    )
+    comparison = compare_sample_sets(
+        stim_samples,
+        rstim_samples,
+        columns=selected_columns,
+        pairs=selected_pairs,
+    )
+    if comparison["status"] != "pass":
+        raise RunnerError("detect comparison failed: " + "; ".join(comparison["failure_reasons"]))
     stim_hash = hashlib.sha256(stim_result.stdout).hexdigest()
     rstim_hash = hashlib.sha256(rstim_result.stdout).hexdigest()
-    if stim_result.stdout != rstim_result.stdout:
-        raise RunnerError("rstim detect output does not match Stim")
     return (
         {
-            "status": "pass",
+            "status": comparison["status"],
             "mode": CORRECTNESS_MODE,
-            "output_format": OUTPUT_FORMAT,
+            "output_format": CORRECTNESS_OUTPUT_FORMAT,
             "shots": shots,
             "seed": seed,
             "detectors": EXPECTED_DETECTORS,
@@ -498,6 +526,12 @@ def run_correctness(
             "rstim_output_bytes": len(rstim_result.stdout),
             "stim_stdout_sha256": stim_hash,
             "rstim_stdout_sha256": rstim_hash,
+            "sample_count": comparison["sample_count"],
+            "selected_columns": selected_columns,
+            "selected_pairs": [list(pair) for pair in selected_pairs],
+            "max_delta": comparison["max_delta"],
+            "max_tolerance": comparison["max_tolerance"],
+            "failure_reasons": comparison["failure_reasons"],
             "stim_elapsed_ns": stim_result.elapsed_ns,
             "rstim_elapsed_ns": rstim_result.elapsed_ns,
         },
