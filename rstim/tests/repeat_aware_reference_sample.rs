@@ -1,5 +1,5 @@
 use rstim::data_path::{
-    ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision,
+    build_reference_sample_with_decision, ReferenceBuildPhaseCounters, ReferenceSampleDecision,
 };
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
@@ -74,6 +74,16 @@ fn nested_long_repeats_fold_recursively_inside_short_parent() {
     assert_eq!(counters.expanded_repeat_iterations, 26);
     assert_eq!(counters.executed_repeat_iterations, 4);
     assert_eq!(counters.skipped_repeat_iterations, 22);
+}
+
+#[test]
+fn folded_outer_repeat_preserves_nested_logical_repeat_counters() {
+    let (bits, counters) = build("REPEAT 12 {\n  REPEAT 12 {\n    M 0\n  }\n}\n");
+    assert_eq!(bits, vec![false; 144]);
+    assert_eq!(counters.measurement_reset_batches, 1);
+    assert_eq!(counters.expanded_repeat_iterations, 156);
+    assert_eq!(counters.executed_repeat_iterations, 2);
+    assert_eq!(counters.skipped_repeat_iterations, 154);
 }
 
 #[test]

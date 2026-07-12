@@ -112,6 +112,15 @@ fn add_repeat_counter(slot: &mut usize, value: u64) {
     *slot = slot.saturating_add(saturating_usize_from_u64(value));
 }
 
+fn logical_repeat_iterations(instrs: &[StimInstr]) -> u64 {
+    instrs.iter().fold(0_u64, |total, instr| match instr {
+        StimInstr::Op { .. } => total,
+        StimInstr::Repeat { count, body } => total.saturating_add(
+            count.saturating_add(count.saturating_mul(logical_repeat_iterations(body))),
+        ),
+    })
+}
+
 fn append_tree_bits(tree: &mut ReferenceSampleTree, bits: Vec<bool>) {
     if bits.is_empty() {
         return;
@@ -312,7 +321,12 @@ fn packed_reference_repeat(
                     .simplified(),
                 );
                 let skipped = whole_cycles * period;
-                add_repeat_counter(&mut counters.skipped_repeat_iterations, skipped);
+                let nested_skipped = skipped.saturating_mul(logical_repeat_iterations(body));
+                add_repeat_counter(&mut counters.expanded_repeat_iterations, nested_skipped);
+                add_repeat_counter(
+                    &mut counters.skipped_repeat_iterations,
+                    skipped.saturating_add(nested_skipped),
+                );
                 iteration += skipped;
             }
             break;
