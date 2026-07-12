@@ -590,6 +590,30 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertIn("candidate frame-noise path exceeds 1.05 non-regression limit", result.stderr)
         self.assertNotIn("artifact", result.stderr.lower())
 
+    def test_accepts_candidate_first_paired_ordering_with_baseline_revision_pinned(self) -> None:
+        records = [json.loads(line) for line in (self.bundle / "paired-raw.jsonl").read_text().splitlines()]
+        candidate_first_records = []
+        for index in range(0, len(records), 2):
+            candidate_first_records.extend((records[index + 1], records[index]))
+        for ordering_slot, record in enumerate(candidate_first_records):
+            record["ordering_slot"] = ordering_slot
+        (self.bundle / "paired-raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in candidate_first_records),
+            encoding="utf-8",
+        )
+        rewrite_json(
+            self.bundle / "environment.json",
+            lambda payload: payload["artifact_sha256"].update(
+                {"paired-raw.jsonl": sha256_file(self.bundle / "paired-raw.jsonl")}
+            ),
+        )
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("candidate_over_baseline=1.0", result.stdout)
+
     def test_rejects_mismatched_fixture_manifest_or_artifact_hash(self) -> None:
         for field, message in (
             ("fixture_sha256", "environment fixture_sha256 does not match fixture"),

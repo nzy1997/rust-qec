@@ -363,7 +363,9 @@ def _derive_paired_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "module": "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise",
         "case_id": EXPECTED_CASE_ID,
         "timer_scope": TIMER_SCOPE,
-        "baseline_revision": records[0]["resolved_revision"],
+        "baseline_revision": next(
+            record["resolved_revision"] for record in records if record["variant"] == PAIRED_BASELINE_VARIANT
+        ),
         "candidate_revision": next(record["resolved_revision"] for record in records if record["variant"] == PAIRED_CANDIDATE_VARIANT),
         "expected_output_bytes": EXPECTED_OUTPUT_BYTES,
         "measured_record_count": 14,
