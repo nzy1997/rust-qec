@@ -173,6 +173,12 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "baseline and candidate revisions must differ"):
             run_paired_frame_noise.ensure_distinct_revisions("a" * 40, "a" * 40)
 
+    def test_classifies_candidate_over_baseline_ratio(self) -> None:
+        self.assertEqual(run_paired_frame_noise.classify_candidate_ratio(0.95), "improved")
+        self.assertEqual(run_paired_frame_noise.classify_candidate_ratio(0.9500001), "neutral")
+        self.assertEqual(run_paired_frame_noise.classify_candidate_ratio(1.05), "neutral")
+        self.assertEqual(run_paired_frame_noise.classify_candidate_ratio(1.0500001), "regressed")
+
     def test_canonical_command_requires_skip_reference_sample(self) -> None:
         argv = [
             run_paired_frame_noise.TOOL_ROLES[run_paired_frame_noise.BASELINE_VARIANT],
@@ -249,6 +255,11 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
                 summary = run_with_fake_builds(out_dir, builds)
 
             self.assertEqual(summary["measured_record_count"], 14)
+            self.assertIn(summary["outcome"], {"improved", "neutral", "regressed"})
+            self.assertEqual(
+                summary["candidate_over_baseline"],
+                summary["variants"][1]["median_elapsed_ns"] / summary["variants"][0]["median_elapsed_ns"],
+            )
             self.assertEqual({path.name for path in out_dir.iterdir()}, {
                 "raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json",
             })
