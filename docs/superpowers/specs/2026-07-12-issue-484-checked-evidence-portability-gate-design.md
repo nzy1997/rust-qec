@@ -8,6 +8,11 @@ Issues #480 through #483 already migrated the individual bundles so their
 default checkers no longer require the publishing worktree, Stim installation,
 Cargo builds, or `target/` products.
 
+The aggregate CI job must be honest in an environment where Stim is not
+installed. The frame-noise checker currently needs special attention because
+its runner import chain reaches modules that import `stim`; the checked-evidence
+path must avoid that import-time dependency.
+
 ## Approach
 
 Use a small aggregate checker at `tools/check_all_portable_evidence.py` with an
@@ -24,9 +29,10 @@ passes, it prints the existing catalog PASS line, then runs each registered
 bundle checker in catalog order.
 
 The aggregate checker imports the existing checker modules and calls their
-`validate_bundle(...)` functions directly. It prints the same PASS line each
-checker's CLI prints on success, so downstream logs preserve all existing
-evidence confirmations. On failure, it catches the checker error and prints:
+`validate_bundle(...)` functions directly after the frame-noise checker is made
+standard-library importable. It prints the same PASS line each checker's CLI
+prints on success, so downstream logs preserve all existing evidence
+confirmations. On failure, it catches the checker error and prints:
 
 ```text
 FAIL portable checked evidence bundle=<bundle-id>: <checker error>
@@ -39,6 +45,10 @@ the underlying checker error only names an artifact field.
 
 - `tools/check_all_portable_evidence.py`: aggregate CLI, registry, catalog
   validation, pass/fail reporting.
+- `tools/check_rstim_vs_stim_instruction_wide_noise_evidence.py`: keep the
+  checked-evidence validation path independent of the frame benchmark runner's
+  import-time Stim dependency by defining the constants and report derivation it
+  needs locally.
 - `tools/test_check_all_portable_evidence.py`: unit and integration coverage for
   success, direct-script help/import behavior, unknown bundle ids, and the fair
   CLI negative control with a rehashed absolute fixture path.
@@ -98,3 +108,8 @@ FAIL portable checked evidence bundle=fair-cli-release
 
 Repository-level verification also runs `cargo test --workspace` as required by
 the repo instructions and Agent Desk prompt.
+
+Add an import smoke test that runs with a blocked `stim` import hook and imports
+both `tools.check_all_portable_evidence` and
+`tools.check_rstim_vs_stim_instruction_wide_noise_evidence`. This prevents local
+Stim installations from masking a CI portability regression.
