@@ -163,6 +163,13 @@ fn assert_raw_z_row_has_y_pivot(tableau: &PackedInverseTableau, q: usize) {
     assert!(tableau.z(row, q), "raw Z row {q} must have Z support");
 }
 
+fn raw_z_x_support(tableau: &PackedInverseTableau, q: usize) -> Vec<usize> {
+    let row = tableau.num_qubits() + q;
+    (0..tableau.num_qubits())
+        .filter(|&qubit| tableau.x(row, qubit))
+        .collect()
+}
+
 #[test]
 fn deterministic_z_batch_avoids_transpose() {
     let mut tableau = PackedInverseTableau::identity(3);
@@ -233,6 +240,42 @@ fn direct_collapse_preserves_deterministic_one() {
     assert_eq!(bits, vec![true]);
     assert_eq!(counters.transposed_collapse_batches, 0);
     assert_eq!(counters.collapse_pivots, 0);
+}
+
+#[test]
+fn direct_collapse_eliminates_multi_x_support_without_padding() {
+    let num_qubits = 32;
+    let mut packed = PackedInverseTableau::identity(num_qubits);
+    let mut legacy = StabilizerState::new(num_qubits);
+
+    packed.h(0);
+    legacy.h(0);
+    packed.h(1);
+    legacy.h(1);
+    packed.cx(0, 1);
+    legacy.cx(0, 1);
+
+    let target = (0..num_qubits)
+        .find(|&q| {
+            let support = raw_z_x_support(&packed, q);
+            support.len() >= 2 && support.iter().skip(1).any(|&later| later > support[0])
+        })
+        .expect("test setup must create a raw Z row with later X support");
+    assert_eq!(raw_z_x_support(&packed, target), vec![0, 1]);
+
+    let targets = [(target, false)];
+    let (packed_bits, counters) = direct_collapse(&mut packed, &targets);
+    let legacy_bits = legacy_measure_z_many(&mut legacy, &targets);
+
+    assert_eq!(packed_bits, legacy_bits);
+    assert_eq!(counters.direct_inverse_batches, 1);
+    assert_eq!(counters.transposed_collapse_batches, 1);
+    assert_eq!(counters.collapse_pivots, 1);
+    assert_snapshot_matches_legacy(
+        &packed,
+        &legacy,
+        "multi-X no-padding collapse snapshot",
+    );
 }
 
 #[test]
