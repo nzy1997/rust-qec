@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import tomllib
 from collections.abc import Callable
@@ -73,6 +74,66 @@ def _bundle_path(repo_root: Path, bundle: dict[str, Any]) -> Path:
     return repo_root / PurePosixPath(raw_path)
 
 
+def _identity_map(raw_identities: object) -> dict[str, dict[str, Any]]:
+    if not isinstance(raw_identities, list):
+        return {}
+    return {
+        identity["role"]: identity
+        for identity in raw_identities
+        if isinstance(identity, dict) and isinstance(identity.get("role"), str)
+    }
+
+
+def _command_argv_set(raw_commands: object) -> set[tuple[str, ...]]:
+    if not isinstance(raw_commands, list):
+        return set()
+    return {
+        tuple(command["argv"])
+        for command in raw_commands
+        if (
+            isinstance(command, dict)
+            and isinstance(command.get("argv"), list)
+            and all(isinstance(arg, str) for arg in command["argv"])
+        )
+    }
+
+
+def _environment_worker_argv_set(environment: dict[str, Any]) -> set[tuple[str, ...]]:
+    worker_argv = environment.get("worker_argv")
+    if not isinstance(worker_argv, dict):
+        return set()
+    return {
+        tuple(argv)
+        for argv in worker_argv.values()
+        if isinstance(argv, list) and all(isinstance(arg, str) for arg in argv)
+    }
+
+
+def _validate_catalog_matches_environment(bundle: dict[str, Any], bundle_root: Path) -> list[str]:
+    environment_path = bundle_root / "environment.json"
+    if not environment_path.is_file():
+        return []
+    try:
+        environment = json.loads(environment_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return [f"environment.json could not be read: {error}"]
+    if not isinstance(environment, dict):
+        return ["environment.json root must be an object"]
+
+    errors: list[str] = []
+    catalog_identities = _identity_map(bundle.get("runtime_identities"))
+    environment_identities = _identity_map(environment.get("runtime_identities"))
+    if environment_identities and catalog_identities != environment_identities:
+        errors.append("catalog runtime_identities do not match environment.json")
+
+    catalog_commands = _command_argv_set(bundle.get("checked_commands"))
+    environment_commands = _environment_worker_argv_set(environment)
+    if environment_commands and catalog_commands != environment_commands:
+        errors.append("catalog checked_commands do not match environment.json worker_argv")
+
+    return errors
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate all portable checked evidence bundles.")
     parser.add_argument("--catalog", type=Path, required=True)
@@ -103,7 +164,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         try:
-            result = checker.validate(_bundle_path(repo_root, bundle))
+            bundle_root = _bundle_path(repo_root, bundle)
+            for error in _validate_catalog_matches_environment(bundle, bundle_root):
+                raise ValueError(error)
+            result = checker.validate(bundle_root)
         except Exception as error:
             print(f"FAIL portable checked evidence bundle={bundle_id}: {error}", file=sys.stderr)
             return 1

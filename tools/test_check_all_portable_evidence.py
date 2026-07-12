@@ -122,6 +122,26 @@ class AllPortableEvidenceCheckerTest(unittest.TestCase):
         }
         self.assertEqual(catalog_commands, environment_commands)
 
+    def test_cli_rejects_reference_build_catalog_environment_command_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_repo = Path(tmp) / "repo"
+            shutil.copytree(REPO_ROOT / "benchmarks", temp_repo / "benchmarks")
+            catalog = temp_repo / "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml"
+            text = catalog.read_text(encoding="utf-8")
+            text = text.replace(
+                'argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1"]',
+                'argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1", "--strategy", "canonical"]',
+                1,
+            )
+            catalog.write_text(text, encoding="utf-8")
+
+            result = self.run_aggregate("--catalog", str(catalog))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("PASS portable evidence catalog bundles=4 schema=2", result.stdout)
+        self.assertIn("FAIL portable checked evidence bundle=reference-build-release", result.stderr)
+        self.assertIn("catalog checked_commands do not match environment.json worker_argv", result.stderr)
+
     def test_fair_cli_rehashed_absolute_fixture_path_fails_with_bundle_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             temp_repo = Path(tmp) / "repo"
