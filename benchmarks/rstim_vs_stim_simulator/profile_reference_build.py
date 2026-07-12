@@ -183,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
         f"batches={counters['measurement_reset_batches']} "
         f"canonical={counters['canonical_materializations']} "
         f"writebacks={counters['canonical_writebacks']} "
+        f"transposed={counters['transposed_collapse_batches']} "
+        f"pivots={counters['collapse_pivots']} "
         f"repeats={counters['expanded_repeat_iterations']} "
         f"bits={counters['measurement_bits']}"
     )
