@@ -60,6 +60,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         backend: str,
         packed: bytes | None = None,
         launched_marker: Path | None = None,
+        omit_phase_counters: bool = False,
     ) -> Path:
         if packed is None:
             packed = b"\x00" * PACKED_BYTES
@@ -79,6 +80,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 DIGEST = {REFERENCE_DIGEST!r}
                 PACKED = {packed!r}
                 LAUNCHED_MARKER = {marker_value!r}
+                OMIT_PHASE_COUNTERS = {omit_phase_counters!r}
 
                 parser = argparse.ArgumentParser()
                 parser.add_argument("--protocol", required=True)
@@ -122,7 +124,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                     if request.get("request_id") != expected_request_id:
                         raise SystemExit(f"wrong request id: {{request!r}}")
                     reference_build_count += 1
-                    print(json.dumps({{
+                    response = {{
                         "protocol": PROTOCOL,
                         "type": "reference_built",
                         "request_id": expected_request_id,
@@ -135,14 +137,25 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                         "byte_sha256": DIGEST,
                         "timer_scope": {TIMER_SCOPE!r},
                         "elapsed_ns": (3000 if args.strategy == "canonical" else 1000) + expected_request_id,
-                        "phase_counters": phase_counters,
-                    }}), flush=True)
+                    }}
+                    if not OMIT_PHASE_COUNTERS:
+                        response["phase_counters"] = phase_counters
+                    print(json.dumps(response), flush=True)
                 """
             ),
             encoding="utf-8",
         )
         path.chmod(0o755)
         return path
+
+    def _seed_baseline_summary(self, out_dir: Path) -> None:
+        out_dir.mkdir()
+        (out_dir / "summary.json").write_bytes(
+            (
+                ROOT
+                / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/baseline-summary.json"
+            ).read_bytes()
+        )
 
     def _write_stim_python_launcher(
         self,
@@ -217,13 +230,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
-            out_dir.mkdir()
-            (out_dir / "summary.json").write_bytes(
-                (
-                    ROOT
-                    / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/baseline-summary.json"
-                ).read_bytes()
-            )
+            self._seed_baseline_summary(out_dir)
 
             expected_git_commit = command_stdout(["git", "rev-parse", "HEAD"])
             expected_git_dirty = bool(command_stdout(["git", "status", "--porcelain"]))
@@ -466,6 +473,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
+            self._seed_baseline_summary(out_dir)
 
             result = self._run_runner(
                 out_dir,
@@ -476,7 +484,31 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0, result.stdout)
             self.assertIn("decoded packed bytes SHA-256", result.stderr)
-            self.assertFalse(out_dir.exists(), "runner wrote artifacts after rejecting packed bytes")
+            self.assertFalse((out_dir / "raw.jsonl").exists(), "runner wrote artifacts after rejecting packed bytes")
+
+    def test_runner_rejects_missing_rstim_phase_counters_before_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            stim_worker = self._write_fake_worker(directory, backend="stim_reference")
+            rstim_worker = self._write_fake_worker(
+                directory,
+                backend="direct_inverse_repeat_folded",
+                omit_phase_counters=True,
+            )
+            stim_python = self._write_stim_python_launcher(directory, stim_worker)
+            out_dir = directory / "out"
+            self._seed_baseline_summary(out_dir)
+
+            result = self._run_runner(
+                out_dir,
+                manifest=MANIFEST,
+                stim_python=stim_python,
+                rstim_worker=rstim_worker,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn(f"{RSTIM_CANONICAL_VARIANT} phase_counters must be present", result.stderr)
+            self.assertFalse((out_dir / "raw.jsonl").exists(), "runner wrote artifacts after missing counters")
 
     def test_runner_rejects_out_of_repository_fixture_before_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

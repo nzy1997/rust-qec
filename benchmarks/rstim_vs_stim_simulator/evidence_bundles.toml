@@ -174,7 +174,7 @@ sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_reference_build_benchmark.py"
-sha256 = "bc6bc2af9204dfbff1eb9cda4e914a2ff53d154ee2b29e3f471010da1c50a6b4"
+sha256 = "b8548cbc757937f63a842f138bf327f240a222537ca96a9c228e7a6558f5cb1c"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_reference_build.py"
@@ -229,14 +229,18 @@ sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
 role = "tool://rstim-reference-worker"
 version = "rstim 0.1.1"
 basename = "rstim_reference_build_worker"
-sha256 = "82d395176ebe76d6890bb9e747771fac46a019867287f69b0da8d6d5075e1265"
+sha256 = "13fa0814e14074db9d096c8befd3fc9e9f09d16d35e87fc0535b9462215cdf09"
 
 [[bundles.checked_commands]]
 name = "stim-reference-worker"
 argv = ["tool://stim-python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", "reference-build-v1"]
 
 [[bundles.checked_commands]]
-name = "rstim-reference-worker"
+name = "rstim-canonical-reference-worker"
+argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1", "--strategy", "canonical"]
+
+[[bundles.checked_commands]]
+name = "rstim-direct-reference-worker"
 argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1"]
 
 [[bundles.checked_provenance]]

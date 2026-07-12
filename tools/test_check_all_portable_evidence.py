@@ -102,6 +102,26 @@ class AllPortableEvidenceCheckerTest(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_reference_build_catalog_provenance_matches_environment(self) -> None:
+        provenance = importlib.import_module("benchmarks.rstim_vs_stim_simulator.portable_provenance")
+        catalog = provenance.load_catalog(CATALOG)
+        bundle = next(entry for entry in catalog["bundles"] if entry["id"] == "reference-build-release")
+        environment = json.loads(
+            (REPO_ROOT / bundle["bundle_path"] / "environment.json").read_text(encoding="utf-8")
+        )
+
+        catalog_identities = {identity["role"]: identity for identity in bundle["runtime_identities"]}
+        environment_identities = {
+            identity["role"]: identity for identity in environment["runtime_identities"]
+        }
+        self.assertEqual(catalog_identities, environment_identities)
+
+        catalog_commands = {tuple(command["argv"]) for command in bundle["checked_commands"]}
+        environment_commands = {
+            tuple(argv) for argv in environment["worker_argv"].values()
+        }
+        self.assertEqual(catalog_commands, environment_commands)
+
     def test_fair_cli_rehashed_absolute_fixture_path_fails_with_bundle_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             temp_repo = Path(tmp) / "repo"

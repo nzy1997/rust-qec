@@ -316,6 +316,12 @@ def _run_variant(
                 backend=backend,
                 request_id=round_index,
             )
+            phase_counters = response.get("phase_counters")
+            if _rstim_worker_has_phase_counters(variant):
+                if not isinstance(phase_counters, dict):
+                    raise RunnerError(f"{variant} phase_counters must be present")
+            elif phase_counters is not None and not isinstance(phase_counters, dict):
+                raise RunnerError(f"{variant} phase_counters must be an object")
             record = {
                     "protocol": PROTOCOL,
                     "variant": variant,
@@ -331,8 +337,8 @@ def _run_variant(
                     "parse_count": response["parse_count"],
                     "reference_build_count": response["reference_build_count"],
             }
-            if "phase_counters" in response:
-                record["phase_counters"] = response["phase_counters"]
+            if isinstance(phase_counters, dict):
+                record["phase_counters"] = phase_counters
             records.append(record)
         session.close()
         return records
@@ -550,6 +556,10 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
     )
     rstim_direct_command = default_rstim_worker_argv(str(args.rstim_worker))
 
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    preserve_baseline_summary(out_dir)
+
     records: list[dict[str, Any]] = []
     records.extend(
         _run_variant(
@@ -582,14 +592,11 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
         )
     )
 
-    out_dir = args.out_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "raw.jsonl").write_text(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
     summary = derive_summary(records)
-    preserve_baseline_summary(out_dir)
     (out_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
