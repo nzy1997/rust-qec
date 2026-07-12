@@ -349,6 +349,108 @@ fn packed_measurement_known_answers() {
 }
 
 #[test]
+fn public_many_measurement_and_reset_wrappers_match_expected_basis_states() {
+    let mut mz = PackedInverseTableau::identity(3);
+    mz.x_gate(0);
+    mz.x_gate(2);
+    assert_eq!(
+        mz.measure_z_many_biased(&[(0, false), (1, true), (2, false)]),
+        vec![true, true, true]
+    );
+
+    let mut mx = PackedInverseTableau::identity(3);
+    for q in 0..3 {
+        mx.h(q);
+    }
+    mx.z_gate(1);
+    assert_eq!(
+        mx.measure_x_many_biased(&[(0, false), (1, false), (2, true)]),
+        vec![false, true, true]
+    );
+
+    let mut my = PackedInverseTableau::identity(3);
+    for q in 0..3 {
+        my.h(q);
+    }
+    my.s(0);
+    my.s_dag(1);
+    my.s(2);
+    assert_eq!(
+        my.measure_y_many_biased(&[(0, false), (1, false), (2, true)]),
+        vec![false, true, true]
+    );
+
+    let mut mrz = PackedInverseTableau::identity(3);
+    mrz.x_gate(0);
+    mrz.x_gate(2);
+    assert_eq!(
+        mrz.measure_reset_z_many_biased(&[(0, false), (1, true), (2, false)]),
+        vec![true, true, true]
+    );
+    assert_eq!(
+        mrz.measure_z_many_biased(&[(0, false), (1, false), (2, false)]),
+        vec![false, false, false]
+    );
+
+    let mut mrx = PackedInverseTableau::identity(3);
+    for q in 0..3 {
+        mrx.h(q);
+    }
+    mrx.z_gate(1);
+    assert_eq!(
+        mrx.measure_reset_x_many_biased(&[(0, false), (1, false), (2, true)]),
+        vec![false, true, true]
+    );
+    assert_eq!(
+        mrx.measure_x_many_biased(&[(0, false), (1, false), (2, false)]),
+        vec![false, false, false]
+    );
+
+    let mut mry = PackedInverseTableau::identity(3);
+    for q in 0..3 {
+        mry.h(q);
+    }
+    mry.s(0);
+    mry.s_dag(1);
+    mry.s(2);
+    assert_eq!(
+        mry.measure_reset_y_many_biased(&[(0, false), (1, false), (2, true)]),
+        vec![false, true, true]
+    );
+    assert_eq!(
+        mry.measure_y_many_biased(&[(0, false), (1, false), (2, false)]),
+        vec![false, false, false]
+    );
+
+    let mut rz = PackedInverseTableau::identity(2);
+    rz.x_gate(0);
+    rz.x_gate(1);
+    rz.reset_z_many_biased(&[0, 0, 1]);
+    assert_eq!(
+        rz.measure_z_many_biased(&[(0, false), (1, false)]),
+        vec![false, false]
+    );
+
+    let mut rx = PackedInverseTableau::identity(2);
+    rx.z_gate(0);
+    rx.z_gate(1);
+    rx.reset_x_many_biased(&[0, 1, 1]);
+    assert_eq!(
+        rx.measure_x_many_biased(&[(0, false), (1, false)]),
+        vec![false, false]
+    );
+
+    let mut ry = PackedInverseTableau::identity(2);
+    ry.x_gate(0);
+    ry.x_gate(1);
+    ry.reset_y_many_biased(&[0, 1, 1]);
+    assert_eq!(
+        ry.measure_y_many_biased(&[(0, false), (1, false)]),
+        vec![false, false]
+    );
+}
+
+#[test]
 fn inverted_measurement_target_only_flips_reported_bit() {
     let (bits, snapshot) = apply_packed_circuit(1, "X 0\nMR !0\nM 0\n");
     assert_eq!(bits, vec![false, false]);

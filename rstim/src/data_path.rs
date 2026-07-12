@@ -190,14 +190,20 @@ fn packed_reference_op(
             );
         }
         "MX" => {
-            for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_x_biased_with_counters(q, inverted, counters));
-            }
+            measurements.extend(
+                tableau.measure_x_many_biased_with_counters(
+                    &qubits_with_inversion(targets)?,
+                    counters,
+                ),
+            );
         }
         "MY" => {
-            for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_y_biased_with_counters(q, inverted, counters));
-            }
+            measurements.extend(
+                tableau.measure_y_many_biased_with_counters(
+                    &qubits_with_inversion(targets)?,
+                    counters,
+                ),
+            );
         }
         "MR" | "MRZ" => {
             measurements.extend(tableau.measure_reset_z_many_biased_with_counters(
@@ -206,29 +212,25 @@ fn packed_reference_op(
             ));
         }
         "MRX" => {
-            for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements
-                    .push(tableau.measure_reset_x_biased_with_counters(q, inverted, counters));
-            }
+            measurements.extend(tableau.measure_reset_x_many_biased_with_counters(
+                &qubits_with_inversion(targets)?,
+                counters,
+            ));
         }
         "MRY" => {
-            for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements
-                    .push(tableau.measure_reset_y_biased_with_counters(q, inverted, counters));
-            }
+            measurements.extend(tableau.measure_reset_y_many_biased_with_counters(
+                &qubits_with_inversion(targets)?,
+                counters,
+            ));
         }
         "R" | "RZ" => {
             tableau.reset_z_many_biased_with_counters(&qubits(targets)?, counters);
         }
         "RX" => {
-            for q in qubits(targets)? {
-                tableau.reset_x_biased_with_counters(q, counters);
-            }
+            tableau.reset_x_many_biased_with_counters(&qubits(targets)?, counters);
         }
         "RY" => {
-            for q in qubits(targets)? {
-                tableau.reset_y_biased_with_counters(q, counters);
-            }
+            tableau.reset_y_many_biased_with_counters(&qubits(targets)?, counters);
         }
         _ => {
             return Err(SamplingFallbackReason::UnsupportedOperation(
