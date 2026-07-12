@@ -271,9 +271,13 @@ sha256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
 path = "benchmarks/rstim_vs_stim_simulator/run_frame_instruction_wide_benchmark.py"
 sha256 = "87d9a6e90e0131a4aff3723dd5844c5b2e081e590d5e2a3da8fdfbd977d9181b"
 
+[[bundles.repository_inputs]]
+path = "benchmarks/rstim_vs_stim_simulator/run_paired_frame_noise.py"
+sha256 = "960cf915b50e9795af81728b1224a4ebc87997d59395b589aed8414406674e90"
+
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "35e7d08db617afbe424ec037e7e612aa00afd3e11c77a21755d62d8ba9917ecb"
+sha256 = "68445ea45e651acbfe9b0bc5eb0f8af6f5514a3bb7a4b9a341f5a52b57fabe75"
 
 [[bundles.artifacts]]
 path = "correctness-summary.json"
@@ -281,11 +285,23 @@ sha256 = "42d4e8ae02c8787292b4b16fc0e66f79c805fb04685d64630fd1778351b57484"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "3ea74cd3685c929883441c0016c9182ca96ba8af0e305cd4ffd6ff282fa51e17"
+sha256 = "d02ebb56bf26cfb2933ed388e0ff3fb94e6d24f1c98b72668d0fa78ce36242c6"
 
 [[bundles.artifacts]]
 path = "fixture-load.json"
 sha256 = "c953d134c601568b9be1d73036ca652bb90438148adeb6c6942fca788435d27f"
+
+[[bundles.artifacts]]
+path = "paired-raw.jsonl"
+sha256 = "06836a8aa1eadb6ae2006c36902eabbe58011f07285b854e588079f5f1d13cae"
+
+[[bundles.artifacts]]
+path = "paired-report.md"
+sha256 = "729051a69af0a15904d9bb4e9e6e513e674b5a1db853c125ced965f56d6afbcf"
+
+[[bundles.artifacts]]
+path = "paired-summary.json"
+sha256 = "e550a4df8a51f8d5694069c8e23ab930facde630507baf984f753e876e549b15"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"

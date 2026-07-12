@@ -1,0 +1,81 @@
+{
+  "baseline_revision": "f10d1ed024d3519318ed244c9095724074519595",
+  "candidate_over_baseline": 0.77585118126732,
+  "candidate_revision": "1e776e284951d555ca8733c299e7c15d4febc8ac",
+  "case_id": "stim_surface_d11_r100",
+  "expected_output_bytes": 1552384,
+  "measured_record_count": 14,
+  "module": "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise",
+  "outcome": "improved",
+  "timer_scope": "process_spawn_stdout_stderr_drain_exit",
+  "variants": [
+    {
+      "elapsed_ns": {
+        "max": 19484167,
+        "mean": 19331934.57142857,
+        "median": 19351166,
+        "min": 19179291,
+        "sample_count": 7,
+        "samples": [
+          19484167,
+          19291875,
+          19189292,
+          19351166,
+          19179291,
+          19459417,
+          19368334
+        ]
+      },
+      "max_elapsed_ns": 19484167,
+      "mean_elapsed_ns": 19331934.57142857,
+      "measured_count": 7,
+      "median_elapsed_ns": 19351166,
+      "min_elapsed_ns": 19179291,
+      "stdout_sha256": [
+        "f29ef51e7b491a5edda31e16179dbdcf0410cce86c12ecb73957e7518f2c29f7",
+        "e49b575865b54c11af7ae8e7bcb086deb002f98b16a5adfea556a01dfe643073",
+        "0d4acda359a0ee56fc8aa720accef994dd30d8d5b9d24b03e2308fdd7947a29c",
+        "ebf1b8b6ff6793a4d32888bda03bd3caced8ec39768a1cdd98dc06abacba539c",
+        "375383949ef8d13e716cbdc70629dd7c93db72f8f126b4ecd85ff18a5c6aabbd",
+        "9689f574ea2910f00ed61a1126e477eba0398aa3cd647dceba1a7293c5ab4df0",
+        "518fdfbd13c7a52558d97ca9ecb4e3c75ae82af8fb23042e872b188682f6511c"
+      ],
+      "total_output_bytes": 10866688,
+      "variant": "baseline-rstim-frame-noise-b8"
+    },
+    {
+      "elapsed_ns": {
+        "max": 15164166,
+        "mean": 14983446.42857143,
+        "median": 15013625,
+        "min": 14745792,
+        "sample_count": 7,
+        "samples": [
+          14867625,
+          15013750,
+          15013625,
+          15012709,
+          15164166,
+          15066458,
+          14745792
+        ]
+      },
+      "max_elapsed_ns": 15164166,
+      "mean_elapsed_ns": 14983446.42857143,
+      "measured_count": 7,
+      "median_elapsed_ns": 15013625,
+      "min_elapsed_ns": 14745792,
+      "stdout_sha256": [
+        "6314be588285f4df03c16e888b9e0a1f219a0808afcf54152500ded9d19bd173",
+        "ddf41f04a02e9b7cc87fab2bf32e3d609af3c529159eff27c48606dfe621785b",
+        "0b099effb699fc854b95d5f065dab52b4d7c195c4dea24821e5a56556f76f33d",
+        "c7ec89b045163fb945ce6ea29f369528fcabcafae3683122cfe2c5ed1c66e376",
+        "4e5274473a1ef006e6b88836eaea4798caa908b7efacc4c85b1fac9c06defde6",
+        "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b",
+        "f5e31923515549ad333eae0cad1238003d36999281e242db73e8f9fa8007d3b2"
+      ],
+      "total_output_bytes": 10866688,
+      "variant": "candidate-rstim-frame-noise-b8"
+    }
+  ]
+}

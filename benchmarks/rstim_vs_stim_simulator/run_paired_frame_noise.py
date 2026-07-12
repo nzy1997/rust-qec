@@ -253,6 +253,14 @@ def _record_result(
     }
 
 
+def classify_candidate_ratio(ratio: float) -> str:
+    if ratio <= 0.95:
+        return "improved"
+    if ratio <= 1.05:
+        return "neutral"
+    return "regressed"
+
+
 def _summary(records: list[dict[str, Any]], *, baseline: RevisionBuild, candidate: RevisionBuild) -> dict[str, Any]:
     variants: list[dict[str, Any]] = []
     for variant in (BASELINE_VARIANT, CANDIDATE_VARIANT):
@@ -278,6 +286,9 @@ def _summary(records: list[dict[str, Any]], *, baseline: RevisionBuild, candidat
             "total_output_bytes": sum(record["actual_output_bytes"] for record in measured_records),
             "stdout_sha256": [record["stdout_sha256"] for record in measured_records],
         })
+    baseline_median = variants[0]["median_elapsed_ns"]
+    candidate_median = variants[1]["median_elapsed_ns"]
+    candidate_over_baseline = candidate_median / baseline_median
     return {
         "module": MODULE_NAME,
         "case_id": CASE_ID,
@@ -286,6 +297,8 @@ def _summary(records: list[dict[str, Any]], *, baseline: RevisionBuild, candidat
         "candidate_revision": candidate.resolved_commit,
         "expected_output_bytes": EXPECTED_OUTPUT_BYTES,
         "measured_record_count": sum(variant["measured_count"] for variant in variants),
+        "candidate_over_baseline": candidate_over_baseline,
+        "outcome": classify_candidate_ratio(candidate_over_baseline),
         "variants": variants,
     }
 
@@ -297,6 +310,8 @@ def _report(summary: dict[str, Any]) -> str:
         f"Case: `{CASE_ID}`",
         f"Timer scope: `{TIMER_SCOPE}`",
         f"Expected stdout bytes per process: `{EXPECTED_OUTPUT_BYTES}`",
+        f"Candidate over baseline: `{summary['candidate_over_baseline']}`",
+        f"Outcome: `{summary['outcome']}`",
         "",
         "| Variant | Measured runs | Median elapsed (ns) |",
         "| --- | ---: | ---: |",
