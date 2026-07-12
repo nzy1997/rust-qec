@@ -42,7 +42,10 @@ def _compiled_steady_pass_line(result: Any) -> str:
 
 
 def _reference_build_pass_line(result: Any) -> str:
-    return "PASS packed reference-build evidence"
+    return (
+        "PASS packed reference-build evidence "
+        f"variants=3 direct_speedup={result['direct_speedup']:.6f}"
+    )
 
 
 def _instruction_wide_pass_line(result: Any) -> str:

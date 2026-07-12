@@ -19,13 +19,15 @@ if str(REPO_ROOT) not in sys.path:
 from benchmarks.rstim_vs_stim_simulator import run_reference_build_benchmark as runner
 
 
-REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
+REQUIRED_FILES = ("raw.jsonl", "summary.json", "baseline-summary.json", "report.md", "environment.json", "artifact-sha256.json")
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
-VARIANTS = (runner.STIM_VARIANT, runner.RSTIM_VARIANT)
+VARIANTS = (runner.STIM_VARIANT, runner.RSTIM_CANONICAL_VARIANT, runner.RSTIM_DIRECT_VARIANT)
 BACKENDS = {
     runner.STIM_VARIANT: runner.STIM_BACKEND,
-    runner.RSTIM_VARIANT: runner.RSTIM_BACKEND,
+    runner.RSTIM_CANONICAL_VARIANT: runner.RSTIM_CANONICAL_BACKEND,
+    runner.RSTIM_DIRECT_VARIANT: runner.RSTIM_DIRECT_BACKEND,
 }
+BASELINE_SUMMARY_SHA256 = runner.BASELINE_SUMMARY_SHA256
 CANONICAL_FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
 EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
@@ -46,6 +48,18 @@ LEGACY_RUNTIME_PATH_FIELDS = frozenset(
         "rstim_worker_binary_path",
         "rstim_worker_binary_sha256",
     }
+)
+PHASE_COUNTER_KEYS = (
+    "measurement_reset_batches",
+    "canonical_materializations",
+    "canonical_writebacks",
+    "direct_inverse_batches",
+    "transposed_collapse_batches",
+    "collapse_pivots",
+    "expanded_repeat_iterations",
+    "executed_repeat_iterations",
+    "skipped_repeat_iterations",
+    "measurement_bits",
 )
 
 
@@ -124,11 +138,29 @@ def _decode_packed_base64(value: Any, variant: str, round_index: int) -> bytes:
         raise ValueError(f"{variant} round {round_index} packed_base64 is not valid base64") from error
 
 
+def _validate_phase_counters(record: dict[str, Any], variant: str) -> dict[str, int]:
+    counters = record.get("phase_counters")
+    if not isinstance(counters, dict):
+        raise ValueError(f"{variant} phase_counters must be a JSON object")
+    if set(counters) != set(PHASE_COUNTER_KEYS):
+        raise ValueError(f"{variant} phase_counters must contain the canonical key set")
+    validated: dict[str, int] = {}
+    for key in PHASE_COUNTER_KEYS:
+        value = counters[key]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"{variant} phase_counters {key} must be a nonnegative integer")
+        validated[key] = value
+    return validated
+
+
 def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
-    if len(records) != 18:
-        raise ValueError("raw.jsonl must contain exactly 18 records")
+    if len(records) != 27:
+        raise ValueError("raw.jsonl must contain exactly 27 records")
     if set(record.get("variant") for record in records) != set(VARIANTS):
-        raise ValueError("raw.jsonl variants must be stim-reference-b8 and rstim-packed-reference-b8")
+        raise ValueError(
+            "raw.jsonl variants must be stim-reference-b8, rstim-canonical-reference-b8, "
+            "and rstim-direct-repeat-reference-b8"
+        )
 
     for variant in VARIANTS:
         backend = BACKENDS[variant]
@@ -147,6 +179,29 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
             _require_equal(record.get("backend"), backend, f"{variant} backend must be {backend}")
             _require_equal(record.get("timer_scope"), runner.TIMER_SCOPE, f"{variant} timer_scope must be {runner.TIMER_SCOPE}")
             _require_int_equal(record.get("parse_count"), 1, f"{variant} parse_count")
+            if variant in {runner.RSTIM_CANONICAL_VARIANT, runner.RSTIM_DIRECT_VARIANT}:
+                counters = _validate_phase_counters(record, variant)
+                if variant == runner.RSTIM_DIRECT_VARIANT:
+                    _require_int_equal(
+                        counters["canonical_materializations"],
+                        0,
+                        "direct reference canonical_materializations",
+                    )
+                    _require_int_equal(
+                        counters["executed_repeat_iterations"],
+                        1,
+                        "direct reference executed_repeat_iterations",
+                    )
+                    _require_int_equal(
+                        counters["skipped_repeat_iterations"],
+                        98,
+                        "direct reference skipped_repeat_iterations",
+                    )
+                    _require_int_equal(
+                        counters["measurement_bits"],
+                        runner.EXPECTED_MEASUREMENT_BITS,
+                        "direct reference phase counter measurement_bits",
+                    )
             _require_int_equal(
                 record.get("measurement_bits"),
                 runner.EXPECTED_MEASUREMENT_BITS,
@@ -183,7 +238,7 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
                     f"must be integer {expected_round + 1}, got {reference_build_count!r}"
                 )
 
-    return {"variants": 2, "measured_records": 14, "final_reference_build_count": 9}
+    return {"variants": 3, "measured_records": 21, "final_reference_build_count": 9}
 
 
 def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -192,6 +247,18 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def render_report(summary: dict[str, Any]) -> str:
     return runner.render_report(summary)
+
+
+def validate_direct_speedup(summary: dict[str, Any]) -> float:
+    by_variant = {item["variant"]: item for item in summary["variants"]}
+    canonical = by_variant[runner.RSTIM_CANONICAL_VARIANT]["median_elapsed_ns"]
+    direct = by_variant[runner.RSTIM_DIRECT_VARIANT]["median_elapsed_ns"]
+    speedup = canonical / direct
+    if speedup < 2.0:
+        raise ValueError("direct reference speedup must be at least 2.0x")
+    if summary.get("direct_speedup") != round(speedup, 6):
+        raise ValueError("summary.json direct_speedup does not match variant medians")
+    return speedup
 
 
 def _resolve_recorded_path(raw: Any, field: str) -> Path:
@@ -300,24 +367,40 @@ def _verify_runtime_binary(path: Path, identity: dict[str, str]) -> None:
 def _validate_worker_argv(environment: dict[str, Any]) -> None:
     worker_argv = environment.get("worker_argv")
     if not isinstance(worker_argv, dict) or set(worker_argv) != set(VARIANTS):
-        raise ValueError("environment worker_argv must contain both reference-build variants")
+        raise ValueError("environment worker_argv must contain all reference-build variants")
     canonical_worker_argv = environment.get("canonical_worker_argv")
     if not isinstance(canonical_worker_argv, dict) or set(canonical_worker_argv) != set(VARIANTS):
-        raise ValueError("environment canonical_worker_argv must contain both reference-build variants")
+        raise ValueError("environment canonical_worker_argv must contain all reference-build variants")
 
     expected_canonical = {
         runner.STIM_VARIANT: runner.default_stim_worker_argv(STIM_PYTHON_ROLE),
-        runner.RSTIM_VARIANT: runner.default_rstim_worker_argv(RSTIM_WORKER_ROLE),
+        runner.RSTIM_CANONICAL_VARIANT: runner.default_rstim_worker_argv(
+            RSTIM_WORKER_ROLE, strategy="canonical"
+        ),
+        runner.RSTIM_DIRECT_VARIANT: runner.default_rstim_worker_argv(RSTIM_WORKER_ROLE),
     }
     if canonical_worker_argv != expected_canonical:
         raise ValueError("environment canonical_worker_argv must match release reference-build commands")
 
     stim_argv = _validate_string_list(worker_argv[runner.STIM_VARIANT], f"environment worker_argv {runner.STIM_VARIANT}")
-    rstim_argv = _validate_string_list(worker_argv[runner.RSTIM_VARIANT], f"environment worker_argv {runner.RSTIM_VARIANT}")
+    canonical_rstim_argv = _validate_string_list(
+        worker_argv[runner.RSTIM_CANONICAL_VARIANT],
+        f"environment worker_argv {runner.RSTIM_CANONICAL_VARIANT}",
+    )
+    direct_rstim_argv = _validate_string_list(
+        worker_argv[runner.RSTIM_DIRECT_VARIANT],
+        f"environment worker_argv {runner.RSTIM_DIRECT_VARIANT}",
+    )
     if stim_argv != expected_canonical[runner.STIM_VARIANT]:
         raise ValueError(f"environment worker_argv {runner.STIM_VARIANT} must run the canonical Stim worker")
-    if rstim_argv != expected_canonical[runner.RSTIM_VARIANT]:
-        raise ValueError(f"environment worker_argv {runner.RSTIM_VARIANT} must run the canonical rstim worker")
+    if canonical_rstim_argv != expected_canonical[runner.RSTIM_CANONICAL_VARIANT]:
+        raise ValueError(
+            f"environment worker_argv {runner.RSTIM_CANONICAL_VARIANT} must run the canonical rstim worker"
+        )
+    if direct_rstim_argv != expected_canonical[runner.RSTIM_DIRECT_VARIANT]:
+        raise ValueError(
+            f"environment worker_argv {runner.RSTIM_DIRECT_VARIANT} must run the direct rstim worker"
+        )
 
 def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> None:
     argv = _validate_string_list(environment.get("runner_argv"), "environment runner_argv")
@@ -396,7 +479,10 @@ def validate_environment(
 def validate_artifact_hashes(results_dir: Path) -> None:
     hashes = load_json_object(results_dir / "artifact-sha256.json", "artifact-sha256.json")
     if set(hashes) != set(ARTIFACT_FILES):
-        raise ValueError("artifact-sha256.json must map exactly raw.jsonl, summary.json, report.md, and environment.json")
+        raise ValueError(
+            "artifact-sha256.json must map exactly raw.jsonl, summary.json, baseline-summary.json, "
+            "report.md, and environment.json"
+        )
     for filename in ARTIFACT_FILES:
         digest = hashes[filename]
         if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
@@ -405,18 +491,22 @@ def validate_artifact_hashes(results_dir: Path) -> None:
             raise ValueError(f"artifact-sha256.json digest does not match {filename}")
 
 
-def validate_bundle(results_dir: Path, verify_runtime_binary: Path | None = None) -> None:
+def validate_bundle(results_dir: Path, verify_runtime_binary: Path | None = None) -> dict[str, Any]:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
     derived = validate_raw_semantics(records)
     summary = derive_summary(records)
     if load_json_object(results_dir / "summary.json", "summary.json") != summary:
         raise ValueError("summary.json does not match summary derived from raw.jsonl")
+    direct_speedup = validate_direct_speedup(summary)
     if (results_dir / "report.md").read_text(encoding="utf-8") != render_report(summary):
         raise ValueError("report.md does not match summary.json")
+    if sha256_file(results_dir / "baseline-summary.json") != BASELINE_SUMMARY_SHA256:
+        raise ValueError("baseline-summary.json SHA-256 must match preserved pre-optimization summary")
     environment = load_json_object(results_dir / "environment.json", "environment.json")
     validate_environment(environment, derived, records, results_dir, verify_runtime_binary)
     validate_artifact_hashes(results_dir)
+    return {"direct_speedup": direct_speedup}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -425,11 +515,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-runtime-binary", type=Path)
     args = parser.parse_args(argv)
     try:
-        validate_bundle(args.results_dir, args.verify_runtime_binary)
+        result = validate_bundle(args.results_dir, args.verify_runtime_binary)
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
-    print("PASS packed reference-build evidence")
+    print(f"PASS packed reference-build evidence variants=3 direct_speedup={result['direct_speedup']:.6f}")
     return 0
 
 
