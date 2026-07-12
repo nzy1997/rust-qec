@@ -5,7 +5,8 @@ use rstim::compiled::{
     SamplerPathDecision, SamplingFallbackReason, choose_sampler_path, compile_circuit,
 };
 use rstim::data_path::{
-    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample_with_decision,
+    ReferenceSampleDecision, ReferenceSampleMode, ReferenceBuildPhaseCounters,
+    build_reference_sample_with_decision,
     build_reference_sample_with_sweep_bits_and_decision,
 };
 use rstim::ir::StimInstr;
@@ -210,6 +211,52 @@ fn assert_all_false(bits: &[bool], label: &str) {
         bits.iter().all(|bit| !*bit),
         "{label}: expected every reference bit to be false"
     );
+}
+
+fn assert_zero_future_counters(counters: &ReferenceBuildPhaseCounters) {
+    assert_eq!(counters.direct_inverse_batches, 0);
+    assert_eq!(counters.transposed_collapse_batches, 0);
+}
+
+#[test]
+fn canonical_surface_fixture_reports_current_reference_phase_work() {
+    let instrs = parse_circuit(SURFACE_D11_R100);
+    let result = build_reference_sample_with_decision(&instrs).expect("reference sample builds");
+    assert_packed_reference_decision(&result.decision);
+
+    let counters = result.phase_counters;
+    assert_eq!(result.bits.len(), 12_121);
+    assert_all_false(&result.bits, "surface d11 r100 reference");
+    assert_eq!(counters.measurement_reset_batches, 103);
+    assert_eq!(counters.canonical_materializations, 103);
+    assert_eq!(counters.canonical_writebacks, 2);
+    assert_eq!(counters.expanded_repeat_iterations, 99);
+    assert_eq!(counters.measurement_bits, 12_121);
+    assert!(counters.collapse_pivots > 0);
+    assert_zero_future_counters(&counters);
+}
+
+#[test]
+fn phase_counters_distinguish_deterministic_and_collapsing_measurements() {
+    let deterministic = build_reference_sample_with_decision(&parse_circuit("X 0\nM 0\n"))
+        .expect("deterministic reference builds")
+        .phase_counters;
+    let collapsing = build_reference_sample_with_decision(&parse_circuit("H 0\nM 0\n"))
+        .expect("collapsing reference builds")
+        .phase_counters;
+
+    assert_eq!(deterministic.measurement_reset_batches, 1);
+    assert_eq!(collapsing.measurement_reset_batches, 1);
+    assert_eq!(deterministic.canonical_materializations, 1);
+    assert_eq!(collapsing.canonical_materializations, 1);
+    assert_eq!(deterministic.canonical_writebacks, 0);
+    assert_eq!(collapsing.canonical_writebacks, 1);
+    assert_eq!(deterministic.collapse_pivots, 0);
+    assert_eq!(collapsing.collapse_pivots, 1);
+    assert_eq!(deterministic.measurement_bits, 1);
+    assert_eq!(collapsing.measurement_bits, 1);
+    assert_zero_future_counters(&deterministic);
+    assert_zero_future_counters(&collapsing);
 }
 
 #[test]

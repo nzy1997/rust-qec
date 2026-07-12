@@ -7,7 +7,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use rstim::data_path::{build_reference_sample_with_decision, ReferenceSampleDecision};
+use rstim::data_path::{
+    ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision,
+};
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
 
@@ -43,6 +45,8 @@ struct BuildReferenceRequest {
     #[serde(rename = "type")]
     request_type: String,
     request_id: u64,
+    #[serde(default)]
+    include_phase_counters: bool,
 }
 
 #[derive(Serialize)]
@@ -69,6 +73,8 @@ struct ReferenceBuiltResponse {
     byte_sha256: String,
     timer_scope: &'static str,
     elapsed_ns: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    phase_counters: Option<ReferenceBuildPhaseCounters>,
 }
 
 #[derive(Serialize)]
@@ -175,6 +181,9 @@ fn handle_build_reference(
         byte_sha256: format!("{:x}", Sha256::digest(&packed)),
         timer_scope: TIMER_SCOPE,
         elapsed_ns,
+        phase_counters: request
+            .include_phase_counters
+            .then_some(reference.phase_counters),
     })
 }
 
