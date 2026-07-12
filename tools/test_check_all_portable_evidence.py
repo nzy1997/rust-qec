@@ -15,7 +15,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools" / "check_all_portable_evidence.py"
 CATALOG = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml"
-FAIR_CLI_ARTIFACTS = ("raw.jsonl", "summary.json", "report.md", "environment.json")
+FAIR_CLI_ARTIFACTS = ("raw.jsonl", "summary.json", "baseline-summary.json", "comparison.json", "report.md", "environment.json")
 FIXTURE_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 
 

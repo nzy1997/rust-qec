@@ -19,27 +19,35 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_fair_cli.py"
-sha256 = "15ea44a9c6e11a87eebc01960c2ed354aade172b49e9aae3357219459f8cb638"
+sha256 = "7e777df43bbcfc6fdfb4b8902b5166501daf150421be993910cc033ad4aec0d0"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "c20d944468004e2497fb7d060ec100f8312a12c0ab7d95a64c09e3a2a35ef877"
+sha256 = "b89abfe8f6281bca0461631feba399d3654d57e1d0d13363b28bcb53d846f3d3"
+
+[[bundles.artifacts]]
+path = "baseline-summary.json"
+sha256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+
+[[bundles.artifacts]]
+path = "comparison.json"
+sha256 = "292adb577ef28eec7df0bc5ed4169dacb2d9e8afee1e572f7e52b81aaef5ffca"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "0cd74dcf0c6aeb0e900b1b3c573d5f9bcbcd281548d92782964f40a033e8c867"
+sha256 = "e01fa8211fd049690fd5d45bd64cce24927586e0ad301d6fde159b71b43a3ff7"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"
-sha256 = "0687869e8af780fcfa95b77e3d0a65448fb29e6e36920c4739f6783b7f90df34"
+sha256 = "715634316bb0c35dbc60edcae2b39609f6e7707243c2c9b32007f00ab2e89328"
 
 [[bundles.artifacts]]
 path = "report.md"
-sha256 = "1b28385ccf1523fac930feb4dc11542751884bdf99416e98815e0591d1960e51"
+sha256 = "418e9c31512fff818792da289de12f571877c69957ec0ec7872d771e603728a9"
 
 [[bundles.artifacts]]
 path = "summary.json"
-sha256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+sha256 = "dc048a0882ed577d38915df5d1b18cd078050245d68117da456bfff5262c7297"
 
 [[bundles.logical_executables]]
 role = "tool://stim"
@@ -57,7 +65,7 @@ sha256 = "e7f31b9ac1780080161b3992e70644ade97dbe97369a9464997645c437a29323"
 role = "tool://rstim"
 version = "rstim 0.1.1"
 basename = "rstim"
-sha256 = "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a"
+sha256 = "cae438197a15395cb397141a75d8a593b6ed502ffe6d8b7e0f548eea7f20a429"
 
 [[bundles.checked_commands]]
 name = "stim-cli-b8"

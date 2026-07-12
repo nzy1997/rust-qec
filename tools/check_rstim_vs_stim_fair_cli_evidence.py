@@ -16,8 +16,23 @@ if str(REPO_ROOT) not in sys.path:
 from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_fair_cli
 
 
-REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
+REQUIRED_FILES = (
+    "raw.jsonl",
+    "summary.json",
+    "baseline-summary.json",
+    "comparison.json",
+    "report.md",
+    "environment.json",
+    "artifact-sha256.json",
+)
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
+BASELINE_SUMMARY_SHA256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+BASELINE_RATIO = 3.576
+REFERENCE_SUMMARY_REPO_PATH = run_fair_cli.REFERENCE_SUMMARY_REPO_PATH
+REFERENCE_VARIANT = run_fair_cli.REFERENCE_VARIANT
+REFERENCE_STRATEGY = run_fair_cli.REFERENCE_STRATEGY
+REFERENCE_CHECKER = run_fair_cli.REFERENCE_CHECKER
+PARITY_WORD_RE = re.compile(r"\bparity\b", re.IGNORECASE)
 VARIANTS = ("stim-cli-b8", "rstim-cli-b8")
 CANONICAL_FAIR_MANIFEST_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 CANONICAL_SOURCE_MANIFEST_PATH = fair_cli_contract.EXPECTED_CASE["source_manifest_path"]
@@ -43,7 +58,7 @@ EXPECTED_RUNTIME_IDENTITIES = (
         "role": "tool://rstim",
         "version": "rstim 0.1.1",
         "basename": "rstim",
-        "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+        "sha256": "cae438197a15395cb397141a75d8a593b6ed502ffe6d8b7e0f548eea7f20a429",
     },
 )
 LIVE_RUNTIME_PATH_FIELDS = frozenset(
@@ -204,8 +219,107 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return run_fair_cli._summary(records, case=fair_cli_contract.EXPECTED_CASE)
 
 
-def render_report(summary: dict[str, Any]) -> str:
-    return run_fair_cli._render_report(summary)
+def render_report(summary: dict[str, Any], comparison: dict[str, Any]) -> str:
+    return run_fair_cli._render_report(summary, comparison)
+
+
+def _summary_baseline_reuse_key(summary: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(summary)
+    variants = summary.get("variants")
+    if isinstance(variants, list):
+        normalized["variants"] = sorted(
+            variants,
+            key=lambda item: item.get("variant", "") if isinstance(item, dict) else "",
+        )
+    return normalized
+
+
+def validate_baseline_and_candidate(results_dir: Path, candidate_summary: dict[str, Any]) -> dict[str, Any]:
+    baseline_path = results_dir / "baseline-summary.json"
+    if sha256_file(baseline_path) != BASELINE_SUMMARY_SHA256:
+        raise ValueError("baseline-summary.json SHA-256 must match pinned pre-optimization summary")
+    if sha256_file(results_dir / "summary.json") == BASELINE_SUMMARY_SHA256:
+        raise ValueError("candidate summary must differ from pinned baseline summary")
+    baseline = load_json_object(baseline_path, "baseline-summary.json")
+    if _summary_baseline_reuse_key(candidate_summary) == _summary_baseline_reuse_key(baseline):
+        raise ValueError("candidate summary must differ from pinned baseline summary")
+    if run_fair_cli._rounded_ratio(run_fair_cli._rstim_over_stim(baseline)) != BASELINE_RATIO:
+        raise ValueError("baseline_rstim_over_stim must be 3.576")
+    return baseline
+
+
+def validate_reference_evidence(reference_evidence: object) -> dict[str, str]:
+    if not isinstance(reference_evidence, dict):
+        raise ValueError("environment reference_evidence must be an object")
+    expected = {
+        "slot": "reference-build-release",
+        "summary_path": REFERENCE_SUMMARY_REPO_PATH,
+        "reference_variant": REFERENCE_VARIANT,
+        "reference_strategy": REFERENCE_STRATEGY,
+        "checker": REFERENCE_CHECKER,
+    }
+    for field, value in expected.items():
+        require_equal(
+            reference_evidence.get(field),
+            value,
+            f"environment reference_evidence {field} must be {value}",
+        )
+    if contains_host_absolute_path(reference_evidence):
+        raise ValueError("environment reference_evidence contains a host-absolute path")
+    digest = reference_evidence.get("summary_sha256")
+    if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+        raise ValueError("environment reference_evidence summary_sha256 must be a lowercase SHA-256 digest")
+    reference_path = REPO_ROOT / REFERENCE_SUMMARY_REPO_PATH
+    if sha256_file(reference_path) != digest:
+        raise ValueError("reference_evidence summary_sha256 does not match reference summary")
+    reference_summary = load_json_object(reference_path, "reference summary")
+    direct = next(
+        (
+            item
+            for item in reference_summary.get("variants", [])
+            if isinstance(item, dict) and item.get("variant") == REFERENCE_VARIANT
+        ),
+        None,
+    )
+    if direct is None or direct.get("backend") != REFERENCE_STRATEGY:
+        raise ValueError("reference summary must record direct_inverse_repeat_folded strategy")
+    return {key: str(value) for key, value in reference_evidence.items()}
+
+
+def validate_comparison(
+    results_dir: Path,
+    baseline_summary: dict[str, Any],
+    candidate_summary: dict[str, Any],
+    reference_evidence: dict[str, str],
+) -> dict[str, Any]:
+    expected = run_fair_cli._comparison(baseline_summary, candidate_summary, reference_evidence)
+    actual = load_json_object(results_dir / "comparison.json", "comparison.json")
+    if actual != expected:
+        raise ValueError("comparison.json does not match comparison derived from baseline and candidate summaries")
+    if actual["baseline_rstim_over_stim"] != BASELINE_RATIO:
+        raise ValueError("comparison.json baseline_rstim_over_stim must be 3.576")
+    if actual["reference_strategy"] != REFERENCE_STRATEGY:
+        raise ValueError("comparison.json reference_strategy must be direct_inverse_repeat_folded")
+    return actual
+
+
+def _string_values(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [item for entry in value for item in _string_values(entry)]
+    if isinstance(value, dict):
+        return [item for entry in value.values() for item in _string_values(entry)]
+    return []
+
+
+def validate_no_unsupported_parity_claim(report_text: str, comparison: dict[str, Any]) -> None:
+    candidate_ratio = comparison["candidate_rstim_over_stim"]
+    if candidate_ratio <= 1.0:
+        return
+    checked_text = [report_text, *_string_values(comparison)]
+    if any(PARITY_WORD_RE.search(text) for text in checked_text):
+        raise ValueError("unsupported parity claim while candidate ratio exceeds 1.0")
 
 
 def _resolve_recorded_path(raw: object, label: str) -> Path:
@@ -269,7 +383,7 @@ def _validate_preflight_detail(variant: str, detail: dict[str, Any]) -> None:
         raise ValueError(f"{variant} known-answer preflight elapsed_ns must be a nonnegative integer")
 
 
-def validate_environment(environment: dict[str, Any], records: list[dict[str, Any]]) -> None:
+def validate_environment(environment: dict[str, Any], records: list[dict[str, Any]]) -> dict[str, str]:
     required_nonempty = ("git_commit", "os", "cpu_model", "rstim_version", "rustc_version")
     for field in required_nonempty:
         if not isinstance(environment.get(field), str) or not environment[field]:
@@ -337,6 +451,7 @@ def validate_environment(environment: dict[str, Any], records: list[dict[str, An
         _validate_preflight_detail(variant, by_variant[variant])
 
     require_equal(environment.get("timer_scope"), case["timer_scope"], "environment timer_scope must match case")
+    return validate_reference_evidence(environment.get("reference_evidence"))
 
 
 def validate_historical_separation(summary_path: Path) -> None:
@@ -349,7 +464,10 @@ def validate_historical_separation(summary_path: Path) -> None:
 def validate_artifact_hashes(results_dir: Path) -> None:
     hashes = load_json_object(results_dir / "artifact-sha256.json", "artifact-sha256.json")
     if set(hashes) != set(ARTIFACT_FILES):
-        raise ValueError("artifact-sha256.json must map exactly raw.jsonl, summary.json, report.md, and environment.json")
+        raise ValueError(
+            "artifact-sha256.json must map exactly raw.jsonl, summary.json, baseline-summary.json, "
+            "comparison.json, report.md, and environment.json"
+        )
     for filename in ARTIFACT_FILES:
         digest = hashes[filename]
         if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
@@ -358,20 +476,30 @@ def validate_artifact_hashes(results_dir: Path) -> None:
             raise ValueError(f"artifact-sha256.json digest does not match {filename}")
 
 
-def validate_bundle(results_dir: Path) -> tuple[int, int]:
+def validate_bundle(results_dir: Path) -> dict[str, Any]:
     validate_required_files(results_dir)
     environment = load_json_object(results_dir / "environment.json", "environment.json")
     records = load_raw_records(results_dir / "raw.jsonl")
     validate_raw_semantics(records)
     summary = derive_summary(records)
+    baseline_summary = validate_baseline_and_candidate(results_dir, summary)
     if load_json_object(results_dir / "summary.json", "summary.json") != summary:
         raise ValueError("summary.json does not match summary derived from raw.jsonl")
-    if (results_dir / "report.md").read_text(encoding="utf-8") != render_report(summary):
+    reference_evidence = validate_environment(environment, records)
+    comparison = validate_comparison(results_dir, baseline_summary, summary, reference_evidence)
+    report_text = (results_dir / "report.md").read_text(encoding="utf-8")
+    validate_no_unsupported_parity_claim(report_text, comparison)
+    if report_text != render_report(summary, comparison):
         raise ValueError("report.md does not match report derived from raw.jsonl")
-    validate_environment(environment, records)
     validate_historical_separation(results_dir / "summary.json")
     validate_artifact_hashes(results_dir)
-    return len(VARIANTS), summary["measured_record_count"]
+    return {
+        "variants": len(VARIANTS),
+        "measured": summary["measured_record_count"],
+        "baseline_rstim_over_stim": comparison["baseline_rstim_over_stim"],
+        "candidate_rstim_over_stim": comparison["candidate_rstim_over_stim"],
+        "reference_strategy": comparison["reference_strategy"],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -379,11 +507,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dir", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
-        variants, measured = validate_bundle(args.dir)
+        result = validate_bundle(args.dir)
     except Exception as error:
         print(str(error), file=sys.stderr)
         return 1
-    print(f"PASS fair CLI sampling evidence variants={variants} measured={measured}")
+    print(f"PASS fair CLI sampling evidence variants={result['variants']} measured={result['measured']}")
     return 0
 
 

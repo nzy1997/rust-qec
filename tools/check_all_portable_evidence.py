@@ -33,8 +33,7 @@ class BundleChecker:
 
 
 def _fair_cli_pass_line(result: Any) -> str:
-    variants, measured = result
-    return f"PASS fair CLI sampling evidence variants={variants} measured={measured}"
+    return f"PASS fair CLI sampling evidence variants={result['variants']} measured={result['measured']}"
 
 
 def _compiled_steady_pass_line(result: Any) -> str:

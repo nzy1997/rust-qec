@@ -5,7 +5,7 @@
   "fixture": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
-  "git_commit": "6965374417bf946b4ab42914e19169e351a07c4e",
+  "git_commit": "e66e5b8fa50a5af2cb0947338ef59b5b6954bedf",
   "known_answer_preflight": "passed",
   "known_answer_preflight_details": [
     {
@@ -21,7 +21,7 @@
         "--in",
         "artifact://known-answer-preflight.stim"
       ],
-      "elapsed_ns": 19569333,
+      "elapsed_ns": 49308083,
       "exit_code": 0,
       "stdout_hex": "01",
       "stdout_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
@@ -40,7 +40,7 @@
         "--in",
         "artifact://known-answer-preflight.stim"
       ],
-      "elapsed_ns": 2816542,
+      "elapsed_ns": 3587292,
       "exit_code": 0,
       "stdout_hex": "01",
       "stdout_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
@@ -52,6 +52,14 @@
   "measure_rounds": 7,
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
+  "reference_evidence": {
+    "checker": "tools/check_rstim_vs_stim_reference_build_evidence.py",
+    "reference_strategy": "direct_inverse_repeat_folded",
+    "reference_variant": "rstim-direct-repeat-reference-b8",
+    "slot": "reference-build-release",
+    "summary_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json",
+    "summary_sha256": "b0e02c0ac11c7f06544215c7de54f03948e81166b74b9cc5805b2e427f6d2c1f"
+  },
   "round_argv": [
     {
       "argv": [
@@ -389,7 +397,7 @@
     {
       "basename": "rstim",
       "role": "tool://rstim",
-      "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+      "sha256": "cae438197a15395cb397141a75d8a593b6ed502ffe6d8b7e0f548eea7f20a429",
       "version": "rstim 0.1.1"
     }
   ],

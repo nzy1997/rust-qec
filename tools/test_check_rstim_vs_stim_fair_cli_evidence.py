@@ -14,7 +14,16 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_fair_cli
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools" / "check_rstim_vs_stim_fair_cli_evidence.py"
-REQUIRED_ARTIFACTS = ("raw.jsonl", "summary.json", "report.md", "environment.json")
+REQUIRED_ARTIFACTS = (
+    "raw.jsonl",
+    "summary.json",
+    "baseline-summary.json",
+    "comparison.json",
+    "report.md",
+    "environment.json",
+)
+BASELINE_SUMMARY_SHA256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+REFERENCE_SUMMARY = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json"
 FIXTURE_REPO_PATH = fair_cli_contract.EXPECTED_CASE["canonical_input_path"]
 KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
 TOOL_ROLES = {
@@ -117,7 +126,17 @@ def write_valid_bundle(path: Path) -> None:
     (path / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (path / "report.md").write_text(run_fair_cli._render_report(summary), encoding="utf-8")
+    baseline_source = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/baseline-summary.json"
+    if not baseline_source.exists():
+        baseline_source = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/summary.json"
+    (path / "baseline-summary.json").write_bytes(baseline_source.read_bytes())
+    baseline_summary = json.loads((path / "baseline-summary.json").read_text(encoding="utf-8"))
+    reference_evidence = run_fair_cli._reference_evidence(repo_root=REPO_ROOT)
+    comparison = run_fair_cli._comparison(baseline_summary, summary, reference_evidence)
+    (path / "comparison.json").write_text(
+        json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (path / "report.md").write_text(run_fair_cli._render_report(summary, comparison), encoding="utf-8")
     environment = {
         "git_commit": "test-commit",
         "os": "test-os",
@@ -149,7 +168,7 @@ def write_valid_bundle(path: Path) -> None:
                 "role": "tool://rstim",
                 "version": "rstim 0.1.1",
                 "basename": "rstim",
-                "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+                "sha256": "cae438197a15395cb397141a75d8a593b6ed502ffe6d8b7e0f548eea7f20a429",
             },
         ],
         "round_argv": [
@@ -170,6 +189,7 @@ def write_valid_bundle(path: Path) -> None:
             }
             for variant in ("stim-cli-b8", "rstim-cli-b8")
         ],
+        "reference_evidence": reference_evidence,
     }
     (path / "environment.json").write_text(
         json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -198,6 +218,109 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual("PASS fair CLI sampling evidence variants=2 measured=14\n", result.stdout)
+
+    def test_committed_bundle_records_comparison_details(self) -> None:
+        checker = __import__("tools.check_rstim_vs_stim_fair_cli_evidence", fromlist=["validate_bundle"])
+        result = checker.validate_bundle(REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release")
+        self.assertEqual(result["baseline_rstim_over_stim"], 3.576)
+        self.assertIsInstance(result["candidate_rstim_over_stim"], float)
+        self.assertEqual(result["reference_strategy"], "direct_inverse_repeat_folded")
+
+    def test_rejects_candidate_summary_reused_from_baseline(self) -> None:
+        (self.bundle / "summary.json").write_bytes((self.bundle / "baseline-summary.json").read_bytes())
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
+
+    def test_rejects_reformatted_candidate_summary_reused_from_baseline(self) -> None:
+        baseline = json.loads((self.bundle / "baseline-summary.json").read_text(encoding="utf-8"))
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        by_variant = {variant["variant"]: variant for variant in baseline["variants"]}
+        for record in records:
+            if record["phase"] != "measured":
+                continue
+            variant = by_variant[record["variant"]]
+            index = record["round_index"]
+            record["elapsed_ns"] = variant["elapsed_ns"]["samples"][index]
+            record["stdout_sha256"] = variant["stdout_sha256"][index]
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+        (self.bundle / "summary.json").write_text(json.dumps(baseline) + "\n", encoding="utf-8")
+        self.assertNotEqual(sha256_file(self.bundle / "summary.json"), BASELINE_SUMMARY_SHA256)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
+
+    def test_rejects_reordered_candidate_summary_reused_from_baseline(self) -> None:
+        baseline = json.loads((self.bundle / "baseline-summary.json").read_text(encoding="utf-8"))
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        by_variant = {variant["variant"]: variant for variant in baseline["variants"]}
+        for record in records:
+            if record["phase"] != "measured":
+                continue
+            variant = by_variant[record["variant"]]
+            index = record["round_index"]
+            record["elapsed_ns"] = variant["elapsed_ns"]["samples"][index]
+            record["stdout_sha256"] = variant["stdout_sha256"][index]
+        records = [record for record in records if record["variant"] == "rstim-cli-b8"] + [
+            record for record in records if record["variant"] == "stim-cli-b8"
+        ]
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+        summary = run_fair_cli._summary(records, case=fair_cli_contract.EXPECTED_CASE)
+        self.assertEqual([variant["variant"] for variant in summary["variants"]], ["rstim-cli-b8", "stim-cli-b8"])
+        self.assertNotEqual(summary, baseline)
+        (self.bundle / "summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        reference_evidence = run_fair_cli._reference_evidence(repo_root=REPO_ROOT)
+        comparison = run_fair_cli._comparison(baseline, summary, reference_evidence)
+        (self.bundle / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (self.bundle / "report.md").write_text(run_fair_cli._render_report(summary, comparison), encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
+
+    def test_rejects_mismatched_reference_evidence_hash(self) -> None:
+        def break_reference_hash(environment: dict[str, Any]) -> None:
+            environment["reference_evidence"]["summary_sha256"] = "0" * 64
+
+        rewrite_json(self.bundle / "environment.json", break_reference_hash)
+        comparison = json.loads((self.bundle / "comparison.json").read_text(encoding="utf-8"))
+        comparison["reference_summary_sha256"] = "0" * 64
+        (self.bundle / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("reference_evidence summary_sha256 does not match reference summary", result.stderr)
+
+    def test_rejects_unsupported_parity_wording_when_ratio_exceeds_one(self) -> None:
+        report = (self.bundle / "report.md").read_text(encoding="utf-8") + "\nThis candidate reaches parity with Stim.\n"
+        (self.bundle / "report.md").write_text(report, encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("unsupported parity claim while candidate ratio exceeds 1.0", result.stderr)
+
+    def test_rejects_comparison_not_derived_from_candidate(self) -> None:
+        comparison = json.loads((self.bundle / "comparison.json").read_text(encoding="utf-8"))
+        comparison["baseline_rstim_over_stim"] = 9.999
+        (self.bundle / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("comparison.json does not match comparison derived from baseline and candidate summaries", result.stderr)
 
     def test_rejects_raw_semantic_error_before_artifact_hashes(self) -> None:
         records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
@@ -426,7 +549,13 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         (self.bundle / "summary.json").write_text(
             json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        (self.bundle / "report.md").write_text(run_fair_cli._render_report(summary), encoding="utf-8")
+        baseline_summary = json.loads((self.bundle / "baseline-summary.json").read_text(encoding="utf-8"))
+        reference_evidence = run_fair_cli._reference_evidence(repo_root=REPO_ROOT)
+        comparison = run_fair_cli._comparison(baseline_summary, summary, reference_evidence)
+        (self.bundle / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (self.bundle / "report.md").write_text(run_fair_cli._render_report(summary, comparison), encoding="utf-8")
         rewrite_artifact_hashes(self.bundle)
 
         regenerated_result = self.run_checker()
