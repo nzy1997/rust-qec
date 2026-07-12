@@ -147,6 +147,39 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
             self.assertIn("not ready", result.stderr)
             self.assertIn("Operational sampler-performance milestone closure", result.stderr)
 
+    def test_mocked_closed_github_milestone_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            github_json = Path(tmp) / "issues.json"
+            github_json.write_text(
+                json.dumps(
+                    [
+                        {
+                            "number": 999,
+                            "title": "Completed sampler-performance milestone closure",
+                            "state": "CLOSED",
+                            "milestone": {"title": "M4: Measured Optimization Closure"},
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            out = Path(tmp) / "readiness.json"
+
+            result = self.run_checker(
+                "--catalog",
+                str(CATALOG),
+                "--out",
+                str(out),
+                "--verify-github",
+                "nzy1997/rstim",
+                "--github-json",
+                str(github_json),
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, PASS_LINE)
+            self.assertEqual(json.loads(out.read_text(encoding="utf-8"))["issues"]["milestone"]["status"], "closed")
+
 
 if __name__ == "__main__":
     unittest.main()

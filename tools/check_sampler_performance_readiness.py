@@ -236,7 +236,10 @@ def build_readiness(catalog_path: Path, verify_github: str | None = None, github
 
         issues: dict[str, object] = {"status": "not_checked", "open": []}
         if verify_github is not None:
-            open_issues = read_github_issues(verify_github, github_json)
+            open_issues = [
+                issue for issue in read_github_issues(verify_github, github_json)
+                if str(issue.get("state", "")).upper() == "OPEN"
+            ]
             if open_issues:
                 titles = ", ".join(str(issue.get("title", issue.get("number", "unknown"))) for issue in open_issues)
                 raise ReadinessError(f"not ready: open sampler-performance milestone issues: {titles}")
