@@ -32,3 +32,4 @@ pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnost
 
 #[doc(hidden)]
 pub mod rare_error_iterator;
+pub mod reference_sample_tree;
