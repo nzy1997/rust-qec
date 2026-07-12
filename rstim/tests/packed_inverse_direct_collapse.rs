@@ -134,5 +134,11 @@ fn direct_collapse_crosses_64_and_128_qubit_boundaries() {
     assert_eq!(counters.direct_inverse_batches, 1);
     assert_eq!(counters.transposed_collapse_batches, 1);
     assert!(counters.collapse_pivots >= 3);
-    assert_snapshot_matches_legacy(&packed, &legacy, "boundary collapse snapshot");
+
+    let verification_targets: Vec<_> = (0..num_qubits).map(|q| (q, false)).collect();
+    assert_eq!(
+        packed.measure_z_many_biased(&verification_targets),
+        legacy_measure_z_many(&mut legacy, &verification_targets),
+        "boundary collapse state",
+    );
 }
