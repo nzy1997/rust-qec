@@ -26,9 +26,10 @@ the Superpowers gates:
 - Visual companion: not used because the task is backend Rust sampling logic.
 - Clarifying questions: answered from issue #489, merged #488 context, and
   existing packed-reference telemetry tests.
-- Recommended approach: detect exact packed-tableau cycles at repeat-loop
-  boundaries, store produced period output in `ReferenceSampleTree`, and
-  decompress to the existing flat `Vec<bool>` API at the end.
+- Recommended approach: detect exact canonical stabilizer-state cycles derived
+  from the packed inverse tableau at repeat-loop boundaries, store produced
+  period output in `ReferenceSampleTree`, and decompress to the existing flat
+  `Vec<bool>` API at the end.
 - Design approval: accepted automatically because the issue gives exact
   interface rules, required tests, verification commands, and out-of-scope
   constraints.
@@ -42,14 +43,15 @@ the Superpowers gates:
    alternates quantum state, so bit-only folding would incorrectly leave the
    final measurement at `0`.
 2. Add a hash-only repeat detector for speed. This is rejected because the
-   issue requires exact packed inverse-tableau equality after any hash
-   acceleration; the first implementation can use direct equality on cloned
-   packed tableaus.
-3. Detect exact packed inverse-tableau states at loop boundaries and compress
-   the matched period's measurement output in `ReferenceSampleTree`. This is
-   chosen because it preserves existing packed-path fallback rules, catches
-   period-one and period-two loops, supports nested repeats through recursion,
-   and still returns the existing flat `Vec<bool>`.
+   issue requires exact state equality after any hash acceleration; the first
+   implementation can use direct equality on canonicalized state keys.
+3. Detect exact canonical stabilizer states materialized from the packed
+   inverse tableau at loop boundaries and compress the matched period's
+   measurement output in `ReferenceSampleTree`. This is chosen because it
+   preserves existing packed-path fallback rules, catches period-one and
+   period-two loops, supports nested repeats through recursion, ignores
+   destabilizer bookkeeping that does not change the quantum state after
+   reset-heavy rounds, and still returns the existing flat `Vec<bool>`.
 
 ## Chosen Design
 
@@ -71,10 +73,10 @@ Packed instruction execution will use an accumulator tree:
 Repeats with `count < 10` execute exactly as before. Their body is run once per
 logical iteration, and no skipping is attempted.
 
-Repeats with `count >= 10` record exact `PackedInverseTableau` clones at loop
-boundaries. Each executed iteration appends the recursively built body output
-to the repeat tree, then compares the current tableau to every previously seen
-boundary state. On the first exact match:
+Repeats with `count >= 10` record exact reduced stabilizer bases derived from
+the packed inverse tableau at loop boundaries. Each executed iteration appends
+the recursively built body output to the repeat tree, then compares the current
+boundary key to every previously seen boundary key. On the first exact match:
 
 1. The period starts at the previous matching iteration and ends at the current
    iteration.
@@ -85,8 +87,8 @@ boundary state. On the first exact match:
 4. Any leftover remainder iterations execute normally.
 
 This handles period-one, period-two, and transient-prefix cycles without
-hashing. Because state equality is on `PackedInverseTableau`, body output alone
-cannot cause a fold.
+hashing. Because equality is on the canonical stabilizer state, body output
+alone cannot cause a fold.
 
 ## Telemetry
 

@@ -2,16 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Detect exact packed-tableau repeat cycles during reference sampling, compress repeated output with `ReferenceSampleTree`, and still return the existing flat `Vec<bool>`.
+**Goal:** Detect exact packed-tableau-derived repeat cycles during reference sampling, compress repeated output with `ReferenceSampleTree`, and still return the existing flat `Vec<bool>`.
 
-**Architecture:** Change the packed reference builder from direct flat accumulation to tree accumulation plus final decompression. Long repeats record exact cloned `PackedInverseTableau` loop-boundary states, wrap detected period output in `ReferenceSampleTree`, skip whole cycles, and execute any remainder normally.
+**Architecture:** Change the packed reference builder from direct flat accumulation to tree accumulation plus final decompression. Long repeats record exact reduced stabilizer-state keys derived from the packed inverse tableau at loop boundaries, wrap detected period output in `ReferenceSampleTree`, skip whole cycles, and execute any remainder normally.
 
 **Tech Stack:** Rust 2024 Cargo workspace, `rstim` integration tests, existing `ReferenceSampleTree`, existing Python `profile_reference_build.py`, no new dependencies.
 
 ## Global Constraints
 
 - Repeats below 10 execute normally and must not skip iterations.
-- Longer supported repeats compare exact packed inverse-tableau state at loop boundaries; any hash acceleration must be followed by exact equality.
+- Longer supported repeats compare exact canonical stabilizer state derived from the packed inverse tableau at loop boundaries; any hash acceleration must be followed by exact equality.
 - Measurement output for the detected period is stored in `ReferenceSampleTree` and decompressed only at the final flat `Vec<bool>` API boundary.
 - Nested supported repeats fold recursively.
 - Existing packed-path fallback rules remain unchanged.
@@ -159,11 +159,11 @@ change `DEFAULT_COUNTERS` to include:
 Change the pass-line assertion to:
 
 ```python
-"PASS reference phase profile batches=103 canonical=0 transposed=2 pivots=120 executed_repeats=1 skipped_repeats=98 bits=12121"
+"PASS reference phase profile batches=5 canonical=0 transposed=2 pivots=120 executed_repeats=1 skipped_repeats=98 bits=12121"
 ```
 
-The fake worker keeps `measurement_reset_batches=103` because this unit test
-only validates formatting and schema, not the real surface fixture.
+The fake worker uses the folded surface counters so this unit test validates
+the same pass line required by the issue.
 
 - [ ] **Step 3: Run red tests**
 
@@ -186,7 +186,7 @@ schema does not validate or print the new fields.
 - Modify: `rstim/tests/rstim_reference_build_worker.rs`
 
 **Interfaces:**
-- Consumes: `ReferenceSampleTree` from #488 and `PackedInverseTableau: Clone + PartialEq + Eq`.
+- Consumes: `ReferenceSampleTree` from #488 and canonical snapshots from `PackedInverseTableau`.
 - Produces: packed-reference construction that skips long exact cycles and exposes new serialized counter fields.
 
 - [ ] **Step 1: Add counter fields and helper functions**
@@ -311,7 +311,7 @@ fn packed_reference_repeat(
         suffix_children: Vec::new(),
         repetitions: 1,
     };
-    let mut seen = vec![(tableau.clone(), 0_u64, 0_usize)];
+    let mut seen = vec![(repeat_boundary_state(tableau), 0_u64, 0_usize)];
     let mut iteration = 0_u64;
 
     while iteration < count {
@@ -320,8 +320,11 @@ fn packed_reference_repeat(
         append_tree_child(&mut tree, child);
         iteration += 1;
 
-        if let Some((_, previous_iteration, child_start)) =
-            seen.iter().find(|(state, _, _)| state == tableau).cloned()
+        let current_state = repeat_boundary_state(tableau);
+        if let Some((previous_iteration, child_start)) = seen
+            .iter()
+            .find(|(state, _, _)| state == &current_state)
+            .map(|(_, previous_iteration, child_start)| (*previous_iteration, *child_start))
         {
             let period = iteration - previous_iteration;
             let remaining = count - iteration;
@@ -346,7 +349,7 @@ fn packed_reference_repeat(
             break;
         }
 
-        seen.push((tableau.clone(), iteration, tree.suffix_children.len()));
+        seen.push((current_state, iteration, tree.suffix_children.len()));
     }
 
     while iteration < count {

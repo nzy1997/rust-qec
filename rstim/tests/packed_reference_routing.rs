@@ -221,13 +221,15 @@ fn canonical_surface_fixture_reports_current_reference_phase_work() {
     let counters = result.phase_counters;
     assert_eq!(result.bits.len(), 12_121);
     assert_all_false(&result.bits, "surface d11 r100 reference");
-    assert_eq!(counters.measurement_reset_batches, 103);
+    assert_eq!(counters.measurement_reset_batches, 5);
     assert_eq!(counters.canonical_materializations, 0);
     assert_eq!(counters.canonical_writebacks, 0);
-    assert_eq!(counters.direct_inverse_batches, 103);
+    assert_eq!(counters.direct_inverse_batches, 5);
     assert_eq!(counters.transposed_collapse_batches, 2);
     assert_eq!(counters.collapse_pivots, 120);
     assert_eq!(counters.expanded_repeat_iterations, 99);
+    assert_eq!(counters.executed_repeat_iterations, 1);
+    assert_eq!(counters.skipped_repeat_iterations, 98);
     assert_eq!(counters.measurement_bits, 12_121);
 }
 
@@ -279,7 +281,11 @@ fn supported_pauli_resets_use_direct_inverse_collapse_and_preserve_duplicates() 
 
     for (circuit, expected_bits, expected_batches) in [
         ("X 0 1\nMR 0 1\nM 0 1\n", vec![true, true, false, false], 2),
-        ("H 0 1\nZ 0 1\nMRX 0 1\nMX 0 1\n", vec![true, true, false, false], 2),
+        (
+            "H 0 1\nZ 0 1\nMRX 0 1\nMX 0 1\n",
+            vec![true, true, false, false],
+            2,
+        ),
         (
             "H 0 1\nS_DAG 0 1\nMRY 0 1\nMY 0 1\n",
             vec![true, true, false, false],
@@ -287,11 +293,7 @@ fn supported_pauli_resets_use_direct_inverse_collapse_and_preserve_duplicates() 
         ),
         ("X 0 1\nR 0 1\nM 0 1\n", vec![false, false], 2),
         ("H 0 1\nZ 0 1\nRX 0 1\nMX 0 1\n", vec![false, false], 2),
-        (
-            "H 0 1\nS_DAG 0 1\nRY 0 1\nMY 0 1\n",
-            vec![false, false],
-            2,
-        ),
+        ("H 0 1\nS_DAG 0 1\nRY 0 1\nMY 0 1\n", vec![false, false], 2),
     ] {
         let result = build_reference_sample_with_decision(&parse_circuit(circuit))
             .expect("reference sample builds");
@@ -299,7 +301,10 @@ fn supported_pauli_resets_use_direct_inverse_collapse_and_preserve_duplicates() 
         assert_eq!(result.bits, expected_bits, "circuit:\n{circuit}");
         assert_eq!(result.phase_counters.canonical_materializations, 0);
         assert_eq!(result.phase_counters.canonical_writebacks, 0);
-        assert_eq!(result.phase_counters.direct_inverse_batches, expected_batches);
+        assert_eq!(
+            result.phase_counters.direct_inverse_batches,
+            expected_batches
+        );
     }
 }
 
@@ -324,6 +329,10 @@ fn phase_counters_distinguish_deterministic_and_collapsing_measurements() {
     assert_eq!(collapsing.transposed_collapse_batches, 1);
     assert_eq!(deterministic.collapse_pivots, 0);
     assert_eq!(collapsing.collapse_pivots, 1);
+    assert_eq!(deterministic.executed_repeat_iterations, 0);
+    assert_eq!(collapsing.executed_repeat_iterations, 0);
+    assert_eq!(deterministic.skipped_repeat_iterations, 0);
+    assert_eq!(collapsing.skipped_repeat_iterations, 0);
     assert_eq!(deterministic.measurement_bits, 1);
     assert_eq!(collapsing.measurement_bits, 1);
 }

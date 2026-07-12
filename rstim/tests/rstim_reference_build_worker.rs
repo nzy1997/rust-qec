@@ -109,6 +109,8 @@ fn rstim_reference_build_worker_reports_phase_counters_only_when_requested() {
     assert_eq!(counters["transposed_collapse_batches"], json!(1));
     assert_eq!(counters["collapse_pivots"], json!(1));
     assert_eq!(counters["expanded_repeat_iterations"], json!(0));
+    assert_eq!(counters["executed_repeat_iterations"], json!(0));
+    assert_eq!(counters["skipped_repeat_iterations"], json!(0));
     assert_eq!(counters["measurement_bits"], json!(1));
 
     drop(stdin);
@@ -143,13 +145,15 @@ fn rstim_reference_build_worker_reports_canonical_surface_phase_counters() {
         .get("phase_counters")
         .and_then(serde_json::Value::as_object)
         .expect("phase counters object");
-    assert_eq!(counters["measurement_reset_batches"], json!(103));
+    assert_eq!(counters["measurement_reset_batches"], json!(5));
     assert_eq!(counters["canonical_materializations"], json!(0));
     assert_eq!(counters["canonical_writebacks"], json!(0));
-    assert_eq!(counters["direct_inverse_batches"], json!(103));
+    assert_eq!(counters["direct_inverse_batches"], json!(5));
     assert_eq!(counters["transposed_collapse_batches"], json!(2));
     assert_eq!(counters["collapse_pivots"], json!(120));
     assert_eq!(counters["expanded_repeat_iterations"], json!(99));
+    assert_eq!(counters["executed_repeat_iterations"], json!(1));
+    assert_eq!(counters["skipped_repeat_iterations"], json!(98));
     assert_eq!(counters["measurement_bits"], json!(12_121));
 
     drop(stdin);
@@ -268,7 +272,10 @@ fn rstim_reference_build_worker_reports_request_errors_and_continues() {
 
     let unexpected_type = read_response(&mut reader, &mut line);
     assert_eq!(unexpected_type["type"], "error");
-    assert_eq!(unexpected_type["message"], "unexpected request type: unexpected");
+    assert_eq!(
+        unexpected_type["message"],
+        "unexpected request type: unexpected"
+    );
 
     let loaded = read_response(&mut reader, &mut line);
     assert_eq!(loaded["type"], "loaded");

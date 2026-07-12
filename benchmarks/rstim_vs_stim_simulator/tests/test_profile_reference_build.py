@@ -12,10 +12,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PROTOCOL = "reference-build-v1"
 DEFAULT_COUNTERS = {
-    "measurement_reset_batches": 103,
+    "measurement_reset_batches": 5,
     "canonical_materializations": 0,
     "canonical_writebacks": 0,
-    "direct_inverse_batches": 103,
+    "direct_inverse_batches": 5,
     "transposed_collapse_batches": 2,
     "collapse_pivots": 120,
     "expanded_repeat_iterations": 99,
@@ -108,12 +108,12 @@ class ProfileReferenceBuildTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 result.stdout.strip(),
-                "PASS reference phase profile batches=103 canonical=0 transposed=2 pivots=120 executed_repeats=1 skipped_repeats=98 bits=12121",
+                "PASS reference phase profile batches=5 canonical=0 transposed=2 pivots=120 executed_repeats=1 skipped_repeats=98 bits=12121",
             )
             payload = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["protocol"], PROTOCOL)
             self.assertEqual(payload["backend"], "packed_inverse")
-            self.assertEqual(payload["phase_counters"]["measurement_reset_batches"], 103)
+            self.assertEqual(payload["phase_counters"]["measurement_reset_batches"], 5)
             self.assertEqual(payload["phase_counters"]["canonical_writebacks"], 0)
 
     def test_profile_command_rejects_missing_phase_counters(self) -> None:

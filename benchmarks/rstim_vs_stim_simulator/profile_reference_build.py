@@ -19,6 +19,8 @@ COUNTER_KEYS = (
     "transposed_collapse_batches",
     "collapse_pivots",
     "expanded_repeat_iterations",
+    "executed_repeat_iterations",
+    "skipped_repeat_iterations",
     "measurement_bits",
 )
 
@@ -182,10 +184,10 @@ def main(argv: list[str] | None = None) -> int:
         "PASS reference phase profile "
         f"batches={counters['measurement_reset_batches']} "
         f"canonical={counters['canonical_materializations']} "
-        f"writebacks={counters['canonical_writebacks']} "
         f"transposed={counters['transposed_collapse_batches']} "
         f"pivots={counters['collapse_pivots']} "
-        f"repeats={counters['expanded_repeat_iterations']} "
+        f"executed_repeats={counters['executed_repeat_iterations']} "
+        f"skipped_repeats={counters['skipped_repeat_iterations']} "
         f"bits={counters['measurement_bits']}"
     )
     return 0

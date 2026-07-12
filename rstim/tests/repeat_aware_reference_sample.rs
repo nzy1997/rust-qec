@@ -1,4 +1,6 @@
-use rstim::data_path::{ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision};
+use rstim::data_path::{
+    ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision,
+};
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
 use sha2::{Digest, Sha256};
