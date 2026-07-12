@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHECKER = REPO_ROOT / "tools" / "check_rstim_vs_stim_reference_build_evidence.py"
-ARTIFACT_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json")
+ARTIFACT_FILES = ("raw.jsonl", "summary.json", "baseline-summary.json", "report.md", "environment.json")
 PROTOCOL = "reference-build-v1"
 TIMER_SCOPE = "reference_build_only"
 REFERENCE_DIGEST = "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d"
@@ -23,7 +23,8 @@ FIXTURE_DIGEST = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b2
 MEASUREMENT_BITS = 12121
 PACKED_BYTES = 1516
 STIM_VARIANT = "stim-reference-b8"
-RSTIM_VARIANT = "rstim-packed-reference-b8"
+RSTIM_CANONICAL_VARIANT = "rstim-canonical-reference-b8"
+RSTIM_DIRECT_VARIANT = "rstim-direct-repeat-reference-b8"
 FIXTURE_REL = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 MANIFEST_REL = "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
 PYTHON_ROLE = "tool://python"
@@ -83,6 +84,7 @@ def render_report(summary: dict[str, Any]) -> str:
             f"{variant['median_elapsed_ns']} | {variant['max_elapsed_ns']} | {variant['backend']} | "
             f"{variant['parse_count']} | {variant['final_reference_build_count']} | {variant['byte_sha256']} |"
         )
+    lines.extend(["", f"direct_speedup={summary['direct_speedup']:.6f}"])
     return "\n".join(lines) + "\n"
 
 
@@ -90,7 +92,8 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     variants = []
     for variant, backend in (
         (STIM_VARIANT, "stim_reference"),
-        (RSTIM_VARIANT, "packed_inverse"),
+        (RSTIM_CANONICAL_VARIANT, "canonical_roundtrip"),
+        (RSTIM_DIRECT_VARIANT, "direct_inverse_repeat_folded"),
     ):
         measured = [
             record
@@ -117,7 +120,12 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "protocol": PROTOCOL,
         "timer_scope": TIMER_SCOPE,
-        "measured_records": 14,
+        "measured_records": 21,
+        "direct_speedup": round(
+            next(item["median_elapsed_ns"] for item in variants if item["variant"] == RSTIM_CANONICAL_VARIANT)
+            / next(item["median_elapsed_ns"] for item in variants if item["variant"] == RSTIM_DIRECT_VARIANT),
+            6,
+        ),
         "variants": variants,
     }
 
@@ -128,22 +136,40 @@ def write_runtime_binary(path: Path, content: bytes = b"test rstim reference bui
     return path
 
 
+def phase_counters(*, canonical: bool) -> dict[str, int]:
+    return {
+        "measurement_reset_batches": 5,
+        "canonical_materializations": 12121 if canonical else 0,
+        "canonical_writebacks": 12121 if canonical else 0,
+        "direct_inverse_batches": 0 if canonical else 5,
+        "transposed_collapse_batches": 0 if canonical else 2,
+        "collapse_pivots": 120,
+        "expanded_repeat_iterations": 99,
+        "executed_repeat_iterations": 99 if canonical else 1,
+        "skipped_repeat_iterations": 0 if canonical else 98,
+        "measurement_bits": MEASUREMENT_BITS,
+    }
+
+
 def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    packed = b"\x00" * PACKED_BYTES
+    reference_records = load_raw(
+        REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/raw.jsonl"
+    )
+    packed = base64.b64decode(reference_records[0]["packed_base64"])
     packed_base64 = base64.b64encode(packed).decode("ascii")
     fixture = REPO_ROOT / FIXTURE_REL
     manifest = REPO_ROOT / MANIFEST_REL
     runner_python = Path(sys.executable).resolve()
 
     records: list[dict[str, Any]] = []
-    for variant, backend, elapsed_base in (
-        (STIM_VARIANT, "stim_reference", 1000),
-        (RSTIM_VARIANT, "packed_inverse", 2000),
+    for variant, backend, elapsed_base, canonical in (
+        (STIM_VARIANT, "stim_reference", 1000, None),
+        (RSTIM_CANONICAL_VARIANT, "canonical_roundtrip", 2000, True),
+        (RSTIM_DIRECT_VARIANT, "direct_inverse_repeat_folded", 800, False),
     ):
         for round_index in range(9):
-            records.append(
-                {
+            record = {
                     "protocol": PROTOCOL,
                     "variant": variant,
                     "phase": "warmup" if round_index < 2 else "measured",
@@ -157,11 +183,17 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                     "timer_scope": TIMER_SCOPE,
                     "parse_count": 1,
                     "reference_build_count": round_index + 1,
-                }
-            )
+            }
+            if canonical is not None:
+                record["phase_counters"] = phase_counters(canonical=canonical)
+            records.append(record)
 
     rewrite_raw(path / "raw.jsonl", records)
     summary = derive_summary(records)
+    baseline_source = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/baseline-summary.json"
+    if not baseline_source.is_file():
+        baseline_source = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json"
+    (path / "baseline-summary.json").write_bytes(baseline_source.read_bytes())
     (path / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -178,11 +210,13 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "stim_version": "1.15.0",
         "worker_argv": {
             STIM_VARIANT: [STIM_PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
-            RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
+            RSTIM_CANONICAL_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL, "--strategy", "canonical"],
+            RSTIM_DIRECT_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
         "canonical_worker_argv": {
             STIM_VARIANT: [STIM_PYTHON_ROLE, "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build", "--protocol", PROTOCOL],
-            RSTIM_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
+            RSTIM_CANONICAL_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL, "--strategy", "canonical"],
+            RSTIM_DIRECT_VARIANT: [RSTIM_WORKER_ROLE, "--protocol", PROTOCOL],
         },
         "runner_argv": [
             PYTHON_ROLE,
@@ -267,12 +301,12 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
     def test_accepts_valid_bundle(self) -> None:
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+        self.assertRegex(result.stdout, r"^PASS packed reference-build evidence variants=3 direct_speedup=\d+\.\d{6}\n$")
 
     def test_accepts_matching_runtime_binary_when_supplied(self) -> None:
         result = self.run_checker("--verify-runtime-binary", str(self.rstim_worker))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+        self.assertRegex(result.stdout, r"^PASS packed reference-build evidence variants=3 direct_speedup=\d+\.\d{6}\n$")
 
     def test_accepts_recorded_git_commit_without_local_object(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
@@ -282,7 +316,7 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "PASS packed reference-build evidence\n")
+        self.assertRegex(result.stdout, r"^PASS packed reference-build evidence variants=3 direct_speedup=\d+\.\d{6}\n$")
 
     def test_rejects_supplied_runtime_binary_with_different_sha(self) -> None:
         other = write_runtime_binary(Path(self.temp_dir.name) / "different-worker", b"different worker\n")
@@ -313,12 +347,43 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
 
     def test_rejects_legacy_rstim_backend(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == RSTIM_VARIANT)["backend"] = "tableau"
+        next(record for record in records if record["variant"] == RSTIM_DIRECT_VARIANT)["backend"] = "tableau"
         rewrite_raw(self.bundle / "raw.jsonl", records)
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("rstim-packed-reference-b8 backend must be packed_inverse", result.stderr)
+        self.assertIn("rstim-direct-repeat-reference-b8 backend must be direct_inverse_repeat_folded", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_direct_variant_with_canonical_materializations(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        next(
+            record for record in records if record["variant"] == RSTIM_DIRECT_VARIANT
+        )["phase_counters"]["canonical_materializations"] = 1
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("direct reference canonical_materializations must be integer 0", result.stderr)
+        self.assertNotIn("artifact-sha256.json", result.stderr)
+
+    def test_rejects_direct_speedup_below_two(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        for record in records:
+            if record["variant"] == RSTIM_DIRECT_VARIANT and record["phase"] == "measured":
+                record["elapsed_ns"] = 900
+            if record["variant"] == RSTIM_CANONICAL_VARIANT and record["phase"] == "measured":
+                record["elapsed_ns"] = 1000
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        summary = derive_summary(records)
+        (self.bundle / "summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (self.bundle / "report.md").write_text(render_report(summary), encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("direct reference speedup must be at least 2.0x", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_timer_scope_including_parsing(self) -> None:
@@ -346,7 +411,7 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
         next(
             record
             for record in records
-            if record["variant"] == RSTIM_VARIANT and record["round"] == 8
+            if record["variant"] == RSTIM_DIRECT_VARIANT and record["round"] == 8
         )["reference_build_count"] = 8
         rewrite_raw(self.bundle / "raw.jsonl", records)
         rewrite_artifact_hashes(self.bundle)
@@ -489,7 +554,7 @@ class CheckReferenceBuildEvidenceTest(unittest.TestCase):
 
     def test_rejects_rehashed_environment_noncanonical_worker_argv_before_hash_mismatch(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            environment["canonical_worker_argv"][RSTIM_VARIANT][0] = "target/debug/rstim_reference_build_worker"
+            environment["canonical_worker_argv"][RSTIM_DIRECT_VARIANT][0] = "target/debug/rstim_reference_build_worker"
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rewrite_artifact_hashes(self.bundle)

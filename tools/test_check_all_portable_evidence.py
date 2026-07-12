@@ -93,7 +93,7 @@ class AllPortableEvidenceCheckerTest(unittest.TestCase):
                     "PASS portable evidence catalog bundles=4 schema=2",
                     "PASS fair CLI sampling evidence variants=2 measured=14",
                     "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9",
-                    "PASS packed reference-build evidence",
+                    "PASS packed reference-build evidence variants=3 direct_speedup=20.978277",
                     "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362",
                     "PASS portable checked evidence bundles=4",
                     "",
@@ -101,6 +101,46 @@ class AllPortableEvidenceCheckerTest(unittest.TestCase):
             ),
         )
         self.assertEqual(result.stderr, "")
+
+    def test_reference_build_catalog_provenance_matches_environment(self) -> None:
+        provenance = importlib.import_module("benchmarks.rstim_vs_stim_simulator.portable_provenance")
+        catalog = provenance.load_catalog(CATALOG)
+        bundle = next(entry for entry in catalog["bundles"] if entry["id"] == "reference-build-release")
+        environment = json.loads(
+            (REPO_ROOT / bundle["bundle_path"] / "environment.json").read_text(encoding="utf-8")
+        )
+
+        catalog_identities = {identity["role"]: identity for identity in bundle["runtime_identities"]}
+        environment_identities = {
+            identity["role"]: identity for identity in environment["runtime_identities"]
+        }
+        self.assertEqual(catalog_identities, environment_identities)
+
+        catalog_commands = {tuple(command["argv"]) for command in bundle["checked_commands"]}
+        environment_commands = {
+            tuple(argv) for argv in environment["worker_argv"].values()
+        }
+        self.assertEqual(catalog_commands, environment_commands)
+
+    def test_cli_rejects_reference_build_catalog_environment_command_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_repo = Path(tmp) / "repo"
+            shutil.copytree(REPO_ROOT / "benchmarks", temp_repo / "benchmarks")
+            catalog = temp_repo / "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml"
+            text = catalog.read_text(encoding="utf-8")
+            text = text.replace(
+                'argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1"]',
+                'argv = ["tool://rstim-reference-worker", "--protocol", "reference-build-v1", "--strategy", "canonical"]',
+                1,
+            )
+            catalog.write_text(text, encoding="utf-8")
+
+            result = self.run_aggregate("--catalog", str(catalog))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("PASS portable evidence catalog bundles=4 schema=2", result.stdout)
+        self.assertIn("FAIL portable checked evidence bundle=reference-build-release", result.stderr)
+        self.assertIn("catalog checked_commands do not match environment.json worker_argv", result.stderr)
 
     def test_fair_cli_rehashed_absolute_fixture_path_fails_with_bundle_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

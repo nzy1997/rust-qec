@@ -4,11 +4,10 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 const PROTOCOL: &str = "reference-build-v1";
 
-fn spawn_worker(protocol: &str) -> (Child, ChildStdin, BufReader<ChildStdout>) {
+fn spawn_worker_with_args(args: &[&str]) -> (Child, ChildStdin, BufReader<ChildStdout>) {
     let worker = env!("CARGO_BIN_EXE_rstim_reference_build_worker");
     let mut child = Command::new(worker)
-        .arg("--protocol")
-        .arg(protocol)
+        .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -16,6 +15,10 @@ fn spawn_worker(protocol: &str) -> (Child, ChildStdin, BufReader<ChildStdout>) {
     let stdin = child.stdin.take().expect("stdin");
     let stdout = child.stdout.take().expect("stdout");
     (child, stdin, BufReader::new(stdout))
+}
+
+fn spawn_worker(protocol: &str) -> (Child, ChildStdin, BufReader<ChildStdout>) {
+    spawn_worker_with_args(&["--protocol", protocol])
 }
 
 fn read_response(reader: &mut BufReader<ChildStdout>, line: &mut String) -> serde_json::Value {
@@ -58,7 +61,7 @@ fn rstim_reference_build_worker_parses_once_and_builds_references() {
         assert_eq!(built["protocol"], PROTOCOL);
         assert_eq!(built["type"], "reference_built");
         assert_eq!(built["request_id"], json!(request_id));
-        assert_eq!(built["backend"], "packed_inverse");
+        assert_eq!(built["backend"], "direct_inverse_repeat_folded");
         assert_eq!(built["parse_count"], json!(1));
         assert_eq!(built["reference_build_count"], json!(request_id + 1));
         assert_eq!(built["measurement_bits"], json!(1));
@@ -140,7 +143,7 @@ fn rstim_reference_build_worker_reports_canonical_surface_phase_counters() {
     )
     .expect("send build");
     let built = read_response(&mut reader, &mut line);
-    assert_eq!(built["backend"], "packed_inverse");
+    assert_eq!(built["backend"], "direct_inverse_repeat_folded");
     let counters = built
         .get("phase_counters")
         .and_then(serde_json::Value::as_object)
@@ -332,7 +335,7 @@ fn rstim_reference_build_worker_packs_multi_byte_base64_remainders() {
         let built = read_response(&mut reader, &mut line);
         assert_eq!(built["type"], "reference_built");
         assert_eq!(built["request_id"], json!(measurement_bits));
-        assert_eq!(built["backend"], "packed_inverse");
+        assert_eq!(built["backend"], "direct_inverse_repeat_folded");
         assert_eq!(built["parse_count"], json!(case_index + 1));
         assert_eq!(built["reference_build_count"], json!(1));
         assert_eq!(built["measurement_bits"], json!(measurement_bits));
@@ -340,6 +343,120 @@ fn rstim_reference_build_worker_packs_multi_byte_base64_remainders() {
         assert_eq!(built["packed_base64"], packed_base64);
         assert_eq!(built["byte_sha256"], digest);
     }
+
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
+
+#[test]
+fn rstim_reference_build_worker_defaults_to_direct_repeat_strategy() {
+    let (mut child, mut stdin, mut reader) = spawn_worker(PROTOCOL);
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    assert_eq!(read_response(&mut reader, &mut line)["type"], "loaded");
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":0,"include_phase_counters":true})
+    )
+    .expect("send build");
+    let built = read_response(&mut reader, &mut line);
+    assert_eq!(built["backend"], "direct_inverse_repeat_folded");
+    let counters = built["phase_counters"]
+        .as_object()
+        .expect("phase counters object");
+    assert_eq!(counters["canonical_materializations"], json!(0));
+    assert_eq!(counters["executed_repeat_iterations"], json!(1));
+    assert_eq!(counters["skipped_repeat_iterations"], json!(98));
+
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
+
+#[test]
+fn rstim_reference_build_worker_canonical_strategy_is_benchmark_only() {
+    let (mut child, mut stdin, mut reader) =
+        spawn_worker_with_args(&["--protocol", PROTOCOL, "--strategy", "canonical"]);
+    let fixture = tempfile::NamedTempFile::new().expect("fixture");
+    std::fs::write(fixture.path(), "H 0\nM 0\n").expect("write fixture");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    assert_eq!(read_response(&mut reader, &mut line)["type"], "loaded");
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":0,"include_phase_counters":true})
+    )
+    .expect("send build");
+    let built = read_response(&mut reader, &mut line);
+    assert_eq!(built["backend"], "canonical_roundtrip");
+    assert_eq!(built["packed_bytes"], json!(1));
+    assert_eq!(built["packed_base64"], "AA==");
+    let counters = built["phase_counters"]
+        .as_object()
+        .expect("phase counters object");
+    assert_eq!(counters["measurement_bits"], json!(1));
+    assert!(counters["canonical_materializations"].as_u64().unwrap() > 0);
+    assert_eq!(counters["skipped_repeat_iterations"], json!(0));
+
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
+
+#[test]
+fn rstim_reference_build_worker_canonical_strategy_counts_repeat_iterations() {
+    let (mut child, mut stdin, mut reader) =
+        spawn_worker_with_args(&["--protocol", PROTOCOL, "--strategy", "canonical"]);
+    let fixture = tempfile::NamedTempFile::new().expect("fixture");
+    std::fs::write(
+        fixture.path(),
+        "REPEAT 3 {\n    M 0\n}\nREPEAT 2 {\n    REPEAT 4 {\n        M 1\n    }\n}\n",
+    )
+    .expect("write fixture");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    let loaded = read_response(&mut reader, &mut line);
+    assert_eq!(loaded["type"], "loaded");
+    assert_eq!(loaded["measurement_bits"], json!(11));
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":0,"include_phase_counters":true})
+    )
+    .expect("send build");
+    let built = read_response(&mut reader, &mut line);
+    assert_eq!(built["backend"], "canonical_roundtrip");
+    assert_eq!(built["packed_bytes"], json!(2));
+    let counters = built["phase_counters"]
+        .as_object()
+        .expect("phase counters object");
+    assert_eq!(counters["measurement_bits"], json!(11));
+    assert_eq!(counters["measurement_reset_batches"], json!(11));
+    assert_eq!(counters["canonical_materializations"], json!(11));
+    assert_eq!(counters["canonical_writebacks"], json!(11));
+    assert_eq!(counters["expanded_repeat_iterations"], json!(13));
+    assert_eq!(counters["executed_repeat_iterations"], json!(13));
+    assert_eq!(counters["skipped_repeat_iterations"], json!(0));
 
     drop(stdin);
     assert!(child.wait().expect("wait").success());

@@ -1,5 +1,6 @@
 {
-  "measured_records": 14,
+  "direct_speedup": 20.978277,
+  "measured_records": 21,
   "protocol": "reference-build-v1",
   "timer_scope": "reference_build_only",
   "variants": [
@@ -8,26 +9,39 @@
       "byte_sha256": "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d",
       "count": 7,
       "final_reference_build_count": 9,
-      "max_elapsed_ns": 956667,
+      "max_elapsed_ns": 944459,
       "measurement_bits": 12121,
-      "median_elapsed_ns": 947959,
-      "min_elapsed_ns": 945500,
+      "median_elapsed_ns": 935667,
+      "min_elapsed_ns": 909833,
       "packed_bytes": 1516,
       "parse_count": 1,
       "variant": "stim-reference-b8"
     },
     {
-      "backend": "packed_inverse",
+      "backend": "canonical_roundtrip",
       "byte_sha256": "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d",
       "count": 7,
       "final_reference_build_count": 9,
-      "max_elapsed_ns": 82458583,
+      "max_elapsed_ns": 71078959,
       "measurement_bits": 12121,
-      "median_elapsed_ns": 80812875,
-      "min_elapsed_ns": 80381750,
+      "median_elapsed_ns": 68685500,
+      "min_elapsed_ns": 67777917,
       "packed_bytes": 1516,
       "parse_count": 1,
-      "variant": "rstim-packed-reference-b8"
+      "variant": "rstim-canonical-reference-b8"
+    },
+    {
+      "backend": "direct_inverse_repeat_folded",
+      "byte_sha256": "d95f3eacd05c1ca0d3a90e4a48e1d68b7ef5f2d817da11121ba4b77454b24d3d",
+      "count": 7,
+      "final_reference_build_count": 9,
+      "max_elapsed_ns": 3317708,
+      "measurement_bits": 12121,
+      "median_elapsed_ns": 3274125,
+      "min_elapsed_ns": 3242292,
+      "packed_bytes": 1516,
+      "parse_count": 1,
+      "variant": "rstim-direct-repeat-reference-b8"
     }
   ]
 }
