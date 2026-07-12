@@ -23,6 +23,16 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get install -y libfontconfig1-dev
       - run: cargo test --workspace
+  checked-evidence-portability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check portable evidence bundles
+        run: |
+          test ! -d target
+          python3 tools/check_all_portable_evidence.py \
+            --catalog benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml
+          test ! -d target
   perf-gate:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
