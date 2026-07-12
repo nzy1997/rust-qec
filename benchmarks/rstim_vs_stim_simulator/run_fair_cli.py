@@ -523,6 +523,7 @@ def _render_report(summary: dict[str, Any], comparison: dict[str, Any] | None = 
     if comparison is not None:
         lines.extend(
             [
+                "",
                 "## Baseline comparison",
                 "",
                 f"Baseline rstim/Stim ratio: {comparison['baseline_rstim_over_stim']:.3f}x",

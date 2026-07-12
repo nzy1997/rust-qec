@@ -58,7 +58,7 @@ EXPECTED_RUNTIME_IDENTITIES = (
         "role": "tool://rstim",
         "version": "rstim 0.1.1",
         "basename": "rstim",
-        "sha256": "2db6fa113495235829ca1dc7e4f8080befe3e6336f8effb61800b9e84510182a",
+        "sha256": "cae438197a15395cb397141a75d8a593b6ed502ffe6d8b7e0f548eea7f20a429",
     },
 )
 LIVE_RUNTIME_PATH_FIELDS = frozenset(
