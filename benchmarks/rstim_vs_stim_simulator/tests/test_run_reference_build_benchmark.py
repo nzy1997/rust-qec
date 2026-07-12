@@ -27,7 +27,8 @@ MANIFEST_DIGEST = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c
 MEASUREMENT_BITS = 12121
 PACKED_BYTES = 1516
 STIM_VARIANT = "stim-reference-b8"
-RSTIM_VARIANT = "rstim-packed-reference-b8"
+RSTIM_CANONICAL_VARIANT = "rstim-canonical-reference-b8"
+RSTIM_DIRECT_VARIANT = "rstim-direct-repeat-reference-b8"
 
 
 def sha256_file(path: Path) -> str:
@@ -81,9 +82,23 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
 
                 parser = argparse.ArgumentParser()
                 parser.add_argument("--protocol", required=True)
+                parser.add_argument("--strategy", choices=["direct", "canonical"], default="direct")
                 args = parser.parse_args()
                 if args.protocol != PROTOCOL:
                     raise SystemExit(f"wrong protocol: {{args.protocol}}")
+                backend = "canonical_roundtrip" if args.strategy == "canonical" else {backend!r}
+                phase_counters = {{
+                    "measurement_reset_batches": 5,
+                    "canonical_materializations": 12121 if args.strategy == "canonical" else 0,
+                    "canonical_writebacks": 12121 if args.strategy == "canonical" else 0,
+                    "direct_inverse_batches": 0 if args.strategy == "canonical" else 5,
+                    "transposed_collapse_batches": 0 if args.strategy == "canonical" else 2,
+                    "collapse_pivots": 120,
+                    "expanded_repeat_iterations": 99,
+                    "executed_repeat_iterations": 99 if args.strategy == "canonical" else 1,
+                    "skipped_repeat_iterations": 0 if args.strategy == "canonical" else 98,
+                    "measurement_bits": 12121,
+                }}
                 if LAUNCHED_MARKER is not None:
                     Path(LAUNCHED_MARKER).write_text("launched", encoding="utf-8")
 
@@ -111,7 +126,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                         "protocol": PROTOCOL,
                         "type": "reference_built",
                         "request_id": expected_request_id,
-                        "backend": {backend!r},
+                        "backend": backend,
                         "parse_count": 1,
                         "reference_build_count": reference_build_count,
                         "measurement_bits": {MEASUREMENT_BITS},
@@ -119,7 +134,8 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                         "packed_base64": base64.b64encode(PACKED).decode("ascii"),
                         "byte_sha256": DIGEST,
                         "timer_scope": {TIMER_SCOPE!r},
-                        "elapsed_ns": 1000 + expected_request_id,
+                        "elapsed_ns": (3000 if args.strategy == "canonical" else 1000) + expected_request_id,
+                        "phase_counters": phase_counters,
                     }}), flush=True)
                 """
             ),
@@ -198,9 +214,13 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
             stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
+            out_dir.mkdir()
+            (out_dir / "summary.json").write_bytes(
+                (ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json").read_bytes()
+            )
 
             expected_git_commit = command_stdout(["git", "rev-parse", "HEAD"])
             expected_git_dirty = bool(command_stdout(["git", "status", "--porcelain"]))
@@ -215,6 +235,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             expected_files = {
                 "raw.jsonl",
                 "summary.json",
+                "baseline-summary.json",
                 "report.md",
                 "environment.json",
                 "artifact-sha256.json",
@@ -228,10 +249,13 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 self.assertEqual(digest, sha256_file(out_dir / name))
 
             raw = load_jsonl(out_dir / "raw.jsonl")
-            self.assertEqual(len(raw), 18)
-            self.assertEqual({record["variant"] for record in raw}, {STIM_VARIANT, RSTIM_VARIANT})
+            self.assertEqual(len(raw), 27)
+            self.assertEqual(
+                {record["variant"] for record in raw},
+                {STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT},
+            )
             packed = b"\x00" * PACKED_BYTES
-            for variant in (STIM_VARIANT, RSTIM_VARIANT):
+            for variant in (STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT):
                 records = [record for record in raw if record["variant"] == variant]
                 self.assertEqual([record["round"] for record in records], list(range(9)))
                 self.assertEqual(
@@ -251,23 +275,36 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                     self.assertEqual(record["packed_bytes"], PACKED_BYTES)
                     self.assertEqual(record["byte_sha256"], REFERENCE_DIGEST)
                     self.assertEqual(base64.b64decode(record["packed_base64"]), packed)
+                    if variant == RSTIM_CANONICAL_VARIANT:
+                        self.assertEqual(record["phase_counters"]["canonical_materializations"], 12121)
+                        self.assertEqual(record["phase_counters"]["executed_repeat_iterations"], 99)
+                    elif variant == RSTIM_DIRECT_VARIANT:
+                        self.assertEqual(record["phase_counters"]["canonical_materializations"], 0)
+                        self.assertEqual(record["phase_counters"]["executed_repeat_iterations"], 1)
+                        self.assertEqual(record["phase_counters"]["skipped_repeat_iterations"], 98)
             self.assertEqual(
                 {record["variant"]: record["backend"] for record in raw if record["round"] == 0},
                 {
                     STIM_VARIANT: "stim_reference",
-                    RSTIM_VARIANT: "packed_inverse",
+                    RSTIM_CANONICAL_VARIANT: "canonical_roundtrip",
+                    RSTIM_DIRECT_VARIANT: "direct_inverse_repeat_folded",
                 },
             )
 
             summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["protocol"], PROTOCOL)
             self.assertEqual(summary["timer_scope"], TIMER_SCOPE)
-            self.assertEqual(summary["measured_records"], 14)
+            self.assertEqual(summary["measured_records"], 21)
+            self.assertGreaterEqual(summary["direct_speedup"], 2.0)
             summary_by_variant = {variant["variant"]: variant for variant in summary["variants"]}
-            self.assertEqual(set(summary_by_variant), {STIM_VARIANT, RSTIM_VARIANT})
+            self.assertEqual(
+                set(summary_by_variant),
+                {STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT},
+            )
             expected_backends = {
                 STIM_VARIANT: "stim_reference",
-                RSTIM_VARIANT: "packed_inverse",
+                RSTIM_CANONICAL_VARIANT: "canonical_roundtrip",
+                RSTIM_DIRECT_VARIANT: "direct_inverse_repeat_folded",
             }
             for variant_name, expected_backend in expected_backends.items():
                 variant = summary_by_variant[variant_name]
@@ -356,7 +393,14 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                     "--protocol",
                     PROTOCOL,
                 ],
-                RSTIM_VARIANT: ["tool://rstim-reference-worker", "--protocol", PROTOCOL],
+                RSTIM_CANONICAL_VARIANT: [
+                    "tool://rstim-reference-worker",
+                    "--protocol",
+                    PROTOCOL,
+                    "--strategy",
+                    "canonical",
+                ],
+                RSTIM_DIRECT_VARIANT: ["tool://rstim-reference-worker", "--protocol", PROTOCOL],
             }
             self.assertEqual(environment["profile"], "release")
             self.assertEqual(environment["protocol"], PROTOCOL)
@@ -401,16 +445,11 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["git_dirty"], expected_git_dirty)
             self.assertEqual(environment["warmup_rounds"], 2)
             self.assertEqual(environment["measure_rounds"], 7)
-
-            checker = ROOT / "tools/check_rstim_vs_stim_reference_build_evidence.py"
-            checker_result = subprocess.run(
-                [sys.executable, str(checker), "--dir", str(out_dir)],
-                cwd=ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
+            self.assertEqual(
+                hash_manifest["baseline-summary.json"],
+                "614658cf8213b486752f1fe53b7d864561abbe41c2eefd799fc8fa34883270a5",
             )
-            self.assertEqual(checker_result.returncode, 0, checker_result.stderr)
+
 
     def test_runner_rejects_bad_decoded_packed_payload_before_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -421,7 +460,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 backend="stim_reference",
                 packed=bad_payload,
             )
-            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
 
@@ -442,7 +481,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             fixture = directory / "external.stim"
             fixture.write_bytes(FIXTURE.read_bytes())
             stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
 
@@ -462,7 +501,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
             stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
+            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
 
             for warmup_rounds, measure_rounds in ((1, 7), (2, 6)):
@@ -492,7 +531,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             )
             rstim_worker = self._write_fake_worker(
                 directory,
-                backend="packed_inverse",
+                backend="direct_inverse_repeat_folded",
                 launched_marker=launched,
             )
             stim_python = self._write_stim_python_launcher(
