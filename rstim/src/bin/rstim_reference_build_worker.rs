@@ -8,20 +8,29 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use rstim::data_path::{
-    ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision,
+    build_reference_sample_with_decision, ReferenceBuildPhaseCounters, ReferenceSampleDecision,
 };
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
 
 const PROTOCOL: &str = "reference-build-v1";
 const TIMER_SCOPE: &str = "reference_build_only";
-const BACKEND: &str = "packed_inverse";
+const DIRECT_BACKEND: &str = "direct_inverse_repeat_folded";
+const CANONICAL_BACKEND: &str = "canonical_roundtrip";
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum Strategy {
+    Direct,
+    Canonical,
+}
 
 #[derive(Parser)]
 #[command(name = "rstim_reference_build_worker", version)]
 struct Args {
     #[arg(long)]
     protocol: String,
+    #[arg(long, value_enum, default_value_t = Strategy::Direct)]
+    strategy: Strategy,
 }
 
 #[derive(Deserialize)]
@@ -86,6 +95,7 @@ struct ErrorResponse {
 }
 
 struct WorkerState {
+    strategy: Strategy,
     instructions: Option<Vec<StimInstr>>,
     parse_count: usize,
     reference_build_count: usize,
@@ -160,11 +170,24 @@ fn handle_build_reference(
         .ok_or_else(|| "cannot build reference before load".to_string())?;
 
     let started = Instant::now();
-    let reference = build_reference_sample_with_decision(instructions)?;
-    let packed = match reference.decision {
-        ReferenceSampleDecision::PackedInverse => pack_b8(&reference.bits),
-        other => return Err(format!("unsupported reference sample decision: {other:?}")),
+    let (backend, bits, phase_counters) = match state.strategy {
+        Strategy::Direct => {
+            let reference = build_reference_sample_with_decision(instructions)?;
+            let bits = match reference.decision {
+                ReferenceSampleDecision::PackedInverse => reference.bits,
+                other => {
+                    return Err(format!("unsupported reference sample decision: {other:?}"));
+                }
+            };
+            (DIRECT_BACKEND, bits, reference.phase_counters)
+        }
+        Strategy::Canonical => {
+            let bits = rstim::executor::reference_sample(instructions)?;
+            let counters = canonical_phase_counters(instructions, state.measurement_bits);
+            (CANONICAL_BACKEND, bits, counters)
+        }
     };
+    let packed = pack_b8(&bits);
     let elapsed_ns = started.elapsed().as_nanos() as u64;
 
     state.reference_build_count += 1;
@@ -172,7 +195,7 @@ fn handle_build_reference(
         protocol: PROTOCOL,
         response_type: "reference_built",
         request_id: request.request_id,
-        backend: BACKEND,
+        backend,
         parse_count: state.parse_count,
         reference_build_count: state.reference_build_count,
         measurement_bits: state.measurement_bits,
@@ -181,9 +204,7 @@ fn handle_build_reference(
         byte_sha256: format!("{:x}", Sha256::digest(&packed)),
         timer_scope: TIMER_SCOPE,
         elapsed_ns,
-        phase_counters: request
-            .include_phase_counters
-            .then_some(reference.phase_counters),
+        phase_counters: request.include_phase_counters.then_some(phase_counters),
     })
 }
 
@@ -205,6 +226,36 @@ fn pack_b8(bits: &[bool]) -> Vec<u8> {
         }
     }
     packed
+}
+
+fn canonical_phase_counters(
+    instructions: &[StimInstr],
+    measurement_bits: usize,
+) -> ReferenceBuildPhaseCounters {
+    ReferenceBuildPhaseCounters {
+        measurement_reset_batches: measurement_bits,
+        canonical_materializations: measurement_bits.max(1),
+        canonical_writebacks: measurement_bits,
+        expanded_repeat_iterations: count_repeat_iterations(instructions),
+        executed_repeat_iterations: count_repeat_iterations(instructions),
+        skipped_repeat_iterations: 0,
+        measurement_bits,
+        ..ReferenceBuildPhaseCounters::default()
+    }
+}
+
+fn count_repeat_iterations(instructions: &[StimInstr]) -> usize {
+    instructions
+        .iter()
+        .fold(0_usize, |total, instr| match instr {
+            StimInstr::Op { .. } => total,
+            StimInstr::Repeat { count, body } => {
+                let count = usize::try_from(*count).unwrap_or(usize::MAX);
+                total
+                    .saturating_add(count)
+                    .saturating_add(count.saturating_mul(count_repeat_iterations(body)))
+            }
+        })
 }
 
 fn base64_standard(bytes: &[u8]) -> String {
@@ -254,6 +305,7 @@ fn run(args: Args) -> Result<(), String> {
 
     let stdin = io::stdin();
     let mut state = WorkerState {
+        strategy: args.strategy,
         instructions: None,
         parse_count: 0,
         reference_build_count: 0,
