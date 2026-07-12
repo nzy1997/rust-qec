@@ -1,0 +1,128 @@
+{
+  "status": "ready",
+  "catalog_path": "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml",
+  "catalog_sha256": "da83ddec534a80366c74662a869e8e208d1b627a6999b90593c44fdadfe1a7f4",
+  "bundle_count": 4,
+  "bundle_ids": [
+    "fair-cli-release",
+    "compiled-steady-release",
+    "reference-build-release",
+    "frame-instruction-wide-release"
+  ],
+  "portable_bundles": [
+    {
+      "id": "fair-cli-release",
+      "bundle_path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release",
+      "checker": "tools.check_rstim_vs_stim_fair_cli_evidence",
+      "pass_line": "PASS fair CLI sampling evidence variants=2 measured=14"
+    },
+    {
+      "id": "compiled-steady-release",
+      "bundle_path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release",
+      "checker": "tools.check_rstim_vs_stim_compiled_steady_evidence",
+      "pass_line": "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9"
+    },
+    {
+      "id": "reference-build-release",
+      "bundle_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release",
+      "checker": "tools.check_rstim_vs_stim_reference_build_evidence",
+      "pass_line": "PASS packed reference-build evidence variants=3 direct_speedup=20.978277"
+    },
+    {
+      "id": "frame-instruction-wide-release",
+      "bundle_path": "benchmarks/rstim_vs_stim_simulator/results/frame-instruction-wide-release",
+      "checker": "tools.check_rstim_vs_stim_instruction_wide_noise_evidence",
+      "pass_line": "PASS instruction-wide frame-noise evidence outcome=improved builds=803 legacy_setups=80362 candidate_over_baseline=0.775851 attempts=82290688"
+    }
+  ],
+  "reference_build": {
+    "direct_speedup": 20.978276638796626,
+    "direct_canonical_materializations": 0,
+    "direct_executed_repeat_iterations": 1,
+    "direct_skipped_repeat_iterations": 98,
+    "canonical_variant": "rstim-canonical-reference-b8",
+    "direct_variant": "rstim-direct-repeat-reference-b8",
+    "summary_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json",
+    "raw_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/raw.jsonl",
+    "report_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/report.md"
+  },
+  "fair_cli": {
+    "variants": 2,
+    "measured": 14,
+    "baseline_rstim_over_stim": 3.576,
+    "candidate_rstim_over_stim": 0.677,
+    "reference_strategy": "direct_inverse_repeat_folded",
+    "ratio_delta": -2.899,
+    "comparison_path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/comparison.json",
+    "summary_path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/summary.json",
+    "report_path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/report.md"
+  },
+  "frame_noise": {
+    "builds": 803,
+    "attempts": 82290688,
+    "legacy_setups": 80362,
+    "candidate_over_baseline": 0.77585118126732,
+    "outcome": "improved",
+    "correctness_status": "pass",
+    "paired_summary_path": "benchmarks/rstim_vs_stim_simulator/results/frame-instruction-wide-release/paired-summary.json",
+    "correctness_path": "benchmarks/rstim_vs_stim_simulator/results/frame-instruction-wide-release/correctness-summary.json",
+    "report_path": "benchmarks/rstim_vs_stim_simulator/results/frame-instruction-wide-release/report.md"
+  },
+  "distribution_correctness": {
+    "status": "pass",
+    "case_count": 8,
+    "summary_path": "benchmarks/rstim_vs_stim_simulator/results/distributions/summary.json",
+    "rollup_path": "benchmarks/rstim_vs_stim_simulator/results/distributions/expanded-correctness.json",
+    "report_path": "benchmarks/rstim_vs_stim_simulator/results/distributions/report.md",
+    "full_summary_path": "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json"
+  },
+  "historical_406": {
+    "status": "preserved",
+    "case_label": "stim-style-surface-sample-d11-r100-b1024",
+    "summary_path": "benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
+    "summary_sha256": "97ae397e598fe447d206c6b07a26ceaa0a3336d1883a7f77bc194f7b4c491805",
+    "stim_cli_over_rstim_compiled": 261.33994311451863
+  },
+  "focused_rust_tests": [
+    "cargo",
+    "test",
+    "-p",
+    "rstim",
+    "--test",
+    "reusable_compiled_measurement_sampler",
+    "--test",
+    "packed_inverse_tableau_storage",
+    "--test",
+    "packed_inverse_tableau_clifford",
+    "--test",
+    "packed_inverse_tableau_measurement",
+    "--test",
+    "packed_inverse_direct_collapse",
+    "--test",
+    "packed_reference_routing",
+    "--test",
+    "reference_sample_tree",
+    "--test",
+    "repeat_aware_reference_sample",
+    "--test",
+    "rare_error_iterator",
+    "--test",
+    "frame_instruction_wide_one_qubit_noise",
+    "--test",
+    "frame_instruction_wide_depolarize2"
+  ],
+  "claim_limits": [
+    "Readiness is limited to the committed evidence bundles and focused Rust tests.",
+    "This is not a broad Stim parity claim and does not close #406.",
+    "Site-facing #379 remains separate; this readiness artifact does not update the site or close #379."
+  ],
+  "issues": {
+    "38": "https://github.com/nzy1997/rstim/issues/38",
+    "406": "https://github.com/nzy1997/rstim/issues/406",
+    "379": "https://github.com/nzy1997/rstim/issues/379",
+    "milestone": {
+      "status": "not_checked",
+      "open": []
+    }
+  }
+}
