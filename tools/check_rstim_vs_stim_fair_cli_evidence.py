@@ -230,6 +230,8 @@ def validate_baseline_and_candidate(results_dir: Path, candidate_summary: dict[s
     if sha256_file(results_dir / "summary.json") == BASELINE_SUMMARY_SHA256:
         raise ValueError("candidate summary must differ from pinned baseline summary")
     baseline = load_json_object(baseline_path, "baseline-summary.json")
+    if candidate_summary == baseline:
+        raise ValueError("candidate summary must differ from pinned baseline summary")
     if run_fair_cli._rounded_ratio(run_fair_cli._rstim_over_stim(baseline)) != BASELINE_RATIO:
         raise ValueError("baseline_rstim_over_stim must be 3.576")
     return baseline

@@ -19,11 +19,11 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_fair_cli.py"
-sha256 = "fa53a2c5c76efd18a052f4401ebf368e603e19bda2e490f311fedceb3c65602c"
+sha256 = "7e777df43bbcfc6fdfb4b8902b5166501daf150421be993910cc033ad4aec0d0"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "26ad81503c37e75f175e840855fead0aac10aa76bd5491b18a3589932bda7ae7"
+sha256 = "b89abfe8f6281bca0461631feba399d3654d57e1d0d13363b28bcb53d846f3d3"
 
 [[bundles.artifacts]]
 path = "baseline-summary.json"
@@ -43,7 +43,7 @@ sha256 = "715634316bb0c35dbc60edcae2b39609f6e7707243c2c9b32007f00ab2e89328"
 
 [[bundles.artifacts]]
 path = "report.md"
-sha256 = "5397b0ec52dbfc83985c78c8f2cd31e4461c6ea814e57d1a90b7f3c61d0b3fec"
+sha256 = "418e9c31512fff818792da289de12f571877c69957ec0ec7872d771e603728a9"
 
 [[bundles.artifacts]]
 path = "summary.json"

@@ -14,4 +14,3 @@ Baseline rstim/Stim ratio: 3.576x
 Candidate rstim/Stim ratio: 0.677x
 Change from baseline: -2.899x
 Reference strategy: direct_inverse_repeat_folded
-

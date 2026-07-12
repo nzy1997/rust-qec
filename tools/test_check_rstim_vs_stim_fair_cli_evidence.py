@@ -233,6 +233,27 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
 
+    def test_rejects_reformatted_candidate_summary_reused_from_baseline(self) -> None:
+        baseline = json.loads((self.bundle / "baseline-summary.json").read_text(encoding="utf-8"))
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        by_variant = {variant["variant"]: variant for variant in baseline["variants"]}
+        for record in records:
+            if record["phase"] != "measured":
+                continue
+            variant = by_variant[record["variant"]]
+            index = record["round_index"]
+            record["elapsed_ns"] = variant["elapsed_ns"]["samples"][index]
+            record["stdout_sha256"] = variant["stdout_sha256"][index]
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+        (self.bundle / "summary.json").write_text(json.dumps(baseline) + "\n", encoding="utf-8")
+        self.assertNotEqual(sha256_file(self.bundle / "summary.json"), BASELINE_SUMMARY_SHA256)
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
+
     def test_rejects_mismatched_reference_evidence_hash(self) -> None:
         def break_reference_hash(environment: dict[str, Any]) -> None:
             environment["reference_evidence"]["summary_sha256"] = "0" * 64

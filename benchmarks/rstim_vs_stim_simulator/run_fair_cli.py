@@ -533,8 +533,7 @@ def _render_report(summary: dict[str, Any], comparison: dict[str, Any] | None = 
                 "",
             ]
         )
-    lines.append("")
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _collect_environment(

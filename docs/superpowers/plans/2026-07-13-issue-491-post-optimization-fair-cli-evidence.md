@@ -823,4 +823,3 @@ git status --short
 ```
 
 Expected: `git diff --check` exits `0`; `git status --short` is clean.
-

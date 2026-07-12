@@ -283,7 +283,10 @@ class RunFairCliTest(unittest.TestCase):
             BASELINE_SUMMARY_SHA256,
         )
         self.assertEqual(comparison["baseline_rstim_over_stim"], 3.576)
-        self.assertGreater(comparison["candidate_rstim_over_stim"], 1.0)
+        self.assertEqual(
+            comparison["candidate_rstim_over_stim"],
+            run_fair_cli._rounded_ratio(run_fair_cli._rstim_over_stim(summary)),
+        )
         self.assertEqual(
             comparison["ratio_delta_from_baseline"],
             round(comparison["candidate_rstim_over_stim"] - comparison["baseline_rstim_over_stim"], 3),
