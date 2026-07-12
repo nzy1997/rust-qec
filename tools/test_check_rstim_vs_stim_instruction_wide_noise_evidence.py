@@ -20,10 +20,16 @@ PUBLISHED_RSTIM_RUNTIME_IDENTITY = {
     "basename": "rstim",
     "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
 }
+PAIRED_ARTIFACTS = (
+    "paired-raw.jsonl",
+    "paired-summary.json",
+    "paired-report.md",
+)
 REQUIRED_ARTIFACTS = (
     "raw.jsonl",
     "summary.json",
     "report.md",
+    *PAIRED_ARTIFACTS,
     "environment.json",
     "fixture-load.json",
     "correctness-summary.json",
@@ -80,6 +86,7 @@ def write_checker_repo_fixture(
 
 def write_valid_bundle(bundle: Path) -> None:
     from benchmarks.rstim_vs_stim_simulator import run_frame_instruction_wide_benchmark as runner
+    from benchmarks.rstim_vs_stim_simulator import run_paired_frame_noise as paired_runner
 
     bundle.mkdir(parents=True, exist_ok=True)
     rstim_binary = bundle / "rstim"
@@ -160,6 +167,66 @@ def write_valid_bundle(bundle: Path) -> None:
     ))
     (bundle / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (bundle / "report.md").write_text(runner.render_report(summary), encoding="utf-8")
+    paired_records = []
+    for phase, rounds in (("warmup", 2), ("measured", 7)):
+        for round_index in range(rounds):
+            seed = round_index if phase == "warmup" else 2 + round_index
+            for ordering_slot, (variant, revision_label, resolved_revision) in enumerate(
+                (
+                    (
+                        paired_runner.BASELINE_VARIANT,
+                        "baseline",
+                        paired_runner.PINNED_BASELINE_REV,
+                    ),
+                    (
+                        paired_runner.CANDIDATE_VARIANT,
+                        "candidate",
+                        "2" * 40,
+                    ),
+                )
+            ):
+                paired_records.append(
+                    {
+                        "case_id": "stim_surface_d11_r100",
+                        "variant": variant,
+                        "phase": phase,
+                        "round_index": round_index,
+                        "ordering_slot": len(paired_records),
+                        "seed": seed,
+                        "argv": paired_runner._canonical_argv(
+                            paired_runner.TOOL_ROLES[variant],
+                            fixture=FIXTURE,
+                            shots=1024,
+                            seed=seed,
+                            repo_root=REPO_ROOT,
+                        ),
+                        "shots": 1024,
+                        "measurement_count": 12_121,
+                        "output_format": "b8",
+                        "expected_output_bytes": 1_552_384,
+                        "resolved_revision": resolved_revision,
+                        "revision_label": revision_label,
+                        "elapsed_ns": 1_000,
+                        "timer_scope": "process_spawn_stdout_stderr_drain_exit",
+                        "exit_code": 0,
+                        "actual_output_bytes": 1_552_384,
+                        "stdout_sha256": "d" * 64,
+                        "stderr_bytes": 0,
+                    }
+                )
+    (bundle / "paired-raw.jsonl").write_text(
+        "".join(json.dumps(record, sort_keys=True) + "\n" for record in paired_records),
+        encoding="utf-8",
+    )
+    paired_summary = paired_runner._summary(
+        paired_records,
+        baseline=paired_runner.RevisionBuild("baseline", paired_runner.PINNED_BASELINE_REV, paired_runner.PINNED_BASELINE_REV, bundle, bundle, bundle / "rstim"),
+        candidate=paired_runner.RevisionBuild("candidate", "HEAD", "2" * 40, bundle, bundle, bundle / "rstim"),
+    )
+    (bundle / "paired-summary.json").write_text(
+        json.dumps(paired_summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (bundle / "paired-report.md").write_text(paired_runner._report(paired_summary), encoding="utf-8")
     fixture_load = {
         "case_id": "stim_surface_d11_r100",
         "status": "pass",
@@ -268,7 +335,8 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
+            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 attempts=82290688 "
+            "legacy_setups=80362 candidate_over_baseline=1.0\n",
         )
 
     def test_default_validation_does_not_require_live_runtime_binary(self) -> None:
@@ -279,7 +347,8 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362\n",
+            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 attempts=82290688 "
+            "legacy_setups=80362 candidate_over_baseline=1.0\n",
         )
 
     def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:
@@ -495,6 +564,30 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("raw measurement field stdout_sha256 must be identical", result.stderr)
+        self.assertNotIn("artifact", result.stderr.lower())
+
+    def test_rejects_paired_classification_mismatch(self) -> None:
+        rewrite_json(self.bundle / "paired-summary.json", lambda payload: payload.update({"outcome": "improved"}))
+        rewrite_hashes(self.bundle)
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("paired-summary outcome must be neutral", result.stderr)
+
+    def test_rejects_paired_candidate_regression_limit_before_hash_error(self) -> None:
+        rewrite_json(
+            self.bundle / "paired-summary.json",
+            lambda payload: (
+                payload["variants"][1].update({"median_elapsed_ns": 1100, "mean_elapsed_ns": 1100}),
+                payload.update({"candidate_over_baseline": 1.1, "outcome": "regressed"}),
+            ),
+        )
+
+        result = self.run_checker()
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate frame-noise path exceeds 1.05 non-regression limit", result.stderr)
         self.assertNotIn("artifact", result.stderr.lower())
 
     def test_rejects_mismatched_fixture_manifest_or_artifact_hash(self) -> None:
