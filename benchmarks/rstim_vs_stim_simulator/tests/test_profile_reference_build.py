@@ -19,6 +19,8 @@ DEFAULT_COUNTERS = {
     "transposed_collapse_batches": 2,
     "collapse_pivots": 120,
     "expanded_repeat_iterations": 99,
+    "executed_repeat_iterations": 1,
+    "skipped_repeat_iterations": 98,
     "measurement_bits": 12121,
 }
 
@@ -106,7 +108,7 @@ class ProfileReferenceBuildTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 result.stdout.strip(),
-                "PASS reference phase profile batches=103 canonical=0 writebacks=0 transposed=2 pivots=120 repeats=99 bits=12121",
+                "PASS reference phase profile batches=103 canonical=0 transposed=2 pivots=120 executed_repeats=1 skipped_repeats=98 bits=12121",
             )
             payload = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["protocol"], PROTOCOL)
