@@ -7,8 +7,6 @@ import binascii
 import hashlib
 import json
 import re
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,6 +31,22 @@ CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.
 EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 GIT_COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
+PYTHON_ROLE = "tool://python"
+STIM_PYTHON_ROLE = "tool://stim-python"
+RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
+EXPECTED_RUNTIME_ROLES = frozenset({PYTHON_ROLE, STIM_PYTHON_ROLE, RSTIM_WORKER_ROLE})
+EXPECTED_RSTIM_WORKER_VERSION = "rstim 0.1.1"
+RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
+LEGACY_RUNTIME_PATH_FIELDS = frozenset(
+    {
+        "python_executable",
+        "python_executable_sha256",
+        "runner_python_executable",
+        "runner_python_executable_sha256",
+        "rstim_worker_binary_path",
+        "rstim_worker_binary_sha256",
+    }
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -187,32 +201,19 @@ def _resolve_recorded_path(raw: Any, field: str) -> Path:
     return path.resolve() if path.is_absolute() else (REPO_ROOT / path).resolve()
 
 
-def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field: str) -> Path:
-    path = _resolve_recorded_path(environment.get(path_field), path_field)
-    if not path.is_file():
-        raise ValueError(f"environment {path_field} does not exist: {environment.get(path_field)}")
-    digest = environment.get(hash_field)
-    if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
-        raise ValueError(f"environment {hash_field} must be a lowercase SHA-256 digest")
-    if sha256_file(path) != digest:
-        raise ValueError(f"environment {hash_field} does not match {path_field}")
-    return path
+def _require_repo_relative_posix_path(raw: Any, field: str) -> str:
+    if not isinstance(raw, str) or not raw:
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    if raw.startswith("/") or "\\" in raw or re.match(r"^[A-Za-z]:", raw):
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    if any(segment in {"", ".", ".."} for segment in raw.split("/")):
+        raise ValueError(f"environment {field} must be a repo-relative POSIX path")
+    return raw
 
 
 def _validate_git_commit(value: Any) -> None:
     if not isinstance(value, str) or GIT_COMMIT_RE.fullmatch(value) is None:
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
-    completed = subprocess.run(
-        ["git", "cat-file", "-e", f"{value}^{{commit}}"],
-        cwd=REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0:
-        detail = completed.stderr.strip()
-        suffix = f": {detail}" if detail else ""
-        raise ValueError(f"environment git_commit must exist in the local git object database{suffix}")
 
 
 def _validate_canonical_path(
@@ -221,7 +222,7 @@ def _validate_canonical_path(
     canonical_path: Path,
     description: str,
 ) -> Path:
-    path = _resolve_recorded_path(environment.get(field), field)
+    path = _resolve_recorded_path(_require_repo_relative_posix_path(environment.get(field), field), field)
     if path != canonical_path.resolve():
         raise ValueError(f"environment {field} must name the canonical {description}")
     return path
@@ -233,20 +234,67 @@ def _validate_string_list(value: Any, label: str) -> list[str]:
     return value
 
 
-def _resolve_command_executable(raw: str, label: str) -> Path:
-    path = Path(raw)
-    if path.is_absolute() or len(path.parts) > 1:
-        candidate = path if path.is_absolute() else REPO_ROOT / path
-        if candidate.is_file():
-            return candidate.resolve()
-        raise ValueError(f"{label} executable does not exist: {raw}")
-    resolved = shutil.which(raw)
-    if resolved is not None:
-        return Path(resolved).resolve()
-    repo_candidate = REPO_ROOT / raw
-    if repo_candidate.is_file():
-        return repo_candidate.resolve()
-    raise ValueError(f"{label} executable does not exist: {raw}")
+def _validate_runtime_identities(environment: dict[str, Any]) -> dict[str, dict[str, str]]:
+    identities = environment.get("runtime_identities")
+    if not isinstance(identities, list):
+        raise ValueError("environment runtime_identities must be an array")
+    by_role: dict[str, dict[str, str]] = {}
+    for index, identity in enumerate(identities):
+        if not isinstance(identity, dict):
+            raise ValueError(f"environment runtime_identities[{index}] must be a JSON object")
+        unsupported = sorted(set(identity) - RUNTIME_IDENTITY_FIELDS)
+        if unsupported:
+            raise ValueError(
+                f"environment runtime_identities[{index}] unsupported field(s): {', '.join(unsupported)}"
+            )
+        role = identity.get("role")
+        if not isinstance(role, str) or role not in EXPECTED_RUNTIME_ROLES:
+            raise ValueError(f"environment runtime_identities[{index}] role must be an expected tool:// role")
+        if role in by_role:
+            raise ValueError(f"environment runtime_identities duplicate role: {role}")
+        version = identity.get("version")
+        basename = identity.get("basename")
+        digest = identity.get("sha256")
+        if not isinstance(version, str) or not version:
+            raise ValueError(f"environment runtime_identities {role} version must be nonempty")
+        if not isinstance(basename, str) or not basename or "/" in basename or "\\" in basename:
+            raise ValueError(f"environment runtime_identities {role} basename must be a filename")
+        if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
+            raise ValueError(f"environment runtime_identities {role} sha256 must be a lowercase SHA-256 digest")
+        by_role[role] = {
+            "role": role,
+            "version": version,
+            "basename": basename,
+            "sha256": digest,
+        }
+
+    if set(by_role) != EXPECTED_RUNTIME_ROLES:
+        roles = ", ".join(sorted(EXPECTED_RUNTIME_ROLES))
+        raise ValueError(f"environment runtime_identities must contain exactly: {roles}")
+    if by_role[PYTHON_ROLE]["version"] != environment.get("python_version"):
+        raise ValueError("environment runtime_identities tool://python version must match python_version")
+    stim_identity = by_role[STIM_PYTHON_ROLE]
+    if stim_identity["version"] != environment.get("stim_version"):
+        raise ValueError("environment runtime_identities tool://stim-python version must match stim_version")
+    rstim_identity = by_role[RSTIM_WORKER_ROLE]
+    if rstim_identity["version"] != EXPECTED_RSTIM_WORKER_VERSION:
+        raise ValueError(f"environment runtime_identities tool://rstim-reference-worker version must be {EXPECTED_RSTIM_WORKER_VERSION}")
+    if rstim_identity["basename"] != "rstim_reference_build_worker":
+        raise ValueError("environment runtime_identities tool://rstim-reference-worker basename must be rstim_reference_build_worker")
+    return by_role
+
+
+def _validate_no_legacy_runtime_paths(environment: dict[str, Any]) -> None:
+    present = sorted(field for field in LEGACY_RUNTIME_PATH_FIELDS if field in environment)
+    if present:
+        raise ValueError(f"environment legacy runtime path field is not portable: {present[0]}")
+
+
+def _verify_runtime_binary(path: Path, identity: dict[str, str]) -> None:
+    if not path.is_file():
+        raise ValueError(f"runtime binary does not exist: {path}")
+    if sha256_file(path) != identity["sha256"]:
+        raise ValueError("runtime binary SHA-256 does not match recorded identity")
 
 
 def _validate_worker_argv(environment: dict[str, Any]) -> None:
@@ -258,56 +306,39 @@ def _validate_worker_argv(environment: dict[str, Any]) -> None:
         raise ValueError("environment canonical_worker_argv must contain both reference-build variants")
 
     expected_canonical = {
-        runner.STIM_VARIANT: runner.default_stim_worker_argv("python3"),
-        runner.RSTIM_VARIANT: runner.default_rstim_worker_argv("target/release/rstim_reference_build_worker"),
+        runner.STIM_VARIANT: runner.default_stim_worker_argv(STIM_PYTHON_ROLE),
+        runner.RSTIM_VARIANT: runner.default_rstim_worker_argv(RSTIM_WORKER_ROLE),
     }
     if canonical_worker_argv != expected_canonical:
         raise ValueError("environment canonical_worker_argv must match release reference-build commands")
 
     stim_argv = _validate_string_list(worker_argv[runner.STIM_VARIANT], f"environment worker_argv {runner.STIM_VARIANT}")
     rstim_argv = _validate_string_list(worker_argv[runner.RSTIM_VARIANT], f"environment worker_argv {runner.RSTIM_VARIANT}")
-    expected_stim_suffix = runner.default_stim_worker_argv(stim_argv[0])[1:]
-    expected_rstim_suffix = runner.default_rstim_worker_argv(rstim_argv[0])[1:]
-    if stim_argv[1:] != expected_stim_suffix:
+    if stim_argv != expected_canonical[runner.STIM_VARIANT]:
         raise ValueError(f"environment worker_argv {runner.STIM_VARIANT} must run the canonical Stim worker")
-    if rstim_argv[1:] != expected_rstim_suffix:
+    if rstim_argv != expected_canonical[runner.RSTIM_VARIANT]:
         raise ValueError(f"environment worker_argv {runner.RSTIM_VARIANT} must run the canonical rstim worker")
 
-    python_path = _resolve_recorded_path(environment.get("python_executable"), "python_executable")
-    rstim_path = _resolve_recorded_path(environment.get("rstim_worker_binary_path"), "rstim_worker_binary_path")
-    if _resolve_command_executable(stim_argv[0], f"environment worker_argv {runner.STIM_VARIANT}") != python_path:
-        raise ValueError("environment worker_argv stim executable must match python_executable")
-    if _resolve_command_executable(rstim_argv[0], f"environment worker_argv {runner.RSTIM_VARIANT}") != rstim_path:
-        raise ValueError("environment worker_argv rstim executable must match rstim_worker_binary_path")
-
-
-def _validate_runner_executable(raw: str) -> None:
-    if raw == "python3":
-        return
-    path = Path(raw)
-    if not path.is_absolute() or not path.name.lower().startswith("python"):
-        raise ValueError("environment runner_argv executable must be python3 or an absolute Python executable")
-
-
-def _validate_runner_argv(environment: dict[str, Any], results_dir: Path, runner_python_path: Path) -> None:
+def _validate_runner_argv(environment: dict[str, Any], results_dir: Path) -> None:
     argv = _validate_string_list(environment.get("runner_argv"), "environment runner_argv")
     if len(argv) != 17:
         raise ValueError("environment runner_argv must match the full canonical runner command")
-    _validate_runner_executable(argv[0])
-    if _resolve_command_executable(argv[0], "environment runner_argv") != runner_python_path:
-        raise ValueError("environment runner_argv executable must match runner_python_executable")
+    if argv[0] != PYTHON_ROLE:
+        raise ValueError("environment runner_argv executable must be tool://python")
     if argv[1:4] != ["-m", runner.MODULE_NAME, "--fixture"] or argv[5] != "--manifest":
         raise ValueError("environment runner_argv must invoke the canonical runner module")
-    if _resolve_recorded_path(argv[4], "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
+    fixture_arg = _require_repo_relative_posix_path(argv[4], "runner_argv fixture")
+    manifest_arg = _require_repo_relative_posix_path(argv[6], "runner_argv manifest")
+    if _resolve_recorded_path(fixture_arg, "runner_argv fixture") != _resolve_recorded_path(environment.get("fixture_path"), "fixture_path"):
         raise ValueError("environment runner_argv fixture must match fixture_path")
-    if _resolve_recorded_path(argv[6], "runner_argv manifest") != _resolve_recorded_path(environment.get("manifest_path"), "manifest_path"):
+    if _resolve_recorded_path(manifest_arg, "runner_argv manifest") != _resolve_recorded_path(environment.get("manifest_path"), "manifest_path"):
         raise ValueError("environment runner_argv manifest must match manifest_path")
 
     expected_tail = [
         "--stim-python",
-        environment["worker_argv"][runner.STIM_VARIANT][0],
+        STIM_PYTHON_ROLE,
         "--rstim-worker",
-        environment["worker_argv"][runner.RSTIM_VARIANT][0],
+        RSTIM_WORKER_ROLE,
         "--warmup-rounds",
         "2",
         "--measure-rounds",
@@ -325,6 +356,7 @@ def validate_environment(
     derived: dict[str, Any],
     records: list[dict[str, Any]],
     results_dir: Path,
+    verify_runtime_binary: Path | None = None,
 ) -> None:
     del derived, records
     _validate_git_commit(environment.get("git_commit"))
@@ -353,15 +385,12 @@ def validate_environment(
         raise ValueError("canonical reference-build fixture file SHA-256 does not match expected digest")
     if sha256_file(manifest_path) != environment.get("manifest_sha256"):
         raise ValueError("environment manifest_sha256 does not match manifest_path")
-    _validate_path_hash(environment, "python_executable", "python_executable_sha256")
-    _validate_path_hash(environment, "rstim_worker_binary_path", "rstim_worker_binary_sha256")
-    runner_python_path = _validate_path_hash(
-        environment,
-        "runner_python_executable",
-        "runner_python_executable_sha256",
-    )
+    _validate_no_legacy_runtime_paths(environment)
+    runtime_identities = _validate_runtime_identities(environment)
     _validate_worker_argv(environment)
-    _validate_runner_argv(environment, results_dir, runner_python_path)
+    _validate_runner_argv(environment, results_dir)
+    if verify_runtime_binary is not None:
+        _verify_runtime_binary(verify_runtime_binary, runtime_identities[RSTIM_WORKER_ROLE])
 
 
 def validate_artifact_hashes(results_dir: Path) -> None:
@@ -376,7 +405,7 @@ def validate_artifact_hashes(results_dir: Path) -> None:
             raise ValueError(f"artifact-sha256.json digest does not match {filename}")
 
 
-def validate_bundle(results_dir: Path) -> None:
+def validate_bundle(results_dir: Path, verify_runtime_binary: Path | None = None) -> None:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
     derived = validate_raw_semantics(records)
@@ -386,16 +415,17 @@ def validate_bundle(results_dir: Path) -> None:
     if (results_dir / "report.md").read_text(encoding="utf-8") != render_report(summary):
         raise ValueError("report.md does not match summary.json")
     environment = load_json_object(results_dir / "environment.json", "environment.json")
-    validate_environment(environment, derived, records, results_dir)
+    validate_environment(environment, derived, records, results_dir, verify_runtime_binary)
     validate_artifact_hashes(results_dir)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate packed reference-build evidence.")
     parser.add_argument("--dir", type=Path, required=True, dest="results_dir")
+    parser.add_argument("--verify-runtime-binary", type=Path)
     args = parser.parse_args(argv)
     try:
-        validate_bundle(args.results_dir)
+        validate_bundle(args.results_dir, args.verify_runtime_binary)
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1

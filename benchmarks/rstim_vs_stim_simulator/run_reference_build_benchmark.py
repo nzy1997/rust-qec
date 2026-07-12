@@ -34,6 +34,10 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parents[1]
 MODULE_NAME = "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark"
 STIM_WORKER_MODULE = "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build"
+PYTHON_ROLE = "tool://python"
+STIM_PYTHON_ROLE = "tool://stim-python"
+RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
+RSTIM_WORKER_VERSION = "rstim 0.1.1"
 
 
 class RunnerError(RuntimeError):
@@ -54,6 +58,14 @@ def default_stim_worker_argv(stim_python: str) -> list[str]:
 
 def default_rstim_worker_argv(rstim_worker: str) -> list[str]:
     return [rstim_worker, "--protocol", PROTOCOL]
+
+
+def logical_stim_worker_argv() -> list[str]:
+    return default_stim_worker_argv(STIM_PYTHON_ROLE)
+
+
+def logical_rstim_worker_argv() -> list[str]:
+    return default_rstim_worker_argv(RSTIM_WORKER_ROLE)
 
 
 def write_artifact_hashes(out_dir: Path) -> None:
@@ -364,23 +376,23 @@ def render_report(summary: dict[str, Any]) -> str:
 
 def _runner_argv(args: argparse.Namespace) -> list[str]:
     return [
-        sys.executable,
+        PYTHON_ROLE,
         "-m",
         MODULE_NAME,
         "--fixture",
-        str(args.fixture),
+        _repo_relative_posix(args.fixture, "runner_argv fixture"),
         "--manifest",
-        str(args.manifest),
+        _repo_relative_posix(args.manifest, "runner_argv manifest"),
         "--stim-python",
-        str(args.stim_python),
+        STIM_PYTHON_ROLE,
         "--rstim-worker",
-        str(args.rstim_worker),
+        RSTIM_WORKER_ROLE,
         "--warmup-rounds",
         str(args.warmup_rounds),
         "--measure-rounds",
         str(args.measure_rounds),
         "--out-dir",
-        str(args.out_dir),
+        _repo_relative_or_abs(args.out_dir),
     ]
 
 
@@ -389,7 +401,15 @@ def _repo_relative_or_abs(path: Path) -> str:
     try:
         return str(resolved.relative_to(REPO_ROOT))
     except ValueError:
-        return str(resolved)
+        return str(path)
+
+
+def _repo_relative_posix(path: Path, label: str) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError as error:
+        raise RunnerError(f"{label} must be under repository root: {resolved}") from error
 
 
 def collect_environment(
@@ -402,8 +422,6 @@ def collect_environment(
     git_dirty: bool,
     stim_version: str,
 ) -> dict[str, Any]:
-    stim_worker_argv = default_stim_worker_argv(str(args.stim_python))
-    rstim_worker_argv = default_rstim_worker_argv(str(args.rstim_worker))
     runner_python_path = Path(sys.executable).resolve()
     stim_python_path = _resolve_executable(str(args.stim_python))
     rstim_worker_path = _resolve_executable(str(args.rstim_worker))
@@ -412,32 +430,46 @@ def collect_environment(
         "protocol": PROTOCOL,
         "timer_scope": TIMER_SCOPE,
         "seed_policy": SEED_POLICY,
-        "fixture_path": _repo_relative_or_abs(fixture),
+        "fixture_path": _repo_relative_posix(fixture, "fixture"),
         "fixture_sha256": fixture_sha256,
-        "manifest_path": _repo_relative_or_abs(manifest),
+        "manifest_path": _repo_relative_posix(manifest, "manifest"),
         "manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "stim_version": stim_version,
         "worker_argv": {
-            STIM_VARIANT: stim_worker_argv,
-            RSTIM_VARIANT: rstim_worker_argv,
+            STIM_VARIANT: logical_stim_worker_argv(),
+            RSTIM_VARIANT: logical_rstim_worker_argv(),
         },
         "canonical_worker_argv": {
-            STIM_VARIANT: default_stim_worker_argv("python3"),
-            RSTIM_VARIANT: default_rstim_worker_argv("target/release/rstim_reference_build_worker"),
+            STIM_VARIANT: logical_stim_worker_argv(),
+            RSTIM_VARIANT: logical_rstim_worker_argv(),
         },
         "runner_argv": _runner_argv(args),
-        "runner_python_executable": str(runner_python_path),
-        "runner_python_executable_sha256": sha256_file(runner_python_path),
+        "runtime_identities": [
+            {
+                "role": PYTHON_ROLE,
+                "version": platform.python_version(),
+                "basename": runner_python_path.name,
+                "sha256": sha256_file(runner_python_path),
+            },
+            {
+                "role": STIM_PYTHON_ROLE,
+                "version": stim_version,
+                "basename": stim_python_path.name,
+                "sha256": sha256_file(stim_python_path),
+            },
+            {
+                "role": RSTIM_WORKER_ROLE,
+                "version": RSTIM_WORKER_VERSION,
+                "basename": "rstim_reference_build_worker",
+                "sha256": sha256_file(rstim_worker_path),
+            },
+        ],
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
         "git_commit": git_commit,
         "git_dirty": git_dirty,
         "os": platform.platform(),
         "cpu_model": _cpu_model(),
-        "python_executable": str(stim_python_path),
-        "python_executable_sha256": sha256_file(stim_python_path),
-        "rstim_worker_binary_path": str(rstim_worker_path),
-        "rstim_worker_binary_sha256": sha256_file(rstim_worker_path),
         "rustc_version": _probe_stdout_or_failed(["rustc", "--version"]),
         "cargo_version": _probe_stdout_or_failed(["cargo", "--version"]),
         "python_version": platform.python_version(),
@@ -452,6 +484,8 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
         raise RunnerError(f"fixture does not exist: {fixture}")
     if not manifest.is_file():
         raise RunnerError(f"manifest does not exist: {manifest}")
+    _repo_relative_posix(fixture, "fixture")
+    _repo_relative_posix(manifest, "manifest")
     manifest_sha256 = sha256_file(manifest)
     if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
         raise RunnerError(
