@@ -586,3 +586,49 @@ fn is_noiselessly_skipped_or_metadata_operation(name: &str) -> bool {
             | "OBSERVABLE_INCLUDE"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn repeat_row(x: &[bool], z: &[bool], phase: u8) -> RepeatPauliRow {
+        RepeatPauliRow {
+            x: x.to_vec(),
+            z: z.to_vec(),
+            phase,
+        }
+    }
+
+    #[test]
+    fn multiply_pauli_covers_all_single_qubit_products() {
+        let cases = [
+            ((false, false), (true, false), (true, false, 0)),
+            ((true, false), (false, false), (true, false, 0)),
+            ((true, false), (true, false), (false, false, 0)),
+            ((false, true), (false, true), (false, false, 0)),
+            ((true, true), (true, true), (false, false, 0)),
+            ((true, false), (false, true), (true, true, 1)),
+            ((false, true), (true, false), (true, true, 3)),
+            ((true, false), (true, true), (false, true, 1)),
+            ((true, true), (true, false), (false, true, 3)),
+            ((false, true), (true, true), (true, false, 3)),
+            ((true, true), (false, true), (true, false, 1)),
+        ];
+
+        for ((x1, z1), (x2, z2), expected) in cases {
+            assert_eq!(multiply_pauli(x1, z1, x2, z2), expected);
+        }
+    }
+
+    #[test]
+    fn repeat_pauli_row_identity_tracks_reduced_dependents() {
+        let mut dependent = repeat_row(&[true], &[false], 0);
+        let basis = vec![Some(repeat_row(&[true], &[false], 0)), None];
+
+        reduce_pauli_row(&mut dependent, &basis);
+
+        assert!(dependent.is_identity());
+        assert_eq!(dependent.phase, 0);
+        assert!(!repeat_row(&[true], &[false], 0).is_identity());
+    }
+}
