@@ -111,6 +111,10 @@ fn direct_collapse_crosses_64_and_128_qubit_boundaries() {
         packed.h(q);
         legacy.h(q);
     }
+    for q in [63, 64, 127, 128] {
+        packed.s_dag(q);
+        legacy.s_dag(q);
+    }
     for (control, target) in [(63, 64), (64, 65), (127, 128), (128, 129)] {
         packed.cx(control, target);
         legacy.cx(control, target);
@@ -136,9 +140,29 @@ fn direct_collapse_crosses_64_and_128_qubit_boundaries() {
     assert!(counters.collapse_pivots >= 3);
 
     let verification_targets: Vec<_> = (0..num_qubits).map(|q| (q, false)).collect();
+    let mut packed_x = packed.clone();
+    let mut legacy_x = legacy.clone();
+    for q in 0..num_qubits {
+        packed_x.h(q);
+        legacy_x.h(q);
+    }
     assert_eq!(
-        packed.measure_z_many_biased(&verification_targets),
-        legacy_measure_z_many(&mut legacy, &verification_targets),
-        "boundary collapse state",
+        packed_x.measure_z_many_biased(&verification_targets),
+        legacy_measure_z_many(&mut legacy_x, &verification_targets),
+        "boundary collapse X-basis state",
+    );
+
+    let mut packed_y = packed.clone();
+    let mut legacy_y = legacy.clone();
+    for q in 0..num_qubits {
+        packed_y.s_dag(q);
+        packed_y.h(q);
+        legacy_y.s_dag(q);
+        legacy_y.h(q);
+    }
+    assert_eq!(
+        packed_y.measure_z_many_biased(&verification_targets),
+        legacy_measure_z_many(&mut legacy_y, &verification_targets),
+        "boundary collapse Y-basis state",
     );
 }
