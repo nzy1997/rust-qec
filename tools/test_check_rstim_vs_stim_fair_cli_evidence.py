@@ -254,6 +254,40 @@ class FairCliEvidenceCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
 
+    def test_rejects_reordered_candidate_summary_reused_from_baseline(self) -> None:
+        baseline = json.loads((self.bundle / "baseline-summary.json").read_text(encoding="utf-8"))
+        records = [json.loads(line) for line in (self.bundle / "raw.jsonl").read_text().splitlines()]
+        by_variant = {variant["variant"]: variant for variant in baseline["variants"]}
+        for record in records:
+            if record["phase"] != "measured":
+                continue
+            variant = by_variant[record["variant"]]
+            index = record["round_index"]
+            record["elapsed_ns"] = variant["elapsed_ns"]["samples"][index]
+            record["stdout_sha256"] = variant["stdout_sha256"][index]
+        records = [record for record in records if record["variant"] == "rstim-cli-b8"] + [
+            record for record in records if record["variant"] == "stim-cli-b8"
+        ]
+        (self.bundle / "raw.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+        )
+        summary = run_fair_cli._summary(records, case=fair_cli_contract.EXPECTED_CASE)
+        self.assertEqual([variant["variant"] for variant in summary["variants"]], ["rstim-cli-b8", "stim-cli-b8"])
+        self.assertNotEqual(summary, baseline)
+        (self.bundle / "summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        reference_evidence = run_fair_cli._reference_evidence(repo_root=REPO_ROOT)
+        comparison = run_fair_cli._comparison(baseline, summary, reference_evidence)
+        (self.bundle / "comparison.json").write_text(
+            json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (self.bundle / "report.md").write_text(run_fair_cli._render_report(summary, comparison), encoding="utf-8")
+        rewrite_artifact_hashes(self.bundle)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("candidate summary must differ from pinned baseline summary", result.stderr)
+
     def test_rejects_mismatched_reference_evidence_hash(self) -> None:
         def break_reference_hash(environment: dict[str, Any]) -> None:
             environment["reference_evidence"]["summary_sha256"] = "0" * 64

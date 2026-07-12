@@ -223,6 +223,17 @@ def render_report(summary: dict[str, Any], comparison: dict[str, Any]) -> str:
     return run_fair_cli._render_report(summary, comparison)
 
 
+def _summary_baseline_reuse_key(summary: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(summary)
+    variants = summary.get("variants")
+    if isinstance(variants, list):
+        normalized["variants"] = sorted(
+            variants,
+            key=lambda item: item.get("variant", "") if isinstance(item, dict) else "",
+        )
+    return normalized
+
+
 def validate_baseline_and_candidate(results_dir: Path, candidate_summary: dict[str, Any]) -> dict[str, Any]:
     baseline_path = results_dir / "baseline-summary.json"
     if sha256_file(baseline_path) != BASELINE_SUMMARY_SHA256:
@@ -230,7 +241,7 @@ def validate_baseline_and_candidate(results_dir: Path, candidate_summary: dict[s
     if sha256_file(results_dir / "summary.json") == BASELINE_SUMMARY_SHA256:
         raise ValueError("candidate summary must differ from pinned baseline summary")
     baseline = load_json_object(baseline_path, "baseline-summary.json")
-    if candidate_summary == baseline:
+    if _summary_baseline_reuse_key(candidate_summary) == _summary_baseline_reuse_key(baseline):
         raise ValueError("candidate summary must differ from pinned baseline summary")
     if run_fair_cli._rounded_ratio(run_fair_cli._rstim_over_stim(baseline)) != BASELINE_RATIO:
         raise ValueError("baseline_rstim_over_stim must be 3.576")
