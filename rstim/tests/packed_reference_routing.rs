@@ -259,6 +259,24 @@ fn supported_pauli_resets_use_direct_inverse_collapse_and_preserve_duplicates() 
     assert_eq!(duplicate.phase_counters.canonical_materializations, 0);
     assert_eq!(duplicate.phase_counters.canonical_writebacks, 0);
 
+    let duplicate_x =
+        build_reference_sample_with_decision(&parse_circuit("H 0\nZ 0\nMRX !0 0\nMX 0\n"))
+            .expect("duplicate X reset reference sample builds");
+    assert_packed_reference_decision(&duplicate_x.decision);
+    assert_eq!(duplicate_x.bits, vec![false, false, false]);
+    assert_eq!(duplicate_x.phase_counters.canonical_materializations, 0);
+    assert_eq!(duplicate_x.phase_counters.canonical_writebacks, 0);
+    assert_eq!(duplicate_x.phase_counters.direct_inverse_batches, 3);
+
+    let duplicate_y =
+        build_reference_sample_with_decision(&parse_circuit("H 0\nS_DAG 0\nMRY 0 !0\nMY 0\n"))
+            .expect("duplicate Y reset reference sample builds");
+    assert_packed_reference_decision(&duplicate_y.decision);
+    assert_eq!(duplicate_y.bits, vec![true, true, false]);
+    assert_eq!(duplicate_y.phase_counters.canonical_materializations, 0);
+    assert_eq!(duplicate_y.phase_counters.canonical_writebacks, 0);
+    assert_eq!(duplicate_y.phase_counters.direct_inverse_batches, 3);
+
     for (circuit, expected_bits, expected_batches) in [
         ("X 0 1\nMR 0 1\nM 0 1\n", vec![true, true, false, false], 2),
         ("H 0 1\nZ 0 1\nMRX 0 1\nMX 0 1\n", vec![true, true, false, false], 2),
