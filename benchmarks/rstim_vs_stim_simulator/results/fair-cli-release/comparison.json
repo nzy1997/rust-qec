@@ -1,0 +1,18 @@
+{
+  "baseline_median_ns": {
+    "rstim-cli-b8": 103262541,
+    "stim-cli-b8": 28879750
+  },
+  "baseline_rstim_over_stim": 3.576,
+  "candidate_median_ns": {
+    "rstim-cli-b8": 18073833,
+    "stim-cli-b8": 26704292
+  },
+  "candidate_rstim_over_stim": 0.677,
+  "claim": "Candidate rstim/Stim median ratio is 0.677x, change from baseline is -2.899x.",
+  "ratio_delta_from_baseline": -2.899,
+  "reference_strategy": "direct_inverse_repeat_folded",
+  "reference_summary_path": "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json",
+  "reference_summary_sha256": "b0e02c0ac11c7f06544215c7de54f03948e81166b74b9cc5805b2e427f6d2c1f",
+  "reference_variant": "rstim-direct-repeat-reference-b8"
+}

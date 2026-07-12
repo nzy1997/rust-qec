@@ -1,6 +1,8 @@
 {
-  "environment.json": "0cd74dcf0c6aeb0e900b1b3c573d5f9bcbcd281548d92782964f40a033e8c867",
-  "raw.jsonl": "0687869e8af780fcfa95b77e3d0a65448fb29e6e36920c4739f6783b7f90df34",
-  "report.md": "1b28385ccf1523fac930feb4dc11542751884bdf99416e98815e0591d1960e51",
-  "summary.json": "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
+  "baseline-summary.json": "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07",
+  "comparison.json": "292adb577ef28eec7df0bc5ed4169dacb2d9e8afee1e572f7e52b81aaef5ffca",
+  "environment.json": "e01fa8211fd049690fd5d45bd64cce24927586e0ad301d6fde159b71b43a3ff7",
+  "raw.jsonl": "715634316bb0c35dbc60edcae2b39609f6e7707243c2c9b32007f00ab2e89328",
+  "report.md": "5397b0ec52dbfc83985c78c8f2cd31e4461c6ea814e57d1a90b7f3c61d0b3fec",
+  "summary.json": "dc048a0882ed577d38915df5d1b18cd078050245d68117da456bfff5262c7297"
 }

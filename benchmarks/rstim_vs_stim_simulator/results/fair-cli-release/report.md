@@ -5,5 +5,13 @@ Measured records: 14
 
 | variant | sample_count | median_elapsed_ns | min_elapsed_ns | max_elapsed_ns |
 | --- | ---: | ---: | ---: | ---: |
-| stim-cli-b8 | 7 | 28879750 | 28728125 | 29394916 |
-| rstim-cli-b8 | 7 | 103262541 | 102557083 | 103508542 |
+| stim-cli-b8 | 7 | 26704292 | 26308292 | 26863625 |
+| rstim-cli-b8 | 7 | 18073833 | 17891500 | 18228916 |
+
+## Baseline comparison
+
+Baseline rstim/Stim ratio: 3.576x
+Candidate rstim/Stim ratio: 0.677x
+Change from baseline: -2.899x
+Reference strategy: direct_inverse_repeat_folded
+
