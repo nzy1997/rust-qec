@@ -101,6 +101,20 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
             with self.assertRaisesRegex(checker.ReadinessError, "not ready: reference direct/canonical speedup"):
                 checker.build_readiness(CATALOG)
 
+    def test_direct_canonical_materializations_report_not_ready(self) -> None:
+        checker = __import__("tools.check_sampler_performance_readiness", fromlist=["ReadinessError", "build_readiness"])
+        counters = {"canonical_materializations": 1, "executed_repeat_iterations": 1}
+        with mock.patch.object(checker, "direct_phase_counters", return_value=counters):
+            with self.assertRaisesRegex(checker.ReadinessError, "not ready: direct reference path recorded production canonical materializations"):
+                checker.build_readiness(CATALOG)
+
+    def test_direct_repeat_iteration_mismatch_reports_not_ready(self) -> None:
+        checker = __import__("tools.check_sampler_performance_readiness", fromlist=["ReadinessError", "build_readiness"])
+        counters = {"canonical_materializations": 0, "executed_repeat_iterations": 2}
+        with mock.patch.object(checker, "direct_phase_counters", return_value=counters):
+            with self.assertRaisesRegex(checker.ReadinessError, "not ready: direct reference path did not execute exactly one d11 repeat iteration"):
+                checker.build_readiness(CATALOG)
+
     def test_frame_ratio_above_limit_reports_not_ready(self) -> None:
         checker = __import__("tools.check_sampler_performance_readiness", fromlist=["ReadinessError", "build_readiness"])
         replacement = {
