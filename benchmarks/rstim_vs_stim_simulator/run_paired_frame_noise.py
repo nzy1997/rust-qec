@@ -309,6 +309,8 @@ def _write_artifact_hashes(out_dir: Path) -> None:
 
 
 def run_paired_frame_noise(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+    if args.baseline_rev != PINNED_BASELINE_REV:
+        raise ValueError(f"baseline revision is pinned to {PINNED_BASELINE_REV}")
     fixture = _validate_fixture(Path(args.fixture), repo_root=repo_root)
     if args.shots != 1024:
         raise ValueError("paired frame-noise benchmark requires --shots 1024")

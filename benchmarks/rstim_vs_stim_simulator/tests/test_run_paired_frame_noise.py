@@ -148,6 +148,27 @@ def run_with_fake_builds(
 
 
 class RunPairedFrameNoiseTest(unittest.TestCase):
+    def test_non_pinned_baseline_revision_rejected_before_materialization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            materialize = mock.Mock()
+            args = argparse.Namespace(
+                baseline_rev="HEAD~1",
+                candidate_rev="HEAD",
+                fixture=FIXTURE,
+                shots=1024,
+                warmup_rounds=2,
+                measure_rounds=7,
+                out_dir=Path(temp_dir) / "out",
+            )
+            with mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise.materialize_revision",
+                materialize,
+            ):
+                with self.assertRaisesRegex(ValueError, f"pinned.*{BASELINE_REV}"):
+                    run_paired_frame_noise.run_paired_frame_noise(args, repo_root=ROOT)
+
+            materialize.assert_not_called()
+
     def test_same_revision_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "baseline and candidate revisions must differ"):
             run_paired_frame_noise.ensure_distinct_revisions("a" * 40, "a" * 40)
