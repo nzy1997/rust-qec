@@ -93,7 +93,7 @@ class AllPortableEvidenceCheckerTest(unittest.TestCase):
                     "PASS portable evidence catalog bundles=4 schema=2",
                     "PASS fair CLI sampling evidence variants=2 measured=14",
                     "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9",
-                    "PASS packed reference-build evidence",
+                    "PASS packed reference-build evidence variants=3 direct_speedup=21.404588",
                     "PASS instruction-wide frame-noise evidence builds=803 attempts=82290688 legacy_setups=80362",
                     "PASS portable checked evidence bundles=4",
                     "",

@@ -219,7 +219,10 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             out_dir = directory / "out"
             out_dir.mkdir()
             (out_dir / "summary.json").write_bytes(
-                (ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json").read_bytes()
+                (
+                    ROOT
+                    / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/baseline-summary.json"
+                ).read_bytes()
             )
 
             expected_git_commit = command_stdout(["git", "rev-parse", "HEAD"])
