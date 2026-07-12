@@ -665,8 +665,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(
         "PASS instruction-wide frame-noise evidence "
-        f"outcome={result['outcome']} builds={result['builds']} attempts={result['attempts']} "
-        f"legacy_setups={result['legacy_setups']} candidate_over_baseline={result['candidate_over_baseline']}"
+        f"outcome={result['outcome']} builds={result['builds']} "
+        f"legacy_setups={result['legacy_setups']} candidate_over_baseline={result['candidate_over_baseline']} "
+        f"attempts={result['attempts']}"
     )
     return 0
 

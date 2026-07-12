@@ -335,8 +335,8 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 attempts=82290688 "
-            "legacy_setups=80362 candidate_over_baseline=1.0\n",
+            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 "
+            "legacy_setups=80362 candidate_over_baseline=1.0 attempts=82290688\n",
         )
 
     def test_default_validation_does_not_require_live_runtime_binary(self) -> None:
@@ -347,8 +347,8 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 attempts=82290688 "
-            "legacy_setups=80362 candidate_over_baseline=1.0\n",
+            "PASS instruction-wide frame-noise evidence outcome=neutral builds=803 "
+            "legacy_setups=80362 candidate_over_baseline=1.0 attempts=82290688\n",
         )
 
     def test_verify_runtime_binary_accepts_matching_supplied_binary(self) -> None:

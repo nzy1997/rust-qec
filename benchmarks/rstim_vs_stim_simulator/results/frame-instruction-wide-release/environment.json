@@ -2,6 +2,9 @@
   "artifact_sha256": {
     "correctness-summary.json": "42d4e8ae02c8787292b4b16fc0e66f79c805fb04685d64630fd1778351b57484",
     "fixture-load.json": "c953d134c601568b9be1d73036ca652bb90438148adeb6c6942fca788435d27f",
+    "paired-raw.jsonl": "06836a8aa1eadb6ae2006c36902eabbe58011f07285b854e588079f5f1d13cae",
+    "paired-report.md": "729051a69af0a15904d9bb4e9e6e513e674b5a1db853c125ced965f56d6afbcf",
+    "paired-summary.json": "e550a4df8a51f8d5694069c8e23ab930facde630507baf984f753e876e549b15",
     "raw.jsonl": "c257e436be785cb48a8847f042883fe066501b479ecad72f781b6f82232494a6",
     "report.md": "fd1e291c7848599c9d06f48d3e139210c7daef25a51b1d1ba301ca3c37afbde4",
     "summary.json": "1b41f2b1f8ad1730ac61f62cd707225f547b42d6f65ac0752b22a6cfbc6cb422"
@@ -59,14 +62,6 @@
   "measure_rounds": 1,
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
-  "runtime_identities": [
-    {
-      "basename": "rstim",
-      "role": "tool://rstim",
-      "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
-      "version": "rstim 0.1.1"
-    }
-  ],
   "rstim_version": "rstim 0.1.1",
   "runner_argv": [
     "/opt/homebrew/opt/python@3.14/bin/python3.14",
@@ -92,6 +87,14 @@
     "1",
     "--out-dir",
     "/tmp/rstim-frame-instruction-wide-release"
+  ],
+  "runtime_identities": [
+    {
+      "basename": "rstim",
+      "role": "tool://rstim",
+      "sha256": "336ab36864ba884314507d39378628aa653f16f9c51693512da510cbf3982568",
+      "version": "rstim 0.1.1"
+    }
   ],
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
   "seed": 7,

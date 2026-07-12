@@ -51,8 +51,9 @@ def _reference_build_pass_line(result: Any) -> str:
 def _instruction_wide_pass_line(result: Any) -> str:
     return (
         "PASS instruction-wide frame-noise evidence "
-        f"outcome={result['outcome']} builds={result['builds']} attempts={result['attempts']} "
-        f"legacy_setups={result['legacy_setups']} candidate_over_baseline={result['candidate_over_baseline']:.6f}"
+        f"outcome={result['outcome']} builds={result['builds']} "
+        f"legacy_setups={result['legacy_setups']} candidate_over_baseline={result['candidate_over_baseline']:.6f} "
+        f"attempts={result['attempts']}"
     )
 
 
