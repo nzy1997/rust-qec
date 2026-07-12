@@ -416,3 +416,48 @@ fn rstim_reference_build_worker_canonical_strategy_is_benchmark_only() {
     drop(stdin);
     assert!(child.wait().expect("wait").success());
 }
+
+#[test]
+fn rstim_reference_build_worker_canonical_strategy_counts_repeat_iterations() {
+    let (mut child, mut stdin, mut reader) =
+        spawn_worker_with_args(&["--protocol", PROTOCOL, "--strategy", "canonical"]);
+    let fixture = tempfile::NamedTempFile::new().expect("fixture");
+    std::fs::write(
+        fixture.path(),
+        "REPEAT 3 {\n    M 0\n}\nREPEAT 2 {\n    REPEAT 4 {\n        M 1\n    }\n}\n",
+    )
+    .expect("write fixture");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    let loaded = read_response(&mut reader, &mut line);
+    assert_eq!(loaded["type"], "loaded");
+    assert_eq!(loaded["measurement_bits"], json!(11));
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":0,"include_phase_counters":true})
+    )
+    .expect("send build");
+    let built = read_response(&mut reader, &mut line);
+    assert_eq!(built["backend"], "canonical_roundtrip");
+    assert_eq!(built["packed_bytes"], json!(2));
+    let counters = built["phase_counters"]
+        .as_object()
+        .expect("phase counters object");
+    assert_eq!(counters["measurement_bits"], json!(11));
+    assert_eq!(counters["measurement_reset_batches"], json!(11));
+    assert_eq!(counters["canonical_materializations"], json!(11));
+    assert_eq!(counters["canonical_writebacks"], json!(11));
+    assert_eq!(counters["expanded_repeat_iterations"], json!(13));
+    assert_eq!(counters["executed_repeat_iterations"], json!(13));
+    assert_eq!(counters["skipped_repeat_iterations"], json!(0));
+
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
