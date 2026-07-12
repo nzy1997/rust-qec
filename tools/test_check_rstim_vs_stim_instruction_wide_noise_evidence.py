@@ -567,7 +567,10 @@ class InstructionWideEvidenceCheckerTest(unittest.TestCase):
         self.assertNotIn("artifact", result.stderr.lower())
 
     def test_rejects_paired_classification_mismatch(self) -> None:
-        rewrite_json(self.bundle / "paired-summary.json", lambda payload: payload.update({"outcome": "improved"}))
+        rewrite_json(
+            self.bundle / "paired-summary.json",
+            lambda payload: payload.update({"candidate_over_baseline": 1.02, "outcome": "improved"}),
+        )
         rewrite_hashes(self.bundle)
 
         result = self.run_checker()
