@@ -39,7 +39,8 @@ TOOL_ROLES = {
     BASELINE_VARIANT: "tool://rstim-baseline-frame-noise",
     CANDIDATE_VARIANT: "tool://rstim-candidate-frame-noise",
 }
-ARTIFACT_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json")
+ARTIFACT_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
+HASHED_ARTIFACT_FILES = ARTIFACT_FILES[:-1]
 
 
 @dataclass(frozen=True)
@@ -96,7 +97,7 @@ def _version_or_failed(argv: list[str], *, cwd: Path) -> str:
     try:
         return _probe_stdout(argv, cwd=cwd)
     except (OSError, RuntimeError) as error:
-        return f"failed: {error}"
+        return f"failed: {type(error).__name__}"
 
 
 def _cpu_model() -> str:
@@ -187,8 +188,14 @@ def _canonical_argv(role: str, *, fixture: Path, shots: int, seed: int, repo_roo
     ]
 
 
-def validate_canonical_command(argv: list[str], *, variant: str, fixture: Path, shots: int, seed: int) -> None:
-    expected = _canonical_argv(argv[0], fixture=fixture, shots=shots, seed=seed, repo_root=REPO_ROOT)
+def validate_canonical_command(
+    argv: list[str], *, variant: str, fixture: Path, shots: int, seed: int, repo_root: Path
+) -> None:
+    if variant not in TOOL_ROLES:
+        raise ValueError(f"unknown variant: {variant}")
+    if not argv or argv[0] != TOOL_ROLES[variant]:
+        raise ValueError(f"{variant} command must use logical tool role {TOOL_ROLES[variant]}")
+    expected = _canonical_argv(TOOL_ROLES[variant], fixture=fixture, shots=shots, seed=seed, repo_root=repo_root)
     if argv != expected:
         if "--skip_reference_sample" not in argv:
             raise ValueError(f"{variant} command must include --skip_reference_sample")
@@ -210,8 +217,10 @@ def _record_result(
     phase: str,
     round_index: int,
     seed: int,
+    ordering_slot: int,
     logical_argv: list[str],
     result: CliResult,
+    revision: RevisionBuild,
 ) -> dict[str, Any]:
     if result.exit_code != 0:
         detail = result.stderr.decode(errors="replace").strip()
@@ -226,8 +235,15 @@ def _record_result(
         "variant": variant,
         "phase": phase,
         "round_index": round_index,
+        "ordering_slot": ordering_slot,
         "seed": seed,
         "argv": logical_argv,
+        "shots": 1024,
+        "measurement_count": MEASUREMENT_COUNT,
+        "output_format": OUTPUT_FORMAT,
+        "expected_output_bytes": EXPECTED_OUTPUT_BYTES,
+        "resolved_revision": revision.resolved_commit,
+        "revision_label": revision.label,
         "elapsed_ns": result.elapsed_ns,
         "timer_scope": TIMER_SCOPE,
         "exit_code": result.exit_code,
@@ -240,7 +256,10 @@ def _record_result(
 def _summary(records: list[dict[str, Any]], *, baseline: RevisionBuild, candidate: RevisionBuild) -> dict[str, Any]:
     variants: list[dict[str, Any]] = []
     for variant in (BASELINE_VARIANT, CANDIDATE_VARIANT):
-        elapsed_ns = [record["elapsed_ns"] for record in records if record["variant"] == variant and record["phase"] == "measured"]
+        measured_records = [
+            record for record in records if record["variant"] == variant and record["phase"] == "measured"
+        ]
+        elapsed_ns = [record["elapsed_ns"] for record in measured_records]
         variants.append({
             "variant": variant,
             "measured_count": len(elapsed_ns),
@@ -248,6 +267,16 @@ def _summary(records: list[dict[str, Any]], *, baseline: RevisionBuild, candidat
             "mean_elapsed_ns": statistics.mean(elapsed_ns),
             "min_elapsed_ns": min(elapsed_ns),
             "max_elapsed_ns": max(elapsed_ns),
+            "elapsed_ns": {
+                "samples": elapsed_ns,
+                "sample_count": len(elapsed_ns),
+                "min": min(elapsed_ns),
+                "max": max(elapsed_ns),
+                "mean": statistics.mean(elapsed_ns),
+                "median": statistics.median(elapsed_ns),
+            },
+            "total_output_bytes": sum(record["actual_output_bytes"] for record in measured_records),
+            "stdout_sha256": [record["stdout_sha256"] for record in measured_records],
         })
     return {
         "module": MODULE_NAME,
@@ -277,7 +306,22 @@ def _report(summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _environment(*, repo_root: Path, fixture: Path, baseline: RevisionBuild, candidate: RevisionBuild) -> dict[str, Any]:
+def _git_dirty(*, repo_root: Path) -> bool:
+    completed = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=repo_root, capture_output=True, text=True, check=False
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("git status --porcelain failed")
+    return bool(completed.stdout.strip())
+
+
+def _environment(
+    *, repo_root: Path, fixture: Path, baseline: RevisionBuild, candidate: RevisionBuild, records: list[dict[str, Any]]
+) -> dict[str, Any]:
+    build_isolation = {
+        "materialization": "git archive",
+        "target_dir_role": "temporary isolated CARGO_TARGET_DIR",
+    }
     return {
         "module": MODULE_NAME,
         "case_id": CASE_ID,
@@ -291,6 +335,24 @@ def _environment(*, repo_root: Path, fixture: Path, baseline: RevisionBuild, can
         "python_version": sys.version,
         "platform": platform.platform(),
         "cpu_model": _cpu_model(),
+        "rustc_version": _version_or_failed(["rustc", "--version"], cwd=repo_root),
+        "cargo_version": _version_or_failed(["cargo", "--version"], cwd=repo_root),
+        "git_commit": resolve_revision("HEAD", repo_root=repo_root),
+        "git_dirty": _git_dirty(repo_root=repo_root),
+        "build_isolation": build_isolation,
+        "baseline_build_isolation": build_isolation,
+        "candidate_build_isolation": build_isolation,
+        "runtime_identities": [
+            {
+                "role": revision.label,
+                "version": _version_or_failed([str(revision.binary_path)], cwd=repo_root),
+                "basename": revision.binary_path.name,
+                "sha256": sha256_file(revision.binary_path),
+            }
+            for revision in (baseline, candidate)
+        ],
+        "round_argv": [record["argv"] for record in records],
+        "runner_argv": sys.argv,
         "baseline_revision": {
             "requested_rev": baseline.requested_rev,
             "resolved_commit": baseline.resolved_commit,
@@ -305,7 +367,7 @@ def _environment(*, repo_root: Path, fixture: Path, baseline: RevisionBuild, can
 
 
 def _write_artifact_hashes(out_dir: Path) -> None:
-    write_json(out_dir / "artifact-sha256.json", {name: sha256_file(out_dir / name) for name in ARTIFACT_FILES})
+    write_json(out_dir / "artifact-sha256.json", {name: sha256_file(out_dir / name) for name in HASHED_ARTIFACT_FILES})
 
 
 def run_paired_frame_noise(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> dict[str, Any]:
@@ -318,6 +380,9 @@ def run_paired_frame_noise(args: argparse.Namespace, *, repo_root: Path = REPO_R
         raise ValueError("round counts must be nonnegative warmup and positive measured")
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    stale_artifacts = [out_dir / name for name in ARTIFACT_FILES if (out_dir / name).exists()]
+    if stale_artifacts:
+        raise ValueError(f"stale benchmark artifact exists: {stale_artifacts[0]}")
 
     with tempfile.TemporaryDirectory(prefix="rstim-paired-frame-noise-") as temp_dir:
         temp_root = Path(temp_dir)
@@ -332,11 +397,13 @@ def run_paired_frame_noise(args: argparse.Namespace, *, repo_root: Path = REPO_R
                 labels = ["baseline", "candidate"]
                 if round_index % 2:
                     labels.reverse()
-                seed = round_index
+                seed = round_index if phase == "warmup" else args.warmup_rounds + round_index
                 for label in labels:
                     variant = BASELINE_VARIANT if label == "baseline" else CANDIDATE_VARIANT
                     logical_argv = _canonical_argv(TOOL_ROLES[variant], fixture=fixture, shots=args.shots, seed=seed, repo_root=repo_root)
-                    validate_canonical_command(logical_argv, variant=variant, fixture=fixture, shots=args.shots, seed=seed)
+                    validate_canonical_command(
+                        logical_argv, variant=variant, fixture=fixture, shots=args.shots, seed=seed, repo_root=repo_root
+                    )
                     actual_argv = [str(binaries[label]), *logical_argv[1:-1], str(fixture)]
                     result = time_cli(actual_argv, cwd=repo_root)
                     records.append(_record_result(
@@ -344,12 +411,16 @@ def run_paired_frame_noise(args: argparse.Namespace, *, repo_root: Path = REPO_R
                         phase=phase,
                         round_index=round_index,
                         seed=seed,
+                        ordering_slot=len(records),
                         logical_argv=logical_argv,
                         result=result,
+                        revision=baseline if label == "baseline" else candidate,
                     ))
 
         summary = _summary(records, baseline=baseline, candidate=candidate)
-        environment = _environment(repo_root=repo_root, fixture=fixture, baseline=baseline, candidate=candidate)
+        environment = _environment(
+            repo_root=repo_root, fixture=fixture, baseline=baseline, candidate=candidate, records=records
+        )
         write_jsonl(out_dir / "raw.jsonl", records)
         write_json(out_dir / "summary.json", summary)
         (out_dir / "report.md").write_text(_report(summary), encoding="utf-8")

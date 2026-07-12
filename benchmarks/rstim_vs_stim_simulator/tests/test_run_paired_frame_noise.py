@@ -175,7 +175,7 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
 
     def test_canonical_command_requires_skip_reference_sample(self) -> None:
         argv = [
-            "tool://rstim-baseline",
+            run_paired_frame_noise.TOOL_ROLES[run_paired_frame_noise.BASELINE_VARIANT],
             "sample",
             "--shots",
             "1024",
@@ -193,6 +193,34 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
                 fixture=Path(FIXTURE_REPO_PATH),
                 shots=1024,
                 seed=0,
+                repo_root=ROOT,
+            )
+
+    def test_canonical_command_rejects_unknown_variant_and_wrong_role(self) -> None:
+        argv = run_paired_frame_noise._canonical_argv(
+            run_paired_frame_noise.TOOL_ROLES[run_paired_frame_noise.BASELINE_VARIANT],
+            fixture=FIXTURE,
+            shots=1024,
+            seed=0,
+            repo_root=ROOT,
+        )
+        with self.assertRaisesRegex(ValueError, "unknown variant"):
+            run_paired_frame_noise.validate_canonical_command(
+                argv,
+                variant="unknown-variant",
+                fixture=FIXTURE,
+                shots=1024,
+                seed=0,
+                repo_root=ROOT,
+            )
+        with self.assertRaisesRegex(ValueError, "logical tool role"):
+            run_paired_frame_noise.validate_canonical_command(
+                argv,
+                variant=run_paired_frame_noise.CANDIDATE_VARIANT,
+                fixture=FIXTURE,
+                shots=1024,
+                seed=0,
+                repo_root=ROOT,
             )
 
     def test_time_cli_includes_complete_stderr_drain_and_exit(self) -> None:
@@ -231,6 +259,14 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
             })
             measured = [record for record in records if record["phase"] == "measured"]
             self.assertEqual(len(measured), 14)
+            self.assertEqual(
+                [record["seed"] for record in records if record["phase"] == "warmup"],
+                [0, 0, 1, 1],
+            )
+            self.assertEqual(
+                [record["seed"] for record in measured],
+                [2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8],
+            )
             for phase in ("warmup", "measured"):
                 phase_records = [record for record in records if record["phase"] == phase]
                 for round_index in sorted({record["round_index"] for record in phase_records}):
@@ -243,6 +279,13 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
             for record in records:
                 self.assertEqual(record["actual_output_bytes"], EXPECTED_BYTES)
                 self.assertEqual(record["stdout_sha256"], EXPECTED_SHA256)
+                self.assertIn("ordering_slot", record)
+                self.assertEqual(record["shots"], 1024)
+                self.assertEqual(record["measurement_count"], 12_121)
+                self.assertEqual(record["output_format"], "b8")
+                self.assertEqual(record["expected_output_bytes"], EXPECTED_BYTES)
+                self.assertEqual(record["resolved_revision"], BASELINE_COMMIT if record["variant"] == run_paired_frame_noise.BASELINE_VARIANT else CANDIDATE_COMMIT)
+                self.assertEqual(record["revision_label"], "baseline" if record["variant"] == run_paired_frame_noise.BASELINE_VARIANT else "candidate")
                 self.assertIn("--skip_reference_sample", record["argv"])
                 self.assertEqual(record["argv"][record["argv"].index("--out_format") + 1], "b8")
                 self.assertEqual(record["argv"][record["argv"].index("--in") + 1], FIXTURE_REPO_PATH)
@@ -252,8 +295,39 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
             self.assertEqual(environment["candidate_revision"]["resolved_commit"], CANDIDATE_COMMIT)
             self.assertEqual(environment["fixture_path"], FIXTURE_REPO_PATH)
             self.assertEqual(environment["expected_output_bytes"], EXPECTED_BYTES)
+            self.assertIn("rustc_version", environment)
+            self.assertIn("cargo_version", environment)
+            self.assertIn("git_commit", environment)
+            self.assertIn("git_dirty", environment)
+            self.assertEqual(environment["build_isolation"]["materialization"], "git archive")
+            self.assertEqual(environment["build_isolation"]["target_dir_role"], "temporary isolated CARGO_TARGET_DIR")
+            self.assertEqual(len(environment["runtime_identities"]), 2)
+            self.assertEqual(
+                {identity["role"] for identity in environment["runtime_identities"]},
+                {"baseline", "candidate"},
+            )
+            for identity in environment["runtime_identities"]:
+                self.assertEqual(identity["basename"], "rstim")
+                binary = builds[identity["role"]].binary_path
+                self.assertEqual(identity["sha256"], hashlib.sha256(binary.read_bytes()).hexdigest())
+                self.assertIn("version", identity)
+            self.assertEqual(environment["round_argv"], [record["argv"] for record in records])
+            self.assertEqual(environment["runner_argv"], sys.argv)
             self.assertNotIn(str(root), json.dumps(records))
             self.assertNotIn(str(root), json.dumps(summary))
+            self.assertNotIn(str(root), json.dumps(environment))
+
+            for variant in summary["variants"]:
+                self.assertEqual(variant["measured_count"], 7)
+                self.assertEqual(variant["total_output_bytes"], 7 * EXPECTED_BYTES)
+                self.assertEqual(variant["stdout_sha256"], [EXPECTED_SHA256] * 7)
+                elapsed = variant["elapsed_ns"]
+                self.assertEqual(elapsed["sample_count"], 7)
+                self.assertEqual(len(elapsed["samples"]), 7)
+                self.assertEqual(elapsed["min"], min(elapsed["samples"]))
+                self.assertEqual(elapsed["max"], max(elapsed["samples"]))
+                self.assertEqual(elapsed["mean"], sum(elapsed["samples"]) / 7)
+                self.assertEqual(elapsed["median"], sorted(elapsed["samples"])[3])
 
             hashes = json.loads((out_dir / "artifact-sha256.json").read_text(encoding="utf-8"))
             self.assertEqual(set(hashes), {"raw.jsonl", "summary.json", "report.md", "environment.json"})
@@ -272,6 +346,37 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "1552384|output bytes"):
                 run_with_fake_builds(out_dir, builds)
             self.assertFalse((out_dir / "summary.json").exists())
+
+    def test_stale_artifact_rejected_before_materialization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            out_dir = root / "out"
+            out_dir.mkdir()
+            stale_summary = out_dir / "summary.json"
+            stale_summary.write_text('{"stale": true}\n', encoding="utf-8")
+            builds = fake_builds(root)
+            builds["candidate"] = dataclasses.replace(
+                builds["candidate"],
+                binary_path=write_fake_rstim(root / "candidate-target/release/rstim", mode="short-output"),
+            )
+            materialize = mock.Mock(side_effect=lambda revision, *, repo_root, temp_root, label: builds[label])
+            args = argparse.Namespace(
+                baseline_rev=BASELINE_REV,
+                candidate_rev="HEAD",
+                fixture=FIXTURE,
+                shots=1024,
+                warmup_rounds=2,
+                measure_rounds=7,
+                out_dir=out_dir,
+            )
+            with mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise.materialize_revision",
+                materialize,
+            ):
+                with self.assertRaisesRegex(ValueError, "stale artifact|summary\\.json"):
+                    run_paired_frame_noise.run_paired_frame_noise(args, repo_root=ROOT)
+            materialize.assert_not_called()
+            self.assertEqual(stale_summary.read_text(encoding="utf-8"), '{"stale": true}\n')
 
     def test_materialize_revision_uses_git_archive_without_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
