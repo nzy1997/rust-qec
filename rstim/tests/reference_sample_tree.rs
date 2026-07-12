@@ -199,3 +199,82 @@ fn simplified_matches_stim_v1_15_empty_and_repetition_case() {
 
     assert_eq!(raw.simplified(), leaf(&[true, true, true], 6));
 }
+
+#[test]
+fn simplified_covers_empty_prefix_payload_and_wrapped_forms() {
+    assert_eq!(
+        ReferenceSampleTree::default().simplified(),
+        ReferenceSampleTree::default()
+    );
+    assert!(!leaf(&[true], 1).empty());
+
+    let concatenated_payload = ReferenceSampleTree {
+        prefix_bits: vec![true],
+        suffix_children: vec![leaf(&[false], 1)],
+        repetitions: 1,
+    };
+    assert_eq!(concatenated_payload.simplified(), leaf(&[true, false], 1));
+
+    let lifted_payload = ReferenceSampleTree {
+        prefix_bits: vec![true],
+        suffix_children: vec![leaf(&[false], 2), leaf(&[true], 1)],
+        repetitions: 1,
+    };
+    assert_eq!(
+        lifted_payload.simplified(),
+        ReferenceSampleTree {
+            prefix_bits: vec![true],
+            suffix_children: vec![leaf(&[false], 2), leaf(&[true], 1)],
+            repetitions: 1,
+        }
+    );
+
+    let wrapped_children = ReferenceSampleTree {
+        prefix_bits: Vec::new(),
+        suffix_children: vec![leaf(&[true], 2), leaf(&[false], 1)],
+        repetitions: 1,
+    };
+    assert_eq!(
+        wrapped_children.simplified(),
+        ReferenceSampleTree {
+            prefix_bits: Vec::new(),
+            suffix_children: vec![leaf(&[true], 2), leaf(&[false], 1)],
+            repetitions: 1,
+        }
+    );
+}
+
+#[test]
+fn repeated_multi_child_simplification_preserves_payload_shape() {
+    let take_payload = ReferenceSampleTree {
+        prefix_bits: vec![true],
+        suffix_children: vec![leaf(&[false], 2)],
+        repetitions: 3,
+    };
+    let simplified = take_payload.simplified();
+    assert_eq!(
+        simplified,
+        ReferenceSampleTree {
+            prefix_bits: vec![true],
+            suffix_children: vec![leaf(&[false], 2)],
+            repetitions: 3,
+        }
+    );
+    assert_eq!(decompress(&simplified), decompress(&take_payload));
+
+    let wrap_children = ReferenceSampleTree {
+        prefix_bits: Vec::new(),
+        suffix_children: vec![leaf(&[true], 2), leaf(&[false], 1)],
+        repetitions: 3,
+    };
+    let simplified = wrap_children.simplified();
+    assert_eq!(
+        simplified,
+        ReferenceSampleTree {
+            prefix_bits: Vec::new(),
+            suffix_children: vec![leaf(&[true], 2), leaf(&[false], 1)],
+            repetitions: 3,
+        }
+    );
+    assert_eq!(decompress(&simplified), decompress(&wrap_children));
+}
