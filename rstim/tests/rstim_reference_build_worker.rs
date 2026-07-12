@@ -103,8 +103,10 @@ fn rstim_reference_build_worker_reports_phase_counters_only_when_requested() {
         .and_then(serde_json::Value::as_object)
         .expect("phase counters object");
     assert_eq!(counters["measurement_reset_batches"], json!(1));
-    assert_eq!(counters["canonical_materializations"], json!(1));
-    assert_eq!(counters["canonical_writebacks"], json!(1));
+    assert_eq!(counters["canonical_materializations"], json!(0));
+    assert_eq!(counters["canonical_writebacks"], json!(0));
+    assert_eq!(counters["direct_inverse_batches"], json!(1));
+    assert_eq!(counters["transposed_collapse_batches"], json!(1));
     assert_eq!(counters["collapse_pivots"], json!(1));
     assert_eq!(counters["expanded_repeat_iterations"], json!(0));
     assert_eq!(counters["measurement_bits"], json!(1));
@@ -142,12 +144,13 @@ fn rstim_reference_build_worker_reports_canonical_surface_phase_counters() {
         .and_then(serde_json::Value::as_object)
         .expect("phase counters object");
     assert_eq!(counters["measurement_reset_batches"], json!(103));
-    assert_eq!(counters["canonical_materializations"], json!(103));
-    assert_eq!(counters["canonical_writebacks"], json!(2));
+    assert_eq!(counters["canonical_materializations"], json!(0));
+    assert_eq!(counters["canonical_writebacks"], json!(0));
+    assert_eq!(counters["direct_inverse_batches"], json!(103));
+    assert_eq!(counters["transposed_collapse_batches"], json!(2));
+    assert_eq!(counters["collapse_pivots"], json!(120));
     assert_eq!(counters["expanded_repeat_iterations"], json!(99));
     assert_eq!(counters["measurement_bits"], json!(12_121));
-    assert_eq!(counters["direct_inverse_batches"], json!(0));
-    assert_eq!(counters["transposed_collapse_batches"], json!(0));
 
     drop(stdin);
     assert!(child.wait().expect("wait").success());

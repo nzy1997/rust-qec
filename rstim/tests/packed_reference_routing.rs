@@ -5,8 +5,7 @@ use rstim::compiled::{
     SamplerPathDecision, SamplingFallbackReason, choose_sampler_path, compile_circuit,
 };
 use rstim::data_path::{
-    ReferenceSampleDecision, ReferenceSampleMode, ReferenceBuildPhaseCounters,
-    build_reference_sample_with_decision,
+    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample_with_decision,
     build_reference_sample_with_sweep_bits_and_decision,
 };
 use rstim::ir::StimInstr;
@@ -213,11 +212,6 @@ fn assert_all_false(bits: &[bool], label: &str) {
     );
 }
 
-fn assert_zero_future_counters(counters: &ReferenceBuildPhaseCounters) {
-    assert_eq!(counters.direct_inverse_batches, 0);
-    assert_eq!(counters.transposed_collapse_batches, 0);
-}
-
 #[test]
 fn canonical_surface_fixture_reports_current_reference_phase_work() {
     let instrs = parse_circuit(SURFACE_D11_R100);
@@ -228,12 +222,67 @@ fn canonical_surface_fixture_reports_current_reference_phase_work() {
     assert_eq!(result.bits.len(), 12_121);
     assert_all_false(&result.bits, "surface d11 r100 reference");
     assert_eq!(counters.measurement_reset_batches, 103);
-    assert_eq!(counters.canonical_materializations, 103);
-    assert_eq!(counters.canonical_writebacks, 2);
+    assert_eq!(counters.canonical_materializations, 0);
+    assert_eq!(counters.canonical_writebacks, 0);
+    assert_eq!(counters.direct_inverse_batches, 103);
+    assert_eq!(counters.transposed_collapse_batches, 2);
+    assert_eq!(counters.collapse_pivots, 120);
     assert_eq!(counters.expanded_repeat_iterations, 99);
     assert_eq!(counters.measurement_bits, 12_121);
-    assert!(counters.collapse_pivots > 0);
-    assert_zero_future_counters(&counters);
+}
+
+#[test]
+fn supported_pauli_measurements_use_direct_inverse_collapse() {
+    for (circuit, expected_bits, expected_pivots) in [
+        ("H 0\nM 0\n", vec![false], 1),
+        ("H 0 1\nMX 0 1\n", vec![false, false], 2),
+        ("H 0 1\nS 0 1\nMY 0 1\n", vec![false, false], 2),
+    ] {
+        let result = build_reference_sample_with_decision(&parse_circuit(circuit))
+            .expect("reference sample builds");
+        assert_packed_reference_decision(&result.decision);
+        assert_eq!(result.bits, expected_bits, "circuit:\n{circuit}");
+        assert_eq!(result.phase_counters.canonical_materializations, 0);
+        assert_eq!(result.phase_counters.canonical_writebacks, 0);
+        assert_eq!(result.phase_counters.direct_inverse_batches, 1);
+        assert_eq!(result.phase_counters.transposed_collapse_batches, 1);
+        assert_eq!(result.phase_counters.collapse_pivots, expected_pivots);
+    }
+}
+
+#[test]
+fn supported_pauli_resets_use_direct_inverse_collapse_and_preserve_duplicates() {
+    let duplicate = build_reference_sample_with_decision(&parse_circuit("X 0\nMR 0 0\nM 0\n"))
+        .expect("duplicate reset reference sample builds");
+    assert_packed_reference_decision(&duplicate.decision);
+    assert_eq!(duplicate.bits, vec![true, false, false]);
+    assert_eq!(duplicate.phase_counters.canonical_materializations, 0);
+    assert_eq!(duplicate.phase_counters.canonical_writebacks, 0);
+
+    for (circuit, expected_bits, expected_batches) in [
+        ("X 0 1\nMR 0 1\nM 0 1\n", vec![true, true, false, false], 2),
+        ("H 0 1\nZ 0 1\nMRX 0 1\nMX 0 1\n", vec![true, true, false, false], 2),
+        (
+            "H 0 1\nS_DAG 0 1\nMRY 0 1\nMY 0 1\n",
+            vec![true, true, false, false],
+            2,
+        ),
+        ("X 0 1\nR 0 1\nM 0 1\n", vec![false, false], 2),
+        ("H 0 1\nZ 0 1\nRX 0 1\nMX 0 1\n", vec![false, false], 2),
+        (
+            "H 0 1\nS_DAG 0 1\nRY 0 1\nMY 0 1\n",
+            vec![false, false],
+            2,
+        ),
+    ] {
+        let result = build_reference_sample_with_decision(&parse_circuit(circuit))
+            .expect("reference sample builds");
+        assert_packed_reference_decision(&result.decision);
+        assert_eq!(result.bits, expected_bits, "circuit:\n{circuit}");
+        assert_eq!(result.phase_counters.canonical_materializations, 0);
+        assert_eq!(result.phase_counters.canonical_writebacks, 0);
+        assert_eq!(result.phase_counters.direct_inverse_batches, expected_batches);
+    }
 }
 
 #[test]
@@ -247,16 +296,18 @@ fn phase_counters_distinguish_deterministic_and_collapsing_measurements() {
 
     assert_eq!(deterministic.measurement_reset_batches, 1);
     assert_eq!(collapsing.measurement_reset_batches, 1);
-    assert_eq!(deterministic.canonical_materializations, 1);
-    assert_eq!(collapsing.canonical_materializations, 1);
+    assert_eq!(deterministic.canonical_materializations, 0);
+    assert_eq!(collapsing.canonical_materializations, 0);
     assert_eq!(deterministic.canonical_writebacks, 0);
-    assert_eq!(collapsing.canonical_writebacks, 1);
+    assert_eq!(collapsing.canonical_writebacks, 0);
+    assert_eq!(deterministic.direct_inverse_batches, 1);
+    assert_eq!(collapsing.direct_inverse_batches, 1);
+    assert_eq!(deterministic.transposed_collapse_batches, 0);
+    assert_eq!(collapsing.transposed_collapse_batches, 1);
     assert_eq!(deterministic.collapse_pivots, 0);
     assert_eq!(collapsing.collapse_pivots, 1);
     assert_eq!(deterministic.measurement_bits, 1);
     assert_eq!(collapsing.measurement_bits, 1);
-    assert_zero_future_counters(&deterministic);
-    assert_zero_future_counters(&collapsing);
 }
 
 #[test]
