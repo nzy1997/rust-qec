@@ -100,9 +100,12 @@ alone cannot cause a fold.
   detection.
 
 `expanded_repeat_iterations` remains the logical repeat-iteration count for
-compatibility with existing JSON consumers. The profile script will validate
-the new counters and print the issue's requested summary labels:
-`executed_repeats` and `skipped_repeats`.
+compatibility with existing JSON consumers. When an outer folded cycle contains
+nested repeats, skipped telemetry includes the skipped outer iterations plus
+the skipped nested logical iterations, preserving the invariant
+`expanded_repeat_iterations == executed_repeat_iterations + skipped_repeat_iterations`.
+The profile script will validate the new counters and print the issue's
+requested summary labels: `executed_repeats` and `skipped_repeats`.
 
 ## Tests
 
@@ -113,6 +116,7 @@ Add `rstim/tests/repeat_aware_reference_sample.rs` covering:
   output;
 - short repeats below 10 executing without skip;
 - nested repeats folding recursively;
+- folded outer repeats preserving nested logical-repeat telemetry;
 - the issue's negative control, `REPEAT 99 { X 0 } M 0`, proving state
   comparison is used even when the loop body emits no measurement bits;
 - the surface-code fixture's 12,121 zero reference bits, packed-byte digest

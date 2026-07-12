@@ -114,6 +114,16 @@ fn nested_long_repeats_fold_recursively_inside_short_parent() {
 }
 
 #[test]
+fn folded_outer_repeat_preserves_nested_logical_repeat_counters() {
+    let (bits, counters) = build("REPEAT 12 {\n  REPEAT 12 {\n    M 0\n  }\n}\n");
+    assert_eq!(bits, vec![false; 144]);
+    assert_eq!(counters.measurement_reset_batches, 1);
+    assert_eq!(counters.expanded_repeat_iterations, 156);
+    assert_eq!(counters.executed_repeat_iterations, 2);
+    assert_eq!(counters.skipped_repeat_iterations, 154);
+}
+
+#[test]
 fn state_alternating_empty_period_is_not_folded_by_bits_only() {
     let (bits, counters) = build("REPEAT 99 {\n  X 0\n}\nM 0\n");
     assert_eq!(bits, vec![true]);
@@ -210,6 +220,15 @@ fn saturating_usize_from_u64(value: u64) -> usize {
 
 fn add_repeat_counter(slot: &mut usize, value: u64) {
     *slot = slot.saturating_add(saturating_usize_from_u64(value));
+}
+
+fn logical_repeat_iterations(instrs: &[StimInstr]) -> u64 {
+    instrs.iter().fold(0_u64, |total, instr| match instr {
+        StimInstr::Op { .. } => total,
+        StimInstr::Repeat { count, body } => total.saturating_add(
+            count.saturating_add(count.saturating_mul(logical_repeat_iterations(body))),
+        ),
+    })
 }
 
 fn append_tree_bits(tree: &mut ReferenceSampleTree, bits: Vec<bool>) {
@@ -343,7 +362,12 @@ fn packed_reference_repeat(
                     .simplified(),
                 );
                 let skipped = whole_cycles * period;
-                add_repeat_counter(&mut counters.skipped_repeat_iterations, skipped);
+                let nested_skipped = skipped.saturating_mul(logical_repeat_iterations(body));
+                add_repeat_counter(&mut counters.expanded_repeat_iterations, nested_skipped);
+                add_repeat_counter(
+                    &mut counters.skipped_repeat_iterations,
+                    skipped.saturating_add(nested_skipped),
+                );
                 iteration += skipped;
             }
             break;
@@ -381,6 +405,10 @@ fn packed_reference_repeat_without_skip(
     Ok(tree.simplified())
 }
 ```
+
+The recursive skipped accounting preserves
+`expanded_repeat_iterations == executed_repeat_iterations + skipped_repeat_iterations`
+even when a folded outer repeat contains nested repeats.
 
 - [ ] **Step 5: Update existing counter expectations**
 
