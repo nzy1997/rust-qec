@@ -20,10 +20,23 @@ pub enum ReferenceSampleDecision {
     LegacyFallback(SamplingFallbackReason),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
+pub struct ReferenceBuildPhaseCounters {
+    pub measurement_reset_batches: usize,
+    pub canonical_materializations: usize,
+    pub canonical_writebacks: usize,
+    pub direct_inverse_batches: usize,
+    pub transposed_collapse_batches: usize,
+    pub collapse_pivots: usize,
+    pub expanded_repeat_iterations: usize,
+    pub measurement_bits: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReferenceSampleResult {
     pub bits: Vec<bool>,
     pub decision: ReferenceSampleDecision,
+    pub phase_counters: ReferenceBuildPhaseCounters,
 }
 
 pub fn build_reference_sample(
@@ -51,15 +64,20 @@ pub fn build_reference_sample_with_sweep_bits_and_decision(
     sweep_bits: Option<&[bool]>,
 ) -> Result<ReferenceSampleResult, String> {
     match build_packed_reference_sample(instrs) {
-        Ok(bits) => Ok(ReferenceSampleResult {
+        Ok((bits, counters)) => Ok(ReferenceSampleResult {
             bits,
             decision: ReferenceSampleDecision::PackedInverse,
+            phase_counters: counters,
         }),
         Err(reason) => {
             let bits = crate::executor::reference_sample_with_sweep_bits(instrs, sweep_bits)?;
             Ok(ReferenceSampleResult {
                 bits,
                 decision: ReferenceSampleDecision::LegacyFallback(reason),
+                phase_counters: ReferenceBuildPhaseCounters {
+                    measurement_bits: crate::stats::num_measurements(instrs),
+                    ..ReferenceBuildPhaseCounters::default()
+                },
             })
         }
     }
@@ -67,28 +85,36 @@ pub fn build_reference_sample_with_sweep_bits_and_decision(
 
 fn build_packed_reference_sample(
     instrs: &[StimInstr],
-) -> Result<Vec<bool>, SamplingFallbackReason> {
+) -> Result<(Vec<bool>, ReferenceBuildPhaseCounters), SamplingFallbackReason> {
     let num_qubits =
         crate::executor::max_qubit(instrs).map_err(SamplingFallbackReason::UnsupportedOperation)?;
     let mut tableau = PackedInverseTableau::identity(num_qubits);
     let mut measurements = Vec::new();
-    packed_reference_instrs(&mut tableau, &mut measurements, instrs)?;
-    Ok(measurements)
+    let mut counters = ReferenceBuildPhaseCounters {
+        measurement_bits: crate::stats::num_measurements(instrs),
+        ..ReferenceBuildPhaseCounters::default()
+    };
+    packed_reference_instrs(&mut tableau, &mut measurements, instrs, &mut counters)?;
+    Ok((measurements, counters))
 }
 
 fn packed_reference_instrs(
     tableau: &mut PackedInverseTableau,
     measurements: &mut Vec<bool>,
     instrs: &[StimInstr],
+    counters: &mut ReferenceBuildPhaseCounters,
 ) -> Result<(), SamplingFallbackReason> {
     for instr in instrs {
         match instr {
             StimInstr::Op { name, targets, .. } => {
-                packed_reference_op(tableau, measurements, name, targets)?;
+                packed_reference_op(tableau, measurements, name, targets, counters)?;
             }
             StimInstr::Repeat { count, body } => {
+                counters.expanded_repeat_iterations = counters
+                    .expanded_repeat_iterations
+                    .saturating_add(usize::try_from(*count).unwrap_or(usize::MAX));
                 for _ in 0..*count {
-                    packed_reference_instrs(tableau, measurements, body)?;
+                    packed_reference_instrs(tableau, measurements, body, counters)?;
                 }
             }
         }
@@ -101,6 +127,7 @@ fn packed_reference_op(
     measurements: &mut Vec<bool>,
     name: &str,
     targets: &[StimTarget],
+    counters: &mut ReferenceBuildPhaseCounters,
 ) -> Result<(), SamplingFallbackReason> {
     if is_loss_operation(name) {
         return Err(SamplingFallbackReason::Loss);
@@ -113,6 +140,9 @@ fn packed_reference_op(
     }
     if is_noiselessly_skipped_or_metadata_operation(name) {
         return Ok(());
+    }
+    if is_measurement_reset_operation(name) {
+        counters.measurement_reset_batches += 1;
     }
 
     match name {
@@ -152,43 +182,52 @@ fn packed_reference_op(
             }
         }
         "M" | "MZ" => {
-            measurements.extend(tableau.measure_z_many_biased(&qubits_with_inversion(targets)?));
+            measurements.extend(
+                tableau.measure_z_many_biased_with_counters(
+                    &qubits_with_inversion(targets)?,
+                    counters,
+                ),
+            );
         }
         "MX" => {
             for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_x_biased(q, inverted));
+                measurements.push(tableau.measure_x_biased_with_counters(q, inverted, counters));
             }
         }
         "MY" => {
             for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_y_biased(q, inverted));
+                measurements.push(tableau.measure_y_biased_with_counters(q, inverted, counters));
             }
         }
         "MR" | "MRZ" => {
-            measurements
-                .extend(tableau.measure_reset_z_many_biased(&qubits_with_inversion(targets)?));
+            measurements.extend(tableau.measure_reset_z_many_biased_with_counters(
+                &qubits_with_inversion(targets)?,
+                counters,
+            ));
         }
         "MRX" => {
             for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_reset_x_biased(q, inverted));
+                measurements
+                    .push(tableau.measure_reset_x_biased_with_counters(q, inverted, counters));
             }
         }
         "MRY" => {
             for (q, inverted) in qubits_with_inversion(targets)? {
-                measurements.push(tableau.measure_reset_y_biased(q, inverted));
+                measurements
+                    .push(tableau.measure_reset_y_biased_with_counters(q, inverted, counters));
             }
         }
         "R" | "RZ" => {
-            tableau.reset_z_many_biased(&qubits(targets)?);
+            tableau.reset_z_many_biased_with_counters(&qubits(targets)?, counters);
         }
         "RX" => {
             for q in qubits(targets)? {
-                tableau.reset_x_biased(q);
+                tableau.reset_x_biased_with_counters(q, counters);
             }
         }
         "RY" => {
             for q in qubits(targets)? {
-                tableau.reset_y_biased(q);
+                tableau.reset_y_biased_with_counters(q, counters);
             }
         }
         _ => {
@@ -241,6 +280,13 @@ fn expect_qubit(target: &StimTarget) -> Result<usize, SamplingFallbackReason> {
 
 fn unsupported_target() -> SamplingFallbackReason {
     SamplingFallbackReason::UnsupportedOperation("target".to_string())
+}
+
+fn is_measurement_reset_operation(name: &str) -> bool {
+    matches!(
+        name,
+        "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" | "R" | "RZ" | "RX" | "RY"
+    )
 }
 
 fn is_loss_operation(name: &str) -> bool {

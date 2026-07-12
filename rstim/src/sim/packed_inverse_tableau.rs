@@ -1,3 +1,5 @@
+use crate::data_path::ReferenceBuildPhaseCounters;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalTableauSnapshot {
     pub num_qubits: usize,
@@ -435,10 +437,25 @@ impl PackedInverseTableau {
     }
 
     fn measure_z_raw_biased(&mut self, q: usize) -> bool {
+        self.measure_z_raw_biased_with_counters(q, None)
+    }
+
+    fn measure_z_raw_biased_with_counters(
+        &mut self,
+        q: usize,
+        mut counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> bool {
         self.check_qubit(q);
+        if let Some(counters) = counters.as_deref_mut() {
+            counters.canonical_materializations += 1;
+        }
         let mut rows = self.canonical_rows();
-        let (raw, changed) = self.measure_z_raw_biased_in_rows(&mut rows, q);
+        let (raw, changed) =
+            self.measure_z_raw_biased_in_rows(&mut rows, q, counters.as_deref_mut());
         if changed {
+            if let Some(counters) = counters.as_deref_mut() {
+                counters.canonical_writebacks += 1;
+            }
             self.replace_from_canonical_rows(&rows);
         }
         raw
@@ -448,6 +465,7 @@ impl PackedInverseTableau {
         &self,
         rows: &mut PackedCanonicalRows,
         q: usize,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
     ) -> (bool, bool) {
         let mut pivot = None;
         for row in self.num_qubits..self.num_rows() {
@@ -458,6 +476,9 @@ impl PackedInverseTableau {
         }
 
         if let Some(p) = pivot {
+            if let Some(counters) = counters {
+                counters.collapse_pivots += 1;
+            }
             let destabilizer = p - self.num_qubits;
             for row in 0..self.num_rows() {
                 if row != p && row != destabilizer && rows.x(row, q) {
@@ -486,26 +507,37 @@ impl PackedInverseTableau {
         (sign_from_words(&temp_x, &temp_z, exponent), false)
     }
 
-    fn measure_z_raw_many_biased(&mut self, qubits: &[usize]) -> Vec<bool> {
+    fn measure_z_raw_many_biased_with_counters(
+        &mut self,
+        qubits: &[usize],
+        mut counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> Vec<bool> {
         if qubits.len() <= 1 || has_duplicate_qubits(qubits) {
             return qubits
                 .iter()
-                .map(|&q| self.measure_z_raw_biased(q))
+                .map(|&q| self.measure_z_raw_biased_with_counters(q, counters.as_deref_mut()))
                 .collect();
         }
 
         for &q in qubits {
             self.check_qubit(q);
         }
+        if let Some(counters) = counters.as_deref_mut() {
+            counters.canonical_materializations += 1;
+        }
         let mut rows = self.canonical_rows();
         let mut changed = false;
         let mut bits = Vec::with_capacity(qubits.len());
         for &q in qubits {
-            let (raw, measurement_changed) = self.measure_z_raw_biased_in_rows(&mut rows, q);
+            let (raw, measurement_changed) =
+                self.measure_z_raw_biased_in_rows(&mut rows, q, counters.as_deref_mut());
             changed |= measurement_changed;
             bits.push(raw);
         }
         if changed {
+            if let Some(counters) = counters.as_deref_mut() {
+                counters.canonical_writebacks += 1;
+            }
             self.replace_from_canonical_rows(&rows);
         }
         bits
@@ -516,8 +548,24 @@ impl PackedInverseTableau {
     }
 
     pub fn measure_z_many_biased(&mut self, targets: &[(usize, bool)]) -> Vec<bool> {
+        self.measure_z_many_biased_with_optional_counters(targets, None)
+    }
+
+    pub(crate) fn measure_z_many_biased_with_counters(
+        &mut self,
+        targets: &[(usize, bool)],
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> Vec<bool> {
+        self.measure_z_many_biased_with_optional_counters(targets, Some(counters))
+    }
+
+    fn measure_z_many_biased_with_optional_counters(
+        &mut self,
+        targets: &[(usize, bool)],
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> Vec<bool> {
         let qubits: Vec<usize> = targets.iter().map(|(q, _)| *q).collect();
-        self.measure_z_raw_many_biased(&qubits)
+        self.measure_z_raw_many_biased_with_counters(&qubits, counters)
             .into_iter()
             .zip(targets)
             .map(|(raw, (_, inverted))| raw ^ *inverted)
@@ -525,16 +573,52 @@ impl PackedInverseTableau {
     }
 
     pub fn measure_x_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.measure_x_biased_with_optional_counters(q, inverted, None)
+    }
+
+    pub(crate) fn measure_x_biased_with_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> bool {
+        self.measure_x_biased_with_optional_counters(q, inverted, Some(counters))
+    }
+
+    fn measure_x_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> bool {
         self.h(q);
-        let bit = self.measure_z_biased(q, inverted);
+        let bit = self.measure_z_raw_biased_with_counters(q, counters) ^ inverted;
         self.h(q);
         bit
     }
 
     pub fn measure_y_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.measure_y_biased_with_optional_counters(q, inverted, None)
+    }
+
+    pub(crate) fn measure_y_biased_with_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> bool {
+        self.measure_y_biased_with_optional_counters(q, inverted, Some(counters))
+    }
+
+    fn measure_y_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> bool {
         self.s_dag(q);
         self.h(q);
-        let bit = self.measure_z_biased(q, inverted);
+        let bit = self.measure_z_raw_biased_with_counters(q, counters) ^ inverted;
         self.h(q);
         self.s(q);
         bit
@@ -549,15 +633,37 @@ impl PackedInverseTableau {
     }
 
     pub fn measure_reset_z_many_biased(&mut self, targets: &[(usize, bool)]) -> Vec<bool> {
+        self.measure_reset_z_many_biased_with_optional_counters(targets, None)
+    }
+
+    pub(crate) fn measure_reset_z_many_biased_with_counters(
+        &mut self,
+        targets: &[(usize, bool)],
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> Vec<bool> {
+        self.measure_reset_z_many_biased_with_optional_counters(targets, Some(counters))
+    }
+
+    fn measure_reset_z_many_biased_with_optional_counters(
+        &mut self,
+        targets: &[(usize, bool)],
+        mut counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> Vec<bool> {
         let qubits: Vec<usize> = targets.iter().map(|(q, _)| *q).collect();
         if targets.len() <= 1 || has_duplicate_qubits(&qubits) {
             return targets
                 .iter()
-                .map(|&(q, inverted)| self.measure_reset_z_biased(q, inverted))
+                .map(|&(q, inverted)| {
+                    let raw = self.measure_z_raw_biased_with_counters(q, counters.as_deref_mut());
+                    if raw {
+                        self.x_gate(q);
+                    }
+                    raw ^ inverted
+                })
                 .collect();
         }
 
-        let raws = self.measure_z_raw_many_biased(&qubits);
+        let raws = self.measure_z_raw_many_biased_with_counters(&qubits, counters);
         for (&q, &raw) in qubits.iter().zip(&raws) {
             if raw {
                 self.x_gate(q);
@@ -570,16 +676,60 @@ impl PackedInverseTableau {
     }
 
     pub fn measure_reset_x_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.measure_reset_x_biased_with_optional_counters(q, inverted, None)
+    }
+
+    pub(crate) fn measure_reset_x_biased_with_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> bool {
+        self.measure_reset_x_biased_with_optional_counters(q, inverted, Some(counters))
+    }
+
+    fn measure_reset_x_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> bool {
         self.h(q);
-        let bit = self.measure_reset_z_biased(q, inverted);
+        let raw = self.measure_z_raw_biased_with_counters(q, counters);
+        if raw {
+            self.x_gate(q);
+        }
+        let bit = raw ^ inverted;
         self.h(q);
         bit
     }
 
     pub fn measure_reset_y_biased(&mut self, q: usize, inverted: bool) -> bool {
+        self.measure_reset_y_biased_with_optional_counters(q, inverted, None)
+    }
+
+    pub(crate) fn measure_reset_y_biased_with_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) -> bool {
+        self.measure_reset_y_biased_with_optional_counters(q, inverted, Some(counters))
+    }
+
+    fn measure_reset_y_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) -> bool {
         self.s_dag(q);
         self.h(q);
-        let bit = self.measure_reset_z_biased(q, inverted);
+        let raw = self.measure_z_raw_biased_with_counters(q, counters);
+        if raw {
+            self.x_gate(q);
+        }
+        let bit = raw ^ inverted;
         self.h(q);
         self.s(q);
         bit
@@ -593,14 +743,33 @@ impl PackedInverseTableau {
     }
 
     pub fn reset_z_many_biased(&mut self, qubits: &[usize]) {
+        self.reset_z_many_biased_with_optional_counters(qubits, None);
+    }
+
+    pub(crate) fn reset_z_many_biased_with_counters(
+        &mut self,
+        qubits: &[usize],
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) {
+        self.reset_z_many_biased_with_optional_counters(qubits, Some(counters));
+    }
+
+    fn reset_z_many_biased_with_optional_counters(
+        &mut self,
+        qubits: &[usize],
+        mut counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) {
         if qubits.len() <= 1 || has_duplicate_qubits(qubits) {
             for &q in qubits {
-                self.reset_z_biased(q);
+                let raw = self.measure_z_raw_biased_with_counters(q, counters.as_deref_mut());
+                if raw {
+                    self.x_gate(q);
+                }
             }
             return;
         }
 
-        let raws = self.measure_z_raw_many_biased(qubits);
+        let raws = self.measure_z_raw_many_biased_with_counters(qubits, counters);
         for (&q, &raw) in qubits.iter().zip(&raws) {
             if raw {
                 self.x_gate(q);
@@ -609,15 +778,53 @@ impl PackedInverseTableau {
     }
 
     pub fn reset_x_biased(&mut self, q: usize) {
+        self.reset_x_biased_with_optional_counters(q, None);
+    }
+
+    pub(crate) fn reset_x_biased_with_counters(
+        &mut self,
+        q: usize,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) {
+        self.reset_x_biased_with_optional_counters(q, Some(counters));
+    }
+
+    fn reset_x_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) {
         self.h(q);
-        self.reset_z_biased(q);
+        let raw = self.measure_z_raw_biased_with_counters(q, counters);
+        if raw {
+            self.x_gate(q);
+        }
         self.h(q);
     }
 
     pub fn reset_y_biased(&mut self, q: usize) {
+        self.reset_y_biased_with_optional_counters(q, None);
+    }
+
+    pub(crate) fn reset_y_biased_with_counters(
+        &mut self,
+        q: usize,
+        counters: &mut ReferenceBuildPhaseCounters,
+    ) {
+        self.reset_y_biased_with_optional_counters(q, Some(counters));
+    }
+
+    fn reset_y_biased_with_optional_counters(
+        &mut self,
+        q: usize,
+        counters: Option<&mut ReferenceBuildPhaseCounters>,
+    ) {
         self.s_dag(q);
         self.h(q);
-        self.reset_z_biased(q);
+        let raw = self.measure_z_raw_biased_with_counters(q, counters);
+        if raw {
+            self.x_gate(q);
+        }
         self.h(q);
         self.s(q);
     }
