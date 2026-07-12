@@ -70,7 +70,45 @@ fn rstim_reference_build_worker_parses_once_and_builds_references() {
             .as_u64()
             .expect("elapsed_ns is unsigned");
         assert!(elapsed_ns > 0, "elapsed_ns must be positive");
+        assert!(built.get("phase_counters").is_none());
     }
+    drop(stdin);
+    assert!(child.wait().expect("wait").success());
+}
+
+#[test]
+fn rstim_reference_build_worker_reports_phase_counters_only_when_requested() {
+    let (mut child, mut stdin, mut reader) = spawn_worker(PROTOCOL);
+    let fixture = tempfile::NamedTempFile::new().expect("fixture");
+    std::fs::write(fixture.path(), "H 0\nM 0\n").expect("write fixture");
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"load","fixture_path":fixture.path()})
+    )
+    .expect("send load");
+    let mut line = String::new();
+    let loaded = read_response(&mut reader, &mut line);
+    assert_eq!(loaded["type"], "loaded");
+
+    writeln!(
+        stdin,
+        "{}",
+        json!({"protocol":PROTOCOL,"type":"build_reference","request_id":0,"include_phase_counters":true})
+    )
+    .expect("send build");
+    let built = read_response(&mut reader, &mut line);
+    let counters = built
+        .get("phase_counters")
+        .and_then(serde_json::Value::as_object)
+        .expect("phase counters object");
+    assert_eq!(counters["measurement_reset_batches"], json!(1));
+    assert_eq!(counters["canonical_materializations"], json!(1));
+    assert_eq!(counters["canonical_writebacks"], json!(1));
+    assert_eq!(counters["collapse_pivots"], json!(1));
+    assert_eq!(counters["expanded_repeat_iterations"], json!(0));
+    assert_eq!(counters["measurement_bits"], json!(1));
+
     drop(stdin);
     assert!(child.wait().expect("wait").success());
 }
