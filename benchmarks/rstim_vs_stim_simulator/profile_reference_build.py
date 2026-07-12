@@ -113,13 +113,25 @@ def _validate_counters(response: dict[str, Any]) -> dict[str, int]:
     return validated
 
 
+def _require_response_field(
+    response: dict[str, Any], key: str, expected: object, context: str
+) -> None:
+    actual = response.get(key)
+    if actual != expected or type(actual) is not type(expected):
+        raise ProfileError(
+            f"{context} {key} must be {expected!r}, got {actual!r}"
+        )
+
+
 def _profile(args: argparse.Namespace) -> dict[str, Any]:
     command = [str(args.worker), "--protocol", PROTOCOL]
     session = WorkerSession(command)
     try:
-        session.request(
+        loaded = session.request(
             {"protocol": PROTOCOL, "type": "load", "fixture_path": str(args.fixture)}
         )
+        _require_response_field(loaded, "protocol", PROTOCOL, "load response")
+        _require_response_field(loaded, "type", "loaded", "load response")
         response = session.request(
             {
                 "protocol": PROTOCOL,
@@ -128,6 +140,9 @@ def _profile(args: argparse.Namespace) -> dict[str, Any]:
                 "include_phase_counters": True,
             }
         )
+        _require_response_field(response, "protocol", PROTOCOL, "build response")
+        _require_response_field(response, "type", "reference_built", "build response")
+        _require_response_field(response, "request_id", 0, "build response")
         counters = _validate_counters(response)
         if response.get("backend") != "packed_inverse":
             raise ProfileError("backend must be 'packed_inverse'")

@@ -11,21 +11,28 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 PROTOCOL = "reference-build-v1"
+DEFAULT_COUNTERS = {
+    "measurement_reset_batches": 103,
+    "canonical_materializations": 103,
+    "canonical_writebacks": 2,
+    "direct_inverse_batches": 0,
+    "transposed_collapse_batches": 0,
+    "collapse_pivots": 120,
+    "expanded_repeat_iterations": 99,
+    "measurement_bits": 12121,
+}
 
 
 class ProfileReferenceBuildTest(unittest.TestCase):
-    def _write_worker(self, directory: Path, *, include_counters: bool = True) -> Path:
+    def _write_worker(
+        self,
+        directory: Path,
+        *,
+        include_counters: bool = True,
+        phase_counters: object = DEFAULT_COUNTERS,
+        response_overrides: dict[str, object] | None = None,
+    ) -> Path:
         worker = directory / "worker.py"
-        counters_literal = {
-            "measurement_reset_batches": 103,
-            "canonical_materializations": 103,
-            "canonical_writebacks": 2,
-            "direct_inverse_batches": 0,
-            "transposed_collapse_batches": 0,
-            "collapse_pivots": 120,
-            "expanded_repeat_iterations": 99,
-            "measurement_bits": 12121,
-        }
         worker.write_text(
             textwrap.dedent(
                 f"""\
@@ -58,7 +65,8 @@ class ProfileReferenceBuildTest(unittest.TestCase):
                     "elapsed_ns": 1,
                 }}
                 if {include_counters!r}:
-                    response["phase_counters"] = {counters_literal!r}
+                    response["phase_counters"] = {phase_counters!r}
+                response.update({(response_overrides or {})!r})
                 print(json.dumps(response), flush=True)
                 """
             ),
@@ -67,38 +75,40 @@ class ProfileReferenceBuildTest(unittest.TestCase):
         worker.chmod(0o755)
         return worker
 
+    def _run_profile(self, directory: Path, worker: Path) -> subprocess.CompletedProcess[str]:
+        fixture = directory / "fixture.stim"
+        fixture.write_text("M 0\n", encoding="utf-8")
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.profile_reference_build",
+                "--fixture",
+                str(fixture),
+                "--worker",
+                str(worker),
+                "--out",
+                str(directory / "profile.json"),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
     def test_profile_command_writes_json_and_pass_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
-            fixture = directory / "fixture.stim"
-            fixture.write_text("M 0\n", encoding="utf-8")
             worker = self._write_worker(directory)
-            out = directory / "profile.json"
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "benchmarks.rstim_vs_stim_simulator.profile_reference_build",
-                    "--fixture",
-                    str(fixture),
-                    "--worker",
-                    str(worker),
-                    "--out",
-                    str(out),
-                ],
-                cwd=ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = self._run_profile(directory, worker)
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 result.stdout.strip(),
                 "PASS reference phase profile batches=103 canonical=103 writebacks=2 repeats=99 bits=12121",
             )
-            payload = json.loads(out.read_text(encoding="utf-8"))
+            payload = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
             self.assertEqual(payload["protocol"], PROTOCOL)
             self.assertEqual(payload["backend"], "packed_inverse")
             self.assertEqual(payload["phase_counters"]["measurement_reset_batches"], 103)
@@ -107,29 +117,59 @@ class ProfileReferenceBuildTest(unittest.TestCase):
     def test_profile_command_rejects_missing_phase_counters(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
-            fixture = directory / "fixture.stim"
-            fixture.write_text("M 0\n", encoding="utf-8")
             worker = self._write_worker(directory, include_counters=False)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "benchmarks.rstim_vs_stim_simulator.profile_reference_build",
-                    "--fixture",
-                    str(fixture),
-                    "--worker",
-                    str(worker),
-                    "--out",
-                    str(directory / "profile.json"),
-                ],
-                cwd=ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = self._run_profile(directory, worker)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("phase_counters", result.stderr)
+
+    def test_profile_command_rejects_malformed_build_response_identity(self) -> None:
+        cases = (
+            ({"protocol": "wrong-protocol"}, "build response protocol"),
+            ({"type": "loaded"}, "build response type"),
+            ({"request_id": 1}, "build response request_id"),
+            ({"request_id": False}, "build response request_id"),
+        )
+        for overrides, message in cases:
+            with self.subTest(overrides=overrides):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    directory = Path(temp_dir)
+                    worker = self._write_worker(
+                        directory, response_overrides=overrides
+                    )
+                    result = self._run_profile(directory, worker)
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
+
+    def test_profile_command_rejects_malformed_phase_counter_payloads(self) -> None:
+        missing_key = dict(DEFAULT_COUNTERS)
+        del missing_key["canonical_writebacks"]
+        cases = (
+            ([], "phase_counters must be a dictionary"),
+            (missing_key, "phase_counters missing 'canonical_writebacks'"),
+            (
+                {**DEFAULT_COUNTERS, "measurement_bits": True},
+                "phase_counters['measurement_bits'] must be a nonnegative integer",
+            ),
+            (
+                {**DEFAULT_COUNTERS, "collapse_pivots": -1},
+                "phase_counters['collapse_pivots'] must be a nonnegative integer",
+            ),
+            (
+                {**DEFAULT_COUNTERS, "direct_inverse_batches": "0"},
+                "phase_counters['direct_inverse_batches'] must be a nonnegative integer",
+            ),
+        )
+        for counters, message in cases:
+            with self.subTest(message=message):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    directory = Path(temp_dir)
+                    worker = self._write_worker(directory, phase_counters=counters)
+                    result = self._run_profile(directory, worker)
+
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
 
 
 if __name__ == "__main__":
