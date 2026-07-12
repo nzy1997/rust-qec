@@ -14,8 +14,32 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from benchmarks.rstim_vs_stim_simulator import run_frame_instruction_wide_benchmark as runner
 from benchmarks.rstim_vs_stim_simulator.portable_provenance import load_catalog
+
+
+EXPECTED_CASE_ID = "stim_surface_d11_r100"
+EXPECTED_STIM_VERSION = "1.15.0"
+EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
+EXPECTED_MANIFEST_SHA256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
+TIMER_SCOPE = "process_spawn_stdout_stderr_drain_exit"
+OUTPUT_FORMAT = "b8"
+CORRECTNESS_MODE = "detect"
+CORRECTNESS_OUTPUT_FORMAT = "01"
+EXPECTED_OUTPUT_BITS = 12_121
+EXPECTED_BYTES_PER_SHOT = 1_516
+EXPECTED_OUTPUT_BYTES = 1_552_384
+EXPECTED_DETECTORS = 12_000
+EXPECTED_OBSERVABLES = 1
+EXPECTED_OPERATION_TOTALS = {
+    "X_ERROR": {"instructions": 203, "targets": 24_362, "iterator_builds": 203, "attempt_count": 24_946_688},
+    "DEPOLARIZE1": {"instructions": 200, "targets": 12_000, "iterator_builds": 200, "attempt_count": 12_288_000},
+    "DEPOLARIZE2": {"instructions": 400, "pairs": 44_000, "iterator_builds": 400, "attempt_count": 45_056_000},
+}
+OPERATION_ORDER = tuple(EXPECTED_OPERATION_TOTALS)
+
+
+class RunnerError(RuntimeError):
+    pass
 
 
 REQUIRED_FILES = (
@@ -100,20 +124,20 @@ def _require_digest(value: Any, message: str) -> str:
 def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
     if len(records) != 3:
         raise ValueError("raw.jsonl must contain exactly three measured operation rows")
-    if [record.get("operation") for record in records] != list(runner.OPERATION_ORDER):
+    if [record.get("operation") for record in records] != list(OPERATION_ORDER):
         raise ValueError("raw.jsonl operations must be X_ERROR, DEPOLARIZE1, DEPOLARIZE2")
     for record in records:
-        _require_equal(record.get("case_id"), runner.EXPECTED_CASE_ID, "raw case_id must be stim_surface_d11_r100")
+        _require_equal(record.get("case_id"), EXPECTED_CASE_ID, "raw case_id must be stim_surface_d11_r100")
         _require_equal(record.get("phase"), "measured", "raw phase must be measured")
         _require_int(record.get("round_index"), 0, "raw round_index")
         _require_int(record.get("seed"), 7, "raw seed")
         _require_equal(record.get("sampling_path"), "sparse", "raw sampling_path must be sparse")
-        _require_equal(record.get("timer_scope"), runner.TIMER_SCOPE, "raw timer_scope must match measurement timer")
-        _require_equal(record.get("output_format"), runner.OUTPUT_FORMAT, "raw output_format must be b8")
-        _require_int(record.get("output_bits"), runner.EXPECTED_OUTPUT_BITS, "raw output_bits")
-        _require_int(record.get("bytes_per_shot"), runner.EXPECTED_BYTES_PER_SHOT, "raw bytes_per_shot")
-        _require_int(record.get("actual_output_bytes"), runner.EXPECTED_OUTPUT_BYTES, "raw actual_output_bytes")
-        _require_int(record.get("expected_output_bytes"), runner.EXPECTED_OUTPUT_BYTES, "raw expected_output_bytes")
+        _require_equal(record.get("timer_scope"), TIMER_SCOPE, "raw timer_scope must match measurement timer")
+        _require_equal(record.get("output_format"), OUTPUT_FORMAT, "raw output_format must be b8")
+        _require_int(record.get("output_bits"), EXPECTED_OUTPUT_BITS, "raw output_bits")
+        _require_int(record.get("bytes_per_shot"), EXPECTED_BYTES_PER_SHOT, "raw bytes_per_shot")
+        _require_int(record.get("actual_output_bytes"), EXPECTED_OUTPUT_BYTES, "raw actual_output_bytes")
+        _require_int(record.get("expected_output_bytes"), EXPECTED_OUTPUT_BYTES, "raw expected_output_bytes")
         _require_digest(record.get("stdout_sha256"), "raw stdout_sha256")
         elapsed = record.get("elapsed_ns")
         if not isinstance(elapsed, int) or isinstance(elapsed, bool) or elapsed <= 0:
@@ -134,7 +158,7 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
             if record.get(field) != first.get(field):
                 raise ValueError(f"raw measurement field {field} must be identical across operation rows")
 
-    for operation, expected in runner.EXPECTED_OPERATION_TOTALS.items():
+    for operation, expected in EXPECTED_OPERATION_TOTALS.items():
         row = next(record for record in records if record.get("operation") == operation)
         for field, value in expected.items():
             _require_int(row.get(field), value, f"{operation} {field}")
@@ -147,21 +171,100 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
     return {"iterator_builds": total_builds, "attempt_count": total_attempts}
 
 
+def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
+    if not records:
+        raise RunnerError("cannot derive summary from empty raw records")
+    first = records[0]
+    operations: list[dict[str, Any]] = []
+    for operation in OPERATION_ORDER:
+        matches = [record for record in records if record.get("operation") == operation]
+        if len(matches) != 1:
+            raise RunnerError(f"raw records must contain exactly one {operation} row")
+        row = dict(matches[0])
+        operation_summary = {
+            "operation": operation,
+            "sampling_path": row["sampling_path"],
+            "instructions": row["instructions"],
+            "iterator_builds": row["iterator_builds"],
+            "attempt_count": row["attempt_count"],
+        }
+        if operation == "DEPOLARIZE2":
+            operation_summary["pairs"] = row["pairs"]
+        else:
+            operation_summary["targets"] = row["targets"]
+        operations.append(operation_summary)
+    return {
+        "case_id": first["case_id"],
+        "seed": first["seed"],
+        "shots": 1024,
+        "phase": "measured",
+        "round_index": 0,
+        "operations": operations,
+        "totals": {
+            "instructions": sum(row["instructions"] for row in operations),
+            "iterator_builds": sum(row["iterator_builds"] for row in operations),
+            "attempt_count": sum(row["attempt_count"] for row in operations),
+        },
+        "measurement": {
+            "timer_scope": TIMER_SCOPE,
+            "output_format": OUTPUT_FORMAT,
+            "output_bits": first["output_bits"],
+            "bytes_per_shot": first["bytes_per_shot"],
+            "expected_output_bytes": first["expected_output_bytes"],
+            "actual_output_bytes": first["actual_output_bytes"],
+            "stdout_sha256": first["stdout_sha256"],
+            "elapsed_ns": first["elapsed_ns"],
+        },
+    }
+
+
+def render_report(summary: dict[str, Any]) -> str:
+    lines = [
+        "# Instruction-Wide Frame-Noise Evidence",
+        "",
+        f"Case: `{summary['case_id']}`",
+        f"Seed: `{summary['seed']}`",
+        f"Timer scope: `{summary['measurement']['timer_scope']}`",
+        "",
+        "| Operation | Instructions/builds | Targets/pairs | Attempts |",
+        "|---|---:|---:|---:|",
+    ]
+    for row in summary["operations"]:
+        target_value = row.get("pairs", row.get("targets"))
+        lines.append(
+            f"| `{row['operation']}` | {row['iterator_builds']} | {target_value} | {row['attempt_count']} |"
+        )
+    totals = summary["totals"]
+    target_total = sum(row.get("pairs", row.get("targets", 0)) for row in summary["operations"])
+    lines.extend(
+        [
+            f"| **Total** | **{totals['iterator_builds']}** | **{target_total}** | **{totals['attempt_count']}** |",
+            "",
+            "Measurement output:",
+            f"- bits per shot: {summary['measurement']['output_bits']}",
+            f"- bytes per shot: {summary['measurement']['bytes_per_shot']}",
+            f"- bytes for run: {summary['measurement']['actual_output_bytes']}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def validate_summary_and_report(records: list[dict[str, Any]], summary: dict[str, Any], report: str) -> None:
-    expected_summary = runner.derive_summary(records)
+    expected_summary = derive_summary(records)
     if summary != expected_summary:
         raise ValueError("summary.json does not match summary derived from raw.jsonl")
-    expected_report = runner.render_report(expected_summary)
+    expected_report = render_report(expected_summary)
     if report != expected_report:
         raise ValueError("report.md does not match report derived from raw.jsonl")
 
 
 def validate_fixture_load(payload: dict[str, Any]) -> int:
-    _require_equal(payload.get("case_id"), runner.EXPECTED_CASE_ID, "fixture-load case_id must match")
+    _require_equal(payload.get("case_id"), EXPECTED_CASE_ID, "fixture-load case_id must match")
     _require_equal(payload.get("status"), "pass", "fixture-load status must be pass")
-    _require_int(payload.get("actual_measurements"), runner.EXPECTED_OUTPUT_BITS, "fixture-load actual_measurements")
-    _require_int(payload.get("actual_detectors"), runner.EXPECTED_DETECTORS, "fixture-load actual_detectors")
-    _require_int(payload.get("actual_observables"), runner.EXPECTED_OBSERVABLES, "fixture-load actual_observables")
+    _require_int(payload.get("actual_measurements"), EXPECTED_OUTPUT_BITS, "fixture-load actual_measurements")
+    _require_int(payload.get("actual_detectors"), EXPECTED_DETECTORS, "fixture-load actual_detectors")
+    _require_int(payload.get("actual_observables"), EXPECTED_OBSERVABLES, "fixture-load actual_observables")
     operations = payload.get("operations")
     if not isinstance(operations, dict):
         raise ValueError("fixture-load operations must be an object")
@@ -308,13 +411,13 @@ def validate_environment(
         raise ValueError("environment git_dirty must be false for published release evidence")
     for field, expected in (
         ("profile", "release"),
-        ("case_id", runner.EXPECTED_CASE_ID),
+        ("case_id", EXPECTED_CASE_ID),
         ("shots", 1024),
         ("seed", 7),
         ("warmup_rounds", 0),
         ("measure_rounds", 1),
-        ("timer_scope", runner.TIMER_SCOPE),
-        ("stim_version", runner.EXPECTED_STIM_VERSION),
+        ("timer_scope", TIMER_SCOPE),
+        ("stim_version", EXPECTED_STIM_VERSION),
     ):
         _require_equal(environment.get(field), expected, f"environment {field} must be {expected}")
     for field in ("rstim_version", "rustc_version", "os", "cpu_model"):
@@ -334,9 +437,9 @@ def validate_environment(
         raise ValueError("environment fixture must name the canonical fixture")
     if manifest != CANONICAL_MANIFEST.resolve():
         raise ValueError("environment manifest must name the canonical manifest")
-    if environment["fixture_sha256"] != runner.EXPECTED_FIXTURE_SHA256:
+    if environment["fixture_sha256"] != EXPECTED_FIXTURE_SHA256:
         raise ValueError("environment fixture_sha256 must match canonical fixture digest")
-    if environment["manifest_sha256"] != runner.EXPECTED_MANIFEST_SHA256:
+    if environment["manifest_sha256"] != EXPECTED_MANIFEST_SHA256:
         raise ValueError("environment manifest_sha256 must match canonical manifest digest")
     runner_argv = environment.get("runner_argv")
     if not isinstance(runner_argv, list) or not all(isinstance(item, str) and item for item in runner_argv):
@@ -395,7 +498,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         builds, attempts, legacy_setups = validate_bundle(args.dir, args.verify_runtime_binary)
-    except (OSError, ValueError, runner.RunnerError) as error:
+    except (OSError, ValueError, RunnerError) as error:
         print(error, file=sys.stderr)
         return 1
     print(
