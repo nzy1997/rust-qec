@@ -235,8 +235,8 @@ fn canonical_surface_fixture_reports_current_reference_phase_work() {
 fn supported_pauli_measurements_use_direct_inverse_collapse() {
     for (circuit, expected_bits, expected_pivots) in [
         ("H 0\nM 0\n", vec![false], 1),
-        ("H 0 1\nMX 0 1\n", vec![false, false], 2),
-        ("H 0 1\nS 0 1\nMY 0 1\n", vec![false, false], 2),
+        ("MX 0 1\n", vec![false, false], 2),
+        ("MY 0 1\n", vec![false, false], 2),
     ] {
         let result = build_reference_sample_with_decision(&parse_circuit(circuit))
             .expect("reference sample builds");
