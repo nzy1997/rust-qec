@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}rstim — a quantum error correction workspace in Rust{% endblock title %}
+{% block description %}rstim combines a Stim-style circuit simulator, MWPM/BP-OSD/ILP decoders, and a parallel benchmark harness in one Rust workspace.{% endblock description %}
+
+{% block hero %}
+<div class="hero">
+  <p class="eyebrow">Rust QEC workspace</p>
+  <h1>A complete quantum error correction workspace in Rust</h1>
+  <p class="hero-copy">
+    <code>rstim</code> combines a Stim-style circuit simulator, MWPM, BP-OSD,
+    and ILP decoders, and a parallel benchmark harness in one Cargo
+    workspace — one <code>cargo build</code> away.
+  </p>
+  <div class="actions" aria-label="Getting started">
+    <a class="button primary" href="#quick-start">Get started</a>
+    <a class="button" href="benchmarks/">See the benchmarks</a>
+  </div>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="capabilities" class="docs-home" aria-label="What is in the box">
+  <div class="section-heading">
+    <p class="eyebrow">What's in the box</p>
+    <h2>One workspace, the whole decoder-experiment loop</h2>
+    <p class="section-copy">
+      Simulate circuits, extract detector error models, decode with three
+      decoder families, and benchmark the results — without leaving the
+      workspace.
+    </p>
+  </div>
+  <div class="docs-grid">
+    <article class="docs-card">
+      <h3>Simulate and sample circuits</h3>
+      <p>
+        Parse Stim-format circuits, inspect structure with
+        <code>rstim stats</code>, and sample measurement or detector shots.
+      </p>
+      <div class="docs-card-links">
+        <a href="guide/#feature-walkthroughs">Walkthroughs</a>
+      </div>
+    </article>
+    <article class="docs-card">
+      <h3>Extract detector error models</h3>
+      <p>
+        Derive DEMs with <code>rstim analyze_errors</code> and sample them
+        directly with <code>rstim sample_dem</code>.
+      </p>
+      <div class="docs-card-links">
+        <a href="guide/#feature-walkthroughs">DEM pipeline</a>
+      </div>
+    </article>
+    <article class="docs-card">
+      <h3>Decode with three decoder families</h3>
+      <p>
+        MWPM (<code>rmatching</code>), BP-OSD (<code>rbposd</code>), and ILP
+        (<code>rilpqec</code>) decoders share one workspace and harness.
+      </p>
+      <div class="docs-card-links">
+        <a href="guide/#workspace-overview">Workspace map</a>
+      </div>
+    </article>
+    <article class="docs-card">
+      <h3>Run benchmark campaigns</h3>
+      <p>
+        <code>rsinter</code> orchestrates decoder experiments and keeps
+        checked artifacts tied to recorded provenance and claims limits.
+      </p>
+      <div class="docs-card-links">
+        <a href="benchmarks/">Benchmarks</a>
+      </div>
+    </article>
+    <article class="docs-card">
+      <h3>Render circuit diagrams</h3>
+      <p>
+        Render SVG diagrams with <code>rstim render_svg</code>, including
+        seeded atom-loss sample-shot overlays, and export QP101 JSON.
+      </p>
+      <div class="docs-card-links">
+        <a href="qp101/#gallery">Gallery</a>
+        <a href="qp101/">QP101 format</a>
+      </div>
+    </article>
+    <article class="docs-card">
+      <h3>Construct CSS codes</h3>
+      <p>
+        Build CSS code matrices with <code>qec-code</code> and run exact or
+        randomized distance checks backed by <code>qec-ilp-core</code>.
+      </p>
+      <div class="docs-card-links">
+        <a href="guide/#feature-walkthroughs">CSS construction</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section id="quick-start" class="panel" aria-labelledby="quick-start-title">
+  <div class="section-heading">
+    <p class="eyebrow">Quick start</p>
+    <h2 id="quick-start-title">From clone to first circuit</h2>
+  </div>
+  <pre><code>git clone https://github.com/nzy1997/rstim
+cd rstim
+cargo build --workspace
+printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | cargo run -p rstim --bin rstim -- stats</code></pre>
+  <p class="section-copy">
+    The last command prints circuit statistics such as
+    <code>num_qubits</code>, <code>num_measurements</code>, and
+    <code>num_detectors</code>. From there, the <a href="guide/">guide</a>
+    walks through sampling, DEM extraction, rendering, and decoder
+    experiments.
+  </p>
+</section>
+
+<section id="headline-benchmark" aria-labelledby="headline-benchmark-title">
+  <div class="section-heading">
+    <p class="eyebrow">Checked evidence</p>
+    <h2 id="headline-benchmark-title">Benchmarked, with claims limits</h2>
+    <p class="section-copy">
+      The committed surface-code decoder comparison below is checked
+      full-tier evidence: committed-run evidence, not a general decoder
+      ordering claim. Methodology, provenance, and every claims limit live
+      on the <a href="benchmarks/">benchmarks page</a>.
+    </p>
+  </div>
+  <figure class="result-plot">
+    <a href="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png">
+      <img
+        src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png"
+        alt="Surface-code decoder comparison plot from the checked full-tier benchmark run"
+      >
+    </a>
+  </figure>
+</section>
+{% endblock main %}
