@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class SiteAppRenderingTest(unittest.TestCase):
-    @unittest.skipUnless(shutil.which("node"), "node is required to execute site/app.js")
+    @unittest.skipUnless(shutil.which("node"), "node is required to execute site/static/js/benchmarks.js")
     def test_checked_result_cards_render_manifest_provenance(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script = textwrap.dedent(
@@ -17,7 +17,7 @@ class SiteAppRenderingTest(unittest.TestCase):
             const fs = require("fs");
             const vm = require("vm");
 
-            const appJs = fs.readFileSync("site/app.js", "utf8");
+            const appJs = fs.readFileSync("site/static/js/benchmarks.js", "utf8");
             const manifest = JSON.parse(fs.readFileSync("site/benchmark-site.json", "utf8"));
 
             function makeElement(name) {
@@ -56,6 +56,7 @@ class SiteAppRenderingTest(unittest.TestCase):
               const elements = new Map();
               const fetchPromises = [];
               const document = {
+                body: { dataset: { root: "." } },
                 getElementById(id) {
                   if (!elements.has(id)) {
                     elements.set(id, makeElement(id));
@@ -67,7 +68,7 @@ class SiteAppRenderingTest(unittest.TestCase):
                 },
               };
               const fetch = (url) => {
-                const fixture = url === "data/benchmark-site.json" ? manifestFixture : schemaFixture();
+                const fixture = url.endsWith("data/benchmark-site.json") ? manifestFixture : schemaFixture();
                 const promise = Promise.resolve({
                   ok: true,
                   json: () => Promise.resolve(fixture),
@@ -75,7 +76,7 @@ class SiteAppRenderingTest(unittest.TestCase):
                 fetchPromises.push(promise);
                 return promise;
               };
-              vm.runInNewContext(appJs, { document, fetch }, { filename: "site/app.js" });
+              vm.runInNewContext(appJs, { document, fetch }, { filename: "site/static/js/benchmarks.js" });
               await Promise.all(fetchPromises);
               await new Promise((resolve) => setImmediate(resolve));
               return elements.get("checked-benchmark-result-cards").innerHTML;
