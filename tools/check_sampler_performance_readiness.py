@@ -25,6 +25,17 @@ from tools import check_rstim_vs_stim_reference_build_evidence as reference_buil
 
 
 PASS_LINE = "PASS sampler performance readiness bundles=4 reference_speedup>=2 frame_ratio<=1.05"
+MILESTONE_TITLES = (
+    "P0: Fair CLI Benchmark",
+    "P1A: Reusable Compiled Sampler",
+    "P1B: Packed Inverse Reference Tableau",
+    "P1C: Instruction-wide Sparse Noise",
+    "M1: Portable Evidence Foundation",
+    "M2: Direct Inverse Measurement",
+    "M3: Repeat-Aware Reference Sampling",
+    "M4: Measured Optimization Closure",
+)
+MILESTONE_PASS_LINE = "PASS milestone closure closed=8 open=0"
 ISSUE_BASE_URL = "https://github.com/nzy1997/rstim/issues"
 
 
@@ -160,27 +171,72 @@ def validate_historical_406() -> dict[str, Any]:
     }
 
 
-def read_github_issues(repo: str, github_json: Path | None) -> list[dict[str, Any]]:
+def read_github_milestones(repo: str, github_json: Path | None) -> list[dict[str, Any]]:
     if github_json is not None:
         with github_json.open(encoding="utf-8") as handle:
             value = json.load(handle)
     else:
-        completed = subprocess.run(
-            [
-                "gh", "issue", "list", "--repo", repo, "--state", "open", "--milestone",
-                "M4: Measured Optimization Closure", "--json", "number,title,state,milestone", "--limit", "100",
-            ],
-            check=False,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if completed.returncode != 0:
-            raise ValueError(f"GitHub milestone query failed: {completed.stderr.strip()}")
-        value = json.loads(completed.stdout)
-    if not isinstance(value, list) or not all(isinstance(issue, dict) for issue in value):
-        raise ValueError("GitHub issue response must be a JSON array of objects")
+        value = []
+        for state in ("open", "closed"):
+            completed = subprocess.run(
+                [
+                    "gh", "api", "-X", "GET", "--paginate", "--slurp",
+                    f"repos/{repo}/milestones",
+                    "-f", f"state={state}",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            if completed.returncode != 0:
+                raise ValueError(f"GitHub milestone query failed: {completed.stderr.strip()}")
+            loaded = json.loads(completed.stdout)
+            if not isinstance(loaded, list) or not all(isinstance(page, list) for page in loaded):
+                raise ValueError("GitHub milestone response must be a JSON array of pages")
+            for page in loaded:
+                value.extend(page)
+    if not isinstance(value, list) or not all(isinstance(milestone, dict) for milestone in value):
+        raise ValueError("GitHub milestone response must be a JSON array of objects")
     return value
+
+
+def verify_milestone_closure(repo: str, github_json: Path | None) -> dict[str, object]:
+    milestones = read_github_milestones(repo, github_json)
+    by_title: dict[str, list[dict[str, Any]]] = {title: [] for title in MILESTONE_TITLES}
+    for milestone in milestones:
+        title = milestone.get("title")
+        if isinstance(title, str) and title in by_title:
+            by_title[title].append(milestone)
+
+    entries: list[dict[str, object]] = []
+    open_count = 0
+    for title in MILESTONE_TITLES:
+        matches = by_title[title]
+        if not matches:
+            raise ReadinessError(f"not ready: sampler-performance milestone missing: {title}")
+        if len(matches) > 1:
+            raise ReadinessError(f"not ready: duplicate sampler-performance milestone title: {title}")
+        milestone = matches[0]
+        state = str(milestone.get("state", "")).lower()
+        if state != "closed":
+            open_count += 1
+            raise ReadinessError(f"not ready: milestone remains open: {title}")
+        entries.append({
+            "number": milestone.get("number"),
+            "title": title,
+            "state": state,
+            "open_issues": milestone.get("open_issues"),
+            "closed_issues": milestone.get("closed_issues"),
+        })
+
+    return {
+        "status": "closed",
+        "repo": repo,
+        "closed": len(entries),
+        "open": open_count,
+        "milestones": entries,
+    }
 
 
 def build_readiness(catalog_path: Path, verify_github: str | None = None, github_json: Path | None = None) -> dict[str, object]:
@@ -236,14 +292,7 @@ def build_readiness(catalog_path: Path, verify_github: str | None = None, github
 
         issues: dict[str, object] = {"status": "not_checked", "open": []}
         if verify_github is not None:
-            open_issues = [
-                issue for issue in read_github_issues(verify_github, github_json)
-                if str(issue.get("state", "")).upper() == "OPEN"
-            ]
-            if open_issues:
-                titles = ", ".join(str(issue.get("title", issue.get("number", "unknown"))) for issue in open_issues)
-                raise ReadinessError(f"not ready: open sampler-performance milestone issues: {titles}")
-            issues = {"status": "closed", "repo": verify_github, "open": []}
+            issues = verify_milestone_closure(verify_github, github_json)
 
         distribution_correctness = validate_expanded_correctness()
         historical_406 = validate_historical_406()
@@ -337,6 +386,8 @@ def main(argv: list[str] | None = None) -> int:
         print(error, file=sys.stderr)
         return 1
     print(PASS_LINE)
+    if args.verify_github is not None:
+        print(MILESTONE_PASS_LINE)
     return 0
 
 
