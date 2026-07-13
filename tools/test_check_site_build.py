@@ -348,6 +348,27 @@ class SiteBuildCheckerTest(unittest.TestCase):
             check_site_build.format_summary(results),
         )
 
+    def test_rejects_root_absolute_html_href(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        index = fixture.site_root / "index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace('href="guide/"', 'href="/guide/"', 1),
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "site pages"
+                and "root-absolute" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
     def test_rejects_broken_cross_page_anchor(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)

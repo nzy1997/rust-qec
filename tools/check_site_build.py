@@ -209,6 +209,8 @@ def check_page_reference(
     split = urlsplit(value)
     if split.scheme or split.netloc or not split.path:
         return None
+    if split.path.startswith("/"):
+        return f"{page}: root-absolute reference breaks subpath deploy: {value}"
     normalized, candidate, error = resolve_site_reference(site_root, page_dir, split.path)
     if error is not None:
         return f"{page}: {error}"
@@ -259,7 +261,17 @@ def check_pages(
                 if rel in js_texts:
                     script_texts.append(js_texts[rel])
 
-        for path in sorted(collect_local_string_paths(text, *script_texts)):
+        for path in sorted(collect_local_string_paths(text)):
+            if path.startswith("/"):
+                problems.append(f"{page}: root-absolute reference breaks subpath deploy: {path}")
+                continue
+            normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
+            if error is not None:
+                problems.append(f"{page}: {error}")
+            elif normalized is not None and candidate is not None and not candidate.exists():
+                problems.append(f"{page}: missing local reference {path}")
+
+        for path in sorted(collect_local_string_paths(*script_texts)):
             normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
             if error is not None:
                 problems.append(f"{page}: {error}")
@@ -1154,6 +1166,16 @@ def run_self_test() -> list[str]:
                     encoding="utf-8",
                 ),
                 "missing anchor #missing-anchor",
+            ),
+            (
+                "root_absolute_href",
+                lambda f: (f.site_root / "index.html").write_text(
+                    (f.site_root / "index.html").read_text(encoding="utf-8").replace(
+                        'href="guide/"', 'href="/guide/"', 1
+                    ),
+                    encoding="utf-8",
+                ),
+                "root-absolute reference breaks subpath deploy",
             ),
         ]
 

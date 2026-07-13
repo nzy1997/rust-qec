@@ -159,6 +159,122 @@ class SiteAppRenderingTest(unittest.TestCase):
             f"node stdout:\n{result.stdout}\nnode stderr:\n{result.stderr}",
         )
 
+    @unittest.skipUnless(shutil.which("node"), "node is required to execute site/static/js/qp101-browser.js")
+    def test_schema_browser_renders_loaded_status_and_detail(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script = textwrap.dedent(
+            r"""
+            const fs = require("fs");
+            const vm = require("vm");
+
+            const browserJs = fs.readFileSync("site/static/js/qp101-browser.js", "utf8");
+
+            function makeElement(name) {
+              return {
+                name,
+                children: [],
+                className: "",
+                innerHTML: "",
+                textContent: "",
+                type: "",
+                classList: {
+                  add() {},
+                  remove() {},
+                },
+                appendChild(child) {
+                  this.children.push(child);
+                },
+                addEventListener(eventName, handler) {
+                  if (eventName === "click") {
+                    this.click = handler;
+                  }
+                },
+                click() {},
+              };
+            }
+
+            function schemaFixture() {
+              return {
+                type: "object",
+                description: "QP101 test schema",
+                $defs: {},
+              };
+            }
+
+            async function renderSchemaBrowser() {
+              const elements = new Map();
+              const fetchPromises = [];
+              const document = {
+                body: { dataset: { root: "." } },
+                getElementById(id) {
+                  if (!elements.has(id)) {
+                    elements.set(id, makeElement(id));
+                  }
+                  return elements.get(id);
+                },
+                createElement(tagName) {
+                  return makeElement(tagName);
+                },
+              };
+              const fetch = (url) => {
+                if (!url.endsWith("qp101.schema.json")) {
+                  throw new Error(`unexpected fetch url ${url}`);
+                }
+                const promise = Promise.resolve({
+                  ok: true,
+                  json: () => Promise.resolve(schemaFixture()),
+                });
+                fetchPromises.push(promise);
+                return promise;
+              };
+              vm.runInNewContext(
+                browserJs,
+                { document, fetch },
+                { filename: "site/static/js/qp101-browser.js" }
+              );
+              await Promise.all(fetchPromises);
+              await new Promise((resolve) => setImmediate(resolve));
+              await new Promise((resolve) => setImmediate(resolve));
+              return elements;
+            }
+
+            function assertEqual(actual, expected, message) {
+              if (actual !== expected) {
+                throw new Error(`${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+              }
+            }
+
+            function assertIncludes(html, expected) {
+              if (!html.includes(expected)) {
+                throw new Error(`rendered HTML did not include ${JSON.stringify(expected)}`);
+              }
+            }
+
+            (async () => {
+              const elements = await renderSchemaBrowser();
+              assertEqual(elements.get("schema-status").textContent, "Loaded", "schema-status textContent");
+              assertIncludes(elements.get("schema-detail").innerHTML, "QP101 test schema");
+            })().catch((error) => {
+              console.error(error && error.stack ? error.stack : error);
+              process.exit(1);
+            });
+            """
+        )
+
+        result = subprocess.run(
+            ["node", "-e", script],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"node stdout:\n{result.stdout}\nnode stderr:\n{result.stderr}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
