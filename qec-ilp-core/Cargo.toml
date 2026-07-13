@@ -2,6 +2,8 @@
 name = "qec-ilp-core"
 version = "0.1.0"
 edition = "2024"
+description = "Backend-neutral binary ILP models for quantum error-correction tools"
+repository = "https://github.com/nzy1997/rstim"
 
 [features]
 default = []
