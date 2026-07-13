@@ -180,7 +180,7 @@ def read_github_milestones(repo: str, github_json: Path | None) -> list[dict[str
         for state in ("open", "closed"):
             completed = subprocess.run(
                 [
-                    "gh", "api", "-X", "GET", "--paginate",
+                    "gh", "api", "-X", "GET", "--paginate", "--slurp",
                     f"repos/{repo}/milestones",
                     "-f", f"state={state}",
                 ],
@@ -192,9 +192,10 @@ def read_github_milestones(repo: str, github_json: Path | None) -> list[dict[str
             if completed.returncode != 0:
                 raise ValueError(f"GitHub milestone query failed: {completed.stderr.strip()}")
             loaded = json.loads(completed.stdout)
-            if not isinstance(loaded, list):
-                raise ValueError("GitHub milestone response must be a JSON array")
-            value.extend(loaded)
+            if not isinstance(loaded, list) or not all(isinstance(page, list) for page in loaded):
+                raise ValueError("GitHub milestone response must be a JSON array of pages")
+            for page in loaded:
+                value.extend(page)
     if not isinstance(value, list) or not all(isinstance(milestone, dict) for milestone in value):
         raise ValueError("GitHub milestone response must be a JSON array of objects")
     return value

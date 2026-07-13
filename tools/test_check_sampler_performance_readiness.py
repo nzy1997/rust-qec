@@ -177,6 +177,38 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
             self.assertEqual(milestone["open"], 0)
             self.assertEqual([item["title"] for item in milestone["milestones"]], list(MILESTONE_TITLES))
 
+    def test_live_github_milestones_handle_multiple_pages(self) -> None:
+        checker = __import__("tools.check_sampler_performance_readiness", fromlist=["verify_milestone_closure"])
+        payload = milestone_payload()
+        responses = [
+            subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps([payload[:2], payload[2:5]]),
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps([payload[5:]]),
+                stderr="",
+            ),
+        ]
+
+        with mock.patch.object(checker.subprocess, "run", side_effect=responses) as run:
+            result = checker.verify_milestone_closure("nzy1997/rstim", None)
+
+        self.assertEqual(result["closed"], 8)
+        self.assertEqual(result["open"], 0)
+        self.assertEqual(
+            [item["title"] for item in result["milestones"]],
+            list(MILESTONE_TITLES),
+        )
+        self.assertEqual(run.call_count, 2)
+        for call in run.call_args_list:
+            self.assertIn("--paginate", call.args[0])
+            self.assertIn("--slurp", call.args[0])
+
     def test_mocked_open_github_milestone_fails_with_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             open_title = "M4: Measured Optimization Closure"
