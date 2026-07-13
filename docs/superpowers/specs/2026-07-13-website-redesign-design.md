@@ -111,11 +111,15 @@ site/
 
 `make build-site` becomes:
 
-1. Run the two existing Python asset steps into `site/static/`:
-   `tools/build_qp101_gallery.py` and `tools/copy_site_benchmark_data.py`.
-2. Copy static payloads into `site/static/` as today: `qp101.schema.json`,
+1. `zola build` with output to `_site`.
+2. Copy static payloads into `_site` as today: `qp101.schema.json`,
    `QP101-ZY.md`, the three example `.qp101.json` files.
-3. `zola build` with output to `_site`.
+3. Run the two existing Python asset steps against `_site`:
+   `tools/build_qp101_gallery.py` and `tools/copy_site_benchmark_data.py`.
+
+(Generated assets land in `_site` after the Zola build rather than being
+staged into `site/static/`, so no gitignore changes are needed and the
+existing script CLIs are reused unchanged.)
 
 `tools/check_site_build.py` remains the CI gate, updated to assert:
 
