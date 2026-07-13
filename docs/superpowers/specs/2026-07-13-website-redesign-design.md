@@ -96,8 +96,9 @@ site/
     (per-section templates as needed)
   static/
     styles.css         ported from current site
-    qp101-browser.js   split from app.js (schema browser part)
-    benchmarks.js      split from app.js (benchmark cards part)
+    js/
+      qp101-browser.js split from app.js (schema browser part)
+      benchmarks.js    split from app.js (benchmark cards part)
 ```
 
 - **Custom templates, no third-party theme.** The existing CSS is ported;
@@ -105,7 +106,9 @@ site/
 - `app.js` is split along its two existing element-guarded halves: the QP101
   schema browser (fetches `qp101.schema.json`) and the benchmark manifest /
   checked-results cards (fetches `data/benchmark-site.json`). Fetch paths
-  must be revisited to work from subpage URLs (root-absolute paths).
+  must be revisited to work from subpage URLs (superseded during
+  implementation: relative paths via the body data-root/ROOT contract — root-
+  absolute URLs are forbidden under the /rstim/ subpath).
 
 ### Build pipeline
 
