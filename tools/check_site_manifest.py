@@ -699,13 +699,13 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
 def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     errors: list[str] = []
     scope = "site root"
-    index_path = site_root / "index.html"
-    app_path = site_root / "app.js"
+    benchmarks_path = site_root / "benchmarks/index.html"
+    benchmarks_js_path = site_root / "js/benchmarks.js"
     expected_manifest = site_root / "data/benchmark-site.json"
 
     for path, label in [
-        (index_path, "index.html"),
-        (app_path, "app.js"),
+        (benchmarks_path, "benchmarks/index.html"),
+        (benchmarks_js_path, "js/benchmarks.js"),
         (expected_manifest, "data/benchmark-site.json"),
     ]:
         if not path.is_file():
@@ -714,8 +714,8 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     if manifest_path.resolve() != expected_manifest.resolve():
         add_error(errors, scope, "manifest path must be _site/data/benchmark-site.json when --site-root is used")
 
-    index = index_path.read_text(encoding="utf-8") if index_path.is_file() else ""
-    app = app_path.read_text(encoding="utf-8") if app_path.is_file() else ""
+    benchmarks = benchmarks_path.read_text(encoding="utf-8") if benchmarks_path.is_file() else ""
+    benchmarks_js = benchmarks_js_path.read_text(encoding="utf-8") if benchmarks_js_path.is_file() else ""
 
     for marker in [
         'id="benchmarks"',
@@ -725,20 +725,24 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
         "Benchmark Methodology",
         "Claims Policy",
     ]:
-        if marker not in index:
-            add_error(errors, scope, f"index.html missing benchmark marker {marker}")
+        if marker not in benchmarks:
+            add_error(errors, scope, f"benchmarks/index.html missing benchmark marker {marker}")
 
     required_app_markers = [
-        'fetch("data/benchmark-site.json")',
+        'fetch(ROOT + "/data/benchmark-site.json")',
         "renderBenchmarkManifest",
         "family.status",
         "family.claims_limit",
         "item.status",
         "item.claims_limit",
     ]
-    missing_app_markers = [marker for marker in required_app_markers if marker not in app]
+    missing_app_markers = [marker for marker in required_app_markers if marker not in benchmarks_js]
     if missing_app_markers:
-        add_error(errors, scope, f"app.js missing manifest status and claims_limit wiring: {missing_app_markers}")
+        add_error(
+            errors,
+            scope,
+            f"js/benchmarks.js missing manifest status and claims_limit wiring: {missing_app_markers}",
+        )
 
     checked_result_markers = [
         "checkedBenchmarkItems",
@@ -749,18 +753,18 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
         "artifact.checked",
         'artifact.kind === "image"',
     ]
-    missing_checked_markers = [marker for marker in checked_result_markers if marker not in app]
+    missing_checked_markers = [marker for marker in checked_result_markers if marker not in benchmarks_js]
     if missing_checked_markers:
-        add_error(errors, scope, f"app.js missing checked result rendering: {missing_checked_markers}")
+        add_error(errors, scope, f"js/benchmarks.js missing checked result rendering: {missing_checked_markers}")
 
     provenance_markers = [
         "item.provenance",
         "renderProvenance",
         "renderProvenance(item.provenance)",
     ]
-    missing_provenance_markers = [marker for marker in provenance_markers if marker not in app]
+    missing_provenance_markers = [marker for marker in provenance_markers if marker not in benchmarks_js]
     if missing_provenance_markers:
-        add_error(errors, scope, f"app.js missing provenance wiring: {missing_provenance_markers}")
+        add_error(errors, scope, f"js/benchmarks.js missing provenance wiring: {missing_provenance_markers}")
 
     try:
         manifest = load_json(manifest_path)
@@ -774,7 +778,14 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
 
 def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any], errors: list[str]) -> None:
     checked_paths = {artifact_path for _, artifact_path in iter_checked_artifact_paths(manifest)}
-    for relative in ("index.html", "app.js"):
+    for relative in (
+        "index.html",
+        "guide/index.html",
+        "benchmarks/index.html",
+        "qp101/index.html",
+        "js/benchmarks.js",
+        "js/qp101-browser.js",
+    ):
         path = site_root / relative
         if not path.is_file():
             continue
