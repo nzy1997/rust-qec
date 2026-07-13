@@ -1193,3 +1193,32 @@ git commit -m "ci: install Zola and gate Pages deploy on site checker"
 - [ ] **Step 4: Finish the branch**
 
 Use the superpowers:finishing-a-development-branch skill to merge or open a PR. After the Pages deploy runs on master, verify https://nzy1997.github.io/rstim/ serves the new landing page and subpages.
+
+---
+
+## Amendment A (Task 6, discovered during execution)
+
+Two defects in Task 6's original text, found when the transcribed checker failed its own fixture:
+
+**A1.** `collect_local_string_paths` may NOT stay unchanged: it must return the RAW matched
+string values (`found.add(value)` instead of `found.add(normalized)`), keeping the
+normalized-based filter. Otherwise the leading `/` of root-relative JS literals
+(`"/data/benchmark-site.json"`) is stripped before `resolve_site_reference` sees them, and
+they mis-resolve against the page directory.
+
+**A2.** `tools/check_site_manifest.py` is in scope after all — `validate_site_root` and
+`validate_site_artifact_references` pin the old single-page layout:
+- `validate_site_root` required files become `benchmarks/index.html`, `js/benchmarks.js`,
+  `data/benchmark-site.json`; the HTML benchmark markers are checked in
+  `benchmarks/index.html` (error label updated accordingly); the renderer markers are checked
+  in `js/benchmarks.js` with the fetch marker updated to `fetch(ROOT + "/data/benchmark-site.json")`;
+  error labels say `js/benchmarks.js` instead of `app.js`.
+- `validate_site_artifact_references` iterates `("index.html", "guide/index.html",
+  "benchmarks/index.html", "qp101/index.html", "js/benchmarks.js", "js/qp101-browser.js")`.
+- `tools/test_check_site_manifest.py`: the site-root fixture and tests retarget
+  `_site/index.html` → `_site/benchmarks/index.html` and `_site/app.js` → `_site/js/benchmarks.js`,
+  with the new fetch marker string; test intent unchanged.
+- The `check_site_build.py` self-test fixture's `js/benchmarks.js` gains `const ROOT = "..";`
+  and its fetch line becomes `fetch(ROOT + "/data/benchmark-site.json");`.
+- Task 6's commit and verification additionally cover `tools/check_site_manifest.py` and
+  `tools/test_check_site_manifest.py` (`python3 -m pytest tools/test_check_site_manifest.py -q`).
