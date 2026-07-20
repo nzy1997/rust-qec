@@ -14,6 +14,7 @@ pub mod distance_ilp;
 pub mod error;
 mod gf2;
 pub mod logical;
+pub mod packed_gf2;
 pub mod pauli;
 mod symplectic;
 
