@@ -22,6 +22,7 @@ pub mod circuit_gen;
 pub mod codegen;
 pub mod m2d;
 pub mod explain_errors;
+pub mod measurement_transform;
 pub mod qp101;
 pub mod qp101_svg;
 pub mod sample_trace;

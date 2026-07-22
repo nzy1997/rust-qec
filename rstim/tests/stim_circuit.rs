@@ -363,35 +363,30 @@ fn count_measurements_with_repeat() {
 
 #[test]
 fn count_measurements_mpp_separate_products() {
-    // In rstim, space-separated Pauli targets WITHOUT `*` are all in one
-    // product (no Combiner tokens), so num_measurements counts 1 group.
-    // Stim treats them as separate products (3 measurements).
+    // Space-separated Pauli targets are separate MPP products.
     let instrs = parse_lines("MPP X0 Z1 Y2").unwrap();
-    assert_eq!(stats::num_measurements(&instrs), 1);
+    assert_eq!(stats::num_measurements(&instrs), 3);
 }
 
 #[test]
 fn count_measurements_mpp_combined() {
-    // X0 followed by Z1*Y2: the parser emits [X0, Z1, Combiner, Y2] which
-    // splits into [X0, Z1] and [Y2] = 2 groups.
+    // X0 followed by Z1*Y2: the combiner keeps Z1 and Y2 in one product.
     let instrs = parse_lines("MPP X0 Z1*Y2").unwrap();
     assert_eq!(stats::num_measurements(&instrs), 2);
 }
 
 #[test]
 fn count_measurements_mpp_long_chain() {
-    // X0*X1*X2*X3*X4 Z5 Z6 parses with Combiners between X-chain elements:
-    // [X0, C, X1, C, X2, C, X3, C, X4, Z5, Z6] -> 5 groups.
+    // X0*X1*X2*X3*X4 is one product; Z5 and Z6 are separate products.
     let instrs = parse_lines("MPP X0*X1*X2*X3*X4 Z5 Z6").unwrap();
-    assert_eq!(stats::num_measurements(&instrs), 5);
+    assert_eq!(stats::num_measurements(&instrs), 3);
 }
 
 #[test]
 fn count_measurements_mpp_multi_product() {
-    // X0*X1 Z0*Z1 Y0*Y1 parses to [X0, C, X1, Z0, C, Z1, Y0, C, Y1]
-    // split by C => [X0], [X1, Z0], [Z1, Y0], [Y1] = 4 groups.
+    // Each space-separated product may itself contain combined Pauli factors.
     let instrs = parse_lines("MPP X0*X1 Z0*Z1 Y0*Y1").unwrap();
-    assert_eq!(stats::num_measurements(&instrs), 4);
+    assert_eq!(stats::num_measurements(&instrs), 3);
 }
 
 // ========== count_detectors_num_observables ==========

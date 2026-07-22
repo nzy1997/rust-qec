@@ -1,5 +1,42 @@
 use rand::Rng;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitTableAllocError {
+    SizeOverflow,
+    ReservationFailed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BitTableStorageSize {
+    pub words_per_row: usize,
+    pub total_words: usize,
+    pub total_bytes: usize,
+}
+
+pub(crate) fn checked_bit_table_storage_size(
+    num_major: usize,
+    num_minor: usize,
+) -> Result<BitTableStorageSize, BitTableAllocError> {
+    let words_per_row = num_minor
+        .checked_add(63)
+        .ok_or(BitTableAllocError::SizeOverflow)?
+        / 64;
+    let total_words = num_major
+        .checked_mul(words_per_row)
+        .ok_or(BitTableAllocError::SizeOverflow)?;
+    let total_bytes = total_words
+        .checked_mul(std::mem::size_of::<u64>())
+        .ok_or(BitTableAllocError::SizeOverflow)?;
+    if total_bytes > isize::MAX as usize {
+        return Err(BitTableAllocError::ReservationFailed);
+    }
+    Ok(BitTableStorageSize {
+        words_per_row,
+        total_words,
+        total_bytes,
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct BitTable {
     num_major: usize,
@@ -10,18 +47,32 @@ pub struct BitTable {
 
 impl BitTable {
     pub fn new(num_major: usize, num_minor: usize) -> Self {
-        let words_per_row = (num_minor + 63) / 64;
-        Self {
-            num_major,
-            num_minor,
-            words_per_row,
-            data: vec![0u64; num_major * words_per_row],
-        }
+        Self::try_new(num_major, num_minor).expect("trusted BitTable dimensions should allocate")
     }
 
-    pub fn num_major(&self) -> usize { self.num_major }
-    pub fn num_minor(&self) -> usize { self.num_minor }
-    pub fn words_per_row(&self) -> usize { self.words_per_row }
+    pub fn try_new(num_major: usize, num_minor: usize) -> Result<Self, BitTableAllocError> {
+        let size = checked_bit_table_storage_size(num_major, num_minor)?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(size.total_words)
+            .map_err(|_| BitTableAllocError::ReservationFailed)?;
+        data.resize(size.total_words, 0u64);
+        Ok(Self {
+            num_major,
+            num_minor,
+            words_per_row: size.words_per_row,
+            data,
+        })
+    }
+
+    pub fn num_major(&self) -> usize {
+        self.num_major
+    }
+    pub fn num_minor(&self) -> usize {
+        self.num_minor
+    }
+    pub fn words_per_row(&self) -> usize {
+        self.words_per_row
+    }
 
     pub fn get(&self, major: usize, minor: usize) -> bool {
         let word_idx = major * self.words_per_row + minor / 64;

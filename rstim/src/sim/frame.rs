@@ -198,21 +198,37 @@ pub struct FrameSimulator {
 
 impl FrameSimulator {
     pub fn new(num_qubits: usize, batch_size: usize) -> Self {
-        let words_per_row = (batch_size + 63) / 64;
-        Self {
+        Self::try_new(num_qubits, batch_size).expect("trusted FrameSimulator dimensions allocate")
+    }
+
+    pub fn try_new(num_qubits: usize, batch_size: usize) -> Result<Self, String> {
+        let words_per_row = batch_size
+            .checked_add(63)
+            .ok_or_else(|| "batch size overflows frame row width".to_string())?
+            / 64;
+        let x_table = BitTable::try_new(num_qubits, batch_size)
+            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let z_table = BitTable::try_new(num_qubits, batch_size)
+            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut last_correlated_error_occurred = Vec::new();
+        last_correlated_error_occurred
+            .try_reserve_exact(words_per_row)
+            .map_err(|err| format!("frame allocation failed: {err}"))?;
+        last_correlated_error_occurred.resize(words_per_row, 0u64);
+        Ok(Self {
             num_qubits,
             batch_size,
-            x_table: BitTable::new(num_qubits, batch_size),
-            z_table: BitTable::new(num_qubits, batch_size),
+            x_table,
+            z_table,
             m_record: MeasureRecordBatch::new(batch_size),
-            last_correlated_error_occurred: vec![0u64; words_per_row],
+            last_correlated_error_occurred,
             depolarize_scratch: DepolarizeScratch::new(),
             det_records: Vec::new(),
             obs_records: Vec::new(),
             materialize_detector_observable_outputs: true,
             detector_materializations: 0,
             observable_materializations: 0,
-        }
+        })
     }
 
     pub(crate) fn randomize_initial_z_frames(&mut self, rng: &mut impl Rng) {
@@ -1565,8 +1581,14 @@ impl FrameSimulator {
     }
 
     pub fn measurements(&self, ref_sample: &[bool]) -> BitTable {
+        self.try_measurements(ref_sample)
+            .expect("trusted measurement output dimensions allocate")
+    }
+
+    pub fn try_measurements(&self, ref_sample: &[bool]) -> Result<BitTable, String> {
         let num_measurements = self.m_record.len();
-        let mut result = BitTable::new(num_measurements, self.batch_size);
+        let mut result = BitTable::try_new(num_measurements, self.batch_size)
+            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
         for m in 0..num_measurements {
             let src = self.m_record.lookback_words(num_measurements - m);
             let dst = result.row_words_mut(m);
@@ -1577,25 +1599,37 @@ impl FrameSimulator {
                 }
             }
         }
-        result
+        Ok(result)
     }
 
     pub fn detections(&self) -> BitTable {
+        self.try_detections()
+            .expect("trusted detection output dimensions allocate")
+    }
+
+    pub fn try_detections(&self) -> Result<BitTable, String> {
         let n = self.det_records.len();
-        let mut result = BitTable::new(n, self.batch_size);
+        let mut result = BitTable::try_new(n, self.batch_size)
+            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
         for (i, row) in self.det_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        result
+        Ok(result)
     }
 
     pub fn observable_flips(&self) -> BitTable {
+        self.try_observable_flips()
+            .expect("trusted observable output dimensions allocate")
+    }
+
+    pub fn try_observable_flips(&self) -> Result<BitTable, String> {
         let n = self.obs_records.len();
-        let mut result = BitTable::new(n, self.batch_size);
+        let mut result = BitTable::try_new(n, self.batch_size)
+            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
         for (i, row) in self.obs_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        result
+        Ok(result)
     }
 }
 

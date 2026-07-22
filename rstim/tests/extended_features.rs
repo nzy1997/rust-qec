@@ -275,7 +275,7 @@ fn stats_num_measurements_mzz() {
 
 #[test]
 fn stats_num_measurements_mpad() {
-    let instrs = parse_lines("MPAD(5) 0").unwrap();
+    let instrs = parse_lines("MPAD(5) 0\nMPAD 0 1 0 1").unwrap();
     assert_eq!(stats::num_measurements(&instrs), 5);
 }
 

@@ -74,77 +74,19 @@ pub fn num_qubits(instrs: &[StimInstr]) -> usize {
 /// Total measurement count. M/MX/MY/MZ/MR/MRX/MRY/MRZ produce 1 per target;
 /// ML/MXL/MYL/MZL/MRL/MRXL/MRYL/MRZL produce 2 per target;
 /// MPP produces 1 per Pauli product; MXX/MYY/MZZ produce 1 per pair;
-/// MPAD produces its arg count; HERALDED_* produce 1 per target.
+/// MPAD produces 1 per target; HERALDED_* produce 1 per target.
 pub fn num_measurements(instrs: &[StimInstr]) -> usize {
-    let mut count = 0;
-    for instr in instrs {
-        match instr {
-            StimInstr::Op {
-                name,
-                targets,
-                args,
-                ..
-            } => {
-                count += match name.as_str() {
-                    "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => targets.len(),
-                    "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
-                        2 * targets.len()
-                    }
-                    "MPP" => targets
-                        .split(|t| matches!(t, crate::ir::StimTarget::Combiner))
-                        .filter(|g| !g.is_empty())
-                        .count(),
-                    "MXX" | "MYY" | "MZZ" => targets.len() / 2,
-                    "MPAD" => args.first().map_or(0, |a| *a as usize),
-                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => targets.len(),
-                    _ => 0,
-                };
-            }
-            StimInstr::Repeat { count: c, body } => {
-                count += (*c as usize) * num_measurements(body);
-            }
-        }
-    }
-    count
+    crate::measurement_transform::num_measurements_unchecked(instrs)
 }
 
 /// Total DETECTOR annotation count.
 pub fn num_detectors(instrs: &[StimInstr]) -> usize {
-    let mut count = 0;
-    for instr in instrs {
-        match instr {
-            StimInstr::Op { name, .. } if name == "DETECTOR" => count += 1,
-            StimInstr::Repeat { count: c, body } => {
-                count += (*c as usize) * num_detectors(body);
-            }
-            _ => {}
-        }
-    }
-    count
+    crate::measurement_transform::num_detectors_unchecked(instrs)
 }
 
 /// One more than the largest OBSERVABLE_INCLUDE index.
 pub fn num_observables(instrs: &[StimInstr]) -> usize {
-    let mut max_idx: Option<usize> = None;
-    for instr in instrs {
-        match instr {
-            StimInstr::Op { name, args, .. } if name == "OBSERVABLE_INCLUDE" => {
-                if let Some(&idx) = args.first() {
-                    let i = idx as usize;
-                    max_idx = Some(max_idx.map_or(i, |m| m.max(i)));
-                }
-            }
-            StimInstr::Repeat { body, .. } => {
-                let inner = num_observables(body);
-                if inner > 0 {
-                    let i = inner - 1;
-                    max_idx = Some(max_idx.map_or(i, |m| m.max(i)));
-                }
-            }
-            _ => {}
-        }
-    }
-    max_idx.map_or(0, |m| m + 1)
+    crate::measurement_transform::num_observables_unchecked(instrs)
 }
 
 /// Total TICK count.
