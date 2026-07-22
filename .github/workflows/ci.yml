@@ -35,6 +35,7 @@ jobs:
             echo "ERROR: minimal dependency graph contains a disabled capability" >&2
             exit 1
           fi
+          cargo test --locked -p rsinter --no-default-features --no-run
           cargo test --locked -p rsinter --no-default-features --features rbposd-runner
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
