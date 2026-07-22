@@ -1,7 +1,7 @@
 # rsmp v1 Issue Sequencing Design
 
 Date: 2026-07-23
-Status: approved in conversation; pending written-spec review
+Status: approved; written-spec review completed
 
 ## Purpose
 
@@ -44,8 +44,15 @@ spelled `--circuit`, `--in`, `--out`, `--shots`, and `--in_format`. Unpack uses
 `--verify_only`. `-` denotes stdin or stdout where that stream is supported.
 
 At most one input may consume stdin and at most one output may target stdout.
-The CLI validates stream conflicts, duplicate final paths, format compatibility,
-and required arguments before opening or truncating any destination.
+For every path other than `-`, the CLI captures the working directory once,
+makes relative paths absolute against it, and lexically normalizes components
+by collapsing redundant separators, removing `.`, and folding `..` without
+crossing the root. It compares those normalized absolute paths before opening
+any input or creating any output or temporary file. It does not call filesystem
+canonicalization and therefore makes no promise about symlink, hard-link,
+mount, case-folding, or other filesystem aliases. The CLI validates stream
+conflicts, normalized input/output and duplicate-final-path collisions, format
+compatibility, and required arguments before opening a path.
 
 ### Shared checked measurement semantics
 
@@ -66,6 +73,35 @@ archive transform. It must:
 elimination state, selected detector rows, pivots, and free columns once.
 `encode_block` and `decode_block` reuse that compiled transform for every shot
 block.
+
+Issue #522 also owns the fallible BitTable allocation boundary:
+
+```text
+// Method on BitTable; body omitted.
+pub fn try_new(
+    num_major: usize,
+    num_minor: usize,
+) -> Result<Self, BitTableAllocError>;
+
+pub struct MeasurementTransformLimits {
+    pub max_measurements: u64,
+    pub max_detectors: u64,
+    pub max_observables: u64,
+    pub max_repeat_depth: u64,
+    pub max_expanded_instructions: u64,
+    pub max_parity_terms: u64,
+    pub max_shots_per_block: u64,
+    pub max_transform_working_bytes: u64,
+    pub max_block_working_bytes: u64,
+}
+```
+
+`try_new` checks row-word, total-word, total-byte, and `Vec<u64>` capacity
+calculations and reserves fallibly before zero-initialization. `BitTable::new`
+is retained only for trusted, prevalidated dimensions. Transform traversal
+bounds repeat depth, expanded instruction count, and expanded parity terms.
+Transform construction and block encode/decode preflight aggregate live working
+bytes before any output or scratch table allocation.
 
 ### Safe limits exist before public readers
 
@@ -102,9 +138,38 @@ frame, decode, or frame-checksum failures use `RSMP_DECOMPRESSION_FAILED`; and
 reconstructed logical content that disagrees with its stored digest uses
 `RSMP_LOGICAL_DIGEST_MISMATCH`.
 
-No archive-controlled count or length reaches `BitTable::new`, `Vec`
-allocation, frame decode, or transform reconstruction before checked conversion
-and limit validation.
+`ArchiveLimits` embeds one `MeasurementTransformLimits` value. Reader and
+writer paths use that value as the canonical source for transform traversal,
+dimensions, block shots, and transform/block working memory instead of copying
+those ceilings into unrelated fields. The writer validates an already-compiled
+transform's actual dimensions and retained resource usage against that value;
+the reader passes it into transform construction. No archive-, circuit-, or
+block-controlled count or length reaches `BitTable::new`, infallible `Vec`
+allocation, frame decode, or transform reconstruction. Checked conversion,
+limit validation, and fallible allocation happen first.
+
+Issue #529 freezes exactly 20 distinct resources: three archive totals, the
+nine embedded transform fields, rank and free width, four frame-byte fields,
+and two Zstandard fields. Its per-field tests exercise every nested and
+archive-specific bound without allocating near the production defaults.
+
+### Stable archive-writer boundary
+
+The public writer owns and reuses one compiled `MeasurementTransform` and
+accepts only raw measurement tables:
+
+```text
+SampleArchiveWriter::write_measurements(&BitTable)
+```
+
+It creates `EncodedMeasurementBlock` values internally. That encoded type
+remains the transform/codec boundary and is not a public input to the archive
+writer. Issue #523 supports zero calls for a zero-shot archive or exactly one
+positive call whose width and shots match the declared one-block archive.
+Issue #526 keeps the same method and extends it to arbitrary positive chunks,
+including a chunk larger than one archive block. It coalesces or splits caller
+chunks into canonical full blocks and at most one short final block; caller
+chunk boundaries never determine archive bytes.
 
 ### Streaming completion is two-phase
 
@@ -124,6 +189,13 @@ Issue #527 introduces strict streaming result readers and writers; it does not
 claim that the existing whole-buffer readers are already streaming. Strict
 readers reject malformed `01`, nonzero `b8` padding, nonzero final `ptb64`
 padding, short input, and extra input.
+
+`ResultBlockWriter` is configured with a `ResultOutputKind` and format, then
+accepts `&DecodedSampleBlock`. Measurement and observable destinations select
+their corresponding tables. A detector `dets` destination consumes both
+`detections` and `observable_flips`, while other detector formats consume only
+`detections`. It validates equal shot counts across all three tables before
+writing any bytes for the block.
 
 `ptb64` output carries an incomplete 64-shot group across archive-block
 boundaries. Concatenating independently padded per-block `ptb64` output is not
@@ -168,6 +240,15 @@ The shared verification catalog is
 roles, not an exact total, and its corruption recipes use symbolic field paths
 instead of hard-coded byte offsets.
 
+The catalog additionally pins four small independent known-answer cases for
+multi-bit `MPAD`, multi-product `MPP`, `HERALDED_ERASE`, and
+`HERALDED_PAULI_CHANNEL_1`. Their fixed measurement input and expected
+detector/observable bytes and SHA-256 values come from hand-checked parity or a
+separately pinned Stim CLI, never from the shared rstim resolver. After #522
+makes `m2d`, circuit statistics, and the transform share that resolver, `m2d`
+comparison remains a useful consistency check but is not counted as an
+independent oracle.
+
 Issue #532 moves before #530. It pins an immutable, additive v1 reader specimen
 with at least two blocks, both sparse and dense syndrome codecs, nonzero
 reference measurements, free coordinates, an observable, and non-byte-aligned
@@ -181,8 +262,10 @@ all three counts are reported separately.
 
 Issue #530 verifies the library reader and corpus contract. It does not depend
 on the CLI publication and `--verify_only` behavior owned by #531. Issue #531
-separately proves that the same reader errors are rendered safely through the
-CLI and that file outputs remain unpublished on late archive failure.
+depends on #530, reuses at least one named materialized corruption recipe for
+its verify-only/unpack error-equivalence check, and separately proves that the
+same reader errors are rendered safely through the CLI and that file outputs
+remain unpublished on late archive failure.
 
 ### Output publication
 
@@ -203,18 +286,18 @@ could destroy a pre-existing destination that was atomically replaced.
 | Issue | Owned deliverable |
 |---|---|
 | #520 | Normative binary envelope, module skeleton, structural errors, version/flag policy, and zero-shot representation |
-| #521 | Shared semantic fixture catalog and field-level corruption recipe catalog |
-| #522 | Checked shared measurement semantics and reusable reversible transform |
-| #523 | Safe single-block dense archive state machine with default limits and bounded Zstandard decode |
+| #521 | Shared semantic fixtures, independent fixed known answers, and field-level corruption recipes |
+| #522 | Checked shared measurement semantics, fallible BitTable allocation, transform limits, and reusable reversible transform |
+| #523 | Stable raw-measurement writer boundary and safe single-block dense archive state machine with embedded transform limits and bounded Zstandard decode |
 | #524 | Strict one-block `b8` CLI path with the final command and option spelling |
 | #525 | Adaptive dense/sparse syndrome codec with bounded candidate selection |
 | #526 | Multi-block streaming and byte-based memory evidence |
-| #527 | Strict streaming result-format adapters and full CLI interoperability |
+| #527 | Strict streaming result-format adapters, decoded-block writer boundary, and full CLI interoperability |
 | #528 | Pinned, checked compression evidence |
 | #529 | Configurable and aggregate limits, validation precedence, and stable error rendering |
 | #532 | Immutable v1 reader compatibility specimen |
 | #530 | Complete corruption corpus based on #532 |
-| #531 | File publication hardening and `--verify_only` |
+| #531 | Normalized-path publication hardening and `--verify_only`, based on #530 corruption materializations |
 | #533 | Operational documentation and always-on readiness aggregation |
 
 ## Required implementation order

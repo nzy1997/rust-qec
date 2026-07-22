@@ -261,10 +261,13 @@ any bytes after the trailer.
 
 ## Streaming and memory behavior
 
-The writer consumes at most one input block at a time, transforms it, writes
-the two frames, and releases block storage. The reader validates and
-reconstructs one block, passes it to the requested output writers, and releases
-it before reading the next block.
+The writer owns and reuses one compiled `MeasurementTransform`. Its public
+streaming boundary accepts raw measurement `BitTable` chunks through
+`write_measurements`; caller chunk boundaries do not become archive block
+boundaries. The writer buffers at most one configured block, transforms it
+internally, writes the two frames, and releases block storage. The reader
+validates and reconstructs one block, passes it to the requested output
+writers, and releases it before reading the next block.
 
 `next_block()` performs block-local validation. Whole-archive completion,
 trailer integrity, and trailing-data rejection are established only by
@@ -291,10 +294,52 @@ Responsibilities:
 - verify that reconstructed measurements reproduce the stored independent
   detector values.
 
+The public allocation and limit types are:
+
+```text
+pub enum BitTableAllocError {
+    SizeOverflow,
+    ReservationFailed,
+}
+
+// Method on BitTable; body omitted.
+pub fn try_new(
+    num_major: usize,
+    num_minor: usize,
+) -> Result<Self, BitTableAllocError>;
+
+pub struct MeasurementTransformLimits {
+    pub max_measurements: u64,
+    pub max_detectors: u64,
+    pub max_observables: u64,
+    pub max_repeat_depth: u64,
+    pub max_expanded_instructions: u64,
+    pub max_parity_terms: u64,
+    pub max_shots_per_block: u64,
+    pub max_transform_working_bytes: u64,
+    pub max_block_working_bytes: u64,
+}
+```
+
+`BitTable::try_new` uses checked row-word and byte-size arithmetic, rejects a
+capacity that `Vec<u64>` cannot represent, and reserves fallibly before zero
+initialization. `BitTable::new` remains only as a compatibility convenience for
+trusted, prevalidated dimensions and delegates to `try_new`. Circuit-,
+archive-, or block-controlled dimensions never call `BitTable::new`.
+
+`MeasurementTransformLimits::default()` is conservative. Transform traversal
+bounds repeat nesting, checked expanded instruction count, and expanded parity
+terms. Construction bounds the aggregate live reference, parity-matrix,
+elimination, and scratch storage. Block encode and decode bound shots and
+aggregate live output/scratch storage before allocating. One checked BitTable
+storage-size helper is shared by `try_new` and all transform/archive preflight
+formulas.
+
 Suggested interface:
 
 ```text
 MeasurementTransform::from_circuit(...)
+MeasurementTransform::from_circuit_with_limits(...)
 MeasurementTransform::encode_block(...)
 MeasurementTransform::decode_block(...)
 ```
@@ -312,8 +357,8 @@ Responsibilities:
 Suggested interfaces:
 
 ```text
-SampleArchiveWriter::new(...)
-SampleArchiveWriter::write_block(...)
+SampleArchiveWriter::new(..., MeasurementTransform, ..., ArchiveLimits)
+SampleArchiveWriter::write_measurements(&BitTable)
 SampleArchiveWriter::finish(...)
 
 SampleArchiveReader::open(...)
@@ -330,6 +375,37 @@ DecodedSampleBlock {
     observable_flips,
 }
 ```
+
+`EncodedMeasurementBlock` is the transform/codec intermediate. It is never a
+public input to `SampleArchiveWriter`; the archive writer creates it internally
+from each canonical measurement block. `ArchiveLimits` embeds one
+`MeasurementTransformLimits` value instead of maintaining duplicate transform
+ceilings. `SampleArchiveWriter::new` takes ownership of an already-compiled
+transform and validates its actual dimensions, traversal totals, and retained
+resource usage against the embedded limits. The reader uses the same embedded
+value when it constructs its transform.
+
+### Streaming result-format adapters
+
+`ResultBlockReader` yields strict, bounded measurement `BitTable` chunks for
+pack input. `ResultBlockWriter` is configured with a result kind and format and
+accepts the complete decoded value:
+
+```text
+enum ResultOutputKind {
+    Measurements,
+    Detectors,
+    Observables,
+}
+
+ResultBlockWriter::write_block(&DecodedSampleBlock)
+```
+
+For detector `dets` output the writer consumes both `detections` and
+`observable_flips`, producing `D#` and `L#` tokens. Other detector formats use
+only `detections`; measurement and observable destinations select their own
+tables. All three tables must have equal shot counts before any bytes for a
+block are written.
 
 ### CLI integration
 
@@ -362,10 +438,11 @@ streaming input formats are `b8`, `ptb64`, and `01`. Binary inputs reject
 non-zero unused padding. `r8` and `hits` measurement inputs are deferred because
 they target sparse records, while measurement records are often high entropy.
 
-`unpack_samples` requires the circuit and at least one requested output.
-Measurement, detector, and observable outputs reuse existing result writers.
-It reconstructs measurements internally even when only detector output is
-requested, but does not retain the whole archive.
+`unpack_samples` requires the circuit and at least one requested output. It
+writes through `ResultBlockWriter`; existing whole-table result writers remain
+byte-for-byte compatibility oracles. It reconstructs measurements internally
+even when only detector output is requested, but does not retain the whole
+archive.
 
 `unpack_samples --verify_only` performs a full read, reconstruction, and
 integrity check without writing result data. On success it prints one stable,
@@ -433,9 +510,14 @@ CLI diagnostics use:
 rsmp error [<CODE>]: <plain-language detail>
 ```
 
-`ArchiveLimits` bounds measurements, detectors, observables, total shots,
-block shots, compressed bytes, decompressed bytes, and the Zstandard window.
-Library defaults are safe and callers may opt into larger explicit limits.
+`ArchiveLimits` embeds `MeasurementTransformLimits` as the sole configurable
+source for measurement, detector, observable, repeat-depth,
+expanded-instruction, parity-term, block-shot, transform-working, and
+block-working bounds. It also bounds archive bytes, block count, total shots,
+rank, free width, compressed and uncompressed bytes per frame and in aggregate,
+and Zstandard window and decoder memory. Library defaults are safe and callers
+may opt into larger explicit limits; checked conversion and allocation remain
+mandatory.
 
 When output targets are file paths, pack and unpack commands write sibling
 temporary files and rename only after `finish()` succeeds. Each individual
@@ -447,11 +529,21 @@ stdout. stdout cannot be rolled back; documentation states that a late error
 may leave complete earlier blocks on stdout, while the process always exits
 nonzero.
 
-The command validates all output paths before creating temporary files and
-rejects duplicate final paths. It never deletes an already-published output in
-an attempt to simulate multi-file rollback, because doing so could destroy a
-pre-existing file that was atomically replaced. `--verify_only` is mutually
-exclusive with result-output arguments and creates no result files.
+For every path other than `-`, the command captures the process working
+directory once, makes relative paths absolute against it, and applies purely
+lexical component normalization: collapse redundant separators, remove `.`
+components, and fold `..` against the preceding normal component without
+crossing the filesystem root. It compares normalized absolute input and final
+output paths before opening an input or creating an output or temporary file.
+This is a syntactic collision check: it does not call filesystem
+canonicalization and does not promise detection of symlink, hard-link, mount,
+or case-folding aliases.
+
+The command rejects normalized duplicate final paths and normalized input/output
+collisions. It never deletes an already-published output in an attempt to
+simulate multi-file rollback, because doing so could destroy a pre-existing
+file that was atomically replaced. `--verify_only` is mutually exclusive with
+result-output arguments and creates no result files.
 
 There is no `--ignore_checksum`, partial-success, or salvage option in v1.
 
@@ -472,6 +564,19 @@ The catalog records provenance, circuit path, measurement input or generation
 command, expected `M/D/L/rank`, expected output hashes, and consuming tests.
 Tiny issue-specific smoke fixtures may supplement it, but must not replace it.
 
+The catalog also pins at least four small independent known-answer entries:
+
+1. `MPAD` with multiple appended bits;
+2. one `MPP` instruction containing multiple Pauli products;
+3. `HERALDED_ERASE`;
+4. `HERALDED_PAULI_CHANNEL_1`.
+
+Each entry commits fixed measurement input and expected detector/observable
+bytes, pins their SHA-256 values, and records hand-checkable provenance or an
+exact independently pinned Stim command and version. Expected outputs must not
+be generated through rstim's shared record resolver, `m2d`, or the transform
+under test.
+
 Correctness hard gate:
 
 ```text
@@ -480,9 +585,13 @@ unpack(pack(measurements, circuit), circuit).measurements
 ```
 
 For each valid case, detectors and observables are compared bit-for-bit with
-the existing measurement-to-detection path. Seeded property tests cover random
-GF(2) matrices and bit tables, including zero rank, full rank, rank deficiency,
-zero shots, and shot counts not divisible by 8 or 64.
+the shared measurement-to-detection path as a consistency check. Because
+`m2d`, statistics, and the transform share the checked resolver after this
+work, that comparison is not an independent oracle. The four fixed
+known-answer entries must also match their committed bytes and hashes. Seeded
+property tests cover random GF(2) matrices and bit tables, including zero rank,
+full rank, rank deficiency, zero shots, and shot counts not divisible by 8 or
+64.
 
 Generate at least twelve deterministic corruption mutations from a known-good
 archive, covering:
