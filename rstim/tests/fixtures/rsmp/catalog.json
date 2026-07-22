@@ -186,8 +186,8 @@
       "detector_count": 2,
       "observable_count": 0,
       "rank_H": 2,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim", "format": "b8", "bit_count": 2},
-      "hashes": {"circuit_sha256": "32912ae0634064f4d842ae3023e0e81949355bf13d2b179897451bcdae1ddef2"},
+      "measurement_generation": {"command": "cargo run -q -p rstim --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim", "format": "b8", "bit_count": 2, "expected_output_bytes": 4, "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"},
+      "hashes": {"circuit_sha256": "32912ae0634064f4d842ae3023e0e81949355bf13d2b179897451bcdae1ddef2", "measurements_b8_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
     {

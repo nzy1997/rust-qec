@@ -70,15 +70,16 @@ compares file size to Stim-style byte-aligned rows,
 zero.
 
 Recipe validation rejects duplicate IDs, missing expected codes, raw byte
-offset selectors, and invalid mappings from the #520 taxonomy. Unknown
-required-feature recipes must use `RSMP_UNSUPPORTED_FEATURE`; malformed
-structure, ordering, padding, canonical encoding, and unknown-ID recipes must
-use `RSMP_MALFORMED_ARCHIVE`; Zstandard frame, decode, or frame-checksum
-recipes must use `RSMP_DECOMPRESSION_FAILED`; and canonical logical payload
-mismatches must use `RSMP_LOGICAL_DIGEST_MISMATCH`. Decoded-payload mutations
-also name the affected Zstandard frame checksum and compressed-length fields in
-their recomputation contract, so later materialization reaches the intended
-inner validation boundary.
+offset selectors, unknown symbolic field selectors, and invalid mappings from
+the #520 taxonomy. Unknown required-feature recipes must use
+`RSMP_UNSUPPORTED_FEATURE`; malformed structure, ordering, padding, canonical
+encoding, and unknown-ID recipes must use `RSMP_MALFORMED_ARCHIVE`; Zstandard
+frame, decode, or frame-checksum recipes must use
+`RSMP_DECOMPRESSION_FAILED`; and canonical logical payload mismatches must use
+`RSMP_LOGICAL_DIGEST_MISMATCH`. Recompute entries are also field-allowlisted.
+Decoded-payload mutations name the affected Zstandard frame checksum and
+compressed-length fields in their recomputation contract, so later
+materialization reaches the intended inner validation boundary.
 
 ## Fixtures
 
@@ -89,8 +90,10 @@ cross-check command for each known answer.
 
 Additional semantic-role cases may use deterministic producer commands instead
 of committed measurement outputs when no small independent oracle is required.
-This keeps the catalog useful for downstream tests without over-claiming
-unimplemented archive behavior in this issue.
+The loss-visible semantic case uses the repository `rstim` CLI as its pinned
+producer because its `ML` instruction is an `rstim` extension not accepted by
+Stim 1.15.0. This keeps the catalog useful for downstream tests without
+over-claiming unimplemented archive behavior in this issue.
 
 ## Testing
 

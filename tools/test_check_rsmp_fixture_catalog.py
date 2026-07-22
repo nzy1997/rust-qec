@@ -264,6 +264,22 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("extra_required_feature_wrong_mapping.expected_code must be RSMP_UNSUPPORTED_FEATURE", result.stderr)
 
+    def test_accepts_added_optional_flags_recipe_with_malformed_mapping(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_optional_flags_malformed",
+                "source_role": "nonzero_reference",
+                "mutation": "set(global.optional_flags, 1)",
+                "expected_code": "RSMP_MALFORMED_ARCHIVE",
+                "recompute": ["global.header_sha256", "trailer.archive_sha256"],
+                "validation_boundary": "optional feature policy",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_rejects_added_unknown_codec_recipe_wrong_mapping(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.recipes(catalog_data).append(
@@ -280,6 +296,23 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("extra_unknown_codec_wrong_mapping.expected_code must be RSMP_MALFORMED_ARCHIVE", result.stderr)
+
+    def test_rejects_unknown_symbolic_recipe_selector(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_unknown_symbolic_selector",
+                "source_role": "surface_d11_r100",
+                "mutation": "set(block.not_a_real_codec_id, 99)",
+                "expected_code": "RSMP_MALFORMED_ARCHIVE",
+                "recompute": ["trailer.archive_sha256"],
+                "validation_boundary": "bogus selector",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_unknown_symbolic_selector.mutation", result.stderr)
 
     def test_rejects_raw_byte_offset_recompute_selector(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
@@ -298,6 +331,23 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("extra_checksum_raw_recompute.recompute", result.stderr)
 
+    def test_rejects_unknown_symbolic_recompute_selector(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_unknown_symbolic_recompute",
+                "source_role": "surface_d11_r100",
+                "mutation": "set(trailer.archive_sha256, alternate_digest)",
+                "expected_code": "RSMP_CHECKSUM_MISMATCH",
+                "recompute": ["block.not_a_real_recompute_field"],
+                "validation_boundary": "archive checksum",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_unknown_symbolic_recompute.recompute", result.stderr)
+
     def test_rejects_incomplete_payload_recipe_recompute_contract(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.find_recipe(catalog_data, "nonzero_padding")["recompute"] = ["trailer.archive_sha256"]
@@ -305,6 +355,23 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("nonzero_padding.recompute", result.stderr)
+
+    def test_rejects_incomplete_logical_syndrome_payload_recompute_contract(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_logical_syndrome_payload_missing_recompute",
+                "source_role": "surface_d11_r100",
+                "mutation": "flip(block.canonical_logical_payload.syndrome_bits.bit)",
+                "expected_code": "RSMP_LOGICAL_DIGEST_MISMATCH",
+                "recompute": [],
+                "validation_boundary": "logical payload digest",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_logical_syndrome_payload_missing_recompute.recompute", result.stderr)
 
     def test_rejects_changed_compressed_payload_wrong_mapping(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
@@ -348,6 +415,17 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("surface_d11_r100.measurement_generation.sha256", result.stderr)
+
+    def test_rejects_loss_visible_invalid_stim_producer(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        case = self.find_case(catalog_data, "loss_visible_measurements")
+        generation = case["measurement_generation"]
+        assert isinstance(generation, dict)
+        generation["command"] = "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("loss_visible_measurements.measurement_generation.command", result.stderr)
 
     def test_rejects_removed_required_known_answer(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()

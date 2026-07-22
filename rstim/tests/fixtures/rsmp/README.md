@@ -37,3 +37,16 @@ The independent command family is pinned to Stim 1.15.0:
 python3 -c 'import stim; print(stim.__version__)'
 stim m2d --circuit <case>.stim --in <case>.measurements.b8 --in_format b8 --out <case>.detectors.check.b8 --out_format b8 --obs_out <case>.observables.check.b8 --obs_out_format b8
 ```
+
+## Loss-Visible Generation
+
+`loss_visible_measurements.stim` uses `ML`, which is an `rstim` extension not
+accepted by Stim 1.15.0. Its deterministic producer is therefore pinned to the
+repository CLI:
+
+```console
+cargo run -q -p rstim --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim
+```
+
+The expected four-shot b8 output is `00 00 00 00`, with SHA-256
+`df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119`.

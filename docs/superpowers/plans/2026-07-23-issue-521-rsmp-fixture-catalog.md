@@ -420,10 +420,11 @@ Validate duplicate recipe IDs, non-empty source roles, mutation strings,
 expected error codes, recomputation lists, and validation boundaries. Reject
 raw byte offset selectors by matching `byte_offset`, `offset(`, `@`, or
 `[number]` patterns in mutation strings and recomputation selectors. Enforce
-the normalized recipe mapping rules from the Global Constraints. For decoded
-payload mutations, require recomputation metadata to include the affected
-Zstandard frame checksum plus enclosing compressed-length and archive-digest
-fields needed to reach the catalogued validation boundary.
+the normalized recipe mapping rules from the Global Constraints using
+allowlisted #520 field selectors, not substring matching. For decoded payload
+mutations, require recomputation metadata to include the affected Zstandard
+frame checksum plus enclosing compressed-length and archive-digest fields
+needed to reach the catalogued validation boundary.
 
 - [ ] **Step 4: Implement CLI entrypoint**
 
