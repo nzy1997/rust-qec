@@ -46,35 +46,115 @@ ERROR_CODES = {
     "RSMP_IO",
 }
 
-KNOWN_ANSWER_SHAPES = {
-    "known_mpad_multi": (3, 2, 1, 2),
-    "known_mpp_multi_product": (3, 3, 1, 3),
-    "known_heralded_erase": (1, 1, 1, 1),
-    "known_heralded_pauli_channel_1": (1, 1, 1, 1),
+EXPECTED_KNOWN_ANSWERS = {
+    "known_mpad_multi": {
+        "circuit_path": "rstim/tests/fixtures/rsmp/known_mpad_multi.stim",
+        "circuit_sha256": "c3693c4dc2b4ff09658be810a2547ee0567da0446af148407fda707eb4a5244f",
+        "shots": 4,
+        "shape": (3, 2, 1, 2),
+        "measurement_input": {
+            "path": "rstim/tests/fixtures/rsmp/known_mpad_multi.measurements.b8",
+            "sha256": "9905474f01a1dc34e8c3db6657a297b6a3f69ee81e7bec97df171f79231aad1c",
+        },
+        "expected_files": {
+            "measurements_b8": ("rstim/tests/fixtures/rsmp/known_mpad_multi.measurements.b8", 3, "9905474f01a1dc34e8c3db6657a297b6a3f69ee81e7bec97df171f79231aad1c"),
+            "detectors_b8": ("rstim/tests/fixtures/rsmp/known_mpad_multi.detectors.b8", 2, "054edec1d0211f624fed0cbca9d4f9400b0e491c43742af2c5b0abebf0c990d8"),
+            "observables_b8": ("rstim/tests/fixtures/rsmp/known_mpad_multi.observables.b8", 1, "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c"),
+        },
+        "stim_cross_check": {
+            "stim_version": "1.15.0",
+            "working_directory": "rstim/tests/fixtures/rsmp",
+            "command": "stim m2d --circuit known_mpad_multi.stim --in known_mpad_multi.measurements.b8 --in_format b8 --out known_mpad_multi.detectors.check.b8 --out_format b8 --obs_out known_mpad_multi.observables.check.b8 --obs_out_format b8",
+        },
+    },
+    "known_mpp_multi_product": {
+        "circuit_path": "rstim/tests/fixtures/rsmp/known_mpp_multi_product.stim",
+        "circuit_sha256": "e7fb467b2532098ac108259f14d8c51261ad712446501ea8970918ecf5d87175",
+        "shots": 4,
+        "shape": (3, 3, 1, 3),
+        "measurement_input": {
+            "path": "rstim/tests/fixtures/rsmp/known_mpp_multi_product.measurements.b8",
+            "sha256": "ee09af6a127a747a1411a19a3a2366aafa80d005ea9f0cb22835284674405196",
+        },
+        "expected_files": {
+            "measurements_b8": ("rstim/tests/fixtures/rsmp/known_mpp_multi_product.measurements.b8", 3, "ee09af6a127a747a1411a19a3a2366aafa80d005ea9f0cb22835284674405196"),
+            "detectors_b8": ("rstim/tests/fixtures/rsmp/known_mpp_multi_product.detectors.b8", 3, "ee09af6a127a747a1411a19a3a2366aafa80d005ea9f0cb22835284674405196"),
+            "observables_b8": ("rstim/tests/fixtures/rsmp/known_mpp_multi_product.observables.b8", 1, "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c"),
+        },
+        "stim_cross_check": {
+            "stim_version": "1.15.0",
+            "working_directory": "rstim/tests/fixtures/rsmp",
+            "command": "stim m2d --circuit known_mpp_multi_product.stim --in known_mpp_multi_product.measurements.b8 --in_format b8 --out known_mpp_multi_product.detectors.check.b8 --out_format b8 --obs_out known_mpp_multi_product.observables.check.b8 --obs_out_format b8",
+        },
+    },
+    "known_heralded_erase": {
+        "circuit_path": "rstim/tests/fixtures/rsmp/known_heralded_erase.stim",
+        "circuit_sha256": "d1c81a073865448121e7a9365ec441a28d484a016b80f1f6e0a5ec01009af34e",
+        "shots": 4,
+        "shape": (1, 1, 1, 1),
+        "measurement_input": {
+            "path": "rstim/tests/fixtures/rsmp/known_heralded_erase.measurements.b8",
+            "sha256": "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c",
+        },
+        "expected_files": {
+            "measurements_b8": ("rstim/tests/fixtures/rsmp/known_heralded_erase.measurements.b8", 1, "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c"),
+            "detectors_b8": ("rstim/tests/fixtures/rsmp/known_heralded_erase.detectors.b8", 1, "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c"),
+            "observables_b8": ("rstim/tests/fixtures/rsmp/known_heralded_erase.observables.b8", 1, "d5e2d2ac07b741be58f6b9e50ede5fdcf16f3e8053ecef9350e7744b0d8bd90c"),
+        },
+        "stim_cross_check": {
+            "stim_version": "1.15.0",
+            "working_directory": "rstim/tests/fixtures/rsmp",
+            "command": "stim m2d --circuit known_heralded_erase.stim --in known_heralded_erase.measurements.b8 --in_format b8 --out known_heralded_erase.detectors.check.b8 --out_format b8 --obs_out known_heralded_erase.observables.check.b8 --obs_out_format b8",
+        },
+    },
+    "known_heralded_pauli_channel_1": {
+        "circuit_path": "rstim/tests/fixtures/rsmp/known_heralded_pauli_channel_1.stim",
+        "circuit_sha256": "e36735f28ec4703ae95c6ea2429a469b326160b20c1b891c0eeab645b1a2687a",
+        "shots": 4,
+        "shape": (1, 1, 1, 1),
+        "measurement_input": {
+            "path": "rstim/tests/fixtures/rsmp/known_heralded_pauli_channel_1.measurements.b8",
+            "sha256": "76cc5805dab9b4eacefdb477f498020fd82bccdbc9c6a2d9ce10586ac85512b4",
+        },
+        "expected_files": {
+            "measurements_b8": ("rstim/tests/fixtures/rsmp/known_heralded_pauli_channel_1.measurements.b8", 1, "76cc5805dab9b4eacefdb477f498020fd82bccdbc9c6a2d9ce10586ac85512b4"),
+            "detectors_b8": ("rstim/tests/fixtures/rsmp/known_heralded_pauli_channel_1.detectors.b8", 1, "76cc5805dab9b4eacefdb477f498020fd82bccdbc9c6a2d9ce10586ac85512b4"),
+            "observables_b8": ("rstim/tests/fixtures/rsmp/known_heralded_pauli_channel_1.observables.b8", 1, "76cc5805dab9b4eacefdb477f498020fd82bccdbc9c6a2d9ce10586ac85512b4"),
+        },
+        "stim_cross_check": {
+            "stim_version": "1.15.0",
+            "working_directory": "rstim/tests/fixtures/rsmp",
+            "command": "stim m2d --circuit known_heralded_pauli_channel_1.stim --in known_heralded_pauli_channel_1.measurements.b8 --in_format b8 --out known_heralded_pauli_channel_1.detectors.check.b8 --out_format b8 --obs_out known_heralded_pauli_channel_1.observables.check.b8 --obs_out_format b8",
+        },
+    },
+}
+EXPECTED_BENCHMARK_GENERATION = {
+    "command": "stim sample --shots 1024 --seed 2 --out_format b8 --in benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+    "sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6",
 }
 REQUIRED_RECIPES = {
-    "bad_magic": "RSMP_BAD_MAGIC",
-    "unsupported_version": "RSMP_UNSUPPORTED_VERSION",
-    "unknown_required_feature": "RSMP_UNSUPPORTED_FEATURE",
-    "circuit_mismatch": "RSMP_CIRCUIT_MISMATCH",
-    "truncated_header": "RSMP_TRUNCATED",
-    "truncated_block": "RSMP_TRUNCATED",
-    "truncated_zstd_frame": "RSMP_TRUNCATED",
-    "zstd_decode_failure": "RSMP_DECOMPRESSION_FAILED",
-    "truncated_trailer": "RSMP_TRUNCATED",
-    "overlong_varint": "RSMP_MALFORMED_ARCHIVE",
-    "sparse_index_out_of_range": "RSMP_MALFORMED_ARCHIVE",
-    "duplicate_block": "RSMP_MALFORMED_ARCHIVE",
-    "omitted_block": "RSMP_MALFORMED_ARCHIVE",
-    "reordered_blocks": "RSMP_MALFORMED_ARCHIVE",
-    "changed_compressed_payload": "RSMP_CHECKSUM_MISMATCH",
-    "checksum_mismatch": "RSMP_CHECKSUM_MISMATCH",
-    "logical_payload_mismatch": "RSMP_LOGICAL_DIGEST_MISMATCH",
-    "declared_length_mismatch": "RSMP_MALFORMED_ARCHIVE",
-    "resource_limit_exceeded": "RSMP_LIMIT_EXCEEDED",
-    "nonzero_padding": "RSMP_MALFORMED_ARCHIVE",
-    "unknown_syndrome_codec": "RSMP_MALFORMED_ARCHIVE",
-    "trailing_data": "RSMP_TRAILING_DATA",
+    "bad_magic": ("nonzero_reference", "set(global.magic, 0x52534d00)", "RSMP_BAD_MAGIC", [], "global header magic"),
+    "unsupported_version": ("nonzero_reference", "set(global.format_major, 2)", "RSMP_UNSUPPORTED_VERSION", [], "global version policy"),
+    "unknown_required_feature": ("nonzero_reference", "set(global.required_flags, unknown_required_feature)", "RSMP_UNSUPPORTED_FEATURE", [], "required feature policy"),
+    "circuit_mismatch": ("nonzero_reference", "set(global.circuit_sha256, alternate_circuit_sha256)", "RSMP_CIRCUIT_MISMATCH", ["global.header_sha256", "trailer.archive_sha256"], "circuit identity"),
+    "truncated_header": ("nonzero_reference", "truncate(global_header)", "RSMP_TRUNCATED", [], "global header decode"),
+    "truncated_block": ("surface_d11_r100", "truncate(block)", "RSMP_TRUNCATED", [], "block decode"),
+    "truncated_zstd_frame": ("surface_d11_r100", "truncate(block.zstd_frame)", "RSMP_TRUNCATED", [], "compressed frame decode"),
+    "zstd_decode_failure": ("surface_d11_r100", "set(block.zstd_frame.payload, invalid_zstandard_frame)", "RSMP_DECOMPRESSION_FAILED", ["trailer.archive_sha256"], "compressed frame decode"),
+    "truncated_trailer": ("surface_d11_r100", "truncate(trailer)", "RSMP_TRUNCATED", [], "trailer decode"),
+    "overlong_varint": ("surface_d11_r100", "set(block.sparse_syndrome_payload.hit_count_uleb128, overlong_encoding(1))", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "trailer.archive_sha256"], "canonical integer decode"),
+    "sparse_index_out_of_range": ("surface_d11_r100", "set(block.sparse_syndrome_payload.detector_index_delta, detector_count)", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "trailer.archive_sha256"], "sparse syndrome index validation"),
+    "duplicate_block": ("surface_d11_r100", "duplicate(block)", "RSMP_MALFORMED_ARCHIVE", ["trailer.block_count", "trailer.archive_sha256"], "block ordering validation"),
+    "omitted_block": ("surface_d11_r100", "omit(block)", "RSMP_MALFORMED_ARCHIVE", ["trailer.block_count", "trailer.archive_sha256"], "block coverage validation"),
+    "reordered_blocks": ("surface_d11_r100", "reorder(blocks)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "block sequence validation"),
+    "changed_compressed_payload": ("surface_d11_r100", "flip(block.zstd_frame.payload.bit)", "RSMP_DECOMPRESSION_FAILED", ["trailer.archive_sha256"], "compressed frame checksum"),
+    "checksum_mismatch": ("surface_d11_r100", "set(trailer.archive_sha256, alternate_digest)", "RSMP_CHECKSUM_MISMATCH", [], "archive checksum"),
+    "logical_payload_mismatch": ("surface_d11_r100", "flip(block.canonical_logical_payload.free_bits.bit)", "RSMP_LOGICAL_DIGEST_MISMATCH", ["block.free_compressed_len", "trailer.archive_sha256"], "logical payload digest"),
+    "declared_length_mismatch": ("surface_d11_r100", "set(block.syndrome_uncompressed_len, block.syndrome_uncompressed_len + 1)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "declared length validation"),
+    "resource_limit_exceeded": ("surface_d11_r100", "set(global.max_shots_per_block, max_allowed_shots_per_block + 1)", "RSMP_LIMIT_EXCEEDED", ["global.header_sha256", "trailer.archive_sha256"], "resource limit validation"),
+    "nonzero_padding": ("surface_d11_r100", "set(block.syndrome_padding_bits, 1)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "zero padding validation"),
+    "unknown_syndrome_codec": ("surface_d11_r100", "set(block.syndrome_codec_id, 99)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "syndrome codec dispatch"),
+    "trailing_data": ("surface_d11_r100", "append_trailing_byte(0)", "RSMP_TRAILING_DATA", [], "archive end-of-input validation"),
 }
 RAW_OFFSET_SELECTOR = re.compile(r"byte_offset|offset\s*\(|@|\[\s*\d+\s*\]", re.IGNORECASE)
 SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
@@ -139,6 +219,11 @@ def require_nonnegative_int(value: object, label: str) -> int:
     return value
 
 
+def require_exact(value: object, expected: object, label: str) -> None:
+    if value != expected:
+        raise ValueError(f"{label} must be {expected}")
+
+
 def validate_hash(path: Path, value: object, label: str) -> None:
     digest = require_string(value, label)
     if not SHA256_HEX.fullmatch(digest):
@@ -147,6 +232,13 @@ def validate_hash(path: Path, value: object, label: str) -> None:
         raise ValueError(f"{label} references a missing committed file")
     if sha256_file(path) != digest:
         raise ValueError(f"{label} does not match committed file")
+
+
+def validate_sha256_text(value: object, label: str) -> str:
+    digest = require_string(value, label)
+    if not SHA256_HEX.fullmatch(digest):
+        raise ValueError(f"{label} must be a lowercase SHA-256 hex digest")
+    return digest
 
 
 def validate_b8_entry(repo_root: Path, entry: object, shots: int, label: str) -> Path:
@@ -200,10 +292,16 @@ def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[st
     known_answer = data.get("known_answer", False)
     if not isinstance(known_answer, bool):
         raise ValueError(f"{case_id}.known_answer must be boolean")
+    if case_id in REQUIRED_KNOWN_ANSWERS and not known_answer:
+        raise ValueError(f"{case_id}.known_answer must be true")
     if known_answer:
-        expected_shape = KNOWN_ANSWER_SHAPES.get(case_id)
-        if expected_shape is None:
+        expected_case = EXPECTED_KNOWN_ANSWERS.get(case_id)
+        if expected_case is None:
             raise ValueError(f"{case_id}.known_answer is not an approved known-answer case")
+        require_exact(data.get("circuit_path"), expected_case["circuit_path"], f"{case_id}.circuit_path")
+        require_exact(data.get("circuit_sha256"), expected_case["circuit_sha256"], f"{case_id}.circuit_sha256")
+        require_exact(shots, expected_case["shots"], f"{case_id}.shots")
+        expected_shape = expected_case["shape"]
         actual_shape = (measurements, detectors, observables, rank)
         for field, actual, expected in zip(
             ("measurement_count", "detector_count", "observable_count", "rank_H"),
@@ -212,7 +310,12 @@ def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[st
         ):
             if actual != expected:
                 raise ValueError(f"{case_id}.{field} must be {expected}")
-        measurement_input = validate_b8_entry(repo_root, data.get("measurement_input"), shots, f"{case_id}.measurement_input")
+        measurement_input_data = require_mapping(data.get("measurement_input"), f"{case_id}.measurement_input")
+        measurement_input = validate_b8_entry(repo_root, measurement_input_data, shots, f"{case_id}.measurement_input")
+        expected_input = require_mapping(expected_case["measurement_input"], f"{case_id}.expected_measurement_input")
+        require_exact(measurement_input_data.get("path"), expected_input["path"], f"{case_id}.measurement_input.path")
+        require_exact(measurement_input_data.get("bit_count"), measurements, f"{case_id}.measurement_input.bit_count")
+        require_exact(measurement_input_data.get("sha256"), expected_input["sha256"], f"{case_id}.measurement_input.sha256")
         expected_files = require_mapping(data.get("expected_files"), f"{case_id}.expected_files")
         expected_bits = {
             "measurements_b8": measurements,
@@ -222,13 +325,22 @@ def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[st
         for name, bit_count in expected_bits.items():
             expected_path = validate_b8_entry(repo_root, expected_files.get(name), shots, f"{case_id}.expected_files.{name}")
             entry = require_mapping(expected_files[name], f"{case_id}.expected_files.{name}")
+            expected_file_path, expected_file_bits, expected_file_sha = expected_case["expected_files"][name]  # type: ignore[index]
+            require_exact(entry.get("path"), expected_file_path, f"{case_id}.expected_files.{name}.path")
             if entry.get("bit_count") != bit_count:
                 raise ValueError(f"{case_id}.expected_files.{name}.bit_count must be {bit_count}")
+            require_exact(entry.get("bit_count"), expected_file_bits, f"{case_id}.expected_files.{name}.bit_count")
+            require_exact(entry.get("sha256"), expected_file_sha, f"{case_id}.expected_files.{name}.sha256")
             hash_field = f"{name}_sha256"
             if hashes.get(hash_field) != entry.get("sha256"):
                 raise ValueError(f"{case_id}.hashes.{hash_field} must match expected file hash")
+            require_exact(hashes.get(hash_field), expected_file_sha, f"{case_id}.hashes.{hash_field}")
             if name == "measurements_b8" and expected_path != measurement_input:
                 raise ValueError(f"{case_id}.measurement_input.path must match expected measurements_b8")
+        cross_check = require_mapping(data.get("stim_cross_check"), f"{case_id}.stim_cross_check")
+        expected_cross_check = require_mapping(expected_case["stim_cross_check"], f"{case_id}.expected_stim_cross_check")
+        for field in ("stim_version", "working_directory", "command"):
+            require_exact(cross_check.get(field), expected_cross_check[field], f"{case_id}.stim_cross_check.{field}")
     else:
         generation = require_mapping(data.get("measurement_generation"), f"{case_id}.measurement_generation")
         require_string(generation.get("command"), f"{case_id}.measurement_generation.command")
@@ -236,6 +348,20 @@ def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[st
             raise ValueError(f"{case_id}.measurement_generation.format must be b8")
         if generation.get("bit_count") != measurements:
             raise ValueError(f"{case_id}.measurement_generation.bit_count must be measurement_count")
+        if case_id == "surface_d11_r100":
+            require_exact(generation.get("command"), EXPECTED_BENCHMARK_GENERATION["command"], f"{case_id}.measurement_generation.command")
+            expected_bytes = b8_len(shots, measurements)
+            actual_bytes = require_nonnegative_int(
+                generation.get("expected_output_bytes"),
+                f"{case_id}.measurement_generation.expected_output_bytes",
+            )
+            if actual_bytes != expected_bytes:
+                raise ValueError(f"{case_id}.measurement_generation.expected_output_bytes must be {expected_bytes}")
+            digest = validate_sha256_text(generation.get("sha256"), f"{case_id}.measurement_generation.sha256")
+            require_exact(digest, EXPECTED_BENCHMARK_GENERATION["sha256"], f"{case_id}.measurement_generation.sha256")
+            if hashes.get("measurements_b8_sha256") != digest:
+                raise ValueError(f"{case_id}.hashes.measurements_b8_sha256 must match measurement_generation.sha256")
+            require_exact(hashes.get("measurements_b8_sha256"), EXPECTED_BENCHMARK_GENERATION["sha256"], f"{case_id}.hashes.measurements_b8_sha256")
 
     return case_id, set(roles)
 
@@ -261,7 +387,7 @@ def validate_recipes(recipes: object, known_roles: set[str]) -> None:
     if not isinstance(recipes, list) or len(recipes) < 12:
         raise ValueError("corruption_recipes must contain at least 12 recipes")
     seen_ids: set[str] = set()
-    recipe_codes: dict[str, str] = {}
+    recipe_data: dict[str, dict[str, Any]] = {}
     for recipe in recipes:
         data = require_mapping(recipe, "corruption recipe")
         recipe_id = require_string(data.get("id"), "corruption_recipe.id")
@@ -282,14 +408,22 @@ def validate_recipes(recipes: object, known_roles: set[str]) -> None:
         if not isinstance(recompute, list) or not all(isinstance(item, str) and item for item in recompute):
             raise ValueError(f"{label}.recompute must be a list of non-empty strings")
         require_string(data.get("validation_boundary"), f"{label}.validation_boundary")
-        recipe_codes[recipe_id] = code
+        recipe_data[recipe_id] = data
 
-    for recipe_id, expected_code in REQUIRED_RECIPES.items():
-        actual_code = recipe_codes.get(recipe_id)
-        if actual_code is None:
+    for recipe_id, (source_role, mutation, expected_code, recompute, validation_boundary) in REQUIRED_RECIPES.items():
+        actual = recipe_data.get(recipe_id)
+        if actual is None:
             raise ValueError(f"missing required corruption recipe {recipe_id}")
-        if actual_code != expected_code:
+        if actual.get("source_role") != source_role:
+            raise ValueError(f"{recipe_id}.source_role must be {source_role}")
+        if actual.get("mutation") != mutation:
+            raise ValueError(f"{recipe_id}.mutation must be {mutation}")
+        if actual.get("expected_code") != expected_code:
             raise ValueError(f"{recipe_id}.expected_code must be {expected_code}")
+        if actual.get("recompute") != recompute:
+            raise ValueError(f"{recipe_id}.recompute must be {recompute}")
+        if actual.get("validation_boundary") != validation_boundary:
+            raise ValueError(f"{recipe_id}.validation_boundary must be {validation_boundary}")
 
 
 def validate_catalog(repo_root: Path, catalog: object) -> None:

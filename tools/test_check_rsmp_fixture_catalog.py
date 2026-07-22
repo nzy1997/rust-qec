@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +34,19 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         catalog_data = json.loads(CATALOG.read_text(encoding="utf-8"))
         catalog_copy.write_text(json.dumps(catalog_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return tmpdir, catalog_copy, catalog_data
+
+    def load_fixture_tree_copy(self) -> tuple[tempfile.TemporaryDirectory[str], Path, Path, dict[str, object]]:
+        tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tmpdir.cleanup)
+        temp_root = Path(tmpdir.name)
+        shutil.copytree(REPO_ROOT / "rstim" / "tests" / "fixtures" / "rsmp", temp_root / "rstim" / "tests" / "fixtures" / "rsmp")
+        benchmark_src = REPO_ROOT / "benchmarks" / "rstim_vs_stim_simulator" / "fixtures" / "stim_surface_code_rotated_memory_z_d11_r100.stim"
+        benchmark_dst = temp_root / "benchmarks" / "rstim_vs_stim_simulator" / "fixtures" / benchmark_src.name
+        benchmark_dst.parent.mkdir(parents=True)
+        shutil.copy2(benchmark_src, benchmark_dst)
+        catalog_path = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "catalog.json"
+        catalog_data = json.loads(catalog_path.read_text(encoding="utf-8"))
+        return tmpdir, temp_root, catalog_path, catalog_data
 
     def write_catalog(self, path: Path, catalog_data: dict[str, object]) -> None:
         path.write_text(json.dumps(catalog_data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -72,6 +86,20 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("known_mpad_multi.measurement_count", result.stderr)
 
+    def test_rejects_demoted_required_known_answer(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        case = self.find_case(catalog_data, "known_mpad_multi")
+        case["known_answer"] = False
+        case["measurement_generation"] = {
+            "command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/known_mpad_multi.stim",
+            "format": "b8",
+            "bit_count": 3,
+        }
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_mpad_multi.known_answer", result.stderr)
+
     def test_rejects_changed_committed_fixture_sha256(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.find_case(catalog_data, "known_mpad_multi")["circuit_sha256"] = "0" * 64
@@ -79,6 +107,44 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("known_mpad_multi.circuit_sha256", result.stderr)
+
+    def test_rejects_changed_known_answer_bytes_even_when_hashes_match(self) -> None:
+        _, temp_root, catalog_path, catalog_data = self.load_fixture_tree_copy()
+        fixture = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "known_heralded_erase.detectors.b8"
+        fixture.write_bytes(b"\x00\x00\x00\x00")
+        digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+        case = self.find_case(catalog_data, "known_heralded_erase")
+        expected_files = case["expected_files"]
+        assert isinstance(expected_files, dict)
+        detectors = expected_files["detectors_b8"]
+        assert isinstance(detectors, dict)
+        detectors["sha256"] = digest
+        hashes = case["hashes"]
+        assert isinstance(hashes, dict)
+        hashes["detectors_b8_sha256"] = digest
+        self.write_catalog(catalog_path, catalog_data)
+        result = self.run_checker(repo_root=temp_root, catalog=catalog_path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_heralded_erase.expected_files.detectors_b8.sha256", result.stderr)
+
+    def test_rejects_known_answer_measurement_input_width_mismatch(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        case = self.find_case(catalog_data, "known_mpad_multi")
+        measurement_input = case["measurement_input"]
+        assert isinstance(measurement_input, dict)
+        measurement_input["bit_count"] = 8
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_mpad_multi.measurement_input.bit_count", result.stderr)
+
+    def test_rejects_missing_known_answer_cross_check(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_case(catalog_data, "known_mpad_multi").pop("stim_cross_check")
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_mpad_multi.stim_cross_check", result.stderr)
 
     def test_rejects_removed_required_semantic_role(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
@@ -113,19 +179,27 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown_required_feature.expected_code must be RSMP_UNSUPPORTED_FEATURE", result.stderr)
 
+    def test_rejects_required_recipe_mutation_change(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_recipe(catalog_data, "unknown_required_feature")["mutation"] = "noop"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown_required_feature.mutation", result.stderr)
+
+    def test_rejects_changed_compressed_payload_wrong_mapping(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_recipe(catalog_data, "changed_compressed_payload")["expected_code"] = "RSMP_CHECKSUM_MISMATCH"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("changed_compressed_payload.expected_code must be RSMP_DECOMPRESSION_FAILED", result.stderr)
+
     def test_rejects_benchmark_duplicate_fixture_path(self) -> None:
-        tmpdir = tempfile.TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-        temp_root = Path(tmpdir.name)
-        shutil.copytree(REPO_ROOT / "rstim" / "tests" / "fixtures" / "rsmp", temp_root / "rstim" / "tests" / "fixtures" / "rsmp")
+        _, temp_root, catalog_path, catalog_data = self.load_fixture_tree_copy()
         benchmark_src = REPO_ROOT / "benchmarks" / "rstim_vs_stim_simulator" / "fixtures" / "stim_surface_code_rotated_memory_z_d11_r100.stim"
-        benchmark_dst = temp_root / "benchmarks" / "rstim_vs_stim_simulator" / "fixtures" / benchmark_src.name
-        benchmark_dst.parent.mkdir(parents=True)
-        shutil.copy2(benchmark_src, benchmark_dst)
         duplicate = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "surface_d11_r100_duplicate.stim"
         shutil.copy2(benchmark_src, duplicate)
-        catalog_path = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "catalog.json"
-        catalog_data = json.loads(catalog_path.read_text(encoding="utf-8"))
         case = self.find_case(catalog_data, "surface_d11_r100")
         case["circuit_path"] = "rstim/tests/fixtures/rsmp/surface_d11_r100_duplicate.stim"
         case["circuit_sha256"] = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
@@ -133,6 +207,28 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(repo_root=temp_root, catalog=catalog_path)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("surface_d11_r100.circuit_path must reference existing benchmark fixture", result.stderr)
+
+    def test_rejects_missing_benchmark_output_evidence(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        case = self.find_case(catalog_data, "surface_d11_r100")
+        generation = case["measurement_generation"]
+        assert isinstance(generation, dict)
+        generation.pop("expected_output_bytes")
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("surface_d11_r100.measurement_generation.expected_output_bytes", result.stderr)
+
+    def test_rejects_benchmark_output_hash_mismatch(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        case = self.find_case(catalog_data, "surface_d11_r100")
+        generation = case["measurement_generation"]
+        assert isinstance(generation, dict)
+        generation["sha256"] = "0" * 64
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("surface_d11_r100.measurement_generation.sha256", result.stderr)
 
     def test_rejects_removed_required_known_answer(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
