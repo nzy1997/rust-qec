@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}QP101-ZY — rstim{% endblock title %}
+{% block description %}QP101-ZY schema browser, protocol draft, examples, and rendered circuit gallery.{% endblock description %}
+
+{% block hero %}
+<div class="hero">
+  <div class="qp101-kicker">
+    <p class="eyebrow">Quantum circuit interchange</p>
+    <span class="status">JSON Schema + protocol draft</span>
+  </div>
+  <h1>QP101-ZY schema browser</h1>
+  <p class="hero-copy">
+    A JSON format for ordered quantum circuits, repeat blocks, detector
+    annotations, noise events, and visualization metadata used by
+    <code>rstim</code> and <code>qp101-viz</code>.
+  </p>
+  <div class="actions" aria-label="QP101 resources">
+    <a class="button primary" href="#schema-browser">Open the schema browser</a>
+    <a class="button" href="../qp101.schema.json" download>Download schema</a>
+    <a class="button" href="../QP101-ZY.md">Read protocol draft</a>
+  </div>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="qp101" class="qp101-section" aria-label="QP101 reference">
+        <section class="intro-grid" aria-label="QP101 summary">
+          <article>
+            <h3>Core Model</h3>
+            <p>
+              QP101 documents keep execution order in an
+              <code>operations</code> stream instead of flattening everything
+              into gates. The schema covers gates, ticks, repeats,
+              coordinates, detectors, observables, noise, and annotations.
+            </p>
+          </article>
+          <article>
+            <h3>Extensible By Design</h3>
+            <p>
+              Tool-specific data belongs in <code>metadata</code>,
+              <code>extensions</code>, or operation-local annotations. The
+              schema validates the stable structure while keeping room for
+              downstream renderers and analysis tools.
+            </p>
+          </article>
+          <article>
+            <h3>Validation Boundary</h3>
+            <p>
+              The schema checks document shape. Whole-document semantic rules,
+              such as comparing target indices with <code>num_qubits</code>,
+              stay in the protocol draft.
+            </p>
+          </article>
+        </section>
+        <section id="schema-browser" class="panel">
+          <div class="section-heading">
+            <p class="eyebrow">Interactive reference</p>
+            <h3>Schema Browser</h3>
+          </div>
+          <div class="schema-shell">
+            <aside class="schema-nav" aria-label="Schema navigation">
+              <div class="schema-nav-header">
+                <span>Definitions</span>
+                <span id="schema-status" class="status">Loading</span>
+              </div>
+              <div id="schema-nav-list" class="schema-nav-list"></div>
+            </aside>
+            <article id="schema-detail" class="schema-detail" aria-live="polite">
+              <h3>Loading schema</h3>
+              <p>Fetching <code>qp101.schema.json</code>.</p>
+            </article>
+          </div>
+        </section>
+        <section id="gallery">
+          <div class="section-heading">
+            <p class="eyebrow">Rendered with rstim render_svg</p>
+            <h3>Circuit Gallery</h3>
+          </div>
+          <div class="gallery-grid">
+            <article class="gallery-card">
+              <div class="gallery-copy">
+                <div class="example-heading">
+                  <h3>Basic Circuit</h3>
+                  <a href="../examples/basic.qp101.json">JSON</a>
+                </div>
+                <p>
+                  Minimal gate, control, tick, and measurement structure
+                  rendered from the same QP101 example shipped with the site.
+                </p>
+                <div class="gallery-links">
+                  <a href="../examples/basic.qp101.json">Example JSON</a>
+                  <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/basic.stim">Stim source</a>
+                </div>
+              </div>
+              <div class="gallery-preview">
+                <img
+                  src="../gallery/basic-site.svg"
+                  alt="Rendered basic QP101 circuit with H, controlled X, tick, and measurement"
+                >
+              </div>
+            </article>
+            <article class="gallery-card">
+              <div class="gallery-copy">
+                <div class="example-heading">
+                  <h3>Repeat Detector</h3>
+                  <a href="../examples/repeat-detector.qp101.json">JSON</a>
+                </div>
+                <p>
+                  A compact QEC-style example showing repeat structure,
+                  measurement anchors, and detector semantics.
+                </p>
+                <div class="gallery-links">
+                  <a href="../examples/repeat-detector.qp101.json">Example JSON</a>
+                  <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/repeat-detector.stim">Stim source</a>
+                </div>
+              </div>
+              <div class="gallery-preview">
+                <img
+                  src="../gallery/repeat-detector-site.svg"
+                  alt="Rendered repeated QP101 detector circuit with CX, measurement, and detector box"
+                >
+              </div>
+            </article>
+            <article class="gallery-card">
+              <div class="gallery-copy">
+                <div class="example-heading">
+                  <h3>Atom Loss Sample</h3>
+                  <a href="../examples/atom-loss-sample.qp101.json">JSON</a>
+                </div>
+                <p>
+                  Sample-trace annotations rendered inline, including atom
+                  loss, measurement results, and detector flips.
+                </p>
+                <div class="gallery-links">
+                  <a href="../examples/atom-loss-sample.qp101.json">Example JSON</a>
+                  <a href="https://github.com/nzy1997/rstim/blob/master/qp101-viz/examples/atom-loss-sample.stim">Stim source</a>
+                </div>
+              </div>
+              <div class="gallery-preview">
+                <img
+                  src="../gallery/atom-loss-sample.svg"
+                  alt="Rendered atom loss sample circuit with inline noise and detector annotations"
+                >
+              </div>
+            </article>
+          </div>
+        </section>
+        <section id="examples">
+          <div class="section-heading">
+            <p class="eyebrow">Concrete documents</p>
+            <h3>Examples</h3>
+          </div>
+          <div class="example-grid">
+            <article>
+              <div class="example-heading">
+                <h3>Minimal Gate Circuit</h3>
+                <a href="../examples/basic.qp101.json">Download</a>
+              </div>
+              <pre><code>{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 2,
+  "operations": [
+    { "type": "gate", "gate": "H", "targets": [0] },
+    {
+      "type": "gate",
+      "gate": "X",
+      "targets": [1],
+      "controls": [0],
+      "control_configs": [true]
+    },
+    { "type": "tick" },
+    { "type": "gate", "gate": "M", "targets": [0, 1] }
+  ]
+}</code></pre>
+            </article>
+            <article>
+              <div class="example-heading">
+                <h3>Repeat And Detector</h3>
+                <a href="../examples/repeat-detector.qp101.json">Download</a>
+              </div>
+              <pre><code>{
+  "type": "repeat",
+  "count": 2,
+  "body": [
+    { "type": "gate", "gate": "CX", "targets": [0, 1] },
+    { "type": "tick" },
+    { "type": "gate", "gate": "M", "targets": [1] },
+    {
+      "type": "detector",
+      "coords": [1.0, 0.0, 0.0],
+      "sources": [
+        { "kind": "rec", "offset": -1 }
+      ]
+    }
+  ]
+}</code></pre>
+            </article>
+          </div>
+        </section>
+</section>
+{% endblock main %}
+
+{% block scripts %}
+<script src="{{ root }}/js/qp101-browser.js"></script>
+{% endblock scripts %}

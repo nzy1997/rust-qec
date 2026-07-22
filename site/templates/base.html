@@ -1,0 +1,40 @@
+{% set root = section.extra.root | default(value=".") %}<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}rstim{% endblock title %}</title>
+    <meta
+      name="description"
+      content="{% block description %}rstim — a quantum error correction workspace in Rust.{% endblock description %}"
+    >
+    <link rel="stylesheet" href="{{ root }}/styles.css">
+  </head>
+  <body data-root="{{ root }}">
+    <header class="site-header">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="brand" href="{{ root }}/" aria-label="rstim home">
+          <span class="brand-mark">r</span>
+          <span>rstim</span>
+        </a>
+        <div class="nav-links">
+          <a href="{{ root }}/">Home</a>
+          <a href="{{ root }}/guide/">Guide</a>
+          <a href="{{ root }}/benchmarks/">Benchmarks</a>
+          <a href="{{ root }}/qp101/">QP101</a>
+        </div>
+      </nav>
+      {% block hero %}{% endblock hero %}
+    </header>
+
+    <main>
+    {% block main %}{% endblock main %}
+    </main>
+
+    <footer class="site-footer">
+      <span>rstim — a quantum error correction workspace in Rust</span>
+      <a href="https://github.com/nzy1997/rstim">Repository</a>
+    </footer>
+    {% block scripts %}{% endblock scripts %}
+  </body>
+</html>

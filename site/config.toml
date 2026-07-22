@@ -1,0 +1,7 @@
+base_url = "https://nzy1997.github.io/rstim"
+title = "rstim"
+compile_sass = false
+build_search_index = false
+
+# Zola 0.22 removed `markdown.highlight_code`. Code highlighting is disabled
+# by default when the `[markdown.highlighting]` table is omitted.

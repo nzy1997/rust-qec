@@ -232,7 +232,7 @@ fn assert_canonical_provenance(item_id: &str, item: &Value) {
 
 #[test]
 fn checked_result_provenance_styles_wrap_long_values() {
-    let styles = read_repo_file("site/styles.css");
+    let styles = read_repo_file("site/static/styles.css");
 
     assert_contains_all(
         &styles,
@@ -282,7 +282,9 @@ fn pages_workflow_builds_benchmarked_site() {
         &workflow,
         &[
             "actions/configure-pages@v5",
+            "zola-v0.22.1-x86_64-unknown-linux-gnu.tar.gz",
             "run: make build-site",
+            "run: python3 tools/check_site_build.py _site",
             "actions/upload-pages-artifact@v3",
             "path: _site",
             "actions/deploy-pages@v4",
@@ -312,8 +314,8 @@ fn pages_workflow_builds_benchmarked_site() {
     assert_contains_all(
         &makefile,
         &[
-            "cp site/index.html site/styles.css site/app.js _site/",
-            "cp site/benchmark-site.json _site/data/benchmark-site.json",
+            "zola --root site build --output-dir $(CURDIR)/_site",
+            "mkdir -p _site/examples _site/data",
             "python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery",
             "python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json",
         ],
@@ -323,31 +325,34 @@ fn pages_workflow_builds_benchmarked_site() {
 
 #[test]
 fn qp101_browser_resources_are_preserved() {
-    let index = read_repo_file("site/index.html");
-    let app = read_repo_file("site/app.js");
+    let qp101 = read_repo_file("site/templates/qp101.html");
+    let guide = read_repo_file("site/templates/guide.html");
+    let browser = read_repo_file("site/static/js/qp101-browser.js");
 
     for marker in [
         "id=\"qp101\"",
-        "href=\"#qp101\"",
-        "href=\"qp101.schema.json\"",
-        "href=\"QP101-ZY.md\"",
-        "href=\"examples/basic.qp101.json\"",
-        "href=\"examples/repeat-detector.qp101.json\"",
-        "href=\"examples/atom-loss-sample.qp101.json\"",
+        "href=\"../qp101.schema.json\"",
+        "href=\"../QP101-ZY.md\"",
+        "href=\"../examples/basic.qp101.json\"",
+        "href=\"../examples/repeat-detector.qp101.json\"",
+        "href=\"../examples/atom-loss-sample.qp101.json\"",
         "id=\"schema-browser\"",
-        "id=\"operations\"",
         "id=\"gallery\"",
         "id=\"examples\"",
-        "src=\"gallery/basic-site.svg\"",
-        "src=\"gallery/repeat-detector-site.svg\"",
-        "src=\"gallery/atom-loss-sample.svg\"",
+        "src=\"../gallery/basic-site.svg\"",
+        "src=\"../gallery/repeat-detector-site.svg\"",
+        "src=\"../gallery/atom-loss-sample.svg\"",
     ] {
-        assert!(index.contains(marker), "site index is missing marker {marker}");
+        assert!(qp101.contains(marker), "QP101 template is missing marker {marker}");
     }
+    assert!(
+        guide.contains("id=\"operations\""),
+        "guide template must preserve the QP101 operations reference"
+    );
 
     assert!(
-        app.contains("fetch(\"qp101.schema.json\")"),
-        "schema browser must keep fetching qp101.schema.json"
+        browser.contains("fetch(ROOT + \"/qp101.schema.json\")"),
+        "schema browser must fetch qp101.schema.json through the relative-root contract"
     );
 
     for relative in [
@@ -366,10 +371,12 @@ fn qp101_browser_resources_are_preserved() {
 
 #[test]
 fn workspace_feature_walkthroughs_are_linked() {
-    let index = read_repo_file("site/index.html");
+    let guide = read_repo_file("site/templates/guide.html");
+    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let site_sources = format!("{guide}\n{benchmarks}");
 
     assert_contains_all(
-        &index,
+        &site_sources,
         &[
             "id=\"workspace-overview\"",
             "id=\"feature-walkthroughs\"",
@@ -403,7 +410,7 @@ fn workspace_feature_walkthroughs_are_linked() {
     );
 
     assert_contains_all_case_insensitive(
-        &index,
+        &site_sources,
         &[
             "circuit parsing",
             "sampling",
@@ -420,8 +427,8 @@ fn workspace_feature_walkthroughs_are_linked() {
 
 #[test]
 fn benchmark_methodology_lists_required_provenance() {
-    let index = read_repo_file("site/index.html");
-    let app = read_repo_file("site/app.js");
+    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let app = read_repo_file("site/static/js/benchmarks.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
@@ -440,7 +447,7 @@ fn benchmark_methodology_lists_required_provenance() {
         "full evidence can describe the committed checked run",
     ] {
         assert!(
-            index.contains(marker),
+            benchmarks.contains(marker),
             "benchmark methodology is missing marker {marker}"
         );
     }
@@ -459,14 +466,14 @@ fn benchmark_methodology_lists_required_provenance() {
         "date",
     ] {
         assert!(
-            index.contains(field),
+            benchmarks.contains(field),
             "benchmark methodology is missing provenance field {field}"
         );
     }
 
     for marker in [
         "id=\"benchmark-manifest\"",
-        "fetch(\"data/benchmark-site.json\")",
+        "fetch(ROOT + \"/data/benchmark-site.json\")",
         "renderBenchmarkManifest",
         "family.status",
         "family.claims_limit",
@@ -476,7 +483,7 @@ fn benchmark_methodology_lists_required_provenance() {
         "https://github.com/nzy1997/rstim/blob/master/",
         "repoSourceHref(path)",
     ] {
-        let source = if marker.starts_with("id=") { &index } else { &app };
+        let source = if marker.starts_with("id=") { &benchmarks } else { &app };
         assert!(
             source.contains(marker),
             "manifest-backed benchmark rendering is missing marker {marker}"
@@ -515,8 +522,8 @@ fn benchmark_methodology_lists_required_provenance() {
 
 #[test]
 fn checked_benchmark_artifacts_are_linked() {
-    let index = read_repo_file("site/index.html");
-    let app = read_repo_file("site/app.js");
+    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let app = read_repo_file("site/static/js/benchmarks.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
@@ -534,7 +541,7 @@ fn checked_benchmark_artifacts_are_linked() {
     const CHECKED_ITEM_ORDER: &str = "surface-decoder-full bb-circuit-full rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample";
 
     assert_contains_all(
-        &index,
+        &benchmarks,
         &[
             "id=\"checked-benchmark-results\"",
             "id=\"checked-benchmark-result-cards\"",
@@ -546,33 +553,33 @@ fn checked_benchmark_artifacts_are_linked() {
 
     for item_id in CHECKED_ITEM_IDS {
         assert!(
-            index.contains(item_id),
-            "site/index.html is missing checked evidence item ID {item_id}"
+            benchmarks.contains(item_id),
+            "benchmarks template is missing checked evidence item ID {item_id}"
         );
         assert!(
             app.contains(item_id),
-            "site/app.js is missing checked evidence item ID {item_id}"
+            "benchmarks.js is missing checked evidence item ID {item_id}"
         );
     }
     let app_items_start = app
         .find("const checkedBenchmarkItems")
-        .expect("site/app.js must define checkedBenchmarkItems");
+        .expect("benchmarks.js must define checkedBenchmarkItems");
     let app_items_end = app[app_items_start..]
         .find("];\n")
         .map(|offset| app_items_start + offset)
-        .expect("site/app.js checkedBenchmarkItems must be an array");
+        .expect("benchmarks.js checkedBenchmarkItems must be an array");
     let app_items = &app[app_items_start..app_items_end];
     assert_eq!(
         app_items.matches('"').count() / 2,
         CHECKED_ITEM_IDS.len(),
-        "site/app.js checkedBenchmarkItems must contain exactly the site/index.html IDs"
+        "benchmarks.js checkedBenchmarkItems must contain exactly the benchmarks template IDs"
     );
     let mut ordered_cursor = 0;
     for item_id in CHECKED_ITEM_IDS {
         let marker = format!("\"{item_id}\"");
         let offset = app_items[ordered_cursor..]
             .find(&marker)
-            .unwrap_or_else(|| panic!("site/app.js checkedBenchmarkItems is out of order at {item_id}"));
+            .unwrap_or_else(|| panic!("benchmarks.js checkedBenchmarkItems is out of order at {item_id}"));
         ordered_cursor += offset + marker.len();
     }
 
@@ -608,12 +615,12 @@ fn checked_benchmark_artifacts_are_linked() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !index.contains(hardcoded_path),
-            "checked artifact path {hardcoded_path} must come from the manifest, not index.html"
+            !benchmarks.contains(hardcoded_path),
+            "checked artifact path {hardcoded_path} must come from the manifest, not the benchmarks template"
         );
         assert!(
             !app.contains(hardcoded_path),
-            "checked artifact path {hardcoded_path} must come from the manifest, not app.js"
+            "checked artifact path {hardcoded_path} must come from the manifest, not benchmarks.js"
         );
     }
 
@@ -884,13 +891,17 @@ fn checked_benchmark_artifacts_are_linked() {
 
 #[test]
 fn checked_benchmark_provenance_is_manifest_backed() {
-    let app = read_repo_file("site/app.js");
-    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/static/js/benchmarks.js");
+    let benchmarks = read_repo_file("site/templates/benchmarks.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value =
         serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
 
-    let checked_renderer = js_function_body(&app, "renderCheckedBenchmarkResults", "\n  function renderNav(");
+    let checked_renderer = js_function_body(
+        &app,
+        "renderCheckedBenchmarkResults",
+        "\n  if (benchmarkManifest || checkedBenchmarkResults)",
+    );
 
     assert_contains_all(
         checked_renderer,
@@ -916,8 +927,8 @@ fn checked_benchmark_provenance_is_manifest_backed() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !index.contains(hardcoded),
-            "checked provenance value {hardcoded} must come from the manifest renderer, not index.html"
+            !benchmarks.contains(hardcoded),
+            "checked provenance value {hardcoded} must come from the manifest renderer, not the benchmarks template"
         );
     }
 
@@ -929,13 +940,13 @@ fn checked_benchmark_provenance_is_manifest_backed() {
 
 #[test]
 fn qec_code_and_future_benchmarks_are_classified() {
-    let index = read_repo_file("site/index.html");
+    let benchmarks = read_repo_file("site/templates/benchmarks.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
 
     assert_contains_all(
-        &index,
+        &benchmarks,
         &[
             "id=\"qec-code-random-window-benchmark\"",
             "<code>qec-code</code>",
@@ -964,14 +975,14 @@ fn qec_code_and_future_benchmarks_are_classified() {
         ],
         "qec-code and future benchmark site sections",
     );
-    let rstim_section_start = index
+    let rstim_section_start = benchmarks
         .find("id=\"future-simulator-benchmarks\"")
         .expect("rstim-vs-stim site section must exist");
-    let rstim_section_end = index[rstim_section_start..]
+    let rstim_section_end = benchmarks[rstim_section_start..]
         .find("</article>")
         .map(|offset| rstim_section_start + offset)
         .expect("rstim-vs-stim site section must close");
-    let rstim_section = &index[rstim_section_start..rstim_section_end];
+    let rstim_section = &benchmarks[rstim_section_start..rstim_section_end];
     assert!(
         !rstim_section.contains("DEM extraction") && !rstim_section.contains("conversion"),
         "rstim-vs-stim site copy must not claim unchecked DEM extraction or conversion evidence"
@@ -996,7 +1007,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
         .expect("qec-code family evidence_items must be an array");
     assert!(!qec_items.is_empty(), "qec-code family must list evidence items");
     assert!(
-        !index.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
+        !benchmarks.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
         "qec-code random-window site copy must not describe evidence without local-only or partial status"
     );
     for item in qec_items {

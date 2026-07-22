@@ -39,10 +39,27 @@ class SiteFixture:
         self.tempdir.cleanup()
 
 
-REQUIRED_FILES = (
+PAGE_FILES = (
     "index.html",
+    "guide/index.html",
+    "benchmarks/index.html",
+    "qp101/index.html",
+)
+JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
+PAGE_REQUIRED_ANCHORS = {
+    "index.html": ("capabilities", "quick-start", "headline-benchmark"),
+    "guide/index.html": ("workspace-overview", "feature-walkthroughs", "operations"),
+    "benchmarks/index.html": (
+        "benchmark-evidence",
+        "checked-benchmark-results",
+        "checked-benchmark-result-cards",
+        "benchmarks",
+        "benchmark-manifest",
+    ),
+    "qp101/index.html": ("qp101", "schema-browser", "gallery", "examples"),
+}
+REQUIRED_FILES = PAGE_FILES + JS_FILES + (
     "styles.css",
-    "app.js",
     "data/benchmark-site.json",
     "QP101-ZY.md",
     "qp101.schema.json",
@@ -63,21 +80,6 @@ QP101_REQUIRED_FILES = (
     "gallery/repeat-detector-site.svg",
     "gallery/atom-loss-sample.svg",
 )
-REQUIRED_ANCHORS = (
-    "docs-home",
-    "workspace-overview",
-    "feature-walkthroughs",
-    "benchmark-evidence",
-    "checked-benchmark-results",
-    "benchmarks",
-    "benchmark-manifest",
-    "checked-benchmark-result-cards",
-    "qp101",
-    "schema-browser",
-    "operations",
-    "gallery",
-    "examples",
-)
 CLAIMS_POLICY_PHRASES = (
     "Claims Policy",
     "Publishable Evidence",
@@ -92,7 +94,7 @@ CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 STRING_LITERAL_PATH_RE = re.compile(r"""["']([A-Za-z0-9_./-]+\.[A-Za-z0-9]+(?:[?#][^"']*)?)["']""")
-ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css", "app.js", "index.html"}
+ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css"}
 
 
 class HtmlCollector(HTMLParser):
@@ -163,68 +165,122 @@ def collect_local_string_paths(*texts: str) -> set[str]:
         for value in STRING_LITERAL_PATH_RE.findall(text):
             normalized = normalize_local_reference(value)
             if normalized is not None and ("/" in normalized or normalized in ROOT_LEVEL_SITE_FILES):
-                found.add(normalized)
+                found.add(value)
     return found
 
 
-def resolve_site_reference(site_root: Path, value: str) -> tuple[str | None, Path | None, str | None]:
+def resolve_site_reference(site_root: Path, base_dir: Path, value: str) -> tuple[str | None, Path | None, str | None]:
     normalized = normalize_local_reference(value)
     if normalized is None:
         return None, None, None
-    candidate = (site_root / normalized).resolve(strict=False)
+    origin = site_root if value.startswith("/") else base_dir
+    candidate = (origin / normalized).resolve(strict=False)
     try:
         candidate.relative_to(site_root)
     except ValueError:
-        return normalized, None, f"path escape outside built site: {normalized}"
+        return normalized, None, f"path escape outside built site: {value}"
     return normalized, candidate, None
 
 
-def read_text_file(path: Path) -> tuple[str | None, str | None]:
+def read_text_file(path: Path, label: str | None = None) -> tuple[str | None, str | None]:
+    name = label or path.name
     try:
         return path.read_text(encoding="utf-8"), None
     except UnicodeDecodeError as exc:
-        return None, f"{path.name}: invalid UTF-8 ({exc})"
+        return None, f"{name}: invalid UTF-8 ({exc})"
     except OSError as exc:
-        return None, f"{path.name}: {exc.strerror or exc}"
+        return None, f"{name}: {exc.strerror or exc}"
 
 
-def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCollector, app_text: str) -> CheckResult:
-    missing_anchors = [anchor for anchor in REQUIRED_ANCHORS if anchor not in collector.ids]
-    if missing_anchors:
-        return fail("workspace overview", f"missing required anchors: {', '.join(missing_anchors)}")
+def check_page_reference(
+    site_root: Path,
+    page: str,
+    page_dir: Path,
+    value: str,
+    ids_by_page: dict[str, set[str]],
+) -> str | None:
+    if value.startswith("#"):
+        anchor = value[1:]
+        if anchor and anchor not in ids_by_page.get(page, set()):
+            return f"{page}: missing same-page anchor #{anchor}"
+        return None
+    if is_external_link(value):
+        return None
+    split = urlsplit(value)
+    if split.scheme or split.netloc or not split.path:
+        return None
+    if split.path.startswith("/"):
+        return f"{page}: root-absolute reference breaks subpath deploy: {value}"
+    normalized, candidate, error = resolve_site_reference(site_root, page_dir, split.path)
+    if error is not None:
+        return f"{page}: {error}"
+    if normalized is None or candidate is None:
+        return None
+    target = candidate / "index.html" if candidate.is_dir() else candidate
+    if not target.exists():
+        return f"{page}: missing local reference {value}"
+    if split.fragment:
+        try:
+            target_page = target.relative_to(site_root).as_posix()
+        except ValueError:
+            return None
+        target_ids = ids_by_page.get(target_page)
+        if target_ids is not None and split.fragment not in target_ids:
+            return f"{page}: missing anchor #{split.fragment} in {target_page}"
+    return None
 
-    missing_refs: list[str] = []
-    for href in collector.hrefs:
-        if href.startswith("#"):
-            anchor = href[1:]
-            if anchor and anchor not in collector.ids:
-                missing_refs.append(f"missing same-page anchor #{anchor}")
-            continue
-        normalized, candidate, error = resolve_site_reference(site_root, href)
-        if error is not None:
-            missing_refs.append(error)
-        elif normalized is not None and candidate is not None and not candidate.exists():
-            missing_refs.append(normalized)
-    for src in collector.srcs:
-        normalized, candidate, error = resolve_site_reference(site_root, src)
-        if error is not None:
-            missing_refs.append(error)
-        elif normalized is not None and candidate is not None and not candidate.exists():
-            missing_refs.append(normalized)
 
-    string_paths = collect_local_string_paths(index_text, app_text)
-    missing_string_paths: list[str] = []
-    for path in sorted(string_paths):
-        normalized, candidate, error = resolve_site_reference(site_root, path)
-        if error is not None:
-            missing_string_paths.append(error)
-        elif normalized is not None and candidate is not None and not candidate.exists():
-            missing_string_paths.append(normalized)
-    if missing_refs or missing_string_paths:
-        details = missing_refs + missing_string_paths
-        return fail("workspace overview", "missing local references: " + ", ".join(details))
+def check_pages(
+    site_root: Path,
+    page_data: dict[str, tuple[str, HtmlCollector]],
+    js_texts: dict[str, str],
+) -> CheckResult:
+    problems: list[str] = []
+    ids_by_page = {page: collector.ids for page, (_, collector) in page_data.items()}
 
-    return pass_("workspace overview", "required anchors and local built-site references are present")
+    for page, (text, collector) in page_data.items():
+        page_dir = (site_root / page).parent
+        missing_anchors = [
+            anchor for anchor in PAGE_REQUIRED_ANCHORS.get(page, ()) if anchor not in collector.ids
+        ]
+        if missing_anchors:
+            problems.append(f"{page}: missing required anchors: {', '.join(missing_anchors)}")
+
+        for value in collector.hrefs + collector.srcs:
+            problem = check_page_reference(site_root, page, page_dir, value, ids_by_page)
+            if problem is not None:
+                problems.append(problem)
+
+        script_texts: list[str] = []
+        for src in collector.srcs:
+            if not src.endswith(".js"):
+                continue
+            _, candidate, _ = resolve_site_reference(site_root, page_dir, src)
+            if candidate is not None and candidate.is_file():
+                rel = candidate.relative_to(site_root).as_posix()
+                if rel in js_texts:
+                    script_texts.append(js_texts[rel])
+
+        for path in sorted(collect_local_string_paths(text)):
+            if path.startswith("/"):
+                problems.append(f"{page}: root-absolute reference breaks subpath deploy: {path}")
+                continue
+            normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
+            if error is not None:
+                problems.append(f"{page}: {error}")
+            elif normalized is not None and candidate is not None and not candidate.exists():
+                problems.append(f"{page}: missing local reference {path}")
+
+        for path in sorted(collect_local_string_paths(*script_texts)):
+            normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
+            if error is not None:
+                problems.append(f"{page}: {error}")
+            elif normalized is not None and candidate is not None and not candidate.exists():
+                problems.append(f"{page}: missing local reference {path}")
+
+    if problems:
+        return fail("site pages", "; ".join(problems))
+    return pass_("site pages", "required anchors, cross-page links, and local references are present")
 
 
 def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list[CheckResult], dict[str, object] | None, list[str]]:
@@ -260,7 +316,7 @@ def check_benchmark_methodology(index_text: str) -> CheckResult:
     return pass_("benchmark methodology", "claims-policy phrases are present")
 
 
-def check_checked_artifacts(site_root: Path, index_text: str, app_text: str, manifest: dict[str, object] | None) -> CheckResult:
+def check_checked_artifacts(site_root: Path, combined_text: str, manifest: dict[str, object] | None) -> CheckResult:
     if manifest is None:
         return fail("checked benchmark artifacts", "manifest could not be loaded")
     checked = check_site_manifest.iter_checked_artifact_paths(manifest)
@@ -271,7 +327,7 @@ def check_checked_artifacts(site_root: Path, index_text: str, app_text: str, man
         return fail("checked benchmark artifacts", "missing copied checked artifacts: " + ", ".join(missing))
 
     checked_paths = {artifact for _, artifact in checked}
-    references = sorted(set(CHECKED_ARTIFACT_REFERENCE_RE.findall(index_text + "\n" + app_text)))
+    references = sorted(set(CHECKED_ARTIFACT_REFERENCE_RE.findall(combined_text)))
     unexpected = [ref for ref in references if ref not in checked_paths]
     if unexpected:
         return fail(
@@ -430,35 +486,46 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
 
     results.append(check_non_empty_files(site_root, QP101_REQUIRED_FILES, "QP101 assets"))
 
-    index_text, index_error = read_text_file(site_root / "index.html")
-    app_text, app_error = read_text_file(site_root / "app.js")
-    collector: HtmlCollector | None = None
-    workspace_read_errors = [error for error in (index_error, app_error) if error is not None]
-
-    if index_text is not None:
+    page_data: dict[str, tuple[str, HtmlCollector]] = {}
+    js_texts: dict[str, str] = {}
+    read_errors: list[str] = []
+    for page in PAGE_FILES:
+        text, error = read_text_file(site_root / page, label=page)
+        if error is not None:
+            read_errors.append(error)
+            continue
         collector = HtmlCollector()
-        collector.feed(index_text)
+        collector.feed(text)
+        page_data[page] = (text, collector)
+    for js_file in JS_FILES:
+        text, error = read_text_file(site_root / js_file, label=js_file)
+        if error is not None:
+            read_errors.append(error)
+        else:
+            js_texts[js_file] = text
 
-    if workspace_read_errors:
-        results.append(fail("workspace overview", "could not read built-site files: " + "; ".join(workspace_read_errors)))
-    elif collector is not None and app_text is not None:
-        results.append(check_workspace_overview(site_root, index_text, collector, app_text))
+    if read_errors:
+        results.append(fail("site pages", "could not read built-site files: " + "; ".join(read_errors)))
+    else:
+        results.append(check_pages(site_root, page_data, js_texts))
 
     manifest_results, manifest, manifest_site_errors = check_manifest_and_artifacts(site_root, repo_root)
     results.extend(manifest_results)
-    results.append(check_checked_provenance(manifest, manifest_site_errors + workspace_read_errors))
-    if index_text is None:
-        results.append(fail("benchmark methodology", "could not read built-site files: index.html"))
-    else:
-        results.append(check_benchmark_methodology(index_text))
+    results.append(check_checked_provenance(manifest, manifest_site_errors + read_errors))
 
-    if index_text is None or app_text is None:
-        unreadable = ", ".join(
-            name for name, text in (("index.html", index_text), ("app.js", app_text)) if text is None
-        )
-        results.append(fail("checked benchmark artifacts", f"could not read built-site files: {unreadable}"))
+    benchmarks_entry = page_data.get("benchmarks/index.html")
+    if benchmarks_entry is None:
+        results.append(fail("benchmark methodology", "could not read built-site files: benchmarks/index.html"))
     else:
-        results.append(check_checked_artifacts(site_root, index_text, app_text, manifest))
+        results.append(check_benchmark_methodology(benchmarks_entry[0]))
+
+    if read_errors:
+        results.append(fail("checked benchmark artifacts", "could not read built-site files: " + "; ".join(read_errors)))
+    else:
+        combined_text = "\n".join(
+            [text for text, _ in page_data.values()] + [js_texts[js_file] for js_file in JS_FILES]
+        )
+        results.append(check_checked_artifacts(site_root, combined_text, manifest))
     results.append(check_local_only_future(site_root, manifest))
 
     return results
@@ -851,27 +918,48 @@ def make_fixture_site() -> SiteFixture:
         site_root / "index.html",
         """<!doctype html>
 <html lang="en">
-<body>
+<body data-root=".">
   <nav>
-    <a href="#docs-home">Overview</a>
-    <a href="#workspace-overview">Workspace</a>
-    <a href="#feature-walkthroughs">Walkthroughs</a>
-    <a href="#benchmark-evidence">Evidence</a>
-    <a href="#checked-benchmark-results">Results</a>
-    <a href="#benchmarks">Methodology</a>
-    <a href="#qp101">QP101</a>
-    <a href="#operations">Operations</a>
-    <a href="#gallery">Gallery</a>
-    <a href="#examples">Examples</a>
+    <a href="./">Home</a>
+    <a href="guide/">Guide</a>
+    <a href="benchmarks/">Benchmarks</a>
+    <a href="qp101/">QP101</a>
   </nav>
-  <section id="docs-home"></section>
+  <section id="capabilities"><a href="guide/#feature-walkthroughs">walkthroughs</a></section>
+  <section id="quick-start"></section>
+  <section id="headline-benchmark">
+    <a href="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png">
+      <img src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png" alt="surface">
+    </a>
+  </section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "guide/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
   <section id="workspace-overview"></section>
-  <section id="feature-walkthroughs"></section>
+  <section id="feature-walkthroughs">
+    <a href="../qp101/">qp101</a>
+    <a href="#operations">ops</a>
+  </section>
+  <section id="operations"></section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "benchmarks/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
   <section id="benchmark-evidence"></section>
   <section id="checked-benchmark-results">
     <div id="checked-benchmark-result-cards"></div>
-    <a href="benchmarks/surface_decoder_compare/results/full/results.csv">surface csv</a>
-    <img src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png" alt="surface">
+    <a href="../benchmarks/surface_decoder_compare/results/full/results.csv">surface csv</a>
   </section>
   <section id="benchmarks">
     <h2>Benchmark Methodology</h2>
@@ -884,28 +972,38 @@ def make_fixture_site() -> SiteFixture:
     <article><h3>Claims Policy</h3></article>
     <div id="benchmark-manifest"></div>
   </section>
-  <section id="qp101">
-    <a href="qp101.schema.json">schema</a>
-    <a href="QP101-ZY.md">protocol</a>
-    <a href="examples/basic.qp101.json">basic</a>
-  </section>
-  <section id="schema-browser"></section>
-  <section id="operations"></section>
-  <section id="gallery">
-    <img src="gallery/basic-site.svg" alt="basic">
-    <img src="gallery/repeat-detector-site.svg" alt="repeat">
-    <img src="gallery/atom-loss-sample.svg" alt="atom">
-  </section>
-  <section id="examples">
-    <a href="examples/repeat-detector.qp101.json">repeat</a>
-    <a href="examples/atom-loss-sample.qp101.json">atom loss</a>
-  </section>
+  <script src="../js/benchmarks.js"></script>
 </body>
 </html>
 """,
     )
     write_text(
-        site_root / "app.js",
+        site_root / "qp101/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="qp101">
+    <a href="../qp101.schema.json">schema</a>
+    <a href="../QP101-ZY.md">protocol</a>
+    <a href="../examples/basic.qp101.json">basic</a>
+  </section>
+  <section id="schema-browser"></section>
+  <section id="gallery">
+    <img src="../gallery/basic-site.svg" alt="basic">
+    <img src="../gallery/repeat-detector-site.svg" alt="repeat">
+    <img src="../gallery/atom-loss-sample.svg" alt="atom">
+  </section>
+  <section id="examples">
+    <a href="../examples/repeat-detector.qp101.json">repeat</a>
+    <a href="../examples/atom-loss-sample.qp101.json">atom loss</a>
+  </section>
+  <script src="../js/qp101-browser.js"></script>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "js/benchmarks.js",
         """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
 function renderBenchmarkManifest(manifest) { return manifest; }
 function renderCheckedBenchmarkResults(manifest) { return manifest; }
@@ -913,19 +1011,23 @@ function renderProvenance(provenance) { return provenance; }
 const manifestMarkers = ["family.status", "family.claims_limit", "item.status", "item.claims_limit"];
 const checkedMarkers = ["item.artifacts", "item.commands", "item.caveats", "artifact.checked"];
 const provenanceMarkers = ["item.provenance", "renderProvenance(item.provenance)", "artifact_hashes"];
-fetch("data/benchmark-site.json");
+const ROOT = "..";
+fetch(ROOT + "/data/benchmark-site.json");
 const localRefs = [
-  "qp101.schema.json",
-  "examples/basic.qp101.json",
-  "examples/repeat-detector.qp101.json",
-  "examples/atom-loss-sample.qp101.json",
-  "gallery/basic-site.svg",
-  "gallery/repeat-detector-site.svg",
-  "gallery/atom-loss-sample.svg",
-  "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
-  "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+  "/benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+  "/benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
 ];
 artifact.kind === "image";
+""",
+    )
+    write_text(
+        site_root / "js/qp101-browser.js",
+        """const status = document.getElementById("schema-status");
+fetch("/qp101.schema.json");
+const localRefs = [
+  "/examples/basic.qp101.json",
+  "/gallery/basic-site.svg",
+];
 """,
     )
 
@@ -992,17 +1094,17 @@ def run_self_test() -> list[str]:
             ),
             (
                 "missing_claims_policy",
-                lambda f: (f.site_root / "index.html").write_text(
-                    (f.site_root / "index.html").read_text(encoding="utf-8").replace("Claims Policy", "Claims"),
+                lambda f: (f.site_root / "benchmarks/index.html").write_text(
+                    (f.site_root / "benchmarks/index.html").read_text(encoding="utf-8").replace("Claims Policy", "Claims"),
                     encoding="utf-8",
                 ),
                 "Claims Policy",
             ),
             (
                 "unmanifested_checked_link",
-                lambda f: (f.site_root / "index.html").write_text(
-                    (f.site_root / "index.html").read_text(encoding="utf-8")
-                    + '<a href="benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
+                lambda f: (f.site_root / "benchmarks/index.html").write_text(
+                    (f.site_root / "benchmarks/index.html").read_text(encoding="utf-8")
+                    + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
                     encoding="utf-8",
                 ),
                 "not listed as a checked manifest artifact",
@@ -1026,7 +1128,7 @@ def run_self_test() -> list[str]:
                     (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
                     (f.site_root / "index.html").write_text(
                         (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                            'href="QP101-ZY.md"', 'href="../outside.txt"', 1
+                            'href="guide/"', 'href="../outside.txt"', 1
                         ),
                         encoding="utf-8",
                     ),
@@ -1037,12 +1139,13 @@ def run_self_test() -> list[str]:
                 "js_escape_outside_site",
                 lambda f: (
                     (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
-                    (f.site_root / "app.js").write_text(
-                        (f.site_root / "app.js").read_text(encoding="utf-8") + '\nconst escaped = "../outside.txt";\n',
+                    (f.site_root / "js/benchmarks.js").write_text(
+                        (f.site_root / "js/benchmarks.js").read_text(encoding="utf-8")
+                        + '\nconst escaped = "../../outside.txt";\n',
                         encoding="utf-8",
                     ),
                 ),
-                "path escape outside built site: ../outside.txt",
+                "path escape outside built site: ../../outside.txt",
             ),
             (
                 "invalid_utf8_index",
@@ -1050,9 +1153,29 @@ def run_self_test() -> list[str]:
                 "index.html: invalid UTF-8",
             ),
             (
-                "invalid_utf8_app",
-                lambda f: (f.site_root / "app.js").write_bytes(b"\xff\xfe\xfa"),
-                "app.js: invalid UTF-8",
+                "invalid_utf8_benchmarks_js",
+                lambda f: (f.site_root / "js/benchmarks.js").write_bytes(b"\xff\xfe\xfa"),
+                "js/benchmarks.js: invalid UTF-8",
+            ),
+            (
+                "broken_cross_page_anchor",
+                lambda f: (f.site_root / "index.html").write_text(
+                    (f.site_root / "index.html").read_text(encoding="utf-8").replace(
+                        'href="guide/#feature-walkthroughs"', 'href="guide/#missing-anchor"', 1
+                    ),
+                    encoding="utf-8",
+                ),
+                "missing anchor #missing-anchor",
+            ),
+            (
+                "root_absolute_href",
+                lambda f: (f.site_root / "index.html").write_text(
+                    (f.site_root / "index.html").read_text(encoding="utf-8").replace(
+                        'href="guide/"', 'href="/guide/"', 1
+                    ),
+                    encoding="utf-8",
+                ),
+                "root-absolute reference breaks subpath deploy",
             ),
         ]
 

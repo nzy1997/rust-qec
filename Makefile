@@ -46,9 +46,8 @@ check:
 
 build-site:
 	rm -rf _site
-	mkdir -p _site/examples _site/gallery _site/data
-	cp site/index.html site/styles.css site/app.js _site/
-	cp site/benchmark-site.json _site/data/benchmark-site.json
+	zola --root site build --output-dir $(CURDIR)/_site
+	mkdir -p _site/examples _site/data
 	cp rstim/doc/qp101.schema.json _site/qp101.schema.json
 	cp rstim/doc/QP101-ZY.md _site/QP101-ZY.md
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Guide — rstim{% endblock title %}
+{% block description %}rstim workspace map, runnable walkthroughs, and the QP101 operation reference.{% endblock description %}
+
+{% block hero %}
+<div class="hero">
+  <p class="eyebrow">Guide</p>
+  <h1>Workspace guide</h1>
+  <p class="hero-copy">
+    The workspace map, runnable walkthroughs, and the QP101 operation
+    reference.
+  </p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+      <section id="workspace-overview" class="workspace-overview" aria-labelledby="workspace-overview-title">
+        <div class="section-heading">
+          <p class="eyebrow">Workspace overview</p>
+          <h2 id="workspace-overview-title">Crates by workflow boundary</h2>
+          <p class="section-copy">
+            The workspace is split around circuit production, detector-error-model
+            data paths, decoder experiments, and CSS-code construction. The cards
+            below name the crate that owns each boundary before the walkthroughs
+            link to runnable examples.
+          </p>
+        </div>
+        <div class="workspace-grid">
+          <article class="compact-card">
+            <h3><code>rstim</code></h3>
+            <p>
+              Simulator crate and CLI for circuit parsing, sampling, detection,
+              DEM extraction, SVG rendering, and QP101 export.
+            </p>
+          </article>
+          <article class="compact-card">
+            <h3><code>rsinter</code></h3>
+            <p>
+              Benchmark orchestration and decoder experiment harness for surface-code
+              and BB-circuit comparison flows.
+            </p>
+          </article>
+          <article class="compact-card">
+            <h3><code>rmatching</code></h3>
+            <p>
+              Rust MWPM decoder entry point for detector-error-model workflows.
+            </p>
+          </article>
+          <article class="compact-card">
+            <h3><code>rbposd</code></h3>
+            <p>
+              BP-OSD decoder component used by the workspace comparison harnesses.
+            </p>
+          </article>
+          <article class="compact-card">
+            <h3><code>rilpqec</code></h3>
+            <p>
+              ILP-style decoder component used in comparison and reproduction flows.
+            </p>
+          </article>
+          <article class="compact-card">
+            <h3><code>qec-code</code> and <code>qec-ilp-core</code></h3>
+            <p>
+              CSS construction helpers, code-family exports, and ILP-backed distance
+              checks used by exact and randomized distance-search workflows.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="feature-walkthroughs" class="feature-walkthroughs" aria-labelledby="feature-walkthroughs-title">
+        <div class="section-heading">
+          <p class="eyebrow">Feature walkthroughs</p>
+          <h2 id="feature-walkthroughs-title">Runnable entry points by task</h2>
+          <p class="section-copy">
+            These cards link the existing showcase pages and CLI references instead
+            of copying their long command blocks into the site.
+          </p>
+        </div>
+        <div class="walkthrough-grid">
+          <article class="compact-card">
+            <h3>Circuit parsing and sampling</h3>
+            <p>
+              Start with <code>rstim stats</code> for circuit parsing and structure,
+              then use <code>rstim sample</code> for measurement shots.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/rstim-cli-dem-pipeline.md">CLI DEM pipeline</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/cli.md">CLI reference</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>Detection and DEM extraction</h3>
+            <p>
+              Use <code>rstim detect</code>, <code>rstim analyze_errors</code>, and
+              <code>rstim sample_dem</code> to sample detector outputs from an
+              already-derived DEM for analysis workflows.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/rstim-cli-dem-pipeline.md">DEM walkthrough</a>
+              <a href="#operations">Operation semantics</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>SVG/QP101 export</h3>
+            <p>
+              Render static diagrams with <code>rstim render_svg</code> and export
+              structured interchange data with <code>rstim export_json</code>.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/rstim-render-svg-atom-loss.md">SVG atom-loss showcase</a>
+              <a href="../qp101/">QP101 browser</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>Decoder experiments</h3>
+            <p>
+              Follow <code>rsinter bench</code> and the decoder crates through the
+              checked-in surface, MWPM, BP-OSD, and ILP comparison evidence.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/benchmark-evidence.md">Benchmark evidence</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/surface_decoder_compare/README.md">Surface decoder comparison</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>CSS construction</h3>
+            <p>
+              Use <code>qec-code code css</code> to list built-ins, export sparse
+              rows, and construct CSS matrices for fixed and parameterized families.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-css-construction.md">CSS construction showcase</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/README.md">Showcase index</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>Distance-search workflows</h3>
+            <p>
+              Run exact checks and randomized upper-bound searches, including
+              <code>random-window-upper-bound</code>, through <code>qec-code</code>
+              and <code>qec-ilp-core</code>.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-css-construction.md">Exact distance examples</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-random-window-benchmark.md">Random-window benchmark</a>
+            </div>
+          </article>
+        </div>
+      </section>
+        <section id="operations">
+          <div class="section-heading">
+            <p class="eyebrow">Ordered operation stream</p>
+            <h3>Operation Types</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Purpose</th>
+                  <th>Core Fields</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>gate</code></td>
+                  <td>Generic quantum gate or measurement operation.</td>
+                  <td><code>gate</code>, <code>targets</code>, <code>controls</code>, <code>raw_targets</code></td>
+                </tr>
+                <tr>
+                  <td><code>repeat</code></td>
+                  <td>Nested block that preserves repeated circuit structure.</td>
+                  <td><code>count</code>, <code>body</code></td>
+                </tr>
+                <tr>
+                  <td><code>tick</code></td>
+                  <td>Explicit timing separator.</td>
+                  <td><code>type</code></td>
+                </tr>
+                <tr>
+                  <td><code>qubit_coords</code></td>
+                  <td>Coordinate declaration for one or more qubits.</td>
+                  <td><code>coords</code>, <code>targets</code></td>
+                </tr>
+                <tr>
+                  <td><code>shift_coords</code></td>
+                  <td>Coordinate offset marker.</td>
+                  <td><code>delta</code></td>
+                </tr>
+                <tr>
+                  <td><code>detector</code></td>
+                  <td>Detector annotation over measurement record sources.</td>
+                  <td><code>coords</code>, <code>sources</code></td>
+                </tr>
+                <tr>
+                  <td><code>observable_include</code></td>
+                  <td>Logical observable include annotation.</td>
+                  <td><code>index</code>, <code>sources</code></td>
+                </tr>
+                <tr>
+                  <td><code>noise</code></td>
+                  <td>Noise or fault operator preserving raw targets.</td>
+                  <td><code>gate</code>, <code>params</code>, <code>raw_targets</code></td>
+                </tr>
+                <tr>
+                  <td><code>annotation</code></td>
+                  <td>Human-readable stream annotation.</td>
+                  <td><code>kind</code>, <code>text</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+{% endblock main %}
