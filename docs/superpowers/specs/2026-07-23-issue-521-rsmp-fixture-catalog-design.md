@@ -65,8 +65,9 @@ produce stable diagnostics naming the invalid field or missing role.
 Path validation is lexical and repository-relative: absolute paths and `..`
 components are rejected before a file is read. Every committed file SHA-256
 listed in the catalog is recomputed. For each committed `b8` file, the checker
-compares file size to `ceil(shots * bit_count / 8)` and verifies unused final
-padding bits are zero.
+compares file size to Stim-style byte-aligned rows,
+`shots * ceil(bit_count / 8)`, and verifies unused padding bits in each row are
+zero.
 
 Recipe validation rejects duplicate IDs, missing expected codes, raw byte
 offset selectors, and invalid mappings from the #520 taxonomy. Unknown

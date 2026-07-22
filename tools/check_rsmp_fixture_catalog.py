@@ -100,8 +100,8 @@ def repo_path(repo_root: Path, value: object, label: str) -> Path:
 
 
 def b8_len(shots: int, bit_count: int) -> int:
-    """Return ceil(shots * bit_count / 8)."""
-    return (shots * bit_count + 7) // 8
+    """Return the number of bytes for byte-aligned b8 rows."""
+    return shots * ((bit_count + 7) // 8)
 
 
 def validate_b8(path: Path, shots: int, bit_count: int, label: str) -> None:
@@ -109,14 +109,15 @@ def validate_b8(path: Path, shots: int, bit_count: int, label: str) -> None:
     if not path.is_file():
         raise ValueError(f"{label}.path does not reference a committed file")
     # Stim b8 stores each sample as a byte-aligned row.
-    expected_len = shots * b8_len(1, bit_count)
+    row_len = b8_len(1, bit_count)
+    expected_len = shots * row_len
     data = path.read_bytes()
     if len(data) != expected_len:
         raise ValueError(f"{label}.length must be {expected_len}, got {len(data)}")
     remainder = bit_count % 8
     if remainder:
         padding_mask = ~((1 << remainder) - 1) & 0xFF
-        if any(data[index] & padding_mask for index in range(b8_len(1, bit_count) - 1, len(data), b8_len(1, bit_count))):
+        if any(data[index] & padding_mask for index in range(row_len - 1, len(data), row_len)):
             raise ValueError(f"{label}.padding_bits must be zero")
 
 

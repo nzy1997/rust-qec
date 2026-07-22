@@ -396,7 +396,8 @@ def repo_path(repo_root: Path, value: object, label: str) -> Path:
 
 
 def b8_len(shots: int, bit_count: int) -> int:
-    """Return ceil(shots * bit_count / 8)."""
+    """Return the bytes for Stim-style byte-aligned b8 rows."""
+    return shots * ((bit_count + 7) // 8)
 
 
 def validate_b8(path: Path, shots: int, bit_count: int, label: str) -> None:
