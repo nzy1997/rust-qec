@@ -56,8 +56,6 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p perf-artifacts
-          # Keep the historical entry-point text discoverable for documentation checks.
-          # cargo run -p rstim --bin rstim -- perf ci --out-dir
           cargo run --locked -p rstim --bin rstim -- perf ci --out-dir perf-artifacts
       - name: Publish perf report
         if: always()
