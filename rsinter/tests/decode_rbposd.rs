@@ -1,7 +1,9 @@
+#![cfg(feature = "rbposd-runner")]
+
 use std::collections::HashMap;
 
 use rbposd::{DecoderConfig, LsdConfig};
-use rsinter::collect::{CollectOptions, collect};
+use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{Decoder, RbposdDemDecoder, RbposdLsdDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::{DemTarget, DetectorErrorModel};
@@ -210,11 +212,7 @@ fn exact_three_error_lsd_logical_error_rate(dem: &DetectorErrorModel, lsd_order:
     bp_config.max_bp_iterations = 0;
     let decoder = RbposdLsdDemDecoder::with_bp_config(lsd_config, bp_config);
     let compiled = decoder.compile_for_dem(dem).unwrap();
-    let probabilities = [
-        0.05,
-        0.1,
-        0.1,
-    ];
+    let probabilities = [0.05, 0.1, 0.1];
     let mut ler = 0.0;
     for e0 in [false, true] {
         for e1 in [false, true] {

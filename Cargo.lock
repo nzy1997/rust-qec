@@ -1086,6 +1086,7 @@ dependencies = [
  "csv",
  "plotters",
  "qec-code",
+ "qec-ilp-core",
  "rand",
  "rayon",
  "rbposd",

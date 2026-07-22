@@ -1,3 +1,5 @@
+#![cfg(feature = "rmatching-runner")]
+
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use rsinter::decode::{Decoder, RmatchingDemDecoder};

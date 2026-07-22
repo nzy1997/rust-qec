@@ -4,14 +4,20 @@ version = "0.1.1"
 edition = "2024"
 
 [features]
-default = []
-gurobi = ["rilpqec/gurobi"]
+default = ["full"]
+rbposd-runner = ["dep:rbposd"]
+rmatching-runner = ["dep:rmatching"]
+ilp-runner = ["dep:rilpqec", "dep:qec-ilp-core"]
+plotting = ["dep:plotters"]
+full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
+gurobi = ["ilp-runner", "rilpqec/gurobi"]
 
 [dependencies]
 rstim = { path = "../rstim" }
-rmatching = { path = "../rmatching", features = ["bench"] }
-rbposd = { path = "../rbposd" }
-rilpqec = { path = "../rilpqec" }
+rmatching = { path = "../rmatching", features = ["bench"], optional = true }
+rbposd = { path = "../rbposd", optional = true }
+rilpqec = { path = "../rilpqec", optional = true }
+qec-ilp-core = { path = "../qec-ilp-core", optional = true }
 rand = "0.8"
 rayon = "1"
 clap = { version = "4", features = ["derive"] }
@@ -20,7 +26,7 @@ serde_json = "1"
 csv = "1"
 sha2 = "0.10"
 toml = "0.8"
-plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"] }
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
 qec-code = { path = "../qec-code" }

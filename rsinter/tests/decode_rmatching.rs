@@ -1,3 +1,5 @@
+#![cfg(feature = "rmatching-runner")]
+
 use rsinter::decode::{Decoder, RmatchingDemDecoder};
 use rstim::dem::DetectorErrorModel;
 
