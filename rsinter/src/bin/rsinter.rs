@@ -7,9 +7,9 @@ use rbposd::OsdVariant;
 
 #[cfg(feature = "rbposd-runner")]
 use rsinter::bb_circuit_memory::{
-    SimulationConfig, export_bravyi_model_audit_for_code, export_comparison_case_for_code,
+    export_bravyi_model_audit_for_code, export_comparison_case_for_code,
     export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
-    run_simulation_for_code_with_osd_variant,
+    run_simulation_for_code_with_osd_variant, SimulationConfig,
 };
 #[cfg(feature = "plotting")]
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
@@ -18,7 +18,7 @@ use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
-use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
+use rsinter::bench::run::{run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 #[cfg(feature = "plotting")]
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
@@ -252,9 +252,11 @@ fn run_bb_circuit_bposd_memory(args: BbCircuitBposdMemoryArgs) -> Result<(), Str
         println!();
     } else if args.json_compare_case {
         let export = match osd_variant {
-            Some(osd_variant) => {
-                export_comparison_case_for_code_with_osd_variant(&args.code_id, config, osd_variant)?
-            }
+            Some(osd_variant) => export_comparison_case_for_code_with_osd_variant(
+                &args.code_id,
+                config,
+                osd_variant,
+            )?,
             None => export_comparison_case_for_code(&args.code_id, config)?,
         };
         serde_json::to_writer_pretty(std::io::stdout(), &export).map_err(|e| e.to_string())?;

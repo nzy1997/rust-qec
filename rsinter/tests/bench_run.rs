@@ -1,9 +1,9 @@
 use rsinter::bench::registry::{
-    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
-    build_default_rust_runner_registry,
+    build_default_rust_runner_registry, BenchCasePoint, BenchRunContext, RustBenchRunner,
+    RustRunnerRegistry,
 };
-use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
-use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark, run_rust_benchmark_with_options};
+use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
+use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
 use std::collections::BTreeMap;
@@ -111,13 +111,12 @@ fn disabled_rilpqec_runner_reports_required_feature_before_artifacts() {
     .expect_err("disabled ILP runner must fail");
 
     assert!(err.contains("requires Cargo feature 'ilp-runner'"), "{err}");
-    assert!(
-        !dir.path()
-            .join("rilpqec-steane")
-            .join("test-run")
-            .join("results.jsonl")
-            .exists()
-    );
+    assert!(!dir
+        .path()
+        .join("rilpqec-steane")
+        .join("test-run")
+        .join("results.jsonl")
+        .exists());
 }
 
 fn write_rows_to_path(rows: &[BenchmarkResultRow], path: &Path) {
@@ -548,11 +547,9 @@ fn rust_benchmark_resume_falls_back_when_runner_cannot_plan_identity() {
 
     assert_eq!(resumed_rows.len(), 2);
     assert_eq!(identity_count(&resumed_rows, &stale_identity), 1);
-    assert!(
-        resumed_rows
-            .iter()
-            .any(|row| row.status == "ok" && row.params["p"] == serde_json::json!(0.1))
-    );
+    assert!(resumed_rows
+        .iter()
+        .any(|row| row.status == "ok" && row.params["p"] == serde_json::json!(0.1)));
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use rsinter::bench::spec::{
-    AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
-    LogicalRateUnit, PanelSpec, PlotFitKind, PlotSpec, SeriesSpec,
+    AxisSpec, BenchmarkMode, BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotFitKind, PlotSpec,
+    SeriesSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
 };
 use std::path::Path;
 

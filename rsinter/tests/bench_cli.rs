@@ -231,7 +231,10 @@ fn rsinter_bench_plot_requires_plotting_feature_before_reading_inputs() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("requires Cargo feature 'plotting'"), "{stderr}");
+    assert!(
+        stderr.contains("requires Cargo feature 'plotting'"),
+        "{stderr}"
+    );
     assert!(!out.exists());
 }
 
