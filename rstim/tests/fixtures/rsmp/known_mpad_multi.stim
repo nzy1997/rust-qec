@@ -1,0 +1,4 @@
+MPAD 0 1 0
+DETECTOR rec[-3] rec[-2]
+DETECTOR rec[-2] rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-3] rec[-1]

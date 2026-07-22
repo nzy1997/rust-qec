@@ -1,0 +1,4 @@
+REPEAT 2 {
+    M 0
+    DETECTOR rec[-1]
+}
