@@ -612,10 +612,11 @@ pub fn checked_logical_payload_bytes(
     free_measurement_count: u64,
     shots: u64,
 ) -> Result<u64, SampleArchiveError> {
-    let width = selected_detector_count
-        .checked_add(free_measurement_count)
-        .ok_or_else(|| limit("logical payload width overflow"))?;
-    checked_dense_bit_bytes(width, shots)
+    let selected_bytes = checked_dense_bit_bytes(selected_detector_count, shots)?;
+    let free_bytes = checked_dense_bit_bytes(free_measurement_count, shots)?;
+    selected_bytes
+        .checked_add(free_bytes)
+        .ok_or_else(|| limit("logical payload byte count overflow"))
 }
 
 fn validate_stream(

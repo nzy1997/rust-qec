@@ -231,8 +231,13 @@ fn rsmp_format_contract_known_vectors_and_negative_cases() {
     assert_eq!(checked_dense_bit_bytes(0, 33).unwrap(), 0);
     assert_eq!(checked_dense_bit_bytes(9, 3).unwrap(), 4);
     assert_eq!(checked_logical_payload_bytes(5, 4, 3).unwrap(), 4);
+    assert_eq!(checked_logical_payload_bytes(1, 1, 1).unwrap(), 2);
     expect_code(
         checked_logical_payload_bytes(u64::MAX, 1, 2),
+        SampleArchiveErrorCode::LimitExceeded,
+    );
+    expect_code(
+        checked_logical_payload_bytes(1, u64::MAX, 2),
         SampleArchiveErrorCode::LimitExceeded,
     );
 
