@@ -142,22 +142,23 @@ REQUIRED_RECIPES = {
     "truncated_zstd_frame": ("surface_d11_r100", "truncate(block.zstd_frame)", "RSMP_TRUNCATED", [], "compressed frame decode"),
     "zstd_decode_failure": ("surface_d11_r100", "set(block.zstd_frame.payload, invalid_zstandard_frame)", "RSMP_DECOMPRESSION_FAILED", ["trailer.archive_sha256"], "compressed frame decode"),
     "truncated_trailer": ("surface_d11_r100", "truncate(trailer)", "RSMP_TRUNCATED", [], "trailer decode"),
-    "overlong_varint": ("surface_d11_r100", "set(block.sparse_syndrome_payload.hit_count_uleb128, overlong_encoding(1))", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "trailer.archive_sha256"], "canonical integer decode"),
-    "sparse_index_out_of_range": ("surface_d11_r100", "set(block.sparse_syndrome_payload.detector_index_delta, detector_count)", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "trailer.archive_sha256"], "sparse syndrome index validation"),
+    "overlong_varint": ("surface_d11_r100", "set(block.sparse_syndrome_payload.hit_count_uleb128, overlong_encoding(1))", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "block.syndrome_zstd_frame.checksum", "trailer.archive_sha256"], "canonical integer decode"),
+    "sparse_index_out_of_range": ("surface_d11_r100", "set(block.sparse_syndrome_payload.detector_index_delta, detector_count)", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_uncompressed_len", "block.syndrome_compressed_len", "block.syndrome_zstd_frame.checksum", "trailer.archive_sha256"], "sparse syndrome index validation"),
     "duplicate_block": ("surface_d11_r100", "duplicate(block)", "RSMP_MALFORMED_ARCHIVE", ["trailer.block_count", "trailer.archive_sha256"], "block ordering validation"),
     "omitted_block": ("surface_d11_r100", "omit(block)", "RSMP_MALFORMED_ARCHIVE", ["trailer.block_count", "trailer.archive_sha256"], "block coverage validation"),
     "reordered_blocks": ("surface_d11_r100", "reorder(blocks)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "block sequence validation"),
     "changed_compressed_payload": ("surface_d11_r100", "flip(block.zstd_frame.payload.bit)", "RSMP_DECOMPRESSION_FAILED", ["trailer.archive_sha256"], "compressed frame checksum"),
     "checksum_mismatch": ("surface_d11_r100", "set(trailer.archive_sha256, alternate_digest)", "RSMP_CHECKSUM_MISMATCH", [], "archive checksum"),
-    "logical_payload_mismatch": ("surface_d11_r100", "flip(block.canonical_logical_payload.free_bits.bit)", "RSMP_LOGICAL_DIGEST_MISMATCH", ["block.free_compressed_len", "trailer.archive_sha256"], "logical payload digest"),
+    "logical_payload_mismatch": ("surface_d11_r100", "flip(block.canonical_logical_payload.free_bits.bit)", "RSMP_LOGICAL_DIGEST_MISMATCH", ["block.free_compressed_len", "block.free_zstd_frame.checksum", "trailer.archive_sha256"], "logical payload digest"),
     "declared_length_mismatch": ("surface_d11_r100", "set(block.syndrome_uncompressed_len, block.syndrome_uncompressed_len + 1)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "declared length validation"),
     "resource_limit_exceeded": ("surface_d11_r100", "set(global.max_shots_per_block, max_allowed_shots_per_block + 1)", "RSMP_LIMIT_EXCEEDED", ["global.header_sha256", "trailer.archive_sha256"], "resource limit validation"),
-    "nonzero_padding": ("surface_d11_r100", "set(block.syndrome_padding_bits, 1)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "zero padding validation"),
+    "nonzero_padding": ("surface_d11_r100", "set(block.syndrome_padding_bits, 1)", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_compressed_len", "block.syndrome_zstd_frame.checksum", "trailer.archive_sha256"], "zero padding validation"),
     "unknown_syndrome_codec": ("surface_d11_r100", "set(block.syndrome_codec_id, 99)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "syndrome codec dispatch"),
     "trailing_data": ("surface_d11_r100", "append_trailing_byte(0)", "RSMP_TRAILING_DATA", [], "archive end-of-input validation"),
 }
 RAW_OFFSET_SELECTOR = re.compile(r"byte_offset|offset\s*\(|@|\[\s*\d+\s*\]", re.IGNORECASE)
 SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
+RECOMPUTE_FIELD_PREFIXES = ("global.", "block.", "trailer.")
 
 
 def sha256_file(path: Path) -> str:
@@ -252,6 +253,25 @@ def validate_b8_entry(repo_root: Path, entry: object, shots: int, label: str) ->
     return path
 
 
+def validate_measurement_input(repo_root: Path, entry: object, hashes: dict[str, Any], shots: int, measurements: int, label: str) -> None:
+    data = require_mapping(entry, label)
+    validate_b8_entry(repo_root, data, shots, label)
+    if data.get("bit_count") != measurements:
+        raise ValueError(f"{label}.bit_count must be measurement_count")
+    if hashes.get("measurements_b8_sha256") != data.get("sha256"):
+        raise ValueError(f"{label}.sha256 must match hashes.measurements_b8_sha256")
+
+
+def validate_measurement_generation(generation: object, measurements: int, label: str) -> dict[str, Any]:
+    data = require_mapping(generation, label)
+    require_string(data.get("command"), f"{label}.command")
+    if data.get("format") != "b8":
+        raise ValueError(f"{label}.format must be b8")
+    if data.get("bit_count") != measurements:
+        raise ValueError(f"{label}.bit_count must be measurement_count")
+    return data
+
+
 def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[str, set[str]]:
     data = require_mapping(case, "case")
     case_id = require_string(data.get("id"), "case.id")
@@ -342,13 +362,27 @@ def validate_case(repo_root: Path, case: object, seen_ids: set[str]) -> tuple[st
         for field in ("stim_version", "working_directory", "command"):
             require_exact(cross_check.get(field), expected_cross_check[field], f"{case_id}.stim_cross_check.{field}")
     else:
-        generation = require_mapping(data.get("measurement_generation"), f"{case_id}.measurement_generation")
-        require_string(generation.get("command"), f"{case_id}.measurement_generation.command")
-        if generation.get("format") != "b8":
-            raise ValueError(f"{case_id}.measurement_generation.format must be b8")
-        if generation.get("bit_count") != measurements:
-            raise ValueError(f"{case_id}.measurement_generation.bit_count must be measurement_count")
+        has_input = "measurement_input" in data
+        has_generation = "measurement_generation" in data
+        if has_input == has_generation:
+            raise ValueError(f"{case_id}.measurement_input must provide exactly one of measurement_input or measurement_generation")
+        if case_id == "surface_d11_r100" and has_input:
+            raise ValueError(f"{case_id}.measurement_input must not duplicate benchmark output")
+        generation: dict[str, Any] | None = None
+        if has_input:
+            validate_measurement_input(
+                repo_root,
+                data.get("measurement_input"),
+                hashes,
+                shots,
+                measurements,
+                f"{case_id}.measurement_input",
+            )
+        else:
+            generation = validate_measurement_generation(data.get("measurement_generation"), measurements, f"{case_id}.measurement_generation")
         if case_id == "surface_d11_r100":
+            if generation is None:
+                raise ValueError(f"{case_id}.measurement_generation must be an object")
             require_exact(generation.get("command"), EXPECTED_BENCHMARK_GENERATION["command"], f"{case_id}.measurement_generation.command")
             expected_bytes = b8_len(shots, measurements)
             actual_bytes = require_nonnegative_int(
@@ -383,6 +417,81 @@ def validate_cases(repo_root: Path, cases: object) -> set[str]:
     return roles
 
 
+def expected_code_for_mutation(mutation: str, label: str) -> str:
+    if mutation.startswith("append_trailing_byte("):
+        return "RSMP_TRAILING_DATA"
+    if mutation.startswith("truncate("):
+        return "RSMP_TRUNCATED"
+    if "global.magic" in mutation:
+        return "RSMP_BAD_MAGIC"
+    if "global.format_major" in mutation or "global.format_minor" in mutation:
+        return "RSMP_UNSUPPORTED_VERSION"
+    if "global.required_flags" in mutation:
+        return "RSMP_UNSUPPORTED_FEATURE"
+    if "global.circuit_sha256" in mutation:
+        return "RSMP_CIRCUIT_MISMATCH"
+    if "max_shots_per_block" in mutation or "limit" in mutation:
+        return "RSMP_LIMIT_EXCEEDED"
+    if "zstd_frame" in mutation:
+        return "RSMP_DECOMPRESSION_FAILED"
+    if "canonical_logical_payload" in mutation:
+        return "RSMP_LOGICAL_DIGEST_MISMATCH"
+    if "trailer.archive_sha256" in mutation:
+        return "RSMP_CHECKSUM_MISMATCH"
+    malformed_tokens = (
+        "codec_id",
+        "uleb",
+        "varint",
+        "sparse_",
+        "padding",
+        "uncompressed_len",
+        "compressed_len",
+        "declared",
+        "duplicate(",
+        "omit(",
+        "reorder(",
+        "block_count",
+        "unknown_",
+    )
+    if any(token in mutation for token in malformed_tokens):
+        return "RSMP_MALFORMED_ARCHIVE"
+    raise ValueError(f"{label}.mutation must use a known rsmp field selector")
+
+
+def validate_recompute_fields(recompute: list[str], label: str) -> None:
+    for index, item in enumerate(recompute):
+        if RAW_OFFSET_SELECTOR.search(item):
+            raise ValueError(f"{label}.recompute[{index}] must use symbolic field paths, not raw byte offsets")
+        if not item.startswith(RECOMPUTE_FIELD_PREFIXES):
+            raise ValueError(f"{label}.recompute[{index}] must name a global, block, or trailer field")
+
+
+def validate_payload_recompute_contract(mutation: str, recompute: list[str], label: str) -> None:
+    required: tuple[str, ...] = ()
+    if "block.sparse_syndrome_payload" in mutation:
+        required = (
+            "block.syndrome_uncompressed_len",
+            "block.syndrome_compressed_len",
+            "block.syndrome_zstd_frame.checksum",
+            "trailer.archive_sha256",
+        )
+    elif "block.syndrome_padding_bits" in mutation:
+        required = (
+            "block.syndrome_compressed_len",
+            "block.syndrome_zstd_frame.checksum",
+            "trailer.archive_sha256",
+        )
+    elif "block.canonical_logical_payload.free_bits" in mutation:
+        required = (
+            "block.free_compressed_len",
+            "block.free_zstd_frame.checksum",
+            "trailer.archive_sha256",
+        )
+    for item in required:
+        if item not in recompute:
+            raise ValueError(f"{label}.recompute must include {item}")
+
+
 def validate_recipes(recipes: object, known_roles: set[str]) -> None:
     if not isinstance(recipes, list) or len(recipes) < 12:
         raise ValueError("corruption_recipes must contain at least 12 recipes")
@@ -404,9 +513,14 @@ def validate_recipes(recipes: object, known_roles: set[str]) -> None:
         code = require_string(data.get("expected_code"), f"{label}.expected_code")
         if code not in ERROR_CODES:
             raise ValueError(f"{label}.expected_code must be a public RSMP error code")
+        expected_code = expected_code_for_mutation(mutation, label)
+        if code != expected_code:
+            raise ValueError(f"{label}.expected_code must be {expected_code}")
         recompute = data.get("recompute")
         if not isinstance(recompute, list) or not all(isinstance(item, str) and item for item in recompute):
             raise ValueError(f"{label}.recompute must be a list of non-empty strings")
+        validate_recompute_fields(recompute, label)
+        validate_payload_recompute_contract(mutation, recompute, label)
         require_string(data.get("validation_boundary"), f"{label}.validation_boundary")
         recipe_data[recipe_id] = data
 

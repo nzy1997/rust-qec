@@ -78,6 +78,26 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, PASS_LINE + "\n")
 
+    def test_accepts_non_known_answer_committed_measurement_input(self) -> None:
+        _, temp_root, catalog_path, catalog_data = self.load_fixture_tree_copy()
+        fixture = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "nonzero_reference.measurements.b8"
+        fixture.write_bytes(b"\x01\x01\x01\x01")
+        digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+        case = self.find_case(catalog_data, "nonzero_reference")
+        case.pop("measurement_generation")
+        case["measurement_input"] = {
+            "path": "rstim/tests/fixtures/rsmp/nonzero_reference.measurements.b8",
+            "format": "b8",
+            "bit_count": 1,
+            "sha256": digest,
+        }
+        hashes = case["hashes"]
+        assert isinstance(hashes, dict)
+        hashes["measurements_b8_sha256"] = digest
+        self.write_catalog(catalog_path, catalog_data)
+        result = self.run_checker(repo_root=temp_root, catalog=catalog_path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_rejects_valid_case_with_incorrect_measurement_count(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.find_case(catalog_data, "known_mpad_multi")["measurement_count"] = 4
@@ -85,6 +105,30 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("known_mpad_multi.measurement_count", result.stderr)
+
+    def test_rejects_duplicate_case_id(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_case(catalog_data, "rank_zero")["id"] = "nonzero_reference"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate case id nonzero_reference", result.stderr)
+
+    def test_rejects_case_path_traversal(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_case(catalog_data, "known_mpad_multi")["circuit_path"] = "../known_mpad_multi.stim"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_mpad_multi.circuit_path", result.stderr)
+
+    def test_rejects_rank_above_shape_bound(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_case(catalog_data, "rank_zero")["rank_H"] = 1
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rank_zero.rank_H", result.stderr)
 
     def test_rejects_demoted_required_known_answer(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
@@ -138,6 +182,14 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("known_mpad_multi.measurement_input.bit_count", result.stderr)
 
+    def test_rejects_b8_padding_bits(self) -> None:
+        _, temp_root, catalog_path, _ = self.load_fixture_tree_copy()
+        fixture = temp_root / "rstim" / "tests" / "fixtures" / "rsmp" / "known_heralded_erase.measurements.b8"
+        fixture.write_bytes(b"\x80\x01\x01\x00")
+        result = self.run_checker(repo_root=temp_root, catalog=catalog_path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("known_heralded_erase.measurement_input.padding_bits", result.stderr)
+
     def test_rejects_missing_known_answer_cross_check(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.find_case(catalog_data, "known_mpad_multi").pop("stim_cross_check")
@@ -171,6 +223,14 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("bad_magic.mutation", result.stderr)
 
+    def test_rejects_duplicate_recipe_id(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_recipe(catalog_data, "unsupported_version")["id"] = "bad_magic"
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate corruption recipe id bad_magic", result.stderr)
+
     def test_rejects_wrong_unknown_required_feature_mapping(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()
         self.find_recipe(catalog_data, "unknown_required_feature")["expected_code"] = "RSMP_MALFORMED_ARCHIVE"
@@ -186,6 +246,65 @@ class RsmpFixtureCatalogCheckerTest(unittest.TestCase):
         result = self.run_checker(catalog=catalog_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown_required_feature.mutation", result.stderr)
+
+    def test_rejects_added_required_feature_recipe_wrong_mapping(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_required_feature_wrong_mapping",
+                "source_role": "nonzero_reference",
+                "mutation": "set(global.required_flags, another_unknown_required_feature)",
+                "expected_code": "RSMP_IO",
+                "recompute": [],
+                "validation_boundary": "required feature policy",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_required_feature_wrong_mapping.expected_code must be RSMP_UNSUPPORTED_FEATURE", result.stderr)
+
+    def test_rejects_added_unknown_codec_recipe_wrong_mapping(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_unknown_codec_wrong_mapping",
+                "source_role": "surface_d11_r100",
+                "mutation": "set(block.free_codec_id, 99)",
+                "expected_code": "RSMP_IO",
+                "recompute": ["trailer.archive_sha256"],
+                "validation_boundary": "free codec dispatch",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_unknown_codec_wrong_mapping.expected_code must be RSMP_MALFORMED_ARCHIVE", result.stderr)
+
+    def test_rejects_raw_byte_offset_recompute_selector(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.recipes(catalog_data).append(
+            {
+                "id": "extra_checksum_raw_recompute",
+                "source_role": "surface_d11_r100",
+                "mutation": "set(trailer.archive_sha256, alternate_digest)",
+                "expected_code": "RSMP_CHECKSUM_MISMATCH",
+                "recompute": ["offset(12)"],
+                "validation_boundary": "archive checksum",
+            }
+        )
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extra_checksum_raw_recompute.recompute", result.stderr)
+
+    def test_rejects_incomplete_payload_recipe_recompute_contract(self) -> None:
+        _, catalog_copy, catalog_data = self.load_catalog_copy()
+        self.find_recipe(catalog_data, "nonzero_padding")["recompute"] = ["trailer.archive_sha256"]
+        self.write_catalog(catalog_copy, catalog_data)
+        result = self.run_checker(catalog=catalog_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nonzero_padding.recompute", result.stderr)
 
     def test_rejects_changed_compressed_payload_wrong_mapping(self) -> None:
         _, catalog_copy, catalog_data = self.load_catalog_copy()

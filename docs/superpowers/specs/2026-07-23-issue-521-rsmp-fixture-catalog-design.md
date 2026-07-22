@@ -73,9 +73,12 @@ Recipe validation rejects duplicate IDs, missing expected codes, raw byte
 offset selectors, and invalid mappings from the #520 taxonomy. Unknown
 required-feature recipes must use `RSMP_UNSUPPORTED_FEATURE`; malformed
 structure, ordering, padding, canonical encoding, and unknown-ID recipes must
-use `RSMP_MALFORMED_ARCHIVE`; Zstandard decode recipes must use
-`RSMP_DECOMPRESSION_FAILED`; and canonical logical payload mismatches must use
-`RSMP_LOGICAL_DIGEST_MISMATCH`.
+use `RSMP_MALFORMED_ARCHIVE`; Zstandard frame, decode, or frame-checksum
+recipes must use `RSMP_DECOMPRESSION_FAILED`; and canonical logical payload
+mismatches must use `RSMP_LOGICAL_DIGEST_MISMATCH`. Decoded-payload mutations
+also name the affected Zstandard frame checksum and compressed-length fields in
+their recomputation contract, so later materialization reaches the intended
+inner validation boundary.
 
 ## Fixtures
 

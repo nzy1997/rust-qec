@@ -20,7 +20,7 @@
 - Public error codes are the #520 taxonomy: `RSMP_BAD_MAGIC`, `RSMP_UNSUPPORTED_VERSION`, `RSMP_UNSUPPORTED_FEATURE`, `RSMP_UNSUPPORTED_SWEEP`, `RSMP_CIRCUIT_MISMATCH`, `RSMP_SHAPE_MISMATCH`, `RSMP_LIMIT_EXCEEDED`, `RSMP_TRUNCATED`, `RSMP_MALFORMED_ARCHIVE`, `RSMP_DECOMPRESSION_FAILED`, `RSMP_CHECKSUM_MISMATCH`, `RSMP_LOGICAL_DIGEST_MISMATCH`, `RSMP_TRAILING_DATA`, and `RSMP_IO`.
 - Unknown required feature recipes must map to `RSMP_UNSUPPORTED_FEATURE`.
 - Malformed fields, order, padding, canonical encoding, or unknown IDs must map to `RSMP_MALFORMED_ARCHIVE`.
-- Zstandard decode failure recipes must map to `RSMP_DECOMPRESSION_FAILED`.
+- Zstandard frame, decode, or frame-checksum failure recipes must map to `RSMP_DECOMPRESSION_FAILED`.
 - Canonical logical payload mismatch recipes must map to `RSMP_LOGICAL_DIGEST_MISMATCH`.
 - Do not implement transforms, archive writers/readers, CLI archive commands, compression, or corruption materialization.
 
@@ -419,8 +419,11 @@ and known-answer expected file hashes and lengths. Use labels like
 Validate duplicate recipe IDs, non-empty source roles, mutation strings,
 expected error codes, recomputation lists, and validation boundaries. Reject
 raw byte offset selectors by matching `byte_offset`, `offset(`, `@`, or
-`[number]` patterns in mutation strings. Enforce the normalized recipe mapping
-rules from the Global Constraints.
+`[number]` patterns in mutation strings and recomputation selectors. Enforce
+the normalized recipe mapping rules from the Global Constraints. For decoded
+payload mutations, require recomputation metadata to include the affected
+Zstandard frame checksum plus enclosing compressed-length and archive-digest
+fields needed to reach the catalogued validation boundary.
 
 - [ ] **Step 4: Implement CLI entrypoint**
 
