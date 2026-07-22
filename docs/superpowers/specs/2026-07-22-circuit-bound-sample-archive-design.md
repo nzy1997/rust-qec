@@ -216,6 +216,12 @@ Default blocks contain at most 4096 shots. The last block can be shorter. The
 writer may accept a bounded alternative block size, but records it in the
 global header and enforces it consistently.
 
+An archive with zero shots contains no blocks: it consists of the global
+header followed by a trailer whose block count and total shot count are both
+zero. Empty syndrome or free-coordinate dimensions inside a non-empty block
+use the one canonical empty-stream representation frozen by the normative
+format document.
+
 ### Syndrome pre-codec
 
 For `R` selected detector values and `S` shots, form both raw-size candidates:
@@ -259,6 +265,13 @@ The writer consumes at most one input block at a time, transforms it, writes
 the two frames, and releases block storage. The reader validates and
 reconstructs one block, passes it to the requested output writers, and releases
 it before reading the next block.
+
+`next_block()` performs block-local validation. Whole-archive completion,
+trailer integrity, and trailing-data rejection are established only by
+`finish()`. A block already returned before a later block or trailer fails
+cannot be revoked and must not be described as a successfully decoded archive
+or as salvage. File outputs remain unpublished until `finish()` succeeds;
+stdout may contain an already-verified prefix when a late failure occurs.
 
 The format contains independent frames for corruption localization and bounded
 decoding, but v1 intentionally has no shot-range index and guarantees only
@@ -391,16 +404,27 @@ Stable public error categories include:
 ```text
 RSMP_BAD_MAGIC
 RSMP_UNSUPPORTED_VERSION
+RSMP_UNSUPPORTED_FEATURE
 RSMP_UNSUPPORTED_SWEEP
 RSMP_CIRCUIT_MISMATCH
 RSMP_SHAPE_MISMATCH
 RSMP_LIMIT_EXCEEDED
 RSMP_TRUNCATED
-RSMP_CORRUPT_BLOCK
+RSMP_MALFORMED_ARCHIVE
+RSMP_DECOMPRESSION_FAILED
 RSMP_CHECKSUM_MISMATCH
+RSMP_LOGICAL_DIGEST_MISMATCH
 RSMP_TRAILING_DATA
 RSMP_IO
 ```
+
+The normative format document freezes the validation precedence and mapping
+from malformed fields to these codes. Zstandard implementation error strings
+are never part of the public contract. Unknown required format features map to
+`RSMP_UNSUPPORTED_FEATURE`; malformed ordering, padding, and canonical encodings
+map to `RSMP_MALFORMED_ARCHIVE`; Zstandard decode failures map to
+`RSMP_DECOMPRESSION_FAILED`; and a mismatch in reconstructed logical block
+content maps to `RSMP_LOGICAL_DIGEST_MISMATCH`.
 
 CLI diagnostics use:
 
@@ -421,6 +445,12 @@ already-committed outputs in its diagnostic. At most one output may target
 stdout. stdout cannot be rolled back; documentation states that a late error
 may leave complete earlier blocks on stdout, while the process always exits
 nonzero.
+
+The command validates all output paths before creating temporary files and
+rejects duplicate final paths. It never deletes an already-published output in
+an attempt to simulate multi-file rollback, because doing so could destroy a
+pre-existing file that was atomically replaced. `--verify_only` is mutually
+exclusive with result-output arguments and creates no result files.
 
 There is no `--ignore_checksum`, partial-success, or salvage option in v1.
 
@@ -494,6 +524,14 @@ For at least 1 MiB of high-entropy input on a circuit with no detector
 constraints, the archive must be no more than 102% of the original `b8` size.
 This proves the dense fallback avoids pathological expansion.
 
+The checked evidence uses Zstandard level 3, content sizes, frame checksums,
+single-threaded compression, and no dictionary for both archive streams and
+the direct-Zstandard comparison. The direct-Zstandard size remains a reported
+diagnostic for the high-entropy control; the normative 102% denominator is the
+original `b8` size. Evidence records the exact producer command, producer
+version, input SHA-256, Zstandard implementation version, and effective frame
+parameters.
+
 The benchmark artifact also reports encode MiB/s, decode MiB/s, selected codec
 per block, detector density, free-bit count, compression ratios, and maximum
 logical block working set. v1 does not impose a fixed wall-clock threshold;
@@ -514,8 +552,13 @@ Document:
 - compression evidence and claim limits.
 
 Maintain a tiny committed v1 reader fixture so future readers must retain v1
-compatibility. Writer byte-for-byte determinism across Zstandard versions is
-not required; semantic output, container validity, and v1 readability are.
+compatibility. The fixture is an immutable valid-reader specimen, not the
+canonical output of the current writer. Compatibility tests read its committed
+bytes directly and never regenerate it with the current writer. Future coverage
+is additive: a writer change may add a fixture but must not replace an existing
+v1 specimen merely because newly written bytes differ. Writer byte-for-byte
+determinism across Zstandard versions is not required; semantic output,
+container validity, and v1 readability are.
 
 ## Risks and mitigations
 
