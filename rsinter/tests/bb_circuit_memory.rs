@@ -1,3 +1,5 @@
+#![cfg(feature = "rbposd-runner")]
+
 use rsinter::bb_circuit_memory::{
     BbPPointConfig, OperationKind, SimulationConfig, bb_circuit_bposd_result_row, build_code,
     build_effective_models, build_syndrome_cycle, build_upstream_code,

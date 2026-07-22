@@ -1,8 +1,11 @@
 use std::fs;
 use std::process::Command;
 
+#[cfg(feature = "plotting")]
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
+#[cfg(feature = "plotting")]
 use rsinter::bench::plot::logical_rate_fit_for_plot;
+#[cfg(feature = "plotting")]
 use rsinter::bench::spec::LogicalRateUnit;
 
 #[test]
@@ -127,6 +130,7 @@ fn rsinter_bench_merge_writes_combined_jsonl() {
 }
 
 #[test]
+#[cfg(feature = "plotting")]
 fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("rows.jsonl");
@@ -169,6 +173,33 @@ fn rsinter_bench_plot_writes_svg_from_jsonl_input() {
 }
 
 #[test]
+#[cfg(all(feature = "rbposd-runner", not(feature = "plotting")))]
+fn rsinter_bench_plot_requires_plotting_feature_before_reading_inputs() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("plot.svg");
+    let input = dir.path().join("missing-results.jsonl");
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "plot",
+            "--spec",
+            "tests/fixtures/bench/minimal_steane_css_rbposd.toml",
+            "--input",
+            input.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("requires Cargo feature 'plotting'"), "{stderr}");
+    assert!(!out.exists());
+}
+
+#[test]
+#[cfg(feature = "plotting")]
 fn rsinter_bench_plot_surface_compare_csv_writes_png_from_legacy_csv() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("plots").join("surface_decoder_compare.png");
@@ -193,6 +224,7 @@ fn rsinter_bench_plot_surface_compare_csv_writes_png_from_legacy_csv() {
 }
 
 #[test]
+#[cfg(feature = "plotting")]
 fn rsinter_bench_plot_bb_compare_csv_writes_png_from_batched_csv() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("bb_results.csv");
@@ -232,6 +264,7 @@ bb72-error,batched_compare,legacy_decoder,bb72,0.003,6,10,,0,12345,ms,10000,osd_
 }
 
 #[test]
+#[cfg(feature = "plotting")]
 fn bb_compare_csv_adapter_preserves_trial_level_ler_for_plot_input() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("bb_results.csv");
@@ -261,6 +294,33 @@ bb144-p0030-c12-t1000000-seed12345,batched_compare,rbposd,bb144,0.003,12,1000000
 }
 
 #[test]
+#[cfg(not(feature = "rbposd-runner"))]
+fn rsinter_bb_circuit_bposd_memory_requires_rbposd_runner_feature() {
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bb-circuit-bposd-memory",
+            "--code-id",
+            "bb90",
+            "--physical-error-rate",
+            "0.000000000001",
+            "--num-cycles",
+            "1",
+            "--num-trials",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("requires Cargo feature 'rbposd-runner'"),
+        "{stderr}"
+    );
+}
+
+#[test]
+#[cfg(feature = "rbposd-runner")]
 fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
@@ -290,6 +350,7 @@ fn rsinter_bb90_circuit_bposd_memory_prints_four_column_result_line() {
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn rsinter_bb_circuit_bposd_memory_accepts_ldpc_osd_method_for_result_line() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
@@ -321,6 +382,7 @@ fn rsinter_bb_circuit_bposd_memory_accepts_ldpc_osd_method_for_result_line() {
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
@@ -360,6 +422,7 @@ fn rsinter_bb_circuit_bposd_memory_json_compare_case_prints_profile_bundle() {
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn rsinter_json_compare_case_accepts_ldpc_osd_method_and_exports_trial_predictions() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([
@@ -408,6 +471,7 @@ fn rsinter_json_compare_case_accepts_ldpc_osd_method_and_exports_trial_predictio
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn rsinter_bb_circuit_bposd_memory_rejects_negative_physical_error_rate() {
     let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
         .args([

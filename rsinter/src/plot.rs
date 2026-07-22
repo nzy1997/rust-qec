@@ -1,3 +1,32 @@
+#[cfg(feature = "plotting")]
+pub use enabled::{plot_error_rate, plot_error_rate_per_piece};
+
+#[cfg(not(feature = "plotting"))]
+use std::path::Path;
+
+#[cfg(not(feature = "plotting"))]
+pub fn plot_error_rate(
+    _stats: &[crate::task_stats::TaskStats],
+    _x_func: impl Fn(&crate::task_stats::TaskStats) -> f64,
+    _group_func: impl Fn(&crate::task_stats::TaskStats) -> String,
+    _output: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    Err("requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(not(feature = "plotting"))]
+pub fn plot_error_rate_per_piece(
+    _stats: &[crate::task_stats::TaskStats],
+    _x_func: impl Fn(&crate::task_stats::TaskStats) -> f64,
+    _group_func: impl Fn(&crate::task_stats::TaskStats) -> String,
+    _pieces_func: impl Fn(&crate::task_stats::TaskStats) -> f64,
+    _output: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    Err("requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(feature = "plotting")]
+mod enabled {
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -475,4 +504,5 @@ mod tests {
             ]
         );
     }
+}
 }

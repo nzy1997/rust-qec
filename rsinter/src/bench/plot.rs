@@ -1,3 +1,64 @@
+#[cfg(feature = "plotting")]
+pub use enabled::{
+    LogLogFitForPlot, LogicalRateFitForPlot, log_log_fit_for_plot, logical_rate_fit_for_plot,
+    render_benchmark_plot,
+};
+
+#[cfg(not(feature = "plotting"))]
+use std::path::Path;
+
+#[cfg(not(feature = "plotting"))]
+use crate::bench::result::BenchmarkResultRow;
+#[cfg(not(feature = "plotting"))]
+use crate::bench::spec::{BenchmarkSpec, LogicalRateUnit};
+
+#[cfg(not(feature = "plotting"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LogicalRateFitForPlot {
+    pub low: f64,
+    pub best: Option<f64>,
+    pub high: f64,
+}
+
+#[cfg(not(feature = "plotting"))]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LogLogFitForPlot {
+    pub slope: f64,
+    pub intercept: f64,
+    pub x_min: f64,
+    pub x_max: f64,
+    pub y_min: f64,
+    pub y_max: f64,
+}
+
+#[cfg(not(feature = "plotting"))]
+pub fn render_benchmark_plot(
+    _spec: &BenchmarkSpec,
+    _rows: &[BenchmarkResultRow],
+    _out: &Path,
+) -> Result<(), String> {
+    Err("requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(not(feature = "plotting"))]
+#[doc(hidden)]
+pub fn logical_rate_fit_for_plot(
+    _row: &BenchmarkResultRow,
+    _unit: LogicalRateUnit,
+) -> Result<LogicalRateFitForPlot, String> {
+    Err("requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(not(feature = "plotting"))]
+#[doc(hidden)]
+pub fn log_log_fit_for_plot(_points: &[(f64, Option<f64>)]) -> Option<LogLogFitForPlot> {
+    None
+}
+
+#[cfg(feature = "plotting")]
+mod enabled {
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -1342,4 +1403,5 @@ mod tests {
         assert_eq!(format_axis_tick(1.0), "1");
         assert_eq!(format_axis_tick(10_000.0), "1.0e4");
     }
+}
 }
