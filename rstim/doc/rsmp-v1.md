@@ -66,7 +66,7 @@ The archive trailer is exactly 64 bytes.
 
 ## Compatibility and canonical structure
 
-The magic values are `RSTMSMP\\0`, `RSMPBLK\\0`, and `RSMPEND\\0`. v1 readers
+The magic values are `RSTMSMP\0`, `RSMPBLK\0`, and `RSMPEND\0`. v1 readers
 accept only major 1, minor 0. A nonzero `required_flags` value is
 `RSMP_UNSUPPORTED_FEATURE`; v1.0 has no defined optional flags, so a nonzero
 `optional_flags` value is malformed. All reserved fields and reserved flags
