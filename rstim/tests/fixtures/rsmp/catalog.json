@@ -106,7 +106,7 @@
       "detector_count": 1,
       "observable_count": 0,
       "rank_H": 1,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/nonzero_reference.stim", "format": "b8", "bit_count": 1},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/nonzero_reference.stim", "format": "b8", "bit_count": 1},
       "hashes": {"circuit_sha256": "a374a9bc82c0b043a7ef40560c1c7021d27ded0484dd7be49be3b4a7bf546744"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
@@ -122,7 +122,7 @@
       "detector_count": 0,
       "observable_count": 0,
       "rank_H": 0,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/rank_zero.stim", "format": "b8", "bit_count": 1},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/rank_zero.stim", "format": "b8", "bit_count": 1},
       "hashes": {"circuit_sha256": "efb8217cc5ffbb305255ac47281b17964df5cf6cb2268e63450f06ce0e001fdb"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
@@ -138,7 +138,7 @@
       "detector_count": 2,
       "observable_count": 0,
       "rank_H": 1,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/dependent_detectors.stim", "format": "b8", "bit_count": 1},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/dependent_detectors.stim", "format": "b8", "bit_count": 1},
       "hashes": {"circuit_sha256": "fd6e6947f74bca00f14c3ac2e4dab460de8267b9236f95cd5799007a0b72cb87"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
@@ -154,7 +154,7 @@
       "detector_count": 2,
       "observable_count": 0,
       "rank_H": 2,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/repeat_records.stim", "format": "b8", "bit_count": 2},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/repeat_records.stim", "format": "b8", "bit_count": 2},
       "hashes": {"circuit_sha256": "332582a44596530f4f4152b3a7d6734f616f4ac76f249a8328612b1110d9d8c5"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
@@ -170,7 +170,7 @@
       "detector_count": 0,
       "observable_count": 1,
       "rank_H": 0,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/observable_recovery.stim", "format": "b8", "bit_count": 1},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/observable_recovery.stim", "format": "b8", "bit_count": 1},
       "hashes": {"circuit_sha256": "b4f3375b3432ea59e468c881020406e63438989a4719234a26dd7fa1435b9df2"},
       "consumers": ["measurement_transform", "m2d", "rsmp_archive"]
     },
@@ -186,7 +186,7 @@
       "detector_count": 2,
       "observable_count": 0,
       "rank_H": 2,
-      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 rstim/tests/fixtures/rsmp/loss_visible_measurements.stim", "format": "b8", "bit_count": 2},
+      "measurement_generation": {"command": "stim sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim", "format": "b8", "bit_count": 2},
       "hashes": {"circuit_sha256": "32912ae0634064f4d842ae3023e0e81949355bf13d2b179897451bcdae1ddef2"},
       "consumers": ["measurement_transform", "rsmp_archive"]
     },
@@ -202,7 +202,7 @@
       "detector_count": 12000,
       "observable_count": 1,
       "rank_H": 12000,
-      "measurement_generation": {"command": "stim sample --shots 1024 --seed 2 --out_format b8 benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "format": "b8", "bit_count": 12121, "expected_output_bytes": 1552384, "sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6"},
+      "measurement_generation": {"command": "stim sample --shots 1024 --seed 2 --out_format b8 --in benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "format": "b8", "bit_count": 12121, "expected_output_bytes": 1552384, "sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6"},
       "hashes": {"circuit_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurements_b8_sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6"},
       "consumers": ["rsmp_archive", "compatibility", "compression_benchmark"]
     }
@@ -210,25 +210,25 @@
   "corruption_recipes": [
     {"id": "bad_magic", "source_role": "nonzero_reference", "mutation": "set(global.magic, 0x52534d00)", "expected_code": "RSMP_BAD_MAGIC", "recompute": [], "validation_boundary": "global header magic"},
     {"id": "unsupported_version", "source_role": "nonzero_reference", "mutation": "set(global.format_major, 2)", "expected_code": "RSMP_UNSUPPORTED_VERSION", "recompute": [], "validation_boundary": "global version policy"},
-    {"id": "unknown_required_feature", "source_role": "nonzero_reference", "mutation": "set(global.required_feature_bits, unknown_required_feature)", "expected_code": "RSMP_UNSUPPORTED_FEATURE", "recompute": [], "validation_boundary": "required feature policy"},
-    {"id": "circuit_mismatch", "source_role": "nonzero_reference", "mutation": "set(global.circuit_sha256, alternate_circuit_sha256)", "expected_code": "RSMP_CIRCUIT_MISMATCH", "recompute": ["trailer.checksum"], "validation_boundary": "circuit identity"},
+    {"id": "unknown_required_feature", "source_role": "nonzero_reference", "mutation": "set(global.required_flags, unknown_required_feature)", "expected_code": "RSMP_UNSUPPORTED_FEATURE", "recompute": [], "validation_boundary": "required feature policy"},
+    {"id": "circuit_mismatch", "source_role": "nonzero_reference", "mutation": "set(global.circuit_sha256, alternate_circuit_sha256)", "expected_code": "RSMP_CIRCUIT_MISMATCH", "recompute": ["trailer.archive_sha256"], "validation_boundary": "circuit identity"},
     {"id": "truncated_header", "source_role": "nonzero_reference", "mutation": "truncate(global_header)", "expected_code": "RSMP_TRUNCATED", "recompute": [], "validation_boundary": "global header decode"},
     {"id": "truncated_block", "source_role": "surface_d11_r100", "mutation": "truncate(block)", "expected_code": "RSMP_TRUNCATED", "recompute": [], "validation_boundary": "block decode"},
-    {"id": "truncated_zstd_frame", "source_role": "surface_d11_r100", "mutation": "truncate(block.zstd_frame)", "expected_code": "RSMP_TRUNCATED", "recompute": ["block.compressed_length"], "validation_boundary": "compressed frame decode"},
-    {"id": "zstd_decode_failure", "source_role": "surface_d11_r100", "mutation": "set(block.zstd_frame.payload, invalid_zstandard_frame)", "expected_code": "RSMP_DECOMPRESSION_FAILED", "recompute": ["trailer.archive_sha256", "trailer.checksum"], "validation_boundary": "compressed frame decode"},
+    {"id": "truncated_zstd_frame", "source_role": "surface_d11_r100", "mutation": "truncate(block.zstd_frame)", "expected_code": "RSMP_TRUNCATED", "recompute": ["block.syndrome_compressed_len"], "validation_boundary": "compressed frame decode"},
+    {"id": "zstd_decode_failure", "source_role": "surface_d11_r100", "mutation": "set(block.zstd_frame.payload, invalid_zstandard_frame)", "expected_code": "RSMP_DECOMPRESSION_FAILED", "recompute": ["trailer.archive_sha256"], "validation_boundary": "compressed frame decode"},
     {"id": "truncated_trailer", "source_role": "surface_d11_r100", "mutation": "truncate(trailer)", "expected_code": "RSMP_TRUNCATED", "recompute": [], "validation_boundary": "trailer decode"},
-    {"id": "overlong_varint", "source_role": "surface_d11_r100", "mutation": "set(block.measurement_count_varint, overlong_encoding(1))", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["block.header_length", "trailer.checksum"], "validation_boundary": "canonical integer decode"},
-    {"id": "sparse_index_out_of_range", "source_role": "surface_d11_r100", "mutation": "set(block.sparse_syndrome_index, detector_count)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["block.syndrome_length", "trailer.checksum"], "validation_boundary": "sparse syndrome index validation"},
-    {"id": "duplicate_block", "source_role": "surface_d11_r100", "mutation": "duplicate(block)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["global.block_count", "trailer.checksum"], "validation_boundary": "block ordering validation"},
-    {"id": "omitted_block", "source_role": "surface_d11_r100", "mutation": "omit(block)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["global.block_count", "trailer.checksum"], "validation_boundary": "block coverage validation"},
-    {"id": "reordered_blocks", "source_role": "surface_d11_r100", "mutation": "reorder(blocks)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.checksum"], "validation_boundary": "block sequence validation"},
+    {"id": "overlong_varint", "source_role": "surface_d11_r100", "mutation": "set(block.measurement_count_varint, overlong_encoding(1))", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["block.syndrome_compressed_len", "trailer.archive_sha256"], "validation_boundary": "canonical integer decode"},
+    {"id": "sparse_index_out_of_range", "source_role": "surface_d11_r100", "mutation": "set(block.sparse_syndrome_index, detector_count)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["block.syndrome_uncompressed_len", "trailer.archive_sha256"], "validation_boundary": "sparse syndrome index validation"},
+    {"id": "duplicate_block", "source_role": "surface_d11_r100", "mutation": "duplicate(block)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["global.block_count", "trailer.archive_sha256"], "validation_boundary": "block ordering validation"},
+    {"id": "omitted_block", "source_role": "surface_d11_r100", "mutation": "omit(block)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["global.block_count", "trailer.archive_sha256"], "validation_boundary": "block coverage validation"},
+    {"id": "reordered_blocks", "source_role": "surface_d11_r100", "mutation": "reorder(blocks)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.archive_sha256"], "validation_boundary": "block sequence validation"},
     {"id": "changed_compressed_payload", "source_role": "surface_d11_r100", "mutation": "flip(block.zstd_frame.payload_bit)", "expected_code": "RSMP_CHECKSUM_MISMATCH", "recompute": [], "validation_boundary": "archive checksum"},
     {"id": "checksum_mismatch", "source_role": "surface_d11_r100", "mutation": "set(trailer.checksum, alternate_checksum)", "expected_code": "RSMP_CHECKSUM_MISMATCH", "recompute": [], "validation_boundary": "archive checksum"},
-    {"id": "logical_payload_mismatch", "source_role": "surface_d11_r100", "mutation": "flip(block.logical_measurement_payload.bit)", "expected_code": "RSMP_LOGICAL_DIGEST_MISMATCH", "recompute": ["block.zstd_frame", "block.compressed_length", "trailer.checksum"], "validation_boundary": "logical payload digest"},
-    {"id": "declared_length_mismatch", "source_role": "surface_d11_r100", "mutation": "set(block.declared_uncompressed_length, declared_uncompressed_length + 1)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.checksum"], "validation_boundary": "declared length validation"},
-    {"id": "resource_limit_exceeded", "source_role": "surface_d11_r100", "mutation": "set(global.declared_decoded_bytes, max_decoded_bytes + 1)", "expected_code": "RSMP_LIMIT_EXCEEDED", "recompute": ["trailer.checksum"], "validation_boundary": "resource limit validation"},
-    {"id": "nonzero_padding", "source_role": "surface_d11_r100", "mutation": "set(block.syndrome_padding_bits, 1)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.checksum"], "validation_boundary": "zero padding validation"},
-    {"id": "unknown_syndrome_codec", "source_role": "surface_d11_r100", "mutation": "set(block.syndrome_codec_id, 99)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.checksum"], "validation_boundary": "syndrome codec dispatch"},
+    {"id": "logical_payload_mismatch", "source_role": "surface_d11_r100", "mutation": "flip(block.logical_measurement_payload.bit)", "expected_code": "RSMP_LOGICAL_DIGEST_MISMATCH", "recompute": ["block.zstd_frame", "block.syndrome_compressed_len", "trailer.archive_sha256"], "validation_boundary": "logical payload digest"},
+    {"id": "declared_length_mismatch", "source_role": "surface_d11_r100", "mutation": "set(block.declared_uncompressed_length, declared_uncompressed_length + 1)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.archive_sha256"], "validation_boundary": "declared length validation"},
+    {"id": "resource_limit_exceeded", "source_role": "surface_d11_r100", "mutation": "set(global.declared_decoded_bytes, max_decoded_bytes + 1)", "expected_code": "RSMP_LIMIT_EXCEEDED", "recompute": ["trailer.archive_sha256"], "validation_boundary": "resource limit validation"},
+    {"id": "nonzero_padding", "source_role": "surface_d11_r100", "mutation": "set(block.syndrome_padding_bits, 1)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.archive_sha256"], "validation_boundary": "zero padding validation"},
+    {"id": "unknown_syndrome_codec", "source_role": "surface_d11_r100", "mutation": "set(block.syndrome_codec_id, 99)", "expected_code": "RSMP_MALFORMED_ARCHIVE", "recompute": ["trailer.archive_sha256"], "validation_boundary": "syndrome codec dispatch"},
     {"id": "trailing_data", "source_role": "surface_d11_r100", "mutation": "append_trailing_byte(0)", "expected_code": "RSMP_TRAILING_DATA", "recompute": [], "validation_boundary": "archive end-of-input validation"}
   ]
 }
