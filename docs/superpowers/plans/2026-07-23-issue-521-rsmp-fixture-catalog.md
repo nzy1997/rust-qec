@@ -312,7 +312,7 @@ The independent command family is pinned to Stim 1.15.0:
 
 ```console
 python3 -c 'import stim; print(stim.__version__)'
-stim m2d --in_format b8 --out_format b8 --append_observables --shots 4 --in <case>.measurements.b8 --circuit <case>.stim
+stim m2d --circuit <case>.stim --in <case>.measurements.b8 --in_format b8 --out <case>.detectors.check.b8 --out_format b8 --obs_out <case>.observables.check.b8 --obs_out_format b8
 ```
 ```
 
