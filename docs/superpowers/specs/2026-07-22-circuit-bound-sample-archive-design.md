@@ -1,0 +1,701 @@
+# Circuit-Bound Sample Archive Design
+
+Date: 2026-07-22
+Status: approved in design review
+
+## Need
+
+`rstim` can already sample all circuit measurement results, write Stim-compatible
+result formats, and convert measurements into detector events with `m2d`. The
+existing result formats are intentionally simple interchange formats. They do
+not bind data to a circuit, carry dimensions and version metadata, localize
+corruption, or exploit the circuit's detector constraints to reduce storage.
+
+This feature adds a v1, production-robust archive for losslessly storing only
+the measurement results needed by the decoding data path. Decompression takes
+the original circuit, recovers every measurement bit, and derives detector
+events and logical observable flips from the recovered measurements.
+
+## Goals
+
+- Losslessly recover every measurement result for every shot.
+- Recover detectors and logical observable flips from the supplied circuit.
+- Compress substantially better than applying a general compressor directly
+  to dense measurement bytes on representative low-noise QEC circuits.
+- Process independent shot blocks sequentially with bounded working memory.
+- Bind an archive to one normalized circuit and reject a different circuit.
+- Detect unsupported versions, malformed structures, truncation, corruption,
+  reordered blocks, resource-exhaustion attempts, and trailing data.
+- Expose library APIs independently from the CLI.
+- Reuse existing `rstim` result readers/writers and `m2d` semantics where their
+  contracts apply.
+
+## Non-goals
+
+- DEM-only decompression.
+- Circuits with sweep bits in v1.
+- Saving internal noise branches, simulator state, visualization traces, or
+  detector-error-model samples.
+- Lossy compression.
+- Random access by shot number.
+- Salvaging or skipping corrupt blocks.
+- Direct `rstim sample --out_format rsmp` integration in v1.
+- A fixed wall-clock performance gate across heterogeneous CI machines.
+- Treating semantically equivalent but structurally rewritten circuits as the
+  same archive identity.
+
+## Existing foundation
+
+- `rstim sample` already uses `SampleOutputMode::MeasurementsOnly` and returns a
+  `BitTable` of all measurement results.
+- `rstim/src/output.rs` implements `01`, `b8`, `r8`, `hits`, and `ptb64`.
+- `rstim/src/m2d.rs` converts a measurement table plus a circuit into detector
+  and logical-observable tables.
+- `BitTable` stores one row per measurement or detector and packs shots into
+  `u64` words, matching the proposed block transform well.
+- The workspace already depends on `sha2`.
+- The checked d11/r100 surface-code fixture has 12,121 measurements, 12,000
+  detectors, one observable, and no sweep bits.
+
+Stim's documented result formats deliberately cover dense versus sparse and
+human-readable versus binary use cases. `ptb64` requires the shot count, and
+`r8` requires the number of bits per shot; `r8` is intended for sparse data such
+as detector events. See
+[Stim result formats](https://github.com/quantumlib/Stim/blob/main/doc/result_formats.md).
+The new archive does not replace these interchange formats. It wraps a
+circuit-derived reversible transform in a versioned, integrity-checked
+container.
+
+Zstandard is the general compression layer. Its frames are independently
+decodable, streamable with bounded intermediate storage, and can carry content
+sizes and checksums. See the
+[Zstandard format specification](https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md)
+and the [`zstd` Rust crate](https://docs.rs/zstd/latest/zstd/).
+
+## Approaches considered
+
+### 1. Circuit-derived reversible transform plus adaptive blocks and Zstandard
+
+Transform each measurement vector into independent detector values plus the
+free measurement coordinates left by detector constraints. Encode sparse and
+dense streams separately, then apply Zstandard per stream and per block.
+
+This is the selected approach. It is lossless, exploits QEC structure, supports
+bounded streaming, and keeps a dense fallback for high-entropy inputs.
+
+### 2. Dense `b8` or `ptb64` followed by Zstandard
+
+This is simpler but does not exploit circuit constraints. Random-looking
+intermediate measurements limit compression even when detector events are
+sparse.
+
+### 3. Circuit-derived transform with only a custom sparse codec
+
+This avoids a new compression dependency but reinvents more entropy-coding
+behavior and produced a weaker sizing estimate than the selected layered
+approach.
+
+## Mathematical representation
+
+For a circuit with `M` measurements, let:
+
+- `m` be one raw measurement vector in `GF(2)^M`;
+- `r` be the circuit's noiseless reference measurement vector;
+- `x = m XOR r` be the measurement-flip vector;
+- `H` be the `D x M` detector parity matrix derived from `DETECTOR rec[-k]`;
+- `G` be the `L x M` observable parity matrix derived from
+  `OBSERVABLE_INCLUDE`.
+
+Each detector or observable target is resolved to an absolute measurement
+index at its point in the expanded circuit. Repeated references cancel by XOR.
+Invalid record references are rejected using the same semantic rules as the
+measurement-to-detection path.
+
+Let `R = rank(H)`. Perform deterministic GF(2) elimination in original detector
+order. At each row, use the highest measurement index as the pivot and reduce
+against existing pivot rows. Record:
+
+- the `R` original detector row indices selected as an independent set;
+- the row operations needed to obtain echelon equations;
+- the `R` pivot measurement columns;
+- the `M-R` non-pivot, or free, measurement columns.
+
+For each shot the archive stores:
+
+1. the values of the selected original detectors, in selected-row order;
+2. the values of `x` at the free measurement columns.
+
+The selected original detector values are used instead of transformed detector
+combinations so low-noise sparsity is preserved. During decoding, replay the
+recorded row operations on their right-hand sides, then solve pivot variables
+from lower to higher pivot index. The `R` independent equations plus `M-R`
+free values uniquely recover all `M` bits of `x`.
+
+After reconstruction:
+
+```text
+measurements = x XOR r
+detectors    = H * x
+observables  = G * x
+```
+
+The decoder computes all detector rows, including dependent rows not stored in
+the archive. The transform also works when `R=0`, `D=0`, or `R=M`.
+
+The reference strategy is `SimulateNoiseless`. It is part of the transform
+version, not inferred from how the input measurements were produced. XOR with
+the deterministic reference is reversible for arbitrary measurement input.
+
+## Circuit identity and supported circuit subset
+
+Parse the supplied Stim-like circuit and serialize it with
+`circuit_to_string`. Compute SHA-256 over the resulting UTF-8 bytes. Comments
+and insignificant whitespace therefore do not affect identity. Gate changes,
+arguments, target changes, operation ordering, and repeat structure do affect
+identity. Semantically equivalent loop folding or algebraic rewrites are not
+normalized in v1.
+
+The header also records `M`, `D`, `L`, `rank(H)`, the canonicalization scheme,
+reference strategy, and transform algorithm version. A decoder validates all
+of them before reading block payloads.
+
+Reject circuits where `num_sweep_bits > 0` with
+`RSMP_UNSUPPORTED_SWEEP`. Sweep values are per-shot external inputs and are not
+present in a measurement-only archive, so v1 cannot reliably reconstruct the
+reference behavior for such circuits.
+
+## Container format
+
+The format name is `rsmp`. Multi-byte integers are unsigned little-endian.
+Every length and count uses checked conversion and checked arithmetic.
+
+### Global header
+
+The fixed prefix contains:
+
+- 8-byte magic `RSTMSMP\0`;
+- `format_major: u16`, initially `1`;
+- `format_minor: u16`, initially `0`;
+- `header_len: u32`;
+- required feature flags and reserved flags;
+- canonicalization, fingerprint, transform, reference, and codec-suite IDs;
+- configured maximum shots per block, default `4096`;
+- `M`, `D`, `L`, `rank(H)`, and total shots as `u64`;
+- the 32-byte circuit SHA-256;
+- the 32-byte SHA-256 of the header bytes excluding this digest field.
+
+Reserved bits must be zero. Unknown major versions and unknown required flags
+are rejected. `header_len` permits future optional minor-version fields, but a
+v1.0 reader only skips fields explicitly marked optional by a compatible flag.
+
+### Block layout
+
+Blocks are sequential and have no random-access index. A block header contains:
+
+- block magic and format;
+- zero-based block sequence number;
+- first shot index;
+- shot count;
+- syndrome and free-stream codec IDs;
+- declared uncompressed and compressed lengths for each stream;
+- the SHA-256 of the canonical uncompressed logical payload.
+
+The header is followed by exactly one syndrome Zstandard frame and one free-bit
+Zstandard frame. Each frame has a declared content size and content checksum.
+Empty-dimension streams have a canonical zero-length representation defined by
+the codec suite.
+
+The canonical logical payload used by the block SHA-256 is independent of the
+selected pre-codec: dense selected-detector bits followed by dense free bits,
+both in the bit order defined below and both with zero final padding. A reader
+reconstructs these canonical bytes before checking the digest. Changing a
+sparse/dense encoding without changing logical values therefore does not change
+the block digest.
+
+Default blocks contain at most 4096 shots. The last block can be shorter. The
+writer may accept a bounded alternative block size, but records it in the
+global header and enforces it consistently.
+
+An archive with zero shots contains no blocks: it consists of the global
+header followed by a trailer whose block count and total shot count are both
+zero. Empty syndrome or free-coordinate dimensions inside a non-empty block
+use the one canonical empty-stream representation frozen by the normative
+format document.
+
+### Syndrome pre-codec
+
+For `R` selected detector values and `S` shots, form both raw-size candidates:
+
+- `dense`: concatenate bits in `(shot, selected_detector)` order, least
+  significant bit first, with no per-shot byte padding;
+- `sparse`: for each shot write a canonical shortest-form unsigned LEB128 hit
+  count, followed by canonical unsigned LEB128 deltas between strictly
+  increasing selected-detector indices. The first delta is the first index;
+  later deltas are `current - previous - 1`.
+
+Choose the smaller raw representation; ties select dense. Compress only the
+chosen representation with the configured Zstandard level. Codec IDs make the
+choice explicit per block.
+
+### Free-bit codec
+
+Concatenate free bits in `(shot, free_measurement)` order, least significant
+bit first, with no per-shot byte padding. Compress the stream as its own
+Zstandard frame. High-entropy data is allowed to remain close to a raw
+Zstandard block; compressibility is not assumed.
+
+All unused final padding bits must be zero and are checked by the reader.
+
+### Trailer
+
+The trailer contains:
+
+- trailer magic and version;
+- block count;
+- total shot count;
+- SHA-256 over the global header, all block bytes, and the trailer prefix before
+  the digest.
+
+The reader rejects a missing trailer, count disagreement, digest mismatch, or
+any bytes after the trailer.
+
+## Streaming and memory behavior
+
+The writer owns and reuses one compiled `MeasurementTransform`. Its public
+streaming boundary accepts raw measurement `BitTable` chunks through
+`write_measurements`; caller chunk boundaries do not become archive block
+boundaries. The writer buffers at most one configured block, transforms it
+internally, writes the two frames, and releases block storage. The reader
+validates and reconstructs one block, passes it to the requested output
+writers, and releases it before reading the next block.
+
+`next_block()` performs block-local validation. Whole-archive completion,
+trailer integrity, and trailing-data rejection are established only by
+`finish()`. A block already returned before a later block or trailer fails
+cannot be revoked and must not be described as a successfully decoded archive
+or as salvage. File outputs remain unpublished until `finish()` succeeds;
+stdout may contain an already-verified prefix when a late failure occurs.
+
+The format contains independent frames for corruption localization and bounded
+decoding, but v1 intentionally has no shot-range index and guarantees only
+sequential reads.
+
+## Library modules
+
+### `measurement_transform`
+
+Responsibilities:
+
+- derive `r`, `H`, `G`, independent detector rows, elimination operations,
+  pivots, and free columns from a circuit;
+- expose dimensions and circuit-derived transform identity;
+- encode one measurement block into selected-detector and free-bit tables;
+- reconstruct measurements and derive full detectors and observables;
+- verify that reconstructed measurements reproduce the stored independent
+  detector values.
+
+The public allocation and limit types are:
+
+```text
+pub enum BitTableAllocError {
+    SizeOverflow,
+    ReservationFailed,
+}
+
+// Method on BitTable; body omitted.
+pub fn try_new(
+    num_major: usize,
+    num_minor: usize,
+) -> Result<Self, BitTableAllocError>;
+
+pub struct MeasurementTransformLimits {
+    pub max_measurements: u64,
+    pub max_detectors: u64,
+    pub max_observables: u64,
+    pub max_repeat_depth: u64,
+    pub max_expanded_instructions: u64,
+    pub max_parity_terms: u64,
+    pub max_shots_per_block: u64,
+    pub max_transform_working_bytes: u64,
+    pub max_block_working_bytes: u64,
+}
+```
+
+`BitTable::try_new` uses checked row-word and byte-size arithmetic, rejects a
+capacity that `Vec<u64>` cannot represent, and reserves fallibly before zero
+initialization. `BitTable::new` remains only as a compatibility convenience for
+trusted, prevalidated dimensions and delegates to `try_new`. Circuit-,
+archive-, or block-controlled dimensions never call `BitTable::new`.
+
+`MeasurementTransformLimits::default()` is conservative. Transform traversal
+bounds repeat nesting, checked expanded instruction count, and expanded parity
+terms. Construction bounds the aggregate live reference, parity-matrix,
+elimination, and scratch storage. Block encode and decode bound shots and
+aggregate live output/scratch storage before allocating. One checked BitTable
+storage-size helper is shared by `try_new` and all transform/archive preflight
+formulas.
+
+Suggested interface:
+
+```text
+MeasurementTransform::from_circuit(...)
+MeasurementTransform::from_circuit_with_limits(...)
+MeasurementTransform::encode_block(...)
+MeasurementTransform::decode_block(...)
+```
+
+### `sample_archive`
+
+Responsibilities:
+
+- encode and decode the binary container;
+- select dense versus sparse syndrome representation;
+- manage Zstandard frames;
+- enforce versions, structural checks, checksums, and resource limits;
+- provide typed, stable error codes.
+
+Suggested interfaces:
+
+```text
+SampleArchiveWriter::new(..., MeasurementTransform, ..., ArchiveLimits)
+SampleArchiveWriter::write_measurements(&BitTable)
+SampleArchiveWriter::finish(...)
+
+SampleArchiveReader::open(...)
+SampleArchiveReader::next_block(...)
+SampleArchiveReader::finish(...)
+```
+
+The decoded block is:
+
+```text
+DecodedSampleBlock {
+    measurements,
+    detections,
+    observable_flips,
+}
+```
+
+`EncodedMeasurementBlock` is the transform/codec intermediate. It is never a
+public input to `SampleArchiveWriter`; the archive writer creates it internally
+from each canonical measurement block. `ArchiveLimits` embeds one
+`MeasurementTransformLimits` value instead of maintaining duplicate transform
+ceilings. `SampleArchiveWriter::new` takes ownership of an already-compiled
+transform and validates its actual dimensions, traversal totals, and retained
+resource usage against the embedded limits. The reader uses the same embedded
+value when it constructs its transform.
+
+### Streaming result-format adapters
+
+`ResultBlockReader` yields strict, bounded measurement `BitTable` chunks for
+pack input. `ResultBlockWriter` is configured with a result kind and format and
+accepts the complete decoded value:
+
+```text
+enum ResultOutputKind {
+    Measurements,
+    Detectors,
+    Observables,
+}
+
+ResultBlockWriter::write_block(&DecodedSampleBlock)
+```
+
+For detector `dets` output the writer consumes both `detections` and
+`observable_flips`, producing `D#` and `L#` tokens. Other detector formats use
+only `detections`; measurement and observable destinations select their own
+tables. All three tables must have equal shot counts before any bytes for a
+block are written.
+
+### CLI integration
+
+Add two commands instead of extending generic `convert`:
+
+```sh
+rstim pack_samples \
+  --circuit circuit.stim \
+  --shots 100000 \
+  --in measurements.b8 \
+  --in_format b8 \
+  --out samples.rsmp
+```
+
+```sh
+rstim unpack_samples \
+  --circuit circuit.stim \
+  --in samples.rsmp \
+  --measurements_out recovered.b8 \
+  --measurements_out_format b8 \
+  --detectors_out detectors.b8 \
+  --detectors_out_format b8 \
+  --obs_out observables.b8 \
+  --obs_out_format b8
+```
+
+`pack_samples` requires `--shots`, allowing the global header to be written
+before payload data and making short or extra input an error. The initial
+streaming input formats are `b8`, `ptb64`, and `01`. Binary inputs reject
+non-zero unused padding. `r8` and `hits` measurement inputs are deferred because
+they target sparse records, while measurement records are often high entropy.
+
+`unpack_samples` requires the circuit and at least one requested output. It
+writes through `ResultBlockWriter`; existing whole-table result writers remain
+byte-for-byte compatibility oracles. It reconstructs measurements internally
+even when only detector output is requested, but does not retain the whole
+archive.
+
+`unpack_samples --verify_only` performs a full read, reconstruction, and
+integrity check without writing result data. On success it prints one stable,
+reviewer-friendly line beginning with `PASS rsmp` and including version, shots,
+blocks, `M/D/L`, and circuit hash prefix.
+
+Direct `sample --out_format rsmp` is deferred until the archive contract is
+stable. Existing `sample --out_format b8` can feed `pack_samples` through a file
+or pipe.
+
+## Error and integrity contract
+
+Decoding is fail-closed. It does not skip or salvage corrupt blocks.
+
+Validation order:
+
+1. Validate magic, version, flags, and header digest.
+2. Validate all dimensions and lengths with checked arithmetic and
+   `ArchiveLimits` before allocation.
+3. Parse the circuit, reject sweep, and compare circuit hash, dimensions, rank,
+   and transform identifiers.
+4. Require consecutive block sequence numbers, first-shot indices, bounded
+   shot counts, known codec IDs, and bounded declared stream lengths.
+5. Preflight each declared Zstandard frame slice, require exactly one frame,
+   bound its window and content size, decode it, and require exactly the
+   declared decompressed byte count and a valid frame checksum.
+6. Validate the decoded codec bytes, including canonical varints, sorted
+   in-range hit indices, exact shot-record count, and zero padding.
+7. Reconstruct measurements and recompute the stored independent detector
+   values.
+8. Verify the block logical-payload SHA-256.
+9. Verify trailer counts and the archive SHA-256.
+10. Reject trailing data.
+
+Stable public error categories include:
+
+```text
+RSMP_BAD_MAGIC
+RSMP_UNSUPPORTED_VERSION
+RSMP_UNSUPPORTED_FEATURE
+RSMP_UNSUPPORTED_SWEEP
+RSMP_CIRCUIT_MISMATCH
+RSMP_SHAPE_MISMATCH
+RSMP_LIMIT_EXCEEDED
+RSMP_TRUNCATED
+RSMP_MALFORMED_ARCHIVE
+RSMP_DECOMPRESSION_FAILED
+RSMP_CHECKSUM_MISMATCH
+RSMP_LOGICAL_DIGEST_MISMATCH
+RSMP_TRAILING_DATA
+RSMP_IO
+```
+
+The normative format document freezes the validation precedence and mapping
+from malformed fields to these codes. Zstandard implementation error strings
+are never part of the public contract. Unknown required format features map to
+`RSMP_UNSUPPORTED_FEATURE`; malformed ordering, padding, and canonical encodings
+map to `RSMP_MALFORMED_ARCHIVE`; Zstandard frame, decode, or frame-checksum
+failures map to `RSMP_DECOMPRESSION_FAILED`; and a mismatch in reconstructed
+logical block content maps to `RSMP_LOGICAL_DIGEST_MISMATCH`.
+
+CLI diagnostics use:
+
+```text
+rsmp error [<CODE>]: <plain-language detail>
+```
+
+`ArchiveLimits` embeds `MeasurementTransformLimits` as the sole configurable
+source for measurement, detector, observable, repeat-depth,
+expanded-instruction, parity-term, block-shot, transform-working, and
+block-working bounds. It also bounds archive bytes, block count, total shots,
+rank, free width, compressed and uncompressed bytes per frame and in aggregate,
+and Zstandard window and decoder memory. Library defaults are safe and callers
+may opt into larger explicit limits; checked conversion and allocation remain
+mandatory.
+
+When output targets are file paths, pack and unpack commands write sibling
+temporary files and rename only after `finish()` succeeds. Each individual
+file is committed atomically. Multiple output files cannot be committed as one
+filesystem transaction: if a rename fails after another output was committed,
+the command reports `RSMP_IO`, removes remaining temporary files, and names the
+already-committed outputs in its diagnostic. At most one output may target
+stdout. stdout cannot be rolled back; documentation states that a late error
+may leave complete earlier blocks on stdout, while the process always exits
+nonzero.
+
+For every path other than `-`, the command captures the process working
+directory once, makes relative paths absolute against it, and applies purely
+lexical component normalization: collapse redundant separators, remove `.`
+components, and fold `..` against the preceding normal component without
+crossing the filesystem root. It compares normalized absolute input and final
+output paths before opening an input or creating an output or temporary file.
+This is a syntactic collision check: it does not call filesystem
+canonicalization and does not promise detection of symlink, hard-link, mount,
+or case-folding aliases.
+
+The command rejects normalized duplicate final paths and normalized input/output
+collisions. It never deletes an already-published output in an attempt to
+simulate multi-file rollback, because doing so could destroy a pre-existing
+file that was atomically replaced. `--verify_only` is mutually exclusive with
+result-output arguments and creates no result files.
+
+There is no `--ignore_checksum`, partial-success, or salvage option in v1.
+
+## Verification catalog
+
+Create one shared manifest consumed by transform, archive, CLI, and performance
+tests. It contains at least seven valid semantic cases:
+
+1. non-zero reference measurements;
+2. `rank(H)=0`, with all measurement columns free;
+3. repeated or linearly dependent detectors;
+4. measurements and detectors inside `REPEAT`;
+5. logical observable recovery;
+6. loss-visible measurement operations and their expanded bit count;
+7. the existing surface-code d11/r100 benchmark fixture.
+
+The catalog records provenance, circuit path, measurement input or generation
+command, expected `M/D/L/rank`, expected output hashes, and consuming tests.
+Tiny issue-specific smoke fixtures may supplement it, but must not replace it.
+
+The catalog also pins at least four small independent known-answer entries:
+
+1. `MPAD` with multiple appended bits;
+2. one `MPP` instruction containing multiple Pauli products;
+3. `HERALDED_ERASE`;
+4. `HERALDED_PAULI_CHANNEL_1`.
+
+Each entry commits fixed measurement input and expected detector/observable
+bytes, pins their SHA-256 values, and records hand-checkable provenance or an
+exact independently pinned Stim command and version. Expected outputs must not
+be generated through rstim's shared record resolver, `m2d`, or the transform
+under test.
+
+Correctness hard gate:
+
+```text
+unpack(pack(measurements, circuit), circuit).measurements
+    == original measurements
+```
+
+For each valid case, detectors and observables are compared bit-for-bit with
+the shared measurement-to-detection path as a consistency check. Because
+`m2d`, statistics, and the transform share the checked resolver after this
+work, that comparison is not an independent oracle. The four fixed
+known-answer entries must also match their committed bytes and hashes. Seeded
+property tests cover random GF(2) matrices and bit tables, including zero rank,
+full rank, rank deficiency, zero shots, and shot counts not divisible by 8 or
+64.
+
+Generate at least twelve deterministic corruption mutations from a known-good
+archive, covering:
+
+- bad magic, version, flags, and circuit;
+- truncated header, block, Zstandard frame, and trailer;
+- overlong or non-canonical varints and out-of-range indices;
+- duplicated, omitted, and reordered blocks;
+- changed payload, checksum, and declared lengths;
+- resource-limit violations;
+- non-zero padding and trailing data.
+
+Each mutation asserts the exact stable error category. A valid archive with a
+different circuit is the negative control for circuit binding. A sweep circuit
+must fail with `RSMP_UNSUPPORTED_SWEEP`.
+
+## Compression and performance acceptance
+
+Use the existing
+`benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim`
+case with 1024 shots and seed 7. It has:
+
+- `M = 12,121`;
+- `D = 12,000`;
+- `L = 1`;
+- `rank(H) = 12,000` under the selected transform;
+- 121 free measurement bits per shot;
+- 1,552,384 bytes of `b8` measurement data.
+
+The checked size gate requires:
+
+- archive size less than 20% of the original `b8` bytes;
+- archive size less than 75% of applying the same Zstandard level directly to
+  the original `b8` bytes.
+
+This second comparison proves the semantic transform contributes material
+value instead of merely wrapping measurements in a general compressor.
+
+For at least 1 MiB of high-entropy input on a circuit with no detector
+constraints, the archive must be no more than 102% of the original `b8` size.
+This proves the dense fallback avoids pathological expansion.
+
+The checked evidence uses Zstandard level 3, content sizes, frame checksums,
+single-threaded compression, and no dictionary for both archive streams and
+the direct-Zstandard comparison. The direct-Zstandard size remains a reported
+diagnostic for the high-entropy control; the normative 102% denominator is the
+original `b8` size. Evidence records the exact producer command, producer
+version, input SHA-256, Zstandard implementation version, and effective frame
+parameters.
+
+The benchmark artifact also reports encode MiB/s, decode MiB/s, selected codec
+per block, detector density, free-bit count, compression ratios, and maximum
+logical block working set. v1 does not impose a fixed wall-clock threshold;
+throughput becomes a hard gate only after checked evidence establishes a
+portable baseline.
+
+## Documentation
+
+Document:
+
+- the mathematical reason the transform is lossless;
+- exact binary fields, bit order, varint rules, hash coverage, and versioning;
+- CLI examples for pack, unpack, and verify-only;
+- supported input/output formats;
+- the circuit-only and no-sweep boundary;
+- resource limits and transactional file behavior;
+- stdout partial-output behavior on late errors;
+- compression evidence and claim limits.
+
+Maintain a tiny committed v1 reader fixture so future readers must retain v1
+compatibility. The fixture is an immutable valid-reader specimen, not the
+canonical output of the current writer. Compatibility tests read its committed
+bytes directly and never regenerate it with the current writer. Future coverage
+is additive: a writer change may add a fixture but must not replace an existing
+v1 specimen merely because newly written bytes differ. Writer byte-for-byte
+determinism across Zstandard versions is not required; semantic output,
+container validity, and v1 readability are.
+
+## Risks and mitigations
+
+- **Elimination bugs could silently change measurements.** Mitigate with
+  independent encode/decode property tests, recomputed syndrome checks, and
+  comparison to `m2d`.
+- **Dependent detector rows could be mishandled.** Preserve selected original
+  row identities and explicitly test rank-deficient matrices.
+- **Sparse coding can expand high-density data.** Compare exact raw candidate
+  sizes per block and select dense on ties.
+- **Circuit normalization may surprise users.** Document that comments and
+  whitespace normalize, but structural semantic rewrites do not.
+- **Corrupt lengths can trigger oversized allocation.** Check arithmetic and
+  limits before allocating or initializing Zstandard decoders.
+- **Streaming output cannot always be transactional.** Use atomic file targets
+  and clearly document stdout semantics.
+- **Compression dependency changes writer bytes.** Treat Zstandard as a stable
+  decoder format while testing semantic compatibility instead of requiring
+  cross-version byte identity.
+
+## Approved boundary summary
+
+The v1 archive stores only the information required to reconstruct all
+measurement results. Decompression requires the original circuit and produces
+measurements, detectors, and logical observable flips. It accepts no DEM-only
+mode, no sweep circuits, no random shot access, no lossy path, and no corrupt
+block salvage. It combines circuit-derived reversible GF(2) coordinates with
+adaptive per-block encoding and independent Zstandard frames, guarded by
+versioning, circuit binding, resource limits, block checks, and whole-archive
+integrity.
