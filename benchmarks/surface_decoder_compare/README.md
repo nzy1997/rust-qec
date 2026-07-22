@@ -21,6 +21,36 @@ python3 -m venv .venv-surface-decoder
 .venv-surface-decoder/bin/python -m pip install gurobipy
 ```
 
+## rsinter Cargo Features
+
+`rsinter` defaults to the `full` feature set, so ordinary builds keep every
+benchmark runner and plotting command available.
+
+| Feature | Enables |
+| --- | --- |
+| `default` | The `full` feature set for ordinary `rsinter` builds |
+| `rbposd-runner` | The `rbposd` adapter and benchmark runner required by the minimal CSS BP+OSD path |
+| `rmatching-runner` | The `rmatching` adapter and benchmark runner |
+| `ilp-runner` | The `rilpqec` adapter, `qec-ilp-core`, and HiGHS-backed ILP runner path |
+| `plotting` | The `plotters` dependency and `rsinter` plotting implementations |
+| `full` | `rbposd-runner`, `rmatching-runner`, `ilp-runner`, and `plotting` |
+
+Full/default build:
+
+```bash
+cargo build --locked -p rsinter
+```
+
+Minimal CSS `rbposd` build:
+
+```bash
+cargo build --locked -p rsinter --no-default-features --features rbposd-runner
+```
+
+The minimal `rbposd-runner` build keeps the CSS benchmark run path available
+while excluding `rmatching`, `rilpqec`, `qec-ilp-core`, HiGHS, and `plotters`
+from the normal and build dependency graph.
+
 ## Run
 
 Comparison benchmark:

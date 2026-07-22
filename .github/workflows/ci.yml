@@ -20,6 +20,23 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      - name: Minimal rsinter build, smoke, and dependency graph
+        run: |
+          cargo build --locked -p rsinter --no-default-features --features rbposd-runner
+          minimal_out="$(mktemp -d)"
+          target/debug/rsinter bench run \
+            --spec rsinter/tests/fixtures/bench/minimal_steane_css_rbposd.toml \
+            --language rust \
+            --out "$minimal_out"
+          cargo tree --locked -p rsinter \
+            --no-default-features --features rbposd-runner \
+            --edges normal,build > /tmp/rsinter-minimal-tree.txt
+          if rg -n '(rmatching|rilpqec|qec-ilp-core|highs|highs-sys|plotters)( |$)' /tmp/rsinter-minimal-tree.txt; then
+            echo "ERROR: minimal dependency graph contains a disabled capability" >&2
+            exit 1
+          fi
+          rm -r "$minimal_out"
+          rm /tmp/rsinter-minimal-tree.txt
       - name: Install system dependencies
         run: sudo apt-get install -y libfontconfig1-dev
       - run: cargo test --locked --workspace
