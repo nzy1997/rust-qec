@@ -5,17 +5,20 @@ use clap::{Parser, Subcommand};
 use rbposd::OsdVariant;
 
 use rsinter::bb_circuit_memory::{
-    export_bravyi_model_audit_for_code, export_comparison_case_for_code,
+    SimulationConfig, export_bravyi_model_audit_for_code, export_comparison_case_for_code,
     export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
-    run_simulation_for_code_with_osd_variant, SimulationConfig,
+    run_simulation_for_code_with_osd_variant,
 };
+#[cfg(feature = "plotting")]
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
 use rsinter::bench::merge::merge_result_rows;
+#[cfg(feature = "plotting")]
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
-use rsinter::bench::run::{run_rust_benchmark_with_options, BenchRunOptions};
+use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
+#[cfg(feature = "plotting")]
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
 
 #[derive(Parser)]
@@ -160,33 +163,13 @@ fn run() -> Result<(), String> {
                 write_results_jsonl(&merged, &mut file)?;
             }
             BenchCommands::Plot { spec, input, out } => {
-                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
-                let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
-                bench_spec.validate()?;
-                let mut rows = Vec::new();
-                for path in input {
-                    let data = std::fs::read(path).map_err(|e| e.to_string())?;
-                    rows.extend(read_results_jsonl(&data[..])?);
-                }
-                ensure_parent_dir(PathBuf::from(&out).as_path())?;
-                render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
+                run_benchmark_plot_command(spec, input, out)?;
             }
             BenchCommands::PlotSurfaceCompareCsv { spec, input, out } => {
-                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
-                let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
-                bench_spec.validate()?;
-                let rows =
-                    read_surface_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
-                ensure_parent_dir(PathBuf::from(&out).as_path())?;
-                render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
+                run_surface_compare_plot_command(spec, input, out)?;
             }
             BenchCommands::PlotBbCompareCsv { spec, input, out } => {
-                let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
-                let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
-                bench_spec.validate()?;
-                let rows = read_bb_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
-                ensure_parent_dir(PathBuf::from(&out).as_path())?;
-                render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())?;
+                run_bb_compare_plot_command(spec, input, out)?;
             }
         },
         Commands::BbCircuitBposdMemory {
@@ -252,6 +235,67 @@ fn run() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "plotting")]
+fn run_benchmark_plot_command(spec: String, input: Vec<String>, out: String) -> Result<(), String> {
+    let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+    let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+    bench_spec.validate()?;
+    let mut rows = Vec::new();
+    for path in input {
+        let data = std::fs::read(path).map_err(|e| e.to_string())?;
+        rows.extend(read_results_jsonl(&data[..])?);
+    }
+    ensure_parent_dir(PathBuf::from(&out).as_path())?;
+    render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())
+}
+
+#[cfg(not(feature = "plotting"))]
+fn run_benchmark_plot_command(
+    _spec: String,
+    _input: Vec<String>,
+    _out: String,
+) -> Result<(), String> {
+    Err("bench plot requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(feature = "plotting")]
+fn run_surface_compare_plot_command(
+    spec: String,
+    input: String,
+    out: String,
+) -> Result<(), String> {
+    let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+    let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+    bench_spec.validate()?;
+    let rows = read_surface_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
+    ensure_parent_dir(PathBuf::from(&out).as_path())?;
+    render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())
+}
+
+#[cfg(not(feature = "plotting"))]
+fn run_surface_compare_plot_command(
+    _spec: String,
+    _input: String,
+    _out: String,
+) -> Result<(), String> {
+    Err("bench plot-surface-compare-csv requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(feature = "plotting")]
+fn run_bb_compare_plot_command(spec: String, input: String, out: String) -> Result<(), String> {
+    let text = std::fs::read_to_string(&spec).map_err(|e| e.to_string())?;
+    let bench_spec: BenchmarkSpec = toml::from_str(&text).map_err(|e| e.to_string())?;
+    bench_spec.validate()?;
+    let rows = read_bb_compare_csv(PathBuf::from(input).as_path(), &bench_spec.name)?;
+    ensure_parent_dir(PathBuf::from(&out).as_path())?;
+    render_benchmark_plot(&bench_spec, &rows, PathBuf::from(out).as_path())
+}
+
+#[cfg(not(feature = "plotting"))]
+fn run_bb_compare_plot_command(_spec: String, _input: String, _out: String) -> Result<(), String> {
+    Err("bench plot-bb-compare-csv requires Cargo feature 'plotting'".into())
 }
 
 fn ensure_parent_dir(path: &std::path::Path) -> Result<(), String> {

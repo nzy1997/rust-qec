@@ -11,6 +11,7 @@ pub mod collect;
 pub mod csv_io;
 pub mod decode;
 pub mod failure;
+#[cfg(feature = "plotting")]
 pub mod plot;
 pub mod stats;
 pub mod task;

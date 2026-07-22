@@ -1,6 +1,7 @@
 pub mod bb_compare_csv;
 pub mod circuit_source;
 pub mod merge;
+#[cfg(feature = "plotting")]
 pub mod plot;
 pub mod registry;
 pub mod result;
