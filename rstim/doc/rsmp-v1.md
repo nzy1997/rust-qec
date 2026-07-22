@@ -136,8 +136,9 @@ The public codes are `RSMP_BAD_MAGIC`, `RSMP_UNSUPPORTED_VERSION`,
 
 Structural parsing maps a bad magic to `RSMP_BAD_MAGIC`, a non-v1.0 version to
 `RSMP_UNSUPPORTED_VERSION`, unknown required features to
-`RSMP_UNSUPPORTED_FEATURE`, a short record to `RSMP_TRUNCATED`, checked wire
-size overflow to `RSMP_LIMIT_EXCEEDED`, and invalid IDs, reserved fields,
-canonical stream encodings, header lengths, or declared length arithmetic to
-`RSMP_MALFORMED_ARCHIVE`. Digest, compression, and archive-state validation
-are owned by later archive layers.
+`RSMP_UNSUPPORTED_FEATURE`, a short record to `RSMP_TRUNCATED`, and invalid
+IDs, reserved fields, canonical stream encodings, header lengths, parsed shot
+ranges, or parsed declared-length arithmetic to `RSMP_MALFORMED_ARCHIVE`.
+Public checked size helpers map caller-supplied representability overflow to
+`RSMP_LIMIT_EXCEEDED`. Digest, compression, and archive-state validation are
+owned by later archive layers.
