@@ -415,6 +415,32 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
             self.assertTrue(any(call[:2] == ["git", "archive"] for call in calls))
             self.assertFalse(any(item == "checkout" for call in calls for item in call))
 
+    def test_build_revision_uses_locked_cargo_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            revision = run_paired_frame_noise.RevisionBuild(
+                label="candidate",
+                requested_rev="HEAD",
+                resolved_commit=CANDIDATE_COMMIT,
+                source_dir=root / "source",
+                target_dir=root / "target",
+                binary_path=root / "target/release/rstim",
+            )
+            revision.source_dir.mkdir()
+            revision.binary_path.parent.mkdir(parents=True)
+            revision.binary_path.write_text("", encoding="utf-8")
+
+            with mock.patch(
+                "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise.subprocess.run",
+                return_value=subprocess.CompletedProcess(["cargo"], 0),
+            ) as run:
+                self.assertEqual(run_paired_frame_noise.build_revision(revision), revision.binary_path)
+
+        self.assertEqual(
+            run.call_args.args[0],
+            ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"],
+        )
+
     def test_main_prints_required_success_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

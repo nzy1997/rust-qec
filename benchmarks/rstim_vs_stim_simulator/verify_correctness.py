@@ -36,7 +36,7 @@ def default_rstim_command() -> list[str]:
     for binary in (Path("target/release/rstim"), Path("target/debug/rstim")):
         if binary.exists():
             return [str(binary)]
-    return ["cargo", "run", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"]
+    return ["cargo", "run", "--locked", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"]
 
 
 def build_sample_command(

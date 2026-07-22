@@ -132,7 +132,7 @@ def default_rstim_worker_command(profile: str) -> list[str]:
 
 
 def build_rstim_worker(profile: str) -> list[str]:
-    command = ["cargo", "build"]
+    command = ["cargo", "build", "--locked"]
     if profile == "release":
         command.append("--release")
     command.extend(["-p", "rstim", "--bin", "rstim_compiled_steady_worker"])

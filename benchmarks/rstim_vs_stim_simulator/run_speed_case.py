@@ -93,10 +93,10 @@ def _collect_environment_base(
 
 def build_rstim(profile: str, *, repo_root: Path = REPO_ROOT) -> Path:
     if profile == "release":
-        command = ["cargo", "build", "--release", "-p", "rstim", "--bin", "rstim"]
+        command = ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"]
         binary = repo_root / "target/release/rstim"
     elif profile == "debug":
-        command = ["cargo", "build", "-p", "rstim", "--bin", "rstim"]
+        command = ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim"]
         binary = repo_root / "target/debug/rstim"
     else:
         raise ValueError(f"unsupported profile: {profile}")
