@@ -1,5 +1,7 @@
+#[cfg(feature = "rbposd-runner")]
 use std::collections::BTreeMap;
 
+#[cfg(any(feature = "rbposd-runner", feature = "ilp-runner"))]
 use rsinter::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
 #[cfg(feature = "rbposd-runner")]
 use rsinter::bench::runners::rbposd::RbposdRunner;

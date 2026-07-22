@@ -5,6 +5,7 @@ use std::process::Command;
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
 #[cfg(feature = "plotting")]
 use rsinter::bench::plot::logical_rate_fit_for_plot;
+#[cfg(feature = "rbposd-runner")]
 use rsinter::bench::result::read_results_jsonl;
 #[cfg(feature = "plotting")]
 use rsinter::bench::spec::LogicalRateUnit;
@@ -35,6 +36,7 @@ fn rsinter_bench_run_help_mentions_resume_flag() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn rsinter_bench_run_writes_artifacts_from_fixture_spec() {
     let dir = tempfile::tempdir().unwrap();
     let spec = "tests/fixtures/bench/minimal_surface_decoder.toml";
@@ -59,6 +61,7 @@ fn rsinter_bench_run_writes_artifacts_from_fixture_spec() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn rsinter_bench_run_writes_artifacts_from_css_fixture_spec() {
     let dir = tempfile::tempdir().unwrap();
     let spec = "tests/fixtures/bench/minimal_css_decoder.toml";

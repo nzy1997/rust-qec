@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+#[cfg(feature = "rbposd-runner")]
 fn issue91_surface_spec(extra_params: &str) -> String {
     format!(
         r#"
@@ -51,6 +52,7 @@ label = "Logical Error Rate"
     )
 }
 
+#[cfg(feature = "rbposd-runner")]
 fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     let spec_text = issue91_surface_spec(extra_params);
     let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
@@ -69,6 +71,7 @@ fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std:
     (dir, artifact_root)
 }
 
+#[cfg(feature = "rbposd-runner")]
 fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
     let data = fs::read(
         artifact_root
@@ -236,6 +239,7 @@ fn fake_result_row(ctx: &BenchRunContext, p: f64, status: &str) -> BenchmarkResu
     }
 }
 
+#[cfg(feature = "rbposd-runner")]
 fn issue96_css_rbposd_spec(schedule: &str, extra_params: &str) -> String {
     format!(
         r#"

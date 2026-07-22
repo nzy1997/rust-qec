@@ -160,7 +160,7 @@ pub(crate) fn run_decoder_point_with_dem_mode(
     )
 }
 
-#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
+#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner"))]
 pub(crate) fn plan_decoder_point_identity(
     runner_name: &'static str,
     point: &BenchCasePoint,

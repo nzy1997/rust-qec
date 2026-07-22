@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use toml::Value;
 
+#[cfg(any(feature = "rbposd-runner", feature = "ilp-runner"))]
 pub(crate) fn optional_bool(
     params: &BTreeMap<String, Value>,
     key: &str,
