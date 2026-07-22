@@ -98,8 +98,8 @@ RSMP_IO
 Issues must not introduce a catch-all `RSMP_CORRUPT_BLOCK` alias. Unknown
 required features use `RSMP_UNSUPPORTED_FEATURE`; invalid canonical structure,
 ordering, IDs, varints, or padding use `RSMP_MALFORMED_ARCHIVE`; Zstandard
-decode failures use `RSMP_DECOMPRESSION_FAILED`; and reconstructed logical
-content that disagrees with its stored digest uses
+frame, decode, or frame-checksum failures use `RSMP_DECOMPRESSION_FAILED`; and
+reconstructed logical content that disagrees with its stored digest uses
 `RSMP_LOGICAL_DIGEST_MISMATCH`.
 
 No archive-controlled count or length reaches `BitTable::new`, `Vec`

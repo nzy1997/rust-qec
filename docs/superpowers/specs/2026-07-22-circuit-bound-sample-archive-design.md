@@ -387,12 +387,13 @@ Validation order:
    `ArchiveLimits` before allocation.
 3. Parse the circuit, reject sweep, and compare circuit hash, dimensions, rank,
    and transform identifiers.
-4. Require consecutive block sequence numbers, first-shot indices, and bounded
-   shot counts.
-5. Validate stream lengths, codec IDs, canonical varints, sorted in-range hit
-   indices, and zero padding.
-6. Bound the Zstandard window and require exactly the declared decompressed
-   byte count.
+4. Require consecutive block sequence numbers, first-shot indices, bounded
+   shot counts, known codec IDs, and bounded declared stream lengths.
+5. Preflight each declared Zstandard frame slice, require exactly one frame,
+   bound its window and content size, decode it, and require exactly the
+   declared decompressed byte count and a valid frame checksum.
+6. Validate the decoded codec bytes, including canonical varints, sorted
+   in-range hit indices, exact shot-record count, and zero padding.
 7. Reconstruct measurements and recompute the stored independent detector
    values.
 8. Verify the block logical-payload SHA-256.
@@ -422,9 +423,9 @@ The normative format document freezes the validation precedence and mapping
 from malformed fields to these codes. Zstandard implementation error strings
 are never part of the public contract. Unknown required format features map to
 `RSMP_UNSUPPORTED_FEATURE`; malformed ordering, padding, and canonical encodings
-map to `RSMP_MALFORMED_ARCHIVE`; Zstandard decode failures map to
-`RSMP_DECOMPRESSION_FAILED`; and a mismatch in reconstructed logical block
-content maps to `RSMP_LOGICAL_DIGEST_MISMATCH`.
+map to `RSMP_MALFORMED_ARCHIVE`; Zstandard frame, decode, or frame-checksum
+failures map to `RSMP_DECOMPRESSION_FAILED`; and a mismatch in reconstructed
+logical block content maps to `RSMP_LOGICAL_DIGEST_MISMATCH`.
 
 CLI diagnostics use:
 
