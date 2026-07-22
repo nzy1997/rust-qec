@@ -282,6 +282,25 @@ fn benchmark_spec_loads_from_toml_fixture() {
 }
 
 #[test]
+fn steane_minimal_feature_gate_fixtures_are_valid() {
+    for (name, text) in [
+        (
+            "minimal_steane_css_rbposd",
+            include_str!("fixtures/bench/minimal_steane_css_rbposd.toml"),
+        ),
+        (
+            "minimal_steane_css_rilpqec",
+            include_str!("fixtures/bench/minimal_steane_css_rilpqec.toml"),
+        ),
+    ] {
+        let spec: BenchmarkSpec =
+            toml::from_str(text).unwrap_or_else(|err| panic!("{name} failed to parse: {err}"));
+        spec.validate()
+            .unwrap_or_else(|err| panic!("{name} failed validation: {err}"));
+    }
+}
+
+#[test]
 fn bb_compare_plot_spec_uses_paper_style_logical_rate_per_syndrome_cycle() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../benchmarks/bb_circuit_bposd_compare/plot.toml");

@@ -94,50 +94,8 @@ fn read_rows(artifact_root: &Path, runner_name: &str) -> Vec<BenchmarkResultRow>
 #[cfg(all(feature = "rbposd-runner", not(feature = "ilp-runner")))]
 #[test]
 fn disabled_rilpqec_runner_reports_required_feature_before_artifacts() {
-    let spec: BenchmarkSpec = toml::from_str(
-        r#"
-name = "css_decoder"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "rilpqec-steane"
-language = "rust"
-impl_key = "rilpqec"
-
-[runner.params]
-input_type = "css"
-code_id = "steane"
-hx = "../css/steane_hx.json"
-hz = "../css/steane_hz.json"
-basis = "x"
-schedule = "greedy"
-observables = "../css/steane_logicals_x.json"
-rounds = [1]
-p = [0.0]
-max_shots = 4
-max_errors = 4
-batch_size = 4
-
-[plot]
-title = "CSS Decoder"
-
-[plot.x]
-field = "params.p"
-scale = "linear"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner", "params.code_id"]
-label_template = "{runner} {params.code_id}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "linear"
-label = "Logical Error Rate"
-"#,
-    )
-    .unwrap();
+    let text = include_str!("fixtures/bench/minimal_steane_css_rilpqec.toml");
+    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
     let dir = tempfile::tempdir().unwrap();
     let registry = build_default_rust_runner_registry();
 

@@ -5,6 +5,7 @@ use std::process::Command;
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
 #[cfg(feature = "plotting")]
 use rsinter::bench::plot::logical_rate_fit_for_plot;
+use rsinter::bench::result::read_results_jsonl;
 #[cfg(feature = "plotting")]
 use rsinter::bench::spec::LogicalRateUnit;
 
@@ -79,6 +80,42 @@ fn rsinter_bench_run_writes_artifacts_from_css_fixture_spec() {
     assert!(output.status.success(), "{output:?}");
     let entries: Vec<_> = fs::read_dir(dir.path()).unwrap().collect();
     assert!(!entries.is_empty());
+}
+
+#[test]
+#[cfg(feature = "rbposd-runner")]
+fn rsinter_bench_run_minimal_steane_css_rbposd_fixture_writes_one_ok_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let spec = "tests/fixtures/bench/minimal_steane_css_rbposd.toml";
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "bench",
+            "run",
+            "--spec",
+            spec,
+            "--language",
+            "rust",
+            "--out",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{output:?}");
+    let results_path = dir
+        .path()
+        .join("rbposd-steane")
+        .join("test-run")
+        .join("results.jsonl");
+    let rows = read_results_jsonl(&fs::read(results_path).unwrap()[..]).unwrap();
+
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    assert_eq!(row.params["input_type"], serde_json::json!("css"));
+    assert_eq!(row.params["code_id"], serde_json::json!("steane"));
+    assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
+    assert_eq!(row.status, "ok");
 }
 
 #[test]
