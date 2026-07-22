@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::StimInstr;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
-use crate::bench::circuit_source::{BuiltCircuit, build_circuit_for_point};
+use crate::bench::circuit_source::{build_circuit_for_point, BuiltCircuit};
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::{FailureKind, classify_completed, classify_error};
+use crate::failure::{classify_completed, classify_error, FailureKind};
 
 pub(crate) mod params;
 pub mod predict_zero;
@@ -20,7 +20,17 @@ pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
 
+#[cfg(any(
+    not(feature = "rbposd-runner"),
+    not(feature = "rmatching-runner"),
+    not(feature = "ilp-runner")
+))]
+pub(crate) fn missing_feature_runner_error(runner_name: &str, feature: &str) -> String {
+    format!("runner '{runner_name}' requires Cargo feature '{feature}'")
+}
+
 pub(crate) enum DemBuildMode {
+    #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
     Decomposed,
     Raw,
 }
@@ -112,6 +122,7 @@ fn benchmark_metrics(
     ])
 }
 
+#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
 pub(crate) fn run_decoder_point(
     runner_name: &'static str,
     decoder: &dyn Decoder,
@@ -149,6 +160,7 @@ pub(crate) fn run_decoder_point_with_dem_mode(
     )
 }
 
+#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner"))]
 pub(crate) fn plan_decoder_point_identity(
     runner_name: &'static str,
     point: &BenchCasePoint,
@@ -216,6 +228,7 @@ fn plan_built_decoder_point_identity_with_dem_mode(
     result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
     let dem = match dem_mode {
+        #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
         DemBuildMode::Decomposed => ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?,
         DemBuildMode::Raw => ErrorAnalyzer::circuit_to_dem(&circuit)?,
     };
@@ -290,6 +303,7 @@ where
     result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
     let dem = match dem_mode {
+        #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
         DemBuildMode::Decomposed => match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
             Ok(dem) => dem,
             Err(decomposition_error) => {
@@ -850,10 +864,9 @@ mod tests {
             case_summary: CaseSummary::new(),
         };
         let decoder_params = crate::bench::result::ParamMap::new();
-        let mut unused_batcher =
-            |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
-                panic!("raw DEM analysis should fail before sampling")
-            };
+        let mut unused_batcher = |_circuit: &[rstim::ir::StimInstr], _shots, _rng: &mut StdRng| {
+            panic!("raw DEM analysis should fail before sampling")
+        };
 
         let row = run_built_decoder_point_with_batcher(
             "fake",
@@ -941,12 +954,11 @@ mod tests {
         assert_eq!(row.status, "error");
         assert_eq!(row.failure_kind, FailureKind::SamplerError);
         assert_eq!(row.metrics["shots_used"], 0.0);
-        assert!(
-            row.error
-                .as_deref()
-                .unwrap()
-                .contains("sampler produced 0 observable bytes")
-        );
+        assert!(row
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("sampler produced 0 observable bytes"));
     }
 
     #[test]

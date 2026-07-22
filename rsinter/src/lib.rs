@@ -1,7 +1,11 @@
+#[cfg(feature = "ilp-runner")]
 mod ilpqec_adapter;
+#[cfg(feature = "rbposd-runner")]
 mod rbposd_adapter;
+#[cfg(feature = "rmatching-runner")]
 mod rmatching_adapter;
 
+#[cfg(feature = "rbposd-runner")]
 pub mod bb_circuit_memory;
 pub mod bench;
 pub mod collect;

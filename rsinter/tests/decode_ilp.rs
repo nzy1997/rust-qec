@@ -1,3 +1,5 @@
+#![cfg(feature = "ilp-runner")]
+
 use std::collections::HashMap;
 
 use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig};

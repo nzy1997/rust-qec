@@ -1,0 +1,41 @@
+name = "minimal_steane_css_rilpqec"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rilpqec-steane"
+language = "rust"
+impl_key = "rilpqec"
+
+[runner.params]
+input_type = "css"
+code_id = "steane"
+hx = "../css/steane_hx.json"
+hz = "../css/steane_hz.json"
+observables = "../css/steane_logicals_x.json"
+basis = "x"
+schedule = "greedy"
+rounds = [1]
+p = [0.0]
+seed = 12345
+max_shots = 8
+max_errors = 4
+batch_size = 4
+backend = "auto"
+
+[plot]
+title = "Minimal Steane CSS RBPOSD"
+
+[plot.x]
+field = "params.p"
+scale = "linear"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner", "params.code_id"]
+label_template = "{runner} {params.code_id}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "linear"
+label = "Logical Error Rate"

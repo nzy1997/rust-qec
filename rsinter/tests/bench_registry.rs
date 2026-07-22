@@ -26,6 +26,21 @@ fn default_rust_runner_registry_exposes_runner_names() {
     assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
 }
 
+#[cfg(all(
+    feature = "rbposd-runner",
+    not(feature = "rmatching-runner"),
+    not(feature = "ilp-runner")
+))]
+#[test]
+fn minimal_feature_registry_keeps_disabled_runner_identifiers_stable() {
+    let registry = build_default_rust_runner_registry();
+
+    assert_eq!(registry.get("rmatching").unwrap().name(), "rmatching");
+    assert_eq!(registry.get("rbposd").unwrap().name(), "rbposd");
+    assert_eq!(registry.get("rilpqec").unwrap().name(), "rilpqec");
+    assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
+}
+
 #[test]
 fn default_rust_runner_names_include_workspace_decoders() {
     let names = default_rust_runner_names();

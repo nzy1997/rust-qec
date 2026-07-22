@@ -1,3 +1,5 @@
+#![cfg(feature = "plotting")]
+
 use rsinter::bench::plot::{
     log_log_fit_for_plot, logical_rate_fit_for_plot, render_benchmark_plot,
 };

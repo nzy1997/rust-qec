@@ -1,6 +1,8 @@
+#![cfg(feature = "rbposd-runner")]
+
 use std::collections::BTreeSet;
 
-use qec_code::css::{SparseRowsMatrix, sparse_rows_matrix_from_json_str};
+use qec_code::css::{sparse_rows_matrix_from_json_str, SparseRowsMatrix};
 use rbposd::{
     BpOsdDecoder, BpVariant, ChannelModel, Correction, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Schedule, Syndrome,
@@ -20,7 +22,10 @@ fn apm_p96_rbposd_smoke_decodes_seeded_syndromes() {
     let hz = parse_sparse_rows(APM_P96_HZ_JSON, "failed to parse APM P=96 Hz fixture");
     assert_eq!(hx.num_cols(), APM_P96_NUM_QUBITS);
     assert_eq!(hz.num_cols(), APM_P96_NUM_QUBITS);
-    assert!(!hz.rows().is_empty(), "APM P=96 Hz fixture should be loaded");
+    assert!(
+        !hz.rows().is_empty(),
+        "APM P=96 Hz fixture should be loaded"
+    );
 
     let pcm = parity_check_from_sparse_rows(&hx);
     let decoder = BpOsdDecoder::new(
@@ -32,11 +37,7 @@ fn apm_p96_rbposd_smoke_decodes_seeded_syndromes() {
     )
     .expect("failed to compile APM P=96 Hx rbposd decoder");
 
-    let supports = seeded_error_supports(
-        APM_P96_SEED,
-        &APM_P96_ERROR_WEIGHTS,
-        APM_P96_NUM_QUBITS,
-    );
+    let supports = seeded_error_supports(APM_P96_SEED, &APM_P96_ERROR_WEIGHTS, APM_P96_NUM_QUBITS);
     assert_eq!(supports, expected_supports());
 
     let mut zero_control_left_residual = false;

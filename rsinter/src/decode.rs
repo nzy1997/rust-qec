@@ -1,7 +1,10 @@
 use rstim::dem::DetectorErrorModel;
 
+#[cfg(feature = "ilp-runner")]
 pub use crate::ilpqec_adapter::IlpDemDecoder;
+#[cfg(feature = "rbposd-runner")]
 pub use crate::rbposd_adapter::{RbposdDemDecoder, RbposdLsdDemDecoder};
+#[cfg(feature = "rmatching-runner")]
 pub use crate::rmatching_adapter::RmatchingDemDecoder;
 
 pub trait CompiledDecoder: Send {
@@ -19,7 +22,7 @@ pub trait CompiledDecoder: Send {
 
 pub trait Decoder: Send + Sync {
     fn compile_for_dem(&self, dem: &DetectorErrorModel)
-    -> Result<Box<dyn CompiledDecoder>, String>;
+        -> Result<Box<dyn CompiledDecoder>, String>;
 }
 
 /// Always predicts no observable flips. Useful for testing the pipeline.
