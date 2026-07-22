@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=Path("_site/gallery"))
     parser.add_argument(
         "--rstim-cmd",
-        default="cargo run -p rstim --bin rstim --",
+        default="cargo run --locked -p rstim --bin rstim --",
         help="Command prefix used before render_svg. Shell-style splitting is supported.",
     )
     return parser.parse_args()

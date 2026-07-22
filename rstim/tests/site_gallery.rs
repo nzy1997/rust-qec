@@ -80,6 +80,13 @@ fn create_failing_rstim(bin_dir: &Path, exit_code: i32) -> PathBuf {
 }
 
 #[test]
+fn qp101_gallery_default_cargo_command_is_locked() {
+    let script = include_str!("../../tools/build_qp101_gallery.py");
+    assert!(script.contains("cargo run --locked -p rstim --bin rstim --"));
+    assert!(!script.contains("cargo run -p rstim --bin rstim --"));
+}
+
+#[test]
 fn qp101_gallery_builds_without_typst() {
     let temp = tempfile::tempdir().unwrap();
     let temp_root = temp.path().join("repo");

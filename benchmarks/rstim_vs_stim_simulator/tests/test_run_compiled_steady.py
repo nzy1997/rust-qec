@@ -21,9 +21,25 @@ MANIFEST = ROOT / "benchmarks" / "rstim_vs_stim_simulator" / "fair_cli_cases.tom
 
 
 class RunCompiledSteadyTest(unittest.TestCase):
+    def test_build_rstim_worker_uses_locked_cargo_resolution(self) -> None:
+        completed = subprocess.CompletedProcess(["cargo"], 0, "", "")
+        with unittest.mock.patch(
+            "benchmarks.rstim_vs_stim_simulator.run_compiled_steady.subprocess.run",
+            return_value=completed,
+        ) as run:
+            self.assertEqual(
+                run_compiled_steady.build_rstim_worker("debug"),
+                ["target/debug/rstim_compiled_steady_worker"],
+            )
+
+        self.assertEqual(
+            run.call_args.args[0],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+        )
+
     def test_rstim_worker_returns_packed_known_answer_and_lifecycle_telemetry(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
             cwd=ROOT,
             check=False,
             capture_output=True,
@@ -75,7 +91,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
     def test_rstim_worker_emits_error_frame_for_missing_input(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
             cwd=ROOT,
             check=False,
             capture_output=True,
@@ -110,7 +126,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
     def test_rstim_worker_emits_error_frame_for_missing_required_args(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
             cwd=ROOT,
             check=False,
             capture_output=True,

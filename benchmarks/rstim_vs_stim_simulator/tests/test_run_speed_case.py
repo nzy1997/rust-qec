@@ -29,7 +29,7 @@ class RunSpeedCaseProfileTest(unittest.TestCase):
                 result = run_speed_case.build_rstim("debug", repo_root=repo_root)
 
             self.assertEqual(result, binary)
-            self.assertEqual(calls[0][0], ["cargo", "build", "-p", "rstim", "--bin", "rstim"])
+            self.assertEqual(calls[0][0], ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim"])
             self.assertEqual(calls[0][1]["cwd"], repo_root)
             self.assertTrue(calls[0][1]["check"])
 
@@ -52,7 +52,7 @@ class RunSpeedCaseProfileTest(unittest.TestCase):
             self.assertEqual(result, binary)
             self.assertEqual(
                 calls[0],
-                ["cargo", "build", "--release", "-p", "rstim", "--bin", "rstim"],
+                ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"],
             )
 
 

@@ -100,7 +100,7 @@ class VerifyCorrectnessRunnerTest(unittest.TestCase):
         ):
             self.assertEqual(
                 default_rstim_command(),
-                ["cargo", "run", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"],
+                ["cargo", "run", "--locked", "--offline", "--quiet", "-p", "rstim", "--bin", "rstim", "--"],
             )
 
     def test_run_tool_records_failure_stderr(self) -> None:

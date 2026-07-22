@@ -97,7 +97,7 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
-sha256 = "ac9e1a0c4e70a1202b265433db80cfbf10257a26da729177d9659af6a6649a5a"
+sha256 = "6d1cc9462ec527144363081f2f43d9375626b1fba2ce3bc92d2fc8c1647c6bb6"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
@@ -273,7 +273,7 @@ sha256 = "87d9a6e90e0131a4aff3723dd5844c5b2e081e590d5e2a3da8fdfbd977d9181b"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_paired_frame_noise.py"
-sha256 = "960cf915b50e9795af81728b1224a4ebc87997d59395b589aed8414406674e90"
+sha256 = "cfbf0dca4a337af62def2a80f12178d95106f787465e2a14ab180c69d172438f"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"

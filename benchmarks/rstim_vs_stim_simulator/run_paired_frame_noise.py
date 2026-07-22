@@ -155,7 +155,7 @@ def build_revision(revision: RevisionBuild) -> Path:
     env = dict(os.environ)
     env["CARGO_TARGET_DIR"] = str(revision.target_dir)
     subprocess.run(
-        ["cargo", "build", "--release", "-p", "rstim", "--bin", "rstim"],
+        ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"],
         cwd=revision.source_dir,
         env=env,
         check=True,

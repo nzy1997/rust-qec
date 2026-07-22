@@ -15,6 +15,7 @@ from parity_harness import (
     map_config_to_ldpc_kwargs,
     map_lsd_case_to_ldpc_kwargs,
     matrix_to_dense,
+    run_rust_case,
 )
 
 
@@ -220,6 +221,16 @@ class ParityHarnessTests(unittest.TestCase):
         self.assertEqual(
             matrix_to_dense(matrix),
             [[1, 0, 0, 1], [0, 1, 1, 0]],
+        )
+
+    def test_run_rust_case_uses_locked_cargo_resolution(self) -> None:
+        completed = mock.Mock(returncode=0, stdout="{}", stderr="")
+        with mock.patch("parity_harness.subprocess.run", return_value=completed) as run:
+            run_rust_case(Path("/repo"), Path("case.json"))
+
+        self.assertEqual(
+            run.call_args.args[0][:4],
+            ["cargo", "run", "--locked", "--quiet"],
         )
 
     def test_iter_generated_cases_includes_tiebreak_case(self) -> None:
