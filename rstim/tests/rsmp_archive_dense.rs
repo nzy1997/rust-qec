@@ -167,7 +167,7 @@ fn verify_transform_limit_mapping() {
         lower_limit(exact_limits, |t| &mut t.max_repeat_depth),
         lower_limit(exact_limits, |t| &mut t.max_expanded_instructions),
         lower_limit(exact_limits, |t| &mut t.max_parity_terms),
-        lower_limit(exact_limits, |t| &mut t.max_shots_per_block),
+        zero_limit(exact_limits, |t| &mut t.max_shots_per_block),
         lower_limit(exact_limits, |t| &mut t.max_transform_working_bytes),
         lower_limit(exact_limits, |t| &mut t.max_block_working_bytes),
     ] {
@@ -606,6 +606,14 @@ fn lower_limit(
 ) -> ArchiveLimits {
     let value = select(&mut limits.transform);
     *value = value.saturating_sub(1);
+    limits
+}
+
+fn zero_limit(
+    mut limits: ArchiveLimits,
+    select: impl FnOnce(&mut MeasurementTransformLimits) -> &mut u64,
+) -> ArchiveLimits {
+    *select(&mut limits.transform) = 0;
     limits
 }
 

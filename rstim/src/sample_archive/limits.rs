@@ -18,7 +18,7 @@ impl Default for ArchiveLimits {
     fn default() -> Self {
         Self {
             transform: MeasurementTransformLimits::default(),
-            max_total_shots: crate::sample_archive::format::DEFAULT_MAX_SHOTS_PER_BLOCK,
+            max_total_shots: 1_000_000,
             max_detector_rank: 10_000_000,
             max_free_measurements: 10_000_000,
             max_compressed_bytes_per_stream: 64 * 1024 * 1024,
@@ -52,10 +52,7 @@ mod tests {
     fn archive_defaults_keep_transform_limits_embedded() {
         let limits = ArchiveLimits::default();
         assert_eq!(limits.transform, MeasurementTransformLimits::default());
-        assert_eq!(
-            limits.max_total_shots,
-            crate::sample_archive::format::DEFAULT_MAX_SHOTS_PER_BLOCK
-        );
+        assert_eq!(limits.max_total_shots, 1_000_000);
         assert_eq!(limits.max_detector_rank, 10_000_000);
         assert_eq!(limits.max_free_measurements, 10_000_000);
         assert_eq!(limits.max_compressed_bytes_per_stream, 64 * 1024 * 1024);
