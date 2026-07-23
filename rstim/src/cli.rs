@@ -1,4 +1,7 @@
-use std::io::{self, Read, Write};
+use std::collections::BTreeSet;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use rand::rngs::StdRng;
@@ -13,11 +16,18 @@ use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
 use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::measurement_transform::{
+    DecodedSampleBlock, MeasurementTransform, MeasurementTransformError,
+};
 use crate::output::{
     write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
     write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
+use crate::sample_archive::{
+    format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
+    SampleArchiveWriter,
+};
 use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
 
@@ -222,6 +232,40 @@ pub enum Commands {
         sample_shot: bool,
         #[arg(long)]
         seed: Option<u64>,
+    },
+    /// Pack b8 measurement samples into an RSMP archive
+    #[command(name = "pack_samples")]
+    PackSamples {
+        #[arg(long = "circuit")]
+        circuit: String,
+        #[arg(long = "shots")]
+        shots: u64,
+        #[arg(long = "in")]
+        r#in: String,
+        #[arg(long = "in_format", default_value = "b8")]
+        in_format: String,
+        #[arg(long = "out")]
+        out: String,
+    },
+    /// Unpack an RSMP archive into b8 sample streams
+    #[command(name = "unpack_samples")]
+    UnpackSamples {
+        #[arg(long = "circuit")]
+        circuit: String,
+        #[arg(long = "in")]
+        r#in: String,
+        #[arg(long = "measurements_out")]
+        measurements_out: Option<String>,
+        #[arg(long = "measurements_out_format", default_value = "b8")]
+        measurements_out_format: String,
+        #[arg(long = "detectors_out")]
+        detectors_out: Option<String>,
+        #[arg(long = "detectors_out_format", default_value = "b8")]
+        detectors_out_format: String,
+        #[arg(long = "obs_out")]
+        obs_out: Option<String>,
+        #[arg(long = "obs_out_format", default_value = "b8")]
+        obs_out_format: String,
     },
     /// Run performance evidence workflows
     Perf {
@@ -604,6 +648,32 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
         }
+        Some(Commands::PackSamples {
+            circuit,
+            shots,
+            r#in,
+            in_format,
+            out,
+        }) => run_pack_samples(&circuit, shots, &r#in, &in_format, &out),
+        Some(Commands::UnpackSamples {
+            circuit,
+            r#in,
+            measurements_out,
+            measurements_out_format,
+            detectors_out,
+            detectors_out_format,
+            obs_out,
+            obs_out_format,
+        }) => run_unpack_samples(
+            &circuit,
+            &r#in,
+            measurements_out.as_deref(),
+            &measurements_out_format,
+            detectors_out.as_deref(),
+            &detectors_out_format,
+            obs_out.as_deref(),
+            &obs_out_format,
+        ),
         Some(Commands::Perf { command }) => {
             match command {
                 PerfCommands::Run {
@@ -906,6 +976,379 @@ pub fn open_output(path: Option<&str>) -> Result<Box<dyn Write>, String> {
         }
         None => Ok(Box::new(io::BufWriter::new(io::stdout().lock()))),
     }
+}
+
+struct PendingOutput {
+    final_path: PathBuf,
+    temp_path: PathBuf,
+    file: BufWriter<File>,
+    published: bool,
+}
+
+impl PendingOutput {
+    fn create(final_path: &str, reserved_final_paths: &BTreeSet<PathBuf>) -> Result<Self, String> {
+        let final_path = PathBuf::from(final_path);
+        let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
+        let name = final_path
+            .file_name()
+            .ok_or_else(|| "output path must name a file".to_string())?
+            .to_string_lossy();
+        let process_id = std::process::id();
+
+        for retry in 0..1024 {
+            let temp_path = parent.join(format!(".{name}.rstim-{process_id}-{retry}.tmp"));
+            if reserved_final_paths.contains(&lexical_absolute_path_from_path(&temp_path)?) {
+                continue;
+            }
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temp_path)
+            {
+                Ok(file) => {
+                    return Ok(Self {
+                        final_path,
+                        temp_path,
+                        file: BufWriter::new(file),
+                        published: false,
+                    });
+                }
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to create staged output {}: {error}",
+                        temp_path.display()
+                    ));
+                }
+            }
+        }
+
+        Err(format!(
+            "failed to allocate a staged output beside {}",
+            final_path.display()
+        ))
+    }
+
+    fn publish(&mut self) -> Result<(), String> {
+        self.file
+            .flush()
+            .map_err(|error| format!("failed to flush {}: {error}", self.temp_path.display()))?;
+        std::fs::rename(&self.temp_path, &self.final_path).map_err(|error| {
+            format!(
+                "failed to publish {} to {}: {error}",
+                self.temp_path.display(),
+                self.final_path.display()
+            )
+        })?;
+        self.published = true;
+        Ok(())
+    }
+}
+
+impl Drop for PendingOutput {
+    fn drop(&mut self) {
+        if !self.published {
+            let _ = std::fs::remove_file(&self.temp_path);
+        }
+    }
+}
+
+fn run_pack_samples(
+    circuit_path: &str,
+    shots: u64,
+    input_path: &str,
+    input_format: &str,
+    output_path: &str,
+) -> Result<(), String> {
+    let reserved_output_paths =
+        preflight_pack_samples(circuit_path, shots, input_path, input_format, output_path)?;
+
+    let circuit_text = read_rsmp_text(circuit_path)?;
+    let circuit = parse_lines(&circuit_text)?;
+    let transform = MeasurementTransform::from_circuit(&circuit)
+        .map_err(format_transform_error_for_rsmp_cli)?;
+    let data = read_rsmp_bytes(input_path)?;
+    let measurements = read_exact_b8_measurements(&data, transform.num_measurements(), shots)?;
+    let limits = ArchiveLimits::default();
+
+    if output_path == "-" {
+        let stdout = io::stdout();
+        let output = BufWriter::new(stdout.lock());
+        let mut writer = SampleArchiveWriter::new(
+            output,
+            transform,
+            shots,
+            SampleArchiveOptions::default(),
+            limits,
+        )
+        .map_err(|error| error.to_string())?;
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .map_err(|error| error.to_string())?;
+        }
+        writer.finish().map_err(|error| error.to_string())?;
+    } else {
+        let mut output = PendingOutput::create(output_path, &reserved_output_paths)?;
+        let mut writer = SampleArchiveWriter::new(
+            &mut output.file,
+            transform,
+            shots,
+            SampleArchiveOptions::default(),
+            limits,
+        )
+        .map_err(|error| error.to_string())?;
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .map_err(|error| error.to_string())?;
+        }
+        writer.finish().map_err(|error| error.to_string())?;
+        output.publish()?;
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_unpack_samples(
+    circuit_path: &str,
+    input_path: &str,
+    measurements_out: Option<&str>,
+    measurements_out_format: &str,
+    detectors_out: Option<&str>,
+    detectors_out_format: &str,
+    obs_out: Option<&str>,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    let reserved_output_paths = preflight_unpack_samples(
+        circuit_path,
+        input_path,
+        measurements_out,
+        measurements_out_format,
+        detectors_out,
+        detectors_out_format,
+        obs_out,
+        obs_out_format,
+    )?;
+
+    let circuit_text = read_rsmp_text(circuit_path)?;
+    let circuit = parse_lines(&circuit_text)?;
+    let decoded = if input_path == "-" {
+        let stdin = io::stdin();
+        read_sample_archive(stdin.lock(), &circuit)?
+    } else {
+        let input = File::open(input_path)
+            .map_err(|error| format!("failed to read {input_path}: {error}"))?;
+        read_sample_archive(BufReader::new(input), &circuit)?
+    };
+
+    write_unpacked_b8_outputs(
+        &decoded,
+        measurements_out,
+        detectors_out,
+        obs_out,
+        &reserved_output_paths,
+    )
+}
+
+fn preflight_pack_samples(
+    circuit_path: &str,
+    shots: u64,
+    input_path: &str,
+    input_format: &str,
+    output_path: &str,
+) -> Result<BTreeSet<PathBuf>, String> {
+    if input_format != "b8" {
+        return Err("pack_samples only supports --in_format b8".to_string());
+    }
+    if [circuit_path, input_path]
+        .iter()
+        .filter(|path| **path == "-")
+        .count()
+        > 1
+    {
+        return Err("pack_samples accepts at most one stdin input".to_string());
+    }
+    if shots > ArchiveLimits::default().transform.max_shots_per_block {
+        return Err("pack_samples shot count exceeds archive block limit".to_string());
+    }
+    if output_path.is_empty() {
+        return Err("pack_samples requires --out".to_string());
+    }
+    let mut final_paths = BTreeSet::new();
+    if output_path != "-" {
+        final_paths.insert(lexical_absolute_path(output_path)?);
+    }
+    Ok(final_paths)
+}
+
+#[allow(clippy::too_many_arguments)]
+#[rustfmt::skip]
+fn preflight_unpack_samples(circuit_path: &str, input_path: &str, measurements_out: Option<&str>, measurements_out_format: &str, detectors_out: Option<&str>, detectors_out_format: &str, obs_out: Option<&str>, obs_out_format: &str) -> Result<BTreeSet<PathBuf>, String> {
+    let outputs = [(measurements_out, measurements_out_format, "--measurements_out_format"), (detectors_out, detectors_out_format, "--detectors_out_format"), (obs_out, obs_out_format, "--obs_out_format")];
+    if outputs.iter().all(|(path, _, _)| path.is_none()) {
+        return Err("unpack_samples requires at least one output".to_string());
+    }
+    if let Some((_, _, flag)) = outputs.iter().find(|(_, format, _)| *format != "b8") {
+        return Err(format!("unpack_samples only supports {flag} b8"));
+    }
+    if [circuit_path, input_path].iter().filter(|path| **path == "-").count() > 1 {
+        return Err("unpack_samples accepts at most one stdin input".to_string());
+    }
+    if outputs.iter().filter(|(path, _, _)| *path == Some("-")).count() > 1 {
+        return Err("unpack_samples accepts at most one stdout output".to_string());
+    }
+    let mut final_paths = BTreeSet::new();
+    for (path, _, _) in outputs {
+        if let Some(path) = path.filter(|path| *path != "-") { if !final_paths.insert(lexical_absolute_path(path)?) { return Err("unpack_samples output paths must be distinct".to_string()); } }
+    }
+    Ok(final_paths)
+}
+
+fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
+    lexical_absolute_path_from_path(Path::new(path))
+}
+
+#[rustfmt::skip]
+fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
+    let absolute = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().map_err(|error| format!("failed to resolve output path: {error}"))?.join(path) };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    Ok(normalized)
+}
+
+fn format_transform_error_for_rsmp_cli(error: MeasurementTransformError) -> String {
+    match error {
+        MeasurementTransformError::UnsupportedSweep => format!(
+            "{}: {}",
+            SampleArchiveErrorCode::UnsupportedSweep.as_str(),
+            error
+        ),
+        _ => error.to_string(),
+    }
+}
+
+fn read_rsmp_text(path: &str) -> Result<String, String> {
+    if path == "-" {
+        let mut text = String::new();
+        io::stdin()
+            .read_to_string(&mut text)
+            .map_err(|error| format!("failed to read stdin: {error}"))?;
+        Ok(text)
+    } else {
+        std::fs::read_to_string(path).map_err(|error| format!("failed to read {path}: {error}"))
+    }
+}
+
+fn read_rsmp_bytes(path: &str) -> Result<Vec<u8>, String> {
+    if path == "-" {
+        let mut bytes = Vec::new();
+        io::stdin()
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("failed to read stdin: {error}"))?;
+        Ok(bytes)
+    } else {
+        std::fs::read(path).map_err(|error| format!("failed to read {path}: {error}"))
+    }
+}
+
+fn read_exact_b8_measurements(data: &[u8], bits: usize, shots: u64) -> Result<BitTable, String> {
+    let shots =
+        usize::try_from(shots).map_err(|_| "pack_samples shot count exceeds usize".to_string())?;
+    let rounded_bits = bits
+        .checked_add(7)
+        .ok_or_else(|| "b8 measurement width overflows".to_string())?;
+    let bytes_per_shot = rounded_bits / 8;
+    let expected_len = bytes_per_shot
+        .checked_mul(shots)
+        .ok_or_else(|| "b8 input length overflows".to_string())?;
+    if data.len() != expected_len {
+        return Err(format!(
+            "b8 input has {} bytes; expected {expected_len}",
+            data.len()
+        ));
+    }
+    let partial_bits = bits % 8;
+    if partial_bits != 0 {
+        let unused_mask = !((1u8 << partial_bits) - 1);
+        for shot in 0..shots {
+            let last_byte = data[shot * bytes_per_shot + bytes_per_shot - 1];
+            if last_byte & unused_mask != 0 {
+                return Err("b8 input has nonzero unused high bits".to_string());
+            }
+        }
+    }
+
+    let mut measurements = BitTable::try_new(bits, shots)
+        .map_err(|error| format!("BitTable allocation failed: {error:?}"))?;
+    for shot in 0..shots {
+        for bit in 0..bits {
+            let byte = data[shot * bytes_per_shot + bit / 8];
+            measurements.set(bit, shot, byte & (1 << (bit % 8)) != 0);
+        }
+    }
+    Ok(measurements)
+}
+
+fn read_sample_archive<R: Read>(
+    input: R,
+    circuit: &[crate::ir::StimInstr],
+) -> Result<DecodedSampleBlock, String> {
+    let mut reader = SampleArchiveReader::open(input, circuit, ArchiveLimits::default())
+        .map_err(|error| error.to_string())?;
+    let block = reader.next_block().map_err(|error| error.to_string())?;
+    reader.finish().map_err(|error| error.to_string())?;
+    match block {
+        Some(block) => Ok(block),
+        None => {
+            let transform =
+                MeasurementTransform::from_circuit(circuit).map_err(|error| error.to_string())?;
+            Ok(DecodedSampleBlock {
+                measurements: empty_bit_table(transform.num_measurements())?,
+                detections: empty_bit_table(transform.num_detectors())?,
+                observable_flips: empty_bit_table(transform.num_observables())?,
+            })
+        }
+    }
+}
+
+fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
+    BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
+}
+
+#[rustfmt::skip]
+fn write_unpacked_b8_outputs(decoded: &DecodedSampleBlock, measurements_out: Option<&str>, detectors_out: Option<&str>, obs_out: Option<&str>, reserved_final_paths: &BTreeSet<PathBuf>) -> Result<(), String> {
+    let mut pending_outputs = Vec::new();
+    write_or_stage_b8_output(measurements_out, &decoded.measurements, reserved_final_paths, &mut pending_outputs)?;
+    write_or_stage_b8_output(detectors_out, &decoded.detections, reserved_final_paths, &mut pending_outputs)?;
+    write_or_stage_b8_output(obs_out, &decoded.observable_flips, reserved_final_paths, &mut pending_outputs)?;
+    pending_outputs.iter_mut().try_for_each(PendingOutput::publish)?;
+    Ok(())
+}
+
+#[rustfmt::skip]
+fn write_or_stage_b8_output(path: Option<&str>, table: &BitTable, reserved_final_paths: &BTreeSet<PathBuf>, pending_outputs: &mut Vec<PendingOutput>) -> Result<(), String> {
+    let Some(path) = path else { return Ok(()); };
+    if path == "-" {
+        let stdout = io::stdout();
+        let mut output = BufWriter::new(stdout.lock());
+        write_shots_b8(table, &mut output).map_err(|error| format!("write error: {error}"))?;
+        output.flush().map_err(|error| format!("write error: {error}"))?;
+        return Ok(());
+    }
+
+    let mut output = PendingOutput::create(path, reserved_final_paths)?;
+    write_shots_b8(table, &mut output.file).map_err(|error| format!("write error: {error}"))?;
+    pending_outputs.push(output);
+    Ok(())
 }
 
 pub fn make_rng(seed: Option<u64>) -> StdRng {
@@ -1855,6 +2298,408 @@ mod tests {
             command: None,
         })
         .unwrap();
+    }
+
+    fn rsmp_temp_candidate(final_path: &Path, retry: usize) -> PathBuf {
+        let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
+        let name = final_path.file_name().unwrap().to_string_lossy();
+        parent.join(format!(".{name}.rstim-{}-{retry}.tmp", std::process::id()))
+    }
+
+    #[test]
+    fn rsmp_pending_output_retries_existing_temp_and_drops_unpublished() {
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("archive.rsmp");
+        let first_temp = rsmp_temp_candidate(&final_path, 0);
+        std::fs::write(&first_temp, b"occupied").unwrap();
+
+        let output = PendingOutput::create(final_path.to_str().unwrap(), &BTreeSet::new()).unwrap();
+        let created_temp = output.temp_path.clone();
+
+        assert_eq!(created_temp, rsmp_temp_candidate(&final_path, 1));
+        drop(output);
+        assert_eq!(std::fs::read(first_temp).unwrap(), b"occupied");
+        assert!(!created_temp.exists());
+    }
+
+    #[test]
+    fn rsmp_pending_output_reports_create_publish_and_exhaustion_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing_parent = dir.path().join("missing").join("archive.rsmp");
+        let create_err = PendingOutput::create(missing_parent.to_str().unwrap(), &BTreeSet::new())
+            .err()
+            .unwrap();
+        assert!(create_err.contains("failed to create staged output"));
+
+        let final_path = dir.path().join("publish.rsmp");
+        let mut output =
+            PendingOutput::create(final_path.to_str().unwrap(), &BTreeSet::new()).unwrap();
+        std::fs::remove_file(&output.temp_path).unwrap();
+        let publish_err = output.publish().unwrap_err();
+        assert!(publish_err.contains("failed to publish"));
+
+        let exhausted_path = dir.path().join("exhausted.rsmp");
+        let mut reserved = BTreeSet::new();
+        for retry in 0..1024 {
+            reserved.insert(
+                lexical_absolute_path_from_path(&rsmp_temp_candidate(&exhausted_path, retry))
+                    .unwrap(),
+            );
+        }
+        let exhausted_err = PendingOutput::create(exhausted_path.to_str().unwrap(), &reserved)
+            .err()
+            .unwrap();
+        assert!(exhausted_err.contains("failed to allocate a staged output"));
+    }
+
+    #[test]
+    fn rsmp_preflight_path_and_error_helpers_cover_edge_paths() {
+        let stdout_paths = preflight_pack_samples("circuit.stim", 0, "measurements.b8", "b8", "-")
+            .expect("stdout output is accepted");
+        assert!(stdout_paths.is_empty());
+
+        let empty_output =
+            preflight_pack_samples("circuit.stim", 0, "measurements.b8", "b8", "").unwrap_err();
+        assert!(empty_output.contains("requires --out"));
+
+        let limit = ArchiveLimits::default().transform.max_shots_per_block;
+        let over_limit =
+            preflight_pack_samples("circuit.stim", limit + 1, "-", "b8", "archive.rsmp")
+                .unwrap_err();
+        assert!(over_limit.contains("shot count exceeds archive block limit"));
+
+        let relative = lexical_absolute_path("one/../two/output.rsmp").unwrap();
+        assert!(relative.ends_with(Path::new("two/output.rsmp")));
+
+        let sweep =
+            format_transform_error_for_rsmp_cli(MeasurementTransformError::UnsupportedSweep);
+        assert!(sweep.contains(SampleArchiveErrorCode::UnsupportedSweep.as_str()));
+
+        let formatted =
+            format_transform_error_for_rsmp_cli(MeasurementTransformError::LimitExceeded {
+                limit: "unit-test limit",
+            });
+        assert_eq!(
+            formatted,
+            "measurement transform limit exceeded: unit-test limit"
+        );
+    }
+
+    #[derive(Clone, Copy)]
+    struct StrictB8AcceptCase {
+        bits: usize,
+        shots: u64,
+        data: &'static [u8],
+    }
+
+    #[derive(Clone, Copy)]
+    struct StrictB8RejectCase {
+        bits: usize,
+        shots: u64,
+        data: &'static [u8],
+        error: &'static str,
+    }
+
+    #[test]
+    fn rsmp_strict_b8_reader_accepts_width_edges() {
+        let cases = [
+            StrictB8AcceptCase {
+                bits: 0,
+                shots: 0,
+                data: &[],
+            },
+            StrictB8AcceptCase {
+                bits: 0,
+                shots: 5,
+                data: &[],
+            },
+            StrictB8AcceptCase {
+                bits: 1,
+                shots: 1,
+                data: &[0x01],
+            },
+            StrictB8AcceptCase {
+                bits: 1,
+                shots: 2,
+                data: &[0x00, 0x01],
+            },
+            StrictB8AcceptCase {
+                bits: 2,
+                shots: 1,
+                data: &[0x03],
+            },
+            StrictB8AcceptCase {
+                bits: 2,
+                shots: 2,
+                data: &[0x01, 0x02],
+            },
+            StrictB8AcceptCase {
+                bits: 3,
+                shots: 1,
+                data: &[0x05],
+            },
+            StrictB8AcceptCase {
+                bits: 3,
+                shots: 2,
+                data: &[0x02, 0x05],
+            },
+            StrictB8AcceptCase {
+                bits: 4,
+                shots: 1,
+                data: &[0x0a],
+            },
+            StrictB8AcceptCase {
+                bits: 4,
+                shots: 2,
+                data: &[0x03, 0x0a],
+            },
+            StrictB8AcceptCase {
+                bits: 5,
+                shots: 1,
+                data: &[0x15],
+            },
+            StrictB8AcceptCase {
+                bits: 5,
+                shots: 2,
+                data: &[0x04, 0x15],
+            },
+            StrictB8AcceptCase {
+                bits: 6,
+                shots: 1,
+                data: &[0x2a],
+            },
+            StrictB8AcceptCase {
+                bits: 6,
+                shots: 2,
+                data: &[0x05, 0x2a],
+            },
+            StrictB8AcceptCase {
+                bits: 7,
+                shots: 1,
+                data: &[0x55],
+            },
+            StrictB8AcceptCase {
+                bits: 7,
+                shots: 2,
+                data: &[0x06, 0x55],
+            },
+            StrictB8AcceptCase {
+                bits: 8,
+                shots: 1,
+                data: &[0xaa],
+            },
+            StrictB8AcceptCase {
+                bits: 8,
+                shots: 2,
+                data: &[0x07, 0xaa],
+            },
+            StrictB8AcceptCase {
+                bits: 9,
+                shots: 1,
+                data: &[0xaa, 0x01],
+            },
+            StrictB8AcceptCase {
+                bits: 9,
+                shots: 2,
+                data: &[0x01, 0x00, 0x02, 0x01],
+            },
+            StrictB8AcceptCase {
+                bits: 10,
+                shots: 1,
+                data: &[0x55, 0x02],
+            },
+            StrictB8AcceptCase {
+                bits: 10,
+                shots: 2,
+                data: &[0x03, 0x00, 0x04, 0x02],
+            },
+            StrictB8AcceptCase {
+                bits: 11,
+                shots: 1,
+                data: &[0xaa, 0x05],
+            },
+            StrictB8AcceptCase {
+                bits: 11,
+                shots: 2,
+                data: &[0x05, 0x00, 0x06, 0x05],
+            },
+            StrictB8AcceptCase {
+                bits: 12,
+                shots: 1,
+                data: &[0x55, 0x0a],
+            },
+            StrictB8AcceptCase {
+                bits: 12,
+                shots: 2,
+                data: &[0x07, 0x00, 0x08, 0x0a],
+            },
+            StrictB8AcceptCase {
+                bits: 13,
+                shots: 1,
+                data: &[0xaa, 0x15],
+            },
+            StrictB8AcceptCase {
+                bits: 13,
+                shots: 2,
+                data: &[0x09, 0x00, 0x0a, 0x15],
+            },
+            StrictB8AcceptCase {
+                bits: 14,
+                shots: 1,
+                data: &[0x55, 0x2a],
+            },
+            StrictB8AcceptCase {
+                bits: 14,
+                shots: 2,
+                data: &[0x0b, 0x00, 0x0c, 0x2a],
+            },
+            StrictB8AcceptCase {
+                bits: 15,
+                shots: 1,
+                data: &[0xaa, 0x55],
+            },
+            StrictB8AcceptCase {
+                bits: 15,
+                shots: 2,
+                data: &[0x0d, 0x00, 0x0e, 0x55],
+            },
+            StrictB8AcceptCase {
+                bits: 16,
+                shots: 1,
+                data: &[0x55, 0xaa],
+            },
+            StrictB8AcceptCase {
+                bits: 16,
+                shots: 2,
+                data: &[0x0f, 0xf0, 0x10, 0x0f],
+            },
+        ];
+
+        for case in cases {
+            let table = read_exact_b8_measurements(case.data, case.bits, case.shots).unwrap();
+            assert_eq!(table.num_major(), case.bits);
+            assert_eq!(table.num_minor(), usize::try_from(case.shots).unwrap());
+            let mut encoded = Vec::new();
+            write_shots_b8(&table, &mut encoded).unwrap();
+            assert_eq!(encoded, case.data);
+        }
+    }
+
+    #[test]
+    fn rsmp_strict_b8_reader_rejects_edge_errors() {
+        let cases = [
+            StrictB8RejectCase {
+                bits: 0,
+                shots: 1,
+                data: &[0x00],
+                error: "expected 0",
+            },
+            StrictB8RejectCase {
+                bits: 1,
+                shots: 1,
+                data: &[],
+                error: "expected 1",
+            },
+            StrictB8RejectCase {
+                bits: 1,
+                shots: 1,
+                data: &[0x00, 0x00],
+                error: "expected 1",
+            },
+            StrictB8RejectCase {
+                bits: 1,
+                shots: 1,
+                data: &[0x02],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 2,
+                shots: 1,
+                data: &[0x04],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 3,
+                shots: 1,
+                data: &[0x08],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 4,
+                shots: 1,
+                data: &[0x10],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 5,
+                shots: 1,
+                data: &[0x20],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 6,
+                shots: 1,
+                data: &[0x40],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 7,
+                shots: 1,
+                data: &[0x80],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 9,
+                shots: 1,
+                data: &[0x00, 0x02],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 10,
+                shots: 1,
+                data: &[0x00, 0x04],
+                error: "nonzero unused high bits",
+            },
+            StrictB8RejectCase {
+                bits: 15,
+                shots: 1,
+                data: &[0x00, 0x80],
+                error: "nonzero unused high bits",
+            },
+        ];
+
+        for case in cases {
+            let error = read_exact_b8_measurements(case.data, case.bits, case.shots)
+                .err()
+                .unwrap();
+            assert!(error.contains(case.error), "{error}");
+        }
+    }
+
+    #[test]
+    fn rsmp_zero_block_archive_decodes_empty_tables() {
+        let circuit =
+            parse_lines("M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+        let transform = MeasurementTransform::from_circuit(&circuit).unwrap();
+        let mut archive = Vec::new();
+        let writer = SampleArchiveWriter::new(
+            &mut archive,
+            transform,
+            0,
+            SampleArchiveOptions::default(),
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        writer.finish().unwrap();
+
+        let decoded = read_sample_archive(std::io::Cursor::new(archive), &circuit).unwrap();
+
+        assert_eq!(decoded.measurements.num_major(), 1);
+        assert_eq!(decoded.measurements.num_minor(), 0);
+        assert_eq!(decoded.detections.num_major(), 1);
+        assert_eq!(decoded.detections.num_minor(), 0);
+        assert_eq!(decoded.observable_flips.num_major(), 1);
+        assert_eq!(decoded.observable_flips.num_minor(), 0);
     }
 
     #[test]
