@@ -932,10 +932,29 @@ pub fn write_format(
 }
 
 pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable {
+    try_merge_detections_observables(dets, obs)
+        .expect("trusted detector/observable dimensions allocate")
+}
+
+pub fn try_merge_detections_observables(
+    dets: &BitTable,
+    obs: &BitTable,
+) -> Result<BitTable, String> {
     let n_dets = dets.num_major();
     let n_obs = obs.num_major();
     let n_shots = dets.num_minor();
-    let mut merged = BitTable::new(n_dets + n_obs, n_shots);
+    if obs.num_minor() != n_shots {
+        return Err(format!(
+            "observable shot count {} does not match detection shot count {}",
+            obs.num_minor(),
+            n_shots
+        ));
+    }
+    let merged_rows = n_dets
+        .checked_add(n_obs)
+        .ok_or_else(|| "detector and observable row count overflows".to_string())?;
+    let mut merged = BitTable::try_new(merged_rows, n_shots)
+        .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
     for row in 0..n_dets {
         for shot in 0..n_shots {
             if dets.get(row, shot) {
@@ -950,7 +969,7 @@ pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable
             }
         }
     }
-    merged
+    Ok(merged)
 }
 
 pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), String> {
@@ -991,7 +1010,7 @@ fn write_detection_outputs(
         }
         _ => {
             if append_observables {
-                let merged = merge_detections_observables(detections, observable_flips);
+                let merged = try_merge_detections_observables(detections, observable_flips)?;
                 write_format(fmt, &merged, out)?;
             } else {
                 write_format(fmt, detections, out)?;
@@ -1381,7 +1400,7 @@ pub fn run_sample_dem(
     let fmt = OutputFormat::from_str(out_format)?;
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
-    let result = dem.sample_batch(shots, &mut rng);
+    let result = dem.try_sample_batch(shots, &mut rng)?;
     write_detection_outputs(
         &result.detections,
         &result.observable_flips,
@@ -1405,7 +1424,7 @@ pub fn run_sample_dem_with_obs(
     let obs_fmt = OutputFormat::from_str(obs_out_format)?;
     let dem = DetectorErrorModel::parse(dem_text)?;
     let mut rng = make_rng(seed);
-    let result = dem.sample_batch(shots, &mut rng);
+    let result = dem.try_sample_batch(shots, &mut rng)?;
     write_detection_outputs(
         &result.detections,
         &result.observable_flips,
@@ -1567,7 +1586,7 @@ fn run_m2d_impl(
         _ => {
             if append_observables {
                 let merged =
-                    merge_detections_observables(&result.detections, &result.observable_flips);
+                    try_merge_detections_observables(&result.detections, &result.observable_flips)?;
                 write_format(fmt, &merged, out)
             } else {
                 write_format(fmt, &result.detections, out)
@@ -1701,6 +1720,16 @@ mod tests {
         assert!(err.contains("--benchmark-telemetry-json"));
         assert!(err.contains("benchmark-telemetry"));
         assert!(!telemetry_path.exists());
+    }
+
+    #[test]
+    fn merge_detections_observables_rejects_shot_count_mismatch() {
+        let dets = BitTable::try_new(1, 2).unwrap();
+        let obs = BitTable::try_new(1, 1).unwrap();
+
+        let err = try_merge_detections_observables(&dets, &obs).unwrap_err();
+
+        assert!(err.contains("observable shot count 1 does not match detection shot count 2"));
     }
 
     #[test]

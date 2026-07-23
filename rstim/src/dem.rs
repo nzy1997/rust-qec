@@ -1,5 +1,5 @@
-use rand::Rng;
 use crate::sim::bit_table::BitTable;
+use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DemTarget {
@@ -137,14 +137,25 @@ impl DetectorErrorModel {
     }
 
     pub fn sample_batch(&self, num_shots: usize, rng: &mut impl Rng) -> DemBatchOutput {
+        self.try_sample_batch(num_shots, rng)
+            .expect("trusted DEM sample dimensions allocate")
+    }
+
+    pub fn try_sample_batch(
+        &self,
+        num_shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<DemBatchOutput, String> {
         let nd = self.effective_num_detectors();
         let mut out = DemBatchOutput {
-            detections: BitTable::new(nd, num_shots),
-            observable_flips: BitTable::new(self.num_observables, num_shots),
+            detections: BitTable::try_new(nd, num_shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?,
+            observable_flips: BitTable::try_new(self.num_observables, num_shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?,
         };
         let wpr = out.detections.words_per_row();
         sample_instrs_batch(&self.instrs, &mut out, wpr, 0, rng);
-        out
+        Ok(out)
     }
 }
 
@@ -168,7 +179,9 @@ fn effective_det_count(instrs: &[DemInstruction], initial_offset: usize) -> usiz
             DemInstruction::Detector { index, .. } => {
                 max_det = max_det.max(index + offset + 1);
             }
-            DemInstruction::ShiftDetectors { detector_offset, .. } => {
+            DemInstruction::ShiftDetectors {
+                detector_offset, ..
+            } => {
                 offset += detector_offset;
             }
             DemInstruction::Repeat { count, body } => {
@@ -192,7 +205,9 @@ fn total_shift(instrs: &[DemInstruction]) -> usize {
     let mut shift = 0;
     for instr in instrs {
         match instr {
-            DemInstruction::ShiftDetectors { detector_offset, .. } => {
+            DemInstruction::ShiftDetectors {
+                detector_offset, ..
+            } => {
                 shift += detector_offset;
             }
             DemInstruction::Repeat { count, body } => {
@@ -214,23 +229,32 @@ fn sample_instrs(
     let mut offset = det_offset;
     for instr in instrs {
         match instr {
-            DemInstruction::Error { probability, targets } => {
+            DemInstruction::Error {
+                probability,
+                targets,
+            } => {
                 if rng.r#gen::<f64>() < *probability {
                     for t in targets {
                         match t {
                             DemTarget::Detector(i) => {
                                 let idx = i + offset;
-                                if idx < dets.len() { dets[idx] ^= true; }
+                                if idx < dets.len() {
+                                    dets[idx] ^= true;
+                                }
                             }
                             DemTarget::Observable(i) => {
-                                if *i < obs.len() { obs[*i] ^= true; }
+                                if *i < obs.len() {
+                                    obs[*i] ^= true;
+                                }
                             }
                             DemTarget::Separator => {}
                         }
                     }
                 }
             }
-            DemInstruction::ShiftDetectors { detector_offset, .. } => {
+            DemInstruction::ShiftDetectors {
+                detector_offset, ..
+            } => {
                 offset += detector_offset;
             }
             DemInstruction::Repeat { count, body } => {
@@ -254,7 +278,10 @@ fn sample_instrs_batch(
     let mut offset = det_offset;
     for instr in instrs {
         match instr {
-            DemInstruction::Error { probability, targets } => {
+            DemInstruction::Error {
+                probability,
+                targets,
+            } => {
                 let noise = random_bits_with_prob(wpr, *probability, rng);
                 for t in targets {
                     match t {
@@ -262,20 +289,26 @@ fn sample_instrs_batch(
                             let row = i + offset;
                             if row < out.detections.num_major() {
                                 let words = out.detections.row_words_mut(row);
-                                for w in 0..wpr { words[w] ^= noise[w]; }
+                                for w in 0..wpr {
+                                    words[w] ^= noise[w];
+                                }
                             }
                         }
                         DemTarget::Observable(i) => {
                             if *i < out.observable_flips.num_major() {
                                 let words = out.observable_flips.row_words_mut(*i);
-                                for w in 0..wpr { words[w] ^= noise[w]; }
+                                for w in 0..wpr {
+                                    words[w] ^= noise[w];
+                                }
                             }
                         }
                         DemTarget::Separator => {}
                     }
                 }
             }
-            DemInstruction::ShiftDetectors { detector_offset, .. } => {
+            DemInstruction::ShiftDetectors {
+                detector_offset, ..
+            } => {
                 offset += detector_offset;
             }
             DemInstruction::Repeat { count, body } => {
@@ -291,8 +324,13 @@ fn sample_instrs_batch(
 
 fn random_bits_with_prob(words: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
-    if p <= 0.0 { return result; }
-    if p >= 1.0 { result.fill(!0u64); return result; }
+    if p <= 0.0 {
+        return result;
+    }
+    if p >= 1.0 {
+        result.fill(!0u64);
+        return result;
+    }
     for w in &mut result {
         for bit in 0..64u32 {
             if rng.r#gen::<f64>() < p {
@@ -383,7 +421,11 @@ fn strip_comment(line: &str) -> &str {
     }
 }
 
-fn parse_block(lines: &mut Vec<&str>, pos: &mut usize, inside_repeat: bool) -> Result<DetectorErrorModel, String> {
+fn parse_block(
+    lines: &mut Vec<&str>,
+    pos: &mut usize,
+    inside_repeat: bool,
+) -> Result<DetectorErrorModel, String> {
     let mut dem = DetectorErrorModel::new();
     while *pos < lines.len() {
         let raw = lines[*pos];

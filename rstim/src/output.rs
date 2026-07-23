@@ -1,5 +1,5 @@
-use std::io::Write;
 use crate::sim::bit_table::BitTable;
+use std::io::Write;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -138,12 +138,18 @@ pub fn write_shots_dets(
 
 /// Read 01 format: each shot is `bits` ASCII '0'/'1' chars followed by '\n'.
 pub fn read_shots_01(data: &[u8], bits: usize) -> Result<BitTable, String> {
-    let line_len = bits + 1; // bits chars + newline
+    let line_len = bits
+        .checked_add(1)
+        .ok_or_else(|| "01 bit count overflows line length".to_string())?; // bits chars + newline
     if data.len() % line_len != 0 {
-        return Err(format!("01 data length {} not divisible by line length {}", data.len(), line_len));
+        return Err(format!(
+            "01 data length {} not divisible by line length {}",
+            data.len(),
+            line_len
+        ));
     }
     let shots = data.len() / line_len;
-    let mut table = BitTable::new(bits, shots);
+    let mut table = alloc_bit_table(bits, shots)?;
     for shot in 0..shots {
         let line = &data[shot * line_len..shot * line_len + bits];
         for (bit, &ch) in line.iter().enumerate() {
@@ -159,15 +165,22 @@ pub fn read_shots_01(data: &[u8], bits: usize) -> Result<BitTable, String> {
 
 /// Read b8 format: each shot is `ceil(bits/8)` bytes, LSB-first.
 pub fn read_shots_b8(data: &[u8], bits: usize) -> Result<BitTable, String> {
-    let bytes_per_shot = (bits + 7) / 8;
+    let bytes_per_shot = bits
+        .checked_add(7)
+        .ok_or_else(|| "b8 bit count overflows bytes_per_shot".to_string())?
+        / 8;
     if bytes_per_shot == 0 {
-        return Ok(BitTable::new(bits, 0));
+        return alloc_bit_table(bits, 0);
     }
     if data.len() % bytes_per_shot != 0 {
-        return Err(format!("b8 data length {} not divisible by bytes_per_shot {}", data.len(), bytes_per_shot));
+        return Err(format!(
+            "b8 data length {} not divisible by bytes_per_shot {}",
+            data.len(),
+            bytes_per_shot
+        ));
     }
     let shots = data.len() / bytes_per_shot;
-    let mut table = BitTable::new(bits, shots);
+    let mut table = alloc_bit_table(bits, shots)?;
     for shot in 0..shots {
         let chunk = &data[shot * bytes_per_shot..(shot + 1) * bytes_per_shot];
         for byte_idx in 0..bytes_per_shot {
@@ -213,10 +226,12 @@ pub fn read_shots_r8(data: &[u8], bits: usize) -> Result<BitTable, String> {
         shots_data.push(shot_bits);
     }
     let shots = shots_data.len();
-    let mut table = BitTable::new(bits, shots);
+    let mut table = alloc_bit_table(bits, shots)?;
     for (shot, shot_bits) in shots_data.iter().enumerate() {
         for (bit, &val) in shot_bits.iter().enumerate() {
-            if val { table.set(bit, shot, true); }
+            if val {
+                table.set(bit, shot, true);
+            }
         }
     }
     Ok(table)
@@ -224,18 +239,25 @@ pub fn read_shots_r8(data: &[u8], bits: usize) -> Result<BitTable, String> {
 
 /// Read hits format: comma-separated bit indices per line.
 pub fn read_shots_hits(data: &[u8], bits: usize) -> Result<BitTable, String> {
-    let text = std::str::from_utf8(data).map_err(|e| format!("hits data not valid UTF-8: {}", e))?;
+    let text =
+        std::str::from_utf8(data).map_err(|e| format!("hits data not valid UTF-8: {}", e))?;
     let shot_lines: Vec<&str> = {
         let mut v: Vec<&str> = text.split('\n').collect();
-        if v.last() == Some(&"") { v.pop(); }
+        if v.last() == Some(&"") {
+            v.pop();
+        }
         v
     };
     let shots = shot_lines.len();
-    let mut table = BitTable::new(bits, shots);
+    let mut table = alloc_bit_table(bits, shots)?;
     for (shot, line) in shot_lines.iter().enumerate() {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         for token in line.split(',') {
-            let idx: usize = token.trim().parse()
+            let idx: usize = token
+                .trim()
+                .parse()
                 .map_err(|_| format!("invalid hit index {:?} in shot {}", token, shot))?;
             if idx >= bits {
                 return Err(format!("hit index {} out of range (bits={})", idx, bits));
@@ -248,12 +270,24 @@ pub fn read_shots_hits(data: &[u8], bits: usize) -> Result<BitTable, String> {
 
 /// Read ptb64 format: inverse of write_shots_ptb64. Needs explicit shot count.
 pub fn read_shots_ptb64(data: &[u8], bits: usize, shots: usize) -> Result<BitTable, String> {
-    let n_chunks = (shots + 63) / 64;
-    let expected = n_chunks * bits * 8;
+    let n_chunks = shots
+        .checked_add(63)
+        .ok_or_else(|| "ptb64 shot count overflows chunk count".to_string())?
+        / 64;
+    let expected = n_chunks
+        .checked_mul(bits)
+        .and_then(|words| words.checked_mul(8))
+        .ok_or_else(|| "ptb64 expected byte count overflows".to_string())?;
     if data.len() != expected {
-        return Err(format!("ptb64 data length {} != expected {} (bits={}, shots={})", data.len(), expected, bits, shots));
+        return Err(format!(
+            "ptb64 data length {} != expected {} (bits={}, shots={})",
+            data.len(),
+            expected,
+            bits,
+            shots
+        ));
     }
-    let mut table = BitTable::new(bits, shots);
+    let mut table = alloc_bit_table(bits, shots)?;
     let mut chunk_start = 0;
     let mut data_pos = 0;
     for _chunk in 0..n_chunks {
@@ -270,6 +304,11 @@ pub fn read_shots_ptb64(data: &[u8], bits: usize, shots: usize) -> Result<BitTab
         chunk_start += 64;
     }
     Ok(table)
+}
+
+fn alloc_bit_table(num_major: usize, num_minor: usize) -> Result<BitTable, String> {
+    BitTable::try_new(num_major, num_minor)
+        .map_err(|err| format!("BitTable allocation failed: {err:?}"))
 }
 
 /// Partially-transposed bit-packed binary (ptb64).

@@ -1,6 +1,6 @@
 //! Targeted tests for remaining coverage gaps.
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rstim::executor::Executor;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
@@ -365,16 +365,19 @@ fn parser_accepts_empty_arg_lists_with_and_without_tags() {
 }
 
 #[test]
-fn m2d_detector_ignores_non_rec_targets() {
+fn m2d_detector_rejects_non_rec_targets() {
     use rstim::m2d::measurements_to_detections;
     use rstim::sim::bit_table::BitTable;
 
     let instrs = parse_lines("R 0\nM 0\nDETECTOR rec[-1] 0\n").unwrap();
     let mut meas = BitTable::new(1, 1);
     meas.set(0, 0, false);
-    let out = measurements_to_detections(&instrs, &meas).unwrap();
-    assert_eq!(out.detections.num_major(), 1);
-    assert!(!out.detections.get(0, 0));
+    match measurements_to_detections(&instrs, &meas) {
+        Ok(_) => panic!("expected non-rec detector target to be rejected"),
+        Err(err) => {
+            assert!(err.contains("DETECTOR and OBSERVABLE_INCLUDE targets must be rec[-k]"));
+        }
+    }
 }
 
 // --- error_analyzer.rs: empty MPP product (lines 635-636) ---

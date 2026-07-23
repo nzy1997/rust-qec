@@ -1,17 +1,18 @@
 use rand::Rng;
 
 use crate::compiled::{
-    CompiledCircuit, SamplerPathDecision, SamplingFallbackReason, choose_sampler_path,
-    compile_circuit, sample_compiled_batch_with_reference,
+    choose_sampler_path, compile_circuit, sample_compiled_batch_with_reference, CompiledCircuit,
+    SamplerPathDecision, SamplingFallbackReason,
 };
 use crate::data_path::{
-    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample,
-    build_reference_sample_with_decision, build_reference_sample_with_sweep_bits_and_decision,
+    build_reference_sample, build_reference_sample_with_decision,
+    build_reference_sample_with_sweep_bits_and_decision, ReferenceSampleDecision,
+    ReferenceSampleMode,
 };
-use crate::executor::Executor;
 use crate::executor::max_qubit;
+use crate::executor::Executor;
 use crate::ir::StimInstr;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -42,7 +43,10 @@ impl BatchOutput {
         }
     }
 
-    pub(crate) fn measurements_only(measurements: BitTable, n_shots: usize) -> Self {
+    pub(crate) fn measurements_only(
+        measurements: BitTable,
+        n_shots: usize,
+    ) -> Result<Self, String> {
         Self::measurements_only_with_materializations(measurements, n_shots, 0, 0)
     }
 
@@ -51,15 +55,15 @@ impl BatchOutput {
         n_shots: usize,
         detector_materializations: usize,
         observable_materializations: usize,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, String> {
+        Ok(Self {
             measurements,
-            detections: BitTable::new(0, n_shots),
-            observable_flips: BitTable::new(0, n_shots),
+            detections: alloc_bit_table(0, n_shots)?,
+            observable_flips: alloc_bit_table(0, n_shots)?,
             output_mode: SampleOutputMode::MeasurementsOnly,
             detector_materializations,
             observable_materializations,
-        }
+        })
     }
 }
 
@@ -286,29 +290,27 @@ fn sample_batch_interpreted_with_sweep_bits(
 
     let ref_sample = build_reference_sample(instrs, options.reference_sample_mode)?;
     let num_qubits = max_qubit(instrs)?;
-    let mut frame = FrameSimulator::new(num_qubits, n_shots);
+    let mut frame = FrameSimulator::try_new(num_qubits, n_shots)?;
     frame.randomize_initial_z_frames(rng);
     frame
         .set_materialize_detector_observable_outputs(options.output_mode == SampleOutputMode::Full);
     frame.run(instrs, &ref_sample, rng)?;
 
-    let measurements = frame.measurements(&ref_sample);
+    let measurements = frame.try_measurements(&ref_sample)?;
     match options.output_mode {
         SampleOutputMode::Full => Ok(BatchOutput::full(
             measurements,
-            frame.detections(),
-            frame.observable_flips(),
+            frame.try_detections()?,
+            frame.try_observable_flips()?,
             frame.detector_materializations(),
             frame.observable_materializations(),
         )),
-        SampleOutputMode::MeasurementsOnly => {
-            Ok(BatchOutput::measurements_only_with_materializations(
-                measurements,
-                n_shots,
-                frame.detector_materializations(),
-                frame.observable_materializations(),
-            ))
-        }
+        SampleOutputMode::MeasurementsOnly => BatchOutput::measurements_only_with_materializations(
+            measurements,
+            n_shots,
+            frame.detector_materializations(),
+            frame.observable_materializations(),
+        ),
     }
 }
 
@@ -326,7 +328,7 @@ fn sample_batch_with_executor(
         ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
     };
     let n_meas = ref_sample.len();
-    let mut measurements = BitTable::new(n_meas, n_shots);
+    let mut measurements = alloc_bit_table(n_meas, n_shots)?;
 
     for shot in 0..n_shots {
         let mut ex = Executor::from_instrs(instrs.to_vec())?;
@@ -344,10 +346,12 @@ fn sample_batch_with_executor(
     }
 
     if options.output_mode == SampleOutputMode::MeasurementsOnly {
-        return Ok(BatchOutput::measurements_only(measurements, n_shots));
+        return BatchOutput::measurements_only(measurements, n_shots);
     }
 
-    let sweep_table = sweep_bits.map(|bits| repeated_sweep_table(instrs, bits, n_shots));
+    let sweep_table = sweep_bits
+        .map(|bits| repeated_sweep_table(instrs, bits, n_shots))
+        .transpose()?;
     let m2d = measurements_to_detections_with_options(
         instrs,
         &measurements,
@@ -369,9 +373,13 @@ fn sample_batch_with_executor(
     ))
 }
 
-fn repeated_sweep_table(instrs: &[StimInstr], sweep_bits: &[bool], n_shots: usize) -> BitTable {
+fn repeated_sweep_table(
+    instrs: &[StimInstr],
+    sweep_bits: &[bool],
+    n_shots: usize,
+) -> Result<BitTable, String> {
     let n_sweep = crate::stats::num_sweep_bits(instrs).max(sweep_bits.len());
-    let mut table = BitTable::new(n_sweep, n_shots);
+    let mut table = alloc_bit_table(n_sweep, n_shots)?;
     for (sweep_index, bit) in sweep_bits.iter().copied().enumerate() {
         if bit {
             for shot in 0..n_shots {
@@ -379,7 +387,12 @@ fn repeated_sweep_table(instrs: &[StimInstr], sweep_bits: &[bool], n_shots: usiz
             }
         }
     }
-    table
+    Ok(table)
+}
+
+fn alloc_bit_table(num_major: usize, num_minor: usize) -> Result<BitTable, String> {
+    BitTable::try_new(num_major, num_minor)
+        .map_err(|err| format!("BitTable allocation failed: {err:?}"))
 }
 
 fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
@@ -419,17 +432,15 @@ fn uses_executor_sampling_fallback(instrs: &[StimInstr]) -> bool {
 
 fn is_feedback_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool {
     matches!(name, "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ")
-        && targets
-            .chunks_exact(2)
-            .any(|pair| {
-                matches!(
-                    pair,
-                    [
-                        crate::ir::StimTarget::Rec(_),
-                        crate::ir::StimTarget::Qubit(_)
-                    ]
-                )
-            })
+        && targets.chunks_exact(2).any(|pair| {
+            matches!(
+                pair,
+                [
+                    crate::ir::StimTarget::Rec(_),
+                    crate::ir::StimTarget::Qubit(_)
+                ]
+            )
+        })
 }
 
 fn is_sweep_dependent_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool {
@@ -456,14 +467,14 @@ fn is_sweep_dependent_operation(name: &str, targets: &[crate::ir::StimTarget]) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;
 
     #[test]
-    fn sample_batch_with_executor_errors_on_reference_sample_mismatch() {
+    fn sample_batch_with_executor_uses_shared_measurement_count_for_sweep_targets() {
         let instrs = vec![StimInstr::new("ML", vec![], vec![StimTarget::Sweep(0)])];
         let mut rng = StdRng::seed_from_u64(0);
 
@@ -478,15 +489,9 @@ mod tests {
             None,
         );
 
-        let err = match result {
-            Ok(_) => panic!("expected reference sample mismatch"),
-            Err(err) => err,
-        };
-
-        assert_eq!(
-            err,
-            "executor produced 0 measurements but reference sample expects 2"
-        );
+        let output = result.expect("shared measurement count should match executor output");
+        assert_eq!(output.measurements.num_major(), 0);
+        assert_eq!(output.measurements.num_minor(), 1);
     }
 
     #[test]
@@ -508,7 +513,8 @@ mod tests {
     #[test]
     fn measurements_only_output_can_report_actual_materialization_counters() {
         let out =
-            BatchOutput::measurements_only_with_materializations(BitTable::new(1, 4), 4, 2, 3);
+            BatchOutput::measurements_only_with_materializations(BitTable::new(1, 4), 4, 2, 3)
+                .unwrap();
 
         assert_eq!(out.output_mode, SampleOutputMode::MeasurementsOnly);
         assert_eq!(out.detections.num_major(), 0);

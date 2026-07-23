@@ -1,5 +1,6 @@
 use crate::data_path::{build_reference_sample, ReferenceSampleMode};
-use crate::ir::{StimInstr, StimTarget};
+use crate::ir::StimInstr;
+use crate::measurement_transform::{CheckedMeasurementLayout, MeasurementTransformLimits};
 use crate::sim::bit_table::BitTable;
 
 pub struct M2dOutput {
@@ -54,22 +55,35 @@ pub fn measurements_to_detections_with_options(
         .unwrap_or(empty_corrections);
 
     let shared_reference = match options.reference_sample_mode {
-        ReferenceSampleMode::SimulateNoiseless if sweep_table.is_none() => {
-            Some(build_reference_sample(work_instrs, ReferenceSampleMode::SimulateNoiseless)?)
+        ReferenceSampleMode::SimulateNoiseless if sweep_table.is_none() => Some(
+            build_reference_sample(work_instrs, ReferenceSampleMode::SimulateNoiseless)?,
+        ),
+        ReferenceSampleMode::AssumeAllZero => {
+            Some(vec![false; crate::stats::num_measurements(work_instrs)])
         }
-        ReferenceSampleMode::AssumeAllZero => Some(vec![false; crate::stats::num_measurements(work_instrs)]),
         ReferenceSampleMode::SimulateNoiseless => None,
     };
-    let n_meas = shared_reference
-        .as_ref()
-        .map(|reference| reference.len())
-        .unwrap_or_else(|| crate::stats::num_measurements(work_instrs));
+    let layout = CheckedMeasurementLayout::from_circuit_with_limits(
+        work_instrs,
+        MeasurementTransformLimits::default(),
+    )
+    .map_err(|err| err.to_string())?;
+    let n_meas = layout.num_measurements();
+    if let Some(reference) = shared_reference.as_ref() {
+        if reference.len() != n_meas {
+            return Err(reference_measurement_count_mismatch(
+                reference.len(),
+                n_meas,
+            ));
+        }
+    }
     let n_shots = meas_table.num_minor();
 
     if meas_table.num_major() != n_meas {
         return Err(format!(
             "meas_table has {} bits but circuit has {} measurements",
-            meas_table.num_major(), n_meas
+            meas_table.num_major(),
+            n_meas
         ));
     }
     if let Some(sweep_table) = sweep_table {
@@ -82,12 +96,13 @@ pub fn measurements_to_detections_with_options(
         }
     }
 
-    let det_obs = collect_det_obs(work_instrs)?;
-    let n_dets = det_obs.detectors.len();
-    let n_obs = det_obs.observables.len();
+    let n_dets = layout.num_detectors();
+    let n_obs = layout.num_observables();
 
-    let mut dets = BitTable::new(n_dets, n_shots);
-    let mut obs = BitTable::new(n_obs, n_shots);
+    let mut dets = BitTable::try_new(n_dets, n_shots)
+        .map_err(|err| format!("failed to allocate detection table: {err:?}"))?;
+    let mut obs = BitTable::try_new(n_obs, n_shots)
+        .map_err(|err| format!("failed to allocate observable table: {err:?}"))?;
 
     for shot in 0..n_shots {
         let per_shot_reference;
@@ -113,89 +128,39 @@ pub fn measurements_to_detections_with_options(
             flips.push(flip);
         }
 
-        for (d, rec_offsets) in det_obs.detectors.iter().enumerate() {
+        for (d, rec_offsets) in layout.detector_rows().iter().enumerate() {
             let val = rec_offsets.iter().fold(false, |acc, &r| acc ^ flips[r]);
-            if val { dets.set(d, shot, true); }
-        }
-        for (o, rec_offsets) in det_obs.observables.iter().enumerate() {
-            let val = rec_offsets.iter().fold(false, |acc, &r| acc ^ flips[r]);
-            if val { obs.set(o, shot, true); }
-        }
-    }
-
-    Ok(M2dOutput { detections: dets, observable_flips: obs })
-}
-
-struct DetObsDef {
-    detectors: Vec<Vec<usize>>,
-    observables: Vec<Vec<usize>>,
-}
-
-fn collect_det_obs(instrs: &[StimInstr]) -> Result<DetObsDef, String> {
-    let mut detectors = Vec::new();
-    let mut observables: Vec<Vec<usize>> = Vec::new();
-    let mut meas_count = 0usize;
-    collect_det_obs_instrs(instrs, &mut meas_count, &mut detectors, &mut observables)?;
-    Ok(DetObsDef { detectors, observables })
-}
-
-fn collect_det_obs_instrs(
-    instrs: &[StimInstr],
-    meas_count: &mut usize,
-    detectors: &mut Vec<Vec<usize>>,
-    observables: &mut Vec<Vec<usize>>,
-) -> Result<(), String> {
-    for instr in instrs {
-        match instr {
-            StimInstr::Op { name, targets, args, .. } => {
-                match name.as_str() {
-                    "DETECTOR" => {
-                        let indices: Vec<usize> = targets.iter().filter_map(|t| {
-                            if let StimTarget::Rec(r) = t {
-                                Some((*meas_count as i64 + *r as i64) as usize)
-                            } else { None }
-                        }).collect();
-                        detectors.push(indices);
-                    }
-                    "OBSERVABLE_INCLUDE" => {
-                        let idx = args.first().copied().unwrap_or(0.0) as usize;
-                        while observables.len() <= idx { observables.push(Vec::new()); }
-                        for t in targets {
-                            if let StimTarget::Rec(r) = t {
-                                let abs = (*meas_count as i64 + *r as i64) as usize;
-                                observables[idx].push(abs);
-                            }
-                        }
-                    }
-                    _ => {
-                        *meas_count += count_measurements_op(name, targets);
-                    }
-                }
+            if val {
+                dets.set(d, shot, true);
             }
-            StimInstr::Repeat { count, body } => {
-                for _ in 0..*count {
-                    collect_det_obs_instrs(body, meas_count, detectors, observables)?;
-                }
+        }
+        for (o, rec_offsets) in layout.observable_rows().iter().enumerate() {
+            let val = rec_offsets.iter().fold(false, |acc, &r| acc ^ flips[r]);
+            if val {
+                obs.set(o, shot, true);
             }
         }
     }
-    Ok(())
+
+    Ok(M2dOutput {
+        detections: dets,
+        observable_flips: obs,
+    })
 }
 
-fn count_measurements_op(name: &str, targets: &[StimTarget]) -> usize {
-    match name {
-        "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" | "MZ" | "MRZ" => {
-            targets.iter().filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_))).count()
-        }
-        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
-            2 * targets
-                .iter()
-                .filter(|t| matches!(t, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
-                .count()
-        }
-        "MXX" | "MYY" | "MZZ" => targets.len() / 2,
-        "MPP" => targets.iter().filter(|t| matches!(t, StimTarget::Combiner)).count() + 1,
-        "MPAD" => targets.len(),
-        _ => 0,
+fn reference_measurement_count_mismatch(reference_len: usize, n_meas: usize) -> String {
+    format!("reference has {reference_len} bits but circuit has {n_meas} measurements")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reference_measurement_count_mismatch_is_actionable() {
+        assert_eq!(
+            reference_measurement_count_mismatch(2, 3),
+            "reference has 2 bits but circuit has 3 measurements"
+        );
     }
 }
