@@ -1,10 +1,10 @@
-use crate::data_path::{build_reference_sample, ReferenceSampleMode};
-use crate::ir::{circuit_to_string, StimInstr, StimTarget};
+use crate::data_path::{ReferenceSampleMode, build_reference_sample};
+use crate::ir::{StimInstr, StimTarget, circuit_to_string};
 use crate::sample_archive::format::{
     CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
     REFERENCE_SIMULATE_NOISELESS, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
-use crate::sim::bit_table::{checked_bit_table_storage_size, BitTable, BitTableAllocError};
+use crate::sim::bit_table::{BitTable, BitTableAllocError, checked_bit_table_storage_size};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -109,6 +109,7 @@ pub struct CheckedMeasurementLayout {
     observable_rows: Vec<Vec<usize>>,
     expanded_instructions: u64,
     parity_terms: u64,
+    max_repeat_depth: u64,
 }
 
 impl CheckedMeasurementLayout {
@@ -125,6 +126,7 @@ impl CheckedMeasurementLayout {
             observable_rows: builder.observable_rows,
             expanded_instructions: builder.expanded_instructions,
             parity_terms: builder.parity_terms,
+            max_repeat_depth: builder.max_repeat_depth,
         })
     }
 
@@ -155,6 +157,10 @@ impl CheckedMeasurementLayout {
     pub fn parity_terms(&self) -> u64 {
         self.parity_terms
     }
+
+    pub fn max_repeat_depth(&self) -> u64 {
+        self.max_repeat_depth
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -169,6 +175,9 @@ pub struct MeasurementTransform {
     free_columns: Vec<usize>,
     equations: Vec<EchelonEquation>,
     solve_order: Vec<usize>,
+    expanded_instructions: u64,
+    parity_terms: u64,
+    max_repeat_depth: u64,
     transform_working_bytes: u64,
 }
 
@@ -275,6 +284,9 @@ impl MeasurementTransform {
             free_columns: elimination.free_columns,
             equations: elimination.equations,
             solve_order: elimination.solve_order,
+            expanded_instructions: layout.expanded_instructions,
+            parity_terms: layout.parity_terms,
+            max_repeat_depth: layout.max_repeat_depth,
             transform_working_bytes: actual_bytes,
         })
     }
@@ -321,6 +333,74 @@ impl MeasurementTransform {
 
     pub fn transform_working_bytes(&self) -> u64 {
         self.transform_working_bytes
+    }
+
+    pub fn expanded_instructions(&self) -> u64 {
+        self.expanded_instructions
+    }
+
+    pub fn parity_terms(&self) -> u64 {
+        self.parity_terms
+    }
+
+    pub fn max_repeat_depth(&self) -> u64 {
+        self.max_repeat_depth
+    }
+
+    pub fn validate_actual_usage(
+        &self,
+        limits: MeasurementTransformLimits,
+        block_shots: Option<usize>,
+    ) -> Result<(), MeasurementTransformError> {
+        enforce_u64(
+            "max_measurements",
+            self.identity.measurement_count,
+            limits.max_measurements,
+        )?;
+        enforce_u64(
+            "max_detectors",
+            self.identity.detector_count,
+            limits.max_detectors,
+        )?;
+        enforce_u64(
+            "max_observables",
+            self.identity.observable_count,
+            limits.max_observables,
+        )?;
+        enforce_u64(
+            "max_repeat_depth",
+            self.max_repeat_depth,
+            limits.max_repeat_depth,
+        )?;
+        enforce_u64(
+            "max_expanded_instructions",
+            self.expanded_instructions,
+            limits.max_expanded_instructions,
+        )?;
+        enforce_u64(
+            "max_parity_terms",
+            self.parity_terms,
+            limits.max_parity_terms,
+        )?;
+        enforce_u64(
+            "max_transform_working_bytes",
+            self.transform_working_bytes,
+            limits.max_transform_working_bytes,
+        )?;
+        if let Some(shots) = block_shots {
+            enforce_u64(
+                "max_shots_per_block",
+                shots as u64,
+                limits.max_shots_per_block,
+            )?;
+            let block_bytes = self.estimate_block_working_bytes(shots)?;
+            enforce_u64(
+                "max_block_working_bytes",
+                block_bytes,
+                limits.max_block_working_bytes,
+            )?;
+        }
+        Ok(())
     }
 
     pub fn estimate_block_working_bytes(
@@ -508,6 +588,7 @@ struct LayoutBuilder {
     observable_rows: Vec<Vec<usize>>,
     expanded_instructions: u64,
     parity_terms: u64,
+    max_repeat_depth: u64,
     layout_working_bytes: u64,
 }
 
@@ -520,6 +601,7 @@ impl LayoutBuilder {
             observable_rows: Vec::new(),
             expanded_instructions: 0,
             parity_terms: 0,
+            max_repeat_depth: 0,
             layout_working_bytes: 0,
         }
     }
@@ -548,6 +630,7 @@ impl LayoutBuilder {
                             limit: "max_repeat_depth",
                         });
                     }
+                    self.max_repeat_depth = self.max_repeat_depth.max(next_depth);
                     self.preflight_repeat_body(*count, body, next_depth)?;
                     for _ in 0..*count {
                         self.visit_instrs(body, next_depth)?;
@@ -1314,6 +1397,18 @@ fn enforce_bytes(
     max_bytes: u64,
 ) -> Result<(), MeasurementTransformError> {
     if bytes > max_bytes {
+        Err(MeasurementTransformError::LimitExceeded { limit })
+    } else {
+        Ok(())
+    }
+}
+
+fn enforce_u64(
+    limit: &'static str,
+    actual: u64,
+    allowed: u64,
+) -> Result<(), MeasurementTransformError> {
+    if actual > allowed {
         Err(MeasurementTransformError::LimitExceeded { limit })
     } else {
         Ok(())
