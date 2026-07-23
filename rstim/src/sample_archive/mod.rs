@@ -1,4 +1,5 @@
 pub mod format;
+pub mod syndrome;
 
 mod dense;
 mod integrity;
