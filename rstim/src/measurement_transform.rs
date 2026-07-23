@@ -1448,6 +1448,7 @@ fn usize_from_u128(value: u128) -> usize {
 mod tests {
     use super::*;
     use crate::ir::PauliBasis;
+    use crate::parser::parse_lines;
 
     #[test]
     fn private_helpers_cover_edge_cases() {
@@ -1493,5 +1494,21 @@ mod tests {
                 limit: "test_limit"
             })
         ));
+
+        let circuit = parse_lines("REPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n")
+            .expect("parse repeat circuit");
+        let layout = CheckedMeasurementLayout::from_circuit_with_limits(
+            &circuit,
+            MeasurementTransformLimits::default(),
+        )
+        .expect("layout builds");
+        assert_eq!(layout.max_repeat_depth(), 1);
+
+        let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
+        assert!(
+            transform
+                .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
+                .is_ok()
+        );
     }
 }

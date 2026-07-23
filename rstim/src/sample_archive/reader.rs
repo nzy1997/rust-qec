@@ -352,3 +352,305 @@ fn read_exact_or_truncated(
 fn checksum(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::ChecksumMismatch, detail)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::measurement_transform::MeasurementTransformLimits;
+    use crate::parser::parse_lines;
+    use crate::sample_archive::limits::SampleArchiveOptions;
+    use crate::sample_archive::writer::SampleArchiveWriter;
+    use crate::sim::bit_table::BitTable;
+    use std::io;
+
+    fn parse(text: &str) -> Vec<StimInstr> {
+        parse_lines(text).expect("parse test circuit")
+    }
+
+    fn test_limits() -> ArchiveLimits {
+        ArchiveLimits {
+            transform: MeasurementTransformLimits {
+                max_measurements: 64,
+                max_detectors: 64,
+                max_observables: 16,
+                max_repeat_depth: 8,
+                max_expanded_instructions: 1_000,
+                max_parity_terms: 1_000,
+                max_shots_per_block: 16,
+                max_transform_working_bytes: 1 << 20,
+                max_block_working_bytes: 1 << 20,
+            },
+            max_total_shots: 16,
+            max_detector_rank: 64,
+            max_free_measurements: 64,
+            max_compressed_bytes_per_stream: 1 << 20,
+            max_decompressed_bytes_per_stream: 1 << 20,
+            max_compressed_bytes_per_archive: 1 << 21,
+            max_decompressed_bytes_per_archive: 1 << 21,
+            max_zstd_window_bytes: 1 << 20,
+            max_zstd_decoder_memory_bytes: 1 << 21,
+        }
+    }
+
+    fn archive_for(circuit: &[StimInstr], shots: usize) -> Vec<u8> {
+        let transform = MeasurementTransform::from_circuit(circuit).expect("test transform");
+        let mut measurements =
+            BitTable::try_new(transform.num_measurements(), shots).expect("table allocates");
+        for row in 0..measurements.num_major() {
+            for shot in 0..measurements.num_minor() {
+                if (row + shot) % 2 == 1 {
+                    measurements.set(row, shot, true);
+                }
+            }
+        }
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform,
+            shots as u64,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("writer constructs");
+        writer
+            .write_measurements(&measurements)
+            .expect("write measurements");
+        writer.finish().expect("finish writer")
+    }
+
+    fn header_from(archive: &[u8]) -> GlobalHeader {
+        GlobalHeader::from_bytes(&archive[..GLOBAL_HEADER_LEN]).expect("parse header")
+    }
+
+    fn block_from(archive: &[u8]) -> BlockHeader {
+        BlockHeader::from_bytes(&archive[GLOBAL_HEADER_LEN..GLOBAL_HEADER_LEN + BLOCK_HEADER_LEN])
+            .expect("parse block")
+    }
+
+    fn assert_code<T>(result: Result<T, SampleArchiveError>, code: SampleArchiveErrorCode) {
+        match result {
+            Ok(_) => panic!("expected {code:?}"),
+            Err(err) => assert_eq!(err.code(), code),
+        }
+    }
+
+    #[test]
+    fn header_limits_and_identity_checks_cover_rejections() {
+        let circuit = parse("M 0 1\nDETECTOR rec[-2]\n");
+        let archive = archive_for(&circuit, 5);
+        let header = header_from(&archive);
+        let transform = MeasurementTransform::from_circuit(&circuit).expect("test transform");
+
+        let mut limits = test_limits();
+        limits.max_total_shots = 4;
+        assert_code(
+            validate_header_limits(&header, limits),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = header.clone();
+        bad.max_shots_per_block = 0;
+        assert_code(
+            validate_header_limits(&bad, test_limits()),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = header.clone();
+        bad.measurement_count = test_limits().transform.max_measurements + 1;
+        assert_code(
+            validate_header_limits(&bad, test_limits()),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = header.clone();
+        bad.detector_rank = test_limits().max_detector_rank + 1;
+        assert_code(
+            validate_header_limits(&bad, test_limits()),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut limits = test_limits();
+        limits.max_free_measurements = 0;
+        assert_code(
+            validate_header_limits(&header, limits),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = header.clone();
+        bad.max_shots_per_block = 4;
+        assert_code(
+            validate_header_limits(&bad, test_limits()),
+            SampleArchiveErrorCode::ShapeMismatch,
+        );
+
+        let mut bad = header;
+        bad.canonicalization_id ^= 1;
+        assert_code(
+            compare_identity(&bad, &transform),
+            SampleArchiveErrorCode::ShapeMismatch,
+        );
+    }
+
+    #[test]
+    fn block_header_validation_covers_stream_accounting_and_codecs() {
+        let circuit = parse("M 0 1\nDETECTOR rec[-2]\n");
+        let archive = archive_for(&circuit, 5);
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        let block = block_from(&archive);
+
+        let mut shot_limit_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        shot_limit_reader.limits.transform.max_shots_per_block = 4;
+        assert_code(
+            shot_limit_reader.validate_block_header(&block),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = block.clone();
+        bad.free_uncompressed_len = test_limits().max_decompressed_bytes_per_stream + 1;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = block.clone();
+        bad.syndrome_uncompressed_len = 6;
+        bad.free_uncompressed_len = 6;
+        reader.limits.max_decompressed_bytes_per_archive = 10;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut bad = block.clone();
+        bad.syndrome_compressed_len = 6;
+        bad.free_compressed_len = 6;
+        reader.limits.max_compressed_bytes_per_archive = 10;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        reader.limits = test_limits();
+        let mut bad = block.clone();
+        bad.syndrome_codec_id = 999;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+
+        let mut bad = block;
+        bad.free_codec_id = 999;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+    }
+
+    #[test]
+    fn decode_stream_and_read_helpers_cover_empty_and_io_errors() {
+        assert_code(
+            decode_stream(&[0], 0, test_limits()),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+
+        let mut limits = test_limits();
+        limits.max_decompressed_bytes_per_stream = 1;
+        assert_code(
+            validate_stream_lengths(2, 0, limits),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut byte = [0u8; 1];
+        assert_code(
+            read_exact_or_truncated(&mut AlwaysErr, &mut byte),
+            SampleArchiveErrorCode::Io,
+        );
+    }
+
+    #[test]
+    fn finish_covers_unread_block_and_trailer_structure_edges() {
+        let circuit = parse("M 0 1\nDETECTOR rec[-2]\n");
+        let archive = archive_for(&circuit, 5);
+
+        let reader = SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+            .expect("open reader");
+        assert_code(reader.finish(), SampleArchiveErrorCode::ShapeMismatch);
+
+        let trailer_start = archive.len() - crate::sample_archive::format::ARCHIVE_TRAILER_LEN;
+
+        let mut second_block = archive.clone();
+        second_block[trailer_start..trailer_start + 8].copy_from_slice(BLOCK_MAGIC);
+        expect_finish_error(
+            second_block,
+            &circuit,
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+
+        let mut bad_magic = archive.clone();
+        bad_magic[trailer_start..trailer_start + 8].copy_from_slice(b"BADMAGIC");
+        expect_finish_error(bad_magic, &circuit, SampleArchiveErrorCode::BadMagic);
+
+        let mut bad_block_count = archive.clone();
+        put_u64(&mut bad_block_count, trailer_start + 16, 2);
+        expect_finish_error(
+            bad_block_count,
+            &circuit,
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+
+        let mut bad_total = archive.clone();
+        put_u64(&mut bad_total, trailer_start + 24, 6);
+        expect_finish_error(bad_total, &circuit, SampleArchiveErrorCode::ShapeMismatch);
+
+        let mut reader =
+            SampleArchiveReader::open(ErrorAfterEof::new(archive), &circuit, test_limits())
+                .expect("open reader");
+        assert!(reader.next_block().expect("read block").is_some());
+        assert_code(reader.finish(), SampleArchiveErrorCode::Io);
+    }
+
+    fn expect_finish_error(archive: Vec<u8>, circuit: &[StimInstr], code: SampleArchiveErrorCode) {
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(archive), circuit, test_limits())
+                .expect("open reader");
+        assert!(reader.next_block().expect("read block").is_some());
+        assert_code(reader.finish(), code);
+    }
+
+    fn put_u64(bytes: &mut [u8], offset: usize, value: u64) {
+        bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+    }
+
+    struct AlwaysErr;
+
+    impl Read for AlwaysErr {
+        fn read(&mut self, _out: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::other("read failed"))
+        }
+    }
+
+    struct ErrorAfterEof {
+        bytes: io::Cursor<Vec<u8>>,
+    }
+
+    impl ErrorAfterEof {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: io::Cursor::new(bytes),
+            }
+        }
+    }
+
+    impl Read for ErrorAfterEof {
+        fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+            if self.bytes.position() == self.bytes.get_ref().len() as u64 {
+                Err(io::Error::other("trailing read failed"))
+            } else {
+                self.bytes.read(out)
+            }
+        }
+    }
+}

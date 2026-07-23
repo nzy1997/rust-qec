@@ -271,3 +271,231 @@ pub(crate) fn shape(detail: &'static str) -> SampleArchiveError {
 pub(crate) fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::LimitExceeded, detail)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::measurement_transform::MeasurementTransformLimits;
+    use crate::parser::parse_lines;
+    use std::io;
+
+    fn parse_transform(text: &str) -> MeasurementTransform {
+        let circuit = parse_lines(text).expect("parse test circuit");
+        MeasurementTransform::from_circuit(&circuit).expect("build test transform")
+    }
+
+    fn test_limits() -> ArchiveLimits {
+        ArchiveLimits {
+            transform: MeasurementTransformLimits {
+                max_measurements: 64,
+                max_detectors: 64,
+                max_observables: 16,
+                max_repeat_depth: 8,
+                max_expanded_instructions: 1_000,
+                max_parity_terms: 1_000,
+                max_shots_per_block: 16,
+                max_transform_working_bytes: 1 << 20,
+                max_block_working_bytes: 1 << 20,
+            },
+            max_total_shots: 16,
+            max_detector_rank: 64,
+            max_free_measurements: 64,
+            max_compressed_bytes_per_stream: 1 << 20,
+            max_decompressed_bytes_per_stream: 1 << 20,
+            max_compressed_bytes_per_archive: 1 << 21,
+            max_decompressed_bytes_per_archive: 1 << 21,
+            max_zstd_window_bytes: 1 << 20,
+            max_zstd_decoder_memory_bytes: 1 << 21,
+        }
+    }
+
+    fn patterned_table(rows: usize, shots: usize) -> BitTable {
+        let mut table = BitTable::try_new(rows, shots).expect("table allocates");
+        for row in 0..rows {
+            for shot in 0..shots {
+                if (row + shot) % 2 == 1 {
+                    table.set(row, shot, true);
+                }
+            }
+        }
+        table
+    }
+
+    fn expect_new_error(
+        transform: MeasurementTransform,
+        total_shots: u64,
+        limits: ArchiveLimits,
+    ) -> SampleArchiveError {
+        match SampleArchiveWriter::new(
+            Vec::new(),
+            transform,
+            total_shots,
+            SampleArchiveOptions::default(),
+            limits,
+        ) {
+            Ok(_) => panic!("expected writer construction error"),
+            Err(err) => err,
+        }
+    }
+
+    fn expect_write_error(
+        circuit: &str,
+        shots: usize,
+        limits: ArchiveLimits,
+    ) -> SampleArchiveError {
+        let transform = parse_transform(circuit);
+        let measurements = patterned_table(transform.num_measurements(), shots);
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform,
+            shots as u64,
+            SampleArchiveOptions::default(),
+            limits,
+        )
+        .expect("writer constructs");
+        writer.write_measurements(&measurements).unwrap_err()
+    }
+
+    #[test]
+    fn writer_state_machine_rejects_zero_and_second_blocks() {
+        let transform = parse_transform("M 0\n");
+        let measurements = patterned_table(1, 1);
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform.clone(),
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("zero-shot writer constructs");
+        assert_eq!(
+            writer.write_measurements(&measurements).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform,
+            1,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("one-shot writer constructs");
+        writer
+            .write_measurements(&measurements)
+            .expect("first block writes");
+        assert_eq!(
+            writer.write_measurements(&measurements).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+    }
+
+    #[test]
+    fn writer_construction_enforces_archive_shape_limits() {
+        let mut limits = test_limits();
+        limits.max_total_shots = 0;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0\n"), 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_detector_rank = 0;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0\nDETECTOR rec[-1]\n"), 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_free_measurements = 0;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0 1\nDETECTOR rec[-2]\n"), 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+    }
+
+    #[test]
+    fn writer_stream_limits_cover_decompressed_and_compressed_accounting() {
+        let mut limits = test_limits();
+        limits.max_decompressed_bytes_per_stream = 1;
+        assert_eq!(
+            expect_write_error("M 0\n", 9, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_decompressed_bytes_per_archive = 1;
+        assert_eq!(
+            expect_write_error("M 0\n", 9, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_compressed_bytes_per_stream = 1;
+        assert_eq!(
+            expect_write_error("M 0\n", 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_compressed_bytes_per_archive = 1;
+        assert_eq!(
+            expect_write_error("M 0\n", 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+    }
+
+    #[test]
+    fn writer_maps_io_and_transform_errors() {
+        let transform = parse_transform("M 0\n");
+        let err = match SampleArchiveWriter::new(
+            FailingWriter,
+            transform,
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        ) {
+            Ok(_) => panic!("expected writer I/O error"),
+            Err(err) => err,
+        };
+        assert_eq!(err.code(), SampleArchiveErrorCode::Io);
+
+        assert_eq!(
+            map_transform_error(MeasurementTransformError::UnsupportedSweep).code(),
+            SampleArchiveErrorCode::UnsupportedSweep
+        );
+        assert_eq!(
+            map_transform_error(MeasurementTransformError::ShapeMismatch {
+                detail: "shape".to_string(),
+            })
+            .code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+        assert_eq!(
+            map_transform_error(MeasurementTransformError::InvalidRecordTarget {
+                detail: "record".to_string(),
+            })
+            .code(),
+            SampleArchiveErrorCode::MalformedArchive
+        );
+        assert_eq!(
+            map_transform_error(MeasurementTransformError::Reference {
+                detail: "reference".to_string(),
+            })
+            .code(),
+            SampleArchiveErrorCode::MalformedArchive
+        );
+    }
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("write failed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::other("flush failed"))
+        }
+    }
+}

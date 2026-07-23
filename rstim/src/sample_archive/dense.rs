@@ -121,3 +121,51 @@ fn map_alloc(_err: BitTableAllocError) -> SampleArchiveError {
         "bit table allocation failed",
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_code(result: Result<(), SampleArchiveError>, code: SampleArchiveErrorCode) {
+        assert_eq!(result.unwrap_err().code(), code);
+    }
+
+    #[test]
+    fn dense_pack_and_unpack_are_tight_and_lsb_first() {
+        let mut table = BitTable::try_new(3, 3).expect("table allocates");
+        table.set(0, 0, true);
+        table.set(2, 0, true);
+        table.set(1, 1, true);
+        table.set(0, 2, true);
+        table.set(2, 2, true);
+
+        let packed = pack_dense(&table).expect("pack dense");
+        assert_eq!(packed, vec![0b0101_0101, 0b0000_0001]);
+
+        let unpacked = unpack_dense(&packed, 3, 3).expect("unpack dense");
+        for row in 0..3 {
+            for shot in 0..3 {
+                assert_eq!(unpacked.get(row, shot), table.get(row, shot));
+            }
+        }
+    }
+
+    #[test]
+    fn dense_validators_reject_shape_padding_and_overflow() {
+        assert_code(
+            validate_dense_shape(&[], 1, 1),
+            SampleArchiveErrorCode::ShapeMismatch,
+        );
+        assert_code(
+            validate_final_padding(&[0b0000_0010], 1, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            validate_final_padding(&[], u64::MAX, 2),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        assert!(validate_final_padding(&[], 0, 9).is_ok());
+        assert!(validate_final_padding(&[0xff], 8, 1).is_ok());
+    }
+}

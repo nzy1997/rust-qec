@@ -43,3 +43,27 @@ impl Default for SampleArchiveOptions {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn archive_defaults_keep_transform_limits_embedded() {
+        let limits = ArchiveLimits::default();
+        assert_eq!(limits.transform, MeasurementTransformLimits::default());
+        assert_eq!(
+            limits.max_total_shots,
+            crate::sample_archive::format::DEFAULT_MAX_SHOTS_PER_BLOCK
+        );
+        assert_eq!(limits.max_detector_rank, 10_000_000);
+        assert_eq!(limits.max_free_measurements, 10_000_000);
+        assert_eq!(limits.max_compressed_bytes_per_stream, 64 * 1024 * 1024);
+        assert_eq!(limits.max_decompressed_bytes_per_stream, 64 * 1024 * 1024);
+        assert_eq!(limits.max_compressed_bytes_per_archive, 256 * 1024 * 1024);
+        assert_eq!(limits.max_decompressed_bytes_per_archive, 256 * 1024 * 1024);
+        assert_eq!(limits.max_zstd_window_bytes, 8 * 1024 * 1024);
+        assert_eq!(limits.max_zstd_decoder_memory_bytes, 64 * 1024 * 1024);
+        assert_eq!(SampleArchiveOptions::default().compression_level, 3);
+    }
+}
