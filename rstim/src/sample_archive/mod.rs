@@ -1,6 +1,7 @@
 pub mod format;
 #[doc(hidden)]
 pub mod syndrome;
+pub mod telemetry;
 
 mod dense;
 mod integrity;
