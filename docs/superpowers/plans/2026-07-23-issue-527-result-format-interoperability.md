@@ -158,13 +158,13 @@ each result writer `finish` and publish file outputs.
 **Interfaces:**
 - Produces: passing focused verification, broad `cargo test`, review evidence, pushed branch, and a PR against `master`.
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run: `cargo test --locked -p rstim --test rsmp_result_format_interop -- --nocapture`
 
 Expected: exit 0 and exactly one required PASS line.
 
-- [ ] **Step 2: Run broader verification**
+- [x] **Step 2: Run broader verification**
 
 Run: `cargo test`
 
