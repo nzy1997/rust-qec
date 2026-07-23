@@ -16,15 +16,19 @@ use rstim::sample_archive::{
 use rstim::sim::bit_table::BitTable;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 const MAX_BLOCK_SHOTS: usize = 4096;
 
 #[test]
 fn rsmp_archive_streaming_contract() {
+    verify_default_block_limit();
     verify_zero_shot_archive();
+    verify_writer_emits_full_blocks_before_finish();
     let boundary_cases = verify_boundary_cases();
     assert_eq!(boundary_cases, 4);
     let partition_invariant = verify_partition_invariant();
@@ -41,6 +45,13 @@ fn rsmp_archive_streaming_contract() {
     }
     println!(
         "PASS rsmp streaming boundary_cases=4 partition_invariant=1 malformed_cases=10 max_buffered_shots=4096 max_live_decoded_blocks=1 max_transform_payloads=2 total_block_growth_bytes=0"
+    );
+}
+
+fn verify_default_block_limit() {
+    assert_eq!(
+        ArchiveLimits::default().transform.max_shots_per_block,
+        MAX_BLOCK_SHOTS as u64
     );
 }
 
@@ -88,6 +99,61 @@ fn verify_boundary_cases() -> usize {
         cases += 1;
     }
     cases
+}
+
+fn verify_writer_emits_full_blocks_before_finish() {
+    let fixture = CatalogFixture::load("known_mpad_multi");
+    let measurements = repeated_table(&fixture.measurements, 8193);
+    let sink = SharedWriter::default();
+    let observed = sink.bytes();
+    let transform = MeasurementTransform::from_circuit(&fixture.circuit).expect("emit transform");
+    let mut writer = SampleArchiveWriter::new(
+        sink,
+        transform,
+        measurements.num_minor() as u64,
+        SampleArchiveOptions::default(),
+        limits(),
+    )
+    .expect("emit writer");
+    assert_eq!(observed.borrow().len(), GLOBAL_HEADER_LEN);
+
+    writer
+        .write_measurements(&slice_table(&measurements, 0, 4095))
+        .expect("write partial block");
+    assert_eq!(
+        complete_blocks_in_prefix(&observed.borrow()),
+        0,
+        "partial chunk must not emit a short interior block"
+    );
+
+    writer
+        .write_measurements(&slice_table(&measurements, 4095, 1))
+        .expect("write chunk crossing first boundary");
+    assert_eq!(
+        complete_blocks_in_prefix(&observed.borrow()),
+        1,
+        "first full block must be emitted before finish"
+    );
+
+    writer
+        .write_measurements(&slice_table(&measurements, 4096, 4096))
+        .expect("write second full block");
+    assert_eq!(
+        complete_blocks_in_prefix(&observed.borrow()),
+        2,
+        "second full block must be emitted before finish"
+    );
+
+    writer
+        .write_measurements(&slice_table(&measurements, 8192, 1))
+        .expect("write final short carry");
+    assert_eq!(
+        complete_blocks_in_prefix(&observed.borrow()),
+        2,
+        "final short block must wait for finish"
+    );
+    writer.finish().expect("finish emitted archive");
+    assert_eq!(block_layouts(&observed.borrow()).len(), 3);
 }
 
 fn verify_partition_invariant() -> usize {
@@ -430,6 +496,31 @@ fn block_layouts(archive: &[u8]) -> Vec<BlockLayout> {
     layouts
 }
 
+fn complete_blocks_in_prefix(bytes: &[u8]) -> usize {
+    let mut blocks = 0usize;
+    let mut offset = GLOBAL_HEADER_LEN;
+    while bytes.len() >= offset + 8 && bytes[offset..offset + 8] == BLOCK_MAGIC[..] {
+        if bytes.len() < offset + BLOCK_HEADER_LEN {
+            break;
+        }
+        let syndrome_len = get_u64(bytes, offset + 52) as usize;
+        let free_len = get_u64(bytes, offset + 68) as usize;
+        let Some(end) = offset
+            .checked_add(BLOCK_HEADER_LEN)
+            .and_then(|value| value.checked_add(syndrome_len))
+            .and_then(|value| value.checked_add(free_len))
+        else {
+            break;
+        };
+        if bytes.len() < end {
+            break;
+        }
+        blocks += 1;
+        offset = end;
+    }
+    blocks
+}
+
 fn trailer_offset(archive: &[u8]) -> usize {
     archive.len() - ARCHIVE_TRAILER_LEN
 }
@@ -654,6 +745,28 @@ struct MemoryResult {
     max_live_decoded_blocks: u64,
     max_transform_payloads: u64,
     total_block_growth_bytes: u64,
+}
+
+#[derive(Clone, Default, Debug)]
+struct SharedWriter {
+    bytes: Rc<RefCell<Vec<u8>>>,
+}
+
+impl SharedWriter {
+    fn bytes(&self) -> Rc<RefCell<Vec<u8>>> {
+        Rc::clone(&self.bytes)
+    }
+}
+
+impl Write for SharedWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.bytes.borrow_mut().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug)]
