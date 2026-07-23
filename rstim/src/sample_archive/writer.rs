@@ -21,6 +21,9 @@ use crate::sim::bit_table::BitTable;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 
+const DECOMP_LIMIT: &str = "decompressed archive bytes exceed limit";
+const COMP_LIMIT: &str = "compressed archive bytes exceed limit";
+
 pub struct SampleArchiveWriter<W: Write> {
     output: W,
     transform: MeasurementTransform,
@@ -239,12 +242,9 @@ impl<W: Write> SampleArchiveWriter<W> {
         if next_compressed_archive_bytes > self.limits.max_compressed_bytes_per_archive {
             return Err(limit("compressed archive bytes exceed limit"));
         }
-        let next_archive_bytes = checked_archive_byte_total(
-            self.archive_bytes,
-            block_compressed_bytes
-                .checked_add(BLOCK_HEADER_LEN as u64)
-                .ok_or_else(|| limit("archive byte count overflow"))?,
-        )?;
+        let block_archive_bytes = checked_block_archive_byte_delta(block_compressed_bytes)?;
+        let next_archive_bytes =
+            checked_archive_byte_total(self.archive_bytes, block_archive_bytes)?;
         let archive_with_trailer =
             checked_archive_byte_total(next_archive_bytes, ARCHIVE_TRAILER_LEN as u64)?;
         if archive_with_trailer > self.limits.max_archive_bytes {
@@ -319,27 +319,24 @@ fn validate_transform_and_archive_shape(
     if total_shots > limits.max_total_shots {
         return Err(limit("archive total shots exceed limit"));
     }
-    if checked_archive_byte_total(GLOBAL_HEADER_LEN as u64, ARCHIVE_TRAILER_LEN as u64)?
-        > limits.max_archive_bytes
-    {
+    let minimum_archive_bytes =
+        checked_archive_byte_total(GLOBAL_HEADER_LEN as u64, ARCHIVE_TRAILER_LEN as u64)?;
+    if minimum_archive_bytes > limits.max_archive_bytes {
         return Err(limit("archive bytes exceed limit"));
     }
-    #[cfg(target_pointer_width = "32")]
-    {
-        if usize::try_from(total_shots).is_err() {
-            return Err(limit("archive shot count exceeds usize"));
-        }
-    }
-    if limits.transform.max_shots_per_block == 0 {
-        return Err(limit("archive block-shot limit is zero"));
-    }
+    reject_limit_when(
+        limits.transform.max_shots_per_block == 0,
+        "archive block-shot limit is zero",
+    )?;
     let expected_blocks = expected_block_count(total_shots, limits.transform.max_shots_per_block)?;
     if expected_blocks > limits.max_block_count {
         return Err(limit("archive block count exceeds limit"));
     }
     let validation_shots = total_shots.min(limits.transform.max_shots_per_block);
+    let validation_shots =
+        usize::try_from(validation_shots).map_err(|_| limit("archive shot count exceeds usize"))?;
     transform
-        .validate_actual_usage(limits.transform, Some(validation_shots as usize))
+        .validate_actual_usage(limits.transform, Some(validation_shots))
         .map_err(map_transform_error)?;
     let rank = transform.rank() as u64;
     if rank > limits.max_detector_rank {
@@ -392,13 +389,13 @@ fn validate_decompressed_streams(
     {
         return Err(limit("decompressed frame exceeds limit"));
     }
-    if syndrome_len
+    let total = syndrome_len
         .checked_add(free_len)
-        .ok_or_else(|| limit("decompressed archive bytes overflow"))?
-        > limits.max_decompressed_bytes_per_archive
-    {
-        return Err(limit("decompressed archive bytes exceed limit"));
-    }
+        .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+    reject_limit_when(
+        total > limits.max_decompressed_bytes_per_archive,
+        DECOMP_LIMIT,
+    )?;
     Ok(())
 }
 
@@ -412,13 +409,10 @@ fn validate_compressed_streams(
     {
         return Err(limit("compressed frame exceeds limit"));
     }
-    if syndrome_len
+    let total = syndrome_len
         .checked_add(free_len)
-        .ok_or_else(|| limit("compressed archive bytes overflow"))?
-        > limits.max_compressed_bytes_per_archive
-    {
-        return Err(limit("compressed archive bytes exceed limit"));
-    }
+        .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+    reject_limit_when(total > limits.max_compressed_bytes_per_archive, COMP_LIMIT)?;
     Ok(())
 }
 
@@ -463,12 +457,24 @@ pub(crate) fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::LimitExceeded, detail)
 }
 
+fn reject_limit_when(rejected: bool, detail: &'static str) -> Result<(), SampleArchiveError> {
+    (!rejected).then_some(()).ok_or_else(|| limit(detail))
+}
+
 pub(crate) fn checked_archive_byte_total(
     current: u64,
     added: u64,
 ) -> Result<u64, SampleArchiveError> {
     current
         .checked_add(added)
+        .ok_or_else(|| limit("archive byte count overflow"))
+}
+
+pub(crate) fn checked_block_archive_byte_delta(
+    block_compressed_bytes: u64,
+) -> Result<u64, SampleArchiveError> {
+    block_compressed_bytes
+        .checked_add(BLOCK_HEADER_LEN as u64)
         .ok_or_else(|| limit("archive byte count overflow"))
 }
 
@@ -641,10 +647,86 @@ mod tests {
             SampleArchiveErrorCode::LimitExceeded
         );
 
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            parse_transform("M 0\n"),
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("writer constructs");
+        writer.limits.max_block_count = 0;
+        assert_eq!(
+            writer.emit_buffered_block(1).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            parse_transform("M 0\n"),
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("writer constructs");
+        writer.limits.max_archive_bytes = 0;
+        assert_eq!(
+            writer.finish().unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
         let mut limits = test_limits();
         limits.transform.max_shots_per_block = 0;
         assert_eq!(
             max_block_shots_usize(limits).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        assert_eq!(
+            expected_block_count(u64::MAX, 2).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_decompressed_bytes_per_frame = 1;
+        assert_eq!(
+            validate_decompressed_streams(0, 2, limits)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_decompressed_bytes_per_archive = 1;
+        assert_eq!(
+            validate_decompressed_streams(1, 1, limits)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_compressed_bytes_per_frame = 1;
+        assert_eq!(
+            validate_compressed_streams(0, 2, limits)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_compressed_bytes_per_archive = 1;
+        assert_eq!(
+            validate_compressed_streams(1, 1, limits)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        assert_eq!(
+            checked_block_archive_byte_delta(u64::MAX)
+                .unwrap_err()
+                .code(),
             SampleArchiveErrorCode::LimitExceeded
         );
     }
@@ -662,6 +744,28 @@ mod tests {
         limits.max_detector_rank = 0;
         assert_eq!(
             expect_new_error(parse_transform("M 0\nDETECTOR rec[-1]\n"), 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.max_archive_bytes = (GLOBAL_HEADER_LEN + ARCHIVE_TRAILER_LEN - 1) as u64;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0\n"), 0, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 1;
+        limits.max_block_count = 1;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0\n"), 2, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 0;
+        assert_eq!(
+            expect_new_error(parse_transform("M 0\n"), 0, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 

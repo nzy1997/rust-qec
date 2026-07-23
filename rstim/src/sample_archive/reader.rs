@@ -18,7 +18,7 @@ use crate::sample_archive::telemetry::{
     record_transform_payloads, record_transform_retained,
 };
 use crate::sample_archive::writer::{
-    checked_archive_byte_total, limit, map_transform_error, shape,
+    checked_archive_byte_total, checked_block_archive_byte_delta, limit, map_transform_error, shape,
 };
 use crate::sample_archive::zstd_frame::decompress_frame;
 use sha2::{Digest, Sha256};
@@ -417,12 +417,9 @@ impl<R: Read> SampleArchiveReader<R> {
             return Err(limit("compressed archive bytes exceed limit"));
         }
 
-        let next_archive_bytes = checked_archive_byte_total(
-            self.archive_bytes,
-            (BLOCK_HEADER_LEN as u64)
-                .checked_add(block_compressed_bytes)
-                .ok_or_else(|| limit("archive byte count overflow"))?,
-        )?;
+        let block_archive_bytes = checked_block_archive_byte_delta(block_compressed_bytes)?;
+        let next_archive_bytes =
+            checked_archive_byte_total(self.archive_bytes, block_archive_bytes)?;
         let archive_with_trailer =
             checked_archive_byte_total(next_archive_bytes, ARCHIVE_TRAILER_LEN as u64)?;
         if archive_with_trailer > self.limits.max_archive_bytes {
@@ -447,9 +444,9 @@ impl<R: Read> SampleArchiveReader<R> {
     }
 
     fn validate_trailer_byte_limit(&self) -> Result<(), SampleArchiveError> {
-        if checked_archive_byte_total(self.archive_bytes, ARCHIVE_TRAILER_LEN as u64)?
-            > self.limits.max_archive_bytes
-        {
+        let archive_with_trailer =
+            checked_archive_byte_total(self.archive_bytes, ARCHIVE_TRAILER_LEN as u64)?;
+        if archive_with_trailer > self.limits.max_archive_bytes {
             return Err(limit("archive bytes exceed limit"));
         }
         Ok(())
@@ -463,24 +460,24 @@ fn validate_header_limits(
     if header.total_shots > limits.max_total_shots {
         return Err(limit("archive total shots exceed limit"));
     }
-    if checked_archive_byte_total(GLOBAL_HEADER_LEN as u64, ARCHIVE_TRAILER_LEN as u64)?
-        > limits.max_archive_bytes
-    {
+    let minimum_archive_bytes =
+        checked_archive_byte_total(GLOBAL_HEADER_LEN as u64, ARCHIVE_TRAILER_LEN as u64)?;
+    if minimum_archive_bytes > limits.max_archive_bytes {
         return Err(limit("archive bytes exceed limit"));
     }
-    if header.max_shots_per_block == 0
-        || header.max_shots_per_block > limits.transform.max_shots_per_block
-    {
+    let block_shots_over_limit = header.max_shots_per_block == 0
+        || header.max_shots_per_block > limits.transform.max_shots_per_block;
+    if block_shots_over_limit {
         return Err(limit("header max shots per block exceeds limit"));
     }
     let minimum_blocks = minimum_block_count(header.total_shots, header.max_shots_per_block)?;
     if minimum_blocks > limits.max_block_count {
         return Err(limit("archive block count exceeds limit"));
     }
-    if header.measurement_count > limits.transform.max_measurements
+    let dimensions_over_limit = header.measurement_count > limits.transform.max_measurements
         || header.detector_count > limits.transform.max_detectors
-        || header.observable_count > limits.transform.max_observables
-    {
+        || header.observable_count > limits.transform.max_observables;
+    if dimensions_over_limit {
         return Err(limit("header dimensions exceed transform limits"));
     }
     if header.detector_rank > limits.max_detector_rank {
@@ -685,6 +682,13 @@ mod tests {
             SampleArchiveErrorCode::LimitExceeded,
         );
 
+        let mut limits = test_limits();
+        limits.max_archive_bytes = (GLOBAL_HEADER_LEN + ARCHIVE_TRAILER_LEN - 1) as u64;
+        assert_code(
+            validate_header_limits(&header, limits),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
         let mut bad = header.clone();
         bad.max_shots_per_block = 0;
         assert_code(
@@ -717,6 +721,12 @@ mod tests {
         bad.max_shots_per_block = 4;
         validate_header_limits(&bad, test_limits())
             .expect("multi-block archive may have total shots above block size");
+        let mut limits = test_limits();
+        limits.max_block_count = 1;
+        assert_code(
+            validate_header_limits(&bad, limits),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
         bad.max_shots_per_block = test_limits().transform.max_shots_per_block + 1;
         assert_code(
             validate_header_limits(&bad, test_limits()),
@@ -746,6 +756,15 @@ mod tests {
         shot_limit_reader.limits.transform.max_shots_per_block = 4;
         assert_code(
             shot_limit_reader.validate_block_header(&block),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut block_count_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        block_count_reader.limits.max_block_count = 0;
+        assert_code(
+            block_count_reader.validate_block_header(&block),
             SampleArchiveErrorCode::LimitExceeded,
         );
 
@@ -809,6 +828,33 @@ mod tests {
             SampleArchiveErrorCode::LimitExceeded,
         );
 
+        let mut archive_limit_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        archive_limit_reader.limits.max_archive_bytes = GLOBAL_HEADER_LEN as u64
+            + BLOCK_HEADER_LEN as u64
+            + block_compressed_bytes
+            + ARCHIVE_TRAILER_LEN as u64
+            - 1;
+        assert_code(
+            archive_limit_reader.validate_archive_stream_totals(&block),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let mut archive_overflow_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        archive_overflow_reader
+            .limits
+            .max_compressed_bytes_per_archive = u64::MAX;
+        let mut bad = block.clone();
+        bad.syndrome_compressed_len = u64::MAX;
+        bad.free_compressed_len = 0;
+        assert_code(
+            archive_overflow_reader.validate_archive_stream_totals(&bad),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
         reader.limits = test_limits();
         let mut bad = block.clone();
         bad.shot_count = 6;
@@ -850,6 +896,17 @@ mod tests {
         assert_code(
             read_exact_or_truncated(&mut AlwaysErr, &mut byte),
             SampleArchiveErrorCode::Io,
+        );
+
+        let circuit = parse("M 0\n");
+        let archive = archive_for(&circuit, 0);
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        reader.limits.max_archive_bytes = 0;
+        assert_code(
+            reader.validate_trailer_byte_limit(),
+            SampleArchiveErrorCode::LimitExceeded,
         );
     }
 
@@ -944,6 +1001,24 @@ mod tests {
                 .expect("open reader");
         assert!(reader.next_block().expect("read block").is_some());
         assert_code(reader.finish(), SampleArchiveErrorCode::Io);
+
+        let archive = archive_for(&circuit, 5);
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        assert!(reader.next_block().expect("read block").is_some());
+        reader.limits.max_block_count = 0;
+        assert_code(reader.finish(), SampleArchiveErrorCode::LimitExceeded);
+
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        assert!(reader.next_block().expect("read block").is_some());
+        reader
+            .read_trailer()
+            .expect("read trailer before lowered limit");
+        reader.limits.max_archive_bytes = 0;
+        assert_code(reader.finish(), SampleArchiveErrorCode::LimitExceeded);
     }
 
     fn expect_finish_error(archive: Vec<u8>, circuit: &[StimInstr], code: SampleArchiveErrorCode) {

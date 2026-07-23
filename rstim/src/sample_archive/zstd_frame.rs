@@ -7,6 +7,8 @@ const ZSTD_BLOCK_HEADER_LEN: usize = 3;
 const ZSTD_FRAME_CHECKSUM_LEN: usize = 4;
 const ZSTD_DECODER_CONTEXT_BYTES: u64 = 256 * 1024;
 
+type ArchiveResult<T> = Result<T, SampleArchiveError>;
+
 pub(crate) fn compress_frame(bytes: &[u8], level: i32) -> Result<Vec<u8>, SampleArchiveError> {
     let mut encoder = zstd::stream::Encoder::new(Vec::new(), level)
         .map_err(|_| compression_failed("failed to initialize zstd encoder"))?;
@@ -36,24 +38,22 @@ pub(crate) fn decompress_frame(
     limits: ArchiveLimits,
 ) -> Result<Vec<u8>, SampleArchiveError> {
     let header = parse_frame_header(compressed)?;
-    let frame_len = single_frame_len(compressed, header.header_len, header.content_checksum)?;
+    let frame_len = single_frame_len(compressed, header.3, header.1)?;
     if frame_len != compressed.len() && starts_with_zstd_frame_magic(&compressed[frame_len..]) {
-        return Err(SampleArchiveError::with_code(
-            SampleArchiveErrorCode::MalformedArchive,
+        return Err(malformed_archive(
             "zstd stream must contain exactly one frame",
         ));
     }
-    if header.window_size > limits.max_zstd_window_bytes {
+    if header.2 > limits.max_zstd_window_bytes {
         return Err(SampleArchiveError::with_code(
             SampleArchiveErrorCode::LimitExceeded,
             "zstd window exceeds limit",
         ));
     }
-    let Some(content_size) = header.content_size else {
-        return Err(decompression_failed("zstd frame content size is missing"));
-    };
-    let decoder_memory =
-        checked_decoder_memory_bytes(compressed.len(), content_size, header.window_size)?;
+    let content_size = header
+        .0
+        .ok_or_else(|| decompression_failed("zstd frame content size is missing"))?;
+    let decoder_memory = checked_decoder_memory_bytes(compressed.len(), content_size, header.2)?;
     if decoder_memory > limits.max_zstd_decoder_memory_bytes {
         return Err(SampleArchiveError::with_code(
             SampleArchiveErrorCode::LimitExceeded,
@@ -65,12 +65,11 @@ pub(crate) fn decompress_frame(
             "zstd frame content size does not match declaration",
         ));
     }
-    if !header.content_checksum {
+    if !header.1 {
         return Err(decompression_failed("zstd frame checksum is missing"));
     }
     if frame_len != compressed.len() {
-        return Err(SampleArchiveError::with_code(
-            SampleArchiveErrorCode::MalformedArchive,
+        return Err(malformed_archive(
             "zstd stream must contain exactly one frame",
         ));
     }
@@ -96,39 +95,17 @@ pub(crate) fn decompress_frame(
     Ok(decoded)
 }
 
-fn checked_decoder_memory_bytes(
-    compressed_len: usize,
-    content_size: u64,
-    window_size: u64,
-) -> Result<u64, SampleArchiveError> {
-    let compressed_len = u64::try_from(compressed_len).map_err(|_| {
-        SampleArchiveError::with_code(
-            SampleArchiveErrorCode::LimitExceeded,
-            "zstd input size too large",
-        )
-    })?;
-    [
-        ZSTD_DECODER_CONTEXT_BYTES,
-        compressed_len,
-        content_size,
-        window_size,
-    ]
-    .into_iter()
-    .try_fold(0u64, |acc, value| {
-        acc.checked_add(value).ok_or_else(|| {
-            SampleArchiveError::with_code(
-                SampleArchiveErrorCode::LimitExceeded,
-                "zstd decoder memory overflow",
-            )
-        })
+fn checked_decoder_memory_bytes(input: usize, content: u64, window: u64) -> ArchiveResult<u64> {
+    let parts = [ZSTD_DECODER_CONTEXT_BYTES, input as u64, content, window];
+    parts.into_iter().try_fold(0u64, |acc, value| {
+        acc.checked_add(value)
+            .ok_or_else(|| limit_exceeded("zstd decoder memory overflow"))
     })
 }
-
 fn window_log_max_for_limit(max_window_bytes: u64) -> u32 {
     let bounded = max_window_bytes.max(1024);
     (u64::BITS - bounded.saturating_sub(1).leading_zeros()).min(31)
 }
-
 fn starts_with_zstd_frame_magic(bytes: &[u8]) -> bool {
     if bytes.len() < ZSTD_MAGIC.len() {
         return false;
@@ -136,16 +113,7 @@ fn starts_with_zstd_frame_magic(bytes: &[u8]) -> bool {
     bytes[..ZSTD_MAGIC.len()] == ZSTD_MAGIC
         || (bytes[1..4] == [0x2a, 0x4d, 0x18] && (0x50..=0x5f).contains(&bytes[0]))
 }
-
-#[derive(Debug, Clone, Copy)]
-struct FrameHeader {
-    content_size: Option<u64>,
-    content_checksum: bool,
-    window_size: u64,
-    header_len: usize,
-}
-
-fn parse_frame_header(bytes: &[u8]) -> Result<FrameHeader, SampleArchiveError> {
+fn parse_frame_header(bytes: &[u8]) -> ArchiveResult<(Option<u64>, bool, u64, usize)> {
     if bytes.len() < 6 || bytes[0..4] != ZSTD_MAGIC {
         return Err(decompression_failed("invalid zstd frame magic"));
     }
@@ -158,7 +126,6 @@ fn parse_frame_header(bytes: &[u8]) -> Result<FrameHeader, SampleArchiveError> {
     let content_checksum = desc & 0x04 != 0;
     let dict_flag = desc & 0x03;
     let mut offset = 5usize;
-
     let window_size = if single_segment {
         None
     } else {
@@ -219,19 +186,19 @@ fn parse_frame_header(bytes: &[u8]) -> Result<FrameHeader, SampleArchiveError> {
         Some(raw)
     };
     let Some(content_size_value) = content_size else {
-        return Ok(FrameHeader {
+        return Ok((
             content_size,
             content_checksum,
-            window_size: window_size.unwrap_or(0),
-            header_len: offset,
-        });
+            window_size.unwrap_or(0),
+            offset,
+        ));
     };
-    Ok(FrameHeader {
+    Ok((
         content_size,
         content_checksum,
-        window_size: window_size.unwrap_or(content_size_value),
-        header_len: offset,
-    })
+        window_size.unwrap_or(content_size_value),
+        offset,
+    ))
 }
 
 fn single_frame_len(
@@ -291,6 +258,14 @@ fn decompression_failed(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::DecompressionFailed, detail)
 }
 
+fn malformed_archive(detail: &'static str) -> SampleArchiveError {
+    SampleArchiveError::with_code(SampleArchiveErrorCode::MalformedArchive, detail)
+}
+
+fn limit_exceeded(detail: &'static str) -> SampleArchiveError {
+    SampleArchiveError::with_code(SampleArchiveErrorCode::LimitExceeded, detail)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,7 +292,7 @@ mod tests {
             SampleArchiveErrorCode::DecompressionFailed,
         );
 
-        let no_content_size = frame_header(0x04, &[0, 1, 0, 0, 0, 0, 0]);
+        let no_content_size = frame_header(0x04, &[0, 1, 0, 0, 0, 0, 0, 0]);
         assert_code(
             decompress_frame(&no_content_size, 0, ArchiveLimits::default()),
             SampleArchiveErrorCode::DecompressionFailed,
@@ -328,6 +303,13 @@ mod tests {
         assert_code(
             decompress_frame(&wrong_size, 3, ArchiveLimits::default()),
             SampleArchiveErrorCode::DecompressionFailed,
+        );
+
+        let mut trailing_junk = compress_frame(b"abc", 3).expect("compress test frame");
+        trailing_junk.push(0);
+        assert_code(
+            decompress_frame(&trailing_junk, 3, ArchiveLimits::default()),
+            SampleArchiveErrorCode::MalformedArchive,
         );
     }
 
@@ -385,29 +367,33 @@ mod tests {
         );
 
         let no_content_size = parse_frame_header(&frame_header(0x04, &[0])).unwrap();
-        assert_eq!(no_content_size.content_size, None);
-        assert_eq!(no_content_size.window_size, 1024);
+        assert_eq!(no_content_size.0, None);
+        assert_eq!(no_content_size.1, true);
+        assert_eq!(no_content_size.2, 1024);
+        assert_eq!(no_content_size.3, 6);
 
         let one_byte_content = parse_frame_header(&frame_header(0x24, &[7])).unwrap();
-        assert_eq!(one_byte_content.content_size, Some(7));
-        assert_eq!(one_byte_content.window_size, 7);
+        assert_eq!(one_byte_content.0, Some(7));
+        assert_eq!(one_byte_content.2, 7);
 
         let two_byte_content = parse_frame_header(&frame_header(0x64, &[1, 0])).unwrap();
-        assert_eq!(two_byte_content.content_size, Some(257));
+        assert_eq!(two_byte_content.0, Some(257));
 
         let four_byte_content = parse_frame_header(&frame_header(0xa4, &[1, 0, 0, 0])).unwrap();
-        assert_eq!(four_byte_content.content_size, Some(1));
+        assert_eq!(four_byte_content.0, Some(1));
 
         let eight_byte_content =
             parse_frame_header(&frame_header(0xe4, &[1, 0, 0, 0, 0, 0, 0, 0])).unwrap();
-        assert_eq!(eight_byte_content.content_size, Some(1));
+        assert_eq!(eight_byte_content.0, Some(1));
 
         let dict_one = parse_frame_header(&frame_header(0x25, &[0, 3])).unwrap();
-        assert_eq!(dict_one.content_size, Some(3));
+        assert_eq!(dict_one.0, Some(3));
         let dict_two = parse_frame_header(&frame_header(0x26, &[0, 0, 3])).unwrap();
-        assert_eq!(dict_two.content_size, Some(3));
+        assert_eq!(dict_two.0, Some(3));
         let dict_four = parse_frame_header(&frame_header(0x27, &[0, 0, 0, 0, 3])).unwrap();
-        assert_eq!(dict_four.content_size, Some(3));
+        assert_eq!(dict_four.0, Some(3));
+
+        assert!(!starts_with_zstd_frame_magic(&[0]));
     }
 
     #[test]

@@ -746,3 +746,22 @@ const fn malformed(detail: &'static str) -> SampleArchiveError {
 const fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::new(SampleArchiveErrorCode::LimitExceeded, detail)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn global_header_unknown_v1_identifiers_are_unsupported_features() {
+        let mut bytes = GlobalHeader::known_vector_v1()
+            .to_bytes()
+            .expect("known vector serializes");
+        bytes[32..34].copy_from_slice(&2u16.to_le_bytes());
+        assert_eq!(
+            GlobalHeader::from_bytes_before_checksum(&bytes)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::UnsupportedFeature
+        );
+    }
+}
