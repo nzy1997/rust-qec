@@ -206,9 +206,11 @@ fn rsmp_format_contract_known_vectors_and_negative_cases() {
 
     let zero_shot = [GLOBAL_VECTOR.as_slice(), TRAILER_VECTOR.as_slice()].concat();
     assert_eq!(zero_shot.len(), GLOBAL_HEADER_LEN + ARCHIVE_TRAILER_LEN);
-    assert!(!zero_shot
-        .windows(BLOCK_MAGIC.len())
-        .any(|w| w == BLOCK_MAGIC));
+    assert!(
+        !zero_shot
+            .windows(BLOCK_MAGIC.len())
+            .any(|w| w == BLOCK_MAGIC)
+    );
     assert_eq!(
         GlobalHeader::from_bytes(&zero_shot[..GLOBAL_HEADER_LEN])
             .unwrap()
@@ -245,21 +247,21 @@ fn rsmp_format_contract_known_vectors_and_negative_cases() {
     shot_range_overflow[20..28].copy_from_slice(&u64::MAX.to_le_bytes());
     expect_code(
         BlockHeader::from_bytes(&shot_range_overflow),
-        SampleArchiveErrorCode::MalformedArchive,
+        SampleArchiveErrorCode::LimitExceeded,
     );
 
     let mut uncompressed_length_overflow = BLOCK_VECTOR;
     uncompressed_length_overflow[44..52].copy_from_slice(&u64::MAX.to_le_bytes());
     expect_code(
         BlockHeader::from_bytes(&uncompressed_length_overflow),
-        SampleArchiveErrorCode::MalformedArchive,
+        SampleArchiveErrorCode::LimitExceeded,
     );
 
     let mut compressed_length_overflow = BLOCK_VECTOR;
     compressed_length_overflow[52..60].copy_from_slice(&u64::MAX.to_le_bytes());
     expect_code(
         BlockHeader::from_bytes(&compressed_length_overflow),
-        SampleArchiveErrorCode::MalformedArchive,
+        SampleArchiveErrorCode::LimitExceeded,
     );
 
     println!("PASS rsmp format contract v=1.0 known_vectors=3 negative_cases=12");

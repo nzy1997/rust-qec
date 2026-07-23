@@ -1,15 +1,19 @@
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
 use crate::sample_archive::dense::pack_dense;
 use crate::sample_archive::format::{
-    BlockHeader, CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
-    FINGERPRINT_SHA256_CANONICAL_CIRCUIT, GlobalHeader, REFERENCE_SIMULATE_NOISELESS,
-    STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1, SampleArchiveError, SampleArchiveErrorCode,
-    TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1, checked_dense_bit_bytes,
+    checked_dense_bit_bytes, BlockHeader, GlobalHeader, SampleArchiveError, SampleArchiveErrorCode,
+    CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
+    FINGERPRINT_SHA256_CANONICAL_CIRCUIT, REFERENCE_SIMULATE_NOISELESS, STREAM_CODEC_EMPTY,
+    STREAM_CODEC_FREE_DENSE_V1, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
 use crate::sample_archive::integrity::{finalize_header, finalize_trailer};
 use crate::sample_archive::limits::{ArchiveLimits, SampleArchiveOptions};
 use crate::sample_archive::syndrome::{
     materialize_syndrome, plan_syndrome, update_dense_syndrome_hash,
+};
+use crate::sample_archive::telemetry::{
+    bit_table_bytes, checked_sum, record_buffered_input, record_transform_payloads,
+    record_transform_retained, record_writer_live_bytes,
 };
 use crate::sample_archive::zstd_frame::compress_frame;
 use crate::sim::bit_table::BitTable;
@@ -23,7 +27,12 @@ pub struct SampleArchiveWriter<W: Write> {
     options: SampleArchiveOptions,
     limits: ArchiveLimits,
     archive_hasher: Sha256,
-    wrote_block: bool,
+    next_block_index: u64,
+    written_shots: u64,
+    buffered_shots: usize,
+    buffer: Option<BitTable>,
+    decompressed_archive_bytes: u64,
+    compressed_archive_bytes: u64,
 }
 
 impl<W: Write> SampleArchiveWriter<W> {
@@ -35,6 +44,7 @@ impl<W: Write> SampleArchiveWriter<W> {
         limits: ArchiveLimits,
     ) -> Result<Self, SampleArchiveError> {
         validate_transform_and_archive_shape(&transform, total_shots, limits)?;
+        record_transform_retained(transform.transform_working_bytes());
         let identity = transform.identity();
         let mut header = GlobalHeader {
             required_flags: 0,
@@ -64,7 +74,12 @@ impl<W: Write> SampleArchiveWriter<W> {
             options,
             limits,
             archive_hasher,
-            wrote_block: false,
+            next_block_index: 0,
+            written_shots: 0,
+            buffered_shots: 0,
+            buffer: None,
+            decompressed_archive_bytes: 0,
+            compressed_archive_bytes: 0,
         })
     }
 
@@ -72,33 +87,115 @@ impl<W: Write> SampleArchiveWriter<W> {
         &mut self,
         measurements: &BitTable,
     ) -> Result<(), SampleArchiveError> {
-        if self.total_shots == 0 {
-            return Err(shape("zero-shot archive cannot contain a block"));
+        if measurements.num_minor() == 0 {
+            return Err(shape("measurement chunk must contain at least one shot"));
         }
-        if self.wrote_block {
-            return Err(shape("positive-shot archive already has its one block"));
-        }
-        if measurements.num_major() != self.transform.num_measurements()
-            || measurements.num_minor() as u64 != self.total_shots
-        {
+        if measurements.num_major() != self.transform.num_measurements() {
             return Err(shape(
                 "measurement table shape does not match archive header",
             ));
         }
-        self.transform
-            .validate_actual_usage(self.limits.transform, Some(measurements.num_minor()))
-            .map_err(map_transform_error)?;
+        let chunk_shots = measurements.num_minor() as u64;
+        let supplied = self
+            .written_shots
+            .checked_add(self.buffered_shots as u64)
+            .ok_or_else(|| limit("supplied shot count overflow"))?;
+        let after_chunk = supplied
+            .checked_add(chunk_shots)
+            .ok_or_else(|| limit("supplied shot count overflow"))?;
+        if after_chunk > self.total_shots {
+            return Err(shape("measurement chunk exceeds declared total shots"));
+        }
+        self.ensure_buffer()?;
+        let max_block_shots = max_block_shots_usize(self.limits)?;
+        let mut chunk_offset = 0usize;
+        while chunk_offset < measurements.num_minor() {
+            let space = max_block_shots - self.buffered_shots;
+            let copied = space.min(measurements.num_minor() - chunk_offset);
+            copy_measurement_columns(
+                measurements,
+                chunk_offset,
+                self.buffer
+                    .as_mut()
+                    .expect("buffer initialized before streaming copy"),
+                self.buffered_shots,
+                copied,
+            );
+            self.buffered_shots += copied;
+            let measurement_rows = self.transform.num_measurements() as u64;
+            record_buffered_input(measurement_rows, self.buffered_shots as u64)?;
+            chunk_offset += copied;
+            if self.buffered_shots == max_block_shots {
+                self.emit_buffered_block(max_block_shots)?;
+            }
+        }
+        Ok(())
+    }
 
+    pub fn finish(mut self) -> Result<W, SampleArchiveError> {
+        let supplied = self
+            .written_shots
+            .checked_add(self.buffered_shots as u64)
+            .ok_or_else(|| limit("supplied shot count overflow"))?;
+        if supplied != self.total_shots {
+            return Err(shape(
+                "supplied measurement shots do not match declared total",
+            ));
+        }
+        if self.buffered_shots > 0 {
+            self.emit_buffered_block(self.buffered_shots)?;
+        }
+        let archive_hasher = self.archive_hasher.clone();
+        let trailer = finalize_trailer(self.next_block_index, self.written_shots, archive_hasher)?;
+        self.output.write_all(&trailer).map_err(map_io)?;
+        self.output.flush().map_err(map_io)?;
+        Ok(self.output)
+    }
+
+    fn ensure_buffer(&mut self) -> Result<(), SampleArchiveError> {
+        if self.buffer.is_none() {
+            let max_block_shots = max_block_shots_usize(self.limits)?;
+            let buffer = BitTable::try_new(self.transform.num_measurements(), max_block_shots)
+                .map_err(|_| limit("measurement buffer allocation failed"))?;
+            self.buffer = Some(buffer);
+        }
+        Ok(())
+    }
+
+    fn emit_buffered_block(&mut self, shots: usize) -> Result<(), SampleArchiveError> {
+        if shots == 0 {
+            return Err(shape("archive block must contain at least one shot"));
+        }
+        let max_block_shots = max_block_shots_usize(self.limits)?;
+        if shots > max_block_shots {
+            return Err(limit("block shot count exceeds limit"));
+        }
+        let buffered_bytes =
+            record_buffered_input(self.transform.num_measurements() as u64, shots as u64)?;
+        let buffer = self
+            .buffer
+            .as_ref()
+            .expect("buffer exists before block emission");
         let encoded = self
             .transform
-            .encode_block(measurements)
+            .encode_block_prefix(buffer, shots)
             .map_err(map_transform_error)?;
-        let free_len = checked_dense_bit_bytes(
-            encoded.free_measurements.num_major() as u64,
-            measurements.num_minor() as u64,
-        )?;
+        record_transform_payloads(2);
+        let free_len =
+            checked_dense_bit_bytes(encoded.free_measurements.num_major() as u64, shots as u64)?;
         let syndrome_plan = plan_syndrome(&encoded.selected_detectors)?;
         validate_decompressed_streams(syndrome_plan.raw_len, free_len, self.limits)?;
+        let block_decompressed_bytes = syndrome_plan
+            .raw_len
+            .checked_add(free_len)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        let next_decompressed_archive_bytes = self
+            .decompressed_archive_bytes
+            .checked_add(block_decompressed_bytes)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        if next_decompressed_archive_bytes > self.limits.max_decompressed_bytes_per_archive {
+            return Err(limit("decompressed archive bytes exceed limit"));
+        }
         let syndrome = materialize_syndrome(&encoded.selected_detectors, syndrome_plan)?;
         let free = pack_dense(&encoded.free_measurements)?;
         let mut logical_hasher = Sha256::new();
@@ -121,11 +218,21 @@ impl<W: Write> SampleArchiveWriter<W> {
             free_frame.len() as u64,
             self.limits,
         )?;
+        let block_compressed_bytes = (syndrome_frame.len() as u64)
+            .checked_add(free_frame.len() as u64)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        let next_compressed_archive_bytes = self
+            .compressed_archive_bytes
+            .checked_add(block_compressed_bytes)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        if next_compressed_archive_bytes > self.limits.max_compressed_bytes_per_archive {
+            return Err(limit("compressed archive bytes exceed limit"));
+        }
 
         let block_header = BlockHeader {
-            block_index: 0,
-            first_shot: 0,
-            shot_count: self.total_shots,
+            block_index: self.next_block_index,
+            first_shot: self.written_shots,
+            shot_count: shots as u64,
             syndrome_codec_id: syndrome_plan.codec_id,
             free_codec_id: if free.is_empty() {
                 STREAM_CODEC_EMPTY
@@ -142,19 +249,42 @@ impl<W: Write> SampleArchiveWriter<W> {
         write_and_hash(&mut self.output, &mut self.archive_hasher, &block_bytes)?;
         write_and_hash(&mut self.output, &mut self.archive_hasher, &syndrome_frame)?;
         write_and_hash(&mut self.output, &mut self.archive_hasher, &free_frame)?;
-        self.wrote_block = true;
+        let selected_rows = encoded.selected_detectors.num_major() as u64;
+        let free_rows = encoded.free_measurements.num_major() as u64;
+        let encoded_selected_bytes =
+            bit_table_bytes("writer.encoded_selected", selected_rows, shots as u64)?;
+        let encoded_free_bytes = bit_table_bytes("writer.encoded_free", free_rows, shots as u64)?;
+        let raw_parts = [
+            ("syndrome_raw", syndrome.len() as u64),
+            ("free_raw", free.len() as u64),
+        ];
+        let raw_bytes = checked_sum("writer.raw_codec_buffers", &raw_parts)?;
+        let compressed_parts = [
+            ("syndrome_frame", syndrome_frame.len() as u64),
+            ("free_frame", free_frame.len() as u64),
+        ];
+        let compressed_bytes = checked_sum("writer.compressed_frames", &compressed_parts)?;
+        let writer_live_parts = [
+            ("buffered_input", buffered_bytes),
+            ("encoded_selected", encoded_selected_bytes),
+            ("encoded_free", encoded_free_bytes),
+            ("raw_codec_buffers", raw_bytes),
+            ("compressed_frames", compressed_bytes),
+            ("zstd_state", self.limits.max_zstd_window_bytes),
+        ];
+        record_writer_live_bytes(&writer_live_parts)?;
+        self.written_shots = self
+            .written_shots
+            .checked_add(shots as u64)
+            .ok_or_else(|| limit("written shot count overflow"))?;
+        self.next_block_index = self
+            .next_block_index
+            .checked_add(1)
+            .ok_or_else(|| limit("block count overflow"))?;
+        self.buffered_shots = 0;
+        self.decompressed_archive_bytes = next_decompressed_archive_bytes;
+        self.compressed_archive_bytes = next_compressed_archive_bytes;
         Ok(())
-    }
-
-    pub fn finish(mut self) -> Result<W, SampleArchiveError> {
-        if self.total_shots > 0 && !self.wrote_block {
-            return Err(shape("positive-shot archive is missing its block"));
-        }
-        let block_count = u64::from(self.wrote_block);
-        let trailer = finalize_trailer(block_count, self.total_shots, self.archive_hasher.clone())?;
-        self.output.write_all(&trailer).map_err(map_io)?;
-        self.output.flush().map_err(map_io)?;
-        Ok(self.output)
     }
 }
 
@@ -166,11 +296,18 @@ fn validate_transform_and_archive_shape(
     if total_shots > limits.max_total_shots {
         return Err(limit("archive total shots exceed limit"));
     }
-    if total_shots > usize::MAX as u64 {
-        return Err(limit("archive shot count exceeds usize"));
+    #[cfg(target_pointer_width = "32")]
+    {
+        if usize::try_from(total_shots).is_err() {
+            return Err(limit("archive shot count exceeds usize"));
+        }
     }
+    if limits.transform.max_shots_per_block == 0 {
+        return Err(limit("archive block-shot limit is zero"));
+    }
+    let validation_shots = total_shots.min(limits.transform.max_shots_per_block);
     transform
-        .validate_actual_usage(limits.transform, Some(total_shots as usize))
+        .validate_actual_usage(limits.transform, Some(validation_shots as usize))
         .map_err(map_transform_error)?;
     let rank = transform.rank() as u64;
     if rank > limits.max_detector_rank {
@@ -184,6 +321,33 @@ fn validate_transform_and_archive_shape(
         return Err(limit("free measurement width exceeds archive limit"));
     }
     Ok(())
+}
+
+fn max_block_shots_usize(limits: ArchiveLimits) -> Result<usize, SampleArchiveError> {
+    if limits.transform.max_shots_per_block == 0 {
+        return Err(limit("archive block-shot limit is zero"));
+    }
+    usize::try_from(limits.transform.max_shots_per_block)
+        .map_err(|_| limit("archive block-shot limit exceeds usize"))
+}
+
+fn copy_measurement_columns(
+    source: &BitTable,
+    source_offset: usize,
+    target: &mut BitTable,
+    target_offset: usize,
+    shots: usize,
+) {
+    debug_assert_eq!(source.num_major(), target.num_major());
+    for row in 0..source.num_major() {
+        for shot in 0..shots {
+            target.set(
+                row,
+                target_offset + shot,
+                source.get(row, source_offset + shot),
+            );
+        }
+    }
 }
 
 fn validate_decompressed_streams(
@@ -333,7 +497,7 @@ mod tests {
         }
     }
 
-    fn expect_write_error(
+    fn expect_write_or_finish_error(
         circuit: &str,
         shots: usize,
         limits: ArchiveLimits,
@@ -348,13 +512,30 @@ mod tests {
             limits,
         )
         .expect("writer constructs");
-        writer.write_measurements(&measurements).unwrap_err()
+        match writer.write_measurements(&measurements) {
+            Ok(()) => writer.finish().unwrap_err(),
+            Err(err) => err,
+        }
     }
 
     #[test]
     fn writer_state_machine_rejects_zero_and_second_blocks() {
         let transform = parse_transform("M 0\n");
+        let empty = patterned_table(1, 0);
         let measurements = patterned_table(1, 1);
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform.clone(),
+            1,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("one-shot writer constructs");
+        assert_eq!(
+            writer.write_measurements(&empty).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+
         let mut writer = SampleArchiveWriter::new(
             Vec::new(),
             transform.clone(),
@@ -382,6 +563,33 @@ mod tests {
         assert_eq!(
             writer.write_measurements(&measurements).unwrap_err().code(),
             SampleArchiveErrorCode::ShapeMismatch
+        );
+    }
+
+    #[test]
+    fn writer_private_streaming_helpers_cover_limit_edges() {
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            parse_transform("M 0\n"),
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("writer constructs");
+        assert_eq!(
+            writer.emit_buffered_block(0).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+        assert_eq!(
+            writer.emit_buffered_block(17).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 0;
+        assert_eq!(
+            max_block_shots_usize(limits).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
         );
     }
 
@@ -414,28 +622,44 @@ mod tests {
         let mut limits = test_limits();
         limits.max_decompressed_bytes_per_stream = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 9, limits).code(),
+            expect_write_or_finish_error("M 0\n", 9, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_decompressed_bytes_per_archive = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 9, limits).code(),
+            expect_write_or_finish_error("M 0\n", 9, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_compressed_bytes_per_stream = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 1, limits).code(),
+            expect_write_or_finish_error("M 0\n", 1, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_compressed_bytes_per_archive = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 1, limits).code(),
+            expect_write_or_finish_error("M 0\n", 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 1;
+        limits.max_decompressed_bytes_per_archive = 1;
+        assert_eq!(
+            expect_write_or_finish_error("M 0\n", 2, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 1;
+        limits.max_compressed_bytes_per_archive = 20;
+        assert_eq!(
+            expect_write_or_finish_error("M 0\n", 2, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
     }
@@ -454,6 +678,8 @@ mod tests {
             Err(err) => err,
         };
         assert_eq!(err.code(), SampleArchiveErrorCode::Io);
+        let mut failing = FailingWriter;
+        assert!(failing.flush().is_err());
 
         assert_eq!(
             map_transform_error(MeasurementTransformError::UnsupportedSweep).code(),

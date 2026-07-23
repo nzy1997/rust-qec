@@ -136,7 +136,10 @@ fn verify_writer_limit_rejects_before_syndrome_materialization() {
         limits,
     )
     .expect("limit writer");
-    let err = writer.write_measurements(&measurements).unwrap_err();
+    writer
+        .write_measurements(&measurements)
+        .expect("buffer final short block before limit check");
+    let err = writer.finish().unwrap_err();
     assert_eq!(err.code(), SampleArchiveErrorCode::LimitExceeded);
     assert_eq!(max_materialized_candidates(), 0);
 }

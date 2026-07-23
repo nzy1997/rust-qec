@@ -1,10 +1,10 @@
-use crate::data_path::{ReferenceSampleMode, build_reference_sample};
-use crate::ir::{StimInstr, StimTarget, circuit_to_string};
+use crate::data_path::{build_reference_sample, ReferenceSampleMode};
+use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 use crate::sample_archive::format::{
     CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
     REFERENCE_SIMULATE_NOISELESS, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
-use crate::sim::bit_table::{BitTable, BitTableAllocError, checked_bit_table_storage_size};
+use crate::sim::bit_table::{checked_bit_table_storage_size, BitTable, BitTableAllocError};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -421,6 +421,14 @@ impl MeasurementTransform {
         &self,
         measurements: &BitTable,
     ) -> Result<EncodedMeasurementBlock, MeasurementTransformError> {
+        self.encode_block_prefix(measurements, measurements.num_minor())
+    }
+
+    pub(crate) fn encode_block_prefix(
+        &self,
+        measurements: &BitTable,
+        shots: usize,
+    ) -> Result<EncodedMeasurementBlock, MeasurementTransformError> {
         if measurements.num_major() != self.num_measurements() {
             return Err(MeasurementTransformError::ShapeMismatch {
                 detail: format!(
@@ -430,7 +438,14 @@ impl MeasurementTransform {
                 ),
             });
         }
-        let shots = measurements.num_minor();
+        if shots > measurements.num_minor() {
+            return Err(MeasurementTransformError::ShapeMismatch {
+                detail: format!(
+                    "measurement shot prefix {shots} exceeds table shots {}",
+                    measurements.num_minor()
+                ),
+            });
+        }
         self.validate_block_shots(shots)?;
         let block_bytes = self.estimate_block_working_bytes(shots)?;
         enforce_bytes(
@@ -1182,6 +1197,7 @@ fn xor_parity_terms_into_row(
             xor_all_valid_bits(dst, shots);
         }
     }
+    clear_invalid_bits(dst, shots);
 }
 
 fn copy_measurement_flip_row(
@@ -1191,10 +1207,12 @@ fn copy_measurement_flip_row(
     reference: bool,
     shots: usize,
 ) {
-    dst.copy_from_slice(measurements.row_words(measurement_col));
+    let src = measurements.row_words(measurement_col);
+    dst.copy_from_slice(&src[..dst.len()]);
     if reference {
         invert_valid_bits(dst, shots);
     }
+    clear_invalid_bits(dst, shots);
 }
 
 fn xor_all_valid_bits(words: &mut [u64], shots: usize) {
@@ -1213,6 +1231,17 @@ fn xor_all_valid_bits(words: &mut [u64], shots: usize) {
 
 fn invert_valid_bits(words: &mut [u64], shots: usize) {
     xor_all_valid_bits(words, shots);
+}
+
+fn clear_invalid_bits(words: &mut [u64], shots: usize) {
+    if shots == 0 || words.is_empty() {
+        return;
+    }
+    let rem = shots % 64;
+    if rem != 0 {
+        let last = shots / 64;
+        words[last] &= (1u64 << rem) - 1;
+    }
 }
 
 fn for_each_set_bit(row_words: &[u64], num_bits: usize, mut f: impl FnMut(usize)) {
@@ -1505,10 +1534,91 @@ mod tests {
         assert_eq!(layout.max_repeat_depth(), 1);
 
         let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
-        assert!(
+        assert!(transform
+            .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
+            .is_ok());
+    }
+
+    #[test]
+    fn encode_block_prefix_uses_only_requested_shots() {
+        let circuit = parse_lines("M 0 1 2\nDETECTOR rec[-3] rec[-2]\nDETECTOR rec[-2] rec[-1]\n")
+            .expect("parse transform circuit");
+        let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
+        let mut buffered =
+            BitTable::try_new(transform.num_measurements(), 4096).expect("buffer allocates");
+        let mut prefix =
+            BitTable::try_new(transform.num_measurements(), 65).expect("prefix allocates");
+        for row in 0..buffered.num_major() {
+            for shot in 0..buffered.num_minor() {
+                let value = if shot < prefix.num_minor() {
+                    (row * 19 + shot * 23) % 3 == 1
+                } else {
+                    true
+                };
+                buffered.set(row, shot, value);
+                if shot < prefix.num_minor() {
+                    prefix.set(row, shot, value);
+                }
+            }
+        }
+
+        let encoded_prefix = transform
+            .encode_block_prefix(&buffered, prefix.num_minor())
+            .expect("encode buffered prefix");
+        let encoded_exact = transform
+            .encode_block(&prefix)
+            .expect("encode exact prefix");
+        let encoded_exact_prefix = transform
+            .encode_block_prefix(&prefix, prefix.num_minor())
+            .expect("encode exact full prefix");
+        assert!(matches!(
             transform
-                .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
-                .is_ok()
+                .encode_block_prefix(&prefix, prefix.num_minor() + 1)
+                .unwrap_err(),
+            MeasurementTransformError::ShapeMismatch { detail }
+                if detail.contains("measurement shot prefix")
+        ));
+        assert_tables_eq(
+            &encoded_exact.selected_detectors,
+            &encoded_prefix.selected_detectors,
         );
+        assert_tables_eq(
+            &encoded_exact.free_measurements,
+            &encoded_prefix.free_measurements,
+        );
+        assert_tables_eq(
+            &encoded_exact.selected_detectors,
+            &encoded_exact_prefix.selected_detectors,
+        );
+        assert_tables_eq(
+            &encoded_exact.free_measurements,
+            &encoded_exact_prefix.free_measurements,
+        );
+        assert_row_words_eq(
+            &encoded_exact.selected_detectors,
+            &encoded_prefix.selected_detectors,
+        );
+        assert_row_words_eq(
+            &encoded_exact.free_measurements,
+            &encoded_prefix.free_measurements,
+        );
+    }
+
+    fn assert_tables_eq(left: &BitTable, right: &BitTable) {
+        assert_eq!(left.num_major(), right.num_major());
+        assert_eq!(left.num_minor(), right.num_minor());
+        for row in 0..left.num_major() {
+            for shot in 0..left.num_minor() {
+                assert_eq!(left.get(row, shot), right.get(row, shot));
+            }
+        }
+    }
+
+    fn assert_row_words_eq(left: &BitTable, right: &BitTable) {
+        assert_eq!(left.num_major(), right.num_major());
+        assert_eq!(left.num_minor(), right.num_minor());
+        for row in 0..left.num_major() {
+            assert_eq!(left.row_words(row), right.row_words(row));
+        }
     }
 }

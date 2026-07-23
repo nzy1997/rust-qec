@@ -4,18 +4,31 @@ use crate::measurement_transform::{
 };
 use crate::sample_archive::dense::unpack_dense;
 use crate::sample_archive::format::{
-    ArchiveTrailer, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader, CODEC_SUITE_ZSTD_FRAMES_V1,
-    GLOBAL_HEADER_LEN, GlobalHeader, STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1,
-    STREAM_CODEC_SYNDROME_DENSE_V1, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, SampleArchiveError,
-    SampleArchiveErrorCode, TRAILER_MAGIC, checked_dense_bit_bytes,
+    checked_dense_bit_bytes, ArchiveTrailer, BlockHeader, GlobalHeader, SampleArchiveError,
+    SampleArchiveErrorCode, ARCHIVE_TRAILER_LEN, BLOCK_HEADER_LEN, BLOCK_MAGIC,
+    CODEC_SUITE_ZSTD_FRAMES_V1, GLOBAL_HEADER_LEN, STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1,
+    STREAM_CODEC_SYNDROME_DENSE_V1, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, TRAILER_MAGIC,
 };
 use crate::sample_archive::integrity::{header_digest, trailer_prefix};
 use crate::sample_archive::limits::ArchiveLimits;
 use crate::sample_archive::syndrome::{decode_syndrome_raw, update_dense_syndrome_hash};
+use crate::sample_archive::telemetry::{
+    bit_table_bytes, checked_sum, record_reader_decoded_blocks, record_reader_live_bytes,
+    record_transform_payloads, record_transform_retained,
+};
 use crate::sample_archive::writer::{limit, map_transform_error, shape};
 use crate::sample_archive::zstd_frame::decompress_frame;
 use sha2::{Digest, Sha256};
 use std::io::{ErrorKind, Read};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArchiveSummary {
+    pub block_count: u64,
+    pub total_shots: u64,
+    pub measurement_count: u64,
+    pub detector_count: u64,
+    pub observable_count: u64,
+}
 
 pub struct SampleArchiveReader<R: Read> {
     input: R,
@@ -23,7 +36,11 @@ pub struct SampleArchiveReader<R: Read> {
     transform: MeasurementTransform,
     limits: ArchiveLimits,
     archive_hasher: Sha256,
-    returned_block: bool,
+    next_block_index: u64,
+    next_first_shot: u64,
+    decompressed_archive_bytes: u64,
+    compressed_archive_bytes: u64,
+    trailer: Option<ArchiveTrailer>,
 }
 
 impl<R: Read> SampleArchiveReader<R> {
@@ -42,6 +59,7 @@ impl<R: Read> SampleArchiveReader<R> {
         let transform = MeasurementTransform::from_circuit_with_limits(circuit, limits.transform)
             .map_err(map_transform_error)?;
         compare_identity(&header, &transform)?;
+        record_transform_retained(transform.transform_working_bytes());
         let mut archive_hasher = Sha256::new();
         archive_hasher.update(header_bytes);
         Ok(Self {
@@ -50,19 +68,41 @@ impl<R: Read> SampleArchiveReader<R> {
             transform,
             limits,
             archive_hasher,
-            returned_block: false,
+            next_block_index: 0,
+            next_first_shot: 0,
+            decompressed_archive_bytes: 0,
+            compressed_archive_bytes: 0,
+            trailer: None,
         })
     }
 
     pub fn next_block(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
-        if self.header.total_shots == 0 || self.returned_block {
+        if self.trailer.is_some() {
             return Ok(None);
         }
+        if self.next_first_shot == self.header.total_shots {
+            self.read_trailer()?;
+            return Ok(None);
+        }
+        let mut magic = [0u8; 8];
+        read_exact_or_truncated(&mut self.input, &mut magic)?;
+        if magic == *TRAILER_MAGIC {
+            self.read_trailer_after_magic(magic)?;
+            return Ok(None);
+        }
+        if magic != *BLOCK_MAGIC {
+            return Err(SampleArchiveError::with_code(
+                SampleArchiveErrorCode::BadMagic,
+                "invalid block magic",
+            ));
+        }
         let mut block_bytes = [0u8; BLOCK_HEADER_LEN];
-        read_exact_or_truncated(&mut self.input, &mut block_bytes)?;
+        block_bytes[..8].copy_from_slice(&magic);
+        read_exact_or_truncated(&mut self.input, &mut block_bytes[8..])?;
         self.archive_hasher.update(block_bytes);
         let block = BlockHeader::from_bytes(&block_bytes)?;
         self.validate_block_header(&block)?;
+        self.validate_archive_stream_totals(&block)?;
 
         let syndrome_frame = self.read_stream(block.syndrome_compressed_len)?;
         let free_frame = self.read_stream(block.free_compressed_len)?;
@@ -106,38 +146,96 @@ impl<R: Read> SampleArchiveReader<R> {
                 free_measurements,
             })
             .map_err(map_transform_error)?;
-        self.returned_block = true;
+        record_transform_payloads(2);
+        record_reader_decoded_blocks(1);
+        let rank = self.transform.rank() as u64;
+        let free_columns = self.transform.free_columns().len() as u64;
+        let measurement_rows = decoded.measurements.num_major() as u64;
+        let detection_rows = decoded.detections.num_major() as u64;
+        let observable_rows = decoded.observable_flips.num_major() as u64;
+        let selected_bytes = bit_table_bytes("reader.selected", rank, block.shot_count)?;
+        let free_table_bytes =
+            bit_table_bytes("reader.free_measurements", free_columns, block.shot_count)?;
+        let decoded_measurements = bit_table_bytes(
+            "reader.decoded_measurements",
+            measurement_rows,
+            block.shot_count,
+        )?;
+        let decoded_detections = bit_table_bytes(
+            "reader.decoded_detections",
+            detection_rows,
+            block.shot_count,
+        )?;
+        let decoded_observables = bit_table_bytes(
+            "reader.decoded_observables",
+            observable_rows,
+            block.shot_count,
+        )?;
+        let transform_scratch_x = bit_table_bytes(
+            "reader.transform_scratch_x",
+            measurement_rows,
+            block.shot_count,
+        )?;
+        let transform_scratch_rhs =
+            bit_table_bytes("reader.transform_scratch_rhs", rank, block.shot_count)?;
+        let transform_scratch_row =
+            bit_table_bytes("reader.transform_scratch_row", 1, block.shot_count)?;
+        let transform_scratch_parts = [
+            ("x", transform_scratch_x),
+            ("rhs", transform_scratch_rhs),
+            ("row", transform_scratch_row),
+        ];
+        let transform_scratch = checked_sum("reader.transform_scratch", &transform_scratch_parts)?;
+        let raw_parts = [
+            ("syndrome_raw", syndrome.len() as u64),
+            ("free_raw", free.len() as u64),
+        ];
+        let raw_bytes = checked_sum("reader.raw_codec_buffers", &raw_parts)?;
+        let compressed_parts = [
+            ("syndrome_frame", syndrome_frame.len() as u64),
+            ("free_frame", free_frame.len() as u64),
+        ];
+        let compressed_bytes = checked_sum("reader.compressed_frames", &compressed_parts)?;
+        let reader_live_parts = [
+            ("selected", selected_bytes),
+            ("free_measurements", free_table_bytes),
+            ("decoded_measurements", decoded_measurements),
+            ("decoded_detections", decoded_detections),
+            ("decoded_observables", decoded_observables),
+            ("transform_scratch", transform_scratch),
+            ("raw_codec_buffers", raw_bytes),
+            ("compressed_frames", compressed_bytes),
+            ("zstd_state", self.limits.max_zstd_window_bytes),
+        ];
+        record_reader_live_bytes(&reader_live_parts)?;
+        self.next_first_shot = self
+            .next_first_shot
+            .checked_add(block.shot_count)
+            .ok_or_else(|| limit("block first-shot sum overflow"))?;
+        self.next_block_index = self
+            .next_block_index
+            .checked_add(1)
+            .ok_or_else(|| limit("block count overflow"))?;
         Ok(Some(decoded))
     }
 
-    pub fn finish(mut self) -> Result<(), SampleArchiveError> {
-        if self.header.total_shots > 0 && !self.returned_block {
-            return Err(shape("positive-shot archive block was not read"));
+    pub fn finish(mut self) -> Result<ArchiveSummary, SampleArchiveError> {
+        while self.trailer.is_none() {
+            if self.next_block()?.is_none() {
+                break;
+            }
         }
-        let mut trailer_bytes = [0u8; crate::sample_archive::format::ARCHIVE_TRAILER_LEN];
-        read_exact_or_truncated(&mut self.input, &mut trailer_bytes)?;
-        if trailer_bytes[0..8] == BLOCK_MAGIC[..] {
-            return Err(SampleArchiveError::with_code(
-                SampleArchiveErrorCode::MalformedArchive,
-                "second data block violates one-block archive contract",
-            ));
+        let trailer = self
+            .trailer
+            .as_ref()
+            .expect("finish loop reads archive trailer");
+        if trailer.block_count != self.next_block_index {
+            return Err(shape("trailer block count does not match decoded blocks"));
         }
-        if trailer_bytes[0..8] != TRAILER_MAGIC[..] {
-            return Err(SampleArchiveError::with_code(
-                SampleArchiveErrorCode::BadMagic,
-                "invalid trailer magic",
-            ));
-        }
-        let trailer = ArchiveTrailer::from_bytes(&trailer_bytes)?;
-        let expected_blocks = u64::from(self.header.total_shots > 0);
-        if trailer.block_count != expected_blocks {
-            return Err(SampleArchiveError::with_code(
-                SampleArchiveErrorCode::MalformedArchive,
-                "trailer block count does not match one-block contract",
-            ));
-        }
-        if trailer.total_shots != self.header.total_shots {
-            return Err(shape("trailer shot count does not match header"));
+        if trailer.total_shots != self.header.total_shots
+            || trailer.total_shots != self.next_first_shot
+        {
+            return Err(shape("trailer shot count does not match decoded blocks"));
         }
         let prefix = trailer_prefix(trailer.block_count, trailer.total_shots)?;
         self.archive_hasher.update(prefix);
@@ -147,7 +245,13 @@ impl<R: Read> SampleArchiveReader<R> {
         }
         let mut extra = [0u8; 1];
         match self.input.read(&mut extra) {
-            Ok(0) => Ok(()),
+            Ok(0) => Ok(ArchiveSummary {
+                block_count: trailer.block_count,
+                total_shots: trailer.total_shots,
+                measurement_count: self.header.measurement_count,
+                detector_count: self.header.detector_count,
+                observable_count: self.header.observable_count,
+            }),
             Ok(_) => Err(SampleArchiveError::with_code(
                 SampleArchiveErrorCode::TrailingData,
                 "archive has trailing data",
@@ -159,20 +263,59 @@ impl<R: Read> SampleArchiveReader<R> {
         }
     }
 
-    fn validate_block_header(&self, block: &BlockHeader) -> Result<(), SampleArchiveError> {
-        if block.block_index != 0 || block.first_shot != 0 {
+    fn read_trailer(&mut self) -> Result<(), SampleArchiveError> {
+        let mut trailer_bytes = [0u8; ARCHIVE_TRAILER_LEN];
+        read_exact_or_truncated(&mut self.input, &mut trailer_bytes)?;
+        if trailer_bytes[0..8] == BLOCK_MAGIC[..] {
             return Err(SampleArchiveError::with_code(
                 SampleArchiveErrorCode::MalformedArchive,
-                "invalid one-block sequence",
+                "data block appears after declared total shots",
             ));
         }
-        if block.shot_count != self.header.total_shots {
-            return Err(shape("block shot count does not match header"));
+        if trailer_bytes[0..8] != TRAILER_MAGIC[..] {
+            return Err(SampleArchiveError::with_code(
+                SampleArchiveErrorCode::BadMagic,
+                "invalid trailer magic",
+            ));
+        }
+        let trailer = ArchiveTrailer::from_bytes(&trailer_bytes)?;
+        self.trailer = Some(trailer);
+        Ok(())
+    }
+
+    fn read_trailer_after_magic(&mut self, magic: [u8; 8]) -> Result<(), SampleArchiveError> {
+        let mut trailer_bytes = [0u8; ARCHIVE_TRAILER_LEN];
+        trailer_bytes[..8].copy_from_slice(&magic);
+        read_exact_or_truncated(&mut self.input, &mut trailer_bytes[8..])?;
+        let trailer = ArchiveTrailer::from_bytes(&trailer_bytes)?;
+        self.trailer = Some(trailer);
+        Ok(())
+    }
+
+    fn validate_block_header(&self, block: &BlockHeader) -> Result<(), SampleArchiveError> {
+        if block.block_index != self.next_block_index {
+            return Err(SampleArchiveError::with_code(
+                SampleArchiveErrorCode::MalformedArchive,
+                "invalid block sequence number",
+            ));
+        }
+        if block.first_shot != self.next_first_shot {
+            return Err(SampleArchiveError::with_code(
+                SampleArchiveErrorCode::MalformedArchive,
+                "invalid block first-shot index",
+            ));
         }
         if block.shot_count > self.header.max_shots_per_block
             || block.shot_count > self.limits.transform.max_shots_per_block
         {
             return Err(limit("block shot count exceeds limit"));
+        }
+        let end = block
+            .first_shot
+            .checked_add(block.shot_count)
+            .ok_or_else(|| limit("block first-shot sum overflow"))?;
+        if end > self.header.total_shots {
+            return Err(shape("block shot count exceeds archive total"));
         }
         validate_stream_lengths(
             block.syndrome_uncompressed_len,
@@ -220,6 +363,39 @@ impl<R: Read> SampleArchiveReader<R> {
         Ok(())
     }
 
+    fn validate_archive_stream_totals(
+        &mut self,
+        block: &BlockHeader,
+    ) -> Result<(), SampleArchiveError> {
+        let block_decompressed_bytes = block
+            .syndrome_uncompressed_len
+            .checked_add(block.free_uncompressed_len)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        let next_decompressed_archive_bytes = self
+            .decompressed_archive_bytes
+            .checked_add(block_decompressed_bytes)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        if next_decompressed_archive_bytes > self.limits.max_decompressed_bytes_per_archive {
+            return Err(limit("decompressed archive bytes exceed limit"));
+        }
+
+        let block_compressed_bytes = block
+            .syndrome_compressed_len
+            .checked_add(block.free_compressed_len)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        let next_compressed_archive_bytes = self
+            .compressed_archive_bytes
+            .checked_add(block_compressed_bytes)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        if next_compressed_archive_bytes > self.limits.max_compressed_bytes_per_archive {
+            return Err(limit("compressed archive bytes exceed limit"));
+        }
+
+        self.decompressed_archive_bytes = next_decompressed_archive_bytes;
+        self.compressed_archive_bytes = next_compressed_archive_bytes;
+        Ok(())
+    }
+
     fn read_stream(&mut self, len: u64) -> Result<Vec<u8>, SampleArchiveError> {
         let len = usize::try_from(len).map_err(|_| limit("compressed stream too large"))?;
         let mut bytes = Vec::new();
@@ -260,9 +436,6 @@ fn validate_header_limits(
         .ok_or_else(|| shape("header rank exceeds measurement count"))?;
     if free > limits.max_free_measurements {
         return Err(limit("header free width exceeds limit"));
-    }
-    if header.total_shots > 0 && header.total_shots > header.max_shots_per_block {
-        return Err(shape("one-block archive exceeds header block-shot limit"));
     }
     Ok(())
 }
@@ -403,9 +576,11 @@ mod tests {
             test_limits(),
         )
         .expect("writer constructs");
-        writer
-            .write_measurements(&measurements)
-            .expect("write measurements");
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .expect("write measurements");
+        }
         writer.finish().expect("finish writer")
     }
 
@@ -469,9 +644,12 @@ mod tests {
 
         let mut bad = header.clone();
         bad.max_shots_per_block = 4;
+        validate_header_limits(&bad, test_limits())
+            .expect("multi-block archive may have total shots above block size");
+        bad.max_shots_per_block = test_limits().transform.max_shots_per_block + 1;
         assert_code(
             validate_header_limits(&bad, test_limits()),
-            SampleArchiveErrorCode::ShapeMismatch,
+            SampleArchiveErrorCode::LimitExceeded,
         );
 
         let mut bad = header;
@@ -525,7 +703,49 @@ mod tests {
             SampleArchiveErrorCode::LimitExceeded,
         );
 
+        let block_decompressed_bytes = block
+            .syndrome_uncompressed_len
+            .checked_add(block.free_uncompressed_len)
+            .expect("test decompressed byte sum");
+        assert!(block_decompressed_bytes > 0);
+        let mut cumulative_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        cumulative_reader.limits.max_decompressed_bytes_per_archive =
+            block_decompressed_bytes * 2 - 1;
+        cumulative_reader
+            .validate_archive_stream_totals(&block)
+            .expect("first block within decompressed archive limit");
+        assert_code(
+            cumulative_reader.validate_archive_stream_totals(&block),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
+        let block_compressed_bytes = block
+            .syndrome_compressed_len
+            .checked_add(block.free_compressed_len)
+            .expect("test compressed byte sum");
+        assert!(block_compressed_bytes > 0);
+        let mut cumulative_reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
+                .expect("open reader");
+        cumulative_reader.limits.max_compressed_bytes_per_archive = block_compressed_bytes * 2 - 1;
+        cumulative_reader
+            .validate_archive_stream_totals(&block)
+            .expect("first block within compressed archive limit");
+        assert_code(
+            cumulative_reader.validate_archive_stream_totals(&block),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+
         reader.limits = test_limits();
+        let mut bad = block.clone();
+        bad.shot_count = 6;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::ShapeMismatch,
+        );
+
         let mut bad = block.clone();
         bad.syndrome_codec_id = 999;
         assert_code(
@@ -589,13 +809,36 @@ mod tests {
     }
 
     #[test]
+    fn next_block_covers_post_trailer_and_bad_magic_edges() {
+        let zero_circuit = parse("M 0\n");
+        let archive = archive_for(&zero_circuit, 0);
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &zero_circuit, test_limits())
+                .expect("open zero-shot reader");
+        assert!(reader.next_block().expect("read trailer").is_none());
+        assert!(reader
+            .next_block()
+            .expect("trailer stays consumed")
+            .is_none());
+
+        let circuit = parse("M 0\n");
+        let mut bad = archive_for(&circuit, 1);
+        bad[GLOBAL_HEADER_LEN..GLOBAL_HEADER_LEN + 8].copy_from_slice(b"BADMAGIC");
+        let mut reader = SampleArchiveReader::open(io::Cursor::new(bad), &circuit, test_limits())
+            .expect("open bad-magic reader");
+        assert_code(reader.next_block(), SampleArchiveErrorCode::BadMagic);
+    }
+
+    #[test]
     fn finish_covers_unread_block_and_trailer_structure_edges() {
         let circuit = parse("M 0 1\nDETECTOR rec[-2]\n");
         let archive = archive_for(&circuit, 5);
 
         let reader = SampleArchiveReader::open(io::Cursor::new(&archive), &circuit, test_limits())
             .expect("open reader");
-        assert_code(reader.finish(), SampleArchiveErrorCode::ShapeMismatch);
+        let summary = reader.finish().expect("finish drains unread block");
+        assert_eq!(summary.block_count, 1);
+        assert_eq!(summary.total_shots, 5);
 
         let trailer_start = archive.len() - crate::sample_archive::format::ARCHIVE_TRAILER_LEN;
 
@@ -616,7 +859,7 @@ mod tests {
         expect_finish_error(
             bad_block_count,
             &circuit,
-            SampleArchiveErrorCode::MalformedArchive,
+            SampleArchiveErrorCode::ShapeMismatch,
         );
 
         let mut bad_total = archive.clone();
