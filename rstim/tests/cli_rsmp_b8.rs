@@ -426,6 +426,23 @@ fn verify_negative_cases(root: &Path) -> usize {
     assert_sentinel(&stream_conflict_out, cases as u8);
     assert_no_new_siblings(root, &entries);
 
+    let stream_conflict_out = sentinel("stream_conflict_stdin.b8");
+    write_sentinel(&stream_conflict_out, cases as u8);
+    let entries = directory_entries(root);
+    let output = run_cli(
+        &unpack_args(
+            Path::new("-"),
+            Path::new("-"),
+            Some(&stream_conflict_out),
+            None,
+            None,
+        ),
+        Some(&fs::read(&archive).expect("read valid archive")),
+    );
+    assert_failure(&output, "unpack multiple stdin consumers");
+    assert_sentinel(&stream_conflict_out, cases as u8);
+    assert_no_new_siblings(root, &entries);
+
     let stream_conflict_out = sentinel("stream_conflict.b8");
     write_sentinel(&stream_conflict_out, cases as u8);
     let entries = directory_entries(root);
@@ -486,19 +503,31 @@ fn verify_negative_cases(root: &Path) -> usize {
     assert_no_new_siblings(root, &entries);
     cases += 1;
 
-    let corrupt_out = sentinel("corrupt_archive.b8");
-    write_sentinel(&corrupt_out, cases as u8);
+    let corrupt_measurements_out = sentinel("corrupt_archive.measurements.b8");
+    let corrupt_detections_out = sentinel("corrupt_archive.detections.b8");
+    let corrupt_observables_out = sentinel("corrupt_archive.observables.b8");
+    write_sentinel(&corrupt_measurements_out, cases as u8);
+    write_sentinel(&corrupt_detections_out, cases.wrapping_add(1) as u8);
+    write_sentinel(&corrupt_observables_out, cases.wrapping_add(2) as u8);
     let corrupt_archive = root.join("corrupt.rsmp");
     let mut corrupt = fs::read(&archive).expect("read valid archive");
-    corrupt[0] ^= 0xff;
+    corrupt.push(0);
     fs::write(&corrupt_archive, corrupt).expect("write corrupt archive");
     let entries = directory_entries(root);
     let output = run_cli(
-        &unpack_args(&circuit, &corrupt_archive, Some(&corrupt_out), None, None),
+        &unpack_args(
+            &circuit,
+            &corrupt_archive,
+            Some(&corrupt_measurements_out),
+            Some(&corrupt_detections_out),
+            Some(&corrupt_observables_out),
+        ),
         None,
     );
-    assert_failure_with_code(&output, "corrupt archive", "RSMP_BAD_MAGIC");
-    assert_sentinel(&corrupt_out, cases as u8);
+    assert_failure_with_code(&output, "archive trailing data", "RSMP_TRAILING_DATA");
+    assert_sentinel(&corrupt_measurements_out, cases as u8);
+    assert_sentinel(&corrupt_detections_out, cases.wrapping_add(1) as u8);
+    assert_sentinel(&corrupt_observables_out, cases.wrapping_add(2) as u8);
     assert_no_new_siblings(root, &entries);
     cases += 1;
 
