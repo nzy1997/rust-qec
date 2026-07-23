@@ -1,4 +1,7 @@
-use std::io::{self, Read, Write};
+use std::collections::BTreeSet;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 use rand::rngs::StdRng;
@@ -13,11 +16,15 @@ use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
 use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::measurement_transform::{DecodedSampleBlock, MeasurementTransform};
 use crate::output::{
     write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
     write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
+use crate::sample_archive::{
+    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
+};
 use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
 
@@ -222,6 +229,40 @@ pub enum Commands {
         sample_shot: bool,
         #[arg(long)]
         seed: Option<u64>,
+    },
+    /// Pack b8 measurement samples into an RSMP archive
+    #[command(name = "pack_samples")]
+    PackSamples {
+        #[arg(long = "circuit")]
+        circuit: String,
+        #[arg(long = "shots")]
+        shots: u64,
+        #[arg(long = "in")]
+        r#in: String,
+        #[arg(long = "in_format", default_value = "b8")]
+        in_format: String,
+        #[arg(long = "out")]
+        out: String,
+    },
+    /// Unpack an RSMP archive into b8 sample streams
+    #[command(name = "unpack_samples")]
+    UnpackSamples {
+        #[arg(long = "circuit")]
+        circuit: String,
+        #[arg(long = "in")]
+        r#in: String,
+        #[arg(long = "measurements_out")]
+        measurements_out: Option<String>,
+        #[arg(long = "measurements_out_format", default_value = "b8")]
+        measurements_out_format: String,
+        #[arg(long = "detectors_out")]
+        detectors_out: Option<String>,
+        #[arg(long = "detectors_out_format", default_value = "b8")]
+        detectors_out_format: String,
+        #[arg(long = "obs_out")]
+        obs_out: Option<String>,
+        #[arg(long = "obs_out_format", default_value = "b8")]
+        obs_out_format: String,
     },
     /// Run performance evidence workflows
     Perf {
@@ -604,6 +645,32 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
         }
+        Some(Commands::PackSamples {
+            circuit,
+            shots,
+            r#in,
+            in_format,
+            out,
+        }) => run_pack_samples(&circuit, shots, &r#in, &in_format, &out),
+        Some(Commands::UnpackSamples {
+            circuit,
+            r#in,
+            measurements_out,
+            measurements_out_format,
+            detectors_out,
+            detectors_out_format,
+            obs_out,
+            obs_out_format,
+        }) => run_unpack_samples(
+            &circuit,
+            &r#in,
+            measurements_out.as_deref(),
+            &measurements_out_format,
+            detectors_out.as_deref(),
+            &detectors_out_format,
+            obs_out.as_deref(),
+            &obs_out_format,
+        ),
         Some(Commands::Perf { command }) => {
             match command {
                 PerfCommands::Run {
@@ -906,6 +973,412 @@ pub fn open_output(path: Option<&str>) -> Result<Box<dyn Write>, String> {
         }
         None => Ok(Box::new(io::BufWriter::new(io::stdout().lock()))),
     }
+}
+
+struct PendingOutput {
+    final_path: PathBuf,
+    temp_path: PathBuf,
+    file: BufWriter<File>,
+    published: bool,
+}
+
+impl PendingOutput {
+    fn create(final_path: &str) -> Result<Self, String> {
+        let final_path = PathBuf::from(final_path);
+        let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
+        let name = final_path
+            .file_name()
+            .ok_or_else(|| "output path must name a file".to_string())?
+            .to_string_lossy();
+        let process_id = std::process::id();
+
+        for retry in 0..1024 {
+            let temp_path = parent.join(format!(".{name}.rstim-{process_id}-{retry}.tmp"));
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temp_path)
+            {
+                Ok(file) => {
+                    return Ok(Self {
+                        final_path,
+                        temp_path,
+                        file: BufWriter::new(file),
+                        published: false,
+                    });
+                }
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to create staged output {}: {error}",
+                        temp_path.display()
+                    ));
+                }
+            }
+        }
+
+        Err(format!(
+            "failed to allocate a staged output beside {}",
+            final_path.display()
+        ))
+    }
+
+    fn publish(&mut self) -> Result<(), String> {
+        self.file
+            .flush()
+            .map_err(|error| format!("failed to flush {}: {error}", self.temp_path.display()))?;
+        std::fs::rename(&self.temp_path, &self.final_path).map_err(|error| {
+            format!(
+                "failed to publish {} to {}: {error}",
+                self.temp_path.display(),
+                self.final_path.display()
+            )
+        })?;
+        self.published = true;
+        Ok(())
+    }
+}
+
+impl Drop for PendingOutput {
+    fn drop(&mut self) {
+        if !self.published {
+            let _ = std::fs::remove_file(&self.temp_path);
+        }
+    }
+}
+
+fn run_pack_samples(
+    circuit_path: &str,
+    shots: u64,
+    input_path: &str,
+    input_format: &str,
+    output_path: &str,
+) -> Result<(), String> {
+    preflight_pack_samples(circuit_path, shots, input_path, input_format, output_path)?;
+
+    let circuit_text = read_rsmp_text(circuit_path)?;
+    let circuit = parse_lines(&circuit_text)?;
+    let transform =
+        MeasurementTransform::from_circuit(&circuit).map_err(|error| error.to_string())?;
+    let data = read_rsmp_bytes(input_path)?;
+    let measurements = read_exact_b8_measurements(&data, transform.num_measurements(), shots)?;
+    let limits = ArchiveLimits::default();
+
+    if output_path == "-" {
+        let stdout = io::stdout();
+        let output = BufWriter::new(stdout.lock());
+        let mut writer = SampleArchiveWriter::new(
+            output,
+            transform,
+            shots,
+            SampleArchiveOptions::default(),
+            limits,
+        )
+        .map_err(|error| error.to_string())?;
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .map_err(|error| error.to_string())?;
+        }
+        writer.finish().map_err(|error| error.to_string())?;
+    } else {
+        let mut output = PendingOutput::create(output_path)?;
+        let mut writer = SampleArchiveWriter::new(
+            &mut output.file,
+            transform,
+            shots,
+            SampleArchiveOptions::default(),
+            limits,
+        )
+        .map_err(|error| error.to_string())?;
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .map_err(|error| error.to_string())?;
+        }
+        writer.finish().map_err(|error| error.to_string())?;
+        output.publish()?;
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_unpack_samples(
+    circuit_path: &str,
+    input_path: &str,
+    measurements_out: Option<&str>,
+    measurements_out_format: &str,
+    detectors_out: Option<&str>,
+    detectors_out_format: &str,
+    obs_out: Option<&str>,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    preflight_unpack_samples(
+        circuit_path,
+        input_path,
+        measurements_out,
+        measurements_out_format,
+        detectors_out,
+        detectors_out_format,
+        obs_out,
+        obs_out_format,
+    )?;
+
+    let circuit_text = read_rsmp_text(circuit_path)?;
+    let circuit = parse_lines(&circuit_text)?;
+    let decoded = if input_path == "-" {
+        let stdin = io::stdin();
+        read_sample_archive(stdin.lock(), &circuit)?
+    } else {
+        let input = File::open(input_path)
+            .map_err(|error| format!("failed to read {input_path}: {error}"))?;
+        read_sample_archive(BufReader::new(input), &circuit)?
+    };
+
+    write_unpacked_b8_outputs(&decoded, measurements_out, detectors_out, obs_out)
+}
+
+fn preflight_pack_samples(
+    circuit_path: &str,
+    shots: u64,
+    input_path: &str,
+    input_format: &str,
+    output_path: &str,
+) -> Result<(), String> {
+    if input_format != "b8" {
+        return Err("pack_samples only supports --in_format b8".to_string());
+    }
+    if [circuit_path, input_path]
+        .iter()
+        .filter(|path| **path == "-")
+        .count()
+        > 1
+    {
+        return Err("pack_samples accepts at most one stdin input".to_string());
+    }
+    if [output_path].iter().filter(|path| **path == "-").count() > 1 {
+        return Err("pack_samples accepts at most one stdout output".to_string());
+    }
+    if shots > ArchiveLimits::default().transform.max_shots_per_block {
+        return Err("pack_samples shot count exceeds archive block limit".to_string());
+    }
+    if output_path.is_empty() {
+        return Err("pack_samples requires --out".to_string());
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn preflight_unpack_samples(
+    circuit_path: &str,
+    input_path: &str,
+    measurements_out: Option<&str>,
+    measurements_out_format: &str,
+    detectors_out: Option<&str>,
+    detectors_out_format: &str,
+    obs_out: Option<&str>,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    let outputs = [
+        (
+            measurements_out,
+            measurements_out_format,
+            "--measurements_out_format",
+        ),
+        (
+            detectors_out,
+            detectors_out_format,
+            "--detectors_out_format",
+        ),
+        (obs_out, obs_out_format, "--obs_out_format"),
+    ];
+    if outputs.iter().all(|(path, _, _)| path.is_none()) {
+        return Err("unpack_samples requires at least one output".to_string());
+    }
+    for (path, format, flag) in outputs {
+        if path.is_some() && format != "b8" {
+            return Err(format!("unpack_samples only supports {flag} b8"));
+        }
+    }
+    if [circuit_path, input_path]
+        .iter()
+        .filter(|path| **path == "-")
+        .count()
+        > 1
+    {
+        return Err("unpack_samples accepts at most one stdin input".to_string());
+    }
+    if outputs
+        .iter()
+        .filter(|(path, _, _)| *path == Some("-"))
+        .count()
+        > 1
+    {
+        return Err("unpack_samples accepts at most one stdout output".to_string());
+    }
+
+    let mut final_paths = BTreeSet::new();
+    for (path, _, _) in outputs {
+        if let Some(path) = path.filter(|path| *path != "-") {
+            let normalized = lexical_absolute_path(path)?;
+            if !final_paths.insert(normalized) {
+                return Err("unpack_samples output paths must be distinct".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
+    let path = Path::new(path);
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("failed to resolve output path: {error}"))?
+            .join(path)
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Normal(name) => normalized.push(name),
+        }
+    }
+    Ok(normalized)
+}
+
+fn read_rsmp_text(path: &str) -> Result<String, String> {
+    if path == "-" {
+        let mut text = String::new();
+        io::stdin()
+            .read_to_string(&mut text)
+            .map_err(|error| format!("failed to read stdin: {error}"))?;
+        Ok(text)
+    } else {
+        std::fs::read_to_string(path).map_err(|error| format!("failed to read {path}: {error}"))
+    }
+}
+
+fn read_rsmp_bytes(path: &str) -> Result<Vec<u8>, String> {
+    if path == "-" {
+        let mut bytes = Vec::new();
+        io::stdin()
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("failed to read stdin: {error}"))?;
+        Ok(bytes)
+    } else {
+        std::fs::read(path).map_err(|error| format!("failed to read {path}: {error}"))
+    }
+}
+
+fn read_exact_b8_measurements(data: &[u8], bits: usize, shots: u64) -> Result<BitTable, String> {
+    let shots =
+        usize::try_from(shots).map_err(|_| "pack_samples shot count exceeds usize".to_string())?;
+    let bytes_per_shot = bits
+        .checked_add(7)
+        .ok_or_else(|| "b8 measurement width overflows".to_string())?
+        / 8;
+    let expected_len = bytes_per_shot
+        .checked_mul(shots)
+        .ok_or_else(|| "b8 input length overflows".to_string())?;
+    if data.len() != expected_len {
+        return Err(format!(
+            "b8 input has {} bytes; expected {expected_len}",
+            data.len()
+        ));
+    }
+    let partial_bits = bits % 8;
+    if partial_bits != 0 {
+        let unused_mask = !((1u8 << partial_bits) - 1);
+        for shot in 0..shots {
+            let last_byte = data[shot * bytes_per_shot + bytes_per_shot - 1];
+            if last_byte & unused_mask != 0 {
+                return Err("b8 input has nonzero unused high bits".to_string());
+            }
+        }
+    }
+
+    let mut measurements = BitTable::try_new(bits, shots)
+        .map_err(|error| format!("BitTable allocation failed: {error:?}"))?;
+    for shot in 0..shots {
+        for bit in 0..bits {
+            let byte = data[shot * bytes_per_shot + bit / 8];
+            if byte & (1 << (bit % 8)) != 0 {
+                measurements.set(bit, shot, true);
+            }
+        }
+    }
+    Ok(measurements)
+}
+
+fn read_sample_archive<R: Read>(
+    input: R,
+    circuit: &[crate::ir::StimInstr],
+) -> Result<DecodedSampleBlock, String> {
+    let mut reader = SampleArchiveReader::open(input, circuit, ArchiveLimits::default())
+        .map_err(|error| error.to_string())?;
+    let block = reader.next_block().map_err(|error| error.to_string())?;
+    reader.finish().map_err(|error| error.to_string())?;
+    if let Some(block) = block {
+        return Ok(block);
+    }
+
+    let transform =
+        MeasurementTransform::from_circuit(circuit).map_err(|error| error.to_string())?;
+    Ok(DecodedSampleBlock {
+        measurements: empty_bit_table(transform.num_measurements())?,
+        detections: empty_bit_table(transform.num_detectors())?,
+        observable_flips: empty_bit_table(transform.num_observables())?,
+    })
+}
+
+fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
+    BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
+}
+
+fn write_unpacked_b8_outputs(
+    decoded: &DecodedSampleBlock,
+    measurements_out: Option<&str>,
+    detectors_out: Option<&str>,
+    obs_out: Option<&str>,
+) -> Result<(), String> {
+    let outputs = [
+        (measurements_out, &decoded.measurements),
+        (detectors_out, &decoded.detections),
+        (obs_out, &decoded.observable_flips),
+    ];
+
+    for (path, table) in outputs {
+        if path == Some("-") {
+            let stdout = io::stdout();
+            let mut output = BufWriter::new(stdout.lock());
+            write_shots_b8(table, &mut output).map_err(|error| format!("write error: {error}"))?;
+            output
+                .flush()
+                .map_err(|error| format!("write error: {error}"))?;
+        }
+    }
+
+    let mut pending_outputs = Vec::new();
+    for (path, table) in outputs {
+        if let Some(path) = path.filter(|path| *path != "-") {
+            let mut output = PendingOutput::create(path)?;
+            write_shots_b8(table, &mut output.file)
+                .map_err(|error| format!("write error: {error}"))?;
+            pending_outputs.push(output);
+        }
+    }
+    for output in &mut pending_outputs {
+        output.publish()?;
+    }
+    Ok(())
 }
 
 pub fn make_rng(seed: Option<u64>) -> StdRng {
