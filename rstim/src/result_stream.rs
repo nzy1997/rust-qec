@@ -1,8 +1,8 @@
+use crate::measurement_transform::DecodedSampleBlock;
 use crate::output::OutputFormat;
 use crate::sim::bit_table::BitTable;
 use std::fmt;
-use std::io::Read;
-use std::marker::PhantomData;
+use std::io::{Read, Write};
 
 const MAX_READ_REQUEST: usize = 64 * 1024;
 
@@ -232,7 +232,6 @@ impl<R: Read> ResultBlockReader<R> {
     }
 }
 
-/// Output selection reserved for the result writer implemented in Task 3.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResultOutputKind {
     Measurements,
@@ -240,33 +239,168 @@ pub enum ResultOutputKind {
     Observables,
 }
 
-/// Temporary API placeholder so reader-only tests compile with the integration contract.
-pub struct ResultBlockWriter<W> {
-    _output: PhantomData<W>,
+pub struct ResultBlockWriter<W: Write> {
+    output: W,
+    kind: ResultOutputKind,
+    format: OutputFormat,
+    ptb64_width: Option<usize>,
+    ptb64_pending: Option<Ptb64Pending>,
 }
 
-impl<W> ResultBlockWriter<W> {
+#[derive(Clone)]
+struct Ptb64Pending {
+    words: Vec<u64>,
+    shots: usize,
+}
+
+impl<W: Write> ResultBlockWriter<W> {
     pub fn new(
-        _output: W,
-        _kind: ResultOutputKind,
-        _format: OutputFormat,
+        output: W,
+        kind: ResultOutputKind,
+        format: OutputFormat,
     ) -> Result<Self, ResultFormatError> {
+        if matches!(format, OutputFormat::Dets) && !matches!(kind, ResultOutputKind::Detectors) {
+            return Err(ResultFormatError::new(
+                "dets output format is only supported for detector results",
+            ));
+        }
         Ok(Self {
-            _output: PhantomData,
+            output,
+            kind,
+            format,
+            ptb64_width: None,
+            ptb64_pending: None,
         })
     }
 
-    pub fn write_block<T>(&mut self, _block: &T) -> Result<(), ResultFormatError> {
-        Err(ResultFormatError::new(
-            "ResultBlockWriter is not implemented yet",
-        ))
+    pub fn write_block(&mut self, block: &DecodedSampleBlock) -> Result<(), ResultFormatError> {
+        validate_block_shots(block)?;
+
+        if matches!(self.format, OutputFormat::Ptb64) {
+            return self.write_ptb64_block(self.selected_table(block));
+        }
+
+        let mut staging = Vec::new();
+        match (self.kind, self.format) {
+            (ResultOutputKind::Detectors, OutputFormat::Dets) => crate::output::write_shots_dets(
+                &block.detections,
+                &block.observable_flips,
+                &mut staging,
+            ),
+            (_, OutputFormat::Format01) => {
+                crate::output::write_shots_01(self.selected_table(block), &mut staging)
+            }
+            (_, OutputFormat::B8) => {
+                crate::output::write_shots_b8(self.selected_table(block), &mut staging)
+            }
+            (_, OutputFormat::R8) => {
+                crate::output::write_shots_r8(self.selected_table(block), &mut staging)
+            }
+            (_, OutputFormat::Hits) => {
+                crate::output::write_shots_hits(self.selected_table(block), &mut staging)
+            }
+            (_, OutputFormat::Dets | OutputFormat::Ptb64) => unreachable!("format was validated"),
+        }
+        .map_err(write_error)?;
+        self.output.write_all(&staging).map_err(write_error)
     }
+
+    pub fn finish(&mut self) -> Result<(), ResultFormatError> {
+        if matches!(self.format, OutputFormat::Ptb64) {
+            self.flush_ptb64_pending()?;
+        }
+        self.output.flush().map_err(write_error)
+    }
+
+    fn selected_table<'a>(&self, block: &'a DecodedSampleBlock) -> &'a BitTable {
+        match self.kind {
+            ResultOutputKind::Measurements => &block.measurements,
+            ResultOutputKind::Detectors => &block.detections,
+            ResultOutputKind::Observables => &block.observable_flips,
+        }
+    }
+
+    fn write_ptb64_block(&mut self, table: &BitTable) -> Result<(), ResultFormatError> {
+        let width = table.num_major();
+        if let Some(previous_width) = self.ptb64_width {
+            if previous_width != width {
+                return Err(ResultFormatError::new(
+                    "ptb64 result width changes between blocks",
+                ));
+            }
+        }
+
+        let mut pending = self.ptb64_pending.clone().unwrap_or(Ptb64Pending {
+            words: vec![0; width],
+            shots: 0,
+        });
+        let mut staging = Vec::new();
+        for shot in 0..table.num_minor() {
+            for bit in 0..width {
+                if table.get(bit, shot) {
+                    pending.words[bit] |= 1u64 << pending.shots;
+                }
+            }
+            pending.shots += 1;
+            if pending.shots == 64 {
+                append_ptb64_group(&pending.words, &mut staging);
+                pending.words.fill(0);
+                pending.shots = 0;
+            }
+        }
+
+        self.output.write_all(&staging).map_err(write_error)?;
+        self.ptb64_width = Some(width);
+        self.ptb64_pending = Some(pending);
+        Ok(())
+    }
+
+    fn flush_ptb64_pending(&mut self) -> Result<(), ResultFormatError> {
+        let Some(pending) = &self.ptb64_pending else {
+            return Ok(());
+        };
+        if pending.shots == 0 {
+            return Ok(());
+        }
+
+        let mut staging = Vec::new();
+        append_ptb64_group(&pending.words, &mut staging);
+        self.output.write_all(&staging).map_err(write_error)?;
+        self.ptb64_pending = Some(Ptb64Pending {
+            words: vec![0; pending.words.len()],
+            shots: 0,
+        });
+        Ok(())
+    }
+}
+
+fn validate_block_shots(block: &DecodedSampleBlock) -> Result<(), ResultFormatError> {
+    let measurements = block.measurements.num_minor();
+    let detections = block.detections.num_minor();
+    let observables = block.observable_flips.num_minor();
+    if measurements != detections || measurements != observables {
+        return Err(ResultFormatError::new(format!(
+            "result block shot counts differ: measurements={measurements}, detections={detections}, observables={observables}",
+        )));
+    }
+    Ok(())
+}
+
+fn append_ptb64_group(words: &[u64], output: &mut Vec<u8>) {
+    for word in words {
+        output.extend_from_slice(&word.to_le_bytes());
+    }
+}
+
+fn write_error(error: std::io::Error) -> ResultFormatError {
+    ResultFormatError::new(format!("failed writing result output: {error}"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::{OutputFormat, write_shots_01, write_shots_b8, write_shots_ptb64};
+    use crate::measurement_transform::DecodedSampleBlock;
+    use crate::output::{write_shots_01, write_shots_b8, write_shots_ptb64, OutputFormat};
     use crate::sim::bit_table::BitTable;
     use std::io::{self, Cursor, Read};
 
@@ -390,6 +524,125 @@ mod tests {
         assert_tables_equal(&actual, &expected);
     }
 
+    #[test]
+    fn writes_detector_dets_with_detector_and_observable_labels() {
+        let block = decoded_block(
+            BitTable::new(0, 2),
+            table_from_shots(&[&[true, false], &[false, true]]),
+            table_from_shots(&[&[false, true], &[true, false]]),
+        );
+        let mut output = Vec::new();
+        let mut writer =
+            ResultBlockWriter::new(&mut output, ResultOutputKind::Detectors, OutputFormat::Dets)
+                .unwrap();
+
+        writer.write_block(&block).unwrap();
+        writer.finish().unwrap();
+
+        assert_eq!(output, b"shot D0 L1\nshot D1 L0\n");
+    }
+
+    #[test]
+    fn writes_zero_detector_dets_with_observables() {
+        let block = decoded_block(
+            BitTable::new(0, 2),
+            BitTable::new(0, 2),
+            table_from_shots(&[&[true, false], &[false, true]]),
+        );
+        let mut output = Vec::new();
+        let mut writer =
+            ResultBlockWriter::new(&mut output, ResultOutputKind::Detectors, OutputFormat::Dets)
+                .unwrap();
+
+        writer.write_block(&block).unwrap();
+        writer.finish().unwrap();
+
+        assert_eq!(output, b"shot L0\nshot L1\n");
+    }
+
+    #[test]
+    fn writes_non_dets_detector_output_without_observables() {
+        let block = decoded_block(
+            BitTable::new(0, 2),
+            table_from_shots(&[&[true, false], &[false, true]]),
+            table_from_shots(&[&[true, true], &[true, true]]),
+        );
+        let mut output = Vec::new();
+        let mut writer = ResultBlockWriter::new(
+            &mut output,
+            ResultOutputKind::Detectors,
+            OutputFormat::Format01,
+        )
+        .unwrap();
+
+        writer.write_block(&block).unwrap();
+        writer.finish().unwrap();
+
+        assert_eq!(output, b"10\n01\n");
+    }
+
+    #[test]
+    fn rejects_mismatched_shot_counts_before_writing_a_block() {
+        let block = decoded_block(
+            BitTable::new(1, 2),
+            BitTable::new(1, 1),
+            BitTable::new(1, 2),
+        );
+        let sentinel = b"unchanged".to_vec();
+        let mut output = sentinel.clone();
+        let mut writer = ResultBlockWriter::new(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::Format01,
+        )
+        .unwrap();
+
+        assert!(writer.write_block(&block).is_err());
+        drop(writer);
+
+        assert_eq!(output, sentinel);
+    }
+
+    #[test]
+    fn carries_ptb64_groups_across_decoded_blocks_until_finish() {
+        let first = decoded_block(
+            sample_table(3, 40),
+            BitTable::new(0, 40),
+            BitTable::new(0, 40),
+        );
+        let second = decoded_block(
+            sample_table_with_shot_offset(3, 25, 40),
+            BitTable::new(0, 25),
+            BitTable::new(0, 25),
+        );
+        let expected = join_tables(&first.measurements, &second.measurements);
+        let mut expected_output = Vec::new();
+        write_shots_ptb64(&expected, &mut expected_output).unwrap();
+        let mut output = Vec::new();
+        let mut writer = ResultBlockWriter::new(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::Ptb64,
+        )
+        .unwrap();
+
+        writer.write_block(&first).unwrap();
+        writer.write_block(&second).unwrap();
+        writer.finish().unwrap();
+
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn rejects_dets_for_measurements_and_observables() {
+        for kind in [
+            ResultOutputKind::Measurements,
+            ResultOutputKind::Observables,
+        ] {
+            assert!(ResultBlockWriter::new(Vec::<u8>::new(), kind, OutputFormat::Dets).is_err());
+        }
+    }
+
     fn read_all(
         input: impl AsRef<[u8]>,
         width: usize,
@@ -430,13 +683,55 @@ mod tests {
     }
 
     fn sample_table(width: usize, shots: usize) -> BitTable {
+        sample_table_with_shot_offset(width, shots, 0)
+    }
+
+    fn sample_table_with_shot_offset(width: usize, shots: usize, shot_offset: usize) -> BitTable {
         let mut table = BitTable::new(width, shots);
         for bit in 0..width {
             for shot in 0..shots {
-                table.set(bit, shot, (bit * 17 + shot * 11) % 5 < 2);
+                table.set(bit, shot, (bit * 17 + (shot + shot_offset) * 11) % 5 < 2);
             }
         }
         table
+    }
+
+    fn decoded_block(
+        measurements: BitTable,
+        detections: BitTable,
+        observable_flips: BitTable,
+    ) -> DecodedSampleBlock {
+        DecodedSampleBlock {
+            measurements,
+            detections,
+            observable_flips,
+        }
+    }
+
+    fn table_from_shots(shots: &[&[bool]]) -> BitTable {
+        let width = shots.first().map_or(0, |shot| shot.len());
+        let mut table = BitTable::new(width, shots.len());
+        for (shot_index, shot) in shots.iter().enumerate() {
+            assert_eq!(shot.len(), width);
+            for (bit, &value) in shot.iter().enumerate() {
+                table.set(bit, shot_index, value);
+            }
+        }
+        table
+    }
+
+    fn join_tables(first: &BitTable, second: &BitTable) -> BitTable {
+        assert_eq!(first.num_major(), second.num_major());
+        let mut joined = BitTable::new(first.num_major(), first.num_minor() + second.num_minor());
+        for bit in 0..joined.num_major() {
+            for shot in 0..first.num_minor() {
+                joined.set(bit, shot, first.get(bit, shot));
+            }
+            for shot in 0..second.num_minor() {
+                joined.set(bit, first.num_minor() + shot, second.get(bit, shot));
+            }
+        }
+        joined
     }
 
     fn assert_tables_equal(actual: &BitTable, expected: &BitTable) {
