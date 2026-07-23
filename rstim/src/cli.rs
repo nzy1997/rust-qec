@@ -4,32 +4,32 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
-use crate::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
-};
 use crate::codegen::NoiseParams;
+use crate::codegen::css::{
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
+};
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 #[cfg(test)]
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
 use crate::output::{
-    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
-    write_shots_r8, OutputFormat,
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
+    write_shots_ptb64, write_shots_r8,
 };
 use crate::parser::parse_lines;
 use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
-    format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
-    SampleArchiveWriter,
+    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
+    format::SampleArchiveErrorCode,
 };
-use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
+use crate::sampler::{SampleOptions, SampleOutputMode, sample_batch, sample_batch_with_options};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -1135,7 +1135,7 @@ fn run_pack_samples(
             SampleArchiveOptions::default(),
             limits,
         )
-        .map_err(|error| error.to_string())?;
+        .map_err(format_sample_archive_error_for_rsmp_cli)?;
         stream_pack_measurements(
             input,
             measurement_count,
@@ -1144,7 +1144,9 @@ fn run_pack_samples(
             max_chunk_shots,
             &mut writer,
         )?;
-        writer.finish().map_err(|error| error.to_string())?;
+        writer
+            .finish()
+            .map_err(format_sample_archive_error_for_rsmp_cli)?;
     } else {
         let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)?;
         let mut writer = SampleArchiveWriter::new(
@@ -1154,7 +1156,7 @@ fn run_pack_samples(
             SampleArchiveOptions::default(),
             limits,
         )
-        .map_err(|error| error.to_string())?;
+        .map_err(format_sample_archive_error_for_rsmp_cli)?;
         stream_pack_measurements(
             input,
             measurement_count,
@@ -1163,7 +1165,9 @@ fn run_pack_samples(
             max_chunk_shots,
             &mut writer,
         )?;
-        writer.finish().map_err(|error| error.to_string())?;
+        writer
+            .finish()
+            .map_err(format_sample_archive_error_for_rsmp_cli)?;
         output.publish()?;
     }
 
@@ -1194,9 +1198,10 @@ fn run_unpack_samples(
 
     let circuit_text = read_rsmp_text(circuit_path)?;
     let circuit = parse_lines(&circuit_text)?;
-    let input = open_rsmp_read(input_path)?;
+    let input = open_rsmp_read(input_path)
+        .map_err(|_| format_rsmp_cli_error(SampleArchiveErrorCode::Io, "archive I/O failed"))?;
     let reader = SampleArchiveReader::open(input, &circuit, ArchiveLimits::default())
-        .map_err(|error| error.to_string())?;
+        .map_err(format_sample_archive_error_for_rsmp_cli)?;
 
     stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
 }
@@ -1418,13 +1423,22 @@ fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
 
 fn format_transform_error_for_rsmp_cli(error: MeasurementTransformError) -> String {
     match error {
-        MeasurementTransformError::UnsupportedSweep => format!(
-            "{}: {}",
-            SampleArchiveErrorCode::UnsupportedSweep.as_str(),
-            error
+        MeasurementTransformError::UnsupportedSweep => format_rsmp_cli_error(
+            SampleArchiveErrorCode::UnsupportedSweep,
+            "sweep-bit circuits are not supported",
         ),
         _ => error.to_string(),
     }
+}
+
+fn format_sample_archive_error_for_rsmp_cli(
+    error: crate::sample_archive::format::SampleArchiveError,
+) -> String {
+    format_rsmp_cli_error(error.code(), error.detail())
+}
+
+fn format_rsmp_cli_error(code: SampleArchiveErrorCode, detail: &str) -> String {
+    format!("rsmp error [{}]: {detail}", code.as_str())
 }
 
 fn read_rsmp_text(path: &str) -> Result<String, String> {
@@ -1467,7 +1481,7 @@ fn stream_pack_measurements<W: Write>(
     while let Some(measurements) = reader.next_block().map_err(|error| error.to_string())? {
         writer
             .write_measurements(&measurements)
-            .map_err(|error| error.to_string())?;
+            .map_err(format_sample_archive_error_for_rsmp_cli)?;
     }
     Ok(())
 }
@@ -1599,7 +1613,10 @@ fn stream_unpack_outputs<R: Read>(
         })
         .transpose()?;
 
-    while let Some(block) = reader.next_block().map_err(|error| error.to_string())? {
+    while let Some(block) = reader
+        .next_block()
+        .map_err(format_sample_archive_error_for_rsmp_cli)?
+    {
         if let Some(writer) = measurements_writer.as_mut() {
             writer
                 .write_block(&block)
@@ -1617,7 +1634,9 @@ fn stream_unpack_outputs<R: Read>(
         }
     }
 
-    reader.finish().map_err(|error| error.to_string())?;
+    reader
+        .finish()
+        .map_err(format_sample_archive_error_for_rsmp_cli)?;
     if let Some(writer) = measurements_writer.as_mut() {
         writer.finish().map_err(|error| error.to_string())?;
     }
@@ -3090,9 +3109,11 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
-            .unwrap()
-            .contains("\"cases\""));
+        assert!(
+            std::fs::read_to_string(gate_out_dir.join("summary.json"))
+                .unwrap()
+                .contains("\"cases\"")
+        );
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -3309,9 +3330,11 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                .unwrap()
-                .contains("QUBIT_COORDS"));
+            assert!(
+                generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                    .unwrap()
+                    .contains("QUBIT_COORDS")
+            );
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)

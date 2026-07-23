@@ -124,7 +124,7 @@ fn verify_writer_limit_rejects_before_syndrome_materialization() {
     let transform = MeasurementTransform::from_circuit(&circuit).expect("limit transform");
     let measurements = BitTable::new(transform.num_measurements(), 1);
     let mut limits = ArchiveLimits::default();
-    limits.max_decompressed_bytes_per_stream = 0;
+    limits.max_decompressed_bytes_per_frame = 0;
     limits.max_decompressed_bytes_per_archive = 0;
     reset_materialization_telemetry();
 

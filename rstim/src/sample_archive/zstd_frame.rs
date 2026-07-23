@@ -5,6 +5,7 @@ use std::io::Write;
 const ZSTD_MAGIC: [u8; 4] = [0x28, 0xb5, 0x2f, 0xfd];
 const ZSTD_BLOCK_HEADER_LEN: usize = 3;
 const ZSTD_FRAME_CHECKSUM_LEN: usize = 4;
+const ZSTD_DECODER_CONTEXT_BYTES: u64 = 256 * 1024;
 
 pub(crate) fn compress_frame(bytes: &[u8], level: i32) -> Result<Vec<u8>, SampleArchiveError> {
     let mut encoder = zstd::stream::Encoder::new(Vec::new(), level)
@@ -35,20 +36,10 @@ pub(crate) fn decompress_frame(
     limits: ArchiveLimits,
 ) -> Result<Vec<u8>, SampleArchiveError> {
     let header = parse_frame_header(compressed)?;
-    if !header.content_checksum {
-        return Err(decompression_failed("zstd frame checksum is missing"));
-    }
-    let Some(content_size) = header.content_size else {
-        return Err(decompression_failed("zstd frame content size is missing"));
-    };
-    if content_size != declared_len {
-        return Err(decompression_failed(
-            "zstd frame content size does not match declaration",
-        ));
-    }
     let frame_len = single_frame_len(compressed, header.header_len, header.content_checksum)?;
-    if frame_len != compressed.len() {
-        return Err(decompression_failed(
+    if frame_len != compressed.len() && starts_with_zstd_frame_magic(&compressed[frame_len..]) {
+        return Err(SampleArchiveError::with_code(
+            SampleArchiveErrorCode::MalformedArchive,
             "zstd stream must contain exactly one frame",
         ));
     }
@@ -58,20 +49,29 @@ pub(crate) fn decompress_frame(
             "zstd window exceeds limit",
         ));
     }
-    if header
-        .window_size
-        .checked_add(content_size)
-        .ok_or_else(|| {
-            SampleArchiveError::with_code(
-                SampleArchiveErrorCode::LimitExceeded,
-                "zstd decoder memory overflow",
-            )
-        })?
-        > limits.max_zstd_decoder_memory_bytes
-    {
+    let Some(content_size) = header.content_size else {
+        return Err(decompression_failed("zstd frame content size is missing"));
+    };
+    let decoder_memory =
+        checked_decoder_memory_bytes(compressed.len(), content_size, header.window_size)?;
+    if decoder_memory > limits.max_zstd_decoder_memory_bytes {
         return Err(SampleArchiveError::with_code(
             SampleArchiveErrorCode::LimitExceeded,
             "zstd decoder memory exceeds limit",
+        ));
+    }
+    if content_size != declared_len {
+        return Err(decompression_failed(
+            "zstd frame content size does not match declaration",
+        ));
+    }
+    if !header.content_checksum {
+        return Err(decompression_failed("zstd frame checksum is missing"));
+    }
+    if frame_len != compressed.len() {
+        return Err(SampleArchiveError::with_code(
+            SampleArchiveErrorCode::MalformedArchive,
+            "zstd stream must contain exactly one frame",
         ));
     }
     let capacity = usize::try_from(declared_len).map_err(|_| {
@@ -80,7 +80,13 @@ pub(crate) fn decompress_frame(
             "zstd content size too large",
         )
     })?;
-    let decoded = zstd::bulk::decompress(compressed, capacity)
+    let mut decoder = zstd::bulk::Decompressor::new()
+        .map_err(|_| decompression_failed("failed to initialize zstd decoder"))?;
+    decoder
+        .window_log_max(window_log_max_for_limit(limits.max_zstd_window_bytes))
+        .map_err(|_| decompression_failed("failed to configure zstd window limit"))?;
+    let decoded = decoder
+        .decompress(compressed, capacity)
         .map_err(|_| decompression_failed("zstd decompression failed"))?;
     if decoded.len() as u64 != declared_len {
         return Err(decompression_failed(
@@ -88,6 +94,47 @@ pub(crate) fn decompress_frame(
         ));
     }
     Ok(decoded)
+}
+
+fn checked_decoder_memory_bytes(
+    compressed_len: usize,
+    content_size: u64,
+    window_size: u64,
+) -> Result<u64, SampleArchiveError> {
+    let compressed_len = u64::try_from(compressed_len).map_err(|_| {
+        SampleArchiveError::with_code(
+            SampleArchiveErrorCode::LimitExceeded,
+            "zstd input size too large",
+        )
+    })?;
+    [
+        ZSTD_DECODER_CONTEXT_BYTES,
+        compressed_len,
+        content_size,
+        window_size,
+    ]
+    .into_iter()
+    .try_fold(0u64, |acc, value| {
+        acc.checked_add(value).ok_or_else(|| {
+            SampleArchiveError::with_code(
+                SampleArchiveErrorCode::LimitExceeded,
+                "zstd decoder memory overflow",
+            )
+        })
+    })
+}
+
+fn window_log_max_for_limit(max_window_bytes: u64) -> u32 {
+    let bounded = max_window_bytes.max(1024);
+    (u64::BITS - bounded.saturating_sub(1).leading_zeros()).min(31)
+}
+
+fn starts_with_zstd_frame_magic(bytes: &[u8]) -> bool {
+    if bytes.len() < ZSTD_MAGIC.len() {
+        return false;
+    }
+    bytes[..ZSTD_MAGIC.len()] == ZSTD_MAGIC
+        || (bytes[1..4] == [0x2a, 0x4d, 0x18] && (0x50..=0x5f).contains(&bytes[0]))
 }
 
 #[derive(Debug, Clone, Copy)]
