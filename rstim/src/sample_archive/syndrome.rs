@@ -7,7 +7,16 @@ use crate::sim::bit_table::{BitTable, BitTableAllocError};
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+static CURRENT_MATERIALIZED_CANDIDATES: AtomicUsize = AtomicUsize::new(0);
 static MAX_MATERIALIZED_CANDIDATES: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyndromePlan {
+    pub codec_id: u16,
+    pub raw_len: u64,
+    pub dense_len: u64,
+    pub sparse_len: u64,
+}
 
 pub struct SyndromeEncoding {
     pub codec_id: u16,
@@ -18,15 +27,25 @@ pub struct SyndromeEncoding {
 }
 
 pub fn encode_syndrome(table: &BitTable) -> Result<SyndromeEncoding, SampleArchiveError> {
-    reset_materialization_telemetry();
+    let plan = plan_syndrome(table)?;
+    let raw = materialize_syndrome(table, plan)?;
 
+    Ok(SyndromeEncoding {
+        codec_id: plan.codec_id,
+        raw_len: plan.raw_len,
+        raw,
+        dense_len: plan.dense_len,
+        sparse_len: plan.sparse_len,
+    })
+}
+
+pub fn plan_syndrome(table: &BitTable) -> Result<SyndromePlan, SampleArchiveError> {
     let rows = table.num_major() as u64;
     let shots = table.num_minor() as u64;
     if rows == 0 || shots == 0 {
-        return Ok(SyndromeEncoding {
+        return Ok(SyndromePlan {
             codec_id: STREAM_CODEC_EMPTY,
             raw_len: 0,
-            raw: Vec::new(),
             dense_len: 0,
             sparse_len: 0,
         });
@@ -34,31 +53,38 @@ pub fn encode_syndrome(table: &BitTable) -> Result<SyndromeEncoding, SampleArchi
 
     let dense_len = checked_dense_bit_bytes(rows, shots)?;
     let sparse_len = checked_sparse_len(table)?;
-    let (codec_id, raw) = if dense_len <= sparse_len {
-        (STREAM_CODEC_SYNDROME_DENSE_V1, materialize_dense(table)?)
+    let (codec_id, raw_len) = if dense_len <= sparse_len {
+        (STREAM_CODEC_SYNDROME_DENSE_V1, dense_len)
     } else {
-        (
-            STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1,
-            materialize_sparse(table, sparse_len)?,
-        )
+        (STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, sparse_len)
     };
-    let raw_len = u64::try_from(raw.len()).map_err(|_| limit("syndrome stream too large"))?;
-    debug_assert_eq!(
-        raw_len,
-        if codec_id == STREAM_CODEC_SYNDROME_DENSE_V1 {
-            dense_len
-        } else {
-            sparse_len
-        }
-    );
 
-    Ok(SyndromeEncoding {
+    Ok(SyndromePlan {
         codec_id,
         raw_len,
-        raw,
         dense_len,
         sparse_len,
     })
+}
+
+pub fn materialize_syndrome(
+    table: &BitTable,
+    plan: SyndromePlan,
+) -> Result<Vec<u8>, SampleArchiveError> {
+    begin_materialization_window();
+    let raw = match plan.codec_id {
+        STREAM_CODEC_EMPTY => Vec::new(),
+        STREAM_CODEC_SYNDROME_DENSE_V1 => materialize_dense(table)?,
+        STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1 => materialize_sparse(table, plan.raw_len)?,
+        _ => return Err(malformed("unknown syndrome codec")),
+    };
+    let raw_len = u64::try_from(raw.len()).map_err(|_| limit("syndrome stream too large"))?;
+    if raw_len != plan.raw_len {
+        return Err(limit(
+            "syndrome stream length changed during materialization",
+        ));
+    }
+    Ok(raw)
 }
 
 pub fn decode_syndrome_raw(
@@ -93,23 +119,11 @@ pub fn decode_syndrome_raw(
             if rows == 0 || shots == 0 {
                 return Err(malformed("empty syndrome uses nonempty codec"));
             }
-            for_each_sparse_syndrome_hit(
-                raw,
-                declared_raw_len,
-                rows as u64,
-                shots as u64,
-                |_, _| {},
-            )?;
+            parse_sparse_syndrome(raw, rows as u64, shots as u64, |_, _| {})?;
             let mut table = BitTable::try_new(rows, shots).map_err(map_alloc)?;
-            for_each_sparse_syndrome_hit(
-                raw,
-                declared_raw_len,
-                rows as u64,
-                shots as u64,
-                |shot, detector| {
-                    table.set(detector as usize, shot as usize, true);
-                },
-            )?;
+            parse_sparse_syndrome(raw, rows as u64, shots as u64, |shot, detector| {
+                table.set(detector as usize, shot as usize, true);
+            })?;
             Ok(table)
         }
         _ => Err(malformed("unknown syndrome codec")),
@@ -129,6 +143,7 @@ pub fn for_each_sparse_syndrome_hit(
 }
 
 pub fn reset_materialization_telemetry() {
+    CURRENT_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
     MAX_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
 }
 
@@ -333,12 +348,17 @@ fn validate_declared_raw_len(raw: &[u8], declared_raw_len: u64) -> Result<(), Sa
     }
 }
 
+fn begin_materialization_window() {
+    CURRENT_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
+}
+
 fn record_materialized_candidate() {
+    let current = CURRENT_MATERIALIZED_CANDIDATES.fetch_add(1, Ordering::Relaxed) + 1;
     let mut observed = MAX_MATERIALIZED_CANDIDATES.load(Ordering::Relaxed);
-    while observed < 1 {
+    while observed < current {
         match MAX_MATERIALIZED_CANDIDATES.compare_exchange_weak(
             observed,
-            1,
+            current,
             Ordering::Relaxed,
             Ordering::Relaxed,
         ) {
@@ -358,4 +378,18 @@ fn malformed(detail: &'static str) -> SampleArchiveError {
 
 fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::LimitExceeded, detail)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn materialization_telemetry_tracks_multiple_candidates_in_one_window() {
+        reset_materialization_telemetry();
+        begin_materialization_window();
+        record_materialized_candidate();
+        record_materialized_candidate();
+        assert_eq!(max_materialized_candidates(), 2);
+    }
 }

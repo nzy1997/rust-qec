@@ -42,6 +42,7 @@ fn verify_known_cases() -> usize {
         STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1
     );
     verify_sparse_archive_round_trip();
+    verify_writer_limit_rejects_before_syndrome_materialization();
 
     let mut all_one = BitTable::new(8, 1);
     for detector in 0..8 {
@@ -117,6 +118,29 @@ fn verify_sparse_archive_round_trip() {
     assert_tables_eq(&decoded.measurements, &measurements);
 }
 
+fn verify_writer_limit_rejects_before_syndrome_materialization() {
+    let circuit_text = sparse_archive_circuit(9);
+    let circuit = parse_lines(&circuit_text).expect("parse limit circuit");
+    let transform = MeasurementTransform::from_circuit(&circuit).expect("limit transform");
+    let measurements = BitTable::new(transform.num_measurements(), 1);
+    let mut limits = ArchiveLimits::default();
+    limits.max_decompressed_bytes_per_stream = 0;
+    limits.max_decompressed_bytes_per_archive = 0;
+    reset_materialization_telemetry();
+
+    let mut writer = SampleArchiveWriter::new(
+        Vec::new(),
+        transform,
+        1,
+        SampleArchiveOptions::default(),
+        limits,
+    )
+    .expect("limit writer");
+    let err = writer.write_measurements(&measurements).unwrap_err();
+    assert_eq!(err.code(), SampleArchiveErrorCode::LimitExceeded);
+    assert_eq!(max_materialized_candidates(), 0);
+}
+
 fn verify_uleb_boundaries() -> usize {
     for detector in [127, 128, 16_383, 16_384] {
         let mut table = BitTable::new(detector + 1, 1);
@@ -139,7 +163,7 @@ fn verify_uleb_boundaries() -> usize {
 fn verify_malformed_cases() -> usize {
     let mut delta_overflow = vec![0x02];
     delta_overflow.extend(uleb(u64::MAX - 1));
-    delta_overflow.push(0x00);
+    delta_overflow.push(0x01);
 
     let sparse_malformed = [
         ("noncanonical ULEB zero", vec![0x80, 0x00], 1u64, 1u64),

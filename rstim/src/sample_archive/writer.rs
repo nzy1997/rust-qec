@@ -8,7 +8,9 @@ use crate::sample_archive::format::{
 };
 use crate::sample_archive::integrity::{finalize_header, finalize_trailer};
 use crate::sample_archive::limits::{ArchiveLimits, SampleArchiveOptions};
-use crate::sample_archive::syndrome::{encode_syndrome, update_dense_syndrome_hash};
+use crate::sample_archive::syndrome::{
+    materialize_syndrome, plan_syndrome, update_dense_syndrome_hash,
+};
 use crate::sample_archive::zstd_frame::compress_frame;
 use crate::sim::bit_table::BitTable;
 use sha2::{Digest, Sha256};
@@ -95,18 +97,19 @@ impl<W: Write> SampleArchiveWriter<W> {
             encoded.free_measurements.num_major() as u64,
             measurements.num_minor() as u64,
         )?;
-        let syndrome = encode_syndrome(&encoded.selected_detectors)?;
-        validate_decompressed_streams(syndrome.raw_len, free_len, self.limits)?;
+        let syndrome_plan = plan_syndrome(&encoded.selected_detectors)?;
+        validate_decompressed_streams(syndrome_plan.raw_len, free_len, self.limits)?;
+        let syndrome = materialize_syndrome(&encoded.selected_detectors, syndrome_plan)?;
         let free = pack_dense(&encoded.free_measurements)?;
         let mut logical_hasher = Sha256::new();
         update_dense_syndrome_hash(&encoded.selected_detectors, &mut logical_hasher)?;
         logical_hasher.update(&free);
         let logical_payload_sha256: [u8; 32] = logical_hasher.finalize().into();
 
-        let syndrome_frame = if syndrome.raw.is_empty() {
+        let syndrome_frame = if syndrome.is_empty() {
             Vec::new()
         } else {
-            compress_frame(&syndrome.raw, self.options.compression_level)?
+            compress_frame(&syndrome, self.options.compression_level)?
         };
         let free_frame = if free.is_empty() {
             Vec::new()
@@ -123,13 +126,13 @@ impl<W: Write> SampleArchiveWriter<W> {
             block_index: 0,
             first_shot: 0,
             shot_count: self.total_shots,
-            syndrome_codec_id: syndrome.codec_id,
+            syndrome_codec_id: syndrome_plan.codec_id,
             free_codec_id: if free.is_empty() {
                 STREAM_CODEC_EMPTY
             } else {
                 STREAM_CODEC_FREE_DENSE_V1
             },
-            syndrome_uncompressed_len: syndrome.raw_len,
+            syndrome_uncompressed_len: syndrome_plan.raw_len,
             syndrome_compressed_len: syndrome_frame.len() as u64,
             free_uncompressed_len: free.len() as u64,
             free_compressed_len: free_frame.len() as u64,
