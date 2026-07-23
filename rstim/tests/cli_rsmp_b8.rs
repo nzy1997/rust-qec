@@ -433,10 +433,7 @@ fn verify_negative_cases(root: &Path) -> usize {
     let output = run_cli_with_open_stdin(
         &pack_args(
             &circuit,
-            rstim::sample_archive::ArchiveLimits::default()
-                .transform
-                .max_shots_per_block
-                + 1,
+            rstim::sample_archive::ArchiveLimits::default().max_total_shots + 1,
             "-",
             &archive,
         ),
@@ -757,23 +754,23 @@ fn verify_non_b8_format_rejections(
     write_sentinel(&input_archive, 0xa0);
     let entries = directory_entries(root);
     let output = run_cli(
-        &pack_args_with_format(circuit, 4, "-", &input_archive, "01"),
+        &pack_args_with_format(circuit, 4, "-", &input_archive, "r8"),
         Some(measurements),
     );
     assert_failure(&output, "unsupported --in_format");
     assert_sentinel(&input_archive, 0xa0);
     assert_no_new_siblings(root, &entries);
 
-    for (name, output_flag, tag) in [
-        ("measurements", "--measurements_out", 0xa1),
-        ("detectors", "--detectors_out", 0xa2),
-        ("observables", "--obs_out", 0xa3),
+    for (name, output_flag, format, tag) in [
+        ("measurements", "--measurements_out", "dets", 0xa1),
+        ("detectors", "--detectors_out", "unknown", 0xa2),
+        ("observables", "--obs_out", "dets", 0xa3),
     ] {
-        let destination = root.join(format!("unsupported_{name}_format.b8"));
+        let destination = root.join(format!("unsupported_{name}_format.out"));
         write_sentinel(&destination, tag);
         let entries = directory_entries(root);
         let output = run_cli(
-            &unpack_args_with_output_format(circuit, archive, output_flag, &destination, "01"),
+            &unpack_args_with_output_format(circuit, archive, output_flag, &destination, format),
             None,
         );
         assert_failure(&output, &format!("unsupported {output_flag}_format"));
