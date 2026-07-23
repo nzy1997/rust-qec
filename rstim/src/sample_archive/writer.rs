@@ -31,6 +31,8 @@ pub struct SampleArchiveWriter<W: Write> {
     written_shots: u64,
     buffered_shots: usize,
     buffer: Option<BitTable>,
+    decompressed_archive_bytes: u64,
+    compressed_archive_bytes: u64,
 }
 
 impl<W: Write> SampleArchiveWriter<W> {
@@ -76,6 +78,8 @@ impl<W: Write> SampleArchiveWriter<W> {
             written_shots: 0,
             buffered_shots: 0,
             buffer: None,
+            decompressed_archive_bytes: 0,
+            compressed_archive_bytes: 0,
         })
     }
 
@@ -188,6 +192,17 @@ impl<W: Write> SampleArchiveWriter<W> {
         )?;
         let syndrome_plan = plan_syndrome(&encoded.selected_detectors)?;
         validate_decompressed_streams(syndrome_plan.raw_len, free_len, self.limits)?;
+        let block_decompressed_bytes = syndrome_plan
+            .raw_len
+            .checked_add(free_len)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        let next_decompressed_archive_bytes = self
+            .decompressed_archive_bytes
+            .checked_add(block_decompressed_bytes)
+            .ok_or_else(|| limit("decompressed archive bytes overflow"))?;
+        if next_decompressed_archive_bytes > self.limits.max_decompressed_bytes_per_archive {
+            return Err(limit("decompressed archive bytes exceed limit"));
+        }
         let syndrome = materialize_syndrome(&encoded.selected_detectors, syndrome_plan)?;
         let free = pack_dense(&encoded.free_measurements)?;
         let mut logical_hasher = Sha256::new();
@@ -210,6 +225,16 @@ impl<W: Write> SampleArchiveWriter<W> {
             free_frame.len() as u64,
             self.limits,
         )?;
+        let block_compressed_bytes = (syndrome_frame.len() as u64)
+            .checked_add(free_frame.len() as u64)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        let next_compressed_archive_bytes = self
+            .compressed_archive_bytes
+            .checked_add(block_compressed_bytes)
+            .ok_or_else(|| limit("compressed archive bytes overflow"))?;
+        if next_compressed_archive_bytes > self.limits.max_compressed_bytes_per_archive {
+            return Err(limit("compressed archive bytes exceed limit"));
+        }
 
         let block_header = BlockHeader {
             block_index: self.next_block_index,
@@ -272,6 +297,8 @@ impl<W: Write> SampleArchiveWriter<W> {
             .checked_add(1)
             .ok_or_else(|| limit("block count overflow"))?;
         self.buffered_shots = 0;
+        self.decompressed_archive_bytes = next_decompressed_archive_bytes;
+        self.compressed_archive_bytes = next_compressed_archive_bytes;
         Ok(())
     }
 }
@@ -482,7 +509,7 @@ mod tests {
         }
     }
 
-    fn expect_write_error(
+    fn expect_write_or_finish_error(
         circuit: &str,
         shots: usize,
         limits: ArchiveLimits,
@@ -497,7 +524,10 @@ mod tests {
             limits,
         )
         .expect("writer constructs");
-        writer.write_measurements(&measurements).unwrap_err()
+        match writer.write_measurements(&measurements) {
+            Ok(()) => writer.finish().unwrap_err(),
+            Err(err) => err,
+        }
     }
 
     #[test]
@@ -563,28 +593,44 @@ mod tests {
         let mut limits = test_limits();
         limits.max_decompressed_bytes_per_stream = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 9, limits).code(),
+            expect_write_or_finish_error("M 0\n", 9, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_decompressed_bytes_per_archive = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 9, limits).code(),
+            expect_write_or_finish_error("M 0\n", 9, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_compressed_bytes_per_stream = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 1, limits).code(),
+            expect_write_or_finish_error("M 0\n", 1, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
 
         let mut limits = test_limits();
         limits.max_compressed_bytes_per_archive = 1;
         assert_eq!(
-            expect_write_error("M 0\n", 1, limits).code(),
+            expect_write_or_finish_error("M 0\n", 1, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 1;
+        limits.max_decompressed_bytes_per_archive = 1;
+        assert_eq!(
+            expect_write_or_finish_error("M 0\n", 2, limits).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 1;
+        limits.max_compressed_bytes_per_archive = 20;
+        assert_eq!(
+            expect_write_or_finish_error("M 0\n", 2, limits).code(),
             SampleArchiveErrorCode::LimitExceeded
         );
     }
