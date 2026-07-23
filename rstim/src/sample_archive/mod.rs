@@ -1,4 +1,6 @@
 pub mod format;
+#[doc(hidden)]
+pub mod syndrome;
 
 mod dense;
 mod integrity;
