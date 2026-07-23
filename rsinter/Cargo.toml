@@ -2,6 +2,7 @@
 name = "rsinter"
 version = "0.1.1"
 edition = "2024"
+license.workspace = true
 
 [features]
 default = ["full"]

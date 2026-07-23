@@ -2,6 +2,7 @@
 name = "rmatching"
 version = "0.1.1"
 edition = "2024"
+license.workspace = true
 
 [features]
 bench = ["dep:rstim", "dep:rand", "dep:serde", "dep:serde_json"]

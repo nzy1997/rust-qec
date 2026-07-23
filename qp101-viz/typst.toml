@@ -7,7 +7,7 @@ authors = [
   "nzy",
   "Codex"
 ]
-license = "MIT"
+license = "Apache-2.0"
 description = "Timeline visualization helpers for QP101-ZY circuit JSON."
 categories = ["visualization"]
 exclude = ["examples/", "checks/"]
