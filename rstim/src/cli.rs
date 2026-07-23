@@ -16,14 +16,17 @@ use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
 use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
-use crate::measurement_transform::{DecodedSampleBlock, MeasurementTransform};
+use crate::measurement_transform::{
+    DecodedSampleBlock, MeasurementTransform, MeasurementTransformError,
+};
 use crate::output::{
     write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
     write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
 use crate::sample_archive::{
-    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
+    format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
+    SampleArchiveWriter,
 };
 use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
@@ -983,7 +986,7 @@ struct PendingOutput {
 }
 
 impl PendingOutput {
-    fn create(final_path: &str) -> Result<Self, String> {
+    fn create(final_path: &str, reserved_final_paths: &BTreeSet<PathBuf>) -> Result<Self, String> {
         let final_path = PathBuf::from(final_path);
         let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
         let name = final_path
@@ -994,6 +997,9 @@ impl PendingOutput {
 
         for retry in 0..1024 {
             let temp_path = parent.join(format!(".{name}.rstim-{process_id}-{retry}.tmp"));
+            if reserved_final_paths.contains(&lexical_absolute_path_from_path(&temp_path)?) {
+                continue;
+            }
             match OpenOptions::new()
                 .write(true)
                 .create_new(true)
@@ -1054,12 +1060,13 @@ fn run_pack_samples(
     input_format: &str,
     output_path: &str,
 ) -> Result<(), String> {
-    preflight_pack_samples(circuit_path, shots, input_path, input_format, output_path)?;
+    let reserved_output_paths =
+        preflight_pack_samples(circuit_path, shots, input_path, input_format, output_path)?;
 
     let circuit_text = read_rsmp_text(circuit_path)?;
     let circuit = parse_lines(&circuit_text)?;
-    let transform =
-        MeasurementTransform::from_circuit(&circuit).map_err(|error| error.to_string())?;
+    let transform = MeasurementTransform::from_circuit(&circuit)
+        .map_err(format_transform_error_for_rsmp_cli)?;
     let data = read_rsmp_bytes(input_path)?;
     let measurements = read_exact_b8_measurements(&data, transform.num_measurements(), shots)?;
     let limits = ArchiveLimits::default();
@@ -1082,7 +1089,7 @@ fn run_pack_samples(
         }
         writer.finish().map_err(|error| error.to_string())?;
     } else {
-        let mut output = PendingOutput::create(output_path)?;
+        let mut output = PendingOutput::create(output_path, &reserved_output_paths)?;
         let mut writer = SampleArchiveWriter::new(
             &mut output.file,
             transform,
@@ -1114,7 +1121,7 @@ fn run_unpack_samples(
     obs_out: Option<&str>,
     obs_out_format: &str,
 ) -> Result<(), String> {
-    preflight_unpack_samples(
+    let reserved_output_paths = preflight_unpack_samples(
         circuit_path,
         input_path,
         measurements_out,
@@ -1136,7 +1143,13 @@ fn run_unpack_samples(
         read_sample_archive(BufReader::new(input), &circuit)?
     };
 
-    write_unpacked_b8_outputs(&decoded, measurements_out, detectors_out, obs_out)
+    write_unpacked_b8_outputs(
+        &decoded,
+        measurements_out,
+        detectors_out,
+        obs_out,
+        &reserved_output_paths,
+    )
 }
 
 fn preflight_pack_samples(
@@ -1145,7 +1158,7 @@ fn preflight_pack_samples(
     input_path: &str,
     input_format: &str,
     output_path: &str,
-) -> Result<(), String> {
+) -> Result<BTreeSet<PathBuf>, String> {
     if input_format != "b8" {
         return Err("pack_samples only supports --in_format b8".to_string());
     }
@@ -1166,7 +1179,11 @@ fn preflight_pack_samples(
     if output_path.is_empty() {
         return Err("pack_samples requires --out".to_string());
     }
-    Ok(())
+    let mut final_paths = BTreeSet::new();
+    if output_path != "-" {
+        final_paths.insert(lexical_absolute_path(output_path)?);
+    }
+    Ok(final_paths)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1179,7 +1196,7 @@ fn preflight_unpack_samples(
     detectors_out_format: &str,
     obs_out: Option<&str>,
     obs_out_format: &str,
-) -> Result<(), String> {
+) -> Result<BTreeSet<PathBuf>, String> {
     let outputs = [
         (
             measurements_out,
@@ -1227,11 +1244,14 @@ fn preflight_unpack_samples(
             }
         }
     }
-    Ok(())
+    Ok(final_paths)
 }
 
 fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
-    let path = Path::new(path);
+    lexical_absolute_path_from_path(Path::new(path))
+}
+
+fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -1252,6 +1272,17 @@ fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
         }
     }
     Ok(normalized)
+}
+
+fn format_transform_error_for_rsmp_cli(error: MeasurementTransformError) -> String {
+    match error {
+        MeasurementTransformError::UnsupportedSweep => format!(
+            "{}: {}",
+            SampleArchiveErrorCode::UnsupportedSweep.as_str(),
+            error
+        ),
+        _ => error.to_string(),
+    }
 }
 
 fn read_rsmp_text(path: &str) -> Result<String, String> {
@@ -1348,6 +1379,7 @@ fn write_unpacked_b8_outputs(
     measurements_out: Option<&str>,
     detectors_out: Option<&str>,
     obs_out: Option<&str>,
+    reserved_final_paths: &BTreeSet<PathBuf>,
 ) -> Result<(), String> {
     let outputs = [
         (measurements_out, &decoded.measurements),
@@ -1369,7 +1401,7 @@ fn write_unpacked_b8_outputs(
     let mut pending_outputs = Vec::new();
     for (path, table) in outputs {
         if let Some(path) = path.filter(|path| *path != "-") {
-            let mut output = PendingOutput::create(path)?;
+            let mut output = PendingOutput::create(path, reserved_final_paths)?;
             write_shots_b8(table, &mut output.file)
                 .map_err(|error| format!("write error: {error}"))?;
             pending_outputs.push(output);

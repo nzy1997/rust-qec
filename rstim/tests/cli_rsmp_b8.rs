@@ -4,6 +4,7 @@ use rstim::output::write_shots_b8;
 use rstim::parser::parse_lines;
 use rstim::sim::bit_table::BitTable;
 use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -242,6 +243,16 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
         &expected_detections,
         &expected_observables,
     );
+    #[cfg(unix)]
+    if id == "repeat_records" {
+        verify_unpack_temp_candidate_does_not_clobber_requested_final(
+            root,
+            &circuit_path,
+            &archive,
+            &measurement_bytes,
+            &expected_detections,
+        );
+    }
 }
 
 fn verify_all_semantic_outputs(
@@ -386,6 +397,7 @@ fn verify_negative_cases(root: &Path) -> usize {
     let archive = root.join("valid.rsmp");
     make_valid_archive(&circuit, &archive, &measurements);
     verify_non_b8_format_rejections(root, &circuit, &archive, &measurements);
+    verify_pack_sweep_rejection_preserves_code_and_destination(root, &measurements);
     cases += 1;
 
     for (name, args) in [
@@ -532,6 +544,89 @@ fn verify_negative_cases(root: &Path) -> usize {
     cases += 1;
 
     cases
+}
+
+#[cfg(unix)]
+fn verify_unpack_temp_candidate_does_not_clobber_requested_final(
+    root: &Path,
+    circuit: &Path,
+    archive: &Path,
+    measurements: &[u8],
+    detections: &[u8],
+) {
+    use std::process::{Command, Stdio};
+
+    let output_name = "temp_collision.detectors.b8";
+    let detections_out = root.join(output_name);
+    let before = directory_entries(root);
+    assert!(
+        !before.contains(&OsString::from(output_name)),
+        "temp collision detector output unexpectedly pre-exists"
+    );
+
+    let child = Command::new("sh")
+        .arg("-c")
+        .arg(
+            "exec \"$1\" unpack_samples \
+             --circuit \"$2\" \
+             --in \"$3\" \
+             --measurements_out \"$4/.$5.rstim-$$-0.tmp\" \
+             --detectors_out \"$4/$5\"",
+        )
+        .arg("rstim-temp-collision")
+        .arg(env!("CARGO_BIN_EXE_rstim"))
+        .arg(circuit)
+        .arg(archive)
+        .arg(root)
+        .arg(output_name)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn rstim temp collision run");
+    let measurement_name = OsString::from(format!(".{output_name}.rstim-{}-0.tmp", child.id()));
+    let measurements_out = root.join(&measurement_name);
+    let output = child
+        .wait_with_output()
+        .expect("wait rstim temp collision run");
+
+    assert_success(&output, "unpack temp/final collision");
+    assert_eq!(
+        fs::read(&measurements_out).expect("read collision measurements"),
+        measurements
+    );
+    assert_eq!(
+        fs::read(&detections_out).expect("read collision detections"),
+        detections
+    );
+
+    let mut expected = before;
+    assert!(
+        expected.insert(measurement_name),
+        "collision measurement output was already reserved"
+    );
+    assert!(
+        expected.insert(OsString::from(output_name)),
+        "collision detector output was already reserved"
+    );
+    assert_eq!(
+        directory_entries(root),
+        expected,
+        "unpack collision run left unexpected sibling entries"
+    );
+}
+
+fn verify_pack_sweep_rejection_preserves_code_and_destination(root: &Path, measurements: &[u8]) {
+    let circuit = root.join("sweep_rejected.stim");
+    fs::write(&circuit, "R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
+        .expect("write sweep circuit");
+    let archive = root.join("sweep_rejected.rsmp");
+    write_sentinel(&archive, 0xb8);
+    let entries = directory_entries(root);
+    let output = run_cli(&pack_args(&circuit, 4, "-", &archive), Some(measurements));
+    assert_failure_with_code(&output, "pack sweep rejection", "RSMP_UNSUPPORTED_SWEEP");
+    assert_sentinel(&archive, 0xb8);
+    assert_no_new_siblings(root, &entries);
 }
 
 fn make_valid_archive(circuit: &Path, archive: &Path, measurements: &[u8]) {
