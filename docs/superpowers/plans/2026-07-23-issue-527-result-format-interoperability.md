@@ -133,18 +133,18 @@ Expected: PASS.
 - Consumes: `ResultBlockReader`, `ResultBlockWriter`, `ResultOutputKind`, `SampleArchiveReader`, `SampleArchiveWriter`.
 - Produces: streaming `pack_samples` input for `01`/`b8`/`ptb64` and `unpack_samples` output for all compatible formats.
 
-- [ ] **Step 1: Extend preflight**
+- [x] **Step 1: Extend preflight**
 
 Validate pack input format membership, output-kind compatibility, at least one
 unpack output, at most one stdout output, and duplicate final paths before any
 destination is opened.
 
-- [ ] **Step 2: Stream pack**
+- [x] **Step 2: Stream pack**
 
 Open input as `Read`, build `ResultBlockReader`, pass each block into
 `SampleArchiveWriter::write_measurements`, then `finish`.
 
-- [ ] **Step 3: Stream unpack**
+- [x] **Step 3: Stream unpack**
 
 Open the archive, create requested `ResultBlockWriter`s, pass each decoded
 block from `SampleArchiveReader::next_block`, call archive `finish`, then call
