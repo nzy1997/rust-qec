@@ -266,10 +266,11 @@ fn verify_negative_cases() -> usize {
     put_u64(&mut changed_total, 80, 6);
     recompute_header_digest(&mut changed_total);
     recompute_archive_digest(&mut changed_total);
-    expect_next_block_error(
+    expect_finish_error(
         &changed_total,
         &circuit,
         SampleArchiveErrorCode::ShapeMismatch,
+        true,
     );
     cases += 1;
 

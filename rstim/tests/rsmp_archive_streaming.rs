@@ -3,7 +3,6 @@ use rstim::m2d::measurements_to_detections;
 use rstim::measurement_transform::{MeasurementTransform, MeasurementTransformLimits};
 use rstim::output::{read_shots_b8, write_shots_b8};
 use rstim::parser::parse_lines;
-use rstim::sample_archive::syndrome::encode_syndrome;
 use rstim::sample_archive::format::{
     ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_FIELDS, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
     CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
@@ -12,6 +11,7 @@ use rstim::sample_archive::format::{
     SampleArchiveErrorCode, TRAILER_FIELDS, TRAILER_MAGIC,
     TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
+use rstim::sample_archive::syndrome::encode_syndrome;
 use rstim::sample_archive::telemetry::{
     archive_telemetry, diagnostic_lines, reset_archive_telemetry,
 };
@@ -89,7 +89,12 @@ fn verify_boundary_cases() -> usize {
             "{shots} shot block count"
         );
         let decoded = decode_archive(&archive, &fixture.circuit, shots, expected_blocks as u64);
-        assert_tables_eq(&measurements, &decoded.measurements, "boundary", "measurements");
+        assert_tables_eq(
+            &measurements,
+            &decoded.measurements,
+            "boundary",
+            "measurements",
+        );
         assert_tables_eq(
             &expected_detections,
             &decoded.detections,
@@ -350,9 +355,12 @@ fn verify_malformed_cases() -> usize {
     let mut late_checksum = archive.clone();
     let digest_offset = late_checksum.len() - 1;
     late_checksum[digest_offset] ^= 0x55;
-    let mut reader =
-        SampleArchiveReader::open(ShortRead::new(&late_checksum, 7), &fixture.circuit, limits())
-            .expect("open late-checksum archive");
+    let mut reader = SampleArchiveReader::open(
+        ShortRead::new(&late_checksum, 7),
+        &fixture.circuit,
+        limits(),
+    )
+    .expect("open late-checksum archive");
     assert!(
         reader
             .next_block()
@@ -411,13 +419,26 @@ fn verify_bounded_memory() -> MemoryResult {
     }
 }
 
-fn memory_case(circuit: &[StimInstr], shots: usize) -> rstim::sample_archive::telemetry::ArchiveTelemetrySnapshot {
+fn memory_case(
+    circuit: &[StimInstr],
+    shots: usize,
+) -> rstim::sample_archive::telemetry::ArchiveTelemetrySnapshot {
     let transform = MeasurementTransform::from_circuit(circuit).expect("memory transform");
     let measurements = patterned_table(transform.num_measurements(), shots, b"memory");
     reset_archive_telemetry();
     let archive = archive_from_partitions(circuit, &measurements, &[shots]);
-    let decoded = decode_archive(&archive, circuit, shots, block_layouts(&archive).len() as u64);
-    assert_tables_eq(&measurements, &decoded.measurements, "memory", "measurements");
+    let decoded = decode_archive(
+        &archive,
+        circuit,
+        shots,
+        block_layouts(&archive).len() as u64,
+    );
+    assert_tables_eq(
+        &measurements,
+        &decoded.measurements,
+        "memory",
+        "measurements",
+    );
     archive_telemetry()
 }
 
@@ -474,8 +495,7 @@ fn archive_from_explicit_blocks(
     };
     let mut header_bytes = header.to_bytes().expect("serialize manual header");
     header.header_sha256 = Sha256::digest(&header_bytes[..GLOBAL_HEADER_LEN - 32]).into();
-    header_bytes[GLOBAL_HEADER_LEN - 32..GLOBAL_HEADER_LEN]
-        .copy_from_slice(&header.header_sha256);
+    header_bytes[GLOBAL_HEADER_LEN - 32..GLOBAL_HEADER_LEN].copy_from_slice(&header.header_sha256);
 
     let mut archive = Vec::new();
     archive.extend_from_slice(&header_bytes);
@@ -571,8 +591,20 @@ fn decode_archive(
     let mut blocks = 0u64;
     while let Some(block) = reader.next_block().expect("read streaming block") {
         let block_shots = block.measurements.num_minor();
-        copy_table_columns(&block.measurements, 0, &mut decoded.measurements, offset, block_shots);
-        copy_table_columns(&block.detections, 0, &mut decoded.detections, offset, block_shots);
+        copy_table_columns(
+            &block.measurements,
+            0,
+            &mut decoded.measurements,
+            offset,
+            block_shots,
+        );
+        copy_table_columns(
+            &block.detections,
+            0,
+            &mut decoded.detections,
+            offset,
+            block_shots,
+        );
         copy_table_columns(
             &block.observable_flips,
             0,
@@ -623,7 +655,8 @@ fn replace_free_stream(
     let layout = block_layouts(archive)[block_index].clone();
     let range = layout.free;
     let header = layout.header.start;
-    let expected_len = get_u64(archive, block_field_offset(header, "free_uncompressed_len")) as usize;
+    let expected_len =
+        get_u64(archive, block_field_offset(header, "free_uncompressed_len")) as usize;
     let mut decoded =
         zstd::bulk::decompress(&archive[range.clone()], expected_len).expect("decompress stream");
     mutate(&mut decoded);
@@ -652,12 +685,14 @@ fn block_layouts(archive: &[u8]) -> Vec<BlockLayout> {
         assert_eq!(archive[offset..offset + 8], BLOCK_MAGIC[..]);
         let syndrome_start = offset + BLOCK_HEADER_LEN;
         let syndrome_end = syndrome_start
-            + get_u64(archive, block_field_offset(offset, "syndrome_compressed_len")) as usize;
+            + get_u64(
+                archive,
+                block_field_offset(offset, "syndrome_compressed_len"),
+            ) as usize;
         let free_end = syndrome_end
             + get_u64(archive, block_field_offset(offset, "free_compressed_len")) as usize;
         layouts.push(BlockLayout {
             header: offset..offset + BLOCK_HEADER_LEN,
-            syndrome: syndrome_start..syndrome_end,
             free: syndrome_end..free_end,
         });
         offset = free_end;
@@ -851,8 +886,7 @@ fn pack_dense_for_test(table: &BitTable) -> Vec<u8> {
 }
 
 fn slice_table(source: &BitTable, offset: usize, shots: usize) -> BitTable {
-    let mut table =
-        BitTable::try_new(source.num_major(), shots).expect("chunk table allocates");
+    let mut table = BitTable::try_new(source.num_major(), shots).expect("chunk table allocates");
     copy_table_columns(source, offset, &mut table, 0, shots);
     table
 }
@@ -914,7 +948,6 @@ fn put_u64(bytes: &mut [u8], offset: usize, value: u64) {
 #[derive(Clone)]
 struct BlockLayout {
     header: std::ops::Range<usize>,
-    syndrome: std::ops::Range<usize>,
     free: std::ops::Range<usize>,
 }
 

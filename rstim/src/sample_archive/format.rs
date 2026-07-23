@@ -533,7 +533,7 @@ impl BlockHeader {
         }
         self.first_shot
             .checked_add(self.shot_count)
-            .ok_or_else(|| malformed("block shot range overflow"))?;
+            .ok_or_else(|| limit("block shot range overflow"))?;
         validate_stream(
             self.syndrome_codec_id,
             self.syndrome_uncompressed_len,

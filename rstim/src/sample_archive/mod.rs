@@ -11,5 +11,5 @@ mod writer;
 mod zstd_frame;
 
 pub use limits::{ArchiveLimits, SampleArchiveOptions};
-pub use reader::SampleArchiveReader;
+pub use reader::{ArchiveSummary, SampleArchiveReader};
 pub use writer::SampleArchiveWriter;
