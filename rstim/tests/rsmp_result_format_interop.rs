@@ -1,10 +1,11 @@
 use rstim::m2d::measurements_to_detections;
-use rstim::measurement_transform::MeasurementTransform;
+use rstim::measurement_transform::{DecodedSampleBlock, MeasurementTransform};
 use rstim::output::{
     read_shots_b8, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8,
+    write_shots_ptb64, write_shots_r8, OutputFormat,
 };
 use rstim::parser::parse_lines;
+use rstim::result_stream::{ResultBlockWriter, ResultOutputKind};
 use rstim::sample_archive::{
     ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
 };
@@ -20,6 +21,7 @@ const DETECTOR_FORMATS: [&str; 6] = ["01", "b8", "r8", "hits", "ptb64", "dets"];
 
 #[test]
 fn rsmp_result_format_interop_contract() {
+    verify_result_block_writer_rejects_mismatched_shots();
     let pack_formats = verify_pack_formats();
     assert_eq!(pack_formats, 3);
     let measurement_formats = verify_measurement_outputs();
@@ -56,7 +58,33 @@ fn verify_pack_formats() -> usize {
         assert_archive_measurements(&archive, &fixture.instructions, &measurements);
         cases += 1;
     }
+    verify_zero_width_pack_inputs();
     cases
+}
+
+fn verify_zero_width_pack_inputs() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let circuit = dir.path().join("zero-width.stim");
+    fs::write(&circuit, b"").expect("write zero-width circuit");
+    let instructions = parse_lines("").expect("parse zero-width circuit");
+    let shots = 3;
+    let measurements = BitTable::try_new(0, shots).expect("allocate zero-width measurements");
+
+    for format in PACK_FORMATS {
+        let input = encode_table(&measurements, format, None);
+        match format {
+            "01" => assert_eq!(input, vec![b'\n'; shots], "zero-width 01 rows"),
+            "b8" | "ptb64" => assert!(input.is_empty(), "zero-width {format} input"),
+            _ => unreachable!("pack format list is fixed"),
+        }
+        let archive = dir.path().join(format!("zero-width-{format}.rsmp"));
+        let output = run_cli(
+            &pack_args(&circuit, shots as u64, Path::new("-"), &archive, format),
+            Some(&input),
+        );
+        assert_success(&output, &format!("pack zero-width {format}"));
+        assert_archive_measurements(&archive, &instructions, &measurements);
+    }
 }
 
 fn verify_measurement_outputs() -> usize {
@@ -167,6 +195,15 @@ fn verify_ptb64_cross_block() -> usize {
     let output_path = dir.path().join("cross-block.ptb64");
     fs::write(&archive_path, archive).expect("write archive");
 
+    let archive_blocks = archive_block_count(
+        &fs::read(&archive_path).expect("read cross-block archive"),
+        &fixture.instructions,
+    );
+    assert!(
+        archive_blocks > 1,
+        "ptb64 cross-block case must contain multiple archive blocks"
+    );
+
     let output = run_cli(
         &unpack_args(
             &fixture.circuit,
@@ -214,11 +251,20 @@ fn verify_negative_cases() -> usize {
     let ptb64 = encode_table(&fixture.measurements, "ptb64", None);
     let mut cases = 0;
 
+    verify_extra_pack_input_rejection(
+        dir.path(),
+        &fixture.circuit,
+        fixture.shots as u64,
+        &b8,
+        &format01,
+        &ptb64,
+    );
+    cases += 1;
+
     let invalid_pack_inputs = [
         ("unsupported-r8", "r8", b8.clone()),
         ("unsupported-dets", "dets", b8.clone()),
         ("short-b8", "b8", b8[..b8.len() - 1].to_vec()),
-        ("extra-b8", "b8", [b8.clone(), vec![0]].concat()),
         ("padding-b8", "b8", vec![0xf8; fixture.shots]),
         ("bad-01", "01", b"10x\n000\n111\n000\n".to_vec()),
         (
@@ -300,6 +346,82 @@ fn verify_negative_cases() -> usize {
     cases
 }
 
+fn verify_extra_pack_input_rejection(
+    dir: &Path,
+    circuit: &Path,
+    shots: u64,
+    b8: &[u8],
+    format01: &[u8],
+    ptb64: &[u8],
+) {
+    let line_len = format01.len() / shots as usize;
+    let extra_inputs = [
+        ("extra-b8", "b8", [b8, &[0]].concat()),
+        ("extra-01", "01", [format01, &format01[..line_len]].concat()),
+        ("extra-ptb64", "ptb64", [ptb64, ptb64].concat()),
+    ];
+    for (tag, (name, format, input)) in extra_inputs.into_iter().enumerate() {
+        let destination = dir.join(format!("{name}.rsmp"));
+        write_sentinel(&destination, 0xd0 + tag as u8);
+        let output = run_cli(
+            &pack_args(circuit, shots, Path::new("-"), &destination, format),
+            Some(&input),
+        );
+        assert_failure(&output, name);
+        assert_sentinel(&destination, 0xd0 + tag as u8);
+    }
+}
+
+fn verify_result_block_writer_rejects_mismatched_shots() {
+    let fixture = CatalogFixture::known_mpad_multi();
+    let decoded = measurements_to_detections(&fixture.instructions, &fixture.measurements)
+        .expect("derive decoded block");
+    let shorter_shots = fixture.shots - 1;
+    let blocks = [
+        (
+            "measurements",
+            table_prefix(&fixture.measurements, shorter_shots),
+            decoded.detections.clone(),
+            decoded.observable_flips.clone(),
+        ),
+        (
+            "detections",
+            fixture.measurements.clone(),
+            table_prefix(&decoded.detections, shorter_shots),
+            decoded.observable_flips.clone(),
+        ),
+        (
+            "observables",
+            fixture.measurements.clone(),
+            decoded.detections.clone(),
+            table_prefix(&decoded.observable_flips, shorter_shots),
+        ),
+    ];
+
+    for (tag, (name, measurements, detections, observable_flips)) in blocks.into_iter().enumerate()
+    {
+        let block = DecodedSampleBlock {
+            measurements,
+            detections,
+            observable_flips,
+        };
+        let sentinel = vec![0xd0, tag as u8, 0x0d];
+        let mut output = sentinel.clone();
+        let mut writer = ResultBlockWriter::new(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::B8,
+        )
+        .expect("create result block writer");
+        assert!(
+            writer.write_block(&block).is_err(),
+            "{name} shot-count mismatch must fail"
+        );
+        drop(writer);
+        assert_eq!(output, sentinel, "{name} mismatch must not write output");
+    }
+}
+
 fn archive_from_measurements(circuit: &[rstim::ir::StimInstr], measurements: &BitTable) -> Vec<u8> {
     let transform = MeasurementTransform::from_circuit(circuit).expect("build archive transform");
     let mut writer = SampleArchiveWriter::new(
@@ -340,6 +462,22 @@ fn assert_archive_measurements(
     reader.finish().expect("finish packed archive");
 }
 
+fn archive_block_count(archive: &[u8], circuit: &[rstim::ir::StimInstr]) -> u64 {
+    let mut reader = SampleArchiveReader::open(archive, circuit, ArchiveLimits::default())
+        .expect("open archive for block count");
+    let mut blocks = 0;
+    while reader
+        .next_block()
+        .expect("read archive block for block count")
+        .is_some()
+    {
+        blocks += 1;
+    }
+    let summary = reader.finish().expect("finish archive block count");
+    assert_eq!(summary.block_count, blocks, "archive block count summary");
+    blocks
+}
+
 fn assert_table_slice_eq(actual: &BitTable, expected: &BitTable, first_shot: usize, label: &str) {
     assert_eq!(actual.num_major(), expected.num_major(), "{label} rows");
     for bit in 0..actual.num_major() {
@@ -374,6 +512,16 @@ fn repeated_table(source: &BitTable, shots: usize) -> BitTable {
     for shot in 0..shots {
         for bit in 0..source.num_major() {
             output.set(bit, shot, source.get(bit, shot % source.num_minor()));
+        }
+    }
+    output
+}
+
+fn table_prefix(source: &BitTable, shots: usize) -> BitTable {
+    let mut output = BitTable::try_new(source.num_major(), shots).expect("allocate table prefix");
+    for shot in 0..shots {
+        for bit in 0..source.num_major() {
+            output.set(bit, shot, source.get(bit, shot));
         }
     }
     output
