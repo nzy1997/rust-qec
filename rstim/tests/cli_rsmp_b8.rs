@@ -340,6 +340,59 @@ fn verify_zero_measurement_round_trip(root: &Path, index: usize) {
         Vec::<u8>::new()
     );
     assert_no_new_siblings(root, &entries);
+
+    let stdin_circuit_text = "M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let measurement_input = root.join("zero_shot.measurements-in.b8");
+    let zero_shot_archive = root.join("zero_shot_circuit_stdin.rsmp");
+    let zero_shot_measurements_out = root.join("zero_shot.measurements.b8");
+    let zero_shot_detections_out = root.join("zero_shot.detections.b8");
+    let zero_shot_observables_out = root.join("zero_shot.observables.b8");
+    fs::write(&measurement_input, []).expect("write zero-shot measurement input");
+    fs::write(&zero_shot_archive, [0x51]).expect("prepare zero-shot archive destination");
+    for destination in [
+        &zero_shot_measurements_out,
+        &zero_shot_detections_out,
+        &zero_shot_observables_out,
+    ] {
+        fs::write(destination, [0x52]).expect("prepare zero-shot unpack destination");
+    }
+    let entries = directory_entries(root);
+    let pack = run_cli(
+        &pack_args(
+            Path::new("-"),
+            0,
+            measurement_input.to_str().expect("measurement input path"),
+            &zero_shot_archive,
+        ),
+        Some(stdin_circuit_text.as_bytes()),
+    );
+    assert_success(&pack, "zero-shot stdin circuit pack_samples");
+    assert_no_new_siblings(root, &entries);
+    let entries = directory_entries(root);
+    let unpack = run_cli(
+        &unpack_args(
+            Path::new("-"),
+            &zero_shot_archive,
+            Some(&zero_shot_measurements_out),
+            Some(&zero_shot_detections_out),
+            Some(&zero_shot_observables_out),
+        ),
+        Some(stdin_circuit_text.as_bytes()),
+    );
+    assert_success(&unpack, "zero-shot stdin circuit unpack_samples");
+    assert_eq!(
+        fs::read(zero_shot_measurements_out).expect("read zero-shot measurements"),
+        Vec::<u8>::new()
+    );
+    assert_eq!(
+        fs::read(zero_shot_detections_out).expect("read zero-shot detections"),
+        Vec::<u8>::new()
+    );
+    assert_eq!(
+        fs::read(zero_shot_observables_out).expect("read zero-shot observables"),
+        Vec::<u8>::new()
+    );
+    assert_no_new_siblings(root, &entries);
     assert_eq!(index, 6);
 }
 
