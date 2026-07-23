@@ -108,3 +108,15 @@ Benchmark smoke runs are documented in
 [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md);
 the README intentionally leaves algorithm details and benchmark implementation
 notes to those dedicated docs.
+
+## License
+
+All tracked content in this repository, including the Rust workspace crates and
+`qp101-viz`, is licensed under Apache-2.0. See [LICENSE](LICENSE) for the full
+license text. Ignored or untracked drafts are outside this repository license
+declaration.
+
+Portions of `rstim` compatibility tests are adapted from
+[Stim](https://github.com/quantumlib/Stim), and `rmatching` is ported from
+[PyMatching](https://github.com/oscarhiggott/PyMatching). Both upstream projects
+are Apache-2.0, and existing source-level provenance comments are preserved.
