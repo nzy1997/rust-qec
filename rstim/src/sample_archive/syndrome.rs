@@ -384,6 +384,99 @@ fn limit(detail: &'static str) -> SampleArchiveError {
 mod tests {
     use super::*;
 
+    fn assert_code<T: std::fmt::Debug>(
+        result: Result<T, SampleArchiveError>,
+        code: SampleArchiveErrorCode,
+    ) {
+        assert_eq!(result.unwrap_err().code(), code);
+    }
+
+    #[test]
+    fn codec_edge_cases_cover_rejected_shapes_and_valid_sparse_replay() {
+        let empty = BitTable::new(0, 0);
+
+        assert_code(
+            materialize_syndrome(
+                &empty,
+                SyndromePlan {
+                    codec_id: 999,
+                    raw_len: 0,
+                    dense_len: 0,
+                    sparse_len: 0,
+                },
+            ),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            materialize_syndrome(
+                &empty,
+                SyndromePlan {
+                    codec_id: STREAM_CODEC_EMPTY,
+                    raw_len: 1,
+                    dense_len: 0,
+                    sparse_len: 0,
+                },
+            ),
+            SampleArchiveErrorCode::LimitExceeded,
+        );
+        assert_code(
+            decode_syndrome_raw(STREAM_CODEC_EMPTY, 0, &[], 1, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            decode_syndrome_raw(STREAM_CODEC_SYNDROME_DENSE_V1, 0, &[], 0, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            decode_syndrome_raw(STREAM_CODEC_SYNDROME_DENSE_V1, 2, &[0, 0], 8, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            decode_syndrome_raw(STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, 0, &[], 0, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+        assert_code(
+            decode_syndrome_raw(999, 0, &[], 1, 1),
+            SampleArchiveErrorCode::MalformedArchive,
+        );
+
+        let mut hits = Vec::new();
+        for_each_sparse_syndrome_hit(&[0x02, 0x00, 0x01, 0x00], 4, 3, 2, |shot, detector| {
+            hits.push((shot, detector));
+        })
+        .expect("valid sparse replay");
+        assert_eq!(hits, [(0, 0), (0, 2)]);
+    }
+
+    #[test]
+    fn dense_syndrome_hash_uses_canonical_shot_major_bytes() {
+        let mut table = BitTable::new(3, 3);
+        let hits_by_shot: &[&[usize]] = &[&[0, 2], &[1], &[0, 1]];
+        for (shot, rows) in hits_by_shot.iter().enumerate() {
+            for &row in *rows {
+                table.set(row, shot, true);
+            }
+        }
+
+        let mut hasher = Sha256::new();
+        update_dense_syndrome_hash(&table, &mut hasher).expect("hash dense syndrome");
+        let digest: [u8; 32] = hasher.finalize().into();
+        let expected: [u8; 32] = Sha256::digest([0xd5, 0x00]).into();
+        assert_eq!(digest, expected);
+    }
+
+    #[test]
+    fn private_error_mappers_preserve_codes() {
+        assert_eq!(
+            map_alloc(BitTableAllocError::SizeOverflow).code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+        assert_eq!(
+            limit("test limit").code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+    }
+
     #[test]
     fn materialization_telemetry_tracks_multiple_candidates_in_one_window() {
         reset_materialization_telemetry();

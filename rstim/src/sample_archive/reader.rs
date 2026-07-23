@@ -418,11 +418,11 @@ mod tests {
             .expect("parse block")
     }
 
-    fn assert_code<T>(result: Result<T, SampleArchiveError>, code: SampleArchiveErrorCode) {
-        match result {
-            Ok(_) => panic!("expected {code:?}"),
-            Err(err) => assert_eq!(err.code(), code),
-        }
+    fn assert_code<T: std::fmt::Debug>(
+        result: Result<T, SampleArchiveError>,
+        code: SampleArchiveErrorCode,
+    ) {
+        assert_eq!(result.unwrap_err().code(), code);
     }
 
     #[test]
@@ -560,6 +560,32 @@ mod tests {
             read_exact_or_truncated(&mut AlwaysErr, &mut byte),
             SampleArchiveErrorCode::Io,
         );
+    }
+
+    #[test]
+    fn next_block_rejects_free_stream_shape_after_successful_decode() {
+        let circuit = parse("M 0 1\nDETECTOR rec[-2]\n");
+        let archive = archive_for(&circuit, 5);
+        let mut block = block_from(&archive);
+        let new_free = crate::sample_archive::zstd_frame::compress_frame(&[0, 0], 0)
+            .expect("compress replacement free stream");
+        block.free_uncompressed_len = 2;
+        block.free_compressed_len = new_free.len() as u64;
+        let block_bytes = block.to_bytes().expect("serialize block");
+
+        let syndrome_start = GLOBAL_HEADER_LEN + BLOCK_HEADER_LEN;
+        let free_start = syndrome_start + block.syndrome_compressed_len as usize;
+        let old_free_end = free_start + block_from(&archive).free_compressed_len as usize;
+        let mut bad = Vec::new();
+        bad.extend_from_slice(&archive[..GLOBAL_HEADER_LEN]);
+        bad.extend_from_slice(&block_bytes);
+        bad.extend_from_slice(&archive[syndrome_start..free_start]);
+        bad.extend_from_slice(&new_free);
+        bad.extend_from_slice(&archive[old_free_end..]);
+
+        let mut reader = SampleArchiveReader::open(io::Cursor::new(bad), &circuit, test_limits())
+            .expect("open reader");
+        assert_code(reader.next_block(), SampleArchiveErrorCode::ShapeMismatch);
     }
 
     #[test]
