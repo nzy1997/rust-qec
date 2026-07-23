@@ -5,11 +5,12 @@ use rstim::output::{read_shots_b8, write_shots_b8};
 use rstim::parser::parse_lines;
 use rstim::sample_archive::syndrome::encode_syndrome;
 use rstim::sample_archive::format::{
-    ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
+    ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_FIELDS, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
     CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
     FINGERPRINT_SHA256_CANONICAL_CIRCUIT, GLOBAL_HEADER_LEN, GlobalHeader,
     REFERENCE_SIMULATE_NOISELESS, STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1,
-    SampleArchiveErrorCode, TRAILER_MAGIC, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
+    SampleArchiveErrorCode, TRAILER_FIELDS, TRAILER_MAGIC,
+    TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
 use rstim::sample_archive::telemetry::{
     archive_telemetry, diagnostic_lines, reset_archive_telemetry,
@@ -216,7 +217,11 @@ fn verify_malformed_cases() -> usize {
     let mut cases = 0;
 
     let mut wrong_first_block = archive.clone();
-    put_u64(&mut wrong_first_block, GLOBAL_HEADER_LEN + 12, 1);
+    put_u64(
+        &mut wrong_first_block,
+        block_field_offset(GLOBAL_HEADER_LEN, "block_index"),
+        1,
+    );
     expect_next_block_error(
         &wrong_first_block,
         &fixture.circuit,
@@ -226,7 +231,11 @@ fn verify_malformed_cases() -> usize {
 
     let second_block = block_layouts(&archive)[1].header.start;
     let mut repeated_block = archive.clone();
-    put_u64(&mut repeated_block, second_block + 12, 0);
+    put_u64(
+        &mut repeated_block,
+        block_field_offset(second_block, "block_index"),
+        0,
+    );
     expect_second_next_block_error(
         &repeated_block,
         &fixture.circuit,
@@ -235,7 +244,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut skipped_block = archive.clone();
-    put_u64(&mut skipped_block, second_block + 12, 2);
+    put_u64(
+        &mut skipped_block,
+        block_field_offset(second_block, "block_index"),
+        2,
+    );
     expect_second_next_block_error(
         &skipped_block,
         &fixture.circuit,
@@ -244,7 +257,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut incorrect_first_shot = archive.clone();
-    put_u64(&mut incorrect_first_shot, second_block + 20, MAX_BLOCK_SHOTS as u64 + 1);
+    put_u64(
+        &mut incorrect_first_shot,
+        block_field_offset(second_block, "first_shot"),
+        MAX_BLOCK_SHOTS as u64 + 1,
+    );
     expect_second_next_block_error(
         &incorrect_first_shot,
         &fixture.circuit,
@@ -253,7 +270,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut first_shot_overflow = archive.clone();
-    put_u64(&mut first_shot_overflow, second_block + 20, u64::MAX);
+    put_u64(
+        &mut first_shot_overflow,
+        block_field_offset(second_block, "first_shot"),
+        u64::MAX,
+    );
     expect_second_next_block_error(
         &first_shot_overflow,
         &fixture.circuit,
@@ -262,7 +283,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut zero_shot_interior = archive.clone();
-    put_u64(&mut zero_shot_interior, second_block + 28, 0);
+    put_u64(
+        &mut zero_shot_interior,
+        block_field_offset(second_block, "shot_count"),
+        0,
+    );
     expect_second_next_block_error(
         &zero_shot_interior,
         &fixture.circuit,
@@ -271,7 +296,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut oversized_block = archive.clone();
-    put_u64(&mut oversized_block, second_block + 28, MAX_BLOCK_SHOTS as u64 + 1);
+    put_u64(
+        &mut oversized_block,
+        block_field_offset(second_block, "shot_count"),
+        MAX_BLOCK_SHOTS as u64 + 1,
+    );
     expect_second_next_block_error(
         &oversized_block,
         &fixture.circuit,
@@ -301,8 +330,16 @@ fn verify_malformed_cases() -> usize {
 
     let trailer = trailer_offset(&archive);
     let mut bad_trailer_totals = archive.clone();
-    put_u64(&mut bad_trailer_totals, trailer + 16, 2);
-    put_u64(&mut bad_trailer_totals, trailer + 24, 8192);
+    put_u64(
+        &mut bad_trailer_totals,
+        trailer_field_offset(trailer, "block_count"),
+        2,
+    );
+    put_u64(
+        &mut bad_trailer_totals,
+        trailer_field_offset(trailer, "total_shots"),
+        8192,
+    );
     expect_finish_error(
         &bad_trailer_totals,
         &fixture.circuit,
@@ -586,14 +623,22 @@ fn replace_free_stream(
     let layout = block_layouts(archive)[block_index].clone();
     let range = layout.free;
     let header = layout.header.start;
-    let expected_len = get_u64(archive, header + 60) as usize;
+    let expected_len = get_u64(archive, block_field_offset(header, "free_uncompressed_len")) as usize;
     let mut decoded =
         zstd::bulk::decompress(&archive[range.clone()], expected_len).expect("decompress stream");
     mutate(&mut decoded);
     let compressed = compress_frame_for_test(&decoded);
     archive.splice(range.clone(), compressed.iter().copied());
-    put_u64(archive, header + 60, decoded.len() as u64);
-    put_u64(archive, header + 68, compressed.len() as u64);
+    put_u64(
+        archive,
+        block_field_offset(header, "free_uncompressed_len"),
+        decoded.len() as u64,
+    );
+    put_u64(
+        archive,
+        block_field_offset(header, "free_compressed_len"),
+        compressed.len() as u64,
+    );
     recompute_archive_digest(archive);
 }
 
@@ -606,8 +651,10 @@ fn block_layouts(archive: &[u8]) -> Vec<BlockLayout> {
         }
         assert_eq!(archive[offset..offset + 8], BLOCK_MAGIC[..]);
         let syndrome_start = offset + BLOCK_HEADER_LEN;
-        let syndrome_end = syndrome_start + get_u64(archive, offset + 52) as usize;
-        let free_end = syndrome_end + get_u64(archive, offset + 68) as usize;
+        let syndrome_end = syndrome_start
+            + get_u64(archive, block_field_offset(offset, "syndrome_compressed_len")) as usize;
+        let free_end = syndrome_end
+            + get_u64(archive, block_field_offset(offset, "free_compressed_len")) as usize;
         layouts.push(BlockLayout {
             header: offset..offset + BLOCK_HEADER_LEN,
             syndrome: syndrome_start..syndrome_end,
@@ -625,8 +672,9 @@ fn complete_blocks_in_prefix(bytes: &[u8]) -> usize {
         if bytes.len() < offset + BLOCK_HEADER_LEN {
             break;
         }
-        let syndrome_len = get_u64(bytes, offset + 52) as usize;
-        let free_len = get_u64(bytes, offset + 68) as usize;
+        let syndrome_len =
+            get_u64(bytes, block_field_offset(offset, "syndrome_compressed_len")) as usize;
+        let free_len = get_u64(bytes, block_field_offset(offset, "free_compressed_len")) as usize;
         let Some(end) = offset
             .checked_add(BLOCK_HEADER_LEN)
             .and_then(|value| value.checked_add(syndrome_len))
@@ -647,10 +695,40 @@ fn trailer_offset(archive: &[u8]) -> usize {
     archive.len() - ARCHIVE_TRAILER_LEN
 }
 
+fn block_field_offset(block_start: usize, name: &str) -> usize {
+    block_start + field_offset(&BLOCK_FIELDS, name)
+}
+
+fn trailer_field_offset(trailer_start: usize, name: &str) -> usize {
+    trailer_start + field_offset(&TRAILER_FIELDS, name)
+}
+
+fn trailer_field_width(name: &str) -> usize {
+    field_width(&TRAILER_FIELDS, name)
+}
+
+fn field_offset(fields: &[rstim::sample_archive::format::FieldSpec], name: &str) -> usize {
+    fields
+        .iter()
+        .find(|field| field.name == name)
+        .unwrap_or_else(|| panic!("missing RSMP field {name}"))
+        .offset
+}
+
+fn field_width(fields: &[rstim::sample_archive::format::FieldSpec], name: &str) -> usize {
+    fields
+        .iter()
+        .find(|field| field.name == name)
+        .unwrap_or_else(|| panic!("missing RSMP field {name}"))
+        .width
+}
+
 fn recompute_archive_digest(archive: &mut [u8]) {
     let trailer = trailer_offset(archive);
-    let digest: [u8; 32] = Sha256::digest(&archive[..trailer + 32]).into();
-    archive[trailer + 32..trailer + 64].copy_from_slice(&digest);
+    let digest_offset = trailer_field_offset(trailer, "archive_sha256");
+    let digest: [u8; 32] = Sha256::digest(&archive[..digest_offset]).into();
+    let digest_width = trailer_field_width("archive_sha256");
+    archive[digest_offset..digest_offset + digest_width].copy_from_slice(&digest);
 }
 
 fn compress_frame_for_test(bytes: &[u8]) -> Vec<u8> {
