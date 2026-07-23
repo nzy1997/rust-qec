@@ -5,7 +5,7 @@ use rstim::output::{
     write_shots_ptb64, write_shots_r8, OutputFormat,
 };
 use rstim::parser::parse_lines;
-use rstim::result_stream::{ResultBlockWriter, ResultOutputKind};
+use rstim::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use rstim::sample_archive::{
     ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
 };
@@ -21,7 +21,6 @@ const DETECTOR_FORMATS: [&str; 6] = ["01", "b8", "r8", "hits", "ptb64", "dets"];
 
 #[test]
 fn rsmp_result_format_interop_contract() {
-    verify_result_block_writer_rejects_mismatched_shots();
     let pack_formats = verify_pack_formats();
     assert_eq!(pack_formats, 3);
     let measurement_formats = verify_measurement_outputs();
@@ -200,6 +199,13 @@ fn verify_observable_outputs() -> usize {
 fn verify_ptb64_cross_block() -> usize {
     let fixture = CatalogFixture::known_mpad_multi();
     let measurements = repeated_table(&fixture.measurements, 195);
+    let decoded = measurements_to_detections(&fixture.instructions, &measurements)
+        .expect("derive cross-block detector results");
+    let outputs = [
+        ("measurements", "--measurements_out", &measurements),
+        ("detectors", "--detectors_out", &decoded.detections),
+        ("observables", "--obs_out", &decoded.observable_flips),
+    ];
     let dir = tempfile::tempdir().expect("tempdir");
 
     for (block_shots, expected_blocks) in [(65, vec![65, 65, 65]), (130, vec![130, 65])] {
@@ -209,7 +215,6 @@ fn verify_ptb64_cross_block() -> usize {
             block_shots,
         );
         let archive_path = dir.path().join(format!("cross-block-{block_shots}.rsmp"));
-        let output_path = dir.path().join(format!("cross-block-{block_shots}.ptb64"));
         fs::write(&archive_path, archive).expect("write archive");
 
         assert_eq!(
@@ -221,44 +226,78 @@ fn verify_ptb64_cross_block() -> usize {
             "ptb64 cross-block archive uses {block_shots}-shot blocks"
         );
 
-        let output = run_cli(
-            &unpack_args(
-                &fixture.circuit,
-                &archive_path,
-                Some(("--measurements_out", &output_path, "ptb64")),
-            ),
-            None,
-        );
-        assert_success(
-            &output,
-            &format!("ptb64 output across {block_shots}-shot archive blocks"),
-        );
-        assert_eq!(
-            fs::read(&output_path).expect("read cross-block ptb64"),
-            encode_table(&measurements, "ptb64", None),
-            "ptb64 bytes carry across {block_shots}-shot archive blocks"
-        );
+        for (kind, flag, expected) in outputs {
+            let output_path = dir
+                .path()
+                .join(format!("cross-block-{block_shots}-{kind}.ptb64"));
+            let output = run_cli(
+                &unpack_args(
+                    &fixture.circuit,
+                    &archive_path,
+                    Some((flag, &output_path, "ptb64")),
+                ),
+                None,
+            );
+            assert_success(
+                &output,
+                &format!("ptb64 {kind} output across {block_shots}-shot archive blocks"),
+            );
+            assert_eq!(
+                fs::read(&output_path).expect("read cross-block ptb64"),
+                ptb64_bytes(expected),
+                "ptb64 {kind} bytes carry across {block_shots}-shot archive blocks"
+            );
+        }
     }
     1
 }
 
 fn verify_guarded_read() -> usize {
     let fixture = CatalogFixture::known_mpad_multi();
-    let measurements = repeated_table(&fixture.measurements, 8193);
-    let archive = archive_from_measurements(&fixture.instructions, &measurements);
-    let mut reader = SampleArchiveReader::open(
-        GuardedRead::new(&archive, 64 * 1024),
-        &fixture.instructions,
-        ArchiveLimits::default(),
+    let measurements = repeated_table(&fixture.measurements, 65_537);
+    let input = encode_table(&measurements, "b8", None);
+    assert!(input.len() > 64 * 1024, "guarded input exceeds 64 KiB");
+
+    let mut input_reader = ResultBlockReader::new(
+        GuardedRead::new(&input, 64 * 1024, 7),
+        measurements.num_major(),
+        measurements.num_minor() as u64,
+        OutputFormat::B8,
+        127,
     )
-    .expect("open archive through guarded reader");
-    let mut shots = 0;
-    while let Some(block) = reader.next_block().expect("read guarded archive block") {
-        shots += block.measurements.num_minor();
+    .expect("open guarded result input");
+    let transform = MeasurementTransform::from_circuit(&fixture.instructions)
+        .expect("build guarded archive transform");
+    let mut limits = ArchiveLimits::default();
+    limits.transform.max_shots_per_block = 257;
+    let mut writer = SampleArchiveWriter::new(
+        Vec::new(),
+        transform,
+        measurements.num_minor() as u64,
+        SampleArchiveOptions::default(),
+        limits,
+    )
+    .expect("open archive writer for guarded input");
+    while let Some(block) = input_reader
+        .next_block()
+        .expect("read guarded result input block")
+    {
+        writer
+            .write_measurements(&block)
+            .expect("write guarded result input block");
     }
-    let summary = reader.finish().expect("finish guarded archive read");
-    assert_eq!(shots, 8193);
-    assert_eq!(summary.total_shots, 8193);
+    let archive = writer
+        .finish()
+        .expect("finish guarded result input archive");
+    assert!(
+        archive_block_shots(&archive, &fixture.instructions).len() > 1,
+        "guarded input produces a many-block archive"
+    );
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let archive_path = dir.path().join("guarded-input.rsmp");
+    fs::write(&archive_path, archive).expect("write guarded input archive");
+    assert_archive_measurements(&archive_path, &fixture.instructions, &measurements);
     1
 }
 
@@ -273,6 +312,9 @@ fn verify_negative_cases() -> usize {
     let ptb64 = encode_table(&fixture.measurements, "ptb64", None);
     let mut cases = 0;
 
+    verify_result_block_writer_rejects_mismatched_shots();
+    cases += 1;
+
     verify_extra_pack_input_rejection(
         dir.path(),
         &fixture.circuit,
@@ -283,9 +325,30 @@ fn verify_negative_cases() -> usize {
     );
     cases += 1;
 
-    let invalid_pack_inputs = [
+    let unsupported_pack_inputs = [
         ("unsupported-r8", "r8", b8.clone()),
         ("unsupported-dets", "dets", b8.clone()),
+        ("unsupported-hits", "hits", b8.clone()),
+    ];
+    for (tag, (name, format, input)) in unsupported_pack_inputs.into_iter().enumerate() {
+        let destination = dir.path().join(format!("{name}.rsmp"));
+        write_sentinel(&destination, 0xb0 + tag as u8);
+        let output = run_cli(
+            &pack_args(
+                &fixture.circuit,
+                fixture.shots as u64,
+                Path::new("-"),
+                &destination,
+                format,
+            ),
+            Some(&input),
+        );
+        assert_failure(&output, name);
+        assert_sentinel(&destination, 0xb0 + tag as u8);
+    }
+    cases += 1;
+
+    let invalid_pack_inputs = [
         ("short-b8", "b8", b8[..b8.len() - 1].to_vec()),
         ("padding-b8", "b8", vec![0xf8; fixture.shots]),
         ("bad-01", "01", b"10x\n000\n111\n000\n".to_vec()),
@@ -550,6 +613,12 @@ fn encode_table(table: &BitTable, format: &str, observables: Option<&BitTable>) 
     bytes
 }
 
+fn ptb64_bytes(table: &BitTable) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    write_shots_ptb64(table, &mut bytes).expect("encode whole-table ptb64");
+    bytes
+}
+
 fn repeated_table(source: &BitTable, shots: usize) -> BitTable {
     let mut output = BitTable::try_new(source.num_major(), shots).expect("allocate repeated table");
     for shot in 0..shots {
@@ -716,11 +785,16 @@ impl CatalogFixture {
 struct GuardedRead<'a> {
     input: &'a [u8],
     max_request: usize,
+    max_yield: usize,
 }
 
 impl<'a> GuardedRead<'a> {
-    fn new(input: &'a [u8], max_request: usize) -> Self {
-        Self { input, max_request }
+    fn new(input: &'a [u8], max_request: usize, max_yield: usize) -> Self {
+        Self {
+            input,
+            max_request,
+            max_yield,
+        }
     }
 }
 
@@ -732,6 +806,7 @@ impl Read for GuardedRead<'_> {
                 format!("read request {} exceeds {}", buffer.len(), self.max_request),
             ));
         }
-        self.input.read(buffer)
+        let yielded = buffer.len().min(self.max_yield);
+        self.input.read(&mut buffer[..yielded])
     }
 }
