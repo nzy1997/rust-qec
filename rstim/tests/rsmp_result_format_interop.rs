@@ -325,6 +325,14 @@ fn verify_negative_cases() -> usize {
     );
     cases += 1;
 
+    verify_01_framing_rejection(
+        dir.path(),
+        &fixture.circuit,
+        fixture.shots as u64,
+        &format01,
+    );
+    cases += 1;
+
     let unsupported_pack_inputs = [
         ("unsupported-r8", "r8", b8.clone()),
         ("unsupported-dets", "dets", b8.clone()),
@@ -352,11 +360,6 @@ fn verify_negative_cases() -> usize {
         ("short-b8", "b8", b8[..b8.len() - 1].to_vec()),
         ("padding-b8", "b8", vec![0xf8; fixture.shots]),
         ("bad-01", "01", b"10x\n000\n111\n000\n".to_vec()),
-        (
-            "missing-newline-01",
-            "01",
-            format01[..format01.len() - 1].to_vec(),
-        ),
         ("short-ptb64", "ptb64", ptb64[..ptb64.len() - 1].to_vec()),
         (
             "padding-ptb64",
@@ -457,6 +460,33 @@ fn verify_extra_pack_input_rejection(
     }
 }
 
+fn verify_01_framing_rejection(dir: &Path, circuit: &Path, shots: u64, format01: &[u8]) {
+    let row_width = format01.len() / shots as usize;
+    let mut misplaced_newline = format01.to_vec();
+    misplaced_newline.swap(row_width - 2, row_width - 1);
+    assert_eq!(misplaced_newline.len(), format01.len());
+
+    for (tag, (name, input)) in [
+        (
+            "missing-newline-01",
+            format01[..format01.len() - 1].to_vec(),
+        ),
+        ("misplaced-newline-01", misplaced_newline),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let destination = dir.join(format!("{name}.rsmp"));
+        write_sentinel(&destination, 0xc0 + tag as u8);
+        let output = run_cli(
+            &pack_args(circuit, shots, Path::new("-"), &destination, "01"),
+            Some(&input),
+        );
+        assert_failure(&output, name);
+        assert_sentinel(&destination, 0xc0 + tag as u8);
+    }
+}
+
 fn verify_result_block_writer_rejects_mismatched_shots() {
     let fixture = CatalogFixture::known_mpad_multi();
     let decoded = measurements_to_detections(&fixture.instructions, &fixture.measurements)
@@ -483,27 +513,36 @@ fn verify_result_block_writer_rejects_mismatched_shots() {
         ),
     ];
 
-    for (tag, (name, measurements, detections, observable_flips)) in blocks.into_iter().enumerate()
+    for (block_tag, (name, measurements, detections, observable_flips)) in
+        blocks.into_iter().enumerate()
     {
         let block = DecodedSampleBlock {
             measurements,
             detections,
             observable_flips,
         };
-        let sentinel = vec![0xd0, tag as u8, 0x0d];
-        let mut output = sentinel.clone();
-        let mut writer = ResultBlockWriter::new(
-            &mut output,
+        for (kind_tag, kind) in [
             ResultOutputKind::Measurements,
-            OutputFormat::B8,
-        )
-        .expect("create result block writer");
-        assert!(
-            writer.write_block(&block).is_err(),
-            "{name} shot-count mismatch must fail"
-        );
-        drop(writer);
-        assert_eq!(output, sentinel, "{name} mismatch must not write output");
+            ResultOutputKind::Detectors,
+            ResultOutputKind::Observables,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sentinel = vec![0xd0, block_tag as u8, kind_tag as u8, 0x0d];
+            let mut output = sentinel.clone();
+            let mut writer = ResultBlockWriter::new(&mut output, kind, OutputFormat::B8)
+                .expect("create result block writer");
+            assert!(
+                writer.write_block(&block).is_err(),
+                "{name} shot-count mismatch must fail for {kind:?}"
+            );
+            drop(writer);
+            assert_eq!(
+                output, sentinel,
+                "{name} mismatch must not write {kind:?} output"
+            );
+        }
     }
 }
 
