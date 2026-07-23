@@ -1,5 +1,6 @@
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::output::OutputFormat;
+use crate::sample_archive::ArchiveLimits;
 use crate::sim::bit_table::BitTable;
 use std::fmt;
 use std::io::{Read, Write};
@@ -243,8 +244,12 @@ pub struct ResultBlockWriter<W: Write> {
     output: W,
     kind: ResultOutputKind,
     format: OutputFormat,
-    ptb64_width: Option<usize>,
+    total_shots: u64,
+    written_shots: u64,
+    selected_width: Option<usize>,
+    dets_observable_width: Option<usize>,
     ptb64_pending: Option<Ptb64Pending>,
+    finished: bool,
 }
 
 #[derive(Clone)]
@@ -258,26 +263,62 @@ impl<W: Write> ResultBlockWriter<W> {
         output: W,
         kind: ResultOutputKind,
         format: OutputFormat,
+        total_shots: u64,
+        limits: ArchiveLimits,
     ) -> Result<Self, ResultFormatError> {
         if matches!(format, OutputFormat::Dets) && !matches!(kind, ResultOutputKind::Detectors) {
             return Err(ResultFormatError::new(
                 "dets output format is only supported for detector results",
             ));
         }
+        if total_shots > limits.max_total_shots {
+            return Err(ResultFormatError::new(
+                "result output shot count exceeds limit",
+            ));
+        }
         Ok(Self {
             output,
             kind,
             format,
-            ptb64_width: None,
+            total_shots,
+            written_shots: 0,
+            selected_width: None,
+            dets_observable_width: None,
             ptb64_pending: None,
+            finished: false,
         })
     }
 
     pub fn write_block(&mut self, block: &DecodedSampleBlock) -> Result<(), ResultFormatError> {
+        if self.finished {
+            return Err(ResultFormatError::new("result writer is already finished"));
+        }
         validate_block_shots(block)?;
 
+        let block_shots = block.measurements.num_minor() as u64;
+        let next_written_shots = self
+            .written_shots
+            .checked_add(block_shots)
+            .ok_or_else(|| ResultFormatError::new("result output shot count overflows"))?;
+        if next_written_shots > self.total_shots {
+            return Err(ResultFormatError::new(
+                "result block exceeds declared total shots",
+            ));
+        }
+        let selected_width = self.selected_table(block).num_major();
+        self.validate_selected_width(selected_width)?;
+        if matches!(
+            (self.kind, self.format),
+            (ResultOutputKind::Detectors, OutputFormat::Dets)
+        ) {
+            self.validate_dets_observable_width(block.observable_flips.num_major())?;
+        }
+
         if matches!(self.format, OutputFormat::Ptb64) {
-            return self.write_ptb64_block(self.selected_table(block));
+            self.write_ptb64_block(self.selected_table(block))?;
+            self.selected_width.get_or_insert(selected_width);
+            self.written_shots = next_written_shots;
+            return Ok(());
         }
 
         let mut staging = Vec::new();
@@ -302,14 +343,34 @@ impl<W: Write> ResultBlockWriter<W> {
             (_, OutputFormat::Dets | OutputFormat::Ptb64) => unreachable!("format was validated"),
         }
         .map_err(write_error)?;
-        self.output.write_all(&staging).map_err(write_error)
+        self.output.write_all(&staging).map_err(write_error)?;
+        self.selected_width.get_or_insert(selected_width);
+        if matches!(
+            (self.kind, self.format),
+            (ResultOutputKind::Detectors, OutputFormat::Dets)
+        ) {
+            self.dets_observable_width
+                .get_or_insert(block.observable_flips.num_major());
+        }
+        self.written_shots = next_written_shots;
+        Ok(())
     }
 
     pub fn finish(&mut self) -> Result<(), ResultFormatError> {
+        if self.finished {
+            return Err(ResultFormatError::new("result writer is already finished"));
+        }
+        if self.written_shots != self.total_shots {
+            return Err(ResultFormatError::new(
+                "result output shot count does not match declared total",
+            ));
+        }
         if matches!(self.format, OutputFormat::Ptb64) {
             self.flush_ptb64_pending()?;
         }
-        self.output.flush().map_err(write_error)
+        self.output.flush().map_err(write_error)?;
+        self.finished = true;
+        Ok(())
     }
 
     fn selected_table<'a>(&self, block: &'a DecodedSampleBlock) -> &'a BitTable {
@@ -322,14 +383,6 @@ impl<W: Write> ResultBlockWriter<W> {
 
     fn write_ptb64_block(&mut self, table: &BitTable) -> Result<(), ResultFormatError> {
         let width = table.num_major();
-        if let Some(previous_width) = self.ptb64_width {
-            if previous_width != width {
-                return Err(ResultFormatError::new(
-                    "ptb64 result width changes between blocks",
-                ));
-            }
-        }
-
         let mut pending = self.ptb64_pending.clone().unwrap_or(Ptb64Pending {
             words: vec![0; width],
             shots: 0,
@@ -350,7 +403,6 @@ impl<W: Write> ResultBlockWriter<W> {
         }
 
         self.output.write_all(&staging).map_err(write_error)?;
-        self.ptb64_width = Some(width);
         self.ptb64_pending = Some(pending);
         Ok(())
     }
@@ -370,6 +422,28 @@ impl<W: Write> ResultBlockWriter<W> {
             words: vec![0; pending.words.len()],
             shots: 0,
         });
+        Ok(())
+    }
+
+    fn validate_selected_width(&self, width: usize) -> Result<(), ResultFormatError> {
+        if let Some(previous_width) = self.selected_width {
+            if previous_width != width {
+                return Err(ResultFormatError::new(
+                    "result output width changes between blocks",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_dets_observable_width(&self, width: usize) -> Result<(), ResultFormatError> {
+        if let Some(previous_width) = self.dets_observable_width {
+            if previous_width != width {
+                return Err(ResultFormatError::new(
+                    "dets observable width changes between blocks",
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -400,9 +474,9 @@ fn write_error(error: std::io::Error) -> ResultFormatError {
 mod tests {
     use super::*;
     use crate::measurement_transform::DecodedSampleBlock;
-    use crate::output::{write_shots_01, write_shots_b8, write_shots_ptb64, OutputFormat};
+    use crate::output::{OutputFormat, write_shots_01, write_shots_b8, write_shots_ptb64};
     use crate::sim::bit_table::BitTable;
-    use std::io::{self, Cursor, Read};
+    use std::io::{self, Cursor, Read, Write};
 
     #[test]
     fn reads_01_in_bounded_blocks() {
@@ -532,9 +606,12 @@ mod tests {
             table_from_shots(&[&[false, true], &[true, false]]),
         );
         let mut output = Vec::new();
-        let mut writer =
-            ResultBlockWriter::new(&mut output, ResultOutputKind::Detectors, OutputFormat::Dets)
-                .unwrap();
+        let mut writer = result_writer(
+            &mut output,
+            ResultOutputKind::Detectors,
+            OutputFormat::Dets,
+            2,
+        );
 
         writer.write_block(&block).unwrap();
         writer.finish().unwrap();
@@ -550,9 +627,12 @@ mod tests {
             table_from_shots(&[&[true, false], &[false, true]]),
         );
         let mut output = Vec::new();
-        let mut writer =
-            ResultBlockWriter::new(&mut output, ResultOutputKind::Detectors, OutputFormat::Dets)
-                .unwrap();
+        let mut writer = result_writer(
+            &mut output,
+            ResultOutputKind::Detectors,
+            OutputFormat::Dets,
+            2,
+        );
 
         writer.write_block(&block).unwrap();
         writer.finish().unwrap();
@@ -568,12 +648,12 @@ mod tests {
             table_from_shots(&[&[true, true], &[true, true]]),
         );
         let mut output = Vec::new();
-        let mut writer = ResultBlockWriter::new(
+        let mut writer = result_writer(
             &mut output,
             ResultOutputKind::Detectors,
             OutputFormat::Format01,
-        )
-        .unwrap();
+            2,
+        );
 
         writer.write_block(&block).unwrap();
         writer.finish().unwrap();
@@ -590,12 +670,12 @@ mod tests {
         );
         let sentinel = b"unchanged".to_vec();
         let mut output = sentinel.clone();
-        let mut writer = ResultBlockWriter::new(
+        let mut writer = result_writer(
             &mut output,
             ResultOutputKind::Measurements,
             OutputFormat::Format01,
-        )
-        .unwrap();
+            2,
+        );
 
         assert!(writer.write_block(&block).is_err());
         drop(writer);
@@ -619,12 +699,12 @@ mod tests {
         let mut expected_output = Vec::new();
         write_shots_ptb64(&expected, &mut expected_output).unwrap();
         let mut output = Vec::new();
-        let mut writer = ResultBlockWriter::new(
+        let mut writer = result_writer(
             &mut output,
             ResultOutputKind::Measurements,
             OutputFormat::Ptb64,
-        )
-        .unwrap();
+            65,
+        );
 
         writer.write_block(&first).unwrap();
         writer.write_block(&second).unwrap();
@@ -634,13 +714,118 @@ mod tests {
     }
 
     #[test]
+    fn enforces_declared_total_shots_and_terminal_finish() {
+        let block = decoded_block(
+            table_from_shots(&[&[true], &[false]]),
+            BitTable::new(0, 2),
+            BitTable::new(0, 2),
+        );
+        let sentinel = b"unchanged".to_vec();
+        let mut output = sentinel.clone();
+        let mut too_many = result_writer(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::Format01,
+            1,
+        );
+        assert!(too_many.write_block(&block).is_err());
+        drop(too_many);
+        assert_eq!(output, sentinel);
+
+        let mut output = Vec::new();
+        let mut too_few = result_writer(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::Format01,
+            3,
+        );
+        too_few.write_block(&block).unwrap();
+        assert!(too_few.finish().is_err());
+
+        let mut output = Vec::new();
+        let mut finished = result_writer(
+            &mut output,
+            ResultOutputKind::Measurements,
+            OutputFormat::Format01,
+            2,
+        );
+        finished.write_block(&block).unwrap();
+        finished.finish().unwrap();
+        assert!(finished.write_block(&block).is_err());
+    }
+
+    #[test]
+    fn rejects_width_changes_before_writing_a_block() {
+        let first = decoded_block(
+            table_from_shots(&[&[true, false]]),
+            BitTable::new(0, 1),
+            BitTable::new(0, 1),
+        );
+        let wider = decoded_block(
+            table_from_shots(&[&[false, true, false]]),
+            BitTable::new(0, 1),
+            BitTable::new(0, 1),
+        );
+        let mut writer = result_writer(
+            Vec::new(),
+            ResultOutputKind::Measurements,
+            OutputFormat::Format01,
+            2,
+        );
+        writer.write_block(&first).unwrap();
+        let after_first = writer.output.clone();
+        assert!(writer.write_block(&wider).is_err());
+        assert_eq!(writer.output, after_first);
+
+        let first = decoded_block(
+            BitTable::new(0, 1),
+            table_from_shots(&[&[true]]),
+            table_from_shots(&[&[true]]),
+        );
+        let wider_observable = decoded_block(
+            BitTable::new(0, 1),
+            table_from_shots(&[&[false]]),
+            table_from_shots(&[&[false, true]]),
+        );
+        let mut writer = result_writer(
+            Vec::new(),
+            ResultOutputKind::Detectors,
+            OutputFormat::Dets,
+            2,
+        );
+        writer.write_block(&first).unwrap();
+        let after_first = writer.output.clone();
+        assert!(writer.write_block(&wider_observable).is_err());
+        assert_eq!(writer.output, after_first);
+    }
+
+    #[test]
     fn rejects_dets_for_measurements_and_observables() {
         for kind in [
             ResultOutputKind::Measurements,
             ResultOutputKind::Observables,
         ] {
-            assert!(ResultBlockWriter::new(Vec::<u8>::new(), kind, OutputFormat::Dets).is_err());
+            assert!(
+                ResultBlockWriter::new(
+                    Vec::<u8>::new(),
+                    kind,
+                    OutputFormat::Dets,
+                    0,
+                    ArchiveLimits::default(),
+                )
+                .is_err()
+            );
         }
+    }
+
+    fn result_writer<W: Write>(
+        output: W,
+        kind: ResultOutputKind,
+        format: OutputFormat,
+        total_shots: u64,
+    ) -> ResultBlockWriter<W> {
+        ResultBlockWriter::new(output, kind, format, total_shots, ArchiveLimits::default())
+            .expect("create result block writer")
     }
 
     fn read_all(

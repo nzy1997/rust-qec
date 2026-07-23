@@ -1,8 +1,8 @@
 use rstim::m2d::measurements_to_detections;
 use rstim::measurement_transform::{DecodedSampleBlock, MeasurementTransform};
 use rstim::output::{
-    read_shots_b8, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8, OutputFormat,
+    OutputFormat, read_shots_b8, write_shots_01, write_shots_b8, write_shots_dets,
+    write_shots_hits, write_shots_ptb64, write_shots_r8,
 };
 use rstim::parser::parse_lines;
 use rstim::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
@@ -531,8 +531,14 @@ fn verify_result_block_writer_rejects_mismatched_shots() {
         {
             let sentinel = vec![0xd0, block_tag as u8, kind_tag as u8, 0x0d];
             let mut output = sentinel.clone();
-            let mut writer = ResultBlockWriter::new(&mut output, kind, OutputFormat::B8)
-                .expect("create result block writer");
+            let mut writer = ResultBlockWriter::new(
+                &mut output,
+                kind,
+                OutputFormat::B8,
+                block.measurements.num_minor() as u64,
+                ArchiveLimits::default(),
+            )
+            .expect("create result block writer");
             assert!(
                 writer.write_block(&block).is_err(),
                 "{name} shot-count mismatch must fail for {kind:?}"
