@@ -299,6 +299,10 @@ impl SampleArchiveError {
         self.code
     }
 
+    pub(crate) const fn with_code(code: SampleArchiveErrorCode, detail: &'static str) -> Self {
+        Self { code, detail }
+    }
+
     const fn new(code: SampleArchiveErrorCode, detail: &'static str) -> Self {
         Self { code, detail }
     }
