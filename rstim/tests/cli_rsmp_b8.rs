@@ -6,6 +6,8 @@ use rstim::sim::bit_table::BitTable;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const SEMANTIC_FIXTURES: [&str; 6] = [
     "nonzero_reference",
@@ -40,6 +42,31 @@ fn run_cli(args: &[String], stdin: Option<&[u8]>) -> std::process::Output {
             .expect("write stdin");
     }
     child.wait_with_output().expect("wait rstim")
+}
+
+fn run_cli_with_open_stdin(args: &[String], timeout: Duration) -> std::process::Output {
+    use std::process::Stdio;
+
+    let mut command = rstim_cmd();
+    command
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().expect("spawn rstim");
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        if child.try_wait().expect("poll rstim").is_some() {
+            return child.wait_with_output().expect("collect rstim output");
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill stdin-blocked rstim");
+            child.wait().expect("reap stdin-blocked rstim");
+            panic!("over-limit shots blocked waiting for stdin");
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[test]
@@ -311,20 +338,18 @@ fn verify_negative_cases(root: &Path) -> usize {
     let sentinel = |name: &str| root.join(name);
     let mut cases: usize = 0;
 
-    for (name, input, format) in [("unsupported_format", measurements.as_slice(), "01")] {
+    for (name, input) in [("short_b8", &measurements[..3])] {
         let archive = sentinel(&format!("{name}.rsmp"));
         write_sentinel(&archive, cases as u8);
-        let args = pack_args_with_format(&circuit, 4, "-", &archive, format);
         let entries = directory_entries(root);
-        let output = run_cli(&args, Some(input));
+        let output = run_cli(&pack_args(&circuit, 4, "-", &archive), Some(input));
         assert_failure(&output, name);
         assert_sentinel(&archive, cases as u8);
         assert_no_new_siblings(root, &entries);
-        cases += 1;
     }
+    cases += 1;
 
     for (name, input) in [
-        ("short_b8", &measurements[..3]),
         ("extra_b8", &[1, 1, 1, 1, 1][..]),
         ("padding_b8", &[0x81, 1, 1, 1][..]),
     ] {
@@ -341,7 +366,7 @@ fn verify_negative_cases(root: &Path) -> usize {
     let archive = sentinel("over_limit.rsmp");
     write_sentinel(&archive, cases as u8);
     let entries = directory_entries(root);
-    let output = run_cli(
+    let output = run_cli_with_open_stdin(
         &pack_args(
             &circuit,
             rstim::sample_archive::ArchiveLimits::default()
@@ -351,7 +376,7 @@ fn verify_negative_cases(root: &Path) -> usize {
             "-",
             &archive,
         ),
-        Some(&vec![0; 1024]),
+        Duration::from_secs(1),
     );
     assert_failure(&output, "over-limit shots before stdin consumption");
     assert_sentinel(&archive, cases as u8);
@@ -360,12 +385,10 @@ fn verify_negative_cases(root: &Path) -> usize {
 
     let archive = root.join("valid.rsmp");
     make_valid_archive(&circuit, &archive, &measurements);
+    verify_non_b8_format_rejections(root, &circuit, &archive, &measurements);
+    cases += 1;
+
     for (name, args) in [
-        ("unpack_unsupported_format", {
-            let destination = sentinel("unpack_unsupported_format.b8");
-            write_sentinel(&destination, 0xa1);
-            unpack_args_with_measurements_format(&circuit, &archive, &destination, "01")
-        }),
         (
             "unpack_missing_output",
             unpack_args(&circuit, &archive, None, None, None),
@@ -385,9 +408,6 @@ fn verify_negative_cases(root: &Path) -> usize {
         let entries = directory_entries(root);
         let output = run_cli(&args, None);
         assert_failure(&output, name);
-        if name == "unpack_unsupported_format" {
-            assert_sentinel(&sentinel("unpack_unsupported_format.b8"), 0xa1);
-        }
         if name == "unpack_duplicate_outputs" {
             assert_sentinel(&sentinel("unpack_duplicate_outputs.b8"), 0xa2);
         }
@@ -537,15 +557,52 @@ fn unpack_args(
     args
 }
 
-fn unpack_args_with_measurements_format(
+fn unpack_args_with_output_format(
     circuit: &Path,
     input: &Path,
-    measurements: &Path,
+    output_flag: &str,
+    output: &Path,
     format: &str,
 ) -> Vec<String> {
-    let mut args = unpack_args(circuit, input, Some(measurements), None, None);
-    args.extend(["--measurements_out_format".to_owned(), format.to_owned()]);
+    let mut args = unpack_args(circuit, input, None, None, None);
+    args.extend([output_flag.to_owned(), output.display().to_string()]);
+    args.extend([format!("{output_flag}_format"), format.to_owned()]);
     args
+}
+
+fn verify_non_b8_format_rejections(
+    root: &Path,
+    circuit: &Path,
+    archive: &Path,
+    measurements: &[u8],
+) {
+    let input_archive = root.join("unsupported_in_format.rsmp");
+    write_sentinel(&input_archive, 0xa0);
+    let entries = directory_entries(root);
+    let output = run_cli(
+        &pack_args_with_format(circuit, 4, "-", &input_archive, "01"),
+        Some(measurements),
+    );
+    assert_failure(&output, "unsupported --in_format");
+    assert_sentinel(&input_archive, 0xa0);
+    assert_no_new_siblings(root, &entries);
+
+    for (name, output_flag, tag) in [
+        ("measurements", "--measurements_out", 0xa1),
+        ("detectors", "--detectors_out", 0xa2),
+        ("observables", "--obs_out", 0xa3),
+    ] {
+        let destination = root.join(format!("unsupported_{name}_format.b8"));
+        write_sentinel(&destination, tag);
+        let entries = directory_entries(root);
+        let output = run_cli(
+            &unpack_args_with_output_format(circuit, archive, output_flag, &destination, "01"),
+            None,
+        );
+        assert_failure(&output, &format!("unsupported {output_flag}_format"));
+        assert_sentinel(&destination, tag);
+        assert_no_new_siblings(root, &entries);
+    }
 }
 
 fn append_output_args(args: &mut Vec<String>, path_flag: &str, path: Option<&Path>) {
