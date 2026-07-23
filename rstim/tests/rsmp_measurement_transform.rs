@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use rstim::ir::{circuit_to_string, StimInstr};
 use rstim::m2d::measurements_to_detections;
 use rstim::measurement_transform::{
-    EncodedMeasurementBlock, MeasurementTransform, MeasurementTransformError,
-    MeasurementTransformLimits,
+    CheckedMeasurementLayout, EncodedMeasurementBlock, MeasurementTransform,
+    MeasurementTransformError, MeasurementTransformLimits,
 };
 use rstim::output::{read_shots_b8, write_shots_b8};
 use rstim::parser::parse_lines;
@@ -25,6 +25,7 @@ fn rsmp_measurement_transform_contract() {
     let mut valid_cases = consume_required_catalog_roles();
     let known_answers = verify_catalog_known_answers();
     verify_fixed_known_answer_case();
+    verify_public_error_and_accessor_contracts();
     valid_cases += verify_additional_valid_semantics();
     assert_eq!(valid_cases, 7);
     assert_eq!(known_answers, 4);
@@ -168,6 +169,108 @@ fn verify_fixed_known_answer_case() {
         "fixed",
         "measurements",
     );
+}
+
+fn verify_public_error_and_accessor_contracts() {
+    assert_eq!(
+        MeasurementTransformError::UnsupportedSweep.to_string(),
+        "sweep-bit circuits are not supported"
+    );
+    assert_eq!(
+        MeasurementTransformError::LimitExceeded {
+            limit: "max_measurements"
+        }
+        .to_string(),
+        "measurement transform limit exceeded: max_measurements"
+    );
+    assert_eq!(
+        MeasurementTransformError::ShapeMismatch {
+            detail: "bad shape".to_string()
+        }
+        .to_string(),
+        "measurement transform shape mismatch: bad shape"
+    );
+    assert_eq!(
+        MeasurementTransformError::from(BitTableAllocError::SizeOverflow).to_string(),
+        "BitTable allocation failed: SizeOverflow"
+    );
+    assert_eq!(
+        MeasurementTransformError::Reference {
+            detail: "reference failed".to_string()
+        }
+        .to_string(),
+        "reference sample construction failed: reference failed"
+    );
+
+    let instrs =
+        parse_lines("X 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let layout =
+        CheckedMeasurementLayout::from_circuit_with_limits(&instrs, permissive_limits()).unwrap();
+    assert_eq!(layout.expanded_instructions(), 4);
+    assert_eq!(layout.parity_terms(), 2);
+
+    let transform = MeasurementTransform::from_circuit_with_limits(&instrs, permissive_limits())
+        .expect("accessor transform");
+    assert_eq!(transform.reference_bits(), &[true]);
+
+    let err = transform
+        .encode_block(&BitTable::try_new(0, 1).unwrap())
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        MeasurementTransformError::ShapeMismatch { .. }
+    ));
+    assert!(err
+        .to_string()
+        .contains("measurement rows 0 do not match transform measurements 1"));
+
+    let zero_shot_measurements = BitTable::try_new(1, 0).unwrap();
+    let zero_shot_encoded = transform.encode_block(&zero_shot_measurements).unwrap();
+    let zero_shot_decoded = transform.decode_block(&zero_shot_encoded).unwrap();
+    assert_eq!(zero_shot_decoded.measurements.num_minor(), 0);
+
+    assert_limit_guard(
+        "direct_max_repeat_depth",
+        "REPEAT 1 {\n  M 0\n}\n",
+        |limits| limits.max_repeat_depth = 0,
+        |limits| limits.max_repeat_depth = 1,
+    );
+    assert_limit_guard(
+        "direct_max_expanded_instructions",
+        "M 0\n",
+        |limits| limits.max_expanded_instructions = 0,
+        |limits| limits.max_expanded_instructions = 1,
+    );
+    assert_limit_guard(
+        "repeat_preflight_max_measurements",
+        "REPEAT 2 {\n  M 0\n}\n",
+        |limits| limits.max_measurements = 1,
+        |limits| limits.max_measurements = 2,
+    );
+    assert_limit_guard(
+        "repeat_preflight_max_detectors",
+        "M 0\nREPEAT 2 {\n  DETECTOR rec[-1]\n}\n",
+        |limits| limits.max_detectors = 1,
+        |limits| limits.max_detectors = 2,
+    );
+    assert_limit_guard(
+        "repeat_preflight_max_observables",
+        "M 0\nREPEAT 1 {\n  OBSERVABLE_INCLUDE(1) rec[-1]\n}\n",
+        |limits| limits.max_observables = 1,
+        |limits| limits.max_observables = 2,
+    );
+    assert_limit_guard(
+        "repeat_preflight_max_parity_terms",
+        "M 0\nREPEAT 2 {\n  DETECTOR rec[-1]\n}\n",
+        |limits| limits.max_parity_terms = 1,
+        |limits| limits.max_parity_terms = 2,
+    );
+
+    let invalid_observable = parse_lines("M 0\nOBSERVABLE_INCLUDE(nan) rec[-1]\n").unwrap();
+    assert!(matches!(
+        MeasurementTransform::from_circuit_with_limits(&invalid_observable, permissive_limits()),
+        Err(MeasurementTransformError::InvalidRecordTarget { .. })
+    ));
 }
 
 fn verify_additional_valid_semantics() -> usize {

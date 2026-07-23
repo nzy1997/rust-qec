@@ -71,10 +71,9 @@ pub fn measurements_to_detections_with_options(
     let n_meas = layout.num_measurements();
     if let Some(reference) = shared_reference.as_ref() {
         if reference.len() != n_meas {
-            return Err(format!(
-                "reference has {} bits but circuit has {} measurements",
+            return Err(reference_measurement_count_mismatch(
                 reference.len(),
-                n_meas
+                n_meas,
             ));
         }
     }
@@ -147,4 +146,21 @@ pub fn measurements_to_detections_with_options(
         detections: dets,
         observable_flips: obs,
     })
+}
+
+fn reference_measurement_count_mismatch(reference_len: usize, n_meas: usize) -> String {
+    format!("reference has {reference_len} bits but circuit has {n_meas} measurements")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reference_measurement_count_mismatch_is_actionable() {
+        assert_eq!(
+            reference_measurement_count_mismatch(2, 3),
+            "reference has 2 bits but circuit has 3 measurements"
+        );
+    }
 }

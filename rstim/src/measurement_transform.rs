@@ -1348,3 +1348,55 @@ fn usize_from_u64(value: u64, limit: &'static str) -> Result<usize, MeasurementT
 fn usize_from_u128(value: u128) -> usize {
     usize::try_from(value).unwrap_or(usize::MAX)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::PauliBasis;
+
+    #[test]
+    fn private_helpers_cover_edge_cases() {
+        let mut empty = Vec::new();
+        xor_all_valid_bits(&mut empty, 0);
+        assert!(empty.is_empty());
+        assert_eq!(highest_set_bit(&[], 0), None);
+
+        let mut words = vec![0u64; 2];
+        xor_all_valid_bits(&mut words, 65);
+        assert_eq!(words, vec![!0u64, 1]);
+
+        assert_eq!(
+            count_mpp_products(&[
+                StimTarget::pauli(0, PauliBasis::X, false),
+                StimTarget::Combiner,
+                StimTarget::pauli(1, PauliBasis::Z, false),
+                StimTarget::Qubit(2),
+                StimTarget::pauli(3, PauliBasis::Y, false),
+            ]),
+            2
+        );
+
+        assert!(matches!(
+            observable_index(&[f64::NAN]),
+            Err(MeasurementTransformError::InvalidRecordTarget { .. })
+        ));
+        assert!(matches!(
+            checked_usize_bytes(usize::MAX, 2, "test_limit"),
+            Err(MeasurementTransformError::LimitExceeded {
+                limit: "test_limit"
+            })
+        ));
+        assert!(matches!(
+            checked_sum("test_limit", &[u64::MAX, 1]),
+            Err(MeasurementTransformError::LimitExceeded {
+                limit: "test_limit"
+            })
+        ));
+        assert!(matches!(
+            enforce_bytes("test_limit", 2, 1),
+            Err(MeasurementTransformError::LimitExceeded {
+                limit: "test_limit"
+            })
+        ));
+    }
+}
