@@ -1,0 +1,117 @@
+schema_version = 1
+fixture_id = "compat_v1_two_block_sparse_dense"
+description = "Immutable two-block rsmp v1 reader compatibility fixture."
+
+consumers = [
+  "compatibility",
+  "corruption_corpus",
+  "cli_publication_tests",
+  "readiness",
+]
+
+[paths]
+circuit = "rstim/tests/fixtures/rsmp/v1/compat.stim"
+measurements_01 = "rstim/tests/fixtures/rsmp/v1/compat-measurements.01"
+measurements_b8 = "rstim/tests/fixtures/rsmp/v1/compat-measurements.b8"
+archive = "rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp"
+expected_detectors_01 = "rstim/tests/fixtures/rsmp/v1/compat-expected-detectors.01"
+expected_observables_01 = "rstim/tests/fixtures/rsmp/v1/compat-expected-observables.01"
+
+[hashes]
+circuit_source_sha256 = "18a857fb71f44eb28144a6a0e3aad17cce675daa2737690432efe305ed5777a2"
+circuit_identity_sha256 = "18a857fb71f44eb28144a6a0e3aad17cce675daa2737690432efe305ed5777a2"
+measurements_01_sha256 = "90efbc9f3f0de6fd6562acba5601d02820f32cbf632410cd01058d1fd4b06c1e"
+measurements_b8_sha256 = "cd575545ea899978f9477b43341c106981061f94a1bfaf9b575cd6a61acc32c3"
+archive_sha256 = "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c"
+expected_detectors_01_sha256 = "bbbb412548a3d2414970dfe3c0c2f875a464b7365a4769f601f1405ff16fa630"
+expected_observables_01_sha256 = "82705308134bbe1154849ebc6ec13ce36c1a232c76415f79c0de21c4d631001f"
+whole_archive_sha256 = "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c"
+trailer_archive_sha256 = "389d04dbc3f40fa57ed9f155f62d4a9ac0770da6fbfece5184a29eebc4bd0144"
+cargo_lock_sha256 = "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6"
+
+[circuit]
+canonical_utf8_bytes = 282
+
+[shape]
+measurements = 10
+detectors = 9
+observables = 1
+rank = 9
+free_measurements = 1
+shots = 4
+blocks = 2
+block_shots = 2
+
+[format]
+format_major = 1
+format_minor = 0
+global_header_len = 152
+block_header_len = 108
+trailer_len = 64
+canonicalization_id = 1
+fingerprint_id = 1
+transform_id = 1
+reference_id = 1
+codec_suite_id = 1
+zstd_level = 3
+syndrome_codec_sparse_id = 2
+syndrome_codec_dense_id = 1
+free_codec_dense_id = 3
+
+[[blocks]]
+index = 0
+first_shot = 0
+shot_count = 2
+syndrome_codec = "sparse"
+syndrome_codec_id = 2
+free_codec = "dense"
+free_codec_id = 3
+syndrome_dense_candidate_bytes = 3
+syndrome_sparse_candidate_bytes = 2
+syndrome_uncompressed_len = 2
+syndrome_compressed_len = 15
+free_uncompressed_len = 1
+free_compressed_len = 14
+logical_payload_sha256 = "433ebf5bc03dffa38536673207a21281612cef5faa9bc7a4d5b9be2fdb12cf1a"
+syndrome_frame_sha256 = "2f66d8a5f2946237765f50b3ad5418b65753593708d93048127016a3760915f4"
+free_frame_sha256 = "91f1c7328b1929204baca7e156dba1ed0c525716049b7bc6e93365d0e063ba0f"
+
+[[blocks]]
+index = 1
+first_shot = 2
+shot_count = 2
+syndrome_codec = "dense"
+syndrome_codec_id = 1
+free_codec = "dense"
+free_codec_id = 3
+syndrome_dense_candidate_bytes = 3
+syndrome_sparse_candidate_bytes = 20
+syndrome_uncompressed_len = 3
+syndrome_compressed_len = 16
+free_uncompressed_len = 1
+free_compressed_len = 14
+logical_payload_sha256 = "d85408cc57c8cfe3cc6916f2d46546634326a6b086c120ab2db599e1a2baed73"
+syndrome_frame_sha256 = "021ee8bff8d90ecb8d0551f9dd7e3e7c5139c87dee32dc82dac502871776e97a"
+free_frame_sha256 = "91f1c7328b1929204baca7e156dba1ed0c525716049b7bc6e93365d0e063ba0f"
+
+[generation]
+argv = [
+  "cargo",
+  "test",
+  "--locked",
+  "-p",
+  "rstim",
+  "--test",
+  "_tmp_generate_compat_fixture",
+  "generate_compat_fixture",
+  "--",
+  "--exact",
+  "--nocapture",
+]
+generator_repository_revision = "31f9f456151d0794b2bc91244f5f4fc46eb5f6de"
+writer_source_base_revision = "98a203f64fbd9b758d8768b68e73162234b50434"
+rust_crate = "rstim 0.1.1"
+zstandard_crate = "zstd 0.13.3"
+zstandard_backend = "zstd-sys 2.0.16+zstd.1.5.7"
+cargo_lock_sha256 = "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6"
+statement = "This command records the historical initial-generation provenance. Future rsmp v1 writers are not required to reproduce identical compressed bytes."
