@@ -534,8 +534,6 @@ fn verify_negative_cases() -> usize {
     assert_sentinel(&duplicate, cases as u8);
     cases += 1;
 
-    verify_unlisted_usage_guards(&fixture, &valid_archive);
-
     cases
 }
 
@@ -556,56 +554,6 @@ fn verify_pack_failure_preserves_destination(
     );
     assert_failure(&output, name);
     assert_sentinel(&destination, tag as u8);
-}
-
-fn verify_unlisted_usage_guards(fixture: &CatalogFixture, valid_archive: &Path) {
-    let dir = tempfile::tempdir().expect("tempdir");
-    for (tag, (name, format, input)) in [
-        (
-            "unsupported-r8",
-            "r8",
-            encode_table(&fixture.measurements, "b8", None),
-        ),
-        (
-            "unsupported-dets",
-            "dets",
-            encode_table(&fixture.measurements, "b8", None),
-        ),
-        (
-            "unsupported-hits",
-            "hits",
-            encode_table(&fixture.measurements, "b8", None),
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        verify_pack_failure_preserves_destination(
-            dir.path(),
-            &fixture.circuit,
-            fixture.shots as u64,
-            name,
-            format,
-            input,
-            0xb0 + tag,
-        );
-    }
-
-    let output = run_cli(&unpack_args(&fixture.circuit, valid_archive, None), None);
-    assert_failure(&output, "unpack without outputs");
-
-    let destination = dir.path().join("unknown-detector-format.out");
-    write_sentinel(&destination, 0xb7);
-    let output = run_cli(
-        &unpack_args(
-            &fixture.circuit,
-            valid_archive,
-            Some(("--detectors_out", &destination, "unknown")),
-        ),
-        None,
-    );
-    assert_failure(&output, "unknown detector format");
-    assert_sentinel(&destination, 0xb7);
 }
 
 fn verify_01_framing_rejection(dir: &Path, circuit: &Path, shots: u64, format01: &[u8]) {

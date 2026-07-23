@@ -234,7 +234,7 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
-    /// Pack b8 measurement samples into an RSMP archive
+    /// Pack measurement samples into an RSMP archive
     #[command(name = "pack_samples")]
     PackSamples {
         #[arg(long = "circuit")]
@@ -248,7 +248,7 @@ pub enum Commands {
         #[arg(long = "out")]
         out: String,
     },
-    /// Unpack an RSMP archive into b8 sample streams
+    /// Unpack an RSMP archive into result sample streams
     #[command(name = "unpack_samples")]
     UnpackSamples {
         #[arg(long = "circuit")]
