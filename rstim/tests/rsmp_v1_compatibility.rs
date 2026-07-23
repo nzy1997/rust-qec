@@ -26,6 +26,7 @@ const CATALOG_PATH: &str = "rstim/tests/fixtures/rsmp/catalog.json";
 const MANIFEST_PATH: &str = "rstim/tests/fixtures/rsmp/v1/manifest.toml";
 const ARCHIVE_PATH: &str = "rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp";
 const ZERO_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+const EXPECTED_ZSTD_LEVEL: i64 = 3;
 
 type CheckResult<T> = Result<T, String>;
 
@@ -56,6 +57,22 @@ fn changed_expected_measurement_hash_is_rejected() {
     assert!(
         err.contains("measurements_01_sha256"),
         "unexpected rejection for changed measurement hash: {err}"
+    );
+}
+
+#[test]
+fn changed_format_codec_id_is_rejected() {
+    let temp = CopiedFixtureTree::new();
+    rewrite_manifest_literal(
+        &temp.manifest_path,
+        "syndrome_codec_sparse_id = 2",
+        "syndrome_codec_sparse_id = 99",
+    );
+    refresh_catalog_manifest_hash(&temp.catalog_path, &temp.manifest_path);
+    let err = verify_fixture(temp.root.path()).expect_err("changed format codec id must fail");
+    assert!(
+        err.contains("format.syndrome_codec_sparse_id"),
+        "unexpected rejection for changed format codec id: {err}"
     );
 }
 
@@ -479,14 +496,33 @@ fn verify_archive_structure(
     shape: &FixtureShape,
     archive: &[u8],
 ) -> CheckResult<ArchiveLayout> {
-    if archive.len() < GLOBAL_HEADER_LEN + ARCHIVE_TRAILER_LEN {
+    let format = FormatPins::from_manifest(manifest)?;
+    let minimum_len = checked_add_usize(
+        format.global_header_len,
+        format.trailer_len,
+        "minimum archive length",
+    )?;
+    if archive.len() < minimum_len {
         return Err("archive too short for global header and trailer".to_string());
     }
-    require_eq(get_u16(archive, 8), FORMAT_MAJOR, "global.format_major")?;
-    require_eq(get_u16(archive, 10), FORMAT_MINOR, "global.format_minor")?;
-    let header = GlobalHeader::from_bytes(&archive[..GLOBAL_HEADER_LEN])
+    require_eq(
+        get_u16(archive, 8),
+        format.format_major,
+        "global.format_major",
+    )?;
+    require_eq(
+        get_u16(archive, 10),
+        format.format_minor,
+        "global.format_minor",
+    )?;
+    require_eq(
+        get_u32(archive, 12) as usize,
+        format.global_header_len,
+        "global.header_len",
+    )?;
+    let header = GlobalHeader::from_bytes(&archive[..format.global_header_len])
         .map_err(|error| format!("global header: {error}"))?;
-    let header_digest = hex(&Sha256::digest(&archive[..GLOBAL_HEADER_LEN - 32]));
+    let header_digest = hex(&Sha256::digest(&archive[..format.global_header_len - 32]));
     require_eq(
         header_digest.as_str(),
         hex(&header.header_sha256).as_str(),
@@ -520,45 +556,56 @@ fn verify_archive_structure(
     require_eq(header.total_shots, shape.shots, "global.total_shots")?;
     require_eq(
         header.canonicalization_id,
-        CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1,
+        format.canonicalization_id,
         "global.canonicalization_id",
     )?;
     require_eq(
         header.fingerprint_id,
-        FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
+        format.fingerprint_id,
         "global.fingerprint_id",
     )?;
     require_eq(
         header.transform_id,
-        TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
+        format.transform_id,
         "global.transform_id",
     )?;
     require_eq(
         header.reference_id,
-        REFERENCE_SIMULATE_NOISELESS,
+        format.reference_id,
         "global.reference_id",
     )?;
     require_eq(
         header.codec_suite_id,
-        CODEC_SUITE_ZSTD_FRAMES_V1,
+        format.codec_suite_id,
         "global.codec_suite_id",
     )?;
 
     let manifest_blocks = toml_array(manifest, &["blocks"])?;
     require_eq(manifest_blocks.len(), shape.blocks as usize, "blocks.len")?;
     let mut block_layouts = Vec::new();
-    let mut offset = GLOBAL_HEADER_LEN;
+    let mut offset = format.global_header_len;
     for (block_index, manifest_block) in manifest_blocks.iter().enumerate() {
-        if offset + BLOCK_HEADER_LEN > archive.len() {
+        let block_end = checked_add_usize(offset, format.block_header_len, "block header end")?;
+        if block_end > archive.len() {
             return Err(format!("block {block_index} exceeds archive length"));
         }
         if archive[offset..offset + 8] != BLOCK_MAGIC[..] {
             return Err(format!("block {block_index} magic mismatch"));
         }
-        let block = BlockHeader::from_bytes(&archive[offset..offset + BLOCK_HEADER_LEN])
+        require_eq(
+            get_u16(archive, offset + 8),
+            format.format_major,
+            &format!("block {block_index}.format_major"),
+        )?;
+        require_eq(
+            get_u16(archive, offset + 10),
+            format.format_minor,
+            &format!("block {block_index}.format_minor"),
+        )?;
+        let block = BlockHeader::from_bytes(&archive[offset..block_end])
             .map_err(|error| format!("block {block_index}: {error}"))?;
-        verify_block_header(block_index, &block, manifest_block)?;
-        let syndrome_start = offset + BLOCK_HEADER_LEN;
+        verify_block_header(block_index, &block, manifest_block, &format)?;
+        let syndrome_start = block_end;
         let syndrome_end = checked_add_usize(
             syndrome_start,
             block.syndrome_compressed_len as usize,
@@ -586,7 +633,8 @@ fn verify_archive_structure(
         offset = free_end;
     }
 
-    if offset + ARCHIVE_TRAILER_LEN != archive.len() {
+    let trailer_end = checked_add_usize(offset, format.trailer_len, "trailer end")?;
+    if trailer_end != archive.len() {
         return Err("archive trailer is not at the expected end offset".to_string());
     }
     if archive[offset..offset + 8] != TRAILER_MAGIC[..] {
@@ -594,15 +642,15 @@ fn verify_archive_structure(
     }
     require_eq(
         get_u16(archive, offset + 8),
-        FORMAT_MAJOR,
+        format.format_major,
         "trailer.format_major",
     )?;
     require_eq(
         get_u16(archive, offset + 10),
-        FORMAT_MINOR,
+        format.format_minor,
         "trailer.format_minor",
     )?;
-    let trailer = ArchiveTrailer::from_bytes(&archive[offset..offset + ARCHIVE_TRAILER_LEN])
+    let trailer = ArchiveTrailer::from_bytes(&archive[offset..trailer_end])
         .map_err(|error| format!("trailer: {error}"))?;
     require_eq(trailer.block_count, shape.blocks, "trailer.block_count")?;
     require_eq(trailer.total_shots, shape.shots, "trailer.total_shots")?;
@@ -627,6 +675,7 @@ fn verify_block_header(
     block_index: usize,
     block: &BlockHeader,
     manifest_block: &TomlValue,
+    format: &FormatPins,
 ) -> CheckResult<()> {
     require_eq(block.block_index, block_index as u64, "block.block_index")?;
     for (field, actual) in [
@@ -647,8 +696,8 @@ fn verify_block_header(
         )?;
     }
     let expected_syndrome_codec = match block_index {
-        0 => ("sparse", STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1),
-        1 => ("dense", STREAM_CODEC_SYNDROME_DENSE_V1),
+        0 => ("sparse", format.syndrome_codec_sparse_id),
+        1 => ("dense", format.syndrome_codec_dense_id),
         _ => return Err(format!("unexpected block index {block_index}")),
     };
     require_eq(
@@ -668,7 +717,7 @@ fn verify_block_header(
     )?;
     require_eq(
         block.free_codec_id,
-        STREAM_CODEC_FREE_DENSE_V1,
+        format.free_codec_dense_id,
         "block.free_codec_id",
     )?;
     require_eq(
@@ -930,6 +979,10 @@ fn get_u16(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
 }
 
+fn get_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
 fn checked_add_usize(left: usize, right: usize, label: &str) -> CheckResult<usize> {
     left.checked_add(right)
         .ok_or_else(|| format!("{label} overflows usize"))
@@ -1000,6 +1053,16 @@ fn toml_i64_value(value: &TomlValue, path: &[&str]) -> CheckResult<i64> {
     toml_value_at(value, path)?
         .as_integer()
         .ok_or_else(|| format!("{} must be an integer", path.join(".")))
+}
+
+fn toml_u16(value: &TomlValue, path: &[&str]) -> CheckResult<u16> {
+    let raw = toml_i64(value, path)?;
+    u16::try_from(raw).map_err(|_| format!("{} must fit in u16", path.join(".")))
+}
+
+fn toml_usize(value: &TomlValue, path: &[&str]) -> CheckResult<usize> {
+    let raw = toml_i64(value, path)?;
+    usize::try_from(raw).map_err(|_| format!("{} must fit in usize", path.join(".")))
 }
 
 fn toml_array<'a>(value: &'a TomlValue, path: &[&str]) -> CheckResult<&'a Vec<TomlValue>> {
@@ -1079,6 +1142,100 @@ impl FixtureShape {
         require_eq(shape.blocks, 2, "shape.blocks")?;
         require_eq(shape.block_shots, 2, "shape.block_shots")?;
         Ok(shape)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct FormatPins {
+    format_major: u16,
+    format_minor: u16,
+    global_header_len: usize,
+    block_header_len: usize,
+    trailer_len: usize,
+    canonicalization_id: u16,
+    fingerprint_id: u16,
+    transform_id: u16,
+    reference_id: u16,
+    codec_suite_id: u16,
+    zstd_level: i64,
+    syndrome_codec_sparse_id: u16,
+    syndrome_codec_dense_id: u16,
+    free_codec_dense_id: u16,
+}
+
+impl FormatPins {
+    fn from_manifest(manifest: &TomlValue) -> CheckResult<Self> {
+        let pins = Self {
+            format_major: toml_u16(manifest, &["format", "format_major"])?,
+            format_minor: toml_u16(manifest, &["format", "format_minor"])?,
+            global_header_len: toml_usize(manifest, &["format", "global_header_len"])?,
+            block_header_len: toml_usize(manifest, &["format", "block_header_len"])?,
+            trailer_len: toml_usize(manifest, &["format", "trailer_len"])?,
+            canonicalization_id: toml_u16(manifest, &["format", "canonicalization_id"])?,
+            fingerprint_id: toml_u16(manifest, &["format", "fingerprint_id"])?,
+            transform_id: toml_u16(manifest, &["format", "transform_id"])?,
+            reference_id: toml_u16(manifest, &["format", "reference_id"])?,
+            codec_suite_id: toml_u16(manifest, &["format", "codec_suite_id"])?,
+            zstd_level: toml_i64(manifest, &["format", "zstd_level"])?,
+            syndrome_codec_sparse_id: toml_u16(manifest, &["format", "syndrome_codec_sparse_id"])?,
+            syndrome_codec_dense_id: toml_u16(manifest, &["format", "syndrome_codec_dense_id"])?,
+            free_codec_dense_id: toml_u16(manifest, &["format", "free_codec_dense_id"])?,
+        };
+        require_eq(pins.format_major, FORMAT_MAJOR, "format.format_major")?;
+        require_eq(pins.format_minor, FORMAT_MINOR, "format.format_minor")?;
+        require_eq(
+            pins.global_header_len,
+            GLOBAL_HEADER_LEN,
+            "format.global_header_len",
+        )?;
+        require_eq(
+            pins.block_header_len,
+            BLOCK_HEADER_LEN,
+            "format.block_header_len",
+        )?;
+        require_eq(pins.trailer_len, ARCHIVE_TRAILER_LEN, "format.trailer_len")?;
+        require_eq(
+            pins.canonicalization_id,
+            CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1,
+            "format.canonicalization_id",
+        )?;
+        require_eq(
+            pins.fingerprint_id,
+            FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
+            "format.fingerprint_id",
+        )?;
+        require_eq(
+            pins.transform_id,
+            TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
+            "format.transform_id",
+        )?;
+        require_eq(
+            pins.reference_id,
+            REFERENCE_SIMULATE_NOISELESS,
+            "format.reference_id",
+        )?;
+        require_eq(
+            pins.codec_suite_id,
+            CODEC_SUITE_ZSTD_FRAMES_V1,
+            "format.codec_suite_id",
+        )?;
+        require_eq(pins.zstd_level, EXPECTED_ZSTD_LEVEL, "format.zstd_level")?;
+        require_eq(
+            pins.syndrome_codec_sparse_id,
+            STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1,
+            "format.syndrome_codec_sparse_id",
+        )?;
+        require_eq(
+            pins.syndrome_codec_dense_id,
+            STREAM_CODEC_SYNDROME_DENSE_V1,
+            "format.syndrome_codec_dense_id",
+        )?;
+        require_eq(
+            pins.free_codec_dense_id,
+            STREAM_CODEC_FREE_DENSE_V1,
+            "format.free_codec_dense_id",
+        )?;
+        Ok(pins)
     }
 }
 
@@ -1197,11 +1354,16 @@ fn flip_first_compressed_stream_byte(archive_path: &Path) {
 }
 
 fn rewrite_manifest_measurement_hash(manifest_path: &Path, replacement: &str) {
-    let text = fs::read_to_string(manifest_path).expect("read manifest copy");
-    let updated = text.replace(
+    rewrite_manifest_literal(
+        manifest_path,
         "measurements_01_sha256 = \"90efbc9f3f0de6fd6562acba5601d02820f32cbf632410cd01058d1fd4b06c1e\"",
         &format!("measurements_01_sha256 = \"{replacement}\""),
     );
+}
+
+fn rewrite_manifest_literal(manifest_path: &Path, from: &str, to: &str) {
+    let text = fs::read_to_string(manifest_path).expect("read manifest copy");
+    let updated = text.replace(from, to);
     assert_ne!(text, updated);
     fs::write(manifest_path, updated).expect("write mutated manifest copy");
 }
