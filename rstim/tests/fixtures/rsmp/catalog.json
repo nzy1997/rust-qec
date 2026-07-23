@@ -205,6 +205,36 @@
       "measurement_generation": {"command": "stim sample --shots 1024 --seed 2 --out_format b8 --in benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "format": "b8", "bit_count": 12121, "expected_output_bytes": 1552384, "sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6"},
       "hashes": {"circuit_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurements_b8_sha256": "3af9666507a0a73f14c5659f4814d6b47752aa455f9ceb00774d1495ee6c72a6"},
       "consumers": ["rsmp_archive", "compatibility", "compression_benchmark"]
+    },
+    {
+      "id": "compat_v1_two_block_sparse_dense",
+      "purpose": "Immutable two-block rsmp v1 reader compatibility fixture.",
+      "semantic_roles": ["v1_reader_compatibility"],
+      "provenance": "Issue #532 immutable rsmp v1 compatibility specimen generated once with block_shots=2.",
+      "circuit_path": "rstim/tests/fixtures/rsmp/v1/compat.stim",
+      "circuit_sha256": "18a857fb71f44eb28144a6a0e3aad17cce675daa2737690432efe305ed5777a2",
+      "shots": 4,
+      "measurement_count": 10,
+      "detector_count": 9,
+      "observable_count": 1,
+      "rank_H": 9,
+      "measurement_input": {"path": "rstim/tests/fixtures/rsmp/v1/compat-measurements.b8", "format": "b8", "bit_count": 10, "sha256": "cd575545ea899978f9477b43341c106981061f94a1bfaf9b575cd6a61acc32c3"},
+      "hashes": {
+        "circuit_sha256": "18a857fb71f44eb28144a6a0e3aad17cce675daa2737690432efe305ed5777a2",
+        "measurements_b8_sha256": "cd575545ea899978f9477b43341c106981061f94a1bfaf9b575cd6a61acc32c3",
+        "archive_sha256": "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c",
+        "manifest_sha256": "b38d0d3f590e12437fae3c1c14f7b9ac6475026d112db9d8ed8add2c1e15e824"
+      },
+      "consumers": ["compatibility", "corruption_corpus", "cli_publication_tests", "readiness"],
+      "rsmp_v1_compatibility": {
+        "manifest_path": "rstim/tests/fixtures/rsmp/v1/manifest.toml",
+        "manifest_sha256": "b38d0d3f590e12437fae3c1c14f7b9ac6475026d112db9d8ed8add2c1e15e824",
+        "archive_path": "rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp",
+        "archive_sha256": "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c",
+        "block_shots": 2,
+        "blocks": 2,
+        "syndrome_codecs": ["sparse", "dense"]
+      }
     }
   ],
   "corruption_recipes": [
