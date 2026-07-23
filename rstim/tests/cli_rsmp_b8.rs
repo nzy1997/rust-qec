@@ -54,7 +54,7 @@ fn rsmp_b8_cli_contract() {
 }
 
 fn verify_positive_cases(root: &Path) -> usize {
-    let mut cases = 0;
+    let mut cases: usize = 0;
     for (index, id) in SEMANTIC_FIXTURES.into_iter().enumerate() {
         let mode = match id {
             "nonzero_reference" => OutputMode::MeasurementsOnly,
@@ -93,16 +93,21 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
     let expected_detections = b8_bytes(&expected.detections);
     let expected_observables = b8_bytes(&expected.observable_flips);
     let archive = root.join(format!("{id}.rsmp"));
+    fs::write(&archive, []).expect("prepare archive destination");
 
+    let entries = directory_entries(root);
     let pack = run_cli(
         &pack_args(&circuit_path, 4, "-", &archive),
         Some(&measurement_bytes),
     );
     assert_success(&pack, &format!("{id}: pack_samples"));
+    assert_no_new_siblings(root, &entries);
 
     match mode {
         OutputMode::MeasurementsOnly => {
             let measurements_out = root.join(format!("{id}.measurements.b8"));
+            fs::write(&measurements_out, []).expect("prepare measurements destination");
+            let entries = directory_entries(root);
             let unpack = run_cli(
                 &unpack_args(&circuit_path, &archive, Some(&measurements_out), None, None),
                 None,
@@ -112,9 +117,12 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
                 fs::read(measurements_out).expect("read measurements"),
                 measurement_bytes
             );
+            assert_no_new_siblings(root, &entries);
         }
         OutputMode::DetectorsOnly => {
             let detections_out = root.join(format!("{id}.detections.b8"));
+            fs::write(&detections_out, []).expect("prepare detections destination");
+            let entries = directory_entries(root);
             let unpack = run_cli(
                 &unpack_args(&circuit_path, &archive, None, Some(&detections_out), None),
                 None,
@@ -124,9 +132,12 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
                 fs::read(detections_out).expect("read detections"),
                 expected_detections
             );
+            assert_no_new_siblings(root, &entries);
         }
         OutputMode::ObservablesOnly => {
             let observables_out = root.join(format!("{id}.observables.b8"));
+            fs::write(&observables_out, []).expect("prepare observables destination");
+            let entries = directory_entries(root);
             let unpack = run_cli(
                 &unpack_args(&circuit_path, &archive, None, None, Some(&observables_out)),
                 None,
@@ -136,11 +147,16 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
                 fs::read(observables_out).expect("read observables"),
                 expected_observables
             );
+            assert_no_new_siblings(root, &entries);
         }
         OutputMode::All => {
             let measurements_out = root.join(format!("{id}.measurements.b8"));
             let detections_out = root.join(format!("{id}.detections.b8"));
             let observables_out = root.join(format!("{id}.observables.b8"));
+            for destination in [&measurements_out, &detections_out, &observables_out] {
+                fs::write(destination, []).expect("prepare unpack destination");
+            }
+            let entries = directory_entries(root);
             let unpack = run_cli(
                 &unpack_args(
                     &circuit_path,
@@ -164,13 +180,17 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
                 fs::read(observables_out).expect("read observables"),
                 expected_observables
             );
+            assert_no_new_siblings(root, &entries);
         }
         OutputMode::Pipeline => {
+            let entries = directory_entries(root);
             let packed = run_cli(
                 &pack_args(&circuit_path, 4, "-", Path::new("-")),
                 Some(&measurement_bytes),
             );
             assert_success(&packed, &format!("{id}: stdin/stdout pack_samples"));
+            assert_no_new_siblings(root, &entries);
+            let entries = directory_entries(root);
             let unpack = run_cli(
                 &unpack_args(
                     &circuit_path,
@@ -183,9 +203,63 @@ fn verify_round_trip(root: &Path, id: &str, seed: usize, mode: OutputMode) {
             );
             assert_success(&unpack, &format!("{id}: stdin/stdout unpack_samples"));
             assert_eq!(unpack.stdout, measurement_bytes);
+            assert_no_new_siblings(root, &entries);
         }
     }
-    assert_no_sibling_temps(root);
+    verify_all_semantic_outputs(
+        root,
+        id,
+        &circuit_path,
+        &archive,
+        &measurement_bytes,
+        &expected_detections,
+        &expected_observables,
+    );
+}
+
+fn verify_all_semantic_outputs(
+    root: &Path,
+    id: &str,
+    circuit: &Path,
+    archive: &Path,
+    measurements: &[u8],
+    detections: &[u8],
+    observables: &[u8],
+) {
+    let measurements_out = root.join(format!("{id}.all.measurements.b8"));
+    let detections_out = root.join(format!("{id}.all.detections.b8"));
+    let observables_out = root.join(format!("{id}.all.observables.b8"));
+    for destination in [&measurements_out, &detections_out, &observables_out] {
+        fs::write(destination, []).expect("prepare unpack destination");
+    }
+    let entries = directory_entries(root);
+    let unpack = run_cli(
+        &unpack_args(
+            circuit,
+            archive,
+            Some(&measurements_out),
+            Some(&detections_out),
+            Some(&observables_out),
+        ),
+        None,
+    );
+    assert_success(
+        &unpack,
+        &format!("{id}: unpack_samples all semantic outputs"),
+    );
+    assert_eq!(
+        fs::read(measurements_out).expect("read measurements"),
+        measurements
+    );
+    assert_eq!(
+        fs::read(detections_out).expect("read detections"),
+        detections
+    );
+    assert_eq!(
+        fs::read(observables_out).expect("read observables"),
+        observables
+    );
+    assert_no_new_siblings(root, &entries);
 }
 
 fn verify_zero_measurement_round_trip(root: &Path, index: usize) {
@@ -195,8 +269,15 @@ fn verify_zero_measurement_round_trip(root: &Path, index: usize) {
     let measurements_out = root.join("zero_measurements.measurements.b8");
     let detections_out = root.join("zero_measurements.detections.b8");
     let observables_out = root.join("zero_measurements.observables.b8");
+    fs::write(&archive, []).expect("prepare archive destination");
+    for destination in [&measurements_out, &detections_out, &observables_out] {
+        fs::write(destination, []).expect("prepare unpack destination");
+    }
+    let entries = directory_entries(root);
     let pack = run_cli(&pack_args(&circuit, 3, "-", &archive), Some(&[]));
     assert_success(&pack, "M = 0 pack_samples");
+    assert_no_new_siblings(root, &entries);
+    let entries = directory_entries(root);
     let unpack = run_cli(
         &unpack_args(
             &circuit,
@@ -220,7 +301,7 @@ fn verify_zero_measurement_round_trip(root: &Path, index: usize) {
         fs::read(observables_out).expect("read zero observables"),
         Vec::<u8>::new()
     );
-    assert_no_sibling_temps(root);
+    assert_no_new_siblings(root, &entries);
     assert_eq!(index, 6);
 }
 
@@ -228,23 +309,12 @@ fn verify_negative_cases(root: &Path) -> usize {
     let circuit = fixture_path("nonzero_reference.stim");
     let measurements = vec![0x01; 4];
     let sentinel = |name: &str| root.join(name);
-    let mut cases = 0;
+    let mut cases: usize = 0;
 
-    for (name, input, format) in [
-        ("unsupported_format", measurements.as_slice(), "01"),
-        ("short_b8", &measurements[..3], "b8"),
-        ("extra_b8", &[1, 1, 1, 1, 1][..], "b8"),
-        ("padding_b8", &[0x81, 1, 1, 1][..], "b8"),
-    ] {
+    for (name, input, format) in [("unsupported_format", measurements.as_slice(), "01")] {
         let archive = sentinel(&format!("{name}.rsmp"));
         write_sentinel(&archive, cases as u8);
-        let mut args = pack_args(&circuit, 4, "-", &archive);
-        let format_index = args
-            .iter()
-            .position(|arg| arg == "--in_format")
-            .expect("format arg")
-            + 1;
-        args[format_index] = format.to_owned();
+        let args = pack_args_with_format(&circuit, 4, "-", &archive, format);
         let entries = directory_entries(root);
         let output = run_cli(&args, Some(input));
         assert_failure(&output, name);
@@ -252,6 +322,21 @@ fn verify_negative_cases(root: &Path) -> usize {
         assert_no_new_siblings(root, &entries);
         cases += 1;
     }
+
+    for (name, input) in [
+        ("short_b8", &measurements[..3]),
+        ("extra_b8", &[1, 1, 1, 1, 1][..]),
+        ("padding_b8", &[0x81, 1, 1, 1][..]),
+    ] {
+        let archive = sentinel(&format!("{name}.rsmp"));
+        write_sentinel(&archive, cases as u8);
+        let entries = directory_entries(root);
+        let output = run_cli(&pack_args(&circuit, 4, "-", &archive), Some(input));
+        assert_failure(&output, name);
+        assert_sentinel(&archive, cases as u8);
+        assert_no_new_siblings(root, &entries);
+    }
+    cases += 1;
 
     let archive = sentinel("over_limit.rsmp");
     write_sentinel(&archive, cases as u8);
@@ -279,14 +364,7 @@ fn verify_negative_cases(root: &Path) -> usize {
         ("unpack_unsupported_format", {
             let destination = sentinel("unpack_unsupported_format.b8");
             write_sentinel(&destination, 0xa1);
-            let mut args = unpack_args(&circuit, &archive, Some(&destination), None, None);
-            let format_index = args
-                .iter()
-                .position(|arg| arg == "--measurements_out_format")
-                .expect("format arg")
-                + 1;
-            args[format_index] = "01".to_owned();
-            args
+            unpack_args_with_measurements_format(&circuit, &archive, &destination, "01")
         }),
         (
             "unpack_missing_output",
@@ -317,6 +395,35 @@ fn verify_negative_cases(root: &Path) -> usize {
         cases += 1;
     }
 
+    let stream_conflict_out = sentinel("stream_conflict.rsmp");
+    write_sentinel(&stream_conflict_out, cases as u8);
+    let entries = directory_entries(root);
+    let output = run_cli(
+        &pack_args(Path::new("-"), 4, "-", &stream_conflict_out),
+        Some(&measurements),
+    );
+    assert_failure(&output, "pack multiple stdin consumers");
+    assert_sentinel(&stream_conflict_out, cases as u8);
+    assert_no_new_siblings(root, &entries);
+
+    let stream_conflict_out = sentinel("stream_conflict.b8");
+    write_sentinel(&stream_conflict_out, cases as u8);
+    let entries = directory_entries(root);
+    let output = run_cli(
+        &unpack_args(
+            &circuit,
+            &archive,
+            Some(Path::new("-")),
+            Some(Path::new("-")),
+            Some(&stream_conflict_out),
+        ),
+        None,
+    );
+    assert_failure(&output, "unpack multiple stdout outputs");
+    assert_sentinel(&stream_conflict_out, cases as u8);
+    assert_no_new_siblings(root, &entries);
+    cases += 1;
+
     let mismatch_out = sentinel("circuit_mismatch.b8");
     write_sentinel(&mismatch_out, cases as u8);
     let mismatch_circuit = root.join("mismatch.stim");
@@ -328,6 +435,34 @@ fn verify_negative_cases(root: &Path) -> usize {
     );
     assert_failure_with_code(&output, "circuit mismatch", "RSMP_CIRCUIT_MISMATCH");
     assert_sentinel(&mismatch_out, cases as u8);
+    assert_no_new_siblings(root, &entries);
+    cases += 1;
+
+    let truncated_measurements_out = sentinel("truncated.measurements.b8");
+    let truncated_detections_out = sentinel("truncated.detections.b8");
+    let truncated_observables_out = sentinel("truncated.observables.b8");
+    write_sentinel(&truncated_measurements_out, cases as u8);
+    write_sentinel(&truncated_detections_out, cases.wrapping_add(1) as u8);
+    write_sentinel(&truncated_observables_out, cases.wrapping_add(2) as u8);
+    let truncated_archive = root.join("truncated.rsmp");
+    let mut truncated = fs::read(&archive).expect("read valid archive");
+    truncated.pop().expect("archive has bytes to truncate");
+    fs::write(&truncated_archive, truncated).expect("write truncated archive");
+    let entries = directory_entries(root);
+    let output = run_cli(
+        &unpack_args(
+            &circuit,
+            &truncated_archive,
+            Some(&truncated_measurements_out),
+            Some(&truncated_detections_out),
+            Some(&truncated_observables_out),
+        ),
+        None,
+    );
+    assert_failure(&output, "truncated archive");
+    assert_sentinel(&truncated_measurements_out, cases as u8);
+    assert_sentinel(&truncated_detections_out, cases.wrapping_add(1) as u8);
+    assert_sentinel(&truncated_observables_out, cases.wrapping_add(2) as u8);
     assert_no_new_siblings(root, &entries);
     cases += 1;
 
@@ -356,7 +491,7 @@ fn make_valid_archive(circuit: &Path, archive: &Path, measurements: &[u8]) {
 }
 
 fn pack_args(circuit: &Path, shots: u64, input: &str, output: &Path) -> Vec<String> {
-    vec![
+    let args = vec![
         "pack_samples".to_owned(),
         "--circuit".to_owned(),
         circuit.display().to_string(),
@@ -364,11 +499,22 @@ fn pack_args(circuit: &Path, shots: u64, input: &str, output: &Path) -> Vec<Stri
         shots.to_string(),
         "--in".to_owned(),
         input.to_owned(),
-        "--in_format".to_owned(),
-        "b8".to_owned(),
         "--out".to_owned(),
         output.display().to_string(),
-    ]
+    ];
+    args
+}
+
+fn pack_args_with_format(
+    circuit: &Path,
+    shots: u64,
+    input: &str,
+    output: &Path,
+    format: &str,
+) -> Vec<String> {
+    let mut args = pack_args(circuit, shots, input, output);
+    args.extend(["--in_format".to_owned(), format.to_owned()]);
+    args
 }
 
 fn unpack_args(
@@ -385,33 +531,27 @@ fn unpack_args(
         "--in".to_owned(),
         input.display().to_string(),
     ];
-    append_output_args(
-        &mut args,
-        "--measurements_out",
-        "--measurements_out_format",
-        measurements,
-    );
-    append_output_args(
-        &mut args,
-        "--detectors_out",
-        "--detectors_out_format",
-        detections,
-    );
-    append_output_args(&mut args, "--obs_out", "--obs_out_format", observables);
+    append_output_args(&mut args, "--measurements_out", measurements);
+    append_output_args(&mut args, "--detectors_out", detections);
+    append_output_args(&mut args, "--obs_out", observables);
     args
 }
 
-fn append_output_args(
-    args: &mut Vec<String>,
-    path_flag: &str,
-    format_flag: &str,
-    path: Option<&Path>,
-) {
+fn unpack_args_with_measurements_format(
+    circuit: &Path,
+    input: &Path,
+    measurements: &Path,
+    format: &str,
+) -> Vec<String> {
+    let mut args = unpack_args(circuit, input, Some(measurements), None, None);
+    args.extend(["--measurements_out_format".to_owned(), format.to_owned()]);
+    args
+}
+
+fn append_output_args(args: &mut Vec<String>, path_flag: &str, path: Option<&Path>) {
     if let Some(path) = path {
         args.push(path_flag.to_owned());
         args.push(path.display().to_string());
-        args.push(format_flag.to_owned());
-        args.push("b8".to_owned());
     }
 }
 
@@ -467,17 +607,6 @@ fn directory_entries(root: &Path) -> BTreeSet<std::ffi::OsString> {
         .expect("read tempdir")
         .map(|entry| entry.expect("directory entry").file_name())
         .collect()
-}
-
-fn assert_no_sibling_temps(root: &Path) {
-    let leaked: Vec<_> = directory_entries(root)
-        .into_iter()
-        .filter(|name| name.to_string_lossy().contains(".tmp"))
-        .collect();
-    assert!(
-        leaked.is_empty(),
-        "leaked sibling temporary files: {leaked:?}"
-    );
 }
 
 fn assert_no_new_siblings(root: &Path, before: &BTreeSet<std::ffi::OsString>) {
