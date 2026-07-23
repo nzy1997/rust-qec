@@ -85,6 +85,17 @@ fn verify_zero_width_pack_inputs() {
         assert_success(&output, &format!("pack zero-width {format}"));
         assert_archive_measurements(&archive, &instructions, &measurements);
     }
+
+    for (tag, format) in ["b8", "ptb64"].into_iter().enumerate() {
+        let destination = dir.path().join(format!("zero-width-extra-{format}.rsmp"));
+        write_sentinel(&destination, 0xe0 + tag as u8);
+        let output = run_cli(
+            &pack_args(&circuit, shots as u64, Path::new("-"), &destination, format),
+            Some(&[0]),
+        );
+        assert_failure(&output, &format!("zero-width-extra-{format}"));
+        assert_sentinel(&destination, 0xe0 + tag as u8);
+    }
 }
 
 fn verify_measurement_outputs() -> usize {
@@ -188,35 +199,46 @@ fn verify_observable_outputs() -> usize {
 
 fn verify_ptb64_cross_block() -> usize {
     let fixture = CatalogFixture::known_mpad_multi();
-    let measurements = repeated_table(&fixture.measurements, 4097);
-    let archive = archive_from_measurements(&fixture.instructions, &measurements);
+    let measurements = repeated_table(&fixture.measurements, 195);
     let dir = tempfile::tempdir().expect("tempdir");
-    let archive_path = dir.path().join("cross-block.rsmp");
-    let output_path = dir.path().join("cross-block.ptb64");
-    fs::write(&archive_path, archive).expect("write archive");
 
-    let archive_blocks = archive_block_count(
-        &fs::read(&archive_path).expect("read cross-block archive"),
-        &fixture.instructions,
-    );
-    assert!(
-        archive_blocks > 1,
-        "ptb64 cross-block case must contain multiple archive blocks"
-    );
+    for (block_shots, expected_blocks) in [(65, vec![65, 65, 65]), (130, vec![130, 65])] {
+        let archive = archive_from_measurements_with_block_shots(
+            &fixture.instructions,
+            &measurements,
+            block_shots,
+        );
+        let archive_path = dir.path().join(format!("cross-block-{block_shots}.rsmp"));
+        let output_path = dir.path().join(format!("cross-block-{block_shots}.ptb64"));
+        fs::write(&archive_path, archive).expect("write archive");
 
-    let output = run_cli(
-        &unpack_args(
-            &fixture.circuit,
-            &archive_path,
-            Some(("--measurements_out", &output_path, "ptb64")),
-        ),
-        None,
-    );
-    assert_success(&output, "ptb64 output across archive blocks");
-    assert_eq!(
-        fs::read(&output_path).expect("read cross-block ptb64"),
-        encode_table(&measurements, "ptb64", None)
-    );
+        assert_eq!(
+            archive_block_shots(
+                &fs::read(&archive_path).expect("read cross-block archive"),
+                &fixture.instructions,
+            ),
+            expected_blocks,
+            "ptb64 cross-block archive uses {block_shots}-shot blocks"
+        );
+
+        let output = run_cli(
+            &unpack_args(
+                &fixture.circuit,
+                &archive_path,
+                Some(("--measurements_out", &output_path, "ptb64")),
+            ),
+            None,
+        );
+        assert_success(
+            &output,
+            &format!("ptb64 output across {block_shots}-shot archive blocks"),
+        );
+        assert_eq!(
+            fs::read(&output_path).expect("read cross-block ptb64"),
+            encode_table(&measurements, "ptb64", None),
+            "ptb64 bytes carry across {block_shots}-shot archive blocks"
+        );
+    }
     1
 }
 
@@ -423,13 +445,31 @@ fn verify_result_block_writer_rejects_mismatched_shots() {
 }
 
 fn archive_from_measurements(circuit: &[rstim::ir::StimInstr], measurements: &BitTable) -> Vec<u8> {
+    archive_from_measurements_with_limits(circuit, measurements, ArchiveLimits::default())
+}
+
+fn archive_from_measurements_with_block_shots(
+    circuit: &[rstim::ir::StimInstr],
+    measurements: &BitTable,
+    block_shots: u64,
+) -> Vec<u8> {
+    let mut limits = ArchiveLimits::default();
+    limits.transform.max_shots_per_block = block_shots;
+    archive_from_measurements_with_limits(circuit, measurements, limits)
+}
+
+fn archive_from_measurements_with_limits(
+    circuit: &[rstim::ir::StimInstr],
+    measurements: &BitTable,
+    limits: ArchiveLimits,
+) -> Vec<u8> {
     let transform = MeasurementTransform::from_circuit(circuit).expect("build archive transform");
     let mut writer = SampleArchiveWriter::new(
         Vec::new(),
         transform,
         measurements.num_minor() as u64,
         SampleArchiveOptions::default(),
-        ArchiveLimits::default(),
+        limits,
     )
     .expect("open archive writer");
     if measurements.num_minor() > 0 {
@@ -462,19 +502,22 @@ fn assert_archive_measurements(
     reader.finish().expect("finish packed archive");
 }
 
-fn archive_block_count(archive: &[u8], circuit: &[rstim::ir::StimInstr]) -> u64 {
+fn archive_block_shots(archive: &[u8], circuit: &[rstim::ir::StimInstr]) -> Vec<usize> {
     let mut reader = SampleArchiveReader::open(archive, circuit, ArchiveLimits::default())
         .expect("open archive for block count");
-    let mut blocks = 0;
-    while reader
+    let mut blocks = Vec::new();
+    while let Some(block) = reader
         .next_block()
         .expect("read archive block for block count")
-        .is_some()
     {
-        blocks += 1;
+        blocks.push(block.measurements.num_minor());
     }
     let summary = reader.finish().expect("finish archive block count");
-    assert_eq!(summary.block_count, blocks, "archive block count summary");
+    assert_eq!(
+        summary.block_count,
+        blocks.len() as u64,
+        "archive block count summary"
+    );
     blocks
 }
 
