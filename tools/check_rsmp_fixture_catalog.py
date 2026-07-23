@@ -143,7 +143,7 @@ REQUIRED_RECIPES = {
     "bad_magic": ("nonzero_reference", "set(global.magic, 0x52534d00)", "RSMP_BAD_MAGIC", [], "global header magic"),
     "unsupported_version": ("nonzero_reference", "set(global.format_major, 2)", "RSMP_UNSUPPORTED_VERSION", [], "global version policy"),
     "unknown_required_feature": ("nonzero_reference", "set(global.required_flags, unknown_required_feature)", "RSMP_UNSUPPORTED_FEATURE", [], "required feature policy"),
-    "circuit_mismatch": ("nonzero_reference", "set(global.circuit_sha256, alternate_circuit_sha256)", "RSMP_CIRCUIT_MISMATCH", ["global.header_sha256", "trailer.archive_sha256"], "circuit identity"),
+    "circuit_mismatch": ("nonzero_reference", "control(different_circuit)", "RSMP_CIRCUIT_MISMATCH", [], "circuit identity"),
     "truncated_header": ("nonzero_reference", "truncate(global_header)", "RSMP_TRUNCATED", [], "global header decode"),
     "truncated_block": ("surface_d11_r100", "truncate(block)", "RSMP_TRUNCATED", [], "block decode"),
     "truncated_zstd_frame": ("surface_d11_r100", "truncate(block.zstd_frame)", "RSMP_TRUNCATED", [], "compressed frame decode"),
@@ -157,8 +157,8 @@ REQUIRED_RECIPES = {
     "changed_compressed_payload": ("surface_d11_r100", "flip(block.zstd_frame.payload.bit)", "RSMP_DECOMPRESSION_FAILED", ["trailer.archive_sha256"], "compressed frame checksum"),
     "checksum_mismatch": ("surface_d11_r100", "set(trailer.archive_sha256, alternate_digest)", "RSMP_CHECKSUM_MISMATCH", [], "archive checksum"),
     "logical_payload_mismatch": ("surface_d11_r100", "flip(block.canonical_logical_payload.free_bits.bit)", "RSMP_LOGICAL_DIGEST_MISMATCH", ["block.free_compressed_len", "block.free_zstd_frame.checksum", "trailer.archive_sha256"], "logical payload digest"),
-    "declared_length_mismatch": ("surface_d11_r100", "set(block.syndrome_uncompressed_len, block.syndrome_uncompressed_len + 1)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "declared length validation"),
-    "resource_limit_exceeded": ("surface_d11_r100", "set(global.max_shots_per_block, max_allowed_shots_per_block + 1)", "RSMP_LIMIT_EXCEEDED", ["global.header_sha256", "trailer.archive_sha256"], "resource limit validation"),
+    "declared_length_mismatch": ("surface_d11_r100", "set(block.syndrome_uncompressed_len, 0)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "declared length validation"),
+    "resource_limit_exceeded": ("surface_d11_r100", "limit(max_archive_bytes, global_header_plus_trailer)", "RSMP_LIMIT_EXCEEDED", [], "resource limit validation"),
     "nonzero_padding": ("surface_d11_r100", "set(block.syndrome_padding_bits, 1)", "RSMP_MALFORMED_ARCHIVE", ["block.syndrome_compressed_len", "block.syndrome_zstd_frame.checksum", "trailer.archive_sha256"], "zero padding validation"),
     "unknown_syndrome_codec": ("surface_d11_r100", "set(block.syndrome_codec_id, 99)", "RSMP_MALFORMED_ARCHIVE", ["trailer.archive_sha256"], "syndrome codec dispatch"),
     "trailing_data": ("surface_d11_r100", "append_trailing_byte(0)", "RSMP_TRAILING_DATA", [], "archive end-of-input validation"),
@@ -502,6 +502,12 @@ def validate_cases(repo_root: Path, cases: object) -> set[str]:
 
 
 def expected_code_for_mutation(mutation: str, label: str) -> str:
+    if mutation == "control(different_circuit)":
+        return "RSMP_CIRCUIT_MISMATCH"
+    if mutation == "control(unsupported_sweep)":
+        return "RSMP_UNSUPPORTED_SWEEP"
+    if mutation == "limit(max_archive_bytes, global_header_plus_trailer)":
+        return "RSMP_LIMIT_EXCEEDED"
     if mutation.startswith("append_trailing_byte("):
         return "RSMP_TRAILING_DATA"
     if mutation.startswith("truncate("):

@@ -16,7 +16,7 @@ sha2 = "0.10"
 libc = "0.2"
 qec-code = { path = "../qec-code" }
 zstd = "0.13"
+toml = "0.8"
 
 [dev-dependencies]
 tempfile = "3"
-toml = "0.8"
