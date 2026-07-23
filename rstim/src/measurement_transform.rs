@@ -1548,12 +1548,16 @@ mod tests {
                 .expect("parse transform circuit");
         let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
         let mut buffered =
-            BitTable::try_new(transform.num_measurements(), 8).expect("buffer allocates");
+            BitTable::try_new(transform.num_measurements(), 4096).expect("buffer allocates");
         let mut prefix =
-            BitTable::try_new(transform.num_measurements(), 5).expect("prefix allocates");
+            BitTable::try_new(transform.num_measurements(), 65).expect("prefix allocates");
         for row in 0..buffered.num_major() {
             for shot in 0..buffered.num_minor() {
-                let value = (row * 19 + shot * 23) % 3 == 1;
+                let value = if shot < prefix.num_minor() {
+                    (row * 19 + shot * 23) % 3 == 1
+                } else {
+                    true
+                };
                 buffered.set(row, shot, value);
                 if shot < prefix.num_minor() {
                     prefix.set(row, shot, value);
@@ -1565,6 +1569,9 @@ mod tests {
             .encode_block_prefix(&buffered, prefix.num_minor())
             .expect("encode buffered prefix");
         let encoded_exact = transform.encode_block(&prefix).expect("encode exact prefix");
+        let encoded_exact_prefix = transform
+            .encode_block_prefix(&prefix, prefix.num_minor())
+            .expect("encode exact full prefix");
         assert_tables_eq(
             &encoded_exact.selected_detectors,
             &encoded_prefix.selected_detectors,
@@ -1573,6 +1580,19 @@ mod tests {
             &encoded_exact.free_measurements,
             &encoded_prefix.free_measurements,
         );
+        assert_tables_eq(
+            &encoded_exact.selected_detectors,
+            &encoded_exact_prefix.selected_detectors,
+        );
+        assert_tables_eq(
+            &encoded_exact.free_measurements,
+            &encoded_exact_prefix.free_measurements,
+        );
+        assert_row_words_eq(
+            &encoded_exact.selected_detectors,
+            &encoded_prefix.selected_detectors,
+        );
+        assert_row_words_eq(&encoded_exact.free_measurements, &encoded_prefix.free_measurements);
     }
 
     fn assert_tables_eq(left: &BitTable, right: &BitTable) {
@@ -1582,6 +1602,14 @@ mod tests {
             for shot in 0..left.num_minor() {
                 assert_eq!(left.get(row, shot), right.get(row, shot));
             }
+        }
+    }
+
+    fn assert_row_words_eq(left: &BitTable, right: &BitTable) {
+        assert_eq!(left.num_major(), right.num_major());
+        assert_eq!(left.num_minor(), right.num_minor());
+        for row in 0..left.num_major() {
+            assert_eq!(left.row_words(row), right.row_words(row));
         }
     }
 }

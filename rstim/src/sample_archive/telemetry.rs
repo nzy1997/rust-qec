@@ -1,4 +1,5 @@
 use crate::sample_archive::format::{SampleArchiveError, SampleArchiveErrorCode};
+use crate::sim::bit_table::{BitTableAllocError, checked_bit_table_storage_size};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -103,9 +104,19 @@ pub(crate) fn bit_table_bytes(
     push_diagnostic(format!(
         "{label}.total_bytes checked_mul words_x_8 = {total_words} * 8"
     ));
-    total_words
-        .checked_mul(8)
-        .ok_or_else(|| limit("telemetry bit-table total-byte overflow"))
+    let size =
+        checked_bit_table_storage_size(rows_to_usize(rows)?, rows_to_usize(shots)?).map_err(
+            |err| match err {
+                BitTableAllocError::SizeOverflow => {
+                    limit("telemetry bit-table total-byte overflow")
+                }
+                BitTableAllocError::ReservationFailed => {
+                    limit("telemetry bit-table reservation limit exceeded")
+                }
+            },
+        )?;
+    u64::try_from(size.total_bytes)
+        .map_err(|_| limit("telemetry bit-table total-byte overflow"))
 }
 
 pub(crate) fn checked_sum(
@@ -140,6 +151,10 @@ fn push_diagnostic(line: String) {
 
 fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::with_code(SampleArchiveErrorCode::LimitExceeded, detail)
+}
+
+fn rows_to_usize(value: u64) -> Result<usize, SampleArchiveError> {
+    usize::try_from(value).map_err(|_| limit("telemetry dimension exceeds usize"))
 }
 
 #[cfg(test)]
