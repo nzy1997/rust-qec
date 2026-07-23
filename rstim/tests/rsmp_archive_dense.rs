@@ -327,7 +327,7 @@ fn verify_negative_cases() -> usize {
     expect_next_block_error(
         &sparse_codec,
         &circuit,
-        SampleArchiveErrorCode::UnsupportedFeature,
+        SampleArchiveErrorCode::MalformedArchive,
     );
     cases += 1;
 

@@ -11,6 +11,7 @@ use crate::sample_archive::format::{
 };
 use crate::sample_archive::integrity::{header_digest, trailer_prefix};
 use crate::sample_archive::limits::ArchiveLimits;
+use crate::sample_archive::syndrome::{decode_syndrome_raw, update_dense_syndrome_hash};
 use crate::sample_archive::writer::{limit, map_transform_error, shape};
 use crate::sample_archive::zstd_frame::decompress_frame;
 use sha2::{Digest, Sha256};
@@ -62,12 +63,6 @@ impl<R: Read> SampleArchiveReader<R> {
         self.archive_hasher.update(block_bytes);
         let block = BlockHeader::from_bytes(&block_bytes)?;
         self.validate_block_header(&block)?;
-        if block.syndrome_codec_id == STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1 {
-            return Err(SampleArchiveError::with_code(
-                SampleArchiveErrorCode::UnsupportedFeature,
-                "sparse syndrome codec is not implemented",
-            ));
-        }
 
         let syndrome_frame = self.read_stream(block.syndrome_compressed_len)?;
         let free_frame = self.read_stream(block.free_compressed_len)?;
@@ -77,28 +72,25 @@ impl<R: Read> SampleArchiveReader<R> {
             self.limits,
         )?;
         let free = decode_stream(&free_frame, block.free_uncompressed_len, self.limits)?;
-        let expected_syndrome_len =
-            checked_dense_bit_bytes(self.transform.rank() as u64, block.shot_count)?;
+        let shot_count =
+            usize::try_from(block.shot_count).map_err(|_| limit("block shot count too large"))?;
         let expected_free_len =
             checked_dense_bit_bytes(self.transform.free_columns().len() as u64, block.shot_count)?;
-        if block.syndrome_uncompressed_len != expected_syndrome_len
-            || block.free_uncompressed_len != expected_free_len
-        {
-            return Err(shape("block dense stream shape does not match transform"));
+        if block.free_uncompressed_len != expected_free_len {
+            return Err(shape("block free stream shape does not match transform"));
         }
 
-        let selected = unpack_dense(
+        let selected = decode_syndrome_raw(
+            block.syndrome_codec_id,
+            block.syndrome_uncompressed_len,
             &syndrome,
             self.transform.rank(),
-            usize::try_from(block.shot_count).map_err(|_| limit("block shot count too large"))?,
+            shot_count,
         )?;
-        let free_measurements = unpack_dense(
-            &free,
-            self.transform.free_columns().len(),
-            usize::try_from(block.shot_count).map_err(|_| limit("block shot count too large"))?,
-        )?;
+        let free_measurements =
+            unpack_dense(&free, self.transform.free_columns().len(), shot_count)?;
         let mut logical_hasher = Sha256::new();
-        logical_hasher.update(&syndrome);
+        update_dense_syndrome_hash(&selected, &mut logical_hasher)?;
         logical_hasher.update(&free);
         let digest: [u8; 32] = logical_hasher.finalize().into();
         if digest != block.logical_payload_sha256 {

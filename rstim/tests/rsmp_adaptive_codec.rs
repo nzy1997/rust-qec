@@ -1,13 +1,18 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
+use rstim::measurement_transform::MeasurementTransform;
+use rstim::parser::parse_lines;
 use rstim::sample_archive::format::{
-    SampleArchiveError, SampleArchiveErrorCode, STREAM_CODEC_EMPTY,
-    STREAM_CODEC_SYNDROME_DENSE_V1, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1,
+    GLOBAL_HEADER_LEN, STREAM_CODEC_EMPTY, STREAM_CODEC_SYNDROME_DENSE_V1,
+    STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, SampleArchiveError, SampleArchiveErrorCode,
 };
 use rstim::sample_archive::syndrome::{
     decode_syndrome_raw, encode_syndrome, for_each_sparse_syndrome_hit,
     max_materialized_candidates, reset_materialization_telemetry,
+};
+use rstim::sample_archive::{
+    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
 };
 use rstim::sim::bit_table::BitTable;
 
@@ -23,14 +28,20 @@ fn rsmp_adaptive_codec_contract() {
     assert_eq!(property_cases, 4096);
     let max_materialized_candidates = max_materialized_candidates();
     assert_eq!(max_materialized_candidates, 1);
-    println!("PASS rsmp adaptive codec known_cases=3 uleb_boundaries=4 malformed_cases=11 property_cases=4096 max_materialized_candidates=1");
+    println!(
+        "PASS rsmp adaptive codec known_cases=3 uleb_boundaries=4 malformed_cases=11 property_cases=4096 max_materialized_candidates=1"
+    );
 }
 
 fn verify_known_cases() -> usize {
     reset_materialization_telemetry();
 
     let zero = BitTable::new(12_000, 1);
-    assert_eq!(encode_syndrome(&zero).unwrap().codec_id, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1);
+    assert_eq!(
+        encode_syndrome(&zero).unwrap().codec_id,
+        STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1
+    );
+    verify_sparse_archive_round_trip();
 
     let mut all_one = BitTable::new(8, 1);
     for detector in 0..8 {
@@ -60,9 +71,50 @@ fn verify_known_cases() -> usize {
         sparse.set(detector, 0, true);
     }
     let sparse_encoding = encode_syndrome(&sparse).unwrap();
-    assert_eq!(sparse_encoding.codec_id, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1);
+    assert_eq!(
+        sparse_encoding.codec_id,
+        STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1
+    );
     assert_eq!(sparse_encoding.raw, [0x03, 0x00, 0x7f, 0x46]);
     3
+}
+
+fn verify_sparse_archive_round_trip() {
+    let circuit_text = sparse_archive_circuit(12_000);
+    let circuit = parse_lines(&circuit_text).expect("parse sparse archive circuit");
+    let transform = MeasurementTransform::from_circuit(&circuit).expect("sparse archive transform");
+    assert_eq!(transform.rank(), 12_000);
+    let measurements = BitTable::new(transform.num_measurements(), 1);
+
+    let mut writer = SampleArchiveWriter::new(
+        Vec::new(),
+        transform,
+        1,
+        SampleArchiveOptions::default(),
+        ArchiveLimits::default(),
+    )
+    .expect("sparse archive writer");
+    writer
+        .write_measurements(&measurements)
+        .expect("write sparse archive measurements");
+    let archive = writer.finish().expect("finish sparse archive");
+    assert_eq!(
+        get_u16(&archive, GLOBAL_HEADER_LEN + 36),
+        STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1
+    );
+
+    let mut reader = SampleArchiveReader::open(
+        std::io::Cursor::new(&archive),
+        &circuit,
+        ArchiveLimits::default(),
+    )
+    .expect("open sparse archive");
+    let decoded = reader
+        .next_block()
+        .expect("read sparse archive block")
+        .expect("sparse archive block exists");
+    reader.finish().expect("finish sparse archive reader");
+    assert_tables_eq(&decoded.measurements, &measurements);
 }
 
 fn verify_uleb_boundaries() -> usize {
@@ -71,9 +123,14 @@ fn verify_uleb_boundaries() -> usize {
         table.set(detector, 0, true);
         let encoded = encode_syndrome(&table).unwrap();
         assert_eq!(encoded.codec_id, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1);
-        let decoded =
-            decode_syndrome_raw(encoded.codec_id, encoded.raw_len, &encoded.raw, detector + 1, 1)
-                .unwrap();
+        let decoded = decode_syndrome_raw(
+            encoded.codec_id,
+            encoded.raw_len,
+            &encoded.raw,
+            detector + 1,
+            1,
+        )
+        .unwrap();
         assert_tables_eq(&decoded, &table);
     }
     4
@@ -87,11 +144,16 @@ fn verify_malformed_cases() -> usize {
     let sparse_malformed = [
         ("noncanonical ULEB zero", vec![0x80, 0x00], 1u64, 1u64),
         ("unterminated ULEB", vec![0x80], 1, 1),
-        ("ULEB overflow", {
-            let mut bytes = vec![0xff; 9];
-            bytes.push(0x02);
-            bytes
-        }, 1, 1),
+        (
+            "ULEB overflow",
+            {
+                let mut bytes = vec![0xff; 9];
+                bytes.push(0x02);
+                bytes
+            },
+            1,
+            1,
+        ),
         ("count greater than R", vec![0x02], 1, 1),
         ("incomplete hit list", vec![0x01], 2, 1),
         (
@@ -169,7 +231,11 @@ fn verify_property_cases() -> usize {
         let mut table = BitTable::new(rows, shots);
         for detector in 0..rows {
             for shot in 0..shots {
-                table.set(detector, shot, rng.gen_bool(if case % 3 == 0 { 0.05 } else { 0.5 }));
+                table.set(
+                    detector,
+                    shot,
+                    rng.gen_bool(if case % 3 == 0 { 0.05 } else { 0.5 }),
+                );
             }
         }
         let encoded = encode_syndrome(&table).unwrap();
@@ -211,6 +277,26 @@ fn assert_tables_eq_with_context(left: &BitTable, right: &BitTable, case: usize)
             );
         }
     }
+}
+
+fn sparse_archive_circuit(measurements: usize) -> String {
+    let mut text = String::new();
+    text.push('M');
+    for measurement in 0..measurements {
+        text.push(' ');
+        text.push_str(&measurement.to_string());
+    }
+    text.push('\n');
+    for measurement in 0..measurements {
+        text.push_str("DETECTOR rec[-");
+        text.push_str(&(measurements - measurement).to_string());
+        text.push_str("]\n");
+    }
+    text
+}
+
+fn get_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
 }
 
 fn uleb(mut value: u64) -> Vec<u8> {
