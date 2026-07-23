@@ -3,9 +3,13 @@ use rstim::m2d::measurements_to_detections;
 use rstim::measurement_transform::{MeasurementTransform, MeasurementTransformLimits};
 use rstim::output::{read_shots_b8, write_shots_b8};
 use rstim::parser::parse_lines;
+use rstim::sample_archive::syndrome::encode_syndrome;
 use rstim::sample_archive::format::{
-    ARCHIVE_TRAILER_LEN, BLOCK_HEADER_LEN, BLOCK_MAGIC, GLOBAL_HEADER_LEN,
-    SampleArchiveErrorCode, TRAILER_MAGIC,
+    ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
+    CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
+    FINGERPRINT_SHA256_CANONICAL_CIRCUIT, GLOBAL_HEADER_LEN, GlobalHeader,
+    REFERENCE_SIMULATE_NOISELESS, STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1,
+    SampleArchiveErrorCode, TRAILER_MAGIC, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
 use rstim::sample_archive::telemetry::{
     archive_telemetry, diagnostic_lines, reset_archive_telemetry,
@@ -29,6 +33,7 @@ fn rsmp_archive_streaming_contract() {
     verify_default_block_limit();
     verify_zero_shot_archive();
     verify_writer_emits_full_blocks_before_finish();
+    verify_reader_accepts_short_interior_blocks();
     let boundary_cases = verify_boundary_cases();
     assert_eq!(boundary_cases, 4);
     let partition_invariant = verify_partition_invariant();
@@ -165,6 +170,20 @@ fn verify_partition_invariant() -> usize {
     assert_eq!(whole, canonical, "single chunk and canonical chunks");
     assert_eq!(whole, crossed, "crossed caller boundary chunks");
     1
+}
+
+fn verify_reader_accepts_short_interior_blocks() {
+    let fixture = CatalogFixture::load("known_mpad_multi");
+    let measurements = repeated_table(&fixture.measurements, 8193);
+    let archive = archive_from_explicit_blocks(&fixture.circuit, &measurements, &[1, 4096, 4096]);
+    assert_eq!(block_layouts(&archive).len(), 3);
+    let decoded = decode_archive(&archive, &fixture.circuit, 8193, 3);
+    assert_tables_eq(
+        &measurements,
+        &decoded.measurements,
+        "short-interior",
+        "measurements",
+    );
 }
 
 fn verify_zero_shot_archive() {
@@ -389,6 +408,109 @@ fn archive_from_partitions(
         offset += shots;
     }
     writer.finish().expect("finish archive").into_inner()
+}
+
+fn archive_from_explicit_blocks(
+    circuit: &[StimInstr],
+    measurements: &BitTable,
+    block_shots: &[usize],
+) -> Vec<u8> {
+    assert_eq!(block_shots.iter().sum::<usize>(), measurements.num_minor());
+    let transform = MeasurementTransform::from_circuit(circuit).expect("manual transform");
+    let identity = transform.identity();
+    let mut header = GlobalHeader {
+        required_flags: 0,
+        optional_flags: 0,
+        canonicalization_id: CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1,
+        fingerprint_id: FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
+        transform_id: TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
+        reference_id: REFERENCE_SIMULATE_NOISELESS,
+        codec_suite_id: CODEC_SUITE_ZSTD_FRAMES_V1,
+        max_shots_per_block: MAX_BLOCK_SHOTS as u64,
+        measurement_count: identity.measurement_count,
+        detector_count: identity.detector_count,
+        observable_count: identity.observable_count,
+        detector_rank: identity.detector_rank,
+        total_shots: measurements.num_minor() as u64,
+        circuit_sha256: identity.circuit_sha256,
+        header_sha256: [0; 32],
+    };
+    let mut header_bytes = header.to_bytes().expect("serialize manual header");
+    header.header_sha256 = Sha256::digest(&header_bytes[..GLOBAL_HEADER_LEN - 32]).into();
+    header_bytes[GLOBAL_HEADER_LEN - 32..GLOBAL_HEADER_LEN]
+        .copy_from_slice(&header.header_sha256);
+
+    let mut archive = Vec::new();
+    archive.extend_from_slice(&header_bytes);
+    let mut archive_hasher = Sha256::new();
+    archive_hasher.update(header_bytes);
+    let mut first_shot = 0u64;
+    let mut offset = 0usize;
+    for (block_index, &shots) in block_shots.iter().enumerate() {
+        let chunk = slice_table(measurements, offset, shots);
+        let encoded = transform.encode_block(&chunk).expect("manual encode block");
+        let syndrome = encode_syndrome(&encoded.selected_detectors).expect("manual syndrome");
+        let free = pack_dense_for_test(&encoded.free_measurements);
+        let dense_syndrome = pack_dense_for_test(&encoded.selected_detectors);
+        let mut logical_hasher = Sha256::new();
+        logical_hasher.update(&dense_syndrome);
+        logical_hasher.update(&free);
+        let syndrome_frame = if syndrome.raw.is_empty() {
+            Vec::new()
+        } else {
+            compress_frame_for_test(&syndrome.raw)
+        };
+        let free_frame = if free.is_empty() {
+            Vec::new()
+        } else {
+            compress_frame_for_test(&free)
+        };
+        let block_header = BlockHeader {
+            block_index: block_index as u64,
+            first_shot,
+            shot_count: shots as u64,
+            syndrome_codec_id: syndrome.codec_id,
+            free_codec_id: if free.is_empty() {
+                STREAM_CODEC_EMPTY
+            } else {
+                STREAM_CODEC_FREE_DENSE_V1
+            },
+            syndrome_uncompressed_len: syndrome.raw_len,
+            syndrome_compressed_len: syndrome_frame.len() as u64,
+            free_uncompressed_len: free.len() as u64,
+            free_compressed_len: free_frame.len() as u64,
+            logical_payload_sha256: logical_hasher.finalize().into(),
+        };
+        let block_bytes = block_header.to_bytes().expect("serialize manual block");
+        archive_hasher.update(block_bytes);
+        archive_hasher.update(&syndrome_frame);
+        archive_hasher.update(&free_frame);
+        archive.extend_from_slice(&block_bytes);
+        archive.extend_from_slice(&syndrome_frame);
+        archive.extend_from_slice(&free_frame);
+        first_shot = first_shot
+            .checked_add(shots as u64)
+            .expect("manual first-shot sum");
+        offset += shots;
+    }
+
+    let prefix = ArchiveTrailer {
+        block_count: block_shots.len() as u64,
+        total_shots: measurements.num_minor() as u64,
+        archive_sha256: [0; 32],
+    }
+    .to_bytes()
+    .expect("serialize manual trailer prefix");
+    archive_hasher.update(&prefix[..32]);
+    let trailer = ArchiveTrailer {
+        block_count: block_shots.len() as u64,
+        total_shots: measurements.num_minor() as u64,
+        archive_sha256: archive_hasher.finalize().into(),
+    }
+    .to_bytes()
+    .expect("serialize manual trailer");
+    archive.extend_from_slice(&trailer);
+    archive
 }
 
 fn decode_archive(
@@ -634,6 +756,20 @@ fn patterned_table(bits: usize, shots: usize, salt: &[u8]) -> BitTable {
         }
     }
     table
+}
+
+fn pack_dense_for_test(table: &BitTable) -> Vec<u8> {
+    let bits = table.num_major() * table.num_minor();
+    let mut bytes = vec![0u8; bits.div_ceil(8)];
+    for shot in 0..table.num_minor() {
+        for row in 0..table.num_major() {
+            if table.get(row, shot) {
+                let bit = shot * table.num_major() + row;
+                bytes[bit / 8] |= 1 << (bit % 8);
+            }
+        }
+    }
+    bytes
 }
 
 fn slice_table(source: &BitTable, offset: usize, shots: usize) -> BitTable {
