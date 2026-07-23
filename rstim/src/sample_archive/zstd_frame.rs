@@ -16,6 +16,9 @@ pub(crate) fn compress_frame(bytes: &[u8], level: i32) -> Result<Vec<u8>, Sample
         .include_contentsize(true)
         .map_err(|_| compression_failed("failed to enable zstd content size"))?;
     encoder
+        .long_distance_matching(false)
+        .map_err(|_| compression_failed("failed to disable zstd long-distance matching"))?;
+    encoder
         .set_pledged_src_size(Some(bytes.len() as u64))
         .map_err(|_| compression_failed("failed to set zstd content size"))?;
     encoder

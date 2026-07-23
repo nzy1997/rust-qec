@@ -268,6 +268,22 @@ pub enum Commands {
         #[arg(long = "obs_out_format", default_value = "b8")]
         obs_out_format: String,
     },
+    /// Write one checked Zstandard frame for rsmp evidence diagnostics
+    #[command(name = "rsmp_zstd_frame", hide = true)]
+    RsmpZstdFrame {
+        #[arg(long = "level")]
+        level: i32,
+        #[arg(long = "in")]
+        r#in: String,
+        #[arg(long = "out")]
+        out: String,
+    },
+    /// Emit the rsmp evidence Zstandard frame contract
+    #[command(name = "rsmp_zstd_info", hide = true)]
+    RsmpZstdInfo {
+        #[arg(long = "out")]
+        out: Option<String>,
+    },
     /// Run performance evidence workflows
     Perf {
         #[command(subcommand)]
@@ -675,6 +691,10 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             obs_out.as_deref(),
             &obs_out_format,
         ),
+        Some(Commands::RsmpZstdFrame { level, r#in, out }) => {
+            run_rsmp_zstd_frame(&r#in, &out, level)
+        }
+        Some(Commands::RsmpZstdInfo { out }) => run_rsmp_zstd_info(out.as_deref()),
         Some(Commands::Perf { command }) => {
             match command {
                 PerfCommands::Run {
@@ -1179,6 +1199,47 @@ fn run_unpack_samples(
         .map_err(|error| error.to_string())?;
 
     stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
+}
+
+fn run_rsmp_zstd_frame(input_path: &str, output_path: &str, level: i32) -> Result<(), String> {
+    if level != 3 {
+        return Err("rsmp_zstd_frame requires --level 3 for rsmp v1 evidence".to_string());
+    }
+    let input = std::fs::read(input_path).map_err(|error| {
+        format!("failed to read rsmp zstd diagnostic input {input_path}: {error}")
+    })?;
+    let frame = crate::sample_archive::zstd_frame::compress_frame(&input, level)
+        .map_err(|error| error.to_string())?;
+    std::fs::write(output_path, frame).map_err(|error| {
+        format!("failed to write rsmp zstd diagnostic output {output_path}: {error}")
+    })
+}
+
+fn run_rsmp_zstd_info(out: Option<&str>) -> Result<(), String> {
+    let info = serde_json::json!({
+        "contract": "rstim-rsmp-v1-zstd-frame",
+        "crate": "zstd",
+        "crate_version": "0.13.3",
+        "zstd_safe_crate": "zstd-safe",
+        "zstd_safe_crate_version": "7.2.4",
+        "zstd_sys_crate": "zstd-sys",
+        "zstd_sys_crate_version": "2.0.16+zstd.1.5.7",
+        "native_zstd_version": zstd::zstd_safe::version_string(),
+        "native_zstd_version_number": zstd::zstd_safe::version_number(),
+        "level": 3,
+        "single_threaded": true,
+        "dictionary": "none",
+        "long_distance_matching": false,
+        "pledged_source_size": true,
+        "frame_content_size": true,
+        "frame_checksum": true
+    });
+    let mut writer = open_output(out)?;
+    serde_json::to_writer_pretty(&mut writer, &info)
+        .map_err(|error| format!("failed to write rsmp zstd info: {error}"))?;
+    writer
+        .write_all(b"\n")
+        .map_err(|error| format!("failed to write rsmp zstd info: {error}"))
 }
 
 #[derive(Debug)]
@@ -2620,6 +2681,60 @@ mod tests {
             formatted,
             "measurement transform limit exceeded: unit-test limit"
         );
+    }
+
+    #[test]
+    fn rsmp_zstd_frame_diagnostic_writes_checked_single_frame() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("input.b8");
+        let output_path = dir.path().join("input.b8.zst");
+        let info_path = dir.path().join("zstd-info.json");
+        let input = b"abcabcabcabc";
+        std::fs::write(&input_path, input).unwrap();
+
+        run(Cli {
+            benchmark_telemetry_json: None,
+            command: Some(Commands::RsmpZstdFrame {
+                level: 3,
+                r#in: input_path.display().to_string(),
+                out: output_path.display().to_string(),
+            }),
+        })
+        .unwrap();
+
+        let frame = std::fs::read(&output_path).unwrap();
+        assert_eq!(&frame[..4], &[0x28, 0xb5, 0x2f, 0xfd]);
+        assert_ne!(frame[4] & 0x04, 0, "frame checksum flag must be set");
+        assert!(
+            frame[4] & 0xe0 != 0 || frame[4] & 0x20 != 0,
+            "frame content size must be encoded"
+        );
+        assert_eq!(zstd::bulk::decompress(&frame, input.len()).unwrap(), input);
+
+        run(Cli {
+            benchmark_telemetry_json: None,
+            command: Some(Commands::RsmpZstdInfo {
+                out: Some(info_path.display().to_string()),
+            }),
+        })
+        .unwrap();
+        let info: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(info_path).unwrap()).unwrap();
+        assert_eq!(info["frame_checksum"], true);
+        assert_eq!(info["frame_content_size"], true);
+        assert_eq!(info["pledged_source_size"], true);
+        assert_eq!(info["long_distance_matching"], false);
+
+        let bad_level = run(Cli {
+            benchmark_telemetry_json: None,
+            command: Some(Commands::RsmpZstdFrame {
+                level: 4,
+                r#in: input_path.display().to_string(),
+                out: output_path.display().to_string(),
+            }),
+        })
+        .unwrap_err();
+        assert!(bad_level.contains("--level 3"));
     }
 
     #[derive(Clone, Copy)]

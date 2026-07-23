@@ -8,7 +8,7 @@ mod integrity;
 mod limits;
 mod reader;
 mod writer;
-mod zstd_frame;
+pub(crate) mod zstd_frame;
 
 pub use limits::{ArchiveLimits, SampleArchiveOptions};
 pub use reader::{ArchiveSummary, SampleArchiveReader};

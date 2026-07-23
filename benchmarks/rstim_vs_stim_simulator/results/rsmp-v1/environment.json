@@ -1,0 +1,562 @@
+{
+  "cargo": {
+    "lock_sha256": "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6",
+    "zstd": "0.13.3",
+    "zstd-safe": "7.2.4",
+    "zstd-sys": "2.0.16+zstd.1.5.7"
+  },
+  "commands": {
+    "benchmark_sample": [
+      "target/release/rstim",
+      "sample",
+      "--shots",
+      "1024",
+      "--seed",
+      "7",
+      "--out_format",
+      "b8",
+      "--in",
+      "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+    ],
+    "rows": {
+      "dependent_detectors": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/dependent_detectors.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/dependent_detectors.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/dependent_detectors.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/dependent_detectors/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "high_entropy_control": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/measurements.b8.zst"
+        ],
+        "measurement": [
+          "python3",
+          "-m",
+          "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
+          "generate-high-entropy",
+          "rstim-rsmp-v1-high-entropy-v1"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/circuit.stim",
+          "--shots",
+          "8192",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/circuit.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/high_entropy_control/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "loss_visible_measurements": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/loss_visible_measurements.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/loss_visible_measurements.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/loss_visible_measurements.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/loss_visible_measurements/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "nonzero_reference": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/nonzero_reference.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/nonzero_reference.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/nonzero_reference.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/nonzero_reference/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "observable_recovery": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/observable_recovery.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/observable_recovery.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/observable_recovery.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/observable_recovery/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "rank_zero": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/rank_zero.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/rank_zero.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/rank_zero.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/rank_zero/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "repeat_records": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "4",
+          "--seed",
+          "2",
+          "--out_format",
+          "b8",
+          "--in",
+          "rstim/tests/fixtures/rsmp/repeat_records.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/repeat_records.stim",
+          "--shots",
+          "4",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "rstim/tests/fixtures/rsmp/repeat_records.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/repeat_records/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      },
+      "stim_surface_d11_r100": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/measurements.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/measurements.b8.zst"
+        ],
+        "measurement": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "1024",
+          "--seed",
+          "7",
+          "--out_format",
+          "b8",
+          "--in",
+          "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+        ],
+        "pack": [
+          "target/release/rstim",
+          "pack_samples",
+          "--circuit",
+          "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+          "--shots",
+          "1024",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/archive.rsmp"
+        ],
+        "unpack": [
+          "target/release/rstim",
+          "unpack_samples",
+          "--circuit",
+          "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/archive.rsmp",
+          "--measurements_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/roundtrip.measurements.b8",
+          "--measurements_out_format",
+          "b8",
+          "--detectors_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/roundtrip.detectors.b8",
+          "--detectors_out_format",
+          "b8",
+          "--obs_out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/roundtrip.observables.b8",
+          "--obs_out_format",
+          "b8"
+        ]
+      }
+    }
+  },
+  "evidence_format": "rsmp-v1-compression-evidence",
+  "generator": {
+    "argv": [
+      "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-528-run-1-agent-issue-528-publish-checked-rsmp-compression-evidence-run-1/benchmarks/rstim_vs_stim_simulator/run_rsmp_compression.py",
+      "--rstim",
+      "target/release/rstim",
+      "--catalog",
+      "rstim/tests/fixtures/rsmp/catalog.json",
+      "--case",
+      "stim_surface_d11_r100",
+      "--shots",
+      "1024",
+      "--seed",
+      "7",
+      "--zstd-level",
+      "3",
+      "--out-dir",
+      "/tmp/rstim-rsmp-v1-evidence"
+    ],
+    "module": "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
+    "module_sha256": "fca80e3b3385c0948caf470ad47bbf87f980cfc7c0e68829b108432d10f9172a"
+  },
+  "git": {
+    "commit": "73f3d43c4599c9010756f3fc0d75abf6dabd8dfc",
+    "dirty": true
+  },
+  "inputs": {
+    "benchmark_case": "stim_surface_d11_r100",
+    "catalog_path": "rstim/tests/fixtures/rsmp/catalog.json",
+    "catalog_sha256": "5555911dc735e079470fcb123afccb4b852428288cc74413869e89f75a98135d",
+    "high_entropy_generator": {
+      "id": "rstim-rsmp-v1-high-entropy-v1",
+      "raw_sha256": "258c8b47bf6e074c19f90bc0e9b0dbdea38030ec7583804980eedce99b99ccf3",
+      "spec_sha256": "a6af302e2c3ecec5798b9e09d50b29072bae35b8d74fdb70cb7ff421c9908cb9"
+    }
+  },
+  "platform": {
+    "machine": "arm64",
+    "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+    "target": "aarch64-apple-darwin"
+  },
+  "producer": {
+    "name": "rstim",
+    "rstim_binary": {
+      "path": "target/release/rstim",
+      "sha256": "1c15d11b589ef31ff57398370425890647cec15b7ffef7e0e6da19983546e5aa"
+    },
+    "version": "rstim 0.1.1"
+  },
+  "schema_version": 1,
+  "zstd_contract": {
+    "dictionary": "none",
+    "frame_checksum": true,
+    "frame_content_size": true,
+    "level": 3,
+    "long_distance_matching": false,
+    "pledged_source_size": true,
+    "single_threaded": true,
+    "threshold_arithmetic": "integer_cross_multiplication"
+  },
+  "zstd_info": {
+    "contract": "rstim-rsmp-v1-zstd-frame",
+    "crate": "zstd",
+    "crate_version": "0.13.3",
+    "dictionary": "none",
+    "frame_checksum": true,
+    "frame_content_size": true,
+    "level": 3,
+    "long_distance_matching": false,
+    "native_zstd_version": "1.5.7",
+    "native_zstd_version_number": 10507,
+    "pledged_source_size": true,
+    "single_threaded": true,
+    "zstd_safe_crate": "zstd-safe",
+    "zstd_safe_crate_version": "7.2.4",
+    "zstd_sys_crate": "zstd-sys",
+    "zstd_sys_crate_version": "2.0.16+zstd.1.5.7"
+  }
+}
