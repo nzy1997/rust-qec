@@ -36,7 +36,7 @@
 - Consumes: real `rstim` binary, shared `rstim/tests/fixtures/rsmp/catalog.json`, existing result writers, `measurements_to_detections`, and archive APIs.
 - Produces: a failing integration test that defines all positive, cross-block, guarded-read, and negative controls from #527.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create a single top-level test `rsmp_result_format_interop_contract` that:
 
@@ -61,7 +61,7 @@ fn rsmp_result_format_interop_contract() {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `cargo test --locked -p rstim --test rsmp_result_format_interop -- --nocapture`
 
@@ -77,20 +77,20 @@ Expected: FAIL because `result_stream` APIs and non-`b8` CLI support are not imp
 - Consumes: `BitTable`, `OutputFormat`, bounded `Read`.
 - Produces: `ResultFormatError`, `ResultBlockReader<R>`, and strict streaming readers for `01`, `b8`, and `ptb64`.
 
-- [ ] **Step 1: Add focused module tests first**
+- [x] **Step 1: Add focused module tests first**
 
 Add unit tests for invalid `01` bytes/newlines, short and extra input, `b8`
 partial rows and padding, `ptb64` invalid length, `ptb64` final padding, extra
 groups, zero-width input, and a guarded reader that rejects reads over 64 KiB.
 
-- [ ] **Step 2: Implement minimal reader**
+- [x] **Step 2: Implement minimal reader**
 
 Implement `ResultBlockReader::new(input, width, total_shots, format, max_chunk_shots)`
 and `next_block() -> Result<Option<BitTable>, ResultFormatError>`. Read at
 most the next chunk, allocate one `BitTable`, and verify EOF after exactly the
 declared total shots.
 
-- [ ] **Step 3: Verify reader tests**
+- [x] **Step 3: Verify reader tests**
 
 Run: `cargo test --locked -p rstim result_stream::tests:: -- --nocapture`
 
@@ -105,20 +105,20 @@ Expected: PASS.
 - Consumes: `DecodedSampleBlock`, `OutputFormat`, existing result writers.
 - Produces: `ResultOutputKind`, `ResultBlockWriter<W>`, `write_block`, and `finish`.
 
-- [ ] **Step 1: Add writer tests first**
+- [x] **Step 1: Add writer tests first**
 
 Add unit tests for detector `dets` including `L#`, zero-detector observable
 `dets`, non-`dets` detector output omitting observables, equal-shot validation
 before write, and `ptb64` carry across two decoded blocks.
 
-- [ ] **Step 2: Implement minimal writer**
+- [x] **Step 2: Implement minimal writer**
 
 Use a staging buffer inside `write_block` so shape failures leave the wrapped
 writer untouched. Non-`ptb64` formats may serialize each block immediately after
 shape validation. `ptb64` stores up to 63 pending shots and flushes the final
 canonical group only from `finish`.
 
-- [ ] **Step 3: Verify writer tests**
+- [x] **Step 3: Verify writer tests**
 
 Run: `cargo test --locked -p rstim result_stream::tests:: -- --nocapture`
 
