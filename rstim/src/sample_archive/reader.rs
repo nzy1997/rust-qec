@@ -174,6 +174,26 @@ impl<R: Read> SampleArchiveReader<R> {
             decoded.observable_flips.num_major() as u64,
             block.shot_count,
         )?;
+        let transform_scratch_x = bit_table_bytes(
+            "reader.transform_scratch_x",
+            self.transform.num_measurements() as u64,
+            block.shot_count,
+        )?;
+        let transform_scratch_rhs = bit_table_bytes(
+            "reader.transform_scratch_rhs",
+            self.transform.rank() as u64,
+            block.shot_count,
+        )?;
+        let transform_scratch_row =
+            bit_table_bytes("reader.transform_scratch_row", 1, block.shot_count)?;
+        let transform_scratch = checked_sum(
+            "reader.transform_scratch",
+            &[
+                ("x", transform_scratch_x),
+                ("rhs", transform_scratch_rhs),
+                ("row", transform_scratch_row),
+            ],
+        )?;
         let raw_bytes = checked_sum(
             "reader.raw_codec_buffers",
             &[
@@ -194,6 +214,7 @@ impl<R: Read> SampleArchiveReader<R> {
             ("decoded_measurements", decoded_measurements),
             ("decoded_detections", decoded_detections),
             ("decoded_observables", decoded_observables),
+            ("transform_scratch", transform_scratch),
             ("raw_codec_buffers", raw_bytes),
             ("compressed_frames", compressed_bytes),
             ("zstd_state", self.limits.max_zstd_window_bytes),

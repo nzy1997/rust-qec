@@ -548,10 +548,10 @@ impl BlockHeader {
         )?;
         self.syndrome_uncompressed_len
             .checked_add(self.free_uncompressed_len)
-            .ok_or_else(|| malformed("uncompressed length overflow"))?;
+            .ok_or_else(|| limit("uncompressed length overflow"))?;
         self.syndrome_compressed_len
             .checked_add(self.free_compressed_len)
-            .ok_or_else(|| malformed("compressed length overflow"))?;
+            .ok_or_else(|| limit("compressed length overflow"))?;
         Ok(())
     }
 }
