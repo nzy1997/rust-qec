@@ -1,0 +1,452 @@
+{
+  "benchmark": {
+    "archive_bytes": 186028,
+    "archive_to_direct_zstd": {
+      "basis_points_floor": 5714,
+      "denominator": 325565,
+      "numerator": 186028
+    },
+    "archive_to_raw": {
+      "basis_points_floor": 1198,
+      "denominator": 1552384,
+      "numerator": 186028
+    },
+    "case_id": "stim_surface_d11_r100",
+    "decode_throughput_bytes_per_second": 37218025,
+    "detector_density": {
+      "one_count": 186951,
+      "ppm": 15214,
+      "total_bits": 12288000
+    },
+    "dimensions": {
+      "D": 12000,
+      "L": 1,
+      "M": 12121,
+      "blocks": 1,
+      "free_width": 121,
+      "rank": 12000,
+      "shots": 1024
+    },
+    "direct_zstd_bytes": 325565,
+    "encode_throughput_bytes_per_second": 15443821,
+    "free_codecs": [
+      "free_dense_v1"
+    ],
+    "peak_logical_block_working_set_bytes": 11900649,
+    "raw_b8_bytes": 1552384,
+    "semantic_role": "surface_d11_r100",
+    "syndrome_codecs": [
+      "syndrome_sparse_leb128_v1"
+    ]
+  },
+  "case_count": 8,
+  "cases": [
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "nonzero_reference",
+      "decode_throughput_bytes_per_second": 545,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 4
+      },
+      "dimensions": {
+        "D": 1,
+        "L": 0,
+        "M": 1,
+        "blocks": 1,
+        "free_width": 0,
+        "rank": 1,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 518,
+      "free_codecs": [
+        "empty"
+      ],
+      "peak_logical_block_working_set_bytes": 8388639,
+      "raw_b8_bytes": 4,
+      "semantic_role": "nonzero_reference",
+      "syndrome_codecs": [
+        "syndrome_dense_v1"
+      ]
+    },
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "rank_zero",
+      "decode_throughput_bytes_per_second": 986,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 0
+      },
+      "dimensions": {
+        "D": 0,
+        "L": 0,
+        "M": 1,
+        "blocks": 1,
+        "free_width": 1,
+        "rank": 0,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 1253,
+      "free_codecs": [
+        "free_dense_v1"
+      ],
+      "peak_logical_block_working_set_bytes": 8388639,
+      "raw_b8_bytes": 4,
+      "semantic_role": "rank_zero",
+      "syndrome_codecs": [
+        "empty"
+      ]
+    },
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "dependent_detectors",
+      "decode_throughput_bytes_per_second": 885,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 8
+      },
+      "dimensions": {
+        "D": 2,
+        "L": 0,
+        "M": 1,
+        "blocks": 1,
+        "free_width": 0,
+        "rank": 1,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 1095,
+      "free_codecs": [
+        "empty"
+      ],
+      "peak_logical_block_working_set_bytes": 8388639,
+      "raw_b8_bytes": 4,
+      "semantic_role": "dependent_detectors",
+      "syndrome_codecs": [
+        "syndrome_dense_v1"
+      ]
+    },
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "repeat_records",
+      "decode_throughput_bytes_per_second": 1098,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 8
+      },
+      "dimensions": {
+        "D": 2,
+        "L": 0,
+        "M": 2,
+        "blocks": 1,
+        "free_width": 0,
+        "rank": 2,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 1121,
+      "free_codecs": [
+        "empty"
+      ],
+      "peak_logical_block_working_set_bytes": 8388655,
+      "raw_b8_bytes": 4,
+      "semantic_role": "repeat_records",
+      "syndrome_codecs": [
+        "syndrome_dense_v1"
+      ]
+    },
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "observable_recovery",
+      "decode_throughput_bytes_per_second": 1248,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 0
+      },
+      "dimensions": {
+        "D": 0,
+        "L": 1,
+        "M": 1,
+        "blocks": 1,
+        "free_width": 1,
+        "rank": 0,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 1410,
+      "free_codecs": [
+        "free_dense_v1"
+      ],
+      "peak_logical_block_working_set_bytes": 8388639,
+      "raw_b8_bytes": 4,
+      "semantic_role": "observable_recovery",
+      "syndrome_codecs": [
+        "empty"
+      ]
+    },
+    {
+      "archive_bytes": 338,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 198823,
+        "denominator": 17,
+        "numerator": 338
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 845000,
+        "denominator": 4,
+        "numerator": 338
+      },
+      "case_id": "loss_visible_measurements",
+      "decode_throughput_bytes_per_second": 1315,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 8
+      },
+      "dimensions": {
+        "D": 2,
+        "L": 0,
+        "M": 2,
+        "blocks": 1,
+        "free_width": 0,
+        "rank": 2,
+        "shots": 4
+      },
+      "direct_zstd_bytes": 17,
+      "encode_throughput_bytes_per_second": 1387,
+      "free_codecs": [
+        "empty"
+      ],
+      "peak_logical_block_working_set_bytes": 8388655,
+      "raw_b8_bytes": 4,
+      "semantic_role": "loss_visible_measurements",
+      "syndrome_codecs": [
+        "syndrome_dense_v1"
+      ]
+    },
+    {
+      "archive_bytes": 186028,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 5714,
+        "denominator": 325565,
+        "numerator": 186028
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 1198,
+        "denominator": 1552384,
+        "numerator": 186028
+      },
+      "case_id": "stim_surface_d11_r100",
+      "decode_throughput_bytes_per_second": 37218025,
+      "detector_density": {
+        "one_count": 186951,
+        "ppm": 15214,
+        "total_bits": 12288000
+      },
+      "dimensions": {
+        "D": 12000,
+        "L": 1,
+        "M": 12121,
+        "blocks": 1,
+        "free_width": 121,
+        "rank": 12000,
+        "shots": 1024
+      },
+      "direct_zstd_bytes": 325565,
+      "encode_throughput_bytes_per_second": 15443821,
+      "free_codecs": [
+        "free_dense_v1"
+      ],
+      "peak_logical_block_working_set_bytes": 11900649,
+      "raw_b8_bytes": 1552384,
+      "semantic_role": "surface_d11_r100",
+      "syndrome_codecs": [
+        "syndrome_sparse_leb128_v1"
+      ]
+    },
+    {
+      "archive_bytes": 1049064,
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 10004,
+        "denominator": 1048616,
+        "numerator": 1049064
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 10004,
+        "denominator": 1048576,
+        "numerator": 1049064
+      },
+      "case_id": "high_entropy_control",
+      "decode_throughput_bytes_per_second": 24977742,
+      "detector_density": {
+        "one_count": 0,
+        "ppm": 0,
+        "total_bits": 0
+      },
+      "dimensions": {
+        "D": 0,
+        "L": 0,
+        "M": 1024,
+        "blocks": 2,
+        "free_width": 1024,
+        "rank": 0,
+        "shots": 8192
+      },
+      "direct_zstd_bytes": 1048616,
+      "encode_throughput_bytes_per_second": 11398829,
+      "free_codecs": [
+        "free_dense_v1",
+        "free_dense_v1"
+      ],
+      "peak_logical_block_working_set_bytes": 10485788,
+      "raw_b8_bytes": 1048576,
+      "semantic_role": "high_entropy_control",
+      "syndrome_codecs": [
+        "empty",
+        "empty"
+      ]
+    }
+  ],
+  "evidence_format": "rsmp-v1-compression-evidence",
+  "gates": {
+    "benchmark_raw_lt_20pct": {
+      "arithmetic": "integer_cross_multiplication",
+      "denominator_kind": "benchmark_raw_b8_bytes",
+      "lhs": 930140,
+      "name": "benchmark_raw_lt_20pct",
+      "operator": "<",
+      "passed": true,
+      "rhs": 1552384
+    },
+    "benchmark_zstd_lt_75pct": {
+      "arithmetic": "integer_cross_multiplication",
+      "denominator_kind": "benchmark_direct_zstd_bytes",
+      "lhs": 744112,
+      "name": "benchmark_zstd_lt_75pct",
+      "operator": "<",
+      "passed": true,
+      "rhs": 976695
+    },
+    "high_entropy_raw_le_102pct": {
+      "arithmetic": "integer_cross_multiplication",
+      "denominator_kind": "high_entropy_raw_b8_bytes",
+      "lhs": 52453200,
+      "name": "high_entropy_raw_le_102pct",
+      "operator": "<=",
+      "passed": true,
+      "rhs": 53477376
+    }
+  },
+  "high_entropy_control": {
+    "archive_bytes": 1049064,
+    "archive_to_direct_zstd": {
+      "basis_points_floor": 10004,
+      "denominator": 1048616,
+      "numerator": 1049064
+    },
+    "archive_to_raw": {
+      "basis_points_floor": 10004,
+      "denominator": 1048576,
+      "numerator": 1049064
+    },
+    "case_id": "high_entropy_control",
+    "decode_throughput_bytes_per_second": 24977742,
+    "detector_density": {
+      "one_count": 0,
+      "ppm": 0,
+      "total_bits": 0
+    },
+    "dimensions": {
+      "D": 0,
+      "L": 0,
+      "M": 1024,
+      "blocks": 2,
+      "free_width": 1024,
+      "rank": 0,
+      "shots": 8192
+    },
+    "direct_zstd_bytes": 1048616,
+    "direct_zstd_is_diagnostic_only": true,
+    "encode_throughput_bytes_per_second": 11398829,
+    "free_codecs": [
+      "free_dense_v1",
+      "free_dense_v1"
+    ],
+    "peak_logical_block_working_set_bytes": 10485788,
+    "raw_b8_bytes": 1048576,
+    "semantic_role": "high_entropy_control",
+    "syndrome_codecs": [
+      "empty",
+      "empty"
+    ]
+  },
+  "pass": true,
+  "pass_line": "PASS rsmp v1 compression benchmark_raw_lt_20pct=1 benchmark_zstd_lt_75pct=1 high_entropy_raw_le_102pct=1",
+  "required_semantic_roles": [
+    "nonzero_reference",
+    "rank_zero",
+    "dependent_detectors",
+    "repeat_records",
+    "observable_recovery",
+    "loss_visible_measurements",
+    "surface_d11_r100"
+  ],
+  "schema_version": 1
+}
