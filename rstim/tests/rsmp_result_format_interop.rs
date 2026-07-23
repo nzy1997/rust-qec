@@ -29,6 +29,8 @@ fn rsmp_result_format_interop_contract() {
     assert_eq!(detector_formats, 6);
     let observable_formats = verify_observable_outputs();
     assert_eq!(observable_formats, 5);
+    verify_simultaneous_outputs_and_dets_labels();
+    verify_zero_detector_observable_dets_cli();
     let ptb64_cross_block = verify_ptb64_cross_block();
     assert_eq!(ptb64_cross_block, 1);
     let guarded_read = verify_guarded_read();
@@ -196,6 +198,89 @@ fn verify_observable_outputs() -> usize {
     cases
 }
 
+fn verify_simultaneous_outputs_and_dets_labels() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let circuit = dir.path().join("three-output-dets.stim");
+    fs::write(
+        &circuit,
+        b"M 0\nM 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("write three-output circuit");
+    let instructions = parse_lines(
+        "M 0\nM 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("parse three-output circuit");
+    let measurements = bit_table_from_shots(&[&[false, true]]);
+    let archive = archive_from_measurements(&instructions, &measurements);
+    let archive_path = dir.path().join("three-output.rsmp");
+    fs::write(&archive_path, archive).expect("write three-output archive");
+
+    let measurements_path = dir.path().join("measurements.01");
+    let detectors_path = dir.path().join("detectors.dets");
+    let observables_path = dir.path().join("observables.01");
+    let output = run_cli(
+        &unpack_args(&circuit, &archive_path, None)
+            .into_iter()
+            .chain([
+                "--measurements_out".to_owned(),
+                measurements_path.display().to_string(),
+                "--measurements_out_format".to_owned(),
+                "01".to_owned(),
+                "--detectors_out".to_owned(),
+                detectors_path.display().to_string(),
+                "--detectors_out_format".to_owned(),
+                "dets".to_owned(),
+                "--obs_out".to_owned(),
+                observables_path.display().to_string(),
+                "--obs_out_format".to_owned(),
+                "01".to_owned(),
+            ])
+            .collect::<Vec<_>>(),
+        None,
+    );
+    assert_success(&output, "unpack all three outputs with dets");
+    assert_eq!(fs::read(measurements_path).unwrap(), b"01\n");
+    assert_eq!(fs::read(detectors_path).unwrap(), b"shot D1 L0\n");
+    assert_eq!(fs::read(observables_path).unwrap(), b"1\n");
+}
+
+fn verify_zero_detector_observable_dets_cli() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let circuit = dir.path().join("zero-detector-observable.stim");
+    fs::write(&circuit, b"M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
+        .expect("write zero-detector circuit");
+    let instructions =
+        parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").expect("parse zero-detector circuit");
+    let measurements = bit_table_from_shots(&[&[true]]);
+    let archive = archive_from_measurements(&instructions, &measurements);
+    let archive_path = dir.path().join("zero-detector.rsmp");
+    fs::write(&archive_path, archive).expect("write zero-detector archive");
+
+    let dets_path = dir.path().join("detectors.dets");
+    let output = run_cli(
+        &unpack_args(
+            &circuit,
+            &archive_path,
+            Some(("--detectors_out", &dets_path, "dets")),
+        ),
+        None,
+    );
+    assert_success(&output, "zero-detector dets output");
+    assert_eq!(fs::read(dets_path).unwrap(), b"shot L0\n");
+
+    let detector_01_path = dir.path().join("detectors.01");
+    let output = run_cli(
+        &unpack_args(
+            &circuit,
+            &archive_path,
+            Some(("--detectors_out", &detector_01_path, "01")),
+        ),
+        None,
+    );
+    assert_success(&output, "zero-detector 01 output");
+    assert_eq!(fs::read(detector_01_path).unwrap(), b"\n");
+}
+
 fn verify_ptb64_cross_block() -> usize {
     let fixture = CatalogFixture::known_mpad_multi();
     let measurements = repeated_table(&fixture.measurements, 195);
@@ -310,18 +395,20 @@ fn verify_negative_cases() -> usize {
     let b8 = encode_table(&fixture.measurements, "b8", None);
     let format01 = encode_table(&fixture.measurements, "01", None);
     let ptb64 = encode_table(&fixture.measurements, "ptb64", None);
+    let row_len = format01.len() / fixture.shots;
     let mut cases = 0;
 
     verify_result_block_writer_rejects_mismatched_shots();
     cases += 1;
 
-    verify_extra_pack_input_rejection(
+    verify_pack_failure_preserves_destination(
         dir.path(),
         &fixture.circuit,
         fixture.shots as u64,
-        &b8,
-        &format01,
-        &ptb64,
+        "non-01-byte",
+        "01",
+        b"10x\n000\n111\n000\n".to_vec(),
+        cases,
     );
     cases += 1;
 
@@ -333,62 +420,63 @@ fn verify_negative_cases() -> usize {
     );
     cases += 1;
 
-    let unsupported_pack_inputs = [
-        ("unsupported-r8", "r8", b8.clone()),
-        ("unsupported-dets", "dets", b8.clone()),
-        ("unsupported-hits", "hits", b8.clone()),
-    ];
-    for (tag, (name, format, input)) in unsupported_pack_inputs.into_iter().enumerate() {
-        let destination = dir.path().join(format!("{name}.rsmp"));
-        write_sentinel(&destination, 0xb0 + tag as u8);
-        let output = run_cli(
-            &pack_args(
-                &fixture.circuit,
-                fixture.shots as u64,
-                Path::new("-"),
-                &destination,
-                format,
-            ),
-            Some(&input),
-        );
-        assert_failure(&output, name);
-        assert_sentinel(&destination, 0xb0 + tag as u8);
-    }
+    verify_pack_failure_preserves_destination(
+        dir.path(),
+        &fixture.circuit,
+        fixture.shots as u64,
+        "fewer-shots",
+        "01",
+        format01[..format01.len() - row_len].to_vec(),
+        cases,
+    );
+    cases += 1;
+
+    verify_pack_failure_preserves_destination(
+        dir.path(),
+        &fixture.circuit,
+        fixture.shots as u64,
+        "more-shots",
+        "01",
+        [format01.as_slice(), &format01[..row_len]].concat(),
+        cases,
+    );
     cases += 1;
 
     let invalid_pack_inputs = [
-        ("short-b8", "b8", b8[..b8.len() - 1].to_vec()),
+        ("partial-b8-row", "b8", b8[..b8.len() - 1].to_vec()),
         ("padding-b8", "b8", vec![0xf8; fixture.shots]),
-        ("bad-01", "01", b"10x\n000\n111\n000\n".to_vec()),
-        ("short-ptb64", "ptb64", ptb64[..ptb64.len() - 1].to_vec()),
         (
-            "padding-ptb64",
+            "invalid-ptb64-byte-length",
+            "ptb64",
+            ptb64[..ptb64.len() - 1].to_vec(),
+        ),
+        (
+            "nonzero-ptb64-shot-padding",
             "ptb64",
             vec![0xff; 8 * fixture.measurements.num_major()],
         ),
+        (
+            "extra-ptb64-group",
+            "ptb64",
+            [ptb64.as_slice(), &ptb64].concat(),
+        ),
     ];
     for (name, format, input) in invalid_pack_inputs {
-        let destination = dir.path().join(format!("{name}.rsmp"));
-        write_sentinel(&destination, cases as u8);
-        let output = run_cli(
-            &pack_args(
-                &fixture.circuit,
-                fixture.shots as u64,
-                Path::new("-"),
-                &destination,
-                format,
-            ),
-            Some(&input),
+        verify_pack_failure_preserves_destination(
+            dir.path(),
+            &fixture.circuit,
+            fixture.shots as u64,
+            name,
+            format,
+            input,
+            cases,
         );
-        assert_failure(&output, name);
-        assert_sentinel(&destination, cases as u8);
         cases += 1;
     }
 
     for (name, flag, format) in [
         ("measurement-dets", "--measurements_out", "dets"),
         ("observable-dets", "--obs_out", "dets"),
-        ("unknown-detector-format", "--detectors_out", "unknown"),
     ] {
         let destination = dir.path().join(format!("{name}.out"));
         write_sentinel(&destination, cases as u8);
@@ -405,8 +493,23 @@ fn verify_negative_cases() -> usize {
         cases += 1;
     }
 
-    let output = run_cli(&unpack_args(&fixture.circuit, &valid_archive, None), None);
-    assert_failure(&output, "unpack without outputs");
+    let output = run_cli(
+        &unpack_args(&fixture.circuit, &valid_archive, None)
+            .into_iter()
+            .chain([
+                "--measurements_out".to_owned(),
+                "-".to_owned(),
+                "--measurements_out_format".to_owned(),
+                "b8".to_owned(),
+                "--detectors_out".to_owned(),
+                "-".to_owned(),
+                "--detectors_out_format".to_owned(),
+                "b8".to_owned(),
+            ])
+            .collect::<Vec<_>>(),
+        None,
+    );
+    assert_failure(&output, "two stdout destinations");
     cases += 1;
 
     let duplicate = dir.path().join("duplicate.b8");
@@ -431,33 +534,78 @@ fn verify_negative_cases() -> usize {
     assert_sentinel(&duplicate, cases as u8);
     cases += 1;
 
+    verify_unlisted_usage_guards(&fixture, &valid_archive);
+
     cases
 }
 
-fn verify_extra_pack_input_rejection(
+fn verify_pack_failure_preserves_destination(
     dir: &Path,
     circuit: &Path,
     shots: u64,
-    b8: &[u8],
-    format01: &[u8],
-    ptb64: &[u8],
+    name: &str,
+    format: &str,
+    input: Vec<u8>,
+    tag: usize,
 ) {
-    let line_len = format01.len() / shots as usize;
-    let extra_inputs = [
-        ("extra-b8", "b8", [b8, &[0]].concat()),
-        ("extra-01", "01", [format01, &format01[..line_len]].concat()),
-        ("extra-ptb64", "ptb64", [ptb64, ptb64].concat()),
-    ];
-    for (tag, (name, format, input)) in extra_inputs.into_iter().enumerate() {
-        let destination = dir.join(format!("{name}.rsmp"));
-        write_sentinel(&destination, 0xd0 + tag as u8);
-        let output = run_cli(
-            &pack_args(circuit, shots, Path::new("-"), &destination, format),
-            Some(&input),
+    let destination = dir.join(format!("{name}.rsmp"));
+    write_sentinel(&destination, tag as u8);
+    let output = run_cli(
+        &pack_args(circuit, shots, Path::new("-"), &destination, format),
+        Some(&input),
+    );
+    assert_failure(&output, name);
+    assert_sentinel(&destination, tag as u8);
+}
+
+fn verify_unlisted_usage_guards(fixture: &CatalogFixture, valid_archive: &Path) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (tag, (name, format, input)) in [
+        (
+            "unsupported-r8",
+            "r8",
+            encode_table(&fixture.measurements, "b8", None),
+        ),
+        (
+            "unsupported-dets",
+            "dets",
+            encode_table(&fixture.measurements, "b8", None),
+        ),
+        (
+            "unsupported-hits",
+            "hits",
+            encode_table(&fixture.measurements, "b8", None),
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        verify_pack_failure_preserves_destination(
+            dir.path(),
+            &fixture.circuit,
+            fixture.shots as u64,
+            name,
+            format,
+            input,
+            0xb0 + tag,
         );
-        assert_failure(&output, name);
-        assert_sentinel(&destination, 0xd0 + tag as u8);
     }
+
+    let output = run_cli(&unpack_args(&fixture.circuit, valid_archive, None), None);
+    assert_failure(&output, "unpack without outputs");
+
+    let destination = dir.path().join("unknown-detector-format.out");
+    write_sentinel(&destination, 0xb7);
+    let output = run_cli(
+        &unpack_args(
+            &fixture.circuit,
+            valid_archive,
+            Some(("--detectors_out", &destination, "unknown")),
+        ),
+        None,
+    );
+    assert_failure(&output, "unknown detector format");
+    assert_sentinel(&destination, 0xb7);
 }
 
 fn verify_01_framing_rejection(dir: &Path, circuit: &Path, shots: u64, format01: &[u8]) {
@@ -662,6 +810,18 @@ fn ptb64_bytes(table: &BitTable) -> Vec<u8> {
     let mut bytes = Vec::new();
     write_shots_ptb64(table, &mut bytes).expect("encode whole-table ptb64");
     bytes
+}
+
+fn bit_table_from_shots(shots: &[&[bool]]) -> BitTable {
+    let width = shots.first().map_or(0, |shot| shot.len());
+    let mut table = BitTable::try_new(width, shots.len()).expect("allocate bit table");
+    for (shot_index, shot) in shots.iter().enumerate() {
+        assert_eq!(shot.len(), width);
+        for (bit, value) in shot.iter().copied().enumerate() {
+            table.set(bit, shot_index, value);
+        }
+    }
+    table
 }
 
 fn repeated_table(source: &BitTable, shots: usize) -> BitTable {
