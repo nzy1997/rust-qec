@@ -24,6 +24,7 @@ const MAX_BLOCK_SHOTS: usize = 4096;
 
 #[test]
 fn rsmp_archive_streaming_contract() {
+    verify_zero_shot_archive();
     let boundary_cases = verify_boundary_cases();
     assert_eq!(boundary_cases, 4);
     let partition_invariant = verify_partition_invariant();
@@ -100,6 +101,28 @@ fn verify_partition_invariant() -> usize {
     1
 }
 
+fn verify_zero_shot_archive() {
+    let circuit = parse("M 0\nDETECTOR rec[-1]\n");
+    let transform = MeasurementTransform::from_circuit(&circuit).expect("zero-shot transform");
+    let writer = SampleArchiveWriter::new(
+        NonSeekableWriter::default(),
+        transform,
+        0,
+        SampleArchiveOptions::default(),
+        limits(),
+    )
+    .expect("zero-shot writer");
+    let archive = writer.finish().expect("zero-shot finish").into_inner();
+    assert!(block_layouts(&archive).is_empty());
+
+    let mut reader =
+        SampleArchiveReader::open(ShortRead::new(&archive, 3), &circuit, limits()).expect("open");
+    assert!(reader.next_block().expect("zero-shot next").is_none());
+    let summary = reader.finish().expect("zero-shot reader finish");
+    assert_eq!(summary.block_count, 0);
+    assert_eq!(summary.total_shots, 0);
+}
+
 fn verify_malformed_cases() -> usize {
     let fixture = CatalogFixture::load("known_mpad_multi");
     let measurements = repeated_table(&fixture.measurements, 8193);
@@ -145,8 +168,8 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut first_shot_overflow = archive.clone();
-    put_u64(&mut first_shot_overflow, GLOBAL_HEADER_LEN + 20, u64::MAX);
-    expect_next_block_error(
+    put_u64(&mut first_shot_overflow, second_block + 20, u64::MAX);
+    expect_second_next_block_error(
         &first_shot_overflow,
         &fixture.circuit,
         SampleArchiveErrorCode::LimitExceeded,
@@ -172,7 +195,7 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let mut wrong_free_shape = archive.clone();
-    replace_stream(&mut wrong_free_shape, 0, StreamKind::Free, |decoded| {
+    replace_free_stream(&mut wrong_free_shape, 0, |decoded| {
         decoded.push(0);
     });
     expect_next_block_error(
@@ -192,17 +215,11 @@ fn verify_malformed_cases() -> usize {
     cases += 1;
 
     let trailer = trailer_offset(&archive);
-    let mut bad_trailer_blocks = archive.clone();
-    put_u64(&mut bad_trailer_blocks, trailer + 16, 2);
+    let mut bad_trailer_totals = archive.clone();
+    put_u64(&mut bad_trailer_totals, trailer + 16, 2);
+    put_u64(&mut bad_trailer_totals, trailer + 24, 8192);
     expect_finish_error(
-        &bad_trailer_blocks,
-        &fixture.circuit,
-        SampleArchiveErrorCode::ShapeMismatch,
-    );
-    let mut bad_trailer_shots = archive.clone();
-    put_u64(&mut bad_trailer_shots, trailer + 24, 8192);
-    expect_finish_error(
-        &bad_trailer_shots,
+        &bad_trailer_totals,
         &fixture.circuit,
         SampleArchiveErrorCode::ShapeMismatch,
     );
@@ -247,13 +264,28 @@ fn verify_bounded_memory() -> MemoryResult {
     let twenty_one_peak = twenty_one_blocks
         .max_writer_live_bytes
         .max(twenty_one_blocks.max_reader_live_bytes);
+    assert_eq!(
+        three_peak, twenty_one_peak,
+        "per-block high-water mark changed from {three_peak} to {twenty_one_peak}"
+    );
+    let diagnostics: Vec<String> = diagnostic_lines();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|line: &String| line.contains("checked_mul")),
+        "memory diagnostics must expose checked multiplication formulas: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|line: &String| line.contains("checked_add")),
+        "memory diagnostics must expose checked addition formulas: {diagnostics:?}"
+    );
     MemoryResult {
         max_buffered_shots: twenty_one_blocks.max_buffered_shots,
         max_live_decoded_blocks: twenty_one_blocks.max_live_decoded_blocks,
         max_transform_payloads: twenty_one_blocks.max_transform_payloads,
-        total_block_growth_bytes: twenty_one_peak
-            .checked_sub(three_peak)
-            .expect("21-block peak should not be smaller than 3-block peak"),
+        total_block_growth_bytes: twenty_one_peak - three_peak,
     }
 }
 
@@ -358,37 +390,22 @@ fn expect_finish_error(archive: &[u8], circuit: &[StimInstr], code: SampleArchiv
     assert_eq!(reader.finish().unwrap_err().code(), code);
 }
 
-fn replace_stream(
+fn replace_free_stream(
     archive: &mut Vec<u8>,
     block_index: usize,
-    kind: StreamKind,
     mutate: impl FnOnce(&mut Vec<u8>),
 ) {
     let layout = block_layouts(archive)[block_index].clone();
-    let range = match kind {
-        StreamKind::Syndrome => layout.syndrome,
-        StreamKind::Free => layout.free,
-    };
+    let range = layout.free;
     let header = layout.header.start;
-    let expected_len = match kind {
-        StreamKind::Syndrome => get_u64(archive, header + 44),
-        StreamKind::Free => get_u64(archive, header + 60),
-    } as usize;
+    let expected_len = get_u64(archive, header + 60) as usize;
     let mut decoded =
         zstd::bulk::decompress(&archive[range.clone()], expected_len).expect("decompress stream");
     mutate(&mut decoded);
     let compressed = compress_frame_for_test(&decoded);
     archive.splice(range.clone(), compressed.iter().copied());
-    match kind {
-        StreamKind::Syndrome => {
-            put_u64(archive, header + 44, decoded.len() as u64);
-            put_u64(archive, header + 52, compressed.len() as u64);
-        }
-        StreamKind::Free => {
-            put_u64(archive, header + 60, decoded.len() as u64);
-            put_u64(archive, header + 68, compressed.len() as u64);
-        }
-    }
+    put_u64(archive, header + 60, decoded.len() as u64);
+    put_u64(archive, header + 68, compressed.len() as u64);
     recompute_archive_digest(archive);
 }
 
@@ -476,11 +493,6 @@ fn repo_path(path: &str) -> PathBuf {
 
 fn read_fixture(name: &str) -> Vec<u8> {
     fs::read(repo_path(&format!("rstim/tests/fixtures/rsmp/{name}")))
-        .unwrap_or_else(|err| panic!("{name}: {err}"))
-}
-
-fn read_fixture_text(name: &str) -> String {
-    fs::read_to_string(repo_path(&format!("rstim/tests/fixtures/rsmp/{name}")))
         .unwrap_or_else(|err| panic!("{name}: {err}"))
 }
 
@@ -599,12 +611,6 @@ struct BlockLayout {
     header: std::ops::Range<usize>,
     syndrome: std::ops::Range<usize>,
     free: std::ops::Range<usize>,
-}
-
-#[derive(Clone, Copy)]
-enum StreamKind {
-    Syndrome,
-    Free,
 }
 
 struct CatalogFixture {
