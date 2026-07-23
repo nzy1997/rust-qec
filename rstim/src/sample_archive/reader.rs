@@ -45,6 +45,7 @@ pub struct SampleArchiveReader<R: Read> {
     decompressed_archive_bytes: u64,
     compressed_archive_bytes: u64,
     trailer: Option<ArchiveTrailer>,
+    terminal_error: Option<SampleArchiveError>,
 }
 
 impl<R: Read> SampleArchiveReader<R> {
@@ -79,6 +80,7 @@ impl<R: Read> SampleArchiveReader<R> {
             decompressed_archive_bytes: 0,
             compressed_archive_bytes: 0,
             trailer: None,
+            terminal_error: None,
         })
     }
 
@@ -87,6 +89,19 @@ impl<R: Read> SampleArchiveReader<R> {
     }
 
     pub fn next_block(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
+        if let Some(err) = self.terminal_error {
+            return Err(err);
+        }
+        match self.next_block_impl() {
+            Ok(block) => Ok(block),
+            Err(err) => {
+                self.terminal_error = Some(err);
+                Err(err)
+            }
+        }
+    }
+
+    fn next_block_impl(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
         if self.trailer.is_some() {
             return Ok(None);
         }
@@ -231,6 +246,9 @@ impl<R: Read> SampleArchiveReader<R> {
     }
 
     pub fn finish(mut self) -> Result<ArchiveSummary, SampleArchiveError> {
+        if let Some(err) = self.terminal_error {
+            return Err(err);
+        }
         while self.trailer.is_none() {
             if self.next_block()?.is_none() {
                 break;
