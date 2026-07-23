@@ -1,15 +1,15 @@
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;
 use rstim::sample_archive::corruption_corpus::{
-    run_corruption_corpus, CorruptionCaseResult, CorruptionCorpusOptions, CorruptionCorpusSummary,
-    PASS_LINE,
+    run_corruption_corpus, write_summary_json, CorruptionCaseResult, CorruptionCorpusOptions,
+    CorruptionCorpusSummary, PASS_LINE,
 };
 use rstim::sample_archive::format::{
     BlockHeader, SampleArchiveErrorCode, ARCHIVE_TRAILER_LEN, BLOCK_HEADER_LEN, BLOCK_MAGIC,
     GLOBAL_HEADER_LEN,
 };
 use rstim::sample_archive::{ArchiveLimits, SampleArchiveReader};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Cursor;
@@ -216,6 +216,215 @@ fn wrong_expected_code_is_rejected() {
     assert!(stderr.contains("actual=RSMP_BAD_MAGIC"), "{stderr}");
 }
 
+#[test]
+fn summary_json_writer_creates_parent_directory() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let out = temp.path().join("nested").join("summary.json");
+    let summary = run_committed_corpus().expect("corruption corpus must pass");
+
+    write_summary_json(&summary, &out).expect("write summary json");
+
+    let written: Value =
+        serde_json::from_slice(&fs::read(&out).expect("read summary")).expect("parse summary");
+    assert_eq!(written["status"], "pass");
+    assert_eq!(written["success_line"], PASS_LINE);
+}
+
+#[test]
+fn catalog_recipe_metadata_errors_are_reported() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+
+    let unknown = json!({
+        "id": "unknown_recipe",
+        "fixture_id": "compat_v1_two_block_sparse_dense",
+        "source_role": "nonzero_reference",
+        "kind": "byte_mutation",
+        "locator": "global.magic",
+        "mutation": "set(global.magic, 0)",
+        "expected_error": "RSMP_BAD_MAGIC",
+        "recompute": []
+    });
+    let unknown_summary = run_catalog(
+        &temp,
+        json!({
+            "corruption_recipes": [unknown],
+            "bit_flips": []
+        }),
+    )
+    .expect("unknown recipe is recorded as a corpus case failure");
+    let unknown_result = corpus_result(&unknown_summary, "unknown_recipe");
+    assert_eq!(unknown_result.status, "panic");
+    assert_eq!(
+        unknown_result.message.as_deref(),
+        Some("unsupported corruption recipe unknown_recipe")
+    );
+
+    let mut wrong_field = committed_recipe("bad_magic");
+    wrong_field["source_role"] = Value::String("wrong_role".to_string());
+    let wrong_field_summary = run_catalog(&temp, catalog_for_recipes(vec![wrong_field]))
+        .expect("metadata mismatch is recorded as a corpus case failure");
+    let wrong_field_result = corpus_result(&wrong_field_summary, "bad_magic");
+    assert_eq!(wrong_field_result.status, "panic");
+    assert_eq!(
+        wrong_field_result.message.as_deref(),
+        Some("bad_magic.source_role must be nonzero_reference, got wrong_role")
+    );
+
+    let mut wrong_recompute = committed_recipe("bad_magic");
+    wrong_recompute["recompute"] = json!(["trailer.archive_sha256"]);
+    let wrong_recompute_summary = run_catalog(&temp, catalog_for_recipes(vec![wrong_recompute]))
+        .expect("recompute mismatch is recorded as a corpus case failure");
+    let wrong_recompute_result = corpus_result(&wrong_recompute_summary, "bad_magic");
+    assert_eq!(wrong_recompute_result.status, "panic");
+    assert_eq!(
+        wrong_recompute_result.message.as_deref(),
+        Some("bad_magic.recompute must be []")
+    );
+}
+
+#[test]
+fn invalid_catalog_expected_error_is_rejected() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let mut recipe = committed_recipe("bad_magic");
+    recipe["expected_error"] = Value::String("NOT_A_PUBLIC_CODE".to_string());
+
+    let err = run_catalog(&temp, catalog_for_recipes(vec![recipe]))
+        .expect_err("invalid public error code must reject catalog");
+
+    assert_eq!(err, "bad_magic.expected_error is not a public rsmp code");
+}
+
+#[test]
+fn bit_flip_metadata_errors_are_rejected() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+
+    let err = run_catalog(
+        &temp,
+        json!({
+            "corruption_recipes": [],
+            "bit_flips": [{
+                "id": "invalid_bit",
+                "locator": "global.magic",
+                "expected_error": "RSMP_BAD_MAGIC",
+                "bit": 8
+            }]
+        }),
+    )
+    .expect_err("bit index outside a byte must reject catalog");
+    assert_eq!(err, "invalid_bit.bit must be between 0 and 7");
+
+    let err = run_catalog(
+        &temp,
+        json!({
+            "corruption_recipes": [],
+            "bit_flips": [{
+                "id": "unknown_locator",
+                "locator": "global.unknown",
+                "expected_error": "RSMP_BAD_MAGIC"
+            }]
+        }),
+    )
+    .expect_err("unknown bit-flip locator must reject catalog");
+    assert_eq!(err, "unknown bit-flip locator global.unknown");
+}
+
+#[test]
+fn manifest_path_and_hash_errors_are_rejected() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let manifest = write_temp_manifest(
+        &temp,
+        r#"
+[paths]
+archive = ""
+circuit = "rstim/tests/fixtures/rsmp/v1/compat.stim"
+
+[hashes]
+archive_sha256 = "unused"
+"#,
+    );
+    let err = run_corruption_corpus(CorruptionCorpusOptions {
+        catalog_path: write_catalog_value(
+            &temp,
+            json!({
+                "corruption_recipes": [],
+                "bit_flips": []
+            }),
+        ),
+        fixture_manifest_path: manifest,
+    })
+    .expect_err("empty archive path must be rejected");
+    assert_eq!(
+        err,
+        "paths.archive must be a non-empty POSIX repo-relative path"
+    );
+
+    let manifest = write_temp_manifest(
+        &temp,
+        r#"
+[paths]
+archive = "../compat-v1.rsmp"
+circuit = "rstim/tests/fixtures/rsmp/v1/compat.stim"
+
+[hashes]
+archive_sha256 = "unused"
+"#,
+    );
+    let err = run_corruption_corpus(CorruptionCorpusOptions {
+        catalog_path: write_catalog_value(
+            &temp,
+            json!({
+                "corruption_recipes": [],
+                "bit_flips": []
+            }),
+        ),
+        fixture_manifest_path: manifest,
+    })
+    .expect_err("parent path must be rejected");
+    assert_eq!(err, "paths.archive must be repo-relative without '..'");
+
+    let manifest = temp_manifest_with_fixture(&temp, "0".repeat(64), &fixture_archive());
+    let err = run_corruption_corpus(CorruptionCorpusOptions {
+        catalog_path: write_catalog_value(
+            &temp,
+            json!({
+                "corruption_recipes": [],
+                "bit_flips": []
+            }),
+        ),
+        fixture_manifest_path: manifest,
+    })
+    .expect_err("hash mismatch must be rejected");
+    assert!(err.starts_with("archive_sha256 mismatch: got "), "{err}");
+    assert!(err
+        .ends_with(", expected 0000000000000000000000000000000000000000000000000000000000000000"));
+}
+
+#[test]
+fn invalid_base_archive_can_make_recipe_unexpectedly_succeed() {
+    let temp = tempfile::tempdir().expect("create temp dir");
+    let mut archive = fixture_archive();
+    archive[0] ^= 0xff;
+    let manifest = temp_manifest_with_fixture(&temp, sha256_hex(&archive), &archive);
+    let summary = run_corruption_corpus(CorruptionCorpusOptions {
+        catalog_path: write_catalog_value(
+            &temp,
+            catalog_for_recipes(vec![committed_recipe("bad_magic")]),
+        ),
+        fixture_manifest_path: manifest,
+    })
+    .expect("run corpus over intentionally invalid base fixture");
+
+    assert_eq!(summary.status, "fail");
+    assert_eq!(summary.valid_archives, 0);
+    assert!(summary.wrong_error_codes >= 1);
+    let valid = corpus_result(&summary, "valid_fixture");
+    assert_eq!(valid.status, "wrong_error_code");
+    assert_eq!(valid.actual_error.as_deref(), Some("RSMP_BAD_MAGIC"));
+    let bad_magic = corpus_result(&summary, "bad_magic");
+    assert_eq!(bad_magic.status, "unexpected_success");
+    assert_eq!(bad_magic.blocks_returned, 2);
+}
+
 fn fixture_circuit() -> Vec<StimInstr> {
     let text = fs::read_to_string(repo_path(FIXTURE_CIRCUIT)).expect("read fixture circuit");
     parse_lines(&text).expect("parse fixture circuit")
@@ -241,6 +450,87 @@ fn run_committed_corpus() -> Result<CorruptionCorpusSummary, String> {
         catalog_path: repo_path(CATALOG),
         fixture_manifest_path: repo_path(FIXTURE_MANIFEST),
     })
+}
+
+fn run_catalog(
+    temp: &tempfile::TempDir,
+    catalog: Value,
+) -> Result<CorruptionCorpusSummary, String> {
+    run_corruption_corpus(CorruptionCorpusOptions {
+        catalog_path: write_catalog_value(temp, catalog),
+        fixture_manifest_path: repo_path(FIXTURE_MANIFEST),
+    })
+}
+
+fn write_catalog_value(temp: &tempfile::TempDir, catalog: Value) -> PathBuf {
+    let path = temp.path().join("catalog.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&catalog).expect("serialize catalog"),
+    )
+    .expect("write catalog");
+    path
+}
+
+fn catalog_for_recipes(recipes: Vec<Value>) -> Value {
+    json!({
+        "corruption_recipes": recipes,
+        "bit_flips": []
+    })
+}
+
+fn committed_recipe(id: &str) -> Value {
+    let catalog_text = fs::read_to_string(repo_path(CATALOG)).expect("read committed catalog");
+    let catalog: Value = serde_json::from_str(&catalog_text).expect("parse committed catalog");
+    catalog
+        .get("corruption_recipes")
+        .and_then(Value::as_array)
+        .expect("catalog recipes")
+        .iter()
+        .find(|recipe| recipe.get("id").and_then(Value::as_str) == Some(id))
+        .unwrap_or_else(|| panic!("missing committed recipe {id}"))
+        .clone()
+}
+
+fn write_temp_manifest(temp: &tempfile::TempDir, text: &str) -> PathBuf {
+    let dir = temp.path().join("rstim/tests/fixtures/rsmp/v1");
+    fs::create_dir_all(&dir).expect("create manifest fixture dir");
+    let path = dir.join("manifest.toml");
+    fs::write(&path, text).expect("write manifest");
+    path
+}
+
+fn temp_manifest_with_fixture(
+    temp: &tempfile::TempDir,
+    archive_sha256: String,
+    archive: &[u8],
+) -> PathBuf {
+    let dir = temp.path().join("rstim/tests/fixtures/rsmp/v1");
+    fs::create_dir_all(&dir).expect("create temp fixture dir");
+    fs::write(dir.join("compat-v1.rsmp"), archive).expect("write temp archive");
+    fs::write(
+        dir.join("compat.stim"),
+        fs::read_to_string(repo_path(FIXTURE_CIRCUIT)).expect("read fixture circuit"),
+    )
+    .expect("write temp circuit");
+    let manifest = format!(
+        r#"
+[paths]
+archive = "rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp"
+circuit = "rstim/tests/fixtures/rsmp/v1/compat.stim"
+
+[hashes]
+archive_sha256 = "{archive_sha256}"
+"#
+    );
+    write_temp_manifest(temp, &manifest)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn corpus_result<'a>(summary: &'a CorruptionCorpusSummary, id: &str) -> &'a CorruptionCaseResult {
