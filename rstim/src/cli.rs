@@ -1196,8 +1196,8 @@ fn preflight_unpack_samples(
     if outputs.iter().all(|(path, _, _)| path.is_none()) {
         return Err("unpack_samples requires at least one output".to_string());
     }
-    for (path, format, flag) in outputs {
-        if path.is_some() && format != "b8" {
+    for (_, format, flag) in outputs {
+        if format != "b8" {
             return Err(format!("unpack_samples only supports {flag} b8"));
         }
     }
