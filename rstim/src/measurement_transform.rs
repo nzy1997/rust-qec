@@ -1,10 +1,10 @@
-use crate::data_path::{ReferenceSampleMode, build_reference_sample};
-use crate::ir::{StimInstr, StimTarget, circuit_to_string};
+use crate::data_path::{build_reference_sample, ReferenceSampleMode};
+use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 use crate::sample_archive::format::{
     CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, FINGERPRINT_SHA256_CANONICAL_CIRCUIT,
     REFERENCE_SIMULATE_NOISELESS, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
-use crate::sim::bit_table::{BitTable, BitTableAllocError, checked_bit_table_storage_size};
+use crate::sim::bit_table::{checked_bit_table_storage_size, BitTable, BitTableAllocError};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -1534,18 +1534,15 @@ mod tests {
         assert_eq!(layout.max_repeat_depth(), 1);
 
         let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
-        assert!(
-            transform
-                .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
-                .is_ok()
-        );
+        assert!(transform
+            .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
+            .is_ok());
     }
 
     #[test]
     fn encode_block_prefix_uses_only_requested_shots() {
-        let circuit =
-            parse_lines("M 0 1 2\nDETECTOR rec[-3] rec[-2]\nDETECTOR rec[-2] rec[-1]\n")
-                .expect("parse transform circuit");
+        let circuit = parse_lines("M 0 1 2\nDETECTOR rec[-3] rec[-2]\nDETECTOR rec[-2] rec[-1]\n")
+            .expect("parse transform circuit");
         let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
         let mut buffered =
             BitTable::try_new(transform.num_measurements(), 4096).expect("buffer allocates");
@@ -1568,10 +1565,19 @@ mod tests {
         let encoded_prefix = transform
             .encode_block_prefix(&buffered, prefix.num_minor())
             .expect("encode buffered prefix");
-        let encoded_exact = transform.encode_block(&prefix).expect("encode exact prefix");
+        let encoded_exact = transform
+            .encode_block(&prefix)
+            .expect("encode exact prefix");
         let encoded_exact_prefix = transform
             .encode_block_prefix(&prefix, prefix.num_minor())
             .expect("encode exact full prefix");
+        assert!(matches!(
+            transform
+                .encode_block_prefix(&prefix, prefix.num_minor() + 1)
+                .unwrap_err(),
+            MeasurementTransformError::ShapeMismatch { detail }
+                if detail.contains("measurement shot prefix")
+        ));
         assert_tables_eq(
             &encoded_exact.selected_detectors,
             &encoded_prefix.selected_detectors,
@@ -1592,7 +1598,10 @@ mod tests {
             &encoded_exact.selected_detectors,
             &encoded_prefix.selected_detectors,
         );
-        assert_row_words_eq(&encoded_exact.free_measurements, &encoded_prefix.free_measurements);
+        assert_row_words_eq(
+            &encoded_exact.free_measurements,
+            &encoded_prefix.free_measurements,
+        );
     }
 
     fn assert_tables_eq(left: &BitTable, right: &BitTable) {

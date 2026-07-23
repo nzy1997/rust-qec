@@ -1,7 +1,7 @@
 use crate::sample_archive::format::{SampleArchiveError, SampleArchiveErrorCode};
-use crate::sim::bit_table::{BitTableAllocError, checked_bit_table_storage_size};
-use std::sync::Mutex;
+use crate::sim::bit_table::{checked_bit_table_storage_size, BitTableAllocError};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::thread::{self, ThreadId};
 
 static TELEMETRY_OWNER: Mutex<Option<ThreadId>> = Mutex::new(None);
@@ -191,13 +191,7 @@ fn telemetry_enabled() -> bool {
 }
 
 fn update_max(cell: &AtomicU64, value: u64) {
-    let mut observed = cell.load(Ordering::Relaxed);
-    while observed < value {
-        match cell.compare_exchange_weak(observed, value, Ordering::Relaxed, Ordering::Relaxed) {
-            Ok(_) => return,
-            Err(current) => observed = current,
-        }
-    }
+    cell.fetch_max(value, Ordering::Relaxed);
 }
 
 fn push_diagnostic(line: String) {
@@ -228,6 +222,7 @@ mod tests {
     #[test]
     fn telemetry_is_disabled_until_reset() {
         let _guard = TEST_LOCK.lock().expect("telemetry test lock");
+        reset_archive_telemetry();
         disable_archive_telemetry();
         assert_eq!(bit_table_bytes("disabled.table", 3, 65).unwrap(), 0);
         record_buffered_input(3, 65).expect("disabled buffer accounting");
@@ -236,6 +231,7 @@ mod tests {
         record_writer_live_bytes(&[("buffer", 48)]).expect("disabled writer accounting");
         record_reader_live_bytes(&[("decoded", 48)]).expect("disabled reader accounting");
         record_transform_retained(123);
+        push_diagnostic("disabled push is ignored".to_string());
 
         assert_eq!(archive_telemetry(), ArchiveTelemetrySnapshot::default());
         assert!(diagnostic_lines().is_empty());
@@ -277,6 +273,18 @@ mod tests {
         reset_archive_telemetry();
         assert_eq!(
             bit_table_bytes("overflow", 1, u64::MAX).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+        assert_eq!(
+            bit_table_bytes("overflow_size", u64::MAX, 64)
+                .unwrap_err()
+                .code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+        assert_eq!(
+            bit_table_bytes("reservation", (isize::MAX as u64 / 8) + 1, 1)
+                .unwrap_err()
+                .code(),
             SampleArchiveErrorCode::LimitExceeded
         );
         assert_eq!(

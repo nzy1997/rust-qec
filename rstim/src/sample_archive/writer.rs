@@ -1,10 +1,10 @@
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
 use crate::sample_archive::dense::pack_dense;
 use crate::sample_archive::format::{
-    BlockHeader, CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
-    FINGERPRINT_SHA256_CANONICAL_CIRCUIT, GlobalHeader, REFERENCE_SIMULATE_NOISELESS,
-    STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1, SampleArchiveError, SampleArchiveErrorCode,
-    TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1, checked_dense_bit_bytes,
+    checked_dense_bit_bytes, BlockHeader, GlobalHeader, SampleArchiveError, SampleArchiveErrorCode,
+    CANONICALIZATION_RSTIM_CIRCUIT_TEXT_V1, CODEC_SUITE_ZSTD_FRAMES_V1,
+    FINGERPRINT_SHA256_CANONICAL_CIRCUIT, REFERENCE_SIMULATE_NOISELESS, STREAM_CODEC_EMPTY,
+    STREAM_CODEC_FREE_DENSE_V1, TRANSFORM_SELECTED_DETECTOR_FREE_MEASUREMENT_V1,
 };
 use crate::sample_archive::integrity::{finalize_header, finalize_trailer};
 use crate::sample_archive::limits::{ArchiveLimits, SampleArchiveOptions};
@@ -122,10 +122,8 @@ impl<W: Write> SampleArchiveWriter<W> {
                 copied,
             );
             self.buffered_shots += copied;
-            record_buffered_input(
-                self.transform.num_measurements() as u64,
-                self.buffered_shots as u64,
-            )?;
+            let measurement_rows = self.transform.num_measurements() as u64;
+            record_buffered_input(measurement_rows, self.buffered_shots as u64)?;
             chunk_offset += copied;
             if self.buffered_shots == max_block_shots {
                 self.emit_buffered_block(max_block_shots)?;
@@ -147,11 +145,8 @@ impl<W: Write> SampleArchiveWriter<W> {
         if self.buffered_shots > 0 {
             self.emit_buffered_block(self.buffered_shots)?;
         }
-        let trailer = finalize_trailer(
-            self.next_block_index,
-            self.written_shots,
-            self.archive_hasher.clone(),
-        )?;
+        let archive_hasher = self.archive_hasher.clone();
+        let trailer = finalize_trailer(self.next_block_index, self.written_shots, archive_hasher)?;
         self.output.write_all(&trailer).map_err(map_io)?;
         self.output.flush().map_err(map_io)?;
         Ok(self.output)
@@ -186,10 +181,8 @@ impl<W: Write> SampleArchiveWriter<W> {
             .encode_block_prefix(buffer, shots)
             .map_err(map_transform_error)?;
         record_transform_payloads(2);
-        let free_len = checked_dense_bit_bytes(
-            encoded.free_measurements.num_major() as u64,
-            shots as u64,
-        )?;
+        let free_len =
+            checked_dense_bit_bytes(encoded.free_measurements.num_major() as u64, shots as u64)?;
         let syndrome_plan = plan_syndrome(&encoded.selected_detectors)?;
         validate_decompressed_streams(syndrome_plan.raw_len, free_len, self.limits)?;
         let block_decompressed_bytes = syndrome_plan
@@ -256,38 +249,30 @@ impl<W: Write> SampleArchiveWriter<W> {
         write_and_hash(&mut self.output, &mut self.archive_hasher, &block_bytes)?;
         write_and_hash(&mut self.output, &mut self.archive_hasher, &syndrome_frame)?;
         write_and_hash(&mut self.output, &mut self.archive_hasher, &free_frame)?;
-        let encoded_selected_bytes = bit_table_bytes(
-            "writer.encoded_selected",
-            encoded.selected_detectors.num_major() as u64,
-            shots as u64,
-        )?;
-        let encoded_free_bytes = bit_table_bytes(
-            "writer.encoded_free",
-            encoded.free_measurements.num_major() as u64,
-            shots as u64,
-        )?;
-        let raw_bytes = checked_sum(
-            "writer.raw_codec_buffers",
-            &[
-                ("syndrome_raw", syndrome.len() as u64),
-                ("free_raw", free.len() as u64),
-            ],
-        )?;
-        let compressed_bytes = checked_sum(
-            "writer.compressed_frames",
-            &[
-                ("syndrome_frame", syndrome_frame.len() as u64),
-                ("free_frame", free_frame.len() as u64),
-            ],
-        )?;
-        record_writer_live_bytes(&[
+        let selected_rows = encoded.selected_detectors.num_major() as u64;
+        let free_rows = encoded.free_measurements.num_major() as u64;
+        let encoded_selected_bytes =
+            bit_table_bytes("writer.encoded_selected", selected_rows, shots as u64)?;
+        let encoded_free_bytes = bit_table_bytes("writer.encoded_free", free_rows, shots as u64)?;
+        let raw_parts = [
+            ("syndrome_raw", syndrome.len() as u64),
+            ("free_raw", free.len() as u64),
+        ];
+        let raw_bytes = checked_sum("writer.raw_codec_buffers", &raw_parts)?;
+        let compressed_parts = [
+            ("syndrome_frame", syndrome_frame.len() as u64),
+            ("free_frame", free_frame.len() as u64),
+        ];
+        let compressed_bytes = checked_sum("writer.compressed_frames", &compressed_parts)?;
+        let writer_live_parts = [
             ("buffered_input", buffered_bytes),
             ("encoded_selected", encoded_selected_bytes),
             ("encoded_free", encoded_free_bytes),
             ("raw_codec_buffers", raw_bytes),
             ("compressed_frames", compressed_bytes),
             ("zstd_state", self.limits.max_zstd_window_bytes),
-        ])?;
+        ];
+        record_writer_live_bytes(&writer_live_parts)?;
         self.written_shots = self
             .written_shots
             .checked_add(shots as u64)
@@ -311,8 +296,11 @@ fn validate_transform_and_archive_shape(
     if total_shots > limits.max_total_shots {
         return Err(limit("archive total shots exceed limit"));
     }
-    if total_shots > usize::MAX as u64 {
-        return Err(limit("archive shot count exceeds usize"));
+    #[cfg(target_pointer_width = "32")]
+    {
+        if usize::try_from(total_shots).is_err() {
+            return Err(limit("archive shot count exceeds usize"));
+        }
     }
     if limits.transform.max_shots_per_block == 0 {
         return Err(limit("archive block-shot limit is zero"));
@@ -533,7 +521,21 @@ mod tests {
     #[test]
     fn writer_state_machine_rejects_zero_and_second_blocks() {
         let transform = parse_transform("M 0\n");
+        let empty = patterned_table(1, 0);
         let measurements = patterned_table(1, 1);
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            transform.clone(),
+            1,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("one-shot writer constructs");
+        assert_eq!(
+            writer.write_measurements(&empty).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+
         let mut writer = SampleArchiveWriter::new(
             Vec::new(),
             transform.clone(),
@@ -561,6 +563,33 @@ mod tests {
         assert_eq!(
             writer.write_measurements(&measurements).unwrap_err().code(),
             SampleArchiveErrorCode::ShapeMismatch
+        );
+    }
+
+    #[test]
+    fn writer_private_streaming_helpers_cover_limit_edges() {
+        let mut writer = SampleArchiveWriter::new(
+            Vec::new(),
+            parse_transform("M 0\n"),
+            0,
+            SampleArchiveOptions::default(),
+            test_limits(),
+        )
+        .expect("writer constructs");
+        assert_eq!(
+            writer.emit_buffered_block(0).unwrap_err().code(),
+            SampleArchiveErrorCode::ShapeMismatch
+        );
+        assert_eq!(
+            writer.emit_buffered_block(17).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
+        );
+
+        let mut limits = test_limits();
+        limits.transform.max_shots_per_block = 0;
+        assert_eq!(
+            max_block_shots_usize(limits).unwrap_err().code(),
+            SampleArchiveErrorCode::LimitExceeded
         );
     }
 
@@ -649,6 +678,8 @@ mod tests {
             Err(err) => err,
         };
         assert_eq!(err.code(), SampleArchiveErrorCode::Io);
+        let mut failing = FailingWriter;
+        assert!(failing.flush().is_err());
 
         assert_eq!(
             map_transform_error(MeasurementTransformError::UnsupportedSweep).code(),

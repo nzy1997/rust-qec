@@ -4,11 +4,10 @@ use crate::measurement_transform::{
 };
 use crate::sample_archive::dense::unpack_dense;
 use crate::sample_archive::format::{
-    ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
-    CODEC_SUITE_ZSTD_FRAMES_V1, GLOBAL_HEADER_LEN, GlobalHeader, STREAM_CODEC_EMPTY,
-    STREAM_CODEC_FREE_DENSE_V1, STREAM_CODEC_SYNDROME_DENSE_V1,
-    STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, SampleArchiveError, SampleArchiveErrorCode,
-    TRAILER_MAGIC, checked_dense_bit_bytes,
+    checked_dense_bit_bytes, ArchiveTrailer, BlockHeader, GlobalHeader, SampleArchiveError,
+    SampleArchiveErrorCode, ARCHIVE_TRAILER_LEN, BLOCK_HEADER_LEN, BLOCK_MAGIC,
+    CODEC_SUITE_ZSTD_FRAMES_V1, GLOBAL_HEADER_LEN, STREAM_CODEC_EMPTY, STREAM_CODEC_FREE_DENSE_V1,
+    STREAM_CODEC_SYNDROME_DENSE_V1, STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, TRAILER_MAGIC,
 };
 use crate::sample_archive::integrity::{header_digest, trailer_prefix};
 use crate::sample_archive::limits::ArchiveLimits;
@@ -149,66 +148,55 @@ impl<R: Read> SampleArchiveReader<R> {
             .map_err(map_transform_error)?;
         record_transform_payloads(2);
         record_reader_decoded_blocks(1);
-        let selected_bytes = bit_table_bytes(
-            "reader.selected",
-            self.transform.rank() as u64,
-            block.shot_count,
-        )?;
-        let free_table_bytes = bit_table_bytes(
-            "reader.free_measurements",
-            self.transform.free_columns().len() as u64,
-            block.shot_count,
-        )?;
+        let rank = self.transform.rank() as u64;
+        let free_columns = self.transform.free_columns().len() as u64;
+        let measurement_rows = decoded.measurements.num_major() as u64;
+        let detection_rows = decoded.detections.num_major() as u64;
+        let observable_rows = decoded.observable_flips.num_major() as u64;
+        let selected_bytes = bit_table_bytes("reader.selected", rank, block.shot_count)?;
+        let free_table_bytes =
+            bit_table_bytes("reader.free_measurements", free_columns, block.shot_count)?;
         let decoded_measurements = bit_table_bytes(
             "reader.decoded_measurements",
-            decoded.measurements.num_major() as u64,
+            measurement_rows,
             block.shot_count,
         )?;
         let decoded_detections = bit_table_bytes(
             "reader.decoded_detections",
-            decoded.detections.num_major() as u64,
+            detection_rows,
             block.shot_count,
         )?;
         let decoded_observables = bit_table_bytes(
             "reader.decoded_observables",
-            decoded.observable_flips.num_major() as u64,
+            observable_rows,
             block.shot_count,
         )?;
         let transform_scratch_x = bit_table_bytes(
             "reader.transform_scratch_x",
-            self.transform.num_measurements() as u64,
+            measurement_rows,
             block.shot_count,
         )?;
-        let transform_scratch_rhs = bit_table_bytes(
-            "reader.transform_scratch_rhs",
-            self.transform.rank() as u64,
-            block.shot_count,
-        )?;
+        let transform_scratch_rhs =
+            bit_table_bytes("reader.transform_scratch_rhs", rank, block.shot_count)?;
         let transform_scratch_row =
             bit_table_bytes("reader.transform_scratch_row", 1, block.shot_count)?;
-        let transform_scratch = checked_sum(
-            "reader.transform_scratch",
-            &[
-                ("x", transform_scratch_x),
-                ("rhs", transform_scratch_rhs),
-                ("row", transform_scratch_row),
-            ],
-        )?;
-        let raw_bytes = checked_sum(
-            "reader.raw_codec_buffers",
-            &[
-                ("syndrome_raw", syndrome.len() as u64),
-                ("free_raw", free.len() as u64),
-            ],
-        )?;
-        let compressed_bytes = checked_sum(
-            "reader.compressed_frames",
-            &[
-                ("syndrome_frame", syndrome_frame.len() as u64),
-                ("free_frame", free_frame.len() as u64),
-            ],
-        )?;
-        record_reader_live_bytes(&[
+        let transform_scratch_parts = [
+            ("x", transform_scratch_x),
+            ("rhs", transform_scratch_rhs),
+            ("row", transform_scratch_row),
+        ];
+        let transform_scratch = checked_sum("reader.transform_scratch", &transform_scratch_parts)?;
+        let raw_parts = [
+            ("syndrome_raw", syndrome.len() as u64),
+            ("free_raw", free.len() as u64),
+        ];
+        let raw_bytes = checked_sum("reader.raw_codec_buffers", &raw_parts)?;
+        let compressed_parts = [
+            ("syndrome_frame", syndrome_frame.len() as u64),
+            ("free_frame", free_frame.len() as u64),
+        ];
+        let compressed_bytes = checked_sum("reader.compressed_frames", &compressed_parts)?;
+        let reader_live_parts = [
             ("selected", selected_bytes),
             ("free_measurements", free_table_bytes),
             ("decoded_measurements", decoded_measurements),
@@ -218,7 +206,8 @@ impl<R: Read> SampleArchiveReader<R> {
             ("raw_codec_buffers", raw_bytes),
             ("compressed_frames", compressed_bytes),
             ("zstd_state", self.limits.max_zstd_window_bytes),
-        ])?;
+        ];
+        record_reader_live_bytes(&reader_live_parts)?;
         self.next_first_shot = self
             .next_first_shot
             .checked_add(block.shot_count)
@@ -236,12 +225,10 @@ impl<R: Read> SampleArchiveReader<R> {
                 break;
             }
         }
-        let trailer = self.trailer.as_ref().ok_or_else(|| {
-            SampleArchiveError::with_code(
-                SampleArchiveErrorCode::Truncated,
-                "missing archive trailer",
-            )
-        })?;
+        let trailer = self
+            .trailer
+            .as_ref()
+            .expect("finish loop reads archive trailer");
         if trailer.block_count != self.next_block_index {
             return Err(shape("trailer block count does not match decoded blocks"));
         }
@@ -589,9 +576,11 @@ mod tests {
             test_limits(),
         )
         .expect("writer constructs");
-        writer
-            .write_measurements(&measurements)
-            .expect("write measurements");
+        if shots > 0 {
+            writer
+                .write_measurements(&measurements)
+                .expect("write measurements");
+        }
         writer.finish().expect("finish writer")
     }
 
@@ -751,6 +740,13 @@ mod tests {
 
         reader.limits = test_limits();
         let mut bad = block.clone();
+        bad.shot_count = 6;
+        assert_code(
+            reader.validate_block_header(&bad),
+            SampleArchiveErrorCode::ShapeMismatch,
+        );
+
+        let mut bad = block.clone();
         bad.syndrome_codec_id = 999;
         assert_code(
             reader.validate_block_header(&bad),
@@ -810,6 +806,27 @@ mod tests {
         let mut reader = SampleArchiveReader::open(io::Cursor::new(bad), &circuit, test_limits())
             .expect("open reader");
         assert_code(reader.next_block(), SampleArchiveErrorCode::ShapeMismatch);
+    }
+
+    #[test]
+    fn next_block_covers_post_trailer_and_bad_magic_edges() {
+        let zero_circuit = parse("M 0\n");
+        let archive = archive_for(&zero_circuit, 0);
+        let mut reader =
+            SampleArchiveReader::open(io::Cursor::new(&archive), &zero_circuit, test_limits())
+                .expect("open zero-shot reader");
+        assert!(reader.next_block().expect("read trailer").is_none());
+        assert!(reader
+            .next_block()
+            .expect("trailer stays consumed")
+            .is_none());
+
+        let circuit = parse("M 0\n");
+        let mut bad = archive_for(&circuit, 1);
+        bad[GLOBAL_HEADER_LEN..GLOBAL_HEADER_LEN + 8].copy_from_slice(b"BADMAGIC");
+        let mut reader = SampleArchiveReader::open(io::Cursor::new(bad), &circuit, test_limits())
+            .expect("open bad-magic reader");
+        assert_code(reader.next_block(), SampleArchiveErrorCode::BadMagic);
     }
 
     #[test]
