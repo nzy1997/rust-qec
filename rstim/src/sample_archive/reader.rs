@@ -76,6 +76,10 @@ impl<R: Read> SampleArchiveReader<R> {
         })
     }
 
+    pub fn total_shots(&self) -> u64 {
+        self.header.total_shots
+    }
+
     pub fn next_block(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
         if self.trailer.is_some() {
             return Ok(None);

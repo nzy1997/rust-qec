@@ -16,14 +16,15 @@ use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
 use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
-use crate::measurement_transform::{
-    DecodedSampleBlock, MeasurementTransform, MeasurementTransformError,
-};
+#[cfg(test)]
+use crate::measurement_transform::DecodedSampleBlock;
+use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
 use crate::output::{
     write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
     write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
+use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
     format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
     SampleArchiveWriter,
@@ -1045,6 +1046,37 @@ impl PendingOutput {
     }
 }
 
+enum OutputTarget {
+    Stdout(BufWriter<io::Stdout>),
+    File(PendingOutput),
+}
+
+impl OutputTarget {
+    fn create(path: &str, reserved_final_paths: &BTreeSet<PathBuf>) -> Result<Self, String> {
+        if path == "-" {
+            Ok(Self::Stdout(BufWriter::new(io::stdout())))
+        } else {
+            PendingOutput::create(path, reserved_final_paths).map(Self::File)
+        }
+    }
+
+    fn writer(&mut self) -> &mut dyn Write {
+        match self {
+            Self::Stdout(output) => output,
+            Self::File(output) => &mut output.file,
+        }
+    }
+
+    fn publish(&mut self) -> Result<(), String> {
+        match self {
+            Self::Stdout(output) => output
+                .flush()
+                .map_err(|error| format!("failed to flush stdout: {error}")),
+            Self::File(output) => output.publish(),
+        }
+    }
+}
+
 impl Drop for PendingOutput {
     fn drop(&mut self) {
         if !self.published {
@@ -1060,16 +1092,18 @@ fn run_pack_samples(
     input_format: &str,
     output_path: &str,
 ) -> Result<(), String> {
-    let reserved_output_paths =
+    let preflight =
         preflight_pack_samples(circuit_path, shots, input_path, input_format, output_path)?;
 
     let circuit_text = read_rsmp_text(circuit_path)?;
     let circuit = parse_lines(&circuit_text)?;
     let transform = MeasurementTransform::from_circuit(&circuit)
         .map_err(format_transform_error_for_rsmp_cli)?;
-    let data = read_rsmp_bytes(input_path)?;
-    let measurements = read_exact_b8_measurements(&data, transform.num_measurements(), shots)?;
+    let measurement_count = transform.num_measurements();
     let limits = ArchiveLimits::default();
+    let max_chunk_shots = usize::try_from(limits.transform.max_shots_per_block)
+        .map_err(|_| "archive block shot limit exceeds usize".to_string())?;
+    let input = open_rsmp_read(input_path)?;
 
     if output_path == "-" {
         let stdout = io::stdout();
@@ -1082,14 +1116,17 @@ fn run_pack_samples(
             limits,
         )
         .map_err(|error| error.to_string())?;
-        if shots > 0 {
-            writer
-                .write_measurements(&measurements)
-                .map_err(|error| error.to_string())?;
-        }
+        stream_pack_measurements(
+            input,
+            measurement_count,
+            shots,
+            preflight.input_format,
+            max_chunk_shots,
+            &mut writer,
+        )?;
         writer.finish().map_err(|error| error.to_string())?;
     } else {
-        let mut output = PendingOutput::create(output_path, &reserved_output_paths)?;
+        let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)?;
         let mut writer = SampleArchiveWriter::new(
             &mut output.file,
             transform,
@@ -1098,11 +1135,14 @@ fn run_pack_samples(
             limits,
         )
         .map_err(|error| error.to_string())?;
-        if shots > 0 {
-            writer
-                .write_measurements(&measurements)
-                .map_err(|error| error.to_string())?;
-        }
+        stream_pack_measurements(
+            input,
+            measurement_count,
+            shots,
+            preflight.input_format,
+            max_chunk_shots,
+            &mut writer,
+        )?;
         writer.finish().map_err(|error| error.to_string())?;
         output.publish()?;
     }
@@ -1121,7 +1161,7 @@ fn run_unpack_samples(
     obs_out: Option<&str>,
     obs_out_format: &str,
 ) -> Result<(), String> {
-    let reserved_output_paths = preflight_unpack_samples(
+    let preflight = preflight_unpack_samples(
         circuit_path,
         input_path,
         measurements_out,
@@ -1134,22 +1174,17 @@ fn run_unpack_samples(
 
     let circuit_text = read_rsmp_text(circuit_path)?;
     let circuit = parse_lines(&circuit_text)?;
-    let decoded = if input_path == "-" {
-        let stdin = io::stdin();
-        read_sample_archive(stdin.lock(), &circuit)?
-    } else {
-        let input = File::open(input_path)
-            .map_err(|error| format!("failed to read {input_path}: {error}"))?;
-        read_sample_archive(BufReader::new(input), &circuit)?
-    };
+    let input = open_rsmp_read(input_path)?;
+    let reader = SampleArchiveReader::open(input, &circuit, ArchiveLimits::default())
+        .map_err(|error| error.to_string())?;
 
-    write_unpacked_b8_outputs(
-        &decoded,
-        measurements_out,
-        detectors_out,
-        obs_out,
-        &reserved_output_paths,
-    )
+    stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
+}
+
+#[derive(Debug)]
+struct PackSamplesPreflight {
+    reserved_output_paths: BTreeSet<PathBuf>,
+    input_format: OutputFormat,
 }
 
 fn preflight_pack_samples(
@@ -1158,10 +1193,8 @@ fn preflight_pack_samples(
     input_path: &str,
     input_format: &str,
     output_path: &str,
-) -> Result<BTreeSet<PathBuf>, String> {
-    if input_format != "b8" {
-        return Err("pack_samples only supports --in_format b8".to_string());
-    }
+) -> Result<PackSamplesPreflight, String> {
+    let input_format = parse_pack_input_format(input_format)?;
     if [circuit_path, input_path]
         .iter()
         .filter(|path| **path == "-")
@@ -1170,8 +1203,8 @@ fn preflight_pack_samples(
     {
         return Err("pack_samples accepts at most one stdin input".to_string());
     }
-    if shots > ArchiveLimits::default().transform.max_shots_per_block {
-        return Err("pack_samples shot count exceeds archive block limit".to_string());
+    if shots > ArchiveLimits::default().max_total_shots {
+        return Err("pack_samples shot count exceeds archive total-shot limit".to_string());
     }
     if output_path.is_empty() {
         return Err("pack_samples requires --out".to_string());
@@ -1180,30 +1213,127 @@ fn preflight_pack_samples(
     if output_path != "-" {
         final_paths.insert(lexical_absolute_path(output_path)?);
     }
-    Ok(final_paths)
+    Ok(PackSamplesPreflight {
+        reserved_output_paths: final_paths,
+        input_format,
+    })
+}
+
+#[derive(Debug)]
+struct UnpackSamplesPreflight {
+    reserved_output_paths: BTreeSet<PathBuf>,
+    measurements_format: Option<OutputFormat>,
+    detectors_format: Option<OutputFormat>,
+    obs_format: Option<OutputFormat>,
 }
 
 #[allow(clippy::too_many_arguments)]
-#[rustfmt::skip]
-fn preflight_unpack_samples(circuit_path: &str, input_path: &str, measurements_out: Option<&str>, measurements_out_format: &str, detectors_out: Option<&str>, detectors_out_format: &str, obs_out: Option<&str>, obs_out_format: &str) -> Result<BTreeSet<PathBuf>, String> {
-    let outputs = [(measurements_out, measurements_out_format, "--measurements_out_format"), (detectors_out, detectors_out_format, "--detectors_out_format"), (obs_out, obs_out_format, "--obs_out_format")];
-    if outputs.iter().all(|(path, _, _)| path.is_none()) {
+fn preflight_unpack_samples(
+    circuit_path: &str,
+    input_path: &str,
+    measurements_out: Option<&str>,
+    measurements_out_format: &str,
+    detectors_out: Option<&str>,
+    detectors_out_format: &str,
+    obs_out: Option<&str>,
+    obs_out_format: &str,
+) -> Result<UnpackSamplesPreflight, String> {
+    let outputs = [
+        (measurements_out, "--measurements_out"),
+        (detectors_out, "--detectors_out"),
+        (obs_out, "--obs_out"),
+    ];
+    if outputs.iter().all(|(path, _)| path.is_none()) {
         return Err("unpack_samples requires at least one output".to_string());
     }
-    if let Some((_, _, flag)) = outputs.iter().find(|(_, format, _)| *format != "b8") {
-        return Err(format!("unpack_samples only supports {flag} b8"));
-    }
-    if [circuit_path, input_path].iter().filter(|path| **path == "-").count() > 1 {
+    if [circuit_path, input_path]
+        .iter()
+        .filter(|path| **path == "-")
+        .count()
+        > 1
+    {
         return Err("unpack_samples accepts at most one stdin input".to_string());
     }
-    if outputs.iter().filter(|(path, _, _)| *path == Some("-")).count() > 1 {
+    if outputs
+        .iter()
+        .filter(|(path, _)| *path == Some("-"))
+        .count()
+        > 1
+    {
         return Err("unpack_samples accepts at most one stdout output".to_string());
     }
+    let measurements_format = measurements_out
+        .map(|_| {
+            parse_result_output_format(
+                measurements_out_format,
+                ResultOutputKind::Measurements,
+                "--measurements_out_format",
+            )
+        })
+        .transpose()?;
+    let detectors_format = detectors_out
+        .map(|_| {
+            parse_result_output_format(
+                detectors_out_format,
+                ResultOutputKind::Detectors,
+                "--detectors_out_format",
+            )
+        })
+        .transpose()?;
+    let obs_format = obs_out
+        .map(|_| {
+            parse_result_output_format(
+                obs_out_format,
+                ResultOutputKind::Observables,
+                "--obs_out_format",
+            )
+        })
+        .transpose()?;
     let mut final_paths = BTreeSet::new();
-    for (path, _, _) in outputs {
-        if let Some(path) = path.filter(|path| *path != "-") { if !final_paths.insert(lexical_absolute_path(path)?) { return Err("unpack_samples output paths must be distinct".to_string()); } }
+    for (path, _) in outputs {
+        if let Some(path) = path.filter(|path| *path != "-") {
+            if !final_paths.insert(lexical_absolute_path(path)?) {
+                return Err("unpack_samples output paths must be distinct".to_string());
+            }
+        }
     }
-    Ok(final_paths)
+    Ok(UnpackSamplesPreflight {
+        reserved_output_paths: final_paths,
+        measurements_format,
+        detectors_format,
+        obs_format,
+    })
+}
+
+fn parse_pack_input_format(format: &str) -> Result<OutputFormat, String> {
+    match format {
+        "01" => Ok(OutputFormat::Format01),
+        "b8" => Ok(OutputFormat::B8),
+        "ptb64" => Ok(OutputFormat::Ptb64),
+        _ => Err("pack_samples --in_format must be one of 01, b8, ptb64".to_string()),
+    }
+}
+
+fn parse_result_output_format(
+    format: &str,
+    kind: ResultOutputKind,
+    flag: &str,
+) -> Result<OutputFormat, String> {
+    let parsed = OutputFormat::from_str(format).map_err(|_| {
+        if matches!(kind, ResultOutputKind::Detectors) {
+            format!("unpack_samples {flag} must be one of 01, b8, r8, hits, ptb64, dets")
+        } else {
+            format!("unpack_samples {flag} must be one of 01, b8, r8, hits, ptb64")
+        }
+    })?;
+    match (kind, parsed) {
+        (ResultOutputKind::Measurements | ResultOutputKind::Observables, OutputFormat::Dets) => {
+            Err(format!(
+                "unpack_samples {flag} dets is only valid for detector output"
+            ))
+        }
+        _ => Ok(parsed),
+    }
 }
 
 fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
@@ -1248,18 +1378,40 @@ fn read_rsmp_text(path: &str) -> Result<String, String> {
     }
 }
 
-fn read_rsmp_bytes(path: &str) -> Result<Vec<u8>, String> {
+fn open_rsmp_read(path: &str) -> Result<Box<dyn Read>, String> {
     if path == "-" {
-        let mut bytes = Vec::new();
-        io::stdin()
-            .read_to_end(&mut bytes)
-            .map_err(|error| format!("failed to read stdin: {error}"))?;
-        Ok(bytes)
+        Ok(Box::new(BufReader::new(io::stdin())))
     } else {
-        std::fs::read(path).map_err(|error| format!("failed to read {path}: {error}"))
+        let input = File::open(path).map_err(|error| format!("failed to read {path}: {error}"))?;
+        Ok(Box::new(BufReader::new(input)))
     }
 }
 
+fn stream_pack_measurements<W: Write>(
+    input: Box<dyn Read>,
+    measurement_count: usize,
+    shots: u64,
+    input_format: OutputFormat,
+    max_chunk_shots: usize,
+    writer: &mut SampleArchiveWriter<W>,
+) -> Result<(), String> {
+    let mut reader = ResultBlockReader::new(
+        input,
+        measurement_count,
+        shots,
+        input_format,
+        max_chunk_shots,
+    )
+    .map_err(|error| error.to_string())?;
+    while let Some(measurements) = reader.next_block().map_err(|error| error.to_string())? {
+        writer
+            .write_measurements(&measurements)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
 fn read_exact_b8_measurements(data: &[u8], bits: usize, shots: u64) -> Result<BitTable, String> {
     let shots =
         usize::try_from(shots).map_err(|_| "pack_samples shot count exceeds usize".to_string())?;
@@ -1298,6 +1450,7 @@ fn read_exact_b8_measurements(data: &[u8], bits: usize, shots: u64) -> Result<Bi
     Ok(measurements)
 }
 
+#[cfg(test)]
 fn read_sample_archive<R: Read>(
     input: R,
     circuit: &[crate::ir::StimInstr],
@@ -1320,35 +1473,118 @@ fn read_sample_archive<R: Read>(
     }
 }
 
-fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
-    BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
-}
+fn stream_unpack_outputs<R: Read>(
+    mut reader: SampleArchiveReader<R>,
+    measurements_out: Option<&str>,
+    detectors_out: Option<&str>,
+    obs_out: Option<&str>,
+    preflight: UnpackSamplesPreflight,
+) -> Result<(), String> {
+    let limits = ArchiveLimits::default();
+    let total_shots = reader.total_shots();
+    let mut measurements_target = measurements_out
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .transpose()?;
+    let mut detectors_target = detectors_out
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .transpose()?;
+    let mut obs_target = obs_out
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .transpose()?;
 
-#[rustfmt::skip]
-fn write_unpacked_b8_outputs(decoded: &DecodedSampleBlock, measurements_out: Option<&str>, detectors_out: Option<&str>, obs_out: Option<&str>, reserved_final_paths: &BTreeSet<PathBuf>) -> Result<(), String> {
-    let mut pending_outputs = Vec::new();
-    write_or_stage_b8_output(measurements_out, &decoded.measurements, reserved_final_paths, &mut pending_outputs)?;
-    write_or_stage_b8_output(detectors_out, &decoded.detections, reserved_final_paths, &mut pending_outputs)?;
-    write_or_stage_b8_output(obs_out, &decoded.observable_flips, reserved_final_paths, &mut pending_outputs)?;
-    pending_outputs.iter_mut().try_for_each(PendingOutput::publish)?;
-    Ok(())
-}
+    let mut measurements_writer = measurements_target
+        .as_mut()
+        .map(|target| {
+            ResultBlockWriter::new(
+                target.writer(),
+                ResultOutputKind::Measurements,
+                preflight
+                    .measurements_format
+                    .expect("measurement format exists when output is configured"),
+                total_shots,
+                limits,
+            )
+            .map_err(|error| error.to_string())
+        })
+        .transpose()?;
+    let mut detectors_writer = detectors_target
+        .as_mut()
+        .map(|target| {
+            ResultBlockWriter::new(
+                target.writer(),
+                ResultOutputKind::Detectors,
+                preflight
+                    .detectors_format
+                    .expect("detector format exists when output is configured"),
+                total_shots,
+                limits,
+            )
+            .map_err(|error| error.to_string())
+        })
+        .transpose()?;
+    let mut obs_writer = obs_target
+        .as_mut()
+        .map(|target| {
+            ResultBlockWriter::new(
+                target.writer(),
+                ResultOutputKind::Observables,
+                preflight
+                    .obs_format
+                    .expect("observable format exists when output is configured"),
+                total_shots,
+                limits,
+            )
+            .map_err(|error| error.to_string())
+        })
+        .transpose()?;
 
-#[rustfmt::skip]
-fn write_or_stage_b8_output(path: Option<&str>, table: &BitTable, reserved_final_paths: &BTreeSet<PathBuf>, pending_outputs: &mut Vec<PendingOutput>) -> Result<(), String> {
-    let Some(path) = path else { return Ok(()); };
-    if path == "-" {
-        let stdout = io::stdout();
-        let mut output = BufWriter::new(stdout.lock());
-        write_shots_b8(table, &mut output).map_err(|error| format!("write error: {error}"))?;
-        output.flush().map_err(|error| format!("write error: {error}"))?;
-        return Ok(());
+    while let Some(block) = reader.next_block().map_err(|error| error.to_string())? {
+        if let Some(writer) = measurements_writer.as_mut() {
+            writer
+                .write_block(&block)
+                .map_err(|error| error.to_string())?;
+        }
+        if let Some(writer) = detectors_writer.as_mut() {
+            writer
+                .write_block(&block)
+                .map_err(|error| error.to_string())?;
+        }
+        if let Some(writer) = obs_writer.as_mut() {
+            writer
+                .write_block(&block)
+                .map_err(|error| error.to_string())?;
+        }
     }
 
-    let mut output = PendingOutput::create(path, reserved_final_paths)?;
-    write_shots_b8(table, &mut output.file).map_err(|error| format!("write error: {error}"))?;
-    pending_outputs.push(output);
+    reader.finish().map_err(|error| error.to_string())?;
+    if let Some(writer) = measurements_writer.as_mut() {
+        writer.finish().map_err(|error| error.to_string())?;
+    }
+    if let Some(writer) = detectors_writer.as_mut() {
+        writer.finish().map_err(|error| error.to_string())?;
+    }
+    if let Some(writer) = obs_writer.as_mut() {
+        writer.finish().map_err(|error| error.to_string())?;
+    }
+    drop(measurements_writer);
+    drop(detectors_writer);
+    drop(obs_writer);
+
+    if let Some(target) = measurements_target.as_mut() {
+        target.publish()?;
+    }
+    if let Some(target) = detectors_target.as_mut() {
+        target.publish()?;
+    }
+    if let Some(target) = obs_target.as_mut() {
+        target.publish()?;
+    }
     Ok(())
+}
+
+#[cfg(test)]
+fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
+    BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
 }
 
 pub fn make_rng(seed: Option<u64>) -> StdRng {
@@ -2354,19 +2590,20 @@ mod tests {
 
     #[test]
     fn rsmp_preflight_path_and_error_helpers_cover_edge_paths() {
-        let stdout_paths = preflight_pack_samples("circuit.stim", 0, "measurements.b8", "b8", "-")
-            .expect("stdout output is accepted");
-        assert!(stdout_paths.is_empty());
+        let stdout_preflight =
+            preflight_pack_samples("circuit.stim", 0, "measurements.b8", "b8", "-")
+                .expect("stdout output is accepted");
+        assert!(stdout_preflight.reserved_output_paths.is_empty());
 
         let empty_output =
             preflight_pack_samples("circuit.stim", 0, "measurements.b8", "b8", "").unwrap_err();
         assert!(empty_output.contains("requires --out"));
 
-        let limit = ArchiveLimits::default().transform.max_shots_per_block;
+        let limit = ArchiveLimits::default().max_total_shots;
         let over_limit =
             preflight_pack_samples("circuit.stim", limit + 1, "-", "b8", "archive.rsmp")
                 .unwrap_err();
-        assert!(over_limit.contains("shot count exceeds archive block limit"));
+        assert!(over_limit.contains("shot count exceeds archive total-shot limit"));
 
         let relative = lexical_absolute_path("one/../two/output.rsmp").unwrap();
         assert!(relative.ends_with(Path::new("two/output.rsmp")));
