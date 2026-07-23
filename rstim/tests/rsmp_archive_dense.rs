@@ -244,7 +244,7 @@ fn verify_negative_cases() -> usize {
     expect_next_block_error(
         &extra_frame,
         &circuit,
-        SampleArchiveErrorCode::DecompressionFailed,
+        SampleArchiveErrorCode::MalformedArchive,
     );
     cases += 1;
 
@@ -288,7 +288,7 @@ fn verify_negative_cases() -> usize {
     put_u64(
         &mut high_length,
         GLOBAL_HEADER_LEN + 52,
-        limits().max_compressed_bytes_per_stream + 1,
+        limits().max_compressed_bytes_per_frame + 1,
     );
     recompute_archive_digest(&mut high_length);
     expect_next_block_error(
@@ -589,11 +589,13 @@ fn limits() -> ArchiveLimits {
             max_transform_working_bytes: 1 << 20,
             max_block_working_bytes: 1 << 20,
         },
+        max_archive_bytes: 1 << 22,
+        max_block_count: 16,
         max_total_shots: 16,
         max_detector_rank: 64,
         max_free_measurements: 64,
-        max_compressed_bytes_per_stream: 1 << 20,
-        max_decompressed_bytes_per_stream: 1 << 20,
+        max_compressed_bytes_per_frame: 1 << 20,
+        max_decompressed_bytes_per_frame: 1 << 20,
         max_compressed_bytes_per_archive: 1 << 21,
         max_decompressed_bytes_per_archive: 1 << 21,
         max_zstd_window_bytes: 1 << 20,
