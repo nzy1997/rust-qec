@@ -4,32 +4,32 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
-use crate::codegen::NoiseParams;
 use crate::codegen::css::{
-    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
-    parse_css_matrix_json, parse_css_observable_json,
+    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
+    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
 };
+use crate::codegen::NoiseParams;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 #[cfg(test)]
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
 use crate::output::{
-    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
-    write_shots_ptb64, write_shots_r8,
+    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
+    write_shots_r8, OutputFormat,
 };
 use crate::parser::parse_lines;
 use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
-    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
-    format::SampleArchiveErrorCode,
+    format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
+    SampleArchiveWriter,
 };
-use crate::sampler::{SampleOptions, SampleOutputMode, sample_batch, sample_batch_with_options};
+use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
 
 #[derive(Parser)]
@@ -267,6 +267,8 @@ pub enum Commands {
         obs_out: Option<String>,
         #[arg(long = "obs_out_format", default_value = "b8")]
         obs_out_format: String,
+        #[arg(long = "verify_only")]
+        verify_only: bool,
     },
     /// Write one checked Zstandard frame for rsmp evidence diagnostics
     #[command(name = "rsmp_zstd_frame", hide = true)]
@@ -681,6 +683,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             detectors_out_format,
             obs_out,
             obs_out_format,
+            verify_only,
         }) => run_unpack_samples(
             &circuit,
             &r#in,
@@ -690,6 +693,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             &detectors_out_format,
             obs_out.as_deref(),
             &obs_out_format,
+            verify_only,
         ),
         Some(Commands::RsmpZstdFrame { level, r#in, out }) => {
             run_rsmp_zstd_frame(&r#in, &out, level)
@@ -1002,8 +1006,54 @@ pub fn open_output(path: Option<&str>) -> Result<Box<dyn Write>, String> {
 struct PendingOutput {
     final_path: PathBuf,
     temp_path: PathBuf,
-    file: BufWriter<File>,
+    file: Option<BufWriter<File>>,
     published: bool,
+}
+
+trait FilePublisher {
+    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
+}
+
+struct FsPublisher {
+    rename_count: usize,
+    fail_at: Option<usize>,
+}
+
+impl FsPublisher {
+    fn from_env() -> Self {
+        let fail_at = if cfg!(debug_assertions) {
+            std::env::var("RSTIM_TEST_RSMP_FAIL_RENAME_AT")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+        } else {
+            None
+        };
+        Self {
+            rename_count: 0,
+            fail_at,
+        }
+    }
+
+    #[cfg(test)]
+    fn without_injection() -> Self {
+        Self {
+            rename_count: 0,
+            fail_at: None,
+        }
+    }
+}
+
+impl FilePublisher for FsPublisher {
+    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()> {
+        self.rename_count += 1;
+        if self.fail_at == Some(self.rename_count) {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "injected rsmp rename failure",
+            ));
+        }
+        std::fs::rename(from, to)
+    }
 }
 
 impl PendingOutput {
@@ -1030,7 +1080,7 @@ impl PendingOutput {
                     return Ok(Self {
                         final_path,
                         temp_path,
-                        file: BufWriter::new(file),
+                        file: Some(BufWriter::new(file)),
                         published: false,
                     });
                 }
@@ -1050,19 +1100,52 @@ impl PendingOutput {
         ))
     }
 
-    fn publish(&mut self) -> Result<(), String> {
+    fn writer(&mut self) -> &mut dyn Write {
         self.file
-            .flush()
+            .as_mut()
+            .expect("staged output writer is still open")
+    }
+
+    fn finish_staging(&mut self) -> Result<(), String> {
+        let Some(mut file) = self.file.take() else {
+            return Ok(());
+        };
+        file.flush()
             .map_err(|error| format!("failed to flush {}: {error}", self.temp_path.display()))?;
-        std::fs::rename(&self.temp_path, &self.final_path).map_err(|error| {
-            format!(
-                "failed to publish {} to {}: {error}",
-                self.temp_path.display(),
-                self.final_path.display()
-            )
-        })?;
+        file.into_inner()
+            .map_err(|error| {
+                format!(
+                    "failed to close staged output {}: {}",
+                    self.temp_path.display(),
+                    error.error()
+                )
+            })
+            .map(drop)
+    }
+
+    #[cfg(test)]
+    fn publish(&mut self) -> Result<(), String> {
+        let mut publisher = FsPublisher::without_injection();
+        self.publish_with(&mut publisher).map(drop)
+    }
+
+    fn publish_with(&mut self, publisher: &mut impl FilePublisher) -> Result<PathBuf, String> {
+        self.finish_staging()?;
+        publisher
+            .rename(&self.temp_path, &self.final_path)
+            .map_err(|error| {
+                format!(
+                    "failed to publish {} to {}: {error}",
+                    self.temp_path.display(),
+                    self.final_path.display()
+                )
+            })?;
         self.published = true;
-        Ok(())
+        Ok(self.final_path.clone())
+    }
+
+    fn final_path(&self) -> &Path {
+        &self.final_path
     }
 }
 
@@ -1083,16 +1166,33 @@ impl OutputTarget {
     fn writer(&mut self) -> &mut dyn Write {
         match self {
             Self::Stdout(output) => output,
-            Self::File(output) => &mut output.file,
+            Self::File(output) => output.writer(),
         }
     }
 
-    fn publish(&mut self) -> Result<(), String> {
+    fn finish_staging(&mut self) -> Result<(), String> {
         match self {
             Self::Stdout(output) => output
                 .flush()
                 .map_err(|error| format!("failed to flush stdout: {error}")),
-            Self::File(output) => output.publish(),
+            Self::File(output) => output.finish_staging(),
+        }
+    }
+
+    fn publish_file(
+        &mut self,
+        publisher: &mut impl FilePublisher,
+    ) -> Result<Option<PathBuf>, String> {
+        match self {
+            Self::Stdout(_) => Ok(None),
+            Self::File(output) => output.publish_with(publisher).map(Some),
+        }
+    }
+
+    fn final_path(&self) -> Option<&Path> {
+        match self {
+            Self::Stdout(_) => None,
+            Self::File(output) => Some(output.final_path()),
         }
     }
 }
@@ -1100,9 +1200,36 @@ impl OutputTarget {
 impl Drop for PendingOutput {
     fn drop(&mut self) {
         if !self.published {
+            self.file.take();
             let _ = std::fs::remove_file(&self.temp_path);
         }
     }
+}
+
+fn rsmp_io_error(detail: impl AsRef<str>) -> String {
+    format_rsmp_cli_error(SampleArchiveErrorCode::Io, detail.as_ref())
+}
+
+fn rsmp_publish_error(final_path: &Path, published: &[PathBuf], cause: Option<&str>) -> String {
+    let mut detail = format!("failed to publish {}", final_path.display());
+    if let Some(cause) = cause {
+        detail.push_str(": ");
+        detail.push_str(cause);
+    }
+    if !published.is_empty() {
+        let already = published
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        detail.push_str("; already published: ");
+        detail.push_str(&already);
+    }
+    rsmp_io_error(detail)
+}
+
+fn fail_pack_finish_is_injected() -> bool {
+    cfg!(debug_assertions) && std::env::var_os("RSTIM_TEST_RSMP_FAIL_PACK_FINISH").is_some()
 }
 
 fn run_pack_samples(
@@ -1148,9 +1275,10 @@ fn run_pack_samples(
             .finish()
             .map_err(format_sample_archive_error_for_rsmp_cli)?;
     } else {
-        let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)?;
+        let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)
+            .map_err(rsmp_io_error)?;
         let mut writer = SampleArchiveWriter::new(
-            &mut output.file,
+            output.writer(),
             transform,
             shots,
             SampleArchiveOptions::default(),
@@ -1165,10 +1293,18 @@ fn run_pack_samples(
             max_chunk_shots,
             &mut writer,
         )?;
+        if fail_pack_finish_is_injected() {
+            return Err(rsmp_io_error("archive finalization failed"));
+        }
         writer
             .finish()
             .map_err(format_sample_archive_error_for_rsmp_cli)?;
-        output.publish()?;
+        output.finish_staging().map_err(rsmp_io_error)?;
+        let mut publisher = FsPublisher::from_env();
+        let final_path = output.final_path().to_path_buf();
+        output
+            .publish_with(&mut publisher)
+            .map_err(|error| rsmp_publish_error(&final_path, &[], Some(&error)))?;
     }
 
     Ok(())
@@ -1184,6 +1320,7 @@ fn run_unpack_samples(
     detectors_out_format: &str,
     obs_out: Option<&str>,
     obs_out_format: &str,
+    verify_only: bool,
 ) -> Result<(), String> {
     let preflight = preflight_unpack_samples(
         circuit_path,
@@ -1194,6 +1331,7 @@ fn run_unpack_samples(
         detectors_out_format,
         obs_out,
         obs_out_format,
+        verify_only,
     )?;
 
     let circuit_text = read_rsmp_text(circuit_path)?;
@@ -1203,7 +1341,11 @@ fn run_unpack_samples(
     let reader = SampleArchiveReader::open(input, &circuit, ArchiveLimits::default())
         .map_err(format_sample_archive_error_for_rsmp_cli)?;
 
-    stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
+    if preflight.verify_only {
+        verify_unpack_archive(reader)
+    } else {
+        stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
+    }
 }
 
 fn run_rsmp_zstd_frame(input_path: &str, output_path: &str, level: i32) -> Result<(), String> {
@@ -1261,6 +1403,8 @@ fn preflight_pack_samples(
     output_path: &str,
 ) -> Result<PackSamplesPreflight, String> {
     let input_format = parse_pack_input_format(input_format)?;
+    let cwd = std::env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
     if [circuit_path, input_path]
         .iter()
         .filter(|path| **path == "-")
@@ -1275,9 +1419,14 @@ fn preflight_pack_samples(
     if output_path.is_empty() {
         return Err("pack_samples requires --out".to_string());
     }
+    let input_paths = normalized_input_paths(&[circuit_path, input_path], &cwd)?;
     let mut final_paths = BTreeSet::new();
     if output_path != "-" {
-        final_paths.insert(lexical_absolute_path(output_path)?);
+        let output_path = lexical_absolute_path_with_cwd(Path::new(output_path), &cwd)?;
+        if input_paths.contains(&output_path) {
+            return Err("pack_samples output path must differ from input paths".to_string());
+        }
+        final_paths.insert(output_path);
     }
     Ok(PackSamplesPreflight {
         reserved_output_paths: final_paths,
@@ -1291,6 +1440,7 @@ struct UnpackSamplesPreflight {
     measurements_format: Option<OutputFormat>,
     detectors_format: Option<OutputFormat>,
     obs_format: Option<OutputFormat>,
+    verify_only: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1303,13 +1453,21 @@ fn preflight_unpack_samples(
     detectors_out_format: &str,
     obs_out: Option<&str>,
     obs_out_format: &str,
+    verify_only: bool,
 ) -> Result<UnpackSamplesPreflight, String> {
     let outputs = [
         (measurements_out, "--measurements_out"),
         (detectors_out, "--detectors_out"),
         (obs_out, "--obs_out"),
     ];
-    if outputs.iter().all(|(path, _)| path.is_none()) {
+    let cwd = std::env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
+    if verify_only && outputs.iter().any(|(path, _)| path.is_some()) {
+        return Err(
+            "unpack_samples --verify_only cannot be combined with result outputs".to_string(),
+        );
+    }
+    if !verify_only && outputs.iter().all(|(path, _)| path.is_none()) {
         return Err("unpack_samples requires at least one output".to_string());
     }
     if [circuit_path, input_path]
@@ -1356,10 +1514,15 @@ fn preflight_unpack_samples(
         })
         .transpose()?;
     let mut final_paths = BTreeSet::new();
+    let input_paths = normalized_input_paths(&[circuit_path, input_path], &cwd)?;
     for (path, _) in outputs {
         if let Some(path) = path.filter(|path| *path != "-") {
-            if !final_paths.insert(lexical_absolute_path(path)?) {
+            let normalized = lexical_absolute_path_with_cwd(Path::new(path), &cwd)?;
+            if !final_paths.insert(normalized.clone()) {
                 return Err("unpack_samples output paths must be distinct".to_string());
+            }
+            if input_paths.contains(&normalized) {
+                return Err("unpack_samples output path must differ from input paths".to_string());
             }
         }
     }
@@ -1368,6 +1531,7 @@ fn preflight_unpack_samples(
         measurements_format,
         detectors_format,
         obs_format,
+        verify_only,
     })
 }
 
@@ -1402,21 +1566,42 @@ fn parse_result_output_format(
     }
 }
 
+#[cfg(test)]
 fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
     lexical_absolute_path_from_path(Path::new(path))
 }
 
 #[rustfmt::skip]
 fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
-    let absolute = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().map_err(|error| format!("failed to resolve output path: {error}"))?.join(path) };
+    let cwd = std::env::current_dir().map_err(|error| format!("failed to resolve current directory: {error}"))?;
+    lexical_absolute_path_with_cwd(path, &cwd)
+}
+
+fn lexical_absolute_path_with_cwd(path: &Path, cwd: &Path) -> Result<PathBuf, String> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        cwd.join(path)
+    };
     let mut normalized = PathBuf::new();
     for component in absolute.components() {
         match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
             Component::ParentDir => {
                 normalized.pop();
             }
-            other => normalized.push(other.as_os_str()),
+            Component::Normal(name) => normalized.push(name),
         }
+    }
+    Ok(normalized)
+}
+
+fn normalized_input_paths(paths: &[&str], cwd: &Path) -> Result<BTreeSet<PathBuf>, String> {
+    let mut normalized = BTreeSet::new();
+    for path in paths.iter().copied().filter(|path| *path != "-") {
+        normalized.insert(lexical_absolute_path_with_cwd(Path::new(path), cwd)?);
     }
     Ok(normalized)
 }
@@ -1548,6 +1733,33 @@ fn read_sample_archive<R: Read>(
     }
 }
 
+fn verify_unpack_archive<R: Read>(reader: SampleArchiveReader<R>) -> Result<(), String> {
+    let summary = reader
+        .finish()
+        .map_err(format_sample_archive_error_for_rsmp_cli)?;
+    println!(
+        "PASS rsmp version={}.{} shots={} blocks={} M={} D={} L={} circuit={}",
+        summary.format_major,
+        summary.format_minor,
+        summary.total_shots,
+        summary.block_count,
+        summary.measurement_count,
+        summary.detector_count,
+        summary.observable_count,
+        hex_prefix(&summary.circuit_sha256, 12)
+    );
+    Ok(())
+}
+
+fn hex_prefix(bytes: &[u8], hex_chars: usize) -> String {
+    let mut output = String::new();
+    for byte in bytes.iter().take(hex_chars.div_ceil(2)) {
+        output.push_str(&format!("{byte:02x}"));
+    }
+    output.truncate(hex_chars);
+    output
+}
+
 fn stream_unpack_outputs<R: Read>(
     mut reader: SampleArchiveReader<R>,
     measurements_out: Option<&str>,
@@ -1558,13 +1770,19 @@ fn stream_unpack_outputs<R: Read>(
     let limits = ArchiveLimits::default();
     let total_shots = reader.total_shots();
     let mut measurements_target = measurements_out
-        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .map(|path| {
+            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
+        })
         .transpose()?;
     let mut detectors_target = detectors_out
-        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .map(|path| {
+            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
+        })
         .transpose()?;
     let mut obs_target = obs_out
-        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
+        .map(|path| {
+            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
+        })
         .transpose()?;
 
     let mut measurements_writer = measurements_target
@@ -1650,16 +1868,45 @@ fn stream_unpack_outputs<R: Read>(
     drop(detectors_writer);
     drop(obs_writer);
 
-    if let Some(target) = measurements_target.as_mut() {
-        target.publish()?;
-    }
-    if let Some(target) = detectors_target.as_mut() {
-        target.publish()?;
-    }
-    if let Some(target) = obs_target.as_mut() {
-        target.publish()?;
+    finish_configured_target(&mut measurements_target)?;
+    finish_configured_target(&mut detectors_target)?;
+    finish_configured_target(&mut obs_target)?;
+
+    let mut publisher = FsPublisher::from_env();
+    let mut published = Vec::new();
+    publish_configured_target(&mut measurements_target, &mut publisher, &mut published)?;
+    publish_configured_target(&mut detectors_target, &mut publisher, &mut published)?;
+    publish_configured_target(&mut obs_target, &mut publisher, &mut published)?;
+    Ok(())
+}
+
+fn finish_configured_target(target: &mut Option<OutputTarget>) -> Result<(), String> {
+    if let Some(target) = target.as_mut() {
+        target.finish_staging().map_err(rsmp_io_error)?;
     }
     Ok(())
+}
+
+fn publish_configured_target(
+    target: &mut Option<OutputTarget>,
+    publisher: &mut impl FilePublisher,
+    published: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    let Some(target) = target.as_mut() else {
+        return Ok(());
+    };
+    let final_path = target.final_path().map(Path::to_path_buf);
+    match target.publish_file(publisher) {
+        Ok(Some(path)) => {
+            published.push(path);
+            Ok(())
+        }
+        Ok(None) => Ok(()),
+        Err(error) => match final_path {
+            Some(path) => Err(rsmp_publish_error(&path, published, Some(&error))),
+            None => Err(rsmp_io_error("failed to publish stdout")),
+        },
+    }
 }
 
 #[cfg(test)]
@@ -3109,11 +3356,9 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(
-            std::fs::read_to_string(gate_out_dir.join("summary.json"))
-                .unwrap()
-                .contains("\"cases\"")
-        );
+        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
+            .unwrap()
+            .contains("\"cases\""));
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -3330,11 +3575,9 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(
-                generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                    .unwrap()
-                    .contains("QUBIT_COORDS")
-            );
+            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                .unwrap()
+                .contains("QUBIT_COORDS"));
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)

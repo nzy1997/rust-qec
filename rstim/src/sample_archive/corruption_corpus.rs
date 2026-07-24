@@ -53,6 +53,15 @@ pub struct CorruptionCaseResult {
     pub message: Option<String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct MaterializedCorruption {
+    pub id: String,
+    pub expected_error: String,
+    pub archive: Vec<u8>,
+    pub circuit_text: Option<String>,
+    pub limits: ArchiveLimits,
+}
+
 #[derive(Debug)]
 struct Fixture {
     archive: Vec<u8>,
@@ -273,6 +282,31 @@ pub fn run_corruption_corpus(
         panics,
         timeouts,
         results,
+    })
+}
+
+pub fn materialize_named_corruption(
+    catalog_path: &Path,
+    fixture_manifest_path: &Path,
+    id: &str,
+) -> Result<MaterializedCorruption, String> {
+    let repo_root = repo_root_from_manifest(fixture_manifest_path)?;
+    let manifest = load_manifest(fixture_manifest_path)?;
+    let catalog = load_catalog(catalog_path)?;
+    let fixture = load_fixture(&repo_root, &manifest)?;
+    let recipe = catalog
+        .corruption_recipes
+        .iter()
+        .find(|recipe| recipe.id == id)
+        .ok_or_else(|| format!("unknown corruption recipe {id}"))?;
+    let expected_error = recipe_expected_error(recipe)?;
+    let input = materialize_recipe(recipe, &fixture.archive)?;
+    Ok(MaterializedCorruption {
+        id: recipe.id.clone(),
+        expected_error,
+        archive: input.archive,
+        circuit_text: input.circuit_text.map(str::to_string),
+        limits: input.limits,
     })
 }
 
