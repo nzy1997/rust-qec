@@ -730,6 +730,153 @@ pre code {
   color: #6f1d1d;
 }
 
+.rsmp-hero {
+  max-width: 1120px;
+}
+
+.rsmp-hero-grid,
+.rsmp-principles,
+.rsmp-command-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.rsmp-metric,
+.rsmp-case,
+.rsmp-caveat {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.rsmp-metric.primary {
+  border-color: rgba(27, 111, 122, 0.42);
+}
+
+.rsmp-metric span,
+.rsmp-metric small,
+.rsmp-case small {
+  display: block;
+  color: var(--muted);
+}
+
+.rsmp-metric strong {
+  display: block;
+  margin: 0.35rem 0 0.1rem;
+  color: var(--accent-dark);
+  font-size: 4.4rem;
+  line-height: 0.95;
+}
+
+.rsmp-case p {
+  margin: 0.7rem 0 0.2rem;
+  font-weight: 700;
+}
+
+.badge.measured {
+  border-color: rgba(27, 111, 122, 0.28);
+  background: #edf7f6;
+  color: var(--accent-dark);
+}
+
+.badge.caveat {
+  border-color: #efc099;
+  background: #fff6ee;
+  color: #7a3b0f;
+}
+
+.rsmp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rsmp-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.rsmp-pipeline span {
+  min-height: 7.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.rsmp-command-grid {
+  grid-template-columns: 1fr;
+}
+
+.rsmp-command-grid .compact-card {
+  overflow: hidden;
+}
+
+.rsmp-command-grid h3 {
+  margin-bottom: 0.85rem;
+}
+
+.rsmp-bars {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.rsmp-bar-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.rsmp-bar-row strong,
+.rsmp-bar-row span {
+  display: block;
+}
+
+.rsmp-bar-row span {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.rsmp-bar-row meter {
+  width: 100%;
+  height: 1.4rem;
+}
+
+.rsmp-caveat p {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+}
+
+.rsmp-share {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.rsmp-share img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .site-footer {
   display: flex;
   justify-content: space-between;
@@ -766,6 +913,10 @@ pre code {
   .evidence-grid,
   .intro-grid,
   .example-grid,
+  .rsmp-hero-grid,
+  .rsmp-principles,
+  .rsmp-pipeline,
+  .rsmp-bar-row,
   .tier-grid,
   .evidence-policy-grid,
   .benchmark-manifest,

@@ -52,6 +52,30 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertIn("not_recorded", output)
         self.assertIn("checked artifact hashes", output)
 
+    def test_valid_fixture_includes_rsmp_showcase_pages_contract(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+
+        index = (fixture.site_root / "index.html").read_text(encoding="utf-8")
+        showcase = (fixture.site_root / "rsmp-v1-showcase/index.html").read_text(encoding="utf-8")
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        summary = check_site_build.format_summary(results)
+
+        self.assertNotIn("FAIL", summary)
+        self.assertIn('href="rsmp-v1-showcase/"', index)
+        for marker in [
+            "RSMP v1",
+            "11.98%",
+            "57.14%",
+            "pack_samples",
+            "unpack_samples",
+            "Projected",
+            "requires the original circuit, not a DEM",
+            "Sweep-bit circuits are unsupported",
+            "non-hermetic checker behavior",
+        ]:
+            self.assertIn(marker, showcase)
+
     def test_rejects_missing_qp101_schema(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
