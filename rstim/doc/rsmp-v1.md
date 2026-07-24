@@ -1,10 +1,32 @@
 # RSMP v1 Binary Envelope
 
-This document is normative for the RSMP v1 structural envelope. All integers
-are unsigned little-endian. The structural layer does not compress streams,
-derive transforms, calculate digests, or parse archive state.
+This document is normative for the RSMP v1 archive format. RSMP stores result
+sample measurements together with the circuit identity needed to recover
+detectors and observables. v1 is a circuit-bound archive format, not a
+standalone detector-error-model sample format.
 
-## Fixed records
+## Circuit-Derived Lossless Transform
+
+The v1 transform is lossless because it is derived from the original circuit,
+the circuit's noiseless reference sample, and the exact detector/observable
+linear relations over measurement bits. For each shot, the encoder maps the
+measurement vector into selected-detector bits plus free-measurement bits. The
+selected-detector part has rank equal to the detector matrix rank; the
+free-measurement part carries the remaining independent measurement columns.
+
+Given the same original circuit, the decoder rebuilds the same transform,
+checks the circuit SHA-256 identity, recombines selected-detector and
+free-measurement coordinates, and applies the noiseless reference to reconstruct
+the original measurement bits. That map is invertible for the circuit and shape
+recorded in the header: no measurement bit is dropped, and detector and
+observable outputs are recomputed from the reconstructed measurements.
+
+## Binary Fields and Canonical Encoding
+
+All fixed-width integers are unsigned little-endian. Bit-packed result streams
+use LSB-first bit order within each byte. Sparse syndrome payload counts and
+index deltas use canonical ULEB128: overlong encodings are malformed. Unused
+padding bits in dense final bytes must be zero padding.
 
 | Global header field | Offset | Width |
 |---|---:|---:|
@@ -64,8 +86,6 @@ The block header is exactly 108 bytes.
 
 The archive trailer is exactly 64 bytes.
 
-## Compatibility and canonical structure
-
 The magic values are `RSTMSMP\0`, `RSMPBLK\0`, and `RSMPEND\0`. v1 readers
 accept only major 1, minor 0. A nonzero `required_flags` value is
 `RSMP_UNSUPPORTED_FEATURE`; v1.0 has no defined optional flags, so a nonzero
@@ -84,14 +104,127 @@ An archive for zero shots is exactly a global header followed by a trailer,
 with both trailer counts zero and no block magic between them. Empty-dimension
 streams in nonempty blocks use the canonical empty-stream representation above.
 
-## Digest coverage
-
 `header_sha256` covers global-header bytes `[0, 120)`. The block logical digest
 covers canonical uncompressed dense selected-detector bytes followed by dense
 free-measurement bytes. `archive_sha256` covers the complete global header,
 all complete block bytes, and the trailer prefix `[0, 32)`.
 
-## Known byte vectors
+## Support Boundaries
+
+The original circuit is required for unpack and verify-only validation. The
+archive stores a circuit identity digest and shape, but it does not store the
+circuit text or a DEM that can replace the circuit. DEM-only input is
+unsupported for pack, unpack, and verify-only.
+
+Sweep-bit circuits are unsupported in v1 and must fail with `RSMP_UNSUPPORTED_SWEEP` before archive bytes are produced or trusted.
+
+RSMP v1 has sequential access only and no random shot access. A reader consumes
+blocks in order, validates the trailer at end of stream, and exposes no index
+that can seek directly to an arbitrary shot.
+
+## Integrity, Authentication, and Access Model
+
+RSMP v1 checks archive integrity but archives are not authenticated. The
+`header_sha256`, per-block `logical_payload_sha256`, Zstandard frame checksums,
+and final `archive_sha256` detect accidental or adversarial byte changes within
+their hash coverage, including the logical payload reconstructed from selected
+detector and free measurement streams. They do not prove who produced an
+archive, bind an external identity, or replace a signature/MAC layer.
+
+A reader may return already-verified earlier blocks before a late trailer or
+trailing-data failure is discovered. Callers that need whole-archive acceptance
+must read through end of stream and finish the reader.
+
+## Resource Limits and Validation Precedence
+
+Resource limits are checked before allocations or decompression work that would
+exceed those limits. The v1 defaults bound total shots, block shots, archive
+bytes, stream lengths, transform dimensions, and logical block working sets.
+Limit failures use `RSMP_LIMIT_EXCEEDED`.
+
+Validation precedence is stable at the public error-code level. Readers check
+fixed record shape, magic/version/feature support, reserved fields, canonical
+integer and padding rules, circuit identity, shape agreement, declared lengths,
+decompression, logical digest, archive digest, trailer consistency, and trailing
+data in that order when the corresponding bytes are available. I/O failures are
+reported as `RSMP_IO`.
+
+## Stable Error Taxonomy
+
+The public codes are:
+
+- `RSMP_BAD_MAGIC`
+- `RSMP_UNSUPPORTED_VERSION`
+- `RSMP_UNSUPPORTED_FEATURE`
+- `RSMP_UNSUPPORTED_SWEEP`
+- `RSMP_CIRCUIT_MISMATCH`
+- `RSMP_SHAPE_MISMATCH`
+- `RSMP_LIMIT_EXCEEDED`
+- `RSMP_TRUNCATED`
+- `RSMP_MALFORMED_ARCHIVE`
+- `RSMP_DECOMPRESSION_FAILED`
+- `RSMP_CHECKSUM_MISMATCH`
+- `RSMP_LOGICAL_DIGEST_MISMATCH`
+- `RSMP_TRAILING_DATA`
+- `RSMP_IO`
+
+Structural parsing maps a bad magic to `RSMP_BAD_MAGIC`, a non-v1.0 version to
+`RSMP_UNSUPPORTED_VERSION`, unknown required features or unknown global v1
+identifiers to `RSMP_UNSUPPORTED_FEATURE`, unsupported sweep circuits to
+`RSMP_UNSUPPORTED_SWEEP`, a mismatched circuit digest to
+`RSMP_CIRCUIT_MISMATCH`, shape disagreement to `RSMP_SHAPE_MISMATCH`, short
+records or streams to `RSMP_TRUNCATED`, reserved fields, canonical stream
+encodings, header lengths, parsed shot ranges, block ordering, padding, or
+declared-length arithmetic to `RSMP_MALFORMED_ARCHIVE`, Zstandard failures to
+`RSMP_DECOMPRESSION_FAILED`, archive/header checksum failures to
+`RSMP_CHECKSUM_MISMATCH`, logical payload digest failures to
+`RSMP_LOGICAL_DIGEST_MISMATCH`, bytes after a valid trailer to
+`RSMP_TRAILING_DATA`, and filesystem/stdin/stdout failures to `RSMP_IO`.
+
+## Compatibility Fixture Policy
+
+The immutable v1 reader fixture is
+`rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp`, described by
+`rstim/tests/fixtures/rsmp/v1/manifest.toml` and cataloged as
+`compat_v1_two_block_sparse_dense`. It contains one fixture, two blocks, and
+the syndrome codecs `sparse` and `dense`.
+
+The policy is immutable/additive. Existing compatibility fixture bytes,
+manifest hashes, and catalog identity fields are not rewritten after
+publication. Future compatibility coverage must add new fixtures or new
+manifest entries instead of mutating this specimen.
+
+## Compression Evidence and Claim Limits
+
+Committed compression evidence lives under
+`benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/`. The checked gate names
+are `benchmark_raw_lt_20pct`, `benchmark_zstd_lt_75pct`, and
+`high_entropy_raw_le_102pct`; their arithmetic is integer cross-multiplication
+over recorded byte counts.
+
+The evidence checker is:
+
+```console
+python3 tools/check_rsmp_v1_compression_evidence.py \
+  --results-dir benchmarks/rstim_vs_stim_simulator/results/rsmp-v1
+```
+
+The reproduction command for regenerating the evidence remains separate from
+readiness:
+
+```console
+python3 -m benchmarks.rstim_vs_stim_simulator.run_rsmp_compression \
+  --results-dir benchmarks/rstim_vs_stim_simulator/results/rsmp-v1
+```
+
+The recorded environment includes producer identity, Git state, Rust target,
+Cargo.lock hash, zstd crate versions, native zstd version, full command argv,
+and artifact SHA-256 values. These gates prove only the pinned `rsmp v1`
+evidence cases under that recorded producer and zstd contract. No fixed
+wall-clock performance gate, cross-version byte-for-byte writer determinism,
+or broader compression claim is made. No fixed wall-clock performance gate is part of readiness.
+
+## Known Byte Vectors
 
 ```text
 GLOBAL_VECTOR = [
@@ -124,22 +257,3 @@ TRAILER_VECTOR = [
 90 91 92 93 94 95 96 97 98 99 9a 9b 9c 9d 9e 9f
 ]
 ```
-
-## Error taxonomy
-
-The public codes are `RSMP_BAD_MAGIC`, `RSMP_UNSUPPORTED_VERSION`,
-`RSMP_UNSUPPORTED_FEATURE`, `RSMP_UNSUPPORTED_SWEEP`,
-`RSMP_CIRCUIT_MISMATCH`, `RSMP_SHAPE_MISMATCH`, `RSMP_LIMIT_EXCEEDED`,
-`RSMP_TRUNCATED`, `RSMP_MALFORMED_ARCHIVE`, `RSMP_DECOMPRESSION_FAILED`,
-`RSMP_CHECKSUM_MISMATCH`, `RSMP_LOGICAL_DIGEST_MISMATCH`,
-`RSMP_TRAILING_DATA`, and `RSMP_IO`.
-
-Structural parsing maps a bad magic to `RSMP_BAD_MAGIC`, a non-v1.0 version to
-`RSMP_UNSUPPORTED_VERSION`, unknown required features to
-`RSMP_UNSUPPORTED_FEATURE`, unknown global v1 identifiers to
-`RSMP_UNSUPPORTED_FEATURE`, a short record to `RSMP_TRUNCATED`, and reserved
-fields, canonical stream encodings, header lengths, parsed shot ranges, or
-parsed declared-length arithmetic to `RSMP_MALFORMED_ARCHIVE`.
-Public checked size helpers map caller-supplied representability overflow to
-`RSMP_LIMIT_EXCEEDED`. Digest, compression, and archive-state validation are
-owned by later archive layers.
