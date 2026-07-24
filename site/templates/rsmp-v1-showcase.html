@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}RSMP v1 Showcase — rstim{% endblock title %}
+{% block description %}RSMP v1 is a lossless circuit-bound sample archive for QEC measurements, with pinned compression evidence and large-scale projections.{% endblock description %}
+
+{% block hero %}
+<div class="hero rsmp-hero">
+  <p class="eyebrow">Lossless circuit-bound sample archives</p>
+  <h1>RSMP v1</h1>
+  <p class="hero-copy">
+    Store every measurement needed for decoding, compress the sparse detector
+    structure, and recover detector and observable results with the original
+    circuit.
+  </p>
+  <div class="rsmp-hero-grid" aria-label="Pinned RSMP compression result">
+    <article class="rsmp-metric primary">
+      <span>Measured RSMP size</span>
+      <strong>11.98%</strong>
+      <small>of raw <code>b8</code></small>
+    </article>
+    <article class="rsmp-metric">
+      <span>Measured against Zstandard</span>
+      <strong>57.14%</strong>
+      <small>of direct Zstd</small>
+    </article>
+    <article class="rsmp-case">
+      <span class="badge measured">Measured</span>
+      <p>surface-code d=11, rounds=100</p>
+      <small>1,024 shots · M=12,121 · D=12,000 · L=1</small>
+    </article>
+  </div>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="rsmp-overview" class="rsmp-section" aria-labelledby="rsmp-overview-title">
+  <div class="section-heading">
+    <p class="eyebrow">What it preserves</p>
+    <h2 id="rsmp-overview-title">Measurements first. Decoder data on demand.</h2>
+    <p class="section-copy">
+      RSMP v1 archives every measurement result needed to reconstruct a sample.
+      During unpack, <code>rstim</code> rebuilds the circuit-derived transform,
+      recovers measurements losslessly, and derives all detector and observable
+      outputs from the supplied circuit.
+    </p>
+  </div>
+  <div class="rsmp-principles">
+    <article class="compact-card">
+      <h3>Lossless measurements</h3>
+      <p>No measurement bit is dropped. The archive stores enough independent
+      coordinates to reconstruct the original measurement stream.</p>
+    </article>
+    <article class="compact-card">
+      <h3>Circuit-bound decode</h3>
+      <p>Unpack and verify require the original circuit, not a DEM. The archive
+      stores a circuit identity digest and transform dimensions, not a circuit
+      replacement.</p>
+    </article>
+    <article class="compact-card">
+      <h3>Explicit v1 limits</h3>
+      <p>Sweep-bit circuits are unsupported. Archives are sequential and do not
+      provide random shot access.</p>
+    </article>
+  </div>
+</section>
+
+<section id="rsmp-transform" class="rsmp-section" aria-labelledby="rsmp-transform-title">
+  <div class="section-heading">
+    <p class="eyebrow">Why circuit knowledge helps</p>
+    <h2 id="rsmp-transform-title">The reversible transform separates sparse syndromes from free coordinates.</h2>
+  </div>
+  <div class="rsmp-pipeline" aria-label="RSMP transform pipeline">
+    <span>measurements</span>
+    <span>XOR noiseless reference</span>
+    <span>detectors + free coordinates</span>
+    <span>dense or sparse syndrome codec</span>
+    <span>independent Zstandard frames</span>
+  </div>
+  <p class="section-copy">
+    The decoder rebuilds the same selected-detector/free-measurement transform
+    from the circuit, recombines those coordinates, and applies the noiseless
+    reference to recover measurements before deriving detectors and logical
+    observables.
+  </p>
+</section>
+
+<section id="rsmp-workflow" class="rsmp-section" aria-labelledby="rsmp-workflow-title">
+  <div class="section-heading">
+    <p class="eyebrow">Real CLI workflow</p>
+    <h2 id="rsmp-workflow-title">Sample, pack, verify, unpack.</h2>
+    <p class="section-copy">
+      The four-shot compatibility case below is a mechanics demonstration. It
+      is too small to be compression evidence because fixed archive envelope
+      overhead dominates tiny inputs.
+    </p>
+  </div>
+  <div class="rsmp-command-grid">
+    <article class="compact-card">
+      <h3>Pack measurements</h3>
+      <pre><code>cargo run --locked -p rstim --bin rstim -- pack_samples \
+  --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
+  --shots 4 \
+  --in rstim/tests/fixtures/rsmp/v1/compat-measurements.b8 \
+  --in_format b8 \
+  --out /tmp/compat.rsmp</code></pre>
+    </article>
+    <article class="compact-card">
+      <h3>Verify without outputs</h3>
+      <pre><code>cargo run --locked -p rstim --bin rstim -- unpack_samples \
+  --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
+  --in /tmp/compat.rsmp \
+  --verify_only</code></pre>
+    </article>
+    <article class="compact-card">
+      <h3>Recover decoder inputs</h3>
+      <pre><code>cargo run --locked -p rstim --bin rstim -- unpack_samples \
+  --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
+  --in /tmp/compat.rsmp \
+  --measurements_out /tmp/measurements.b8 \
+  --measurements_out_format b8 \
+  --detectors_out /tmp/detectors.01 \
+  --detectors_out_format 01 \
+  --obs_out /tmp/observables.01 \
+  --obs_out_format 01</code></pre>
+    </article>
+  </div>
+</section>
+
+<section id="rsmp-compression" class="rsmp-section" aria-labelledby="rsmp-compression-title">
+  <div class="section-heading">
+    <p class="eyebrow">Measured compression</p>
+    <h2 id="rsmp-compression-title">The pinned d=11/r=100 case compresses to 11.98% of raw <code>b8</code>.</h2>
+    <p class="section-copy">
+      RSMP uses 186,028 bytes for the pinned surface-code sample set, compared
+      with 1,552,384 bytes of raw <code>b8</code> and 325,565 bytes after
+      applying Zstandard directly to raw samples.
+    </p>
+  </div>
+  <div class="rsmp-bars" aria-label="Measured byte comparison">
+    <div class="rsmp-bar-row">
+      <div><strong>Raw b8</strong><span>1,552,384 B · 100.00%</span></div>
+      <meter min="0" max="100" value="100">100.00%</meter>
+    </div>
+    <div class="rsmp-bar-row">
+      <div><strong>Direct Zstandard</strong><span>325,565 B · 20.97%</span></div>
+      <meter min="0" max="100" value="20.97">20.97%</meter>
+    </div>
+    <div class="rsmp-bar-row">
+      <div><strong>RSMP v1</strong><span>186,028 B · 11.98%</span></div>
+      <meter min="0" max="100" value="11.98">11.98%</meter>
+    </div>
+  </div>
+  <div class="rsmp-principles">
+    <article class="compact-card">
+      <h3>88.02% saved vs raw</h3>
+      <p>Measured on the pinned 1,024-shot surface-code case.</p>
+    </article>
+    <article class="compact-card">
+      <h3>42.86% saved vs direct Zstd</h3>
+      <p>RSMP is compared against direct Zstandard on raw <code>b8</code>, not
+      against an uncompressed text format.</p>
+    </article>
+    <article class="compact-card">
+      <h3>High-entropy control</h3>
+      <p>RSMP is 1,049,064 B for a 1,048,576 B high-entropy raw input:
+      100.0465% of raw. This demonstrates bounded overhead, not compression.</p>
+    </article>
+  </div>
+</section>
+
+<section id="rsmp-scale" class="rsmp-section" aria-labelledby="rsmp-scale-title">
+  <div class="section-heading">
+    <p class="eyebrow">Projected</p>
+    <h2 id="rsmp-scale-title">Large-scale estimates from the same 1,024-shot observation.</h2>
+    <p class="section-copy">
+      These values are linear projections, not large-scale measurements or
+      runtime guarantees. Timing includes process startup, circuit parsing,
+      transform construction, and file I/O in the recorded observation.
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Shots</th>
+          <th>Raw b8</th>
+          <th>Direct Zstd</th>
+          <th>RSMP v1</th>
+          <th>Serial pack</th>
+          <th>Serial unpack</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1,000,000</td>
+          <td>1.516 GB</td>
+          <td>317.935 MB</td>
+          <td>181.668 MB</td>
+          <td>1m 38s</td>
+          <td>41s</td>
+        </tr>
+        <tr>
+          <td>100,000,000</td>
+          <td>151.600 GB</td>
+          <td>31.793 GB</td>
+          <td>18.167 GB</td>
+          <td>2h 44m</td>
+          <td>1h 8m</td>
+        </tr>
+        <tr>
+          <td>1,000,000,000</td>
+          <td>1.516 TB</td>
+          <td>317.935 GB</td>
+          <td>181.668 GB</td>
+          <td>27h 16m</td>
+          <td>11h 19m</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="rsmp-evidence" class="rsmp-section" aria-labelledby="rsmp-evidence-title">
+  <div class="section-heading">
+    <p class="eyebrow">Evidence and caveats</p>
+    <h2 id="rsmp-evidence-title">Production-style corruption coverage, with one readiness caveat.</h2>
+    <p class="section-copy">
+      The committed evidence includes seven required semantic roles, 27 named
+      corruption recipes, 491 generated truncation checks, eight generated bit
+      flips, and one immutable two-block compatibility fixture covering sparse
+      and dense codecs.
+    </p>
+  </div>
+  <div class="rsmp-caveat">
+    <span class="badge caveat">Caveat</span>
+    <p>
+      The complete 19-command readiness suite passes in a clean exported
+      checkout. An ordinary working tree can fail evidence validation when a
+      different current <code>target/release/rstim</code> exists at the
+      historical producer path. That is an existence-dependent, non-hermetic
+      checker behavior, not a recomputation failure of the committed
+      compression arithmetic.
+    </p>
+  </div>
+  <figure class="rsmp-share">
+    <img src="og.png" alt="RSMP v1 social preview card with measured compression values">
+  </figure>
+  <div class="docs-card-links">
+    <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-v1.md">Normative format</a>
+    <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-cli.md">CLI guide</a>
+    <a href="https://github.com/nzy1997/rstim/tree/master/benchmarks/rstim_vs_stim_simulator/results/rsmp-v1">Evidence bundle</a>
+    <a href="https://github.com/nzy1997/rstim/blob/master/docs/test-reports/test-feature-20260724-rsmp-v1.md">Feature-test report</a>
+  </div>
+</section>
+{% endblock main %}

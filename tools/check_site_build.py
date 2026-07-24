@@ -43,6 +43,7 @@ PAGE_FILES = (
     "index.html",
     "guide/index.html",
     "benchmarks/index.html",
+    "rsmp-v1-showcase/index.html",
     "qp101/index.html",
 )
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
@@ -55,6 +56,14 @@ PAGE_REQUIRED_ANCHORS = {
         "checked-benchmark-result-cards",
         "benchmarks",
         "benchmark-manifest",
+    ),
+    "rsmp-v1-showcase/index.html": (
+        "rsmp-overview",
+        "rsmp-transform",
+        "rsmp-workflow",
+        "rsmp-compression",
+        "rsmp-scale",
+        "rsmp-evidence",
     ),
     "qp101/index.html": ("qp101", "schema-browser", "gallery", "examples"),
 }
@@ -898,6 +907,7 @@ def make_fixture_site() -> SiteFixture:
         "gallery/basic-site.svg": "<svg><title>basic</title></svg>\n",
         "gallery/repeat-detector-site.svg": "<svg><title>repeat</title></svg>\n",
         "gallery/atom-loss-sample.svg": "<svg><title>atom-loss</title></svg>\n",
+        "rsmp-v1-showcase/og.png": "png\n",
         "benchmarks/surface_decoder_compare/results/full/results.csv": "distance,shots\n",
         "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png": "png\n",
         "benchmarks/bb_circuit_bposd_compare/results/full/results.csv": "distance,shots\n",
@@ -923,6 +933,7 @@ def make_fixture_site() -> SiteFixture:
     <a href="./">Home</a>
     <a href="guide/">Guide</a>
     <a href="benchmarks/">Benchmarks</a>
+    <a href="rsmp-v1-showcase/">RSMP v1</a>
     <a href="qp101/">QP101</a>
   </nav>
   <section id="capabilities"><a href="guide/#feature-walkthroughs">walkthroughs</a></section>
@@ -931,6 +942,42 @@ def make_fixture_site() -> SiteFixture:
     <a href="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png">
       <img src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png" alt="surface">
     </a>
+  </section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "rsmp-v1-showcase/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <nav>
+    <a href="../">Home</a>
+    <a href="../guide/">Guide</a>
+    <a href="../benchmarks/">Benchmarks</a>
+    <a href="../qp101/">QP101</a>
+  </nav>
+  <section id="rsmp-overview">
+    <h1>RSMP v1</h1>
+    <p>requires the original circuit, not a DEM</p>
+    <p>Sweep-bit circuits are unsupported</p>
+  </section>
+  <section id="rsmp-transform"></section>
+  <section id="rsmp-workflow">
+    <code>pack_samples</code>
+    <code>unpack_samples</code>
+  </section>
+  <section id="rsmp-compression">
+    <p>11.98%</p>
+    <p>57.14%</p>
+  </section>
+  <section id="rsmp-scale">
+    <p>Projected</p>
+  </section>
+  <section id="rsmp-evidence">
+    <p>non-hermetic checker behavior</p>
+    <img src="og.png" alt="RSMP v1 social preview">
   </section>
 </body>
 </html>
