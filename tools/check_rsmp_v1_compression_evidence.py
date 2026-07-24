@@ -147,12 +147,12 @@ def load_catalog_cases_from_path(catalog_path: Path) -> dict[str, dict[str, Any]
     return by_id
 
 
-def load_catalog_cases() -> dict[str, dict[str, Any]]:
-    return load_catalog_cases_from_path(REPO_ROOT / "rstim/tests/fixtures/rsmp/catalog.json")
+def load_catalog_cases(repo_root: Path = REPO_ROOT) -> dict[str, dict[str, Any]]:
+    return load_catalog_cases_from_path(repo_root / "rstim/tests/fixtures/rsmp/catalog.json")
 
 
-def load_locked_package_versions() -> dict[str, str]:
-    with (REPO_ROOT / "Cargo.lock").open("rb") as handle:
+def load_locked_package_versions(repo_root: Path = REPO_ROOT) -> dict[str, str]:
+    with (repo_root / "Cargo.lock").open("rb") as handle:
         lock = tomllib.load(handle)
     packages = lock.get("package")
     if not isinstance(packages, list):
@@ -293,12 +293,12 @@ def peak_working_set(row: dict[str, Any]) -> int:
     return peak
 
 
-def validate_records(records: list[dict[str, Any]]) -> None:
+def validate_records(records: list[dict[str, Any]], repo_root: Path = REPO_ROOT) -> None:
     if len(records) != len(REQUIRED_ROWS):
         raise ValueError(f"raw.jsonl must contain exactly {len(REQUIRED_ROWS)} rows")
     if sha256_bytes(HIGH_ENTROPY_CIRCUIT_TEXT.encode("utf-8")) != HIGH_ENTROPY_CIRCUIT_SHA256:
         raise ValueError("internal high-entropy circuit SHA-256 constant is wrong")
-    catalog_cases = load_catalog_cases()
+    catalog_cases = load_catalog_cases(repo_root)
     for index, (row, requirement) in enumerate(zip(records, REQUIRED_ROWS, strict=True)):
         label = f"raw row {index} ({requirement.case_id})"
         if row.get("schema_version") != RAW_SCHEMA_VERSION:
@@ -684,7 +684,7 @@ def first_json_difference(expected: Any, actual: Any, path: str = "$") -> str | 
     return None
 
 
-def validate_environment(environment: dict[str, Any]) -> None:
+def validate_environment(environment: dict[str, Any], repo_root: Path = REPO_ROOT) -> None:
     if environment.get("schema_version") != ENVIRONMENT_SCHEMA_VERSION:
         raise ValueError(f"environment.json schema_version must be {ENVIRONMENT_SCHEMA_VERSION}")
     if environment.get("evidence_format") != EVIDENCE_FORMAT:
@@ -692,9 +692,9 @@ def validate_environment(environment: dict[str, Any]) -> None:
     if require_object(environment.get("zstd_contract"), "environment zstd_contract") != ZSTD_CONTRACT:
         raise ValueError("environment zstd_contract mismatch")
     cargo = require_object(environment.get("cargo"), "environment cargo")
-    if cargo.get("lock_sha256") != sha256_file(REPO_ROOT / "Cargo.lock"):
+    if cargo.get("lock_sha256") != sha256_file(repo_root / "Cargo.lock"):
         raise ValueError("environment Cargo.lock sha256 mismatch")
-    locked_versions = load_locked_package_versions()
+    locked_versions = load_locked_package_versions(repo_root)
     for package in ("zstd", "zstd-safe", "zstd-sys"):
         if cargo.get(package) != locked_versions.get(package):
             raise ValueError(f"environment cargo {package} version mismatch")
@@ -725,7 +725,7 @@ def validate_environment(environment: dict[str, Any]) -> None:
     if isinstance(binary_path_raw, str) and binary_path_raw:
         binary_path = Path(binary_path_raw)
         if not binary_path.is_absolute():
-            binary_path = REPO_ROOT / binary_path
+            binary_path = repo_root / binary_path
         if binary_path.exists() and sha256_file(binary_path) != binary["sha256"]:
             raise ValueError("environment rstim_binary sha256 mismatch")
     commands = require_object(environment.get("commands"), "environment commands")
@@ -753,10 +753,10 @@ def validate_gates(summary: dict[str, Any]) -> None:
         raise ValueError("gate failure: " + ", ".join(failed))
 
 
-def check_bundle(results_dir: Path) -> str:
+def check_bundle(results_dir: Path, repo_root: Path = REPO_ROOT) -> str:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
-    validate_records(records)
+    validate_records(records, repo_root)
     derived_summary = derive_summary(records)
     summary = load_json_object(results_dir / "summary.json", "summary.json")
     diff = first_json_difference(derived_summary, summary)
@@ -767,7 +767,7 @@ def check_bundle(results_dir: Path) -> str:
     if actual_report != expected_report:
         raise ValueError("report.md is stale or not checker-derived")
     environment = load_json_object(results_dir / "environment.json", "environment.json")
-    validate_environment(environment)
+    validate_environment(environment, repo_root)
     validate_artifact_hashes(results_dir)
     validate_gates(derived_summary)
     return derived_summary["pass_line"]
@@ -776,9 +776,10 @@ def check_bundle(results_dir: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check rsmp v1 compression evidence bundle")
     parser.add_argument("--results-dir", required=True, type=Path)
+    parser.add_argument("--repo-root", default=REPO_ROOT, type=Path)
     args = parser.parse_args(argv)
     try:
-        line = check_bundle(args.results_dir)
+        line = check_bundle(args.results_dir, args.repo_root.resolve())
     except ValueError as error:
         print(f"FAIL rsmp v1 compression {error}", file=sys.stderr)
         return 1

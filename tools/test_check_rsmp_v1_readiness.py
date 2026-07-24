@@ -173,5 +173,48 @@ class RsmpV1ReadinessNegativeControls(unittest.TestCase):
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+class RsmpV1ReadinessRepoRootControls(unittest.TestCase):
+    def test_compression_validation_uses_supplied_repo_root_cargo_lock(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="rstim-rsmp-readiness-root-test-") as raw_tmp:
+            temp_root = Path(raw_tmp) / "repo"
+            artifact_dir = Path(raw_tmp) / "out"
+            control = RsmpV1ReadinessNegativeControls()
+            control.copy_required_inputs(temp_root)
+            cargo_lock = temp_root / "Cargo.lock"
+            cargo_lock.write_text(
+                cargo_lock.read_text(encoding="utf-8") + "\n# readiness regression\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--repo-root",
+                    str(temp_root),
+                    "--out-dir",
+                    str(artifact_dir),
+                    "--skip-commands",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            combined = result.stdout + result.stderr
+            self.assertIn("compression evidence validation failed", combined)
+            self.assertIn("environment Cargo.lock sha256 mismatch", combined)
+            self.assertNotIn(PASS_LINE, combined)
+            artifact = json.loads((artifact_dir / "readiness.json").read_text())
+            self.assertEqual(artifact["status"], "fail")
+            self.assertTrue(
+                any(item["check"] == "compression.bundle" for item in artifact["failed_checks"]),
+                artifact["failed_checks"],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

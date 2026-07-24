@@ -539,7 +539,7 @@ def validate_compression(repo_root: Path, report: dict[str, Any]) -> None:
             missing_hashes[0],
         )
     try:
-        compression_checker.check_bundle(results_dir)
+        compression_checker.check_bundle(results_dir, repo_root=repo_root)
     except ValueError as error:
         text = str(error)
         if "gate failure" in text:
@@ -948,6 +948,8 @@ def run_focused_commands(ctx: ReadinessContext) -> None:
             "tools/check_rsmp_v1_compression_evidence.py",
             "--results-dir",
             str(COMPRESSION_DIR),
+            "--repo-root",
+            ".",
         ],
     )
 
