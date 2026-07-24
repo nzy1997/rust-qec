@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test check build-site release rsmp-v1-readiness bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -23,6 +23,7 @@ help:
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
+	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
@@ -43,6 +44,9 @@ test:
 
 check:
 	cargo check --locked --workspace
+
+rsmp-v1-readiness:
+	@python3 tools/check_rsmp_v1_readiness.py --repo-root . --out-dir benchmarks/out/rsmp-v1
 
 build-site:
 	rm -rf _site
