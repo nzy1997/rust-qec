@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -244,6 +243,12 @@ class ReadinessContext:
         self.checked_commands: list[dict[str, Any]] = []
 
     def ensure_output_dirs(self) -> None:
+        if self.logs_dir.is_symlink():
+            raise ReadinessFailure(
+                "readiness.output",
+                "output path is unsafe",
+                f"{self.logs_dir} is a symlink",
+            )
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
     def run_child(self, check_id: str, argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -280,6 +285,45 @@ class ReadinessContext:
             raise ReadinessFailure(
                 check_id,
                 f"{check_id} command failed",
+                f"see {log_path}",
+            )
+        return result
+
+    def run_probe(self, check_id: str, argv: list[str]) -> subprocess.CompletedProcess[str]:
+        self.ensure_output_dirs()
+        log_path = self.logs_dir / f"{check_id}.log"
+        result = subprocess.run(
+            argv,
+            cwd=self.repo_root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            env=os.environ.copy(),
+        )
+        log_text = [
+            "$ " + " ".join(argv),
+            f"exit_code={result.returncode}",
+            "",
+            "[stdout]",
+            result.stdout,
+            "[stderr]",
+            result.stderr,
+        ]
+        log_path.write_text("\n".join(log_text), encoding="utf-8")
+        self.checked_commands.append(
+            {
+                "check": check_id,
+                "argv": argv,
+                "exit_code": result.returncode,
+                "log": str(log_path.relative_to(self.out_dir)),
+                "expected_failure": True,
+            }
+        )
+        if result.returncode == 0:
+            raise ReadinessFailure(
+                check_id,
+                f"{check_id} probe unexpectedly succeeded",
                 f"see {log_path}",
             )
         return result
@@ -550,17 +594,25 @@ def capture_help(ctx: ReadinessContext, command: str) -> str:
     return result.stdout
 
 
-def normalized_help_model(pack_help: str, unpack_help: str) -> dict[str, Any]:
+def normalized_help_model(
+    pack_help: str,
+    unpack_help: str,
+    allowed_values_by_option: dict[tuple[str, str], list[str]],
+) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "commands": [
-            parse_help_command("pack_samples", pack_help),
-            parse_help_command("unpack_samples", unpack_help),
+            parse_help_command("pack_samples", pack_help, allowed_values_by_option),
+            parse_help_command("unpack_samples", unpack_help, allowed_values_by_option),
         ],
     }
 
 
-def parse_help_command(command: str, help_text: str) -> dict[str, Any]:
+def parse_help_command(
+    command: str,
+    help_text: str,
+    allowed_values_by_option: dict[tuple[str, str], list[str]],
+) -> dict[str, Any]:
     usage = ""
     options: list[dict[str, Any]] = []
     for line in help_text.splitlines():
@@ -575,7 +627,7 @@ def parse_help_command(command: str, help_text: str) -> dict[str, Any]:
     required_options = re.findall(r"(?<!\[)(--[a-z0-9_-]+) <[^>]+>", usage)
     for option in options:
         option["required"] = option["name"] in required_options
-        option["allowed_values"] = allowed_values(command, option["name"])
+        option["allowed_values"] = allowed_values_by_option.get((command, option["name"]))
     return {
         "name": command,
         "usage": usage,
@@ -601,17 +653,98 @@ def parse_option_line(line: str) -> dict[str, Any] | None:
     }
 
 
-def allowed_values(command: str, option: str) -> list[str] | None:
-    if command == "pack_samples" and option == "--in_format":
-        return ["01", "b8", "ptb64"]
-    if command == "unpack_samples" and option == "--detectors_out_format":
-        return ["01", "b8", "r8", "hits", "ptb64", "dets"]
-    if command == "unpack_samples" and option in {
-        "--measurements_out_format",
-        "--obs_out_format",
-    }:
-        return ["01", "b8", "r8", "hits", "ptb64"]
-    return None
+def capture_allowed_values(ctx: ReadinessContext) -> dict[tuple[str, str], list[str]]:
+    probes: tuple[tuple[str, str, list[str]], ...] = (
+        (
+            "pack_samples",
+            "--in_format",
+            [
+                "pack_samples",
+                "--circuit",
+                "circuit.stim",
+                "--shots",
+                "1",
+                "--in",
+                "measurements.b8",
+                "--in_format",
+                "__rsmp_readiness_invalid__",
+                "--out",
+                "archive.rsmp",
+            ],
+        ),
+        (
+            "unpack_samples",
+            "--measurements_out_format",
+            [
+                "unpack_samples",
+                "--circuit",
+                "circuit.stim",
+                "--in",
+                "archive.rsmp",
+                "--measurements_out",
+                "measurements.b8",
+                "--measurements_out_format",
+                "__rsmp_readiness_invalid__",
+            ],
+        ),
+        (
+            "unpack_samples",
+            "--detectors_out_format",
+            [
+                "unpack_samples",
+                "--circuit",
+                "circuit.stim",
+                "--in",
+                "archive.rsmp",
+                "--detectors_out",
+                "detectors.b8",
+                "--detectors_out_format",
+                "__rsmp_readiness_invalid__",
+            ],
+        ),
+        (
+            "unpack_samples",
+            "--obs_out_format",
+            [
+                "unpack_samples",
+                "--circuit",
+                "circuit.stim",
+                "--in",
+                "archive.rsmp",
+                "--obs_out",
+                "observables.b8",
+                "--obs_out_format",
+                "__rsmp_readiness_invalid__",
+            ],
+        ),
+    )
+    values: dict[tuple[str, str], list[str]] = {}
+    for command, option, argv_tail in probes:
+        result = ctx.run_probe(
+            f"cli_allowed_values_{command}_{option.removeprefix('--')}",
+            [
+                "cargo",
+                "run",
+                "--locked",
+                "--quiet",
+                "-p",
+                "rstim",
+                "--bin",
+                "rstim",
+                "--",
+                *argv_tail,
+            ],
+        )
+        diagnostic = result.stdout + "\n" + result.stderr
+        values[(command, option)] = parse_allowed_values_diagnostic(command, option, diagnostic)
+    return values
+
+
+def parse_allowed_values_diagnostic(command: str, option: str, diagnostic: str) -> list[str]:
+    match = re.search(r"must be one of ([0-9A-Za-z_, ]+)", diagnostic)
+    if match is None:
+        raise ValueError(f"{command} {option} diagnostic does not expose allowed values")
+    return [value.strip() for value in match.group(1).split(",")]
 
 
 def extract_section(text: str, heading: str) -> str:
@@ -764,6 +897,7 @@ def validate_documentation(
         help_model = normalized_help_model(
             capture_help(ctx, "pack_samples"),
             capture_help(ctx, "unpack_samples"),
+            capture_allowed_values(ctx),
         )
     else:
         help_model = EXPECTED_HELP_MODEL
@@ -847,14 +981,34 @@ def build_readiness_report(
     )
 
     report["checked_commands"] = ctx.checked_commands
+    if not run_commands:
+        append_failure(
+            report,
+            ReadinessFailure(
+                "readiness.commands",
+                "readiness commands were skipped",
+                "validation-only mode cannot produce the rsmp v1 readiness PASS line",
+            ),
+        )
     report["status"] = "pass" if not report["failed_checks"] else "fail"
     write_report(out_dir, report)
     return report
 
 
-def clean_output_dir(out_dir: Path) -> None:
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
+def prepare_output_dir(out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("readiness.json", CORRUPTION_SUMMARY_NAME):
+        path = out_dir / name
+        if not path.exists():
+            continue
+        if path.is_file() or path.is_symlink():
+            path.unlink()
+        else:
+            raise ReadinessFailure(
+                "readiness.output",
+                "output path is unsafe",
+                f"{path} exists and is not a file",
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -870,7 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = args.repo_root.resolve()
     out_dir = args.out_dir if args.out_dir.is_absolute() else repo_root / args.out_dir
     try:
-        clean_output_dir(out_dir)
+        prepare_output_dir(out_dir)
         report = build_readiness_report(
             repo_root,
             out_dir,
