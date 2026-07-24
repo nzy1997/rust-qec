@@ -174,6 +174,41 @@ class RsmpV1ReadinessNegativeControls(unittest.TestCase):
 
 
 class RsmpV1ReadinessRepoRootControls(unittest.TestCase):
+    def test_validation_only_mode_never_emits_readiness_pass(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="rstim-rsmp-readiness-skip-test-") as raw_tmp:
+            temp_root = Path(raw_tmp) / "repo"
+            artifact_dir = Path(raw_tmp) / "out"
+            control = RsmpV1ReadinessNegativeControls()
+            control.copy_required_inputs(temp_root)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--repo-root",
+                    str(temp_root),
+                    "--out-dir",
+                    str(artifact_dir),
+                    "--skip-commands",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            combined = result.stdout + result.stderr
+            self.assertNotIn(PASS_LINE, combined)
+            self.assertIn("not ready: readiness commands were skipped", combined)
+            artifact = json.loads((artifact_dir / "readiness.json").read_text())
+            self.assertEqual(artifact["status"], "fail")
+            self.assertTrue(
+                any(item["check"] == "readiness.commands" for item in artifact["failed_checks"]),
+                artifact["failed_checks"],
+            )
+
     def test_compression_validation_uses_supplied_repo_root_cargo_lock(self) -> None:
         with tempfile.TemporaryDirectory(prefix="rstim-rsmp-readiness-root-test-") as raw_tmp:
             temp_root = Path(raw_tmp) / "repo"
