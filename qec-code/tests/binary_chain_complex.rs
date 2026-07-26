@@ -62,6 +62,16 @@ fn square_cell_boundary_maps_match_fixture() {
         .collect::<Vec<_>>();
     assert_eq!(ordered_dimensions, vec![1, 2]);
 
+    let boundary_1_map = complex.boundary_map(1).unwrap();
+    assert_eq!(boundary_1_map.domain_dimension(), 1);
+    assert_eq!(boundary_1_map.codomain_dimension(), 0);
+    assert_eq!(boundary_1_map.num_domain_cells(), 4);
+    assert_eq!(boundary_1_map.num_codomain_cells(), 4);
+    assert_eq!(
+        boundary_1_map.matrix().rows(),
+        &[vec![0, 3], vec![0, 1], vec![1, 2], vec![2, 3]]
+    );
+
     let boundary_1 = complex.boundary(1).unwrap();
     assert_eq!(boundary_1.num_rows(), 4);
     assert_eq!(boundary_1.num_cols(), 4);
@@ -86,6 +96,28 @@ fn square_cell_boundary_maps_match_fixture() {
     );
     assert_eq!(css.hz().rows(), &[vec![0, 1, 2, 3]]);
     assert!(rows_are_orthogonal(css.hx(), css.hz()));
+}
+
+#[test]
+fn chain_complex_orders_nonconsecutive_boundaries_without_composing() {
+    let boundary_1 =
+        BinaryBoundaryMap::new(1, 0, SparseGf2Matrix::new(1, 3, vec![vec![]]).unwrap()).unwrap();
+    let boundary_3 = BinaryBoundaryMap::new(
+        3,
+        2,
+        SparseGf2Matrix::new(2, 1, vec![vec![0], vec![0]]).unwrap(),
+    )
+    .unwrap();
+
+    let complex = BinaryChainComplex::new(vec![boundary_3, boundary_1]).unwrap();
+    let ordered_dimensions = complex
+        .boundaries()
+        .iter()
+        .map(BinaryBoundaryMap::domain_dimension)
+        .collect::<Vec<_>>();
+
+    assert_eq!(ordered_dimensions, vec![1, 3]);
+    assert!(complex.boundary(2).is_none());
 }
 
 #[test]

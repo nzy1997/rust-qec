@@ -132,11 +132,6 @@ NonzeroBoundaryComposition {
     row: usize,
     support: Vec<usize>,
 }
-InvalidHomologicalCssView {
-    qubit_dimension: usize,
-    hx_num_qubits: usize,
-    hz_num_qubits: usize,
-}
 ```
 
 The composition errors identify the two cellular dimensions whose composition

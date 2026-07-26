@@ -209,14 +209,6 @@ NonzeroBoundaryComposition {
     row: usize,
     support: Vec<usize>,
 },
-#[error(
-    "invalid homological CSS view for qubit dimension {qubit_dimension}: H_X has {hx_num_qubits} qubits, H_Z has {hz_num_qubits} qubits"
-)]
-InvalidHomologicalCssView {
-    qubit_dimension: usize,
-    hx_num_qubits: usize,
-    hz_num_qubits: usize,
-},
 ```
 
 - [x] **Step 4: Add the chain-complex module**
@@ -339,14 +331,6 @@ impl BinaryChainComplex {
                 domain_dimension: upper_dimension,
             })?
             .transpose()?;
-
-        if hx.num_cols() != hz.num_cols() {
-            return Err(QecError::InvalidHomologicalCssView {
-                qubit_dimension,
-                hx_num_qubits: hx.num_cols(),
-                hz_num_qubits: hz.num_cols(),
-            });
-        }
 
         Ok(HomologicalCssView {
             qubit_dimension,

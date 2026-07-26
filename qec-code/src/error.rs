@@ -67,14 +67,6 @@ pub enum QecError {
         row: usize,
         support: Vec<usize>,
     },
-    #[error(
-        "invalid homological CSS view for qubit dimension {qubit_dimension}: H_X has {hx_num_qubits} qubits, H_Z has {hz_num_qubits} qubits"
-    )]
-    InvalidHomologicalCssView {
-        qubit_dimension: usize,
-        hx_num_qubits: usize,
-        hz_num_qubits: usize,
-    },
     #[error("invalid regular classical matrix option {option}: {reason}")]
     InvalidRegularClassicalMatrixConfig {
         option: &'static str,
@@ -207,7 +199,9 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    #[error(
+        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
+    )]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

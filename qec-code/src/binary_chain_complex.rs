@@ -114,14 +114,6 @@ impl BinaryChainComplex {
             })?
             .transpose()?;
 
-        if hx.num_cols() != hz.num_cols() {
-            return Err(QecError::InvalidHomologicalCssView {
-                qubit_dimension,
-                hx_num_qubits: hx.num_cols(),
-                hz_num_qubits: hz.num_cols(),
-            });
-        }
-
         Ok(HomologicalCssView {
             qubit_dimension,
             hx,
