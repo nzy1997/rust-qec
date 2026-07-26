@@ -161,7 +161,11 @@ fn inline_json_and_rust_routes_lower_to_same_spec() {
 fn planned_families_have_no_callable_stub() {
     assert_eq!(
         CssFamilySpec::callable_requested_family_ids(),
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Color666,
+        ]
     );
 }
 

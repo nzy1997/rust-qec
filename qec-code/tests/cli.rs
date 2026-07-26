@@ -616,6 +616,10 @@ fn code_css_list_includes_supported_built_ins() {
         "stdout was: {stdout}"
     );
     assert!(
+        stdout.contains("color_666:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(
         stdout.contains("toric:d=<distance>"),
         "stdout was: {stdout}"
     );
@@ -812,7 +816,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
 
     let width = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...".len();
     let expected = format!(
-        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm96:width$}  fixed Table A1 P=96 APM-CSS code\n  {apm192:width$}  fixed Table A1 P=192 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2",
+        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm96:width$}  fixed Table A1 P=96 APM-CSS code\n  {apm192:width$}  fixed Table A1 P=192 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {color_666:width$}  triangular 6.6.6 color CSS code, odd distance >= 3\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2",
         steane = "steane",
         bb72 = "bb72",
         apm96 = "apm_kasai:p=96",
@@ -821,6 +825,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
         rep_x = "repetition_x:d=<distance>",
         rep_z = "repetition_z:d=<distance>",
         surf = "surface_rotated:d=<distance>",
+        color_666 = "color_666:d=<distance>",
         toric = "toric:d=<distance>",
         width = width,
     );

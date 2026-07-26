@@ -51,6 +51,7 @@ Built-in CSS codes:
   repetition_x:d=<distance>                                       X-check chain, distance >= 2
   repetition_z:d=<distance>                                       Z-check chain, distance >= 2
   surface_rotated:d=<distance>                                    rotated surface CSS code, distance >= 2
+  color_666:d=<distance>                                          triangular 6.6.6 color CSS code, odd distance >= 3
   toric:d=<distance>                                              periodic square-lattice toric CSS code, distance >= 2
 ```
 
@@ -86,7 +87,7 @@ The exact-distance command returns JSON with `"status":"completed"` and
 construction layer before matrix generation.
 
 Compact CLI inputs use the documented inline syntax already accepted by
-`code css export`, such as `surface_rotated:d=3`, `bb72`, or
+`code css export`, such as `surface_rotated:d=3`, `color_666:d=5`, `bb72`, or
 `bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0`. The CLI lowers each inline string
 with `CssConstructionSpec::from_inline`, constructs through `construct_css`,
 then serializes the selected `Hx` or `Hz` matrix with the existing
@@ -100,6 +101,10 @@ For example:
 
 ```json
 {"schema_version":1,"construction":"surface","distance":3}
+```
+
+```json
+{"schema_version":1,"construction":"color_666","distance":5}
 ```
 
 The JSON request above lowers to the same typed surface specification as the
