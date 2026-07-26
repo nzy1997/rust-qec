@@ -1,5 +1,5 @@
+use qec_code::sparse_gf2::{hconcat, identity, kron, transpose, SparseGf2Matrix};
 use qec_code::QecError;
-use qec_code::sparse_gf2::{SparseGf2Matrix, hconcat, identity, kron, transpose};
 
 fn assert_shape_and_rows(
     matrix: &SparseGf2Matrix,
@@ -62,6 +62,33 @@ fn sparse_gf2_composition_matches_known_answers() {
 }
 
 #[test]
+fn sparse_gf2_methods_cover_rectangular_composition() {
+    let left = SparseGf2Matrix::new(2, 3, vec![vec![0, 2], vec![1]]).unwrap();
+    let right = SparseGf2Matrix::new(2, 1, vec![vec![0], vec![]]).unwrap();
+    let factor = SparseGf2Matrix::new(1, 2, vec![vec![1]]).unwrap();
+
+    assert_shape_and_rows(
+        &SparseGf2Matrix::identity(3).unwrap(),
+        3,
+        3,
+        &[vec![0], vec![1], vec![2]],
+    );
+    assert_shape_and_rows(
+        &left.transpose().unwrap(),
+        3,
+        2,
+        &[vec![0], vec![1], vec![0]],
+    );
+    assert_shape_and_rows(
+        &left.hconcat(&right).unwrap(),
+        2,
+        4,
+        &[vec![0, 2, 3], vec![1]],
+    );
+    assert_shape_and_rows(&left.kron(&factor).unwrap(), 2, 6, &[vec![1, 5], vec![3]]);
+}
+
+#[test]
 fn sparse_gf2_composition_rejects_invalid_shapes() {
     assert_eq!(
         SparseGf2Matrix::new(1, 2, vec![vec![2]]),
@@ -103,5 +130,23 @@ fn sparse_gf2_composition_rejects_invalid_shapes() {
     assert_eq!(
         kron(&max_width, &two_cols),
         Err(QecError::SparseGf2DimensionOverflow { operation: "kron" })
+    );
+}
+
+#[test]
+fn sparse_gf2_composition_reports_reachable_allocation_overflows() {
+    assert_eq!(
+        SparseGf2Matrix::identity(usize::MAX),
+        Err(QecError::SparseGf2DimensionOverflow {
+            operation: "identity",
+        })
+    );
+
+    let max_width = SparseGf2Matrix::new(0, usize::MAX, vec![]).unwrap();
+    assert_eq!(
+        max_width.transpose(),
+        Err(QecError::SparseGf2DimensionOverflow {
+            operation: "transpose",
+        })
     );
 }
