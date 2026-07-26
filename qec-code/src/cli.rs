@@ -58,11 +58,11 @@ pub enum CodeCommands {
 #[command(arg_required_else_help = true)]
 pub struct CssArgs {
     #[command(subcommand)]
-    pub command: Option<CssCommands>,
+    command: Option<CssCommands>,
     #[arg(value_name = "CODE_ID", required = true)]
-    pub code_id: Option<String>,
+    code_id: Option<String>,
     #[arg(value_name = "MATRIX", required = true)]
-    pub matrix: Option<CssMatrixKind>,
+    matrix: Option<CssMatrixKind>,
 }
 
 impl CssArgs {

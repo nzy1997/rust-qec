@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::Path;
 
+use clap::Parser;
 use qec_code::QecError;
-use qec_code::cli::{
-    Cli, CodeCommands, Commands, CssArgs, CssCommands, CssConstructionOutput, run,
-};
+use qec_code::cli::{Cli, run};
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
@@ -16,6 +16,13 @@ fn classical_2x3() -> CssClassicalCheckSpec {
     CssClassicalCheckSpec {
         num_cols: 3,
         rows: vec![vec![0, 1], vec![1, 2]],
+    }
+}
+
+fn classical_1x2() -> CssClassicalCheckSpec {
+    CssClassicalCheckSpec {
+        num_cols: 2,
+        rows: vec![vec![0, 1]],
     }
 }
 
@@ -64,19 +71,16 @@ fn css_code(num_cols: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]) -> CssCode 
     .unwrap()
 }
 
-fn construct_cli_output(spec_path: PathBuf, output: CssConstructionOutput) -> String {
-    run(Cli {
-        command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: Some(CssCommands::Construct {
-                    spec: spec_path,
-                    output,
-                }),
-                code_id: None,
-                matrix: None,
-            }),
-        },
-    })
+fn construct_cli_output(spec_path: &Path, output: &str) -> String {
+    run(Cli::parse_from([
+        OsString::from("qec-code"),
+        OsString::from("code"),
+        OsString::from("css"),
+        OsString::from("construct"),
+        OsString::from("--spec"),
+        spec_path.as_os_str().to_owned(),
+        OsString::from(output),
+    ]))
     .unwrap()
 }
 
@@ -132,21 +136,12 @@ fn hypergraph_product_matches_2x3_fixture() {
     let spec_path = dir.path().join("hgp.json");
     std::fs::write(&spec_path, fixture_json()).unwrap();
 
-    let hx_json: serde_json::Value = serde_json::from_str(&construct_cli_output(
-        spec_path.clone(),
-        CssConstructionOutput::Hx,
-    ))
-    .unwrap();
-    let hz_json: serde_json::Value = serde_json::from_str(&construct_cli_output(
-        spec_path.clone(),
-        CssConstructionOutput::Hz,
-    ))
-    .unwrap();
-    let metadata: serde_json::Value = serde_json::from_str(&construct_cli_output(
-        spec_path,
-        CssConstructionOutput::Metadata,
-    ))
-    .unwrap();
+    let hx_json: serde_json::Value =
+        serde_json::from_str(&construct_cli_output(&spec_path, "hx")).unwrap();
+    let hz_json: serde_json::Value =
+        serde_json::from_str(&construct_cli_output(&spec_path, "hz")).unwrap();
+    let metadata: serde_json::Value =
+        serde_json::from_str(&construct_cli_output(&spec_path, "metadata")).unwrap();
 
     assert_eq!(hx_json["format"], "sparse_rows");
     assert_eq!(hx_json["num_cols"], 13);
@@ -154,8 +149,17 @@ fn hypergraph_product_matches_2x3_fixture() {
     assert_eq!(hz_json["format"], "sparse_rows");
     assert_eq!(hz_json["num_cols"], 13);
     assert_eq!(hz_json["rows"], serde_json::json!(expected_hz()));
+    assert_eq!(metadata["schema_version"], 1);
     assert_eq!(metadata["construction_id"], "hypergraph_product");
     assert_eq!(metadata["requested_family_id"], serde_json::Value::Null);
+    assert_eq!(
+        metadata["normalized_parameters"]["left"],
+        serde_json::json!({"num_cols": 3, "rows": [[0, 1], [1, 2]]})
+    );
+    assert_eq!(
+        metadata["normalized_parameters"]["right"],
+        serde_json::json!({"num_cols": 3, "rows": [[0, 1], [1, 2]]})
+    );
     assert_eq!(metadata["stats"]["n"], 13);
     assert_eq!(metadata["stats"]["m_x"], 6);
     assert_eq!(metadata["stats"]["m_z"], 6);
@@ -164,6 +168,72 @@ fn hypergraph_product_matches_2x3_fixture() {
     assert_eq!(metadata["stats"]["k"], 1);
     assert_eq!(metadata["checks"]["h_x"], serde_json::json!(expected_hx()));
     assert_eq!(metadata["checks"]["h_z"], serde_json::json!(expected_hz()));
+    assert_eq!(metadata["provenance"]["adapter"], "hypergraph_product");
+    assert_eq!(
+        metadata["provenance"]["source"],
+        "CssConstructionSpec::HypergraphProduct"
+    );
+    assert!(
+        !metadata["provenance"]["normalized_input_digest"]
+            .as_str()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn hypergraph_product_accepts_independent_rectangular_inputs() {
+    let left_small = construct_css(CssConstructionSpec::HypergraphProduct(
+        HypergraphProductSpec {
+            left: classical_1x2(),
+            right: classical_2x3(),
+        },
+    ))
+    .unwrap();
+
+    assert_eq!(left_small.stats.n, 8);
+    assert_eq!(left_small.stats.m_x, 3);
+    assert_eq!(left_small.stats.m_z, 4);
+    assert_eq!(
+        left_small.checks.h_x,
+        vec![vec![0, 3, 6], vec![1, 4, 6, 7], vec![2, 5, 7]]
+    );
+    assert_eq!(
+        left_small.checks.h_z,
+        vec![vec![0, 1, 6], vec![1, 2, 7], vec![3, 4, 6], vec![4, 5, 7]]
+    );
+    verify_css_orthogonality(
+        left_small.stats.n,
+        &left_small.checks.h_x,
+        &left_small.checks.h_z,
+    )
+    .unwrap();
+
+    let right_small = construct_css(CssConstructionSpec::HypergraphProduct(
+        HypergraphProductSpec {
+            left: classical_2x3(),
+            right: classical_1x2(),
+        },
+    ))
+    .unwrap();
+
+    assert_eq!(right_small.stats.n, 8);
+    assert_eq!(right_small.stats.m_x, 4);
+    assert_eq!(right_small.stats.m_z, 3);
+    assert_eq!(
+        right_small.checks.h_x,
+        vec![vec![0, 2, 6], vec![1, 3, 6], vec![2, 4, 7], vec![3, 5, 7]]
+    );
+    assert_eq!(
+        right_small.checks.h_z,
+        vec![vec![0, 1, 6], vec![2, 3, 6, 7], vec![4, 5, 7]]
+    );
+    verify_css_orthogonality(
+        right_small.stats.n,
+        &right_small.checks.h_x,
+        &right_small.checks.h_z,
+    )
+    .unwrap();
 }
 
 #[test]
