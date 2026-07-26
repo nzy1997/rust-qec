@@ -13,6 +13,9 @@ use crate::codes::built_in_css::{
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
+use crate::codes::random_two_block::{
+    RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
+};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
 
@@ -120,11 +123,16 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    RandomTwoBlock(RandomTwoBlockSpec),
 }
 
 impl CssFamilySpec {
     pub const fn callable_requested_family_ids() -> &'static [RequestedFamilyId] {
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::RandomTwoBlock,
+        ]
     }
 }
 
@@ -241,6 +249,21 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hz,
                 "quantum_tanner",
                 "CssFamilySpec::QuantumTanner",
+                None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::RandomTwoBlock(spec)) => {
+            let checks = random_two_block_css_checks(&spec)?;
+            let parameters = random_two_block_normalized_parameters(&spec, &checks);
+            construction_result(
+                "random_two_block",
+                Some(RequestedFamilyId::RandomTwoBlock),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                "random_two_block",
+                "CssFamilySpec::RandomTwoBlock",
                 None,
             )
         }
@@ -628,6 +651,52 @@ fn quantum_tanner_normalized_parameters(spec: &QuantumTannerSpec) -> BTreeMap<St
     parameters
 }
 
+fn random_two_block_normalized_parameters(
+    spec: &RandomTwoBlockSpec,
+    checks: &crate::codes::random_two_block::RandomTwoBlockCssChecks,
+) -> BTreeMap<String, Value> {
+    let mut group = BTreeMap::new();
+    group.insert("order".to_owned(), Value::from(spec.group.order()));
+    group.insert("identity".to_owned(), Value::from(spec.group.identity()));
+    group.insert(
+        "multiplication_table".to_owned(),
+        serde_json::to_value(spec.group.multiplication_table())
+            .expect("serializable random two-block group table"),
+    );
+
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "group".to_owned(),
+        serde_json::to_value(group).expect("serializable random two-block group"),
+    );
+    parameters.insert(
+        "group_digest".to_owned(),
+        Value::from(checks.metadata.group_digest.clone()),
+    );
+    parameters.insert("seed".to_owned(), Value::from(checks.metadata.seed));
+    parameters.insert(
+        "support_a_weight".to_owned(),
+        Value::from(checks.metadata.support_a_weight),
+    );
+    parameters.insert(
+        "support_b_weight".to_owned(),
+        Value::from(checks.metadata.support_b_weight),
+    );
+    parameters.insert(
+        "algorithm_version".to_owned(),
+        Value::from(checks.metadata.algorithm_version),
+    );
+    parameters.insert(
+        "support_a".to_owned(),
+        serde_json::to_value(&checks.support_a).expect("serializable support A"),
+    );
+    parameters.insert(
+        "support_b".to_owned(),
+        serde_json::to_value(&checks.support_b).expect("serializable support B"),
+    );
+    parameters
+}
+
 pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
@@ -656,6 +725,9 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             let spec_json = serde_json::to_string(&spec_object)
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
+        }
+        "random_two_block" => {
+            Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
         }
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {

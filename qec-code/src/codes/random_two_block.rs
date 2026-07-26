@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::error::{QecError, Result};
@@ -37,6 +38,24 @@ pub struct RandomTwoBlockMetadata {
     pub algorithm_version: u32,
 }
 
+#[derive(Debug, Deserialize)]
+struct RandomTwoBlockSpecJson {
+    group: ExplicitRandomTwoBlockGroupJson,
+    support_a_weight: usize,
+    support_b_weight: usize,
+    seed: Option<u64>,
+    algorithm_version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExplicitRandomTwoBlockGroupJson {
+    name: Option<String>,
+    element_order: Option<String>,
+    order: usize,
+    identity: usize,
+    multiplication_table: Vec<Vec<usize>>,
+}
+
 impl RandomTwoBlockSpec {
     pub fn new(
         group: FiniteGroupSpec,
@@ -55,6 +74,33 @@ impl RandomTwoBlockSpec {
         verify_random_two_block_spec(&spec)?;
         Ok(spec)
     }
+}
+
+pub fn random_two_block_spec_from_json_str(input: &str) -> Result<RandomTwoBlockSpec> {
+    let parsed: RandomTwoBlockSpecJson = serde_json::from_str(input)
+        .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
+    let seed = parsed
+        .seed
+        .ok_or_else(|| QecError::InvalidRandomTwoBlockSpec {
+            option: "seed",
+            reason: "must be provided".to_owned(),
+        })?;
+    let ExplicitRandomTwoBlockGroupJson {
+        name,
+        element_order,
+        order,
+        identity,
+        multiplication_table,
+    } = parsed.group;
+    let _ = (name, element_order);
+    let group = FiniteGroupSpec::new(order, identity, multiplication_table)?;
+    RandomTwoBlockSpec::new(
+        group,
+        parsed.support_a_weight,
+        parsed.support_b_weight,
+        seed,
+        parsed.algorithm_version,
+    )
 }
 
 pub fn random_two_block_css_checks(spec: &RandomTwoBlockSpec) -> Result<RandomTwoBlockCssChecks> {

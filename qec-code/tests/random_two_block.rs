@@ -1,11 +1,18 @@
+use clap::Parser;
 use qec_code::QecError;
+use qec_code::cli::Cli;
+use qec_code::cli::run;
 use qec_code::codes::random_two_block::{
     RANDOM_TWO_BLOCK_ALGORITHM_V1, RandomTwoBlockSpec, random_two_block_css_checks,
 };
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
-use qec_code::family_contract::verify_css_orthogonality;
+use qec_code::family_contract::{
+    CssFamilySpec, RequestedFamilyId, construct_css, parse_css_construction_json,
+    verify_css_orthogonality,
+};
 use qec_code::finite_group::{FiniteGroupSpec, MAX_FINITE_GROUP_ORDER};
+use tempfile::tempdir;
 
 fn s3_table() -> Vec<Vec<usize>> {
     vec![
@@ -24,6 +31,20 @@ fn s3_group() -> FiniteGroupSpec {
 
 fn s3_spec() -> RandomTwoBlockSpec {
     RandomTwoBlockSpec::new(s3_group(), 2, 2, 7, RANDOM_TWO_BLOCK_ALGORITHM_V1).unwrap()
+}
+
+fn s3_request_json(include_seed: bool) -> String {
+    let seed_field = if include_seed { r#","seed":7"# } else { "" };
+    format!(
+        r#"{{"schema_version":1,"construction":"random_two_block","group":{{"name":"S3","element_order":"0=e,1=r,2=r^2,3=s,4=rs,5=r^2s","order":6,"identity":0,"multiplication_table":{}}},"support_a_weight":2,"support_b_weight":2{seed_field},"algorithm_version":1}}"#,
+        serde_json::to_string(&s3_table()).unwrap()
+    )
+}
+
+fn run_qec_code_in_process(args: &[&str]) -> Result<String, QecError> {
+    let mut argv = vec!["qec-code"];
+    argv.extend(args);
+    run(Cli::parse_from(argv))
 }
 
 fn expected_hx() -> Vec<Vec<usize>> {
@@ -83,6 +104,82 @@ fn random_two_block_s3_seed7_matches_fixture() {
     assert_eq!(css.code().num_logical_qubits(), 2);
     let distance = compute_distance(css.code()).unwrap();
     assert_eq!(distance.distance, 2);
+
+    let common = construct_css(CssFamilySpec::RandomTwoBlock(s3_spec()).into()).unwrap();
+    assert_eq!(common.construction_id, "random_two_block");
+    assert_eq!(
+        common.requested_family_id,
+        Some(RequestedFamilyId::RandomTwoBlock)
+    );
+    assert_eq!(common.stats.n, 12);
+    assert_eq!(common.stats.rank_x, 5);
+    assert_eq!(common.stats.rank_z, 5);
+    assert_eq!(common.stats.k, 2);
+    assert_eq!(common.checks.h_x, expected_hx());
+    assert_eq!(common.checks.h_z, expected_hz());
+    assert_eq!(common.normalized_parameters["seed"], serde_json::json!(7));
+    assert_eq!(
+        common.normalized_parameters["support_a_weight"],
+        serde_json::json!(2)
+    );
+    assert_eq!(
+        common.normalized_parameters["support_b_weight"],
+        serde_json::json!(2)
+    );
+    assert_eq!(
+        common.normalized_parameters["algorithm_version"],
+        serde_json::json!(RANDOM_TWO_BLOCK_ALGORITHM_V1)
+    );
+    assert_eq!(
+        common.normalized_parameters["support_a"],
+        serde_json::json!([3, 5])
+    );
+    assert_eq!(
+        common.normalized_parameters["support_b"],
+        serde_json::json!([0, 4])
+    );
+    assert_eq!(
+        common.normalized_parameters["group_digest"],
+        serde_json::json!(checks.metadata.group_digest)
+    );
+
+    let parsed = parse_css_construction_json(&s3_request_json(true)).unwrap();
+    let parsed_common = construct_css(parsed).unwrap();
+    assert_eq!(parsed_common.checks, common.checks);
+    assert_eq!(
+        parsed_common.normalized_parameters,
+        common.normalized_parameters
+    );
+
+    let dir = tempdir().unwrap();
+    let spec_path = dir.path().join("random-two-block-s3.json");
+    std::fs::write(&spec_path, s3_request_json(true)).unwrap();
+    let cli_hx = run_qec_code_in_process(&[
+        "code",
+        "css",
+        "construct",
+        "--spec",
+        spec_path.to_str().unwrap(),
+        "hx",
+    ])
+    .unwrap();
+    let cli_hz = run_qec_code_in_process(&[
+        "code",
+        "css",
+        "construct",
+        "--spec",
+        spec_path.to_str().unwrap(),
+        "hz",
+    ])
+    .unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&cli_hx).unwrap()["rows"],
+        serde_json::json!(expected_hx())
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&cli_hz).unwrap()["rows"],
+        serde_json::json!(expected_hz())
+    );
 }
 
 #[test]
@@ -141,5 +238,15 @@ fn random_two_block_rejects_invalid_sampling_specs() {
     assert!(matches!(
         FiniteGroupSpec::new(6, 0, vec![vec![0, 1, 2, 3, 4, 6]; 6]),
         Err(QecError::InvalidFiniteGroupTable { .. })
+    ));
+    assert!(matches!(
+        parse_css_construction_json(&s3_request_json(false)),
+        Err(QecError::InvalidRandomTwoBlockSpec { option: "seed", .. })
+    ));
+    assert!(matches!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"random_two_block","group":{"order":257,"identity":0,"multiplication_table":[]},"support_a_weight":1,"support_b_weight":1,"seed":7,"algorithm_version":1}"#
+        ),
+        Err(QecError::GroupOrderLimitExceeded { .. })
     ));
 }
