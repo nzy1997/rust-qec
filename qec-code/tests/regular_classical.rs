@@ -121,6 +121,26 @@ fn deterministic_regular_matrix_rejects_invalid_degrees() {
     ));
 
     let mut config = fixture_config(7);
+    config.row_count = 1;
+    assert!(matches!(
+        deterministic_regular_matrix(config),
+        Err(QecError::InvalidRegularClassicalMatrixConfig {
+            option: "column_weight",
+            ..
+        })
+    ));
+
+    let mut config = fixture_config(7);
+    config.column_count = 2;
+    assert!(matches!(
+        deterministic_regular_matrix(config),
+        Err(QecError::InvalidRegularClassicalMatrixConfig {
+            option: "row_weight",
+            ..
+        })
+    ));
+
+    let mut config = fixture_config(7);
     config.column_count = 5;
     assert!(matches!(
         deterministic_regular_matrix(config),
