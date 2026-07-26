@@ -18,6 +18,9 @@ use crate::codes::directional::{
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
+use crate::codes::random_two_block::{
+    RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
+};
 use crate::codes::toric_3d::{Toric3dSpec, toric_3d_css_checks};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
@@ -127,6 +130,7 @@ pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
     Toric3d(Toric3dSpec),
+    RandomTwoBlock(RandomTwoBlockSpec),
     Color666(Color666FamilySpec),
     Directional(DirectionalCssSpec),
 }
@@ -137,6 +141,7 @@ impl CssFamilySpec {
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::Toric3d,
+            RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
             RequestedFamilyId::Directional,
         ]
@@ -294,6 +299,21 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "toric_3d_chain_complex",
                 "CssFamilySpec::Toric3d",
                 Some((checks.distances.d_x, checks.distances.d_z)),
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::RandomTwoBlock(spec)) => {
+            let checks = random_two_block_css_checks(&spec)?;
+            let parameters = random_two_block_normalized_parameters(&spec, &checks);
+            construction_result(
+                "random_two_block",
+                Some(RequestedFamilyId::RandomTwoBlock),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                "random_two_block",
+                "CssFamilySpec::RandomTwoBlock",
+                None,
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
@@ -759,6 +779,52 @@ fn quantum_tanner_normalized_parameters(spec: &QuantumTannerSpec) -> BTreeMap<St
     parameters
 }
 
+fn random_two_block_normalized_parameters(
+    spec: &RandomTwoBlockSpec,
+    checks: &crate::codes::random_two_block::RandomTwoBlockCssChecks,
+) -> BTreeMap<String, Value> {
+    let mut group = BTreeMap::new();
+    group.insert("order".to_owned(), Value::from(spec.group.order()));
+    group.insert("identity".to_owned(), Value::from(spec.group.identity()));
+    group.insert(
+        "multiplication_table".to_owned(),
+        serde_json::to_value(spec.group.multiplication_table())
+            .expect("serializable random two-block group table"),
+    );
+
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "group".to_owned(),
+        serde_json::to_value(group).expect("serializable random two-block group"),
+    );
+    parameters.insert(
+        "group_digest".to_owned(),
+        Value::from(checks.metadata.group_digest.clone()),
+    );
+    parameters.insert("seed".to_owned(), Value::from(checks.metadata.seed));
+    parameters.insert(
+        "support_a_weight".to_owned(),
+        Value::from(checks.metadata.support_a_weight),
+    );
+    parameters.insert(
+        "support_b_weight".to_owned(),
+        Value::from(checks.metadata.support_b_weight),
+    );
+    parameters.insert(
+        "algorithm_version".to_owned(),
+        Value::from(checks.metadata.algorithm_version),
+    );
+    parameters.insert(
+        "support_a".to_owned(),
+        serde_json::to_value(&checks.support_a).expect("serializable support A"),
+    );
+    parameters.insert(
+        "support_b".to_owned(),
+        serde_json::to_value(&checks.support_b).expect("serializable support B"),
+    );
+    parameters
+}
+
 pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
@@ -807,6 +873,9 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             };
             toric_3d_css_checks(spec)?;
             Ok(CssFamilySpec::Toric3d(spec).into())
+        }
+        "random_two_block" => {
+            Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
         }
         "directional" => directional_construction_from_json(object, construction),
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
