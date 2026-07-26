@@ -87,12 +87,7 @@ fn normalize_exponents(
 }
 
 fn cyclic_circulant(order: usize, exponents: &[usize]) -> Result<SparseGf2Matrix> {
-    let mut rows = Vec::new();
-    rows.try_reserve_exact(order)
-        .map_err(|_| QecError::InvalidCssConstruction {
-            construction: GENERALIZED_BICYCLE_CONSTRUCTION_ID.to_owned(),
-            reason: "size arithmetic overflow while allocating cyclic circulant".to_owned(),
-        })?;
+    let mut rows = Vec::with_capacity(order);
     for row in 0..order {
         rows.push(
             exponents

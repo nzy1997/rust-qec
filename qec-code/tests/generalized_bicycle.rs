@@ -180,6 +180,40 @@ fn generalized_bicycle_order5_matches_fixture() {
 }
 
 #[test]
+fn generalized_bicycle_accepts_non_fixture_cyclic_code() {
+    let result = construct_css(
+        CssFamilySpec::GeneralizedBicycle(GeneralizedBicycleSpec {
+            order: 3,
+            a_exponents: vec![0],
+            b_exponents: vec![1],
+        })
+        .into(),
+    )
+    .unwrap();
+
+    assert_eq!(result.stats.n, 6);
+    assert_eq!(result.stats.m_x, 3);
+    assert_eq!(result.stats.m_z, 3);
+    assert_eq!(result.stats.rank_x, 3);
+    assert_eq!(result.stats.rank_z, 3);
+    assert_eq!(result.stats.k, 0);
+    assert_eq!(result.stats.d_x, None);
+    assert_eq!(result.stats.d_z, None);
+    assert_eq!(result.normalized_parameters["order"], serde_json::json!(3));
+    assert_eq!(
+        result.normalized_parameters["a_exponents"],
+        serde_json::json!([0])
+    );
+    assert_eq!(
+        result.normalized_parameters["b_exponents"],
+        serde_json::json!([1])
+    );
+    assert_eq!(result.checks.h_x, vec![vec![0, 4], vec![1, 5], vec![2, 3]]);
+    assert_eq!(result.checks.h_z, vec![vec![2, 3], vec![0, 4], vec![1, 5]]);
+    verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
+}
+
+#[test]
 fn generalized_bicycle_rejects_invalid_exponents() {
     for (case, expected) in [
         (
@@ -238,4 +272,25 @@ fn generalized_bicycle_rejects_invalid_exponents() {
             if construction == "generalized_bicycle"
                 && reason == "b_exponents[1] must be a nonnegative integer"
     ));
+
+    for (input, expected) in [
+        (
+            r#"{"schema_version":1,"construction":"generalized_bicycle","order":5,"b_exponents":[0]}"#,
+            "missing or invalid a_exponents",
+        ),
+        (
+            r#"{"schema_version":1,"construction":"generalized_bicycle","order":5,"a_exponents":true,"b_exponents":[0]}"#,
+            "missing or invalid a_exponents",
+        ),
+        (
+            r#"{"schema_version":1,"construction":"generalized_bicycle","order":5,"a_exponents":[0],"b_exponents":null}"#,
+            "missing or invalid b_exponents",
+        ),
+    ] {
+        assert!(matches!(
+            parse_css_construction_json(input),
+            Err(QecError::InvalidCssConstruction { construction, reason })
+                if construction == "generalized_bicycle" && reason == expected
+        ));
+    }
 }

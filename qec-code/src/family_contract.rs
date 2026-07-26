@@ -1327,10 +1327,30 @@ fn required_usize_array(
                     construction: construction.to_owned(),
                     reason: format!("{field}[{index}] must be a nonnegative integer"),
                 })?;
-            usize::try_from(value).map_err(|_| QecError::InvalidCssConstruction {
-                construction: construction.to_owned(),
-                reason: format!("{field}[{index}] is outside usize range"),
-            })
+            json_u64_to_usize_array_entry(value, field, index, construction)
         })
         .collect()
+}
+
+#[cfg(target_pointer_width = "64")]
+fn json_u64_to_usize_array_entry(
+    value: u64,
+    _field: &str,
+    _index: usize,
+    _construction: &str,
+) -> Result<usize> {
+    Ok(value as usize)
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+fn json_u64_to_usize_array_entry(
+    value: u64,
+    field: &str,
+    index: usize,
+    construction: &str,
+) -> Result<usize> {
+    usize::try_from(value).map_err(|_| QecError::InvalidCssConstruction {
+        construction: construction.to_owned(),
+        reason: format!("{field}[{index}] is outside usize range"),
+    })
 }
