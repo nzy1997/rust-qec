@@ -2925,6 +2925,7 @@ fn built_in_css_catalog_lists_supported_specs() {
             "repetition_z:d=<distance>",
             "surface_rotated:d=<distance>",
             "toric:d=<distance>",
+            "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>",
         ]
     );
     assert_eq!(unique_specs.len(), specs.len());

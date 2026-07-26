@@ -78,6 +78,8 @@ fn toric_3d_3x3x3_matches_fixture() {
     assert_eq!(result.stats.rank_x, 26);
     assert_eq!(result.stats.rank_z, 52);
     assert_eq!(result.stats.k, 3);
+    assert_eq!(result.stats.d_x, Some(9));
+    assert_eq!(result.stats.d_z, Some(3));
     assert_eq!(result.checks.h_x, checks.hx);
     assert_eq!(result.checks.h_z, checks.hz);
 
@@ -126,6 +128,8 @@ fn toric_3d_accepts_rectangular_periods() {
     assert_eq!(result.stats.rank_x, 59);
     assert_eq!(result.stats.rank_z, 118);
     assert_eq!(result.stats.k, 3);
+    assert_eq!(result.stats.d_x, Some(12));
+    assert_eq!(result.stats.d_z, Some(3));
 }
 
 #[test]
