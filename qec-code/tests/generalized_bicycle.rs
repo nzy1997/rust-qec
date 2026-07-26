@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
+use qec_code::cli::{run, Cli};
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     construct_css, parse_css_construction_json, CssFamilySpec, GeneralizedBicycleSpec,
