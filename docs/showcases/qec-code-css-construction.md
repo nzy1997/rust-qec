@@ -80,14 +80,43 @@ larger than the Steane and `bb72` examples.
 The exact-distance command returns JSON with `"status":"completed"` and
 `"distance":3` for the Steane code.
 
+## Construction Routing
+
+`qec-code` now routes compact and structured CSS constructors through one typed
+construction layer before matrix generation.
+
+Compact CLI inputs use the documented inline syntax already accepted by
+`code css export`, such as `surface_rotated:d=3`, `bb72`, or
+`bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0`. The CLI lowers each inline string
+with `CssConstructionSpec::from_inline`, constructs through `construct_css`,
+then serializes the selected `Hx` or `Hz` matrix with the existing
+`sparse_rows` JSON format. This preserves legacy byte output while giving the
+Rust API one normalized result shape.
+
+Structured constructor requests use versioned JSON with `schema_version = 1`
+and a `construction` field. They are exported with
+`code css construct --spec <path> hx` or `code css construct --spec <path> hz`.
+For example:
+
+```json
+{"schema_version":1,"construction":"surface","distance":3}
+```
+
+The JSON request above lowers to the same typed surface specification as the
+inline `surface_rotated:d=3` route and the Rust API value
+`CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`. Unsupported schema
+versions are rejected before construction.
+
 ## Code
 
 Primary implementation and CLI coverage:
 
 - [`qec-code/src/cli.rs`](qec-code/src/cli.rs)
 - [`qec-code/src/codes/built_in_css.rs`](qec-code/src/codes/built_in_css.rs)
+- [`qec-code/src/family_contract.rs`](qec-code/src/family_contract.rs)
 - [`qec-code/tests/cli.rs`](qec-code/tests/cli.rs)
 - [`qec-code/tests/code.rs`](qec-code/tests/code.rs)
+- [`qec-code/tests/family_contract.rs`](qec-code/tests/family_contract.rs)
 
 Construction notes and contracts:
 

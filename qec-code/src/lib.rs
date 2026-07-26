@@ -12,6 +12,7 @@ pub mod distance_exact;
 #[cfg(feature = "distance-ilp-highs")]
 pub mod distance_ilp;
 pub mod error;
+pub mod family_contract;
 pub mod finite_group;
 mod gf2;
 pub mod logical;
