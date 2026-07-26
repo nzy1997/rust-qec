@@ -16,6 +16,7 @@ distance-ilp-gurobi = ["distance-ilp-highs", "qec-ilp-core/gurobi"]
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 thiserror = "2"
 qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", optional = true }
 

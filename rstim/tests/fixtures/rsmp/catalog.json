@@ -223,12 +223,12 @@
         "circuit_sha256": "18a857fb71f44eb28144a6a0e3aad17cce675daa2737690432efe305ed5777a2",
         "measurements_b8_sha256": "cd575545ea899978f9477b43341c106981061f94a1bfaf9b575cd6a61acc32c3",
         "archive_sha256": "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c",
-        "manifest_sha256": "b38d0d3f590e12437fae3c1c14f7b9ac6475026d112db9d8ed8add2c1e15e824"
+        "manifest_sha256": "d5e983ac8261f49fd8a8fdfa3e6d119eddf85d80e23065d041a07797da7b5d8a"
       },
       "consumers": ["compatibility", "corruption_corpus", "cli_publication_tests", "readiness"],
       "rsmp_v1_compatibility": {
         "manifest_path": "rstim/tests/fixtures/rsmp/v1/manifest.toml",
-        "manifest_sha256": "b38d0d3f590e12437fae3c1c14f7b9ac6475026d112db9d8ed8add2c1e15e824",
+        "manifest_sha256": "d5e983ac8261f49fd8a8fdfa3e6d119eddf85d80e23065d041a07797da7b5d8a",
         "archive_path": "rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp",
         "archive_sha256": "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c",
         "block_shots": 2,
