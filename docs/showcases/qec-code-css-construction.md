@@ -107,12 +107,22 @@ For example:
 {"schema_version":1,"construction":"color_666","distance":5}
 ```
 
-The surface JSON request lowers to the same typed surface specification as the
-inline `surface_rotated:d=3` route and the Rust API value
-`CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`. The color JSON
-request lowers to `CssFamilySpec::Color666(Color666FamilySpec { distance: 5,
-layout: Color666Layout::Triangular })`. Unsupported schema versions are
-rejected before construction.
+The legacy JSON request above remains the square rotated adapter: it lowers to
+the same typed surface specification as the inline `surface_rotated:d=3` route
+and the Rust API value `CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`.
+Use `SurfaceSpec::rotated_square(3)` or a fully specified `SurfaceSpec` for
+the generalized route.
+Structured surface requests can select a layout and independent row and column
+distances, for example:
+
+```json
+{"schema_version":1,"construction":"surface","layout":"rotated","row_distance":3,"column_distance":5}
+```
+
+Color-code requests lower to
+`CssFamilySpec::Color666(Color666FamilySpec { distance: 5, layout:
+Color666Layout::Triangular })`. Unsupported schema versions are rejected before
+construction.
 
 ## Code
 

@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
+use qec_code::QecError;
 use qec_code::codes::quantum_tanner::quantum_tanner_spec_from_json_str;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, verify_css_orthogonality, CssClassicalCheckSpec,
-    CssConstructionSpec, CssFamilySpec, HypergraphProductSpec, RequestedFamilyId,
-    SurfaceFamilySpec, CLASSICAL_IDENTITY_2,
+    CLASSICAL_IDENTITY_2, CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec,
+    HypergraphProductSpec, RequestedFamilyId, SurfaceFamilySpec, construct_css,
+    parse_css_construction_json, verify_css_orthogonality,
 };
-use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

@@ -1372,7 +1372,7 @@ fn refresh_catalog_manifest_hash(catalog_path: &Path, manifest_path: &Path) {
     let new_hash = sha256_file(manifest_path).expect("hash mutated manifest");
     let text = fs::read_to_string(catalog_path).expect("read catalog copy");
     let updated = text.replace(
-        "b38d0d3f590e12437fae3c1c14f7b9ac6475026d112db9d8ed8add2c1e15e824",
+        "d5e983ac8261f49fd8a8fdfa3e6d119eddf85d80e23065d041a07797da7b5d8a",
         &new_hash,
     );
     assert_ne!(text, updated);

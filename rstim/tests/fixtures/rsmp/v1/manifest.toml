@@ -27,7 +27,7 @@ expected_detectors_01_sha256 = "bbbb412548a3d2414970dfe3c0c2f875a464b7365a4769f6
 expected_observables_01_sha256 = "82705308134bbe1154849ebc6ec13ce36c1a232c76415f79c0de21c4d631001f"
 whole_archive_sha256 = "82dbdb498343daa9c09b10f1a35070d322222df76b192da816e6e9f9691b2c5c"
 trailer_archive_sha256 = "389d04dbc3f40fa57ed9f155f62d4a9ac0770da6fbfece5184a29eebc4bd0144"
-cargo_lock_sha256 = "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6"
+cargo_lock_sha256 = "c686b75aa69a970dd77e4ec39f8cb8d070064cc111863f5964a34d27ff2b9a4a"
 
 [circuit]
 canonical_utf8_bytes = 282
@@ -113,5 +113,5 @@ writer_source_base_revision = "98a203f64fbd9b758d8768b68e73162234b50434"
 rust_crate = "rstim 0.1.1"
 zstandard_crate = "zstd 0.13.3"
 zstandard_backend = "zstd-sys 2.0.16+zstd.1.5.7"
-cargo_lock_sha256 = "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6"
+cargo_lock_sha256 = "c686b75aa69a970dd77e4ec39f8cb8d070064cc111863f5964a34d27ff2b9a4a"
 statement = "This command records the historical initial-generation provenance. Future rsmp v1 writers are not required to reproduce identical compressed bytes."

@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
+use qec_code::QecError;
 use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::codes::color_666::COLOR_666_STEANE_PERMUTATION;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, Color666FamilySpec, Color666Layout,
-    CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
+    Color666FamilySpec, Color666Layout, CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
+    construct_css, parse_css_construction_json,
 };
-use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -88,6 +88,8 @@ fn color_666_d3_matches_steane_under_stable_permutation() {
     assert_eq!(result.stats.rank_x, 3);
     assert_eq!(result.stats.rank_z, 3);
     assert_eq!(result.stats.k, 1);
+    assert_eq!(result.stats.d_x, Some(3));
+    assert_eq!(result.stats.d_z, Some(3));
     assert_eq!(result.checks.h_x, fixture_rows("color_666_d3_hx.json"));
     assert_eq!(result.checks.h_z, fixture_rows("color_666_d3_hz.json"));
 
@@ -124,6 +126,8 @@ fn color_666_d5_matches_fixture() {
     assert_eq!(result.stats.rank_x, 9);
     assert_eq!(result.stats.rank_z, 9);
     assert_eq!(result.stats.k, 1);
+    assert_eq!(result.stats.d_x, Some(5));
+    assert_eq!(result.stats.d_z, Some(5));
     assert_eq!(result.checks.h_x, fixture_rows("color_666_d5_hx.json"));
     assert_eq!(result.checks.h_z, fixture_rows("color_666_d5_hz.json"));
     assert_eq!(
