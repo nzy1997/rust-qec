@@ -164,6 +164,7 @@ fn planned_families_have_no_callable_stub() {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,
         ]
     );
