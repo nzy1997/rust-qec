@@ -6,7 +6,10 @@ use qec_code::family_contract::{CssFamilySpec, RequestedFamilyId};
 const CONTRACT: &str = include_str!("../doc/hyperbolic_5_5_contract.md");
 
 fn assert_contains(haystack: &str, needle: &str) {
-    assert!(haystack.contains(needle), "missing contract marker: {needle}");
+    assert!(
+        haystack.contains(needle),
+        "missing contract marker: {needle}"
+    );
 }
 
 fn assert_src_tree_does_not_define_callable_hyperbolic_5_5() {
