@@ -7,11 +7,11 @@ use sha2::{Digest, Sha256};
 
 use crate::binary::try_binary_rank;
 use crate::codes::built_in_css::{
-    built_in_css_checks, parse_built_in_css_code_spec, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_checks,
+    parse_built_in_css_code_spec,
 };
 use crate::codes::quantum_tanner::{
-    quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
+    QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
@@ -78,6 +78,39 @@ impl RequestedFamilyId {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SurfaceLayout {
+    Rotated,
+    Unrotated,
+}
+
+impl SurfaceLayout {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Rotated => "rotated",
+            Self::Unrotated => "unrotated",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SurfaceSpec {
+    pub layout: SurfaceLayout,
+    pub row_distance: usize,
+    pub column_distance: usize,
+}
+
+impl SurfaceSpec {
+    pub const fn rotated_square(distance: usize) -> Self {
+        Self {
+            layout: SurfaceLayout::Rotated,
+            row_distance: distance,
+            column_distance: distance,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SurfaceFamilySpec {
     pub distance: usize,
@@ -121,6 +154,7 @@ pub struct LegacyBuiltInCssSpec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CssConstructionSpec {
     Family(CssFamilySpec),
+    Surface(SurfaceSpec),
     HypergraphProduct(HypergraphProductSpec),
     LegacyBuiltIn(LegacyBuiltInCssSpec),
 }
@@ -128,6 +162,12 @@ pub enum CssConstructionSpec {
 impl From<CssFamilySpec> for CssConstructionSpec {
     fn from(value: CssFamilySpec) -> Self {
         Self::Family(value)
+    }
+}
+
+impl From<SurfaceSpec> for CssConstructionSpec {
+    fn from(value: SurfaceSpec) -> Self {
+        Self::Surface(value)
     }
 }
 
@@ -162,6 +202,10 @@ pub struct CssCodeStats {
     pub rank_x: usize,
     pub rank_z: usize,
     pub k: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d_x: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d_z: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,21 +228,7 @@ pub struct CssConstructionResult {
 
 pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult> {
     match spec {
-        CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => {
-            let checks = built_in_css_checks(&format!("surface_rotated:d={}", spec.distance))?;
-            let mut parameters = BTreeMap::new();
-            parameters.insert("distance".to_owned(), Value::from(spec.distance));
-            construction_result(
-                checks.code_id,
-                Some(RequestedFamilyId::Surface),
-                parameters,
-                checks.num_cols,
-                checks.hx,
-                checks.hz,
-                "built_in_css",
-                "CssFamilySpec::Surface",
-            )
-        }
+        CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => construct_legacy_surface(spec),
         CssConstructionSpec::Family(CssFamilySpec::QuantumTanner(spec)) => {
             let checks = quantum_tanner_css_checks(&spec)?;
             let parameters = quantum_tanner_normalized_parameters(&spec);
@@ -211,10 +241,16 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hz,
                 "quantum_tanner",
                 "CssFamilySpec::QuantumTanner",
+                None,
             )
         }
+        CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
+            if let Some(distance) = legacy_surface_distance_from_code_id(&spec.code_id) {
+                preflight_legacy_surface_overflow(distance)?;
+            }
+
             let checks = built_in_css_checks(&spec.code_id)?;
             let mut parameters = BTreeMap::new();
             parameters.insert("code_id".to_owned(), Value::from(spec.code_id));
@@ -227,9 +263,296 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hz,
                 "built_in_css",
                 "CssConstructionSpec::LegacyBuiltIn",
+                None,
             )
         }
     }
+}
+
+fn legacy_surface_distance_from_code_id(code_id: &str) -> Option<usize> {
+    match parse_built_in_css_code_spec(code_id).ok()? {
+        BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::SurfaceRotated,
+            params: BuiltInCssParams::Distance { distance },
+        } => Some(distance),
+        _ => None,
+    }
+}
+
+fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionResult> {
+    preflight_legacy_surface_overflow(spec.distance)?;
+
+    let checks = built_in_css_checks(&format!("surface_rotated:d={}", spec.distance))?;
+    let mut parameters = BTreeMap::new();
+    parameters.insert("distance".to_owned(), Value::from(spec.distance));
+    construction_result(
+        checks.code_id,
+        Some(RequestedFamilyId::Surface),
+        parameters,
+        checks.num_cols,
+        checks.hx,
+        checks.hz,
+        "built_in_css",
+        "CssFamilySpec::Surface",
+        Some((spec.distance, spec.distance)),
+    )
+}
+
+fn construct_surface(spec: SurfaceSpec) -> Result<CssConstructionResult> {
+    validate_surface_spec(&spec)?;
+    let (n, h_x, h_z, construction_id) = match spec.layout {
+        SurfaceLayout::Rotated => {
+            let n = spec
+                .row_distance
+                .checked_mul(spec.column_distance)
+                .ok_or_else(|| surface_overflow("data qubit count"))?;
+            let (h_x, h_z) = rotated_surface_supports(spec.row_distance, spec.column_distance);
+            (n, h_x, h_z, "surface_rotated")
+        }
+        SurfaceLayout::Unrotated => {
+            let n = unrotated_surface_num_data_qubits(spec.row_distance, spec.column_distance)?;
+            let (h_x, h_z) = unrotated_surface_supports(spec.row_distance, spec.column_distance)?;
+            (n, h_x, h_z, "surface_unrotated")
+        }
+    };
+    let mut parameters = BTreeMap::new();
+    parameters.insert("layout".to_owned(), Value::from(spec.layout.as_str()));
+    parameters.insert("row_distance".to_owned(), Value::from(spec.row_distance));
+    parameters.insert(
+        "column_distance".to_owned(),
+        Value::from(spec.column_distance),
+    );
+    construction_result(
+        construction_id,
+        Some(RequestedFamilyId::Surface),
+        parameters,
+        n,
+        h_x,
+        h_z,
+        "surface",
+        "CssConstructionSpec::Surface",
+        Some((spec.column_distance, spec.row_distance)),
+    )
+}
+
+fn validate_surface_spec(spec: &SurfaceSpec) -> Result<()> {
+    validate_surface_distance("row_distance", spec.row_distance)?;
+    validate_surface_distance("column_distance", spec.column_distance)?;
+
+    if matches!(spec.layout, SurfaceLayout::Rotated)
+        && (spec.row_distance > isize::MAX as usize / 2
+            || spec.column_distance > isize::MAX as usize / 2)
+    {
+        return Err(surface_overflow("rotated coordinate arithmetic"));
+    }
+
+    Ok(())
+}
+
+fn validate_surface_distance(parameter: &'static str, value: usize) -> Result<()> {
+    if value < 2 {
+        return Err(QecError::InvalidCssConstruction {
+            construction: "surface".to_owned(),
+            reason: format!("{parameter} must be at least 2, got {value}"),
+        });
+    }
+    Ok(())
+}
+
+fn preflight_legacy_surface_overflow(distance: usize) -> Result<()> {
+    distance
+        .checked_mul(distance)
+        .ok_or_else(|| surface_overflow("data qubit count"))?;
+    if distance > isize::MAX as usize / 2 {
+        return Err(surface_overflow("rotated coordinate arithmetic"));
+    }
+    Ok(())
+}
+
+fn surface_overflow(operation: &'static str) -> QecError {
+    QecError::InvalidCssConstruction {
+        construction: "surface".to_owned(),
+        reason: format!("surface dimension overflow during {operation}"),
+    }
+}
+
+fn rotated_surface_supports(
+    row_distance: usize,
+    column_distance: usize,
+) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    let mut h_x = Vec::new();
+    let mut h_z = Vec::new();
+
+    for ax in 0..=row_distance {
+        for ay in 0..=column_distance {
+            let on_row_boundary = ax == 0 || ax == row_distance;
+            let on_column_boundary = ay == 0 || ay == column_distance;
+            let parity = (ax % 2) != (ay % 2);
+            if on_row_boundary && parity {
+                continue;
+            }
+            if on_column_boundary && !parity {
+                continue;
+            }
+
+            let support = rotated_surface_measure_support(row_distance, column_distance, ax, ay);
+            if support.is_empty() {
+                continue;
+            }
+
+            if parity {
+                h_x.push(support);
+            } else {
+                h_z.push(support);
+            }
+        }
+    }
+
+    (h_x, h_z)
+}
+
+fn rotated_surface_measure_support(
+    row_distance: usize,
+    column_distance: usize,
+    ax: usize,
+    ay: usize,
+) -> Vec<usize> {
+    let mut support = Vec::new();
+    let mx = (2 * ax) as isize;
+    let my = (2 * ay) as isize;
+
+    for (dx, dy) in [(1isize, 1isize), (1, -1), (-1, 1), (-1, -1)] {
+        let x = mx + dx;
+        let y = my + dy;
+        if x >= 1
+            && x <= (2 * row_distance - 1) as isize
+            && y >= 1
+            && y <= (2 * column_distance - 1) as isize
+            && x % 2 == 1
+            && y % 2 == 1
+        {
+            let qx = ((x - 1) / 2) as usize;
+            let qy = ((y - 1) / 2) as usize;
+            if qx < row_distance && qy < column_distance {
+                support.push(qx * column_distance + qy);
+            }
+        }
+    }
+
+    support.sort_unstable();
+    support.dedup();
+    support
+}
+
+fn unrotated_surface_num_data_qubits(row_distance: usize, column_distance: usize) -> Result<usize> {
+    let grid_rows = checked_surface_grid_extent(row_distance, "row grid extent")?;
+    let grid_columns = checked_surface_grid_extent(column_distance, "column grid extent")?;
+    grid_rows
+        .checked_mul(grid_columns)
+        .and_then(|count| count.checked_add(1))
+        .map(|count| count / 2)
+        .ok_or_else(|| surface_overflow("data qubit count"))
+}
+
+fn checked_surface_grid_extent(distance: usize, operation: &'static str) -> Result<usize> {
+    distance
+        .checked_mul(2)
+        .and_then(|extent| extent.checked_sub(1))
+        .ok_or_else(|| surface_overflow(operation))
+}
+
+fn unrotated_surface_data_indices(
+    grid_rows: usize,
+    grid_columns: usize,
+) -> Result<Vec<Vec<Option<usize>>>> {
+    let mut data_indices = Vec::with_capacity(grid_rows);
+    let mut next_index = 0usize;
+    for row in 0..grid_rows {
+        let mut indices = Vec::with_capacity(grid_columns);
+        for column in 0..grid_columns {
+            if (row % 2) == (column % 2) {
+                indices.push(Some(next_index));
+                next_index = next_index
+                    .checked_add(1)
+                    .ok_or_else(|| surface_overflow("data qubit count"))?;
+            } else {
+                indices.push(None);
+            }
+        }
+        data_indices.push(indices);
+    }
+    Ok(data_indices)
+}
+
+fn unrotated_surface_supports(
+    row_distance: usize,
+    column_distance: usize,
+) -> Result<(Vec<Vec<usize>>, Vec<Vec<usize>>)> {
+    let grid_rows = checked_surface_grid_extent(row_distance, "row grid extent")?;
+    let grid_columns = checked_surface_grid_extent(column_distance, "column grid extent")?;
+    let data_indices = unrotated_surface_data_indices(grid_rows, grid_columns)?;
+    let mut h_x = Vec::with_capacity(
+        row_distance
+            .checked_sub(1)
+            .and_then(|rows| rows.checked_mul(column_distance))
+            .ok_or_else(|| surface_overflow("X-check count"))?,
+    );
+    let mut h_z = Vec::with_capacity(
+        column_distance
+            .checked_sub(1)
+            .and_then(|columns| row_distance.checked_mul(columns))
+            .ok_or_else(|| surface_overflow("Z-check count"))?,
+    );
+
+    for row in (1..grid_rows).step_by(2) {
+        for column in (0..grid_columns).step_by(2) {
+            h_x.push(unrotated_surface_check_support(
+                grid_rows,
+                grid_columns,
+                &data_indices,
+                row,
+                column,
+            ));
+        }
+    }
+    for row in (0..grid_rows).step_by(2) {
+        for column in (1..grid_columns).step_by(2) {
+            h_z.push(unrotated_surface_check_support(
+                grid_rows,
+                grid_columns,
+                &data_indices,
+                row,
+                column,
+            ));
+        }
+    }
+
+    Ok((h_x, h_z))
+}
+
+fn unrotated_surface_check_support(
+    grid_rows: usize,
+    grid_columns: usize,
+    data_indices: &[Vec<Option<usize>>],
+    row: usize,
+    column: usize,
+) -> Vec<usize> {
+    let mut support = Vec::with_capacity(4);
+    for (neighbor_row, neighbor_column) in [
+        (row.checked_sub(1), Some(column)),
+        (Some(row), column.checked_sub(1)),
+        (Some(row), column.checked_add(1)),
+        (row.checked_add(1), Some(column)),
+    ] {
+        if let (Some(neighbor_row), Some(neighbor_column)) = (neighbor_row, neighbor_column)
+            && neighbor_row < grid_rows
+            && neighbor_column < grid_columns
+            && let Some(index) = data_indices[neighbor_row][neighbor_column]
+        {
+            support.push(index);
+        }
+    }
+    support
 }
 
 fn quantum_tanner_normalized_parameters(spec: &QuantumTannerSpec) -> BTreeMap<String, Value> {
@@ -319,10 +642,7 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     }
     let construction = required_string(object, "construction")?;
     match construction {
-        "surface" => Ok(CssFamilySpec::Surface(SurfaceFamilySpec {
-            distance: required_usize(object, "distance", construction)?,
-        })
-        .into()),
+        "surface" => surface_construction_from_json(object, construction),
         "quantum_tanner" => {
             let spec_value = object.get("spec").unwrap_or(&value);
             let mut spec_object = spec_value.as_object().cloned().ok_or_else(|| {
@@ -455,6 +775,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         h_z,
         "hypergraph_product",
         "CssConstructionSpec::HypergraphProduct",
+        None,
     )
 }
 
@@ -467,6 +788,7 @@ fn construction_result(
     h_z: Vec<Vec<usize>>,
     adapter: impl Into<String>,
     source: impl Into<String>,
+    known_distances: Option<(usize, usize)>,
 ) -> Result<CssConstructionResult> {
     let construction_id = construction_id.into();
     let adapter = adapter.into();
@@ -481,6 +803,9 @@ fn construction_result(
     verify_css_orthogonality(n, &h_x, &h_z)?;
     let rank_x = try_binary_rank(&dense_rows(n, &h_x))?;
     let rank_z = try_binary_rank(&dense_rows(n, &h_z))?;
+    let (d_x, d_z) = known_distances
+        .map(|(d_x, d_z)| (Some(d_x), Some(d_z)))
+        .unwrap_or((None, None));
     let stats = CssCodeStats {
         n,
         m_x: h_x.len(),
@@ -488,6 +813,8 @@ fn construction_result(
         rank_x,
         rank_z,
         k: n.saturating_sub(rank_x + rank_z),
+        d_x,
+        d_z,
     };
     Ok(CssConstructionResult {
         schema_version: CSS_CONSTRUCTION_SCHEMA_VERSION,
@@ -558,6 +885,51 @@ fn transpose_supports(num_cols: usize, rows: &[Vec<usize>]) -> Vec<Vec<usize>> {
         }
     }
     columns
+}
+
+fn surface_construction_from_json(
+    object: &Map<String, Value>,
+    construction: &str,
+) -> Result<CssConstructionSpec> {
+    let has_legacy_distance = object.contains_key("distance");
+    let has_layout_aware_fields = object.contains_key("layout")
+        || object.contains_key("row_distance")
+        || object.contains_key("column_distance");
+    if has_legacy_distance && has_layout_aware_fields {
+        return Err(QecError::InvalidCssConstruction {
+            construction: construction.to_owned(),
+            reason: "conflicting legacy distance and layout-aware surface parameters".to_owned(),
+        });
+    }
+    if has_legacy_distance {
+        return Ok(CssFamilySpec::Surface(SurfaceFamilySpec {
+            distance: required_usize(object, "distance", construction)?,
+        })
+        .into());
+    }
+    if !has_layout_aware_fields {
+        return Err(QecError::InvalidCssConstruction {
+            construction: construction.to_owned(),
+            reason: "missing or invalid distance".to_owned(),
+        });
+    }
+
+    let layout = match required_string(object, "layout")? {
+        "rotated" => SurfaceLayout::Rotated,
+        "unrotated" => SurfaceLayout::Unrotated,
+        value => {
+            return Err(QecError::InvalidCssConstruction {
+                construction: construction.to_owned(),
+                reason: format!("unknown surface layout {value}"),
+            });
+        }
+    };
+    Ok(SurfaceSpec {
+        layout,
+        row_distance: required_usize(object, "row_distance", construction)?,
+        column_distance: required_usize(object, "column_distance", construction)?,
+    }
+    .into())
 }
 
 fn required_string<'a>(object: &'a Map<String, Value>, field: &str) -> Result<&'a str> {
