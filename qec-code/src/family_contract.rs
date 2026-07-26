@@ -10,6 +10,8 @@ use crate::codes::built_in_css::{
     BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_checks,
     parse_built_in_css_code_spec,
 };
+use crate::codes::color_666::{COLOR_666_CONSTRUCTION_ID, color_666_sparse_checks};
+pub use crate::codes::color_666::{Color666FamilySpec, Color666Layout};
 use crate::codes::directional::{
     DirectionalConnectivity, DirectionalCssSpec, build_directional_css_checks,
 };
@@ -123,6 +125,7 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    Color666(Color666FamilySpec),
     Directional(DirectionalCssSpec),
 }
 
@@ -131,6 +134,7 @@ impl CssFamilySpec {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Color666,
             RequestedFamilyId::Directional,
         ]
     }
@@ -188,6 +192,17 @@ impl CssConstructionSpec {
         } = parsed
         {
             return Ok(CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into());
+        }
+        if let BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::Color666,
+            params: BuiltInCssParams::Distance { distance },
+        } = parsed
+        {
+            return Ok(CssFamilySpec::Color666(Color666FamilySpec {
+                distance,
+                layout: Color666Layout::Triangular,
+            })
+            .into());
         }
 
         Ok(Self::LegacyBuiltIn(LegacyBuiltInCssSpec {
@@ -265,6 +280,23 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "directional",
                 "CssFamilySpec::Directional",
                 directional_known_distances(&spec, &checks.normalized_route),
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::Color666(spec)) => {
+            let checks = color_666_sparse_checks(&spec)?;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("distance".to_owned(), Value::from(spec.distance));
+            parameters.insert("layout".to_owned(), Value::from(spec.layout.as_str()));
+            construction_result(
+                COLOR_666_CONSTRUCTION_ID,
+                Some(RequestedFamilyId::Color666),
+                parameters,
+                checks.num_cols,
+                checks.rows.clone(),
+                checks.rows,
+                COLOR_666_CONSTRUCTION_ID,
+                "CssFamilySpec::Color666",
+                Some((spec.distance, spec.distance)),
             )
         }
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
@@ -713,6 +745,17 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let construction = required_string(object, "construction")?;
     match construction {
         "surface" => surface_construction_from_json(object, construction),
+        "color_666" => {
+            let layout = optional_string(object, "layout")?
+                .map(Color666Layout::parse)
+                .transpose()?
+                .unwrap_or(Color666Layout::Triangular);
+            Ok(CssFamilySpec::Color666(Color666FamilySpec {
+                distance: required_usize(object, "distance", construction)?,
+                layout,
+            })
+            .into())
+        }
         "quantum_tanner" => {
             let spec_value = object.get("spec").unwrap_or(&value);
             let mut spec_object = spec_value.as_object().cloned().ok_or_else(|| {
@@ -1036,6 +1079,16 @@ fn required_string<'a>(object: &'a Map<String, Value>, field: &str) -> Result<&'
         .get(field)
         .and_then(Value::as_str)
         .ok_or_else(|| QecError::InvalidCssConstructionJson(format!("missing or invalid {field}")))
+}
+
+fn optional_string<'a>(object: &'a Map<String, Value>, field: &str) -> Result<Option<&'a str>> {
+    match object.get(field) {
+        None => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value)),
+        Some(_) => Err(QecError::InvalidCssConstructionJson(format!(
+            "missing or invalid {field}"
+        ))),
+    }
 }
 
 fn required_u64(object: &Map<String, Value>, field: &str) -> Result<u64> {
