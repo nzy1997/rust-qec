@@ -2,6 +2,7 @@
 extern crate self as qec_code;
 
 pub mod binary;
+pub mod binary_chain_complex;
 pub mod cli;
 pub mod code;
 pub mod codes;
