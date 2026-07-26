@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use super::apm::{AffinePermutation, ApmCssManifestEntry, build_apm_css_checks};
+use super::apm::{build_apm_css_checks, AffinePermutation, ApmCssManifestEntry};
+use super::color_666::{color_666_sparse_checks, Color666FamilySpec, Color666Layout};
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +34,7 @@ pub enum BuiltInCssFamily {
     RepetitionX,
     RepetitionZ,
     SurfaceRotated,
+    Color666,
     Toric,
     BivariateBicycle,
     ApmKasai,
@@ -87,6 +89,10 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
         description: "rotated surface CSS code, distance >= 2",
     },
     BuiltInCssCatalogEntry {
+        spec: "color_666:d=<distance>",
+        description: "triangular 6.6.6 color CSS code, odd distance >= 3",
+    },
+    BuiltInCssCatalogEntry {
         spec: "toric:d=<distance>",
         description: "periodic square-lattice toric CSS code, distance >= 2",
     },
@@ -108,7 +114,7 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
             family: input.to_owned(),
             parameter: "p".to_owned(),
         }),
-        "repetition_x" | "repetition_z" | "surface_rotated" | "toric" => {
+        "repetition_x" | "repetition_z" | "surface_rotated" | "color_666" | "toric" => {
             Err(QecError::MissingBuiltInCssParameter {
                 family: input.to_owned(),
                 parameter: "d".to_owned(),
@@ -137,6 +143,9 @@ fn parse_built_in_css_family_spec(
         }
         "surface_rotated" => {
             parse_distance_family_spec(family_name, BuiltInCssFamily::SurfaceRotated, params_text)
+        }
+        "color_666" => {
+            parse_distance_family_spec(family_name, BuiltInCssFamily::Color666, params_text)
         }
         "toric" => parse_distance_family_spec(family_name, BuiltInCssFamily::Toric, params_text),
         "apm_kasai" => {
@@ -698,6 +707,21 @@ fn family_css_checks(
             };
             surface_rotated_css_checks(distance)
         }
+        BuiltInCssFamily::Color666 => {
+            let BuiltInCssParams::Distance { distance } = params else {
+                unreachable!("color_666 only uses distance params");
+            };
+            let checks = color_666_sparse_checks(&Color666FamilySpec {
+                distance,
+                layout: Color666Layout::Triangular,
+            })?;
+            Ok(BuiltInCssChecks {
+                code_id: "color_666",
+                num_cols: checks.num_cols,
+                hx: checks.rows.clone(),
+                hz: checks.rows,
+            })
+        }
         BuiltInCssFamily::Toric => {
             let BuiltInCssParams::Distance { distance } = params else {
                 unreachable!("toric only uses distance params");
@@ -879,4 +903,18 @@ fn wrap_prev(value: usize, distance: usize) -> usize {
 
 fn wrap_next(value: usize, distance: usize) -> usize {
     (value + 1) % distance
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "color_666 only uses distance params")]
+    fn color_666_family_checks_reject_mismatched_internal_params() {
+        let _ = family_css_checks(
+            BuiltInCssFamily::Color666,
+            BuiltInCssParams::ApmKasai { p: 96 },
+        );
+    }
 }
