@@ -17,6 +17,10 @@ pub enum QecError {
         construction: String,
         reason: String,
     },
+    #[error("invalid directional route {route}: {reason}")]
+    InvalidDirectionalRoute { route: String, reason: String },
+    #[error("invalid directional CSS specification: {reason}")]
+    InvalidDirectionalCssSpec { reason: String },
     #[error("row width mismatch: expected {expected}, got {actual}")]
     RowWidthMismatch { expected: usize, actual: usize },
     #[error("invalid symplectic row width: expected even width, got {width}")]
