@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use clap::Parser;
 use qec_code::QecError;
-use qec_code::cli::{CodeCommands, Commands, CssArgs, CssMatrixKind, run};
+use qec_code::cli::{CodeCommands, Commands, CssArgs, CssMatrixKind, Cli, run};
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     CssConstructionSpec, CssFamilySpec, SurfaceLayout, SurfaceSpec, construct_css,
@@ -36,15 +37,19 @@ fn write_spec(dir: &Path, name: &str, body: &str) -> PathBuf {
 }
 
 fn cli_export_from_spec(spec: PathBuf, matrix: CssMatrixKind) -> String {
-    run(qec_code::cli::Cli {
-        command: Commands::Code {
-            command: CodeCommands::Css(CssArgs {
-                command: Some(qec_code::cli::CssCommands::Construct { spec, matrix }),
-                code_id: None,
-                matrix: None,
-            }),
-        },
-    })
+    let matrix = match matrix {
+        CssMatrixKind::Hx => "hx",
+        CssMatrixKind::Hz => "hz",
+    };
+    run(Cli::parse_from([
+        "qec-code",
+        "code",
+        "css",
+        "construct",
+        "--spec",
+        spec.to_str().expect("spec path should be UTF-8"),
+        matrix,
+    ]))
     .unwrap()
 }
 
