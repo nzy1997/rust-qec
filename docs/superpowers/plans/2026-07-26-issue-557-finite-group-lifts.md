@@ -17,7 +17,7 @@
 - Validate positive group order, identity range, exact square table shape, in-range products, unique two-sided identity matching the declared identity, one two-sided inverse per element, and associativity.
 - `GroupAlgebraElement::new` must validate support bounds, sort supports, and cancel even multiplicities over GF(2).
 - Canonical serialization must use deterministic compact JSON with group field order `order`, `identity`, `multiplication_table` and element field order `group_order`, `support`.
-- Left regular lift semantics: support element `g` contributes `matrix_col * group.order() + group.multiply(g, x)`.
+- Left regular lift semantics: support element `g` contributes `matrix_col * group.order() + group.multiply(group.inverse(g)?, x)`. This inverse-indexed left action is fixed by the exact issue #557 `C3` fixture.
 - Right regular lift semantics: support element `h` contributes `matrix_col * group.order() + group.multiply(x, h)`.
 - Lift output shape is `(matrix_rows * group.order()) x (matrix_cols * group.order())` with checked multiplication and checked column offset arithmetic.
 - Public APIs return typed `QecError` values instead of panicking.
@@ -302,7 +302,7 @@ pub struct LeftRegularLift;
 pub struct RightRegularLift;
 ```
 
-Implement the public methods and free functions listed in the design. Use private helpers named `validate_group_table_shape`, `find_unique_table_identity`, `build_inverse_table`, `validate_associativity`, `validate_group_element`, `canonicalize_support`, `regular_lift`, `regular_lift_shape`, `left_action`, and `right_action`. The shape helper must use `checked_mul` for both row and column dimensions and return `QecError::GroupAlgebraDimensionOverflow { operation: "regular lift shape" }` for overflow. The regular lift helper must check rectangular input rows, check each element's `group_order`, compute output columns with checked multiplication/addition, and pass the output rows through `SparseGf2Matrix::new`.
+Implement the public methods and free functions listed in the design. Use private helpers named `validate_group_table_shape`, `find_unique_table_identity`, `build_inverse_table`, `validate_associativity`, `validate_group_element`, `canonicalize_support`, `regular_lift`, `regular_lift_shape`, `left_action`, and `right_action`. The shape helper must use `checked_mul` for both row and column dimensions and return `QecError::GroupAlgebraDimensionOverflow { operation: "regular lift shape" }` for overflow. The left action helper must use `group.multiply(group.inverse(g)?, x)` so the exact `C3` fixture matches. The right action helper must use `group.multiply(x, h)`. The regular lift helper must check rectangular input rows, check each element's `group_order`, compute output columns with checked multiplication/addition, and pass the output rows through `SparseGf2Matrix::new`.
 
 Add `pub mod finite_group;` to `qec-code/src/lib.rs`.
 

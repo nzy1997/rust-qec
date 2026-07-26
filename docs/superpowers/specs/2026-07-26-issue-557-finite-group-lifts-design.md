@@ -155,7 +155,10 @@ For a group-algebra matrix with `m` rows and `n` columns over a group of order
 `matrix_row * k + x` expands each algebra element in that row.
 
 For left-regular lift, a support element `g` contributes column
-`matrix_col * k + group.multiply(g, x)`.
+`matrix_col * k + group.multiply(group.inverse(g)?, x)`. This inverse-indexed
+left action is the convention fixed by the issue #557 exact `C3` fixture: for
+the second row block, support `1` in `C3` maps row offsets `0, 1, 2` to
+`2, 0, 1`.
 
 For right-regular lift, a support element `h` contributes column
 `matrix_col * k + group.multiply(x, h)`.
