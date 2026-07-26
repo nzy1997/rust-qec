@@ -727,16 +727,7 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
         }
-        "directional" => {
-            let spec_value = object.get("spec").unwrap_or(&value);
-            let spec = serde_json::from_value(spec_value.clone()).map_err(|error| {
-                QecError::InvalidCssConstruction {
-                    construction: construction.to_owned(),
-                    reason: error.to_string(),
-                }
-            })?;
-            Ok(CssFamilySpec::Directional(spec).into())
-        }
+        "directional" => directional_construction_from_json(object, construction),
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
                 QecError::InvalidCssConstruction {
@@ -752,6 +743,34 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             construction: unknown.to_owned(),
         }),
     }
+}
+
+fn directional_construction_from_json(
+    object: &Map<String, Value>,
+    construction: &str,
+) -> Result<CssConstructionSpec> {
+    let spec_value = if let Some(spec_value) = object.get("spec") {
+        for key in object.keys() {
+            if !matches!(key.as_str(), "schema_version" | "construction" | "spec") {
+                return Err(QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: format!("unknown directional construction field {key:?}"),
+                });
+            }
+        }
+        spec_value.clone()
+    } else {
+        let mut spec_object = object.clone();
+        spec_object.remove("schema_version");
+        spec_object.remove("construction");
+        Value::Object(spec_object)
+    };
+    let spec =
+        serde_json::from_value(spec_value).map_err(|error| QecError::InvalidCssConstruction {
+            construction: construction.to_owned(),
+            reason: error.to_string(),
+        })?;
+    Ok(CssFamilySpec::Directional(spec).into())
 }
 
 pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]) -> Result<()> {

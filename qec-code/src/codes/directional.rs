@@ -11,6 +11,7 @@ const HEX_COMPATIBLE_NORMALIZED_ROUTES: &[&str] = &["NE3N"];
 type Coordinate = (i64, i64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DirectionalCssSpec {
     pub torus: DirectionalTorusSpec,
     pub route: String,
@@ -21,6 +22,7 @@ pub struct DirectionalCssSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DirectionalTorusSpec {
     pub period_x: usize,
     pub period_y: usize,
@@ -29,6 +31,7 @@ pub struct DirectionalTorusSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DirectionalLayoutSpec {
     #[serde(default = "default_x_ancilla_coset")]
     pub x_ancilla_coset: DirectionalAncillaCoset,
@@ -149,7 +152,7 @@ fn parse_route(route: &str) -> Result<ParsedRoute> {
     let mut index = 0;
     let mut previous = (0_i64, 0_i64);
     let mut support = Vec::new();
-    let mut normalized = String::new();
+    let mut normalized_runs: Vec<(char, usize)> = Vec::new();
     while index < chars.len() {
         let direction = chars[index];
         let displacement = match direction {
@@ -181,9 +184,21 @@ fn parse_route(route: &str) -> Result<ParsedRoute> {
             }
             repetitions
         };
-        normalized.push(direction);
-        if repetitions > 1 {
-            normalized.push_str(&repetitions.to_string());
+        if normalized_runs
+            .last()
+            .is_some_and(|(last_direction, _)| *last_direction == direction)
+        {
+            let (_, last_repetitions) = normalized_runs
+                .last_mut()
+                .expect("last normalized route run should exist");
+            *last_repetitions = last_repetitions.checked_add(repetitions).ok_or_else(|| {
+                QecError::InvalidDirectionalRoute {
+                    route: route.to_owned(),
+                    reason: "normalized route repetition overflow".to_owned(),
+                }
+            })?;
+        } else {
+            normalized_runs.push((direction, repetitions));
         }
 
         for _ in 0..repetitions {
@@ -213,6 +228,13 @@ fn parse_route(route: &str) -> Result<ParsedRoute> {
                     reason: "route displacement overflow".to_owned(),
                 }
             })?;
+        }
+    }
+    let mut normalized = String::new();
+    for (direction, repetitions) in normalized_runs {
+        normalized.push(direction);
+        if repetitions > 1 {
+            normalized.push_str(&repetitions.to_string());
         }
     }
 
@@ -492,6 +514,10 @@ mod tests {
             parse_directional_route_support("NE2N").unwrap(),
             vec![(0, 1), (1, 2), (3, 2), (4, 3)]
         );
+        assert_eq!(
+            parse_directional_route_support("NE2EN").unwrap(),
+            vec![(0, 1), (1, 2), (3, 2), (5, 2), (6, 3)]
+        );
         assert!(parse_directional_route_support("N0E").is_err());
         assert!(parse_directional_route_support("NX").is_err());
     }
@@ -507,7 +533,26 @@ mod tests {
 
     #[test]
     fn generates_hex_ne3n_checks_in_hardware_order() {
-        let checks = build_directional_css_checks(&DirectionalCssSpec {
+        let spec = DirectionalCssSpec {
+            torus: DirectionalTorusSpec {
+                period_x: 18,
+                period_y: 4,
+                vertical_period_x_shift: 0,
+            },
+            route: "NE3N".to_owned(),
+            layout: DirectionalLayoutSpec::default(),
+            connectivity: DirectionalConnectivity::Hex,
+        };
+        let checks = build_directional_css_checks(&spec).unwrap();
+
+        assert_eq!(checks.num_cols, 36);
+        assert_eq!(checks.hx[0], vec![9, 19, 20, 21, 30]);
+        assert_eq!(checks.hz[0], vec![3, 18, 27, 28, 29]);
+    }
+
+    #[test]
+    fn canonicalizes_route_spellings_before_hex_compatibility() {
+        let canonical = build_directional_css_checks(&DirectionalCssSpec {
             torus: DirectionalTorusSpec {
                 period_x: 18,
                 period_y: 4,
@@ -519,29 +564,48 @@ mod tests {
         })
         .unwrap();
 
-        assert_eq!(checks.num_cols, 36);
-        assert_eq!(checks.hx[0], vec![9, 19, 20, 21, 30]);
-        assert_eq!(checks.hz[0], vec![3, 18, 27, 28, 29]);
+        for route in ["NEEEN", "NE2EN"] {
+            let checks = build_directional_css_checks(&DirectionalCssSpec {
+                route: route.to_owned(),
+                torus: DirectionalTorusSpec {
+                    period_x: 18,
+                    period_y: 4,
+                    vertical_period_x_shift: 0,
+                },
+                layout: DirectionalLayoutSpec::default(),
+                connectivity: DirectionalConnectivity::Hex,
+            })
+            .unwrap();
+
+            assert_eq!(checks.normalized_route, "NE3N");
+            assert_eq!(checks.route_support, canonical.route_support);
+            assert_eq!(checks.hx, canonical.hx);
+            assert_eq!(checks.hz, canonical.hz);
+        }
     }
 
     #[test]
     fn rejects_invalid_directional_specs() {
         assert!(build_directional_css_checks(&square_spec("NE")).is_err());
-        assert!(build_directional_css_checks(&DirectionalCssSpec {
-            connectivity: DirectionalConnectivity::Hex,
-            route: "NE2N".to_owned(),
-            ..square_spec("NE2N")
-        })
-        .is_err());
-        assert!(build_directional_css_checks(&DirectionalCssSpec {
-            torus: DirectionalTorusSpec {
-                period_x: 8,
-                period_y: 6,
-                vertical_period_x_shift: 1,
-            },
-            ..square_spec("NE2N")
-        })
-        .is_err());
+        assert!(
+            build_directional_css_checks(&DirectionalCssSpec {
+                connectivity: DirectionalConnectivity::Hex,
+                route: "NE2N".to_owned(),
+                ..square_spec("NE2N")
+            })
+            .is_err()
+        );
+        assert!(
+            build_directional_css_checks(&DirectionalCssSpec {
+                torus: DirectionalTorusSpec {
+                    period_x: 8,
+                    period_y: 6,
+                    vertical_period_x_shift: 1,
+                },
+                ..square_spec("NE2N")
+            })
+            .is_err()
+        );
     }
 
     #[test]
