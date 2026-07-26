@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use qec_code::family_contract::{CssFamilySpec, RequestedFamilyId};
+use qec_code::family_contract::{parse_css_construction_json, CssFamilySpec, RequestedFamilyId};
+use qec_code::QecError;
 
 const CONTRACT: &str = include_str!("../doc/hyperbolic_5_5_contract.md");
 
@@ -116,6 +117,15 @@ fn hyperbolic_5_5_contract_is_complete_and_deferred() {
     assert!(
         !CssFamilySpec::callable_requested_family_ids().contains(&RequestedFamilyId::Hyperbolic55),
         "hyperbolic_5_5 must remain absent from callable family IDs"
+    );
+    assert_eq!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"hyperbolic_5_5_quotient","num_flags":4,"r0":[1,0,3,2],"r1":[2,3,0,1],"r2":[2,3,0,1]}"#
+        ),
+        Err(QecError::UnknownCssConstruction {
+            construction: "hyperbolic_5_5_quotient".to_owned(),
+        }),
+        "hyperbolic_5_5 quotient inputs must remain non-callable until implementation"
     );
     assert_src_tree_does_not_define_callable_hyperbolic_5_5();
 }
