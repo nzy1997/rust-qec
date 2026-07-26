@@ -111,20 +111,35 @@ fn validate_period(parameter: &str, value: usize) -> Result<()> {
 
 fn checked_mul(left: usize, right: usize) -> Result<usize> {
     left.checked_mul(right)
-        .ok_or(QecError::SparseGf2DimensionOverflow {
-            operation: "toric_3d",
-        })
+        .ok_or_else(toric_3d_dimension_overflow)
 }
 
 fn checked_add(left: usize, right: usize) -> Result<usize> {
     left.checked_add(right)
-        .ok_or(QecError::SparseGf2DimensionOverflow {
-            operation: "toric_3d",
-        })
+        .ok_or_else(toric_3d_dimension_overflow)
+}
+
+fn toric_3d_dimension_overflow() -> QecError {
+    QecError::SparseGf2DimensionOverflow {
+        operation: "toric_3d",
+    }
+}
+
+fn row_buffer(capacity: usize) -> Result<Vec<Vec<usize>>> {
+    let mut rows = Vec::new();
+    rows.try_reserve_exact(capacity)
+        .map_err(|_| toric_3d_dimension_overflow())?;
+    Ok(rows)
+}
+
+fn empty_rows(len: usize) -> Result<Vec<Vec<usize>>> {
+    let mut rows = row_buffer(len)?;
+    rows.resize_with(len, Vec::new);
+    Ok(rows)
 }
 
 fn vertex_edge_rows(dims: &Toric3dDimensions) -> Result<Vec<Vec<usize>>> {
-    let mut rows = Vec::with_capacity(dims.volume);
+    let mut rows = row_buffer(dims.volume)?;
     for x in 0..dims.spec.lx {
         let previous_x = previous_coordinate(x, dims.spec.lx);
         for y in 0..dims.spec.ly {
@@ -146,7 +161,7 @@ fn vertex_edge_rows(dims: &Toric3dDimensions) -> Result<Vec<Vec<usize>>> {
 }
 
 fn edge_plaquette_rows(dims: &Toric3dDimensions) -> Result<Vec<Vec<usize>>> {
-    let mut rows = vec![Vec::new(); dims.num_edges];
+    let mut rows = empty_rows(dims.num_edges)?;
     let mut plaquette = 0;
 
     for x in 0..dims.spec.lx {

@@ -256,4 +256,16 @@ fn toric_3d_rejects_overflowing_dimensions() {
             operation: "toric_3d"
         })
     ));
+
+    let capacity_overflow_lx = isize::MAX as usize / std::mem::size_of::<Vec<usize>>() / 9 + 1;
+    assert!(matches!(
+        toric_3d_css_checks(Toric3dSpec {
+            lx: capacity_overflow_lx,
+            ly: 3,
+            lz: 3,
+        }),
+        Err(QecError::SparseGf2DimensionOverflow {
+            operation: "toric_3d"
+        })
+    ));
 }
