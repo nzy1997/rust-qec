@@ -1,6 +1,6 @@
-use qec_code::QecError;
 use qec_code::binary_chain_complex::{BinaryBoundaryMap, BinaryChainComplex};
 use qec_code::sparse_gf2::SparseGf2Matrix;
+use qec_code::QecError;
 
 fn square_complex(face_boundary: Vec<usize>) -> Result<BinaryChainComplex, QecError> {
     let boundary_1 = BinaryBoundaryMap::new(
@@ -104,11 +104,7 @@ fn corrupt_face_boundary_is_rejected() {
 #[test]
 fn boundary_maps_reject_invalid_cell_dimensions() {
     assert_eq!(
-        BinaryBoundaryMap::new(
-            2,
-            0,
-            SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap(),
-        ),
+        BinaryBoundaryMap::new(2, 0, SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap(),),
         Err(QecError::InvalidBoundaryMapDimensions {
             domain_dimension: 2,
             codomain_dimension: 0,
@@ -118,18 +114,10 @@ fn boundary_maps_reject_invalid_cell_dimensions() {
 
 #[test]
 fn chain_complex_rejects_duplicate_boundary_dimensions() {
-    let boundary_a = BinaryBoundaryMap::new(
-        1,
-        0,
-        SparseGf2Matrix::new(0, 0, vec![]).unwrap(),
-    )
-    .unwrap();
-    let boundary_b = BinaryBoundaryMap::new(
-        1,
-        0,
-        SparseGf2Matrix::new(0, 0, vec![]).unwrap(),
-    )
-    .unwrap();
+    let boundary_a =
+        BinaryBoundaryMap::new(1, 0, SparseGf2Matrix::new(0, 0, vec![]).unwrap()).unwrap();
+    let boundary_b =
+        BinaryBoundaryMap::new(1, 0, SparseGf2Matrix::new(0, 0, vec![]).unwrap()).unwrap();
 
     assert_eq!(
         BinaryChainComplex::new(vec![boundary_a, boundary_b]),
@@ -141,12 +129,8 @@ fn chain_complex_rejects_duplicate_boundary_dimensions() {
 
 #[test]
 fn chain_complex_reports_composition_shape_mismatch() {
-    let lower = BinaryBoundaryMap::new(
-        1,
-        0,
-        SparseGf2Matrix::new(1, 3, vec![vec![]]).unwrap(),
-    )
-    .unwrap();
+    let lower =
+        BinaryBoundaryMap::new(1, 0, SparseGf2Matrix::new(1, 3, vec![vec![]]).unwrap()).unwrap();
     let upper = BinaryBoundaryMap::new(
         2,
         1,
@@ -167,27 +151,23 @@ fn chain_complex_reports_composition_shape_mismatch() {
 
 #[test]
 fn css_view_reports_missing_boundary_maps() {
-    let boundary_1 = BinaryBoundaryMap::new(
-        1,
-        0,
-        SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap(),
-    )
-    .unwrap();
+    let boundary_1 =
+        BinaryBoundaryMap::new(1, 0, SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap()).unwrap();
     let only_boundary_1 = BinaryChainComplex::new(vec![boundary_1]).unwrap();
     assert_eq!(
         only_boundary_1.css_view(1),
-        Err(QecError::MissingBoundaryMap { domain_dimension: 2 })
+        Err(QecError::MissingBoundaryMap {
+            domain_dimension: 2
+        })
     );
 
-    let boundary_2 = BinaryBoundaryMap::new(
-        2,
-        1,
-        SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap(),
-    )
-    .unwrap();
+    let boundary_2 =
+        BinaryBoundaryMap::new(2, 1, SparseGf2Matrix::new(1, 1, vec![vec![0]]).unwrap()).unwrap();
     let only_boundary_2 = BinaryChainComplex::new(vec![boundary_2]).unwrap();
     assert_eq!(
         only_boundary_2.css_view(1),
-        Err(QecError::MissingBoundaryMap { domain_dimension: 1 })
+        Err(QecError::MissingBoundaryMap {
+            domain_dimension: 1
+        })
     );
 }
