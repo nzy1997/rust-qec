@@ -3,16 +3,17 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
+use crate::QecError;
 use crate::codes::built_in_css::{built_in_css_catalog, built_in_css_checks};
 use crate::codes::quantum_tanner::{
-    quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
+    QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
 use crate::codes::steane::Steane;
-use crate::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
+use crate::css::{CssCode, SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use crate::distance::{compute_distance, compute_distance_with_solver_options};
 use crate::distance_bound::{
-    random_window_css_upper_bound, randomized_css_upper_bound, RandomWindowUpperBoundOptions,
-    RandomizedUpperBoundOptions,
+    RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions, random_window_css_upper_bound,
+    randomized_css_upper_bound,
 };
 use crate::distance_exact::{
     ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
@@ -20,9 +21,8 @@ use crate::distance_exact::{
 };
 use crate::error::CssMatrixReadSource;
 use crate::family_contract::{
-    construct_css, parse_css_construction_json, CssConstructionSpec, CssFamilySpec,
+    CssConstructionSpec, CssFamilySpec, construct_css, parse_css_construction_json,
 };
-use crate::QecError;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -58,11 +58,11 @@ pub enum CodeCommands {
 #[command(arg_required_else_help = true)]
 pub struct CssArgs {
     #[command(subcommand)]
-    command: Option<CssCommands>,
+    pub command: Option<CssCommands>,
     #[arg(value_name = "CODE_ID", required = true)]
-    code_id: Option<String>,
+    pub code_id: Option<String>,
     #[arg(value_name = "MATRIX", required = true)]
-    matrix: Option<CssMatrixKind>,
+    pub matrix: Option<CssMatrixKind>,
 }
 
 impl CssArgs {
@@ -101,7 +101,7 @@ pub enum CssCommands {
     Construct {
         #[arg(long)]
         spec: PathBuf,
-        matrix: CssMatrixKind,
+        output: CssConstructionOutput,
     },
     QuantumTanner {
         #[arg(long)]
@@ -114,6 +114,13 @@ pub enum CssCommands {
 pub enum CssMatrixKind {
     Hx,
     Hz,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum CssConstructionOutput {
+    Hx,
+    Hz,
+    Metadata,
 }
 
 #[derive(Debug, Subcommand)]
@@ -217,7 +224,7 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
     match args.command {
         Some(CssCommands::List) => Ok(run_css_list()),
         Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
-        Some(CssCommands::Construct { spec, matrix }) => run_css_construction_spec(&spec, matrix),
+        Some(CssCommands::Construct { spec, output }) => run_css_construction_spec(&spec, output),
         Some(CssCommands::QuantumTanner { spec, matrix }) => run_css_quantum_tanner(&spec, matrix),
         None => {
             let code_id = args
@@ -266,10 +273,13 @@ fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
     Ok(matrix.to_json_string())
 }
 
-fn run_css_construction_spec(path: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
+fn run_css_construction_spec(
+    path: &PathBuf,
+    output: CssConstructionOutput,
+) -> Result<String, QecError> {
     let input = read_css_spec_file(path)?;
     let spec = parse_css_construction_json(&input)?;
-    export_css_construction(spec, matrix)
+    export_css_construction_output(spec, output)
 }
 
 fn run_css_quantum_tanner(spec: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
@@ -281,7 +291,30 @@ fn export_css_construction(
     spec: CssConstructionSpec,
     matrix: CssMatrixKind,
 ) -> Result<String, QecError> {
+    export_css_construction_matrix(construct_css(spec)?, matrix)
+}
+
+fn export_css_construction_output(
+    spec: CssConstructionSpec,
+    output: CssConstructionOutput,
+) -> Result<String, QecError> {
     let construction = construct_css(spec)?;
+    match output {
+        CssConstructionOutput::Hx => {
+            export_css_construction_matrix(construction, CssMatrixKind::Hx)
+        }
+        CssConstructionOutput::Hz => {
+            export_css_construction_matrix(construction, CssMatrixKind::Hz)
+        }
+        CssConstructionOutput::Metadata => Ok(serde_json::to_string(&construction)
+            .expect("validated CSS construction result should always serialize")),
+    }
+}
+
+fn export_css_construction_matrix(
+    construction: crate::family_contract::CssConstructionResult,
+    matrix: CssMatrixKind,
+) -> Result<String, QecError> {
     let rows = match matrix {
         CssMatrixKind::Hx => construction.checks.h_x,
         CssMatrixKind::Hz => construction.checks.h_z,

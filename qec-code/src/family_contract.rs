@@ -17,6 +17,7 @@ use crate::codes::quantum_tanner::{
 };
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
+use crate::sparse_gf2::SparseGf2Matrix;
 
 pub const CSS_CONSTRUCTION_SCHEMA_VERSION: u64 = 1;
 
@@ -753,62 +754,48 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         left: left_spec,
         right: right_spec,
     } = spec;
-    let left = canonical_sparse_rows(left_spec.num_cols, left_spec.rows)?;
-    let right = canonical_sparse_rows(right_spec.num_cols, right_spec.rows)?;
-    let m_1 = left.len();
-    let n_1 = left_spec.num_cols;
-    let m_2 = right.len();
-    let n_2 = right_spec.num_cols;
-    let right_columns = transpose_supports(n_2, &right);
-    let left_columns = transpose_supports(n_1, &left);
-    let right_offset = n_1 * n_2;
+    let left = classical_check_matrix(left_spec)?;
+    let right = classical_check_matrix(right_spec)?;
 
-    let mut h_x = Vec::with_capacity(m_1 * n_2);
-    for row_1 in 0..m_1 {
-        for column_2 in 0..n_2 {
-            let mut row = left[row_1]
-                .iter()
-                .map(|&column_1| column_1 * n_2 + column_2)
-                .collect::<Vec<_>>();
-            row.extend(
-                right_columns[column_2]
-                    .iter()
-                    .map(|&row_2| right_offset + row_1 * m_2 + row_2),
-            );
-            h_x.push(row);
-        }
-    }
+    let left_identity_rows = SparseGf2Matrix::identity(left.num_rows())?;
+    let left_identity_cols = SparseGf2Matrix::identity(left.num_cols())?;
+    let right_identity_rows = SparseGf2Matrix::identity(right.num_rows())?;
+    let right_identity_cols = SparseGf2Matrix::identity(right.num_cols())?;
+    let left_transpose = left.transpose()?;
+    let right_transpose = right.transpose()?;
 
-    let mut h_z = Vec::with_capacity(n_1 * m_2);
-    for column_1 in 0..n_1 {
-        for row_2 in 0..m_2 {
-            let mut row = right[row_2]
-                .iter()
-                .map(|&column_2| column_1 * n_2 + column_2)
-                .collect::<Vec<_>>();
-            row.extend(
-                left_columns[column_1]
-                    .iter()
-                    .map(|&row_1| right_offset + row_1 * m_2 + row_2),
-            );
-            h_z.push(row);
-        }
+    let h_x = left
+        .kron(&right_identity_cols)?
+        .hconcat(&left_identity_rows.kron(&right_transpose)?)?;
+    let h_z = left_identity_cols
+        .kron(&right)?
+        .hconcat(&left_transpose.kron(&right_identity_rows)?)?;
+
+    if h_x.num_cols() != h_z.num_cols() {
+        return Err(QecError::InvalidCssConstruction {
+            construction: "hypergraph_product".to_owned(),
+            reason: format!(
+                "H_X width {} does not match H_Z width {}",
+                h_x.num_cols(),
+                h_z.num_cols()
+            ),
+        });
     }
 
     let mut parameters = BTreeMap::new();
     parameters.insert(
         "left".to_owned(),
         serde_json::to_value(CssClassicalCheckSpec {
-            num_cols: n_1,
-            rows: left.clone(),
+            num_cols: left.num_cols(),
+            rows: left.rows().to_vec(),
         })
         .expect("serializable spec"),
     );
     parameters.insert(
         "right".to_owned(),
         serde_json::to_value(CssClassicalCheckSpec {
-            num_cols: n_2,
-            rows: right.clone(),
+            num_cols: right.num_cols(),
+            rows: right.rows().to_vec(),
         })
         .expect("serializable spec"),
     );
@@ -816,13 +803,28 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         "hypergraph_product",
         None,
         parameters,
-        n_1 * n_2 + m_1 * m_2,
-        h_x,
-        h_z,
+        h_x.num_cols(),
+        h_x.rows().to_vec(),
+        h_z.rows().to_vec(),
         "hypergraph_product",
         "CssConstructionSpec::HypergraphProduct",
         None,
     )
+}
+
+fn classical_check_matrix(spec: CssClassicalCheckSpec) -> Result<SparseGf2Matrix> {
+    for (row_index, row) in spec.rows.iter().enumerate() {
+        let mut supports = std::collections::BTreeSet::new();
+        for &support in row {
+            if !supports.insert(support) {
+                return Err(QecError::DuplicateSparseRowSupport {
+                    row: row_index,
+                    support,
+                });
+            }
+        }
+    }
+    SparseGf2Matrix::new(spec.rows.len(), spec.num_cols, spec.rows)
 }
 
 fn construction_result(
@@ -921,16 +923,6 @@ fn dense_rows(n: usize, rows: &[Vec<usize>]) -> Vec<Vec<u8>> {
             dense
         })
         .collect()
-}
-
-fn transpose_supports(num_cols: usize, rows: &[Vec<usize>]) -> Vec<Vec<usize>> {
-    let mut columns = vec![Vec::new(); num_cols];
-    for (row, support) in rows.iter().enumerate() {
-        for &column in support {
-            columns[column].push(row);
-        }
-    }
-    columns
 }
 
 fn surface_construction_from_json(
