@@ -892,6 +892,32 @@ fn run_code_css_construct_json_surface_rotated_d3_matches_inline_fixture() {
 }
 
 #[test]
+fn run_code_css_construct_json_directional_square_hx_matches_fixture() {
+    let dir = tempdir().unwrap();
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/directional/square_ne2n_8x6.json")).unwrap();
+    let request = serde_json::to_string(&fixture["request"]).unwrap();
+    let spec = write_matrix_file(dir.path(), "directional-square.json", &request);
+
+    let hx = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css"),
+        OsString::from("construct"),
+        OsString::from("--spec"),
+        spec.into_os_string(),
+        OsString::from("hx"),
+    ])
+    .unwrap();
+
+    let expected = serde_json::json!({
+        "format": "sparse_rows",
+        "num_cols": 24,
+        "rows": fixture["checks"]["h_x"],
+    });
+    assert_eq!(hx, serde_json::to_string(&expected).unwrap());
+}
+
+#[test]
 fn run_code_css_construct_json_rejects_unknown_schema() {
     let dir = tempdir().unwrap();
     let spec = write_matrix_file(
