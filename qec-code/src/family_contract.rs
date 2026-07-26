@@ -12,8 +12,14 @@ use crate::codes::built_in_css::{
 };
 use crate::codes::color_666::{COLOR_666_CONSTRUCTION_ID, color_666_sparse_checks};
 pub use crate::codes::color_666::{Color666FamilySpec, Color666Layout};
+use crate::codes::directional::{
+    DirectionalConnectivity, DirectionalCssSpec, build_directional_css_checks,
+};
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
+};
+use crate::codes::random_two_block::{
+    RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
 };
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
@@ -123,7 +129,9 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    RandomTwoBlock(RandomTwoBlockSpec),
     Color666(Color666FamilySpec),
+    Directional(DirectionalCssSpec),
 }
 
 impl CssFamilySpec {
@@ -131,7 +139,9 @@ impl CssFamilySpec {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
+            RequestedFamilyId::Directional,
         ]
     }
 }
@@ -263,6 +273,36 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 None,
             )
         }
+        CssConstructionSpec::Family(CssFamilySpec::RandomTwoBlock(spec)) => {
+            let checks = random_two_block_css_checks(&spec)?;
+            let parameters = random_two_block_normalized_parameters(&spec, &checks);
+            construction_result(
+                "random_two_block",
+                Some(RequestedFamilyId::RandomTwoBlock),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                "random_two_block",
+                "CssFamilySpec::RandomTwoBlock",
+                None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
+            let checks = build_directional_css_checks(&spec)?;
+            let parameters = directional_normalized_parameters(&spec, &checks);
+            construction_result(
+                checks.code_id,
+                Some(RequestedFamilyId::Directional),
+                parameters,
+                checks.num_cols,
+                checks.hx,
+                checks.hz,
+                "directional",
+                "CssFamilySpec::Directional",
+                directional_known_distances(&spec, &checks.normalized_route),
+            )
+        }
         CssConstructionSpec::Family(CssFamilySpec::Color666(spec)) => {
             let checks = color_666_sparse_checks(&spec)?;
             let mut parameters = BTreeMap::new();
@@ -302,6 +342,53 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 None,
             )
         }
+    }
+}
+
+fn directional_normalized_parameters(
+    spec: &DirectionalCssSpec,
+    checks: &crate::codes::directional::DirectionalCssChecks,
+) -> BTreeMap<String, Value> {
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "torus".to_owned(),
+        serde_json::to_value(&spec.torus).expect("serializable directional torus"),
+    );
+    parameters.insert("route".to_owned(), Value::from(spec.route.clone()));
+    parameters.insert(
+        "normalized_route".to_owned(),
+        Value::from(checks.normalized_route.clone()),
+    );
+    parameters.insert(
+        "route_support".to_owned(),
+        serde_json::to_value(&checks.route_support)
+            .expect("serializable directional route support"),
+    );
+    parameters.insert(
+        "layout".to_owned(),
+        serde_json::to_value(&spec.layout).expect("serializable directional layout"),
+    );
+    parameters.insert(
+        "connectivity".to_owned(),
+        serde_json::to_value(spec.connectivity).expect("serializable directional connectivity"),
+    );
+    parameters
+}
+
+fn directional_known_distances(
+    spec: &DirectionalCssSpec,
+    normalized_route: &str,
+) -> Option<(usize, usize)> {
+    match (
+        spec.torus.period_x,
+        spec.torus.period_y,
+        spec.torus.vertical_period_x_shift,
+        normalized_route,
+        spec.connectivity,
+    ) {
+        (8, 6, 4, "NE2N", DirectionalConnectivity::Square) => Some((3, 3)),
+        (18, 4, 0, "NE3N", DirectionalConnectivity::Hex) => Some((4, 4)),
+        _ => None,
     }
 }
 
@@ -664,6 +751,52 @@ fn quantum_tanner_normalized_parameters(spec: &QuantumTannerSpec) -> BTreeMap<St
     parameters
 }
 
+fn random_two_block_normalized_parameters(
+    spec: &RandomTwoBlockSpec,
+    checks: &crate::codes::random_two_block::RandomTwoBlockCssChecks,
+) -> BTreeMap<String, Value> {
+    let mut group = BTreeMap::new();
+    group.insert("order".to_owned(), Value::from(spec.group.order()));
+    group.insert("identity".to_owned(), Value::from(spec.group.identity()));
+    group.insert(
+        "multiplication_table".to_owned(),
+        serde_json::to_value(spec.group.multiplication_table())
+            .expect("serializable random two-block group table"),
+    );
+
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "group".to_owned(),
+        serde_json::to_value(group).expect("serializable random two-block group"),
+    );
+    parameters.insert(
+        "group_digest".to_owned(),
+        Value::from(checks.metadata.group_digest.clone()),
+    );
+    parameters.insert("seed".to_owned(), Value::from(checks.metadata.seed));
+    parameters.insert(
+        "support_a_weight".to_owned(),
+        Value::from(checks.metadata.support_a_weight),
+    );
+    parameters.insert(
+        "support_b_weight".to_owned(),
+        Value::from(checks.metadata.support_b_weight),
+    );
+    parameters.insert(
+        "algorithm_version".to_owned(),
+        Value::from(checks.metadata.algorithm_version),
+    );
+    parameters.insert(
+        "support_a".to_owned(),
+        serde_json::to_value(&checks.support_a).expect("serializable support A"),
+    );
+    parameters.insert(
+        "support_b".to_owned(),
+        serde_json::to_value(&checks.support_b).expect("serializable support B"),
+    );
+    parameters
+}
+
 pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
@@ -704,6 +837,10 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
         }
+        "random_two_block" => {
+            Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
+        }
+        "directional" => directional_construction_from_json(object, construction),
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
                 QecError::InvalidCssConstruction {
@@ -719,6 +856,34 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             construction: unknown.to_owned(),
         }),
     }
+}
+
+fn directional_construction_from_json(
+    object: &Map<String, Value>,
+    construction: &str,
+) -> Result<CssConstructionSpec> {
+    let spec_value = if let Some(spec_value) = object.get("spec") {
+        for key in object.keys() {
+            if !matches!(key.as_str(), "schema_version" | "construction" | "spec") {
+                return Err(QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: format!("unknown directional construction field {key:?}"),
+                });
+            }
+        }
+        spec_value.clone()
+    } else {
+        let mut spec_object = object.clone();
+        spec_object.remove("schema_version");
+        spec_object.remove("construction");
+        Value::Object(spec_object)
+    };
+    let spec =
+        serde_json::from_value(spec_value).map_err(|error| QecError::InvalidCssConstruction {
+            construction: construction.to_owned(),
+            reason: error.to_string(),
+        })?;
+    Ok(CssFamilySpec::Directional(spec).into())
 }
 
 pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]) -> Result<()> {

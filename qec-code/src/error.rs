@@ -17,6 +17,10 @@ pub enum QecError {
         construction: String,
         reason: String,
     },
+    #[error("invalid directional route {route}: {reason}")]
+    InvalidDirectionalRoute { route: String, reason: String },
+    #[error("invalid directional CSS specification: {reason}")]
+    InvalidDirectionalCssSpec { reason: String },
     #[error("row width mismatch: expected {expected}, got {actual}")]
     RowWidthMismatch { expected: usize, actual: usize },
     #[error("invalid symplectic row width: expected even width, got {width}")]
@@ -99,6 +103,13 @@ pub enum QecError {
     },
     #[error("unsupported regular classical matrix algorithm version {algorithm_version}")]
     UnsupportedRegularClassicalMatrixAlgorithm { algorithm_version: u32 },
+    #[error("invalid random two-block spec option {option}: {reason}")]
+    InvalidRandomTwoBlockSpec {
+        option: &'static str,
+        reason: String,
+    },
+    #[error("unsupported random two-block algorithm version {algorithm_version}")]
+    UnsupportedRandomTwoBlockAlgorithm { algorithm_version: u32 },
     #[error("regular classical matrix stub-count overflow for {side}")]
     RegularClassicalMatrixStubCountOverflow { side: &'static str },
     #[error(
@@ -224,9 +235,7 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error(
-        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
-    )]
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

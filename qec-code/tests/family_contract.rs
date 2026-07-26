@@ -38,6 +38,22 @@ fn assert_canonical_sparse_rows(rows: &[Vec<usize>]) {
     }
 }
 
+fn assert_directional_json_error_contains(input: &str, expected_reason: &str) {
+    match parse_css_construction_json(input) {
+        Err(QecError::InvalidCssConstruction {
+            construction,
+            reason,
+        }) => {
+            assert_eq!(construction, "directional");
+            assert!(
+                reason.contains(expected_reason),
+                "expected {reason:?} to contain {expected_reason:?}"
+            );
+        }
+        other => panic!("expected invalid directional JSON, got {other:?}"),
+    }
+}
+
 #[test]
 fn unified_family_contract_preserves_requested_family_ids() {
     let ids = serde_json::to_value(RequestedFamilyId::ALL).unwrap();
@@ -164,7 +180,9 @@ fn planned_families_have_no_callable_stub() {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
+            RequestedFamilyId::Directional,
         ]
     );
 }
@@ -264,6 +282,176 @@ fn quantum_tanner_json_adapter_constructs_fixture() {
         serde_json::to_string(&result.normalized_parameters).unwrap(),
         serde_json::to_string(&repeated.normalized_parameters).unwrap(),
         "quantum Tanner normalized parameters should serialize deterministically"
+    );
+}
+
+#[test]
+fn directional_json_adapter_constructs_square_fixture_with_deterministic_metadata() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/directional/square_ne2n_8x6.json")).unwrap();
+    let request = serde_json::to_string(&fixture["request"]).unwrap();
+
+    let parsed = parse_css_construction_json(&request).unwrap();
+    let result = construct_css(parsed.clone()).unwrap();
+
+    assert_eq!(result.construction_id, "directional");
+    assert_eq!(
+        result.requested_family_id,
+        Some(RequestedFamilyId::Directional)
+    );
+    assert_eq!(result.stats.d_x, Some(3));
+    assert_eq!(result.stats.d_z, Some(3));
+    assert_eq!(
+        result.checks.h_x,
+        serde_json::from_value::<Vec<Vec<usize>>>(fixture["checks"]["h_x"].clone()).unwrap()
+    );
+    assert_eq!(
+        result.checks.h_z,
+        serde_json::from_value::<Vec<Vec<usize>>>(fixture["checks"]["h_z"].clone()).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(&result.normalized_parameters).unwrap(),
+        serde_json::json!({
+            "torus": {
+                "period_x": 8,
+                "period_y": 6,
+                "vertical_period_x_shift": 4
+            },
+            "route": "NE2N",
+            "normalized_route": "NE2N",
+            "route_support": [[0, 1], [1, 2], [3, 2], [4, 3]],
+            "layout": {
+                "x_ancilla_coset": "odd_even",
+                "z_ancilla_coset": "even_odd"
+            },
+            "connectivity": "square"
+        })
+    );
+    assert_eq!(result.provenance.adapter, "directional");
+    assert_eq!(result.provenance.source, "CssFamilySpec::Directional");
+
+    let repeated = construct_css(parsed).unwrap();
+    assert_eq!(
+        result.provenance.normalized_input_digest, repeated.provenance.normalized_input_digest,
+        "directional normalized metadata digest should be deterministic"
+    );
+}
+
+#[test]
+fn directional_json_adapter_accepts_direct_top_level_spec() {
+    let parsed = parse_css_construction_json(
+        r#"{
+            "schema_version": 1,
+            "construction": "directional",
+            "torus": {
+                "period_x": 8,
+                "period_y": 6,
+                "vertical_period_x_shift": 4
+            },
+            "route": "NE2N",
+            "connectivity": "square"
+        }"#,
+    )
+    .unwrap();
+    let result = construct_css(parsed).unwrap();
+
+    assert_eq!(result.stats.d_x, Some(3));
+    assert_eq!(result.stats.d_z, Some(3));
+    assert_eq!(
+        result.normalized_parameters["normalized_route"],
+        serde_json::json!("NE2N")
+    );
+}
+
+#[test]
+fn directional_json_adapter_leaves_unknown_distances_unset() {
+    let parsed = parse_css_construction_json(
+        r#"{
+            "schema_version": 1,
+            "construction": "directional",
+            "torus": {
+                "period_x": 10,
+                "period_y": 6,
+                "vertical_period_x_shift": 0
+            },
+            "route": "NE2N",
+            "connectivity": "square"
+        }"#,
+    )
+    .unwrap();
+    let result = construct_css(parsed).unwrap();
+
+    assert_eq!(result.stats.n, 30);
+    assert_eq!(result.stats.d_x, None);
+    assert_eq!(result.stats.d_z, None);
+}
+
+#[test]
+fn directional_json_adapter_canonicalizes_hex_route_spellings() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/directional/hex_ne3n_18x4.json")).unwrap();
+    let expected_h_x: Vec<Vec<usize>> =
+        serde_json::from_value(fixture["checks"]["h_x"].clone()).unwrap();
+    let expected_h_z: Vec<Vec<usize>> =
+        serde_json::from_value(fixture["checks"]["h_z"].clone()).unwrap();
+
+    for route in ["NEEEN", "NE2EN"] {
+        let mut request = fixture["request"].clone();
+        request["spec"]["route"] = serde_json::json!(route);
+        let parsed = parse_css_construction_json(&serde_json::to_string(&request).unwrap())
+            .expect("equivalent hex route spelling should parse");
+        let result = construct_css(parsed).expect("equivalent hex route spelling should construct");
+
+        assert_eq!(result.stats.d_x, Some(4));
+        assert_eq!(result.stats.d_z, Some(4));
+        assert_eq!(
+            result.normalized_parameters["normalized_route"],
+            serde_json::json!("NE3N")
+        );
+        assert_eq!(result.checks.h_x, expected_h_x);
+        assert_eq!(result.checks.h_z, expected_h_z);
+    }
+}
+
+#[test]
+fn directional_json_adapter_rejects_misspelled_fields() {
+    let direct_top_level = r#"{
+        "schema_version": 1,
+        "construction": "directional",
+        "torus": {
+            "period_x": 8,
+            "period_y": 6,
+            "vertical_period_x_shfit": 4
+        },
+        "route": "NE2N",
+        "connectivity": "square"
+    }"#;
+    assert_directional_json_error_contains(direct_top_level, "unknown field");
+    assert_directional_json_error_contains(direct_top_level, "vertical_period_x_shfit");
+
+    assert_directional_json_error_contains(
+        r#"{
+            "schema_version": 1,
+            "construction": "directional",
+            "spec": {
+                "torus": {"period_x": 8, "period_y": 6, "vertical_period_x_shift": 4},
+                "route": "NE2N",
+                "connectivty": "hex"
+            }
+        }"#,
+        "connectivty",
+    );
+    assert_directional_json_error_contains(
+        r#"{
+            "schema_version": 1,
+            "construction": "directional",
+            "spec": {
+                "torus": {"period_x": 8, "period_y": 6, "vertical_period_x_shift": 4},
+                "route": "NE2N"
+            },
+            "connectivty": "hex"
+        }"#,
+        "connectivty",
     );
 }
 
