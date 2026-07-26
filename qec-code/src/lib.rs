@@ -17,6 +17,7 @@ pub mod logical;
 pub mod packed_gf2;
 pub mod pauli;
 pub mod regular_classical;
+pub mod sparse_gf2;
 mod symplectic;
 
 pub use code::StabilizerCode;
