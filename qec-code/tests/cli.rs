@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli, CodeCommands, Commands, CssArgs, CssMatrixKind};
 use qec_code::QecError;
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -146,6 +146,8 @@ const BB144_PARAMETERIZED_SPEC: &str = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:
 const BB_FAMILY_CATALOG_SPEC: &str =
     "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...";
 const BB_INVALID_LX_ERROR: &str = "out-of-range built-in CSS integer parameter lx for family bb: 0";
+const TORIC_3D_PARAMETERIZED_SPEC: &str = "toric_3d:lx=3,ly=3,lz=3";
+const TORIC_3D_FAMILY_CATALOG_SPEC: &str = "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>";
 
 fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
@@ -220,6 +222,16 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         code_id: "toric:d=3",
         matrix: "hz",
         fixture: "toric_d3_hz.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: TORIC_3D_PARAMETERIZED_SPEC,
+        matrix: "hx",
+        fixture: "toric_3d_3x3x3_hx.json",
+    },
+    BuiltInCssFixtureCase {
+        code_id: TORIC_3D_PARAMETERIZED_SPEC,
+        matrix: "hz",
+        fixture: "toric_3d_3x3x3_hz.json",
     },
 ];
 
@@ -549,6 +561,46 @@ fn code_css_toric_d3_hz_prints_workspace_fixture() {
 }
 
 #[test]
+fn code_css_toric_3d_3x3x3_hx_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", TORIC_3D_PARAMETERIZED_SPEC, "hx"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/toric_3d_3x3x3_hx.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_toric_3d_3x3x3_hz_prints_workspace_fixture() {
+    let output = run_qec_code(&["code", "css", TORIC_3D_PARAMETERIZED_SPEC, "hz"]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    let expected = read_fixture("qec-code/tests/fixtures/css/toric_3d_3x3x3_hz.json");
+
+    assert_eq!(stdout, expected);
+}
+
+#[test]
+fn code_css_toric_3d_rejects_degenerate_periods() {
+    let output = run_qec_code(&["code", "css", "toric_3d:lx=2,ly=3,lz=3", "hx"]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+
+    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
+    assert!(
+        stderr.contains("out-of-range built-in CSS integer parameter lx for family toric_3d: 2"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
 fn code_css_toric_missing_or_bad_distance_fails() {
     #[derive(Debug)]
     struct FailureCase {
@@ -673,6 +725,10 @@ fn code_css_list_includes_supported_built_ins() {
     );
     assert!(
         stdout.contains("toric:d=<distance>"),
+        "stdout was: {stdout}"
+    );
+    assert!(
+        stdout.contains(TORIC_3D_FAMILY_CATALOG_SPEC),
         "stdout was: {stdout}"
     );
     assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
@@ -894,7 +950,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
 
     let width = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...".len();
     let expected = format!(
-        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm96:width$}  fixed Table A1 P=96 APM-CSS code\n  {apm192:width$}  fixed Table A1 P=192 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {color_666:width$}  triangular 6.6.6 color CSS code, odd distance >= 3\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2",
+        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm96:width$}  fixed Table A1 P=96 APM-CSS code\n  {apm192:width$}  fixed Table A1 P=192 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {color_666:width$}  triangular 6.6.6 color CSS code, odd distance >= 3\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2\n  {toric_3d:width$}  periodic cubic 3D toric CSS code, periods >= 3",
         steane = "steane",
         bb72 = "bb72",
         apm96 = "apm_kasai:p=96",
@@ -905,6 +961,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
         surf = "surface_rotated:d=<distance>",
         color_666 = "color_666:d=<distance>",
         toric = "toric:d=<distance>",
+        toric_3d = TORIC_3D_FAMILY_CATALOG_SPEC,
         width = width,
     );
     assert_eq!(output, expected);
@@ -2062,12 +2119,16 @@ fn random_window_upper_bound_doc_contract() {
     let file_block = css_distance_doc_command_block("css_distance:random_window_files");
     assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hx.json"));
     assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hz.json"));
-    assert!(workspace_root()
-        .join("qec-code/tests/fixtures/css/steane_hx.json")
-        .exists());
-    assert!(workspace_root()
-        .join("qec-code/tests/fixtures/css/steane_hz.json")
-        .exists());
+    assert!(
+        workspace_root()
+            .join("qec-code/tests/fixtures/css/steane_hx.json")
+            .exists()
+    );
+    assert!(
+        workspace_root()
+            .join("qec-code/tests/fixtures/css/steane_hz.json")
+            .exists()
+    );
 
     let files = assert_random_window_doc_json(&file_command);
     assert_eq!(files["upper_bound"], 3);

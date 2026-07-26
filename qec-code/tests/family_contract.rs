@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use qec_code::QecError;
 use qec_code::codes::quantum_tanner::quantum_tanner_spec_from_json_str;
+use qec_code::codes::toric_3d::Toric3dSpec;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     CLASSICAL_IDENTITY_2, CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec,
@@ -174,12 +175,31 @@ fn inline_json_and_rust_routes_lower_to_same_spec() {
 }
 
 #[test]
+fn inline_json_and_rust_routes_lower_to_same_toric_3d_spec() {
+    let inline = CssConstructionSpec::from_inline("toric_3d:lx=3,ly=4,lz=5").unwrap();
+    let json = parse_css_construction_json(
+        r#"{"schema_version":1,"construction":"toric_3d","lx":3,"ly":4,"lz":5}"#,
+    )
+    .unwrap();
+    let rust_api = CssFamilySpec::Toric3d(Toric3dSpec {
+        lx: 3,
+        ly: 4,
+        lz: 5,
+    })
+    .into();
+
+    assert_eq!(inline, json);
+    assert_eq!(json, rust_api);
+}
+
+#[test]
 fn planned_families_have_no_callable_stub() {
     assert_eq!(
         CssFamilySpec::callable_requested_family_ids(),
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,

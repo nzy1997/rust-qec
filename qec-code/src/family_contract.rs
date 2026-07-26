@@ -21,6 +21,7 @@ use crate::codes::quantum_tanner::{
 use crate::codes::random_two_block::{
     RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
 };
+use crate::codes::toric_3d::{Toric3dSpec, toric_3d_css_checks};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
 use crate::sparse_gf2::SparseGf2Matrix;
@@ -135,6 +136,7 @@ pub struct ShorLikeSpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    Toric3d(Toric3dSpec),
     RandomTwoBlock(RandomTwoBlockSpec),
     Color666(Color666FamilySpec),
     ShorLike(ShorLikeSpec),
@@ -146,6 +148,7 @@ impl CssFamilySpec {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,
@@ -219,6 +222,14 @@ impl CssConstructionSpec {
             .into());
         }
 
+        if let BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::Toric3d,
+            params: BuiltInCssParams::Toric3d(spec),
+        } = parsed
+        {
+            return Ok(CssFamilySpec::Toric3d(spec).into());
+        }
+
         Ok(Self::LegacyBuiltIn(LegacyBuiltInCssSpec {
             code_id: input.to_owned(),
         }))
@@ -279,6 +290,24 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "quantum_tanner",
                 "CssFamilySpec::QuantumTanner",
                 None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::Toric3d(spec)) => {
+            let checks = toric_3d_css_checks(spec)?;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("lx".to_owned(), Value::from(spec.lx));
+            parameters.insert("ly".to_owned(), Value::from(spec.ly));
+            parameters.insert("lz".to_owned(), Value::from(spec.lz));
+            construction_result(
+                "toric_3d",
+                Some(RequestedFamilyId::Toric3d),
+                parameters,
+                checks.num_cols,
+                checks.hx,
+                checks.hz,
+                "toric_3d_chain_complex",
+                "CssFamilySpec::Toric3d",
+                Some((checks.distances.d_x, checks.distances.d_z)),
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::RandomTwoBlock(spec)) => {
@@ -923,6 +952,15 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             let spec_json = serde_json::to_string(&spec_object)
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
+        }
+        "toric_3d" => {
+            let spec = Toric3dSpec {
+                lx: required_usize(object, "lx", construction)?,
+                ly: required_usize(object, "ly", construction)?,
+                lz: required_usize(object, "lz", construction)?,
+            };
+            toric_3d_css_checks(spec)?;
+            Ok(CssFamilySpec::Toric3d(spec).into())
         }
         "random_two_block" => {
             Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
