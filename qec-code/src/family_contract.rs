@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::binary::try_binary_rank;
 use crate::codes::built_in_css::{
@@ -210,6 +211,8 @@ pub struct CssCodeStats {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CssConstructionProvenance {
     pub adapter: String,
+    pub source: String,
+    pub normalized_input_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -237,18 +240,15 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hx,
                 checks.hz,
                 "quantum_tanner",
+                "CssFamilySpec::QuantumTanner",
                 None,
             )
         }
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
-            if let Ok(BuiltInCssCodeSpec::Family {
-                family: BuiltInCssFamily::SurfaceRotated,
-                params: BuiltInCssParams::Distance { distance },
-            }) = parse_built_in_css_code_spec(&spec.code_id)
-            {
-                return construct_legacy_surface(SurfaceFamilySpec { distance });
+            if let Some(distance) = legacy_surface_distance_from_code_id(&spec.code_id) {
+                preflight_legacy_surface_overflow(distance)?;
             }
 
             let checks = built_in_css_checks(&spec.code_id)?;
@@ -262,20 +262,25 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hx,
                 checks.hz,
                 "built_in_css",
+                "CssConstructionSpec::LegacyBuiltIn",
                 None,
             )
         }
     }
 }
 
-fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionResult> {
-    validate_surface_distance("distance", spec.distance)?;
-    spec.distance
-        .checked_mul(spec.distance)
-        .ok_or_else(|| surface_overflow("data qubit count"))?;
-    if spec.distance > isize::MAX as usize / 2 {
-        return Err(surface_overflow("rotated coordinate arithmetic"));
+fn legacy_surface_distance_from_code_id(code_id: &str) -> Option<usize> {
+    match parse_built_in_css_code_spec(code_id).ok()? {
+        BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::SurfaceRotated,
+            params: BuiltInCssParams::Distance { distance },
+        } => Some(distance),
+        _ => None,
     }
+}
+
+fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionResult> {
+    preflight_legacy_surface_overflow(spec.distance)?;
 
     let checks = built_in_css_checks(&format!("surface_rotated:d={}", spec.distance))?;
     let mut parameters = BTreeMap::new();
@@ -288,6 +293,7 @@ fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionRe
         checks.hx,
         checks.hz,
         "built_in_css",
+        "CssFamilySpec::Surface",
         Some((spec.distance, spec.distance)),
     )
 }
@@ -324,6 +330,7 @@ fn construct_surface(spec: SurfaceSpec) -> Result<CssConstructionResult> {
         h_x,
         h_z,
         "surface",
+        "CssConstructionSpec::Surface",
         Some((spec.column_distance, spec.row_distance)),
     )
 }
@@ -348,6 +355,16 @@ fn validate_surface_distance(parameter: &'static str, value: usize) -> Result<()
             construction: "surface".to_owned(),
             reason: format!("{parameter} must be at least 2, got {value}"),
         });
+    }
+    Ok(())
+}
+
+fn preflight_legacy_surface_overflow(distance: usize) -> Result<()> {
+    distance
+        .checked_mul(distance)
+        .ok_or_else(|| surface_overflow("data qubit count"))?;
+    if distance > isize::MAX as usize / 2 {
+        return Err(surface_overflow("rotated coordinate arithmetic"));
     }
     Ok(())
 }
@@ -757,6 +774,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         h_x,
         h_z,
         "hypergraph_product",
+        "CssConstructionSpec::HypergraphProduct",
         None,
     )
 }
@@ -769,8 +787,17 @@ fn construction_result(
     h_x: Vec<Vec<usize>>,
     h_z: Vec<Vec<usize>>,
     adapter: impl Into<String>,
+    source: impl Into<String>,
     known_distances: Option<(usize, usize)>,
 ) -> Result<CssConstructionResult> {
+    let construction_id = construction_id.into();
+    let adapter = adapter.into();
+    let source = source.into();
+    let normalized_input_digest = normalized_input_digest(
+        &construction_id,
+        requested_family_id,
+        &normalized_parameters,
+    );
     let h_x = canonical_sparse_rows(n, h_x)?;
     let h_z = canonical_sparse_rows(n, h_z)?;
     verify_css_orthogonality(n, &h_x, &h_z)?;
@@ -791,15 +818,43 @@ fn construction_result(
     };
     Ok(CssConstructionResult {
         schema_version: CSS_CONSTRUCTION_SCHEMA_VERSION,
-        construction_id: construction_id.into(),
+        construction_id,
         requested_family_id,
         normalized_parameters,
         checks: CssChecks { h_x, h_z },
         stats,
         provenance: CssConstructionProvenance {
-            adapter: adapter.into(),
+            adapter,
+            source,
+            normalized_input_digest,
         },
     })
+}
+
+fn normalized_input_digest(
+    construction_id: &str,
+    requested_family_id: Option<RequestedFamilyId>,
+    normalized_parameters: &BTreeMap<String, Value>,
+) -> String {
+    let payload = serde_json::json!({
+        "schema_version": CSS_CONSTRUCTION_SCHEMA_VERSION,
+        "construction_id": construction_id,
+        "requested_family_id": requested_family_id,
+        "normalized_parameters": normalized_parameters,
+    });
+    let json = serde_json::to_vec(&payload).expect("normalized construction input is serializable");
+    format!("sha256:{}", lower_hex(&Sha256::digest(json)))
+}
+
+fn lower_hex(bytes: impl AsRef<[u8]>) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let bytes = bytes.as_ref();
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 fn canonical_sparse_rows(n: usize, mut rows: Vec<Vec<usize>>) -> Result<Vec<Vec<usize>>> {

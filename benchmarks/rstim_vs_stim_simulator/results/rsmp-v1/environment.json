@@ -1,6 +1,6 @@
 {
   "cargo": {
-    "lock_sha256": "f77ec208e036f53c8b0053ee84459f90a08446e16eee577ba84cef2a55b035a6",
+    "lock_sha256": "c686b75aa69a970dd77e4ec39f8cb8d070064cc111863f5964a34d27ff2b9a4a",
     "zstd": "0.13.3",
     "zstd-safe": "7.2.4",
     "zstd-sys": "2.0.16+zstd.1.5.7"

@@ -173,6 +173,48 @@ fn ordinary_surface_d3_matches_fixture() {
 }
 
 #[test]
+fn generalized_surface_accepts_even_rectangular_dimensions() {
+    let rotated = construct_css(
+        SurfaceSpec {
+            layout: SurfaceLayout::Rotated,
+            row_distance: 4,
+            column_distance: 2,
+        }
+        .into(),
+    )
+    .unwrap();
+    assert_eq!(rotated.construction_id, "surface_rotated");
+    assert_eq!(rotated.stats.n, 8);
+    assert_eq!(rotated.stats.k, 1);
+    assert_eq!(rotated.stats.d_x, Some(2));
+    assert_eq!(rotated.stats.d_z, Some(4));
+    verify_css_orthogonality(rotated.stats.n, &rotated.checks.h_x, &rotated.checks.h_z).unwrap();
+
+    let unrotated = construct_css(
+        SurfaceSpec {
+            layout: SurfaceLayout::Unrotated,
+            row_distance: 2,
+            column_distance: 4,
+        }
+        .into(),
+    )
+    .unwrap();
+    assert_eq!(unrotated.construction_id, "surface_unrotated");
+    assert_eq!(unrotated.stats.n, 11);
+    assert_eq!(unrotated.stats.m_x, 4);
+    assert_eq!(unrotated.stats.m_z, 6);
+    assert_eq!(unrotated.stats.k, 1);
+    assert_eq!(unrotated.stats.d_x, Some(4));
+    assert_eq!(unrotated.stats.d_z, Some(2));
+    verify_css_orthogonality(
+        unrotated.stats.n,
+        &unrotated.checks.h_x,
+        &unrotated.checks.h_z,
+    )
+    .unwrap();
+}
+
+#[test]
 fn legacy_rotated_surface_outputs_are_unchanged() {
     let legacy_spec = SurfaceFamilySpec { distance: 3 };
     assert_eq!(
@@ -249,6 +291,42 @@ fn legacy_rotated_surface_outputs_are_unchanged() {
     assert_eq!(d3_hz, fixture_text("surface_rotated_d3_hz.json"));
     assert_eq!(d4_hx, fixture_text("surface_rotated_d4_hx.json"));
     assert_eq!(d4_hz, fixture_text("surface_rotated_d4_hz.json"));
+}
+
+#[test]
+fn legacy_built_in_surface_keeps_generic_metadata() {
+    let spec = CssConstructionSpec::LegacyBuiltIn(LegacyBuiltInCssSpec {
+        code_id: "surface_rotated:d=3".to_owned(),
+    });
+    let result = construct_css(spec).unwrap();
+    let oracle = built_in_css_checks("surface_rotated:d=3").unwrap();
+
+    assert_eq!(result.construction_id, "surface_rotated");
+    assert_eq!(result.requested_family_id, None);
+    assert_eq!(
+        result.normalized_parameters["code_id"],
+        serde_json::json!("surface_rotated:d=3")
+    );
+    assert_eq!(result.provenance.adapter, "built_in_css");
+    assert_eq!(
+        result.provenance.source,
+        "CssConstructionSpec::LegacyBuiltIn"
+    );
+    assert_eq!(result.stats.d_x, None);
+    assert_eq!(result.stats.d_z, None);
+    assert_eq!(result.checks.h_x, oracle.hx);
+    assert_eq!(result.checks.h_z, oracle.hz);
+
+    let parsed = parse_css_construction_json(
+        r#"{"schema_version":1,"construction":"legacy_built_in","code_id":"surface_rotated:d=3"}"#,
+    )
+    .unwrap();
+    let json_result = construct_css(parsed).unwrap();
+    assert_eq!(json_result.requested_family_id, None);
+    assert_eq!(
+        json_result.normalized_parameters["code_id"],
+        serde_json::json!("surface_rotated:d=3")
+    );
 }
 
 #[test]

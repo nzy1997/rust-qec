@@ -215,7 +215,7 @@ qec-code code css export surface_rotated:d=3 hz
 
 Structured JSON exposes the new layout and dimensions through the common
 `code css construct --spec <path> <matrix>` route. The compact legacy route and
-the structured rotated-square route must lower to equivalent typed specs.
+the structured rotated-square route must produce equivalent checks and stats.
 
 The built-in catalog keeps documenting the legacy compact
 `surface_rotated:d=<distance>` syntax. The new rectangular and ordinary
