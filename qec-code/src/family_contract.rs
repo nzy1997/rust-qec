@@ -13,6 +13,7 @@ use crate::codes::built_in_css::{
 use crate::codes::quantum_tanner::{
     quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
 };
+use crate::codes::toric_3d::{toric_3d_css_checks, Toric3dSpec};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
 
@@ -87,11 +88,16 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    Toric3d(Toric3dSpec),
 }
 
 impl CssFamilySpec {
     pub const fn callable_requested_family_ids() -> &'static [RequestedFamilyId] {
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Toric3d,
+        ]
     }
 }
 
@@ -140,6 +146,14 @@ impl CssConstructionSpec {
         } = parsed
         {
             return Ok(CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into());
+        }
+
+        if let BuiltInCssCodeSpec::Family {
+            family: BuiltInCssFamily::Toric3d,
+            params: BuiltInCssParams::Toric3d(spec),
+        } = parsed
+        {
+            return Ok(CssFamilySpec::Toric3d(spec).into());
         }
 
         Ok(Self::LegacyBuiltIn(LegacyBuiltInCssSpec {
@@ -211,6 +225,23 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hz,
                 "quantum_tanner",
                 "CssFamilySpec::QuantumTanner",
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::Toric3d(spec)) => {
+            let checks = toric_3d_css_checks(spec)?;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("lx".to_owned(), Value::from(spec.lx));
+            parameters.insert("ly".to_owned(), Value::from(spec.ly));
+            parameters.insert("lz".to_owned(), Value::from(spec.lz));
+            construction_result(
+                "toric_3d",
+                Some(RequestedFamilyId::Toric3d),
+                parameters,
+                checks.num_cols,
+                checks.hx,
+                checks.hz,
+                "toric_3d_chain_complex",
+                "CssFamilySpec::Toric3d",
             )
         }
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
@@ -336,6 +367,15 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             let spec_json = serde_json::to_string(&spec_object)
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
+        }
+        "toric_3d" => {
+            let spec = Toric3dSpec {
+                lx: required_usize(object, "lx", construction)?,
+                ly: required_usize(object, "ly", construction)?,
+                lz: required_usize(object, "lz", construction)?,
+            };
+            toric_3d_css_checks(spec)?;
+            Ok(CssFamilySpec::Toric3d(spec).into())
         }
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
