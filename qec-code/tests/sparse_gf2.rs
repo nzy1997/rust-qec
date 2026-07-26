@@ -1,5 +1,5 @@
+use qec_code::sparse_gf2::{hconcat, identity, kron, transpose, SparseGf2Matrix};
 use qec_code::QecError;
-use qec_code::sparse_gf2::{SparseGf2Matrix, hconcat, identity, kron, transpose};
 
 fn assert_shape_and_rows(
     matrix: &SparseGf2Matrix,
@@ -19,22 +19,46 @@ fn sparse_gf2_composition_matches_known_answers() {
 
     assert_shape_and_rows(&identity(2).unwrap(), 2, 2, &[vec![0], vec![1]]);
     assert_shape_and_rows(&transpose(&a).unwrap(), 2, 2, &[vec![0, 1], vec![1]]);
-    assert_shape_and_rows(&hconcat(&a, &b).unwrap(), 2, 4, &[vec![0, 3], vec![0, 1, 2]]);
-    assert_shape_and_rows(&kron(&a, &b).unwrap(), 4, 4, &[vec![1], vec![0], vec![1, 3], vec![0, 2]]);
+    assert_shape_and_rows(
+        &hconcat(&a, &b).unwrap(),
+        2,
+        4,
+        &[vec![0, 3], vec![0, 1, 2]],
+    );
+    assert_shape_and_rows(
+        &kron(&a, &b).unwrap(),
+        4,
+        4,
+        &[vec![1], vec![0], vec![1, 3], vec![0, 2]],
+    );
 
-    let canonicalized =
-        SparseGf2Matrix::new(2, 4, vec![vec![3, 1, 3, 2, 1], vec![2, 2]]).unwrap();
+    let canonicalized = SparseGf2Matrix::new(2, 4, vec![vec![3, 1, 3, 2, 1], vec![2, 2]]).unwrap();
     assert_shape_and_rows(&canonicalized, 2, 4, &[vec![2], vec![]]);
 
     assert_shape_and_rows(&identity(0).unwrap(), 0, 0, &[]);
 
     let empty_wide = SparseGf2Matrix::new(0, 3, vec![]).unwrap();
-    assert_shape_and_rows(&transpose(&empty_wide).unwrap(), 3, 0, &[vec![], vec![], vec![]]);
+    assert_shape_and_rows(
+        &transpose(&empty_wide).unwrap(),
+        3,
+        0,
+        &[vec![], vec![], vec![]],
+    );
 
     let empty_rows_left = SparseGf2Matrix::new(0, 2, vec![]).unwrap();
     let empty_rows_right = SparseGf2Matrix::new(0, 5, vec![]).unwrap();
-    assert_shape_and_rows(&hconcat(&empty_rows_left, &empty_rows_right).unwrap(), 0, 7, &[]);
-    assert_shape_and_rows(&kron(&empty_rows_left, &empty_rows_right).unwrap(), 0, 10, &[]);
+    assert_shape_and_rows(
+        &hconcat(&empty_rows_left, &empty_rows_right).unwrap(),
+        0,
+        7,
+        &[],
+    );
+    assert_shape_and_rows(
+        &kron(&empty_rows_left, &empty_rows_right).unwrap(),
+        0,
+        10,
+        &[],
+    );
 }
 
 #[test]

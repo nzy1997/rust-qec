@@ -87,10 +87,7 @@ pub fn transpose(matrix: &SparseGf2Matrix) -> Result<SparseGf2Matrix> {
     SparseGf2Matrix::new(matrix.num_cols, matrix.num_rows, rows)
 }
 
-pub fn hconcat(
-    left: &SparseGf2Matrix,
-    right: &SparseGf2Matrix,
-) -> Result<SparseGf2Matrix> {
+pub fn hconcat(left: &SparseGf2Matrix, right: &SparseGf2Matrix) -> Result<SparseGf2Matrix> {
     if left.num_rows != right.num_rows {
         return Err(QecError::SparseGf2HorizontalRowMismatch {
             left_rows: left.num_rows,
@@ -119,13 +116,11 @@ pub fn hconcat(
             })?;
         row.extend(left_row.iter().copied());
         for &support in right_row {
-            row.push(
-                left.num_cols.checked_add(support).ok_or(
-                    QecError::SparseGf2DimensionOverflow {
-                        operation: "hconcat",
-                    },
-                )?,
-            );
+            row.push(left.num_cols.checked_add(support).ok_or(
+                QecError::SparseGf2DimensionOverflow {
+                    operation: "hconcat",
+                },
+            )?);
         }
         rows.push(row);
     }
@@ -134,14 +129,14 @@ pub fn hconcat(
 }
 
 pub fn kron(left: &SparseGf2Matrix, right: &SparseGf2Matrix) -> Result<SparseGf2Matrix> {
-    let num_rows =
-        left.num_rows
-            .checked_mul(right.num_rows)
-            .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?;
-    let num_cols =
-        left.num_cols
-            .checked_mul(right.num_cols)
-            .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?;
+    let num_rows = left
+        .num_rows
+        .checked_mul(right.num_rows)
+        .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?;
+    let num_cols = left
+        .num_cols
+        .checked_mul(right.num_cols)
+        .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?;
 
     let mut rows = Vec::new();
     rows.try_reserve_exact(num_rows)
@@ -151,13 +146,15 @@ pub fn kron(left: &SparseGf2Matrix, right: &SparseGf2Matrix) -> Result<SparseGf2
         for right_row in &right.rows {
             let mut row = Vec::new();
             for &left_support in left_row {
-                let block_start = left_support.checked_mul(right.num_cols).ok_or(
-                    QecError::SparseGf2DimensionOverflow { operation: "kron" },
-                )?;
+                let block_start = left_support
+                    .checked_mul(right.num_cols)
+                    .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?;
                 for &right_support in right_row {
-                    row.push(block_start.checked_add(right_support).ok_or(
-                        QecError::SparseGf2DimensionOverflow { operation: "kron" },
-                    )?);
+                    row.push(
+                        block_start
+                            .checked_add(right_support)
+                            .ok_or(QecError::SparseGf2DimensionOverflow { operation: "kron" })?,
+                    );
                 }
             }
             rows.push(row);
