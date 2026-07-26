@@ -1,0 +1,515 @@
+{
+  "schema_version": 1,
+  "manifest_id": "qec_family_construction_targets_v1",
+  "provenance": [
+    "GitHub issue #552, Roadmap ID M1-01, requested the 14 normalized QEC family targets.",
+    "Repository design docs/design/2026-07-26-qec-code-family-support.md defines the shared 14-family fixture/provenance manifest direction."
+  ],
+  "verification": [
+    "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+    "cargo test -p qec-code --test family_manifest family_manifest_rejects_invalid_entries -- --exact"
+  ],
+  "intended_consumers": [
+    "qec-code construction-roadmap tracking",
+    "future qec-code executable fixture gates",
+    "issue #573 availability promotion gate"
+  ],
+  "availability_promotion_gate": {
+    "issue": 573,
+    "rule": "Supported families remain availability=planned until issue #573 verifies constructors and executable positive/negative fixture coverage before promotion to availability=available."
+  },
+  "families": [
+    {
+      "schema_version": 1,
+      "family_id": "directional",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists directional as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for directional"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "directional_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid directional construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "directional_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid directional construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "quantum_tanner",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists quantum_tanner as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for quantum_tanner"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "quantum_tanner_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid quantum_tanner construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "quantum_tanner_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid quantum_tanner construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "generalized_bicycle",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists generalized_bicycle as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for generalized_bicycle"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "generalized_bicycle_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid generalized_bicycle construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "generalized_bicycle_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid generalized_bicycle construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "la_cross",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists la_cross as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for la_cross"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "la_cross_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid la_cross construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "la_cross_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid la_cross construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "random_hgp",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists random_hgp as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for random_hgp"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "random_hgp_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid random_hgp construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "random_hgp_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid random_hgp construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "lifted_product",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists lifted_product as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for lifted_product"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "lifted_product_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid lifted_product construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "lifted_product_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid lifted_product construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "hyperbolic_5_5",
+      "disposition": "deferred",
+      "availability": "not_applicable",
+      "provenance": [
+        "GitHub issue #552 explicitly defers hyperbolic_5_5 as a research target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "research-roadmap tracking for hyperbolic_5_5"
+      ],
+      "callable_constructor": null,
+      "executable_cases": []
+    },
+    {
+      "schema_version": 1,
+      "family_id": "coprime_bb",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists coprime_bb as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for coprime_bb"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "coprime_bb_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid coprime_bb construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "coprime_bb_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid coprime_bb construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "toric_3d",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists toric_3d as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for toric_3d"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "toric_3d_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid toric_3d construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "toric_3d_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid toric_3d construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "color_666",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists color_666 as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for color_666"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "color_666_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid color_666 construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "color_666_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid color_666 construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "surface",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists surface as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for surface"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "surface_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid surface construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "surface_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid surface construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "shor_like",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists shor_like as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for shor_like"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "shor_like_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid shor_like construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "shor_like_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid shor_like construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "random_two_block",
+      "disposition": "supported",
+      "availability": "planned",
+      "provenance": [
+        "GitHub issue #552 lists random_two_block as a supported QEC construction target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
+        "issue #573 must verify constructor execution before this family can become availability=available"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "future executable fixture cases for random_two_block"
+      ],
+      "callable_constructor": null,
+      "executable_cases": [
+        {
+          "case_id": "random_two_block_positive_smoke",
+          "case_kind": "positive",
+          "expected_outcome": "success",
+          "description": "Future small valid random_two_block construction case for issue #573 availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        },
+        {
+          "case_id": "random_two_block_negative_rejection",
+          "case_kind": "negative",
+          "expected_outcome": "rejection",
+          "description": "Future invalid random_two_block construction case that must reject before availability promotion.",
+          "verification": [
+            "planned for issue #573 constructor fixture coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "family_id": "perturbed_hgp",
+      "disposition": "deferred",
+      "availability": "not_applicable",
+      "provenance": [
+        "GitHub issue #552 explicitly defers perturbed_hgp as a research target."
+      ],
+      "verification": [
+        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact"
+      ],
+      "intended_consumers": [
+        "qec-code family manifest readers",
+        "research-roadmap tracking for perturbed_hgp"
+      ],
+      "callable_constructor": null,
+      "executable_cases": []
+    }
+  ]
+}
