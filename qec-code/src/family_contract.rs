@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::binary::try_binary_rank;
 use crate::codes::built_in_css::{
@@ -166,6 +167,8 @@ pub struct CssCodeStats {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CssConstructionProvenance {
     pub adapter: String,
+    pub source: String,
+    pub normalized_input_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -193,6 +196,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hx,
                 checks.hz,
                 "built_in_css",
+                "CssFamilySpec::Surface",
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::QuantumTanner(spec)) => {
@@ -206,6 +210,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hx,
                 checks.hz,
                 "quantum_tanner",
+                "CssFamilySpec::QuantumTanner",
             )
         }
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
@@ -221,6 +226,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.hx,
                 checks.hz,
                 "built_in_css",
+                "CssConstructionSpec::LegacyBuiltIn",
             )
         }
     }
@@ -448,6 +454,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         h_x,
         h_z,
         "hypergraph_product",
+        "CssConstructionSpec::HypergraphProduct",
     )
 }
 
@@ -459,7 +466,16 @@ fn construction_result(
     h_x: Vec<Vec<usize>>,
     h_z: Vec<Vec<usize>>,
     adapter: impl Into<String>,
+    source: impl Into<String>,
 ) -> Result<CssConstructionResult> {
+    let construction_id = construction_id.into();
+    let adapter = adapter.into();
+    let source = source.into();
+    let normalized_input_digest = normalized_input_digest(
+        &construction_id,
+        requested_family_id,
+        &normalized_parameters,
+    );
     let h_x = canonical_sparse_rows(n, h_x)?;
     let h_z = canonical_sparse_rows(n, h_z)?;
     verify_css_orthogonality(n, &h_x, &h_z)?;
@@ -475,15 +491,43 @@ fn construction_result(
     };
     Ok(CssConstructionResult {
         schema_version: CSS_CONSTRUCTION_SCHEMA_VERSION,
-        construction_id: construction_id.into(),
+        construction_id,
         requested_family_id,
         normalized_parameters,
         checks: CssChecks { h_x, h_z },
         stats,
         provenance: CssConstructionProvenance {
-            adapter: adapter.into(),
+            adapter,
+            source,
+            normalized_input_digest,
         },
     })
+}
+
+fn normalized_input_digest(
+    construction_id: &str,
+    requested_family_id: Option<RequestedFamilyId>,
+    normalized_parameters: &BTreeMap<String, Value>,
+) -> String {
+    let payload = serde_json::json!({
+        "schema_version": CSS_CONSTRUCTION_SCHEMA_VERSION,
+        "construction_id": construction_id,
+        "requested_family_id": requested_family_id,
+        "normalized_parameters": normalized_parameters,
+    });
+    let json = serde_json::to_vec(&payload).expect("normalized construction input is serializable");
+    format!("sha256:{}", lower_hex(&Sha256::digest(json)))
+}
+
+fn lower_hex(bytes: impl AsRef<[u8]>) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let bytes = bytes.as_ref();
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 fn canonical_sparse_rows(n: usize, mut rows: Vec<Vec<usize>>) -> Result<Vec<Vec<usize>>> {
