@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use super::apm::{AffinePermutation, ApmCssManifestEntry, build_apm_css_checks};
-use super::color_666::{Color666FamilySpec, Color666Layout, color_666_sparse_checks};
+use super::apm::{build_apm_css_checks, AffinePermutation, ApmCssManifestEntry};
+use super::color_666::{color_666_sparse_checks, Color666FamilySpec, Color666Layout};
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -903,4 +903,18 @@ fn wrap_prev(value: usize, distance: usize) -> usize {
 
 fn wrap_next(value: usize, distance: usize) -> usize {
     (value + 1) % distance
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "color_666 only uses distance params")]
+    fn color_666_family_checks_reject_mismatched_internal_params() {
+        let _ = family_css_checks(
+            BuiltInCssFamily::Color666,
+            BuiltInCssParams::ApmKasai { p: 96 },
+        );
+    }
 }

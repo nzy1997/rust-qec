@@ -230,26 +230,48 @@ mod tests {
 
     #[test]
     fn rejects_invalid_distance_values() {
-        assert!(
-            color_666_sparse_checks(&Color666FamilySpec {
-                distance: 2,
-                layout: Color666Layout::Triangular,
-            })
-            .is_err()
-        );
-        assert!(
-            color_666_sparse_checks(&Color666FamilySpec {
-                distance: 4,
-                layout: Color666Layout::Triangular,
-            })
-            .is_err()
-        );
-        assert!(
-            color_666_sparse_checks(&Color666FamilySpec {
-                distance: usize::MAX,
-                layout: Color666Layout::Triangular,
-            })
-            .is_err()
-        );
+        assert!(color_666_sparse_checks(&Color666FamilySpec {
+            distance: 2,
+            layout: Color666Layout::Triangular,
+        })
+        .is_err());
+        assert!(color_666_sparse_checks(&Color666FamilySpec {
+            distance: 4,
+            layout: Color666Layout::Triangular,
+        })
+        .is_err());
+        assert!(color_666_sparse_checks(&Color666FamilySpec {
+            distance: usize::MAX,
+            layout: Color666Layout::Triangular,
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn defensive_lattice_helpers_report_count_and_bound_errors() {
+        assert!(matches!(
+            triangular_bound(0),
+            Err(QecError::InvalidCssConstruction {
+                construction,
+                reason
+            }) if construction == COLOR_666_CONSTRUCTION_ID
+                && reason.contains("triangular lattice bound")
+        ));
+        assert!(matches!(
+            site_index_map(1, 1),
+            Err(QecError::InvalidCssConstruction {
+                construction,
+                reason
+            }) if construction == COLOR_666_CONSTRUCTION_ID
+                && reason.contains("exceeded")
+        ));
+        assert!(matches!(
+            site_index_map(1, 4),
+            Err(QecError::InvalidCssConstruction {
+                construction,
+                reason
+            }) if construction == COLOR_666_CONSTRUCTION_ID
+                && reason.contains("did not match")
+        ));
     }
 }

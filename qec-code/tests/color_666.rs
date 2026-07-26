@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
-use qec_code::QecError;
-use qec_code::codes::built_in_css::built_in_css_checks;
+use qec_code::codes::built_in_css::{built_in_css_checks, parse_built_in_css_code_spec};
 use qec_code::codes::color_666::COLOR_666_STEANE_PERMUTATION;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
-    Color666FamilySpec, Color666Layout, CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
-    construct_css, parse_css_construction_json,
+    construct_css, parse_css_construction_json, Color666FamilySpec, Color666Layout,
+    CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
 };
+use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -210,6 +210,28 @@ fn color_666_rejects_unsupported_layout() {
 }
 
 #[test]
+fn color_666_rejects_non_string_layout() {
+    assert!(matches!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"color_666","distance":5,"layout":7}"#
+        ),
+        Err(QecError::InvalidCssConstructionJson(reason))
+            if reason.contains("missing or invalid layout")
+    ));
+}
+
+#[test]
+fn color_666_builtin_requires_distance_parameter() {
+    assert!(matches!(
+        parse_built_in_css_code_spec("color_666"),
+        Err(QecError::MissingBuiltInCssParameter {
+            family,
+            parameter
+        }) if family == "color_666" && parameter == "d"
+    ));
+}
+
+#[test]
 fn color_666_inline_spec_defaults_to_triangular_layout() {
     assert_eq!(
         CssConstructionSpec::from_inline("color_666:d=5").unwrap(),
@@ -226,6 +248,21 @@ fn color_666_json_spec_defaults_to_triangular_layout() {
     assert_eq!(
         parse_css_construction_json(
             r#"{"schema_version":1,"construction":"color_666","distance":5}"#
+        )
+        .unwrap(),
+        CssFamilySpec::Color666(Color666FamilySpec {
+            distance: 5,
+            layout: Color666Layout::Triangular,
+        })
+        .into()
+    );
+}
+
+#[test]
+fn color_666_json_spec_accepts_explicit_triangular_layout() {
+    assert_eq!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"color_666","distance":5,"layout":"triangular"}"#
         )
         .unwrap(),
         CssFamilySpec::Color666(Color666FamilySpec {
