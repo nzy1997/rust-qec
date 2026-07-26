@@ -3,7 +3,7 @@
   "manifest_id": "qec_family_construction_targets_v1",
   "provenance": [
     "GitHub issue #552, Roadmap ID M1-01, requested the 14 normalized QEC family targets.",
-    "The repository design reference named in issue #552 is absent in this checkout; this manifest is grounded in the issue body."
+    "Repository design docs/design/2026-07-26-qec-code-family-support.md defines the shared 14-family fixture/provenance manifest direction."
   ],
   "verification": [
     "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",

@@ -29,7 +29,7 @@
 - Deferred entries declare no executable cases.
 - Planned and deferred entries cannot declare a non-null `callable_constructor`.
 - This issue does not add family constructors, CLI commands, public runtime registries, or public runtime APIs.
-- The referenced file `docs/design/2026-07-26-qec-code-family-support.md` is absent in this checkout; ground implementation in GitHub issue #552 and this plan.
+- The referenced file `docs/design/2026-07-26-qec-code-family-support.md` is available from the local `master` branch but not from this worker branch's `origin/master` base; ground implementation in GitHub issue #552, that design reference, and this plan without merging unrelated base drift.
 
 ---
 
@@ -271,7 +271,7 @@ Top-level values:
   "manifest_id": "qec_family_construction_targets_v1",
   "provenance": [
     "GitHub issue #552, Roadmap ID M1-01, requested the 14 normalized QEC family targets.",
-    "The repository design reference named in issue #552 is absent in this checkout; this manifest is grounded in the issue body."
+    "Repository design docs/design/2026-07-26-qec-code-family-support.md defines the shared 14-family fixture/provenance manifest direction."
   ],
   "verification": [
     "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",

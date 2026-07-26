@@ -17,11 +17,10 @@ test-local by design: it validates the manifest contract and future executable
 case capacity without adding constructors, registries, CLI commands, or public
 runtime APIs.
 
-The issue references `docs/design/2026-07-26-qec-code-family-support.md`, but
-that file is not present in this checkout. The issue body contains the complete
-family list, lifecycle rules, negative controls, and verification commands, so
-the fixture should be grounded directly in the issue while noting the missing
-reference as an input gap.
+The issue references `docs/design/2026-07-26-qec-code-family-support.md`. That
+file is present on local `master` but not on this worker branch's
+`origin/master` base. The fixture should be grounded in the issue body and the
+design reference without merging unrelated base drift into this PR.
 
 ## Goals
 
