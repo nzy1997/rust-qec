@@ -6,3 +6,4 @@ pub mod generalized_bicycle;
 pub mod quantum_tanner;
 pub mod random_two_block;
 pub mod steane;
+pub mod toric_3d;
