@@ -38,6 +38,20 @@ pub enum QecError {
     SparseGf2HorizontalRowMismatch { left_rows: usize, right_rows: usize },
     #[error("sparse GF(2) dimension overflow during {operation}")]
     SparseGf2DimensionOverflow { operation: &'static str },
+    #[error("invalid finite group table: {reason}")]
+    InvalidFiniteGroupTable { reason: String },
+    #[error("finite group order {order} exceeds maximum supported order {max_order}")]
+    GroupOrderLimitExceeded { order: usize, max_order: usize },
+    #[error("invalid finite group element {element}: expected < {order}")]
+    InvalidFiniteGroupElement { element: usize, order: usize },
+    #[error("invalid group-algebra support {support}: expected < {order}")]
+    InvalidGroupAlgebraElementSupport { support: usize, order: usize },
+    #[error("group-algebra element order mismatch: expected {expected}, got {actual}")]
+    GroupAlgebraOrderMismatch { expected: usize, actual: usize },
+    #[error("group-algebra matrix row width mismatch: expected {expected}, got {actual}")]
+    GroupAlgebraMatrixRowWidthMismatch { expected: usize, actual: usize },
+    #[error("group-algebra dimension overflow during {operation}")]
+    GroupAlgebraDimensionOverflow { operation: &'static str },
     #[error("invalid regular classical matrix option {option}: {reason}")]
     InvalidRegularClassicalMatrixConfig {
         option: &'static str,
