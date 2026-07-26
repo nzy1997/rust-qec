@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
-use qec_code::QecError;
 use qec_code::codes::built_in_css::built_in_css_checks;
+use qec_code::codes::color_666::COLOR_666_STEANE_PERMUTATION;
 use qec_code::css::{CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
-    Color666FamilySpec, Color666Layout, CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
-    construct_css, parse_css_construction_json,
+    construct_css, parse_css_construction_json, Color666FamilySpec, Color666Layout,
+    CssConstructionSpec, CssFamilySpec, RequestedFamilyId,
 };
-
-const COLOR_TO_STEANE_PERMUTATION: [usize; 7] = [0, 3, 6, 5, 1, 4, 2];
+use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -58,6 +57,8 @@ fn permute_rows(rows: &[Vec<usize>], permutation: &[usize]) -> Vec<Vec<usize>> {
 
 #[test]
 fn color_666_d3_matches_steane_under_stable_permutation() {
+    assert_eq!(COLOR_666_STEANE_PERMUTATION, [0, 3, 6, 5, 1, 4, 2]);
+
     let result = construct_css(
         CssFamilySpec::Color666(Color666FamilySpec {
             distance: 3,
@@ -92,7 +93,7 @@ fn color_666_d3_matches_steane_under_stable_permutation() {
 
     let steane = built_in_css_checks("steane").unwrap();
     assert_eq!(
-        permute_rows(&result.checks.h_x, &COLOR_TO_STEANE_PERMUTATION),
+        permute_rows(&result.checks.h_x, &COLOR_666_STEANE_PERMUTATION),
         {
             let mut rows = steane.hx.clone();
             rows.sort();

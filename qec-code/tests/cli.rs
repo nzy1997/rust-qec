@@ -471,6 +471,58 @@ fn code_css_surface_rotated_d3_hz_prints_workspace_fixture() {
 }
 
 #[test]
+fn code_css_color_666_d5_inline_matrices_print_workspace_fixtures() {
+    for (matrix, fixture) in [
+        ("hx", "color_666_d5_hx.json"),
+        ("hz", "color_666_d5_hz.json"),
+    ] {
+        let output = run_qec_code(&["code", "css", "color_666:d=5", matrix]);
+
+        assert!(output.status.success(), "{matrix} export failed");
+        assert_eq!(output.stderr, b"", "{matrix} export printed stderr");
+
+        let expected = read_fixture(&format!("qec-code/tests/fixtures/css/{fixture}"));
+        assert_eq!(
+            output.stdout,
+            expected.as_bytes(),
+            "{matrix} output differed"
+        );
+    }
+}
+
+#[test]
+fn code_css_color_666_d5_structured_matrices_print_workspace_fixtures() {
+    let dir = tempdir().unwrap();
+    let spec = write_matrix_file(
+        dir.path(),
+        "color-666.json",
+        r#"{"schema_version":1,"construction":"color_666","distance":5}"#,
+    );
+
+    for (matrix, fixture) in [
+        ("hx", "color_666_d5_hx.json"),
+        ("hz", "color_666_d5_hz.json"),
+    ] {
+        let output = Command::new(qec_code_bin())
+            .args(["code", "css", "construct", "--spec"])
+            .arg(&spec)
+            .arg(matrix)
+            .output()
+            .expect("qec-code binary should run");
+
+        assert!(output.status.success(), "{matrix} export failed");
+        assert_eq!(output.stderr, b"", "{matrix} export printed stderr");
+
+        let expected = read_fixture(&format!("qec-code/tests/fixtures/css/{fixture}"));
+        assert_eq!(
+            output.stdout,
+            expected.as_bytes(),
+            "{matrix} output differed"
+        );
+    }
+}
+
+#[test]
 fn code_css_toric_d3_hx_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "toric:d=3", "hx"]);
 
@@ -1113,6 +1165,31 @@ fn code_css_distance_exact_code_id_returns_exact_json() {
     assert_eq!(json["witness"]["weight"], 3);
     assert_eq!(json["options"]["input"], "code_id");
     assert_eq!(json["options"]["code_id"], "steane");
+    assert_eq!(json["provenance"]["tool"], "qec-code");
+}
+
+#[test]
+fn code_css_distance_exact_color_666_d3_code_id_returns_exact_json() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "color_666:d=3",
+        "--json",
+    ]);
+
+    assert!(output.status.success());
+    assert_eq!(output.stderr, b"");
+
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["status"], "completed");
+    assert_eq!(json["distance"], 3);
+    assert_eq!(json["method"], "rstim-ilp-exact");
+    assert_eq!(json["bound_type"], "exact");
+    assert_eq!(json["witness"]["weight"], 3);
+    assert_eq!(json["options"]["input"], "code_id");
+    assert_eq!(json["options"]["code_id"], "color_666:d=3");
     assert_eq!(json["provenance"]["tool"], "qec-code");
 }
 
