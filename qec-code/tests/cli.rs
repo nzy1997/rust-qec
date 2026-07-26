@@ -757,6 +757,51 @@ fn run_code_css_surface_rotated_d3_matrices_return_fixture_json_without_newline(
 }
 
 #[test]
+fn run_code_css_construct_json_surface_rotated_d3_matches_inline_fixture() {
+    let dir = tempdir().unwrap();
+    let spec = write_matrix_file(
+        dir.path(),
+        "surface.json",
+        r#"{"schema_version":1,"construction":"surface","distance":3}"#,
+    );
+
+    let hx = run_qec_code_in_process_os(vec![
+        OsString::from("code"),
+        OsString::from("css"),
+        OsString::from("construct"),
+        OsString::from("--spec"),
+        spec.into_os_string(),
+        OsString::from("hx"),
+    ])
+    .unwrap();
+
+    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
+    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
+}
+
+#[test]
+fn run_code_css_construct_json_rejects_unknown_schema() {
+    let dir = tempdir().unwrap();
+    let spec = write_matrix_file(
+        dir.path(),
+        "surface-v2.json",
+        r#"{"schema_version":2,"construction":"surface","distance":3}"#,
+    );
+
+    assert_eq!(
+        run_qec_code_in_process_os(vec![
+            OsString::from("code"),
+            OsString::from("css"),
+            OsString::from("construct"),
+            OsString::from("--spec"),
+            spec.into_os_string(),
+            OsString::from("hx"),
+        ]),
+        Err(QecError::UnsupportedCssConstructionSchemaVersion { version: 2 })
+    );
+}
+
+#[test]
 fn run_code_css_list_returns_catalog_without_newline() {
     let output = run(Cli {
         command: Commands::Code {
