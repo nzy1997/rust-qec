@@ -363,6 +363,29 @@ fn directional_json_adapter_accepts_direct_top_level_spec() {
 }
 
 #[test]
+fn directional_json_adapter_leaves_unknown_distances_unset() {
+    let parsed = parse_css_construction_json(
+        r#"{
+            "schema_version": 1,
+            "construction": "directional",
+            "torus": {
+                "period_x": 10,
+                "period_y": 6,
+                "vertical_period_x_shift": 0
+            },
+            "route": "NE2N",
+            "connectivity": "square"
+        }"#,
+    )
+    .unwrap();
+    let result = construct_css(parsed).unwrap();
+
+    assert_eq!(result.stats.n, 30);
+    assert_eq!(result.stats.d_x, None);
+    assert_eq!(result.stats.d_z, None);
+}
+
+#[test]
 fn directional_json_adapter_canonicalizes_hex_route_spellings() {
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/directional/hex_ne3n_18x4.json")).unwrap();

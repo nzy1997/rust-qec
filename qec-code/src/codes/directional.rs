@@ -508,6 +508,14 @@ mod tests {
         }
     }
 
+    fn assert_spec_error_contains<T: std::fmt::Debug>(result: Result<T>, expected: &str) {
+        let error = result.unwrap_err();
+        assert!(
+            format!("{error:?}").contains(expected),
+            "expected {error:?} to contain {expected:?}"
+        );
+    }
+
     #[test]
     fn parses_repeated_route_with_paper_offsets() {
         assert_eq!(
@@ -518,8 +526,32 @@ mod tests {
             parse_directional_route_support("NE2EN").unwrap(),
             vec![(0, 1), (1, 2), (3, 2), (5, 2), (6, 3)]
         );
+        assert_eq!(
+            parse_directional_route_support("SW").unwrap(),
+            vec![(0, -1), (-1, -2)]
+        );
+        assert_spec_error_contains(
+            parse_directional_route_support(""),
+            "route must contain at least one direction",
+        );
+        assert_spec_error_contains(
+            parse_directional_route_support("N999999999999999999999999999999999999"),
+            "is out of range",
+        );
         assert!(parse_directional_route_support("N0E").is_err());
         assert!(parse_directional_route_support("NX").is_err());
+    }
+
+    #[test]
+    fn ancilla_coset_translation_covers_checkerboard_cases() {
+        assert_eq!(
+            DirectionalAncillaCoset::EvenOdd.translated((1, 1)),
+            DirectionalAncillaCoset::OddEven
+        );
+        assert_eq!(
+            DirectionalAncillaCoset::OddEven.translated((1, 0)),
+            DirectionalAncillaCoset::OddEven
+        );
     }
 
     #[test]
@@ -586,16 +618,19 @@ mod tests {
 
     #[test]
     fn rejects_invalid_directional_specs() {
-        assert!(build_directional_css_checks(&square_spec("NE")).is_err());
-        assert!(
+        assert_spec_error_contains(
+            build_directional_css_checks(&square_spec("NE")),
+            "odd route-overlap delta",
+        );
+        assert_spec_error_contains(
             build_directional_css_checks(&DirectionalCssSpec {
                 connectivity: DirectionalConnectivity::Hex,
                 route: "NE2N".to_owned(),
                 ..square_spec("NE2N")
-            })
-            .is_err()
+            }),
+            "hex connectivity does not support normalized route NE2N",
         );
-        assert!(
+        assert_spec_error_contains(
             build_directional_css_checks(&DirectionalCssSpec {
                 torus: DirectionalTorusSpec {
                     period_x: 8,
@@ -603,8 +638,249 @@ mod tests {
                     vertical_period_x_shift: 1,
                 },
                 ..square_spec("NE2N")
-            })
-            .is_err()
+            }),
+            "vertical_period_x_shift must be even",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&DirectionalCssSpec {
+                torus: DirectionalTorusSpec {
+                    period_x: 0,
+                    ..square_spec("NE2N").torus
+                },
+                ..square_spec("NE2N")
+            }),
+            "period_x must be positive and even",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&DirectionalCssSpec {
+                torus: DirectionalTorusSpec {
+                    period_x: 7,
+                    ..square_spec("NE2N").torus
+                },
+                ..square_spec("NE2N")
+            }),
+            "period_x must be positive and even",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&DirectionalCssSpec {
+                torus: DirectionalTorusSpec {
+                    period_y: 0,
+                    ..square_spec("NE2N").torus
+                },
+                ..square_spec("NE2N")
+            }),
+            "period_y must be positive and even",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&DirectionalCssSpec {
+                torus: DirectionalTorusSpec {
+                    period_y: 5,
+                    ..square_spec("NE2N").torus
+                },
+                ..square_spec("NE2N")
+            }),
+            "period_y must be positive and even",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&DirectionalCssSpec {
+                layout: DirectionalLayoutSpec {
+                    x_ancilla_coset: DirectionalAncillaCoset::OddEven,
+                    z_ancilla_coset: DirectionalAncillaCoset::OddEven,
+                },
+                ..square_spec("NE2N")
+            }),
+            "X and Z checks must use distinct ancilla cosets",
+        );
+        assert_spec_error_contains(
+            build_directional_css_checks(&square_spec("NS")),
+            "route support contains duplicate offsets",
+        );
+    }
+
+    #[test]
+    fn finite_torus_and_row_builders_report_specific_errors() {
+        let torus = DirectionalTorusSpec {
+            period_x: 8,
+            period_y: 6,
+            vertical_period_x_shift: 0,
+        };
+        let data_index = data_index(&torus).unwrap();
+
+        assert_spec_error_contains(
+            validate_finite_torus(&[(0, 0), (8, 0)], &torus),
+            "finite torus identifies route support offsets",
+        );
+        assert_spec_error_contains(
+            validate_finite_torus(&[(0, 0), (3, 0), (5, 0)], &torus),
+            "route delta vectors collide on the finite torus",
+        );
+        assert_spec_error_contains(
+            build_check_rows(
+                DirectionalAncillaCoset::OddEven,
+                &[(0, 0)],
+                &torus,
+                &data_index,
+            ),
+            "to non-data coordinate",
+        );
+        assert_spec_error_contains(
+            build_check_rows(
+                DirectionalAncillaCoset::OddEven,
+                &[(0, 1), (0, 1)],
+                &torus,
+                &data_index,
+            ),
+            "generated finite-torus check has duplicate support",
+        );
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn lattice_helpers_report_overflow_errors() {
+        let too_large = usize::MAX;
+        let normal = DirectionalTorusSpec {
+            period_x: 8,
+            period_y: 2,
+            vertical_period_x_shift: 0,
+        };
+
+        assert_spec_error_contains(
+            data_index(&DirectionalTorusSpec {
+                period_x: too_large,
+                ..normal.clone()
+            }),
+            "period_x is too large",
+        );
+        assert_spec_error_contains(
+            data_index(&DirectionalTorusSpec {
+                period_y: too_large,
+                ..normal.clone()
+            }),
+            "period_y is too large",
+        );
+        assert_spec_error_contains(
+            build_check_rows(
+                DirectionalAncillaCoset::OddEven,
+                &[(0, 1)],
+                &DirectionalTorusSpec {
+                    period_x: too_large,
+                    ..normal.clone()
+                },
+                &BTreeMap::new(),
+            ),
+            "period_x is too large",
+        );
+        assert_spec_error_contains(
+            build_check_rows(
+                DirectionalAncillaCoset::OddEven,
+                &[(0, 1)],
+                &DirectionalTorusSpec {
+                    period_y: too_large,
+                    ..normal.clone()
+                },
+                &BTreeMap::new(),
+            ),
+            "period_y is too large",
+        );
+        assert_spec_error_contains(
+            reduce_coordinate(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    period_x: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "period_x is too large",
+        );
+        assert_spec_error_contains(
+            reduce_coordinate(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    period_y: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "period_y is too large",
+        );
+        assert_spec_error_contains(
+            reduce_coordinate(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "vertical_period_x_shift is too large",
+        );
+        assert_spec_error_contains(
+            reduce_coordinate(
+                (0, i64::MAX - 1),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: 4,
+                    ..normal.clone()
+                },
+            ),
+            "coordinate reduction overflow",
+        );
+        assert_spec_error_contains(
+            reduce_coordinate(
+                (i64::MIN, i64::MAX - 1),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: 2,
+                    ..normal.clone()
+                },
+            ),
+            "coordinate reduction overflow",
+        );
+        assert_spec_error_contains(
+            in_period_lattice(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    period_x: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "period_x is too large",
+        );
+        assert_spec_error_contains(
+            in_period_lattice(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    period_y: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "period_y is too large",
+        );
+        assert_spec_error_contains(
+            in_period_lattice(
+                (0, 0),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: too_large,
+                    ..normal.clone()
+                },
+            ),
+            "vertical_period_x_shift is too large",
+        );
+        assert_spec_error_contains(
+            in_period_lattice(
+                (0, i64::MAX - 1),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: 4,
+                    ..normal.clone()
+                },
+            ),
+            "period lattice overflow",
+        );
+        assert_spec_error_contains(
+            in_period_lattice(
+                (i64::MIN, i64::MAX - 1),
+                &DirectionalTorusSpec {
+                    vertical_period_x_shift: 2,
+                    ..normal
+                },
+            ),
+            "period lattice overflow",
         );
     }
 
