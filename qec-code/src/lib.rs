@@ -2,6 +2,7 @@
 extern crate self as qec_code;
 
 pub mod binary;
+pub mod binary_chain_complex;
 pub mod cli;
 pub mod code;
 pub mod codes;
@@ -13,6 +14,7 @@ pub mod distance_exact;
 pub mod distance_ilp;
 pub mod error;
 pub mod family_contract;
+pub mod finite_group;
 mod gf2;
 pub mod logical;
 pub mod packed_gf2;
