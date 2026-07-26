@@ -273,4 +273,15 @@ fn surface_family_rejects_invalid_dimensions() {
         Err(QecError::InvalidCssConstruction { construction, reason })
             if construction == "surface" && reason.contains("overflow")
     ));
+
+    assert!(matches!(
+        construct_css(CssFamilySpec::Surface(SurfaceSpec {
+            layout: SurfaceLayout::Rotated,
+            row_distance: isize::MAX as usize,
+            column_distance: 2,
+        })
+        .into()),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
 }

@@ -287,7 +287,16 @@ fn construct_surface(spec: SurfaceSpec) -> Result<CssConstructionResult> {
 
 fn validate_surface_spec(spec: &SurfaceSpec) -> Result<()> {
     validate_surface_distance("row_distance", spec.row_distance)?;
-    validate_surface_distance("column_distance", spec.column_distance)
+    validate_surface_distance("column_distance", spec.column_distance)?;
+
+    if matches!(spec.layout, SurfaceLayout::Rotated)
+        && (spec.row_distance > isize::MAX as usize / 2
+            || spec.column_distance > isize::MAX as usize / 2)
+    {
+        return Err(surface_overflow("rotated coordinate arithmetic"));
+    }
+
+    Ok(())
 }
 
 fn validate_surface_distance(parameter: &'static str, value: usize) -> Result<()> {
