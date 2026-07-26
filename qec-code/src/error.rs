@@ -231,9 +231,7 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error(
-        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
-    )]
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

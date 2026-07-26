@@ -184,8 +184,7 @@ fn random_two_block_s3_seed7_matches_fixture() {
 
 #[test]
 fn random_two_block_s3_seed1_uses_swap_sampling() {
-    let spec = RandomTwoBlockSpec::new(s3_group(), 2, 3, 1, RANDOM_TWO_BLOCK_ALGORITHM_V1)
-        .unwrap();
+    let spec = RandomTwoBlockSpec::new(s3_group(), 2, 3, 1, RANDOM_TWO_BLOCK_ALGORITHM_V1).unwrap();
     let checks = random_two_block_css_checks(&spec).unwrap();
 
     assert_eq!(checks.support_a, vec![0, 5]);
