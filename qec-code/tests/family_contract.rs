@@ -41,6 +41,7 @@ fn assert_canonical_sparse_rows(rows: &[Vec<usize>]) {
 #[test]
 fn unified_family_contract_preserves_requested_family_ids() {
     let ids = serde_json::to_value(RequestedFamilyId::ALL).unwrap();
+    let id_strings = RequestedFamilyId::ALL.map(RequestedFamilyId::as_str);
 
     assert_eq!(
         ids,
@@ -60,6 +61,25 @@ fn unified_family_contract_preserves_requested_family_ids() {
             "random_two_block",
             "perturbed_hgp"
         ])
+    );
+    assert_eq!(
+        id_strings,
+        [
+            "directional",
+            "quantum_tanner",
+            "generalized_bicycle",
+            "la_cross",
+            "random_hgp",
+            "lifted_product",
+            "hyperbolic_5_5",
+            "coprime_bb",
+            "toric_3d",
+            "color_666",
+            "surface",
+            "shor_like",
+            "random_two_block",
+            "perturbed_hgp"
+        ]
     );
 }
 
@@ -266,12 +286,40 @@ fn construction_json_rejects_malformed_and_unknown_requests() {
         parse_css_construction_json("{"),
         Err(QecError::InvalidCssConstructionJson(_))
     ));
+    assert!(matches!(
+        parse_css_construction_json("[]"),
+        Err(QecError::InvalidCssConstructionJson(message))
+            if message == "construction request must be a JSON object"
+    ));
     assert_eq!(
         parse_css_construction_json(r#"{"schema_version":1,"construction":"unknown"}"#),
         Err(QecError::UnknownCssConstruction {
             construction: "unknown".to_owned(),
         })
     );
+    assert_eq!(
+        parse_css_construction_json(r#"{"schema_version":1,"construction":"surface"}"#),
+        Err(QecError::InvalidCssConstruction {
+            construction: "surface".to_owned(),
+            reason: "missing or invalid distance".to_owned(),
+        })
+    );
+    assert_eq!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"quantum_tanner","spec":false}"#
+        ),
+        Err(QecError::InvalidCssConstruction {
+            construction: "quantum_tanner".to_owned(),
+            reason: "spec must be a JSON object".to_owned(),
+        })
+    );
+    assert!(matches!(
+        parse_css_construction_json(
+            r#"{"schema_version":1,"construction":"hypergraph_product","left":{"num_cols":2,"rows":[]}}"#
+        ),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "hypergraph_product" && reason.contains("missing field `right`")
+    ));
     assert!(matches!(
         construct_css(CssConstructionSpec::HypergraphProduct(
             HypergraphProductSpec {
