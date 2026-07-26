@@ -32,7 +32,9 @@ pub enum QecError {
         support: usize,
         num_cols: usize,
     },
-    #[error("sparse GF(2) horizontal concatenation row mismatch: left has {left_rows}, right has {right_rows}")]
+    #[error(
+        "sparse GF(2) horizontal concatenation row mismatch: left has {left_rows}, right has {right_rows}"
+    )]
     SparseGf2HorizontalRowMismatch { left_rows: usize, right_rows: usize },
     #[error("sparse GF(2) dimension overflow during {operation}")]
     SparseGf2DimensionOverflow { operation: &'static str },
@@ -143,9 +145,7 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error(
-        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
-    )]
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

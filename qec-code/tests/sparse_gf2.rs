@@ -1,5 +1,5 @@
-use qec_code::sparse_gf2::{hconcat, identity, kron, transpose, SparseGf2Matrix};
 use qec_code::QecError;
+use qec_code::sparse_gf2::{SparseGf2Matrix, hconcat, identity, kron, transpose};
 
 fn assert_shape_and_rows(
     matrix: &SparseGf2Matrix,
