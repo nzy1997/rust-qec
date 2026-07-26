@@ -13,15 +13,16 @@ adapter and must keep producing byte-for-byte identical sparse-row matrix JSON
 for every distance that was valid before, including even distances.
 
 The selected design keeps surface construction inside the existing
-`CssConstructionSpec` and `CssFamilySpec` route. It replaces the square-only
-`SurfaceFamilySpec { distance }` shape with an explicit `SurfaceSpec`:
+`CssConstructionSpec` and `CssFamilySpec` route. It retains the square-only
+`SurfaceFamilySpec { distance }` compatibility adapter and adds an explicit
+`SurfaceSpec` for generalized construction:
 
 - `layout`: `rotated` or `unrotated`
 - `row_distance`: row distance, minimum `2`
 - `column_distance`: column distance, minimum `2`
 
-The Rust helper for legacy square rotated requests builds the same normalized
-spec with `layout = rotated` and both dimensions equal to `d`.
+The Rust helper for generalized square rotated requests builds a normalized
+`SurfaceSpec` with `layout = rotated` and both dimensions equal to `d`.
 
 ## Existing Context
 
@@ -44,15 +45,15 @@ There is no repository `AGENTS.md` in this worktree.
 ### 1. Extend the #553 contract in place - selected
 
 Add `SurfaceLayout` and `SurfaceSpec` to `qec-code/src/family_contract.rs`,
-generate rotated and ordinary planar supports from that typed spec, and keep
-`surface_rotated:d=<distance>` as a lowering adapter.
+generate rotated and ordinary planar supports from that typed spec, and retain
+`surface_rotated:d=<distance>` through the legacy `SurfaceFamilySpec` adapter.
 
 Benefits:
 
 - uses the established common contract instead of adding a parallel API
-- keeps CLI compact and JSON routes lowering to the same typed value
-- preserves legacy matrix serialization because the square rotated generator
-  remains equivalent to the existing algorithm
+- keeps CLI compact and JSON routes in the common construction contract
+- preserves legacy matrix serialization by routing square rotated requests to
+  the existing built-in generator
 - lets the contract report surface layout, dimensions, and known directional
   distances alongside existing stats
 
@@ -113,9 +114,10 @@ pub struct SurfaceSpec {
 }
 ```
 
-For compatibility with #553 callers, `SurfaceSpec::rotated_square(distance)`
-constructs the legacy square rotated spec. A type alias
-`SurfaceFamilySpec = SurfaceSpec` keeps the existing exported name available.
+`SurfaceFamilySpec { distance }` remains the #553 compatibility adapter and
+uses the existing built-in square rotated constructor. `SurfaceSpec::rotated_square(distance)`
+constructs the generalized square rotated specification, which enters through
+`CssConstructionSpec::Surface`.
 
 The JSON construction contract accepts:
 
@@ -139,8 +141,8 @@ The legacy JSON shape remains accepted:
 }
 ```
 
-It lowers to the same `SurfaceSpec::rotated_square(3)` value as
-`surface_rotated:d=3`.
+It lowers to `CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`, the
+same compatibility route as `surface_rotated:d=3`.
 
 Conflicting legacy and new parameters are rejected. A request that contains
 `distance` together with `layout`, `row_distance`, or `column_distance` returns a
@@ -148,7 +150,7 @@ typed `InvalidCssConstruction` error. Unknown layouts, missing dimensions,
 dimension values below `2`, and `usize` overflows return typed errors without
 panicking.
 
-Successful surface results include normalized parameters:
+Generalized surface results include normalized parameters:
 
 - `layout`
 - `row_distance`

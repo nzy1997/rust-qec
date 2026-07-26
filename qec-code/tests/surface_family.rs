@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use qec_code::QecError;
 use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
+use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    CssConstructionSpec, CssFamilySpec, SurfaceLayout, SurfaceSpec, construct_css,
-    parse_css_construction_json, verify_css_orthogonality,
+    CssConstructionSpec, CssFamilySpec, SurfaceFamilySpec, SurfaceLayout, SurfaceSpec,
+    construct_css, parse_css_construction_json, verify_css_orthogonality,
 };
 use tempfile::tempdir;
 
@@ -79,7 +80,7 @@ fn rectangular_rotated_surface_3x5_matches_fixture() {
         row_distance: 3,
         column_distance: 5,
     };
-    let result = construct_css(CssFamilySpec::Surface(spec.clone()).into()).unwrap();
+    let result = construct_css(spec.clone().into()).unwrap();
 
     assert_eq!(result.construction_id, "surface_rotated");
     assert_eq!(
@@ -112,7 +113,7 @@ fn rectangular_rotated_surface_3x5_matches_fixture() {
         r#"{"schema_version":1,"construction":"surface","layout":"rotated","row_distance":3,"column_distance":5}"#,
     )
     .unwrap();
-    assert_eq!(json, CssFamilySpec::Surface(spec).into());
+    assert_eq!(json, spec.into());
 }
 
 #[test]
@@ -139,7 +140,7 @@ fn ordinary_surface_d3_matches_fixture() {
         column_distance: 3,
     };
 
-    let result = construct_css(CssFamilySpec::Surface(spec).into()).unwrap();
+    let result = construct_css(spec.into()).unwrap();
 
     assert_eq!(result.construction_id, "surface_unrotated");
     assert_eq!(result.stats.n, 13);
@@ -173,16 +174,36 @@ fn ordinary_surface_d3_matches_fixture() {
 
 #[test]
 fn legacy_rotated_surface_outputs_are_unchanged() {
+    let legacy_spec = SurfaceFamilySpec { distance: 3 };
+    assert_eq!(
+        serde_json::from_str::<SurfaceFamilySpec>(r#"{"distance":3}"#).unwrap(),
+        legacy_spec
+    );
+
     for distance in 2..=6 {
         let inline =
             CssConstructionSpec::from_inline(&format!("surface_rotated:d={distance}")).unwrap();
-        let typed = CssFamilySpec::Surface(SurfaceSpec::rotated_square(distance)).into();
+        let typed = CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into();
         assert_eq!(inline, typed);
 
         let legacy = construct_css(inline).unwrap();
-        let direct = construct_css(typed).unwrap();
-        assert_eq!(legacy.checks, direct.checks);
-        assert_eq!(legacy.stats, direct.stats);
+        let oracle = built_in_css_checks(&format!("surface_rotated:d={distance}")).unwrap();
+        assert_eq!(
+            SparseRowsMatrix::new(legacy.stats.n, legacy.checks.h_x.clone())
+                .unwrap()
+                .to_json_string(),
+            SparseRowsMatrix::new(oracle.num_cols, oracle.hx)
+                .unwrap()
+                .to_json_string()
+        );
+        assert_eq!(
+            SparseRowsMatrix::new(legacy.stats.n, legacy.checks.h_z.clone())
+                .unwrap()
+                .to_json_string(),
+            SparseRowsMatrix::new(oracle.num_cols, oracle.hz)
+                .unwrap()
+                .to_json_string()
+        );
         assert_eq!(legacy.stats.d_x, Some(distance));
         assert_eq!(legacy.stats.d_z, Some(distance));
     }
@@ -234,11 +255,11 @@ fn legacy_rotated_surface_outputs_are_unchanged() {
 fn surface_family_rejects_invalid_dimensions() {
     assert!(
         construct_css(
-            CssFamilySpec::Surface(SurfaceSpec {
+            SurfaceSpec {
                 layout: SurfaceLayout::Rotated,
                 row_distance: 1,
                 column_distance: 3,
-            })
+            }
             .into()
         )
         .is_err()
@@ -246,11 +267,11 @@ fn surface_family_rejects_invalid_dimensions() {
 
     assert!(
         construct_css(
-            CssFamilySpec::Surface(SurfaceSpec {
+            SurfaceSpec {
                 layout: SurfaceLayout::Unrotated,
                 row_distance: 3,
                 column_distance: 1,
-            })
+            }
             .into()
         )
         .is_err()
@@ -281,23 +302,27 @@ fn surface_family_rejects_invalid_dimensions() {
     ));
 
     assert!(matches!(
-        construct_css(CssFamilySpec::Surface(SurfaceSpec {
-            layout: SurfaceLayout::Unrotated,
-            row_distance: usize::MAX,
-            column_distance: 2,
-        })
-        .into()),
+        construct_css(
+            SurfaceSpec {
+                layout: SurfaceLayout::Unrotated,
+                row_distance: usize::MAX,
+                column_distance: 2,
+            }
+            .into()
+        ),
         Err(QecError::InvalidCssConstruction { construction, reason })
             if construction == "surface" && reason.contains("overflow")
     ));
 
     assert!(matches!(
-        construct_css(CssFamilySpec::Surface(SurfaceSpec {
-            layout: SurfaceLayout::Rotated,
-            row_distance: isize::MAX as usize,
-            column_distance: 2,
-        })
-        .into()),
+        construct_css(
+            SurfaceSpec {
+                layout: SurfaceLayout::Rotated,
+                row_distance: isize::MAX as usize,
+                column_distance: 2,
+            }
+            .into()
+        ),
         Err(QecError::InvalidCssConstruction { construction, reason })
             if construction == "surface" && reason.contains("overflow")
     ));

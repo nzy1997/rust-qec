@@ -110,7 +110,10 @@ impl SurfaceSpec {
     }
 }
 
-pub type SurfaceFamilySpec = SurfaceSpec;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SurfaceFamilySpec {
+    pub distance: usize,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CssFamilySpec {
@@ -150,6 +153,7 @@ pub struct LegacyBuiltInCssSpec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CssConstructionSpec {
     Family(CssFamilySpec),
+    Surface(SurfaceSpec),
     HypergraphProduct(HypergraphProductSpec),
     LegacyBuiltIn(LegacyBuiltInCssSpec),
 }
@@ -157,6 +161,12 @@ pub enum CssConstructionSpec {
 impl From<CssFamilySpec> for CssConstructionSpec {
     fn from(value: CssFamilySpec) -> Self {
         Self::Family(value)
+    }
+}
+
+impl From<SurfaceSpec> for CssConstructionSpec {
+    fn from(value: SurfaceSpec) -> Self {
+        Self::Surface(value)
     }
 }
 
@@ -168,7 +178,7 @@ impl CssConstructionSpec {
             params: BuiltInCssParams::Distance { distance },
         } = parsed
         {
-            return Ok(CssFamilySpec::Surface(SurfaceSpec::rotated_square(distance)).into());
+            return Ok(CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into());
         }
 
         Ok(Self::LegacyBuiltIn(LegacyBuiltInCssSpec {
@@ -215,7 +225,7 @@ pub struct CssConstructionResult {
 
 pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult> {
     match spec {
-        CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => construct_surface(spec),
+        CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => construct_legacy_surface(spec),
         CssConstructionSpec::Family(CssFamilySpec::QuantumTanner(spec)) => {
             let checks = quantum_tanner_css_checks(&spec)?;
             let parameters = quantum_tanner_normalized_parameters(&spec);
@@ -230,6 +240,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 None,
             )
         }
+        CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
             let checks = built_in_css_checks(&spec.code_id)?;
@@ -247,6 +258,22 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
             )
         }
     }
+}
+
+fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionResult> {
+    let checks = built_in_css_checks(&format!("surface_rotated:d={}", spec.distance))?;
+    let mut parameters = BTreeMap::new();
+    parameters.insert("distance".to_owned(), Value::from(spec.distance));
+    construction_result(
+        checks.code_id,
+        Some(RequestedFamilyId::Surface),
+        parameters,
+        checks.num_cols,
+        checks.hx,
+        checks.hz,
+        "built_in_css",
+        Some((spec.distance, spec.distance)),
+    )
 }
 
 fn construct_surface(spec: SurfaceSpec) -> Result<CssConstructionResult> {
@@ -582,9 +609,7 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     }
     let construction = required_string(object, "construction")?;
     match construction {
-        "surface" => {
-            Ok(CssFamilySpec::Surface(surface_spec_from_json(object, construction)?).into())
-        }
+        "surface" => surface_construction_from_json(object, construction),
         "quantum_tanner" => {
             let spec_value = object.get("spec").unwrap_or(&value);
             let mut spec_object = spec_value.as_object().cloned().ok_or_else(|| {
@@ -791,7 +816,10 @@ fn transpose_supports(num_cols: usize, rows: &[Vec<usize>]) -> Vec<Vec<usize>> {
     columns
 }
 
-fn surface_spec_from_json(object: &Map<String, Value>, construction: &str) -> Result<SurfaceSpec> {
+fn surface_construction_from_json(
+    object: &Map<String, Value>,
+    construction: &str,
+) -> Result<CssConstructionSpec> {
     let has_legacy_distance = object.contains_key("distance");
     let has_layout_aware_fields = object.contains_key("layout")
         || object.contains_key("row_distance")
@@ -803,11 +831,10 @@ fn surface_spec_from_json(object: &Map<String, Value>, construction: &str) -> Re
         });
     }
     if has_legacy_distance {
-        return Ok(SurfaceSpec::rotated_square(required_usize(
-            object,
-            "distance",
-            construction,
-        )?));
+        return Ok(CssFamilySpec::Surface(SurfaceFamilySpec {
+            distance: required_usize(object, "distance", construction)?,
+        })
+        .into());
     }
     if !has_layout_aware_fields {
         return Err(QecError::InvalidCssConstruction {
@@ -830,7 +857,8 @@ fn surface_spec_from_json(object: &Map<String, Value>, construction: &str) -> Re
         layout,
         row_distance: required_usize(object, "row_distance", construction)?,
         column_distance: required_usize(object, "column_distance", construction)?,
-    })
+    }
+    .into())
 }
 
 fn required_string<'a>(object: &'a Map<String, Value>, field: &str) -> Result<&'a str> {

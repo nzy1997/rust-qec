@@ -5,7 +5,7 @@ use qec_code::codes::quantum_tanner::quantum_tanner_spec_from_json_str;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     CLASSICAL_IDENTITY_2, CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec,
-    HypergraphProductSpec, RequestedFamilyId, SurfaceSpec, construct_css,
+    HypergraphProductSpec, RequestedFamilyId, SurfaceFamilySpec, construct_css,
     parse_css_construction_json, verify_css_orthogonality,
 };
 
@@ -86,7 +86,7 @@ fn unified_family_contract_preserves_requested_family_ids() {
 #[test]
 fn unified_family_contract_preserves_surface_d3() {
     let result =
-        construct_css(CssFamilySpec::Surface(SurfaceSpec::rotated_square(3)).into()).unwrap();
+        construct_css(CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 }).into()).unwrap();
 
     assert_eq!(result.construction_id, "surface_rotated");
     assert_eq!(result.requested_family_id, Some(RequestedFamilyId::Surface));
@@ -119,7 +119,7 @@ fn unified_family_contract_preserves_surface_d3() {
     assert_eq!(hz_json, fixture_text("surface_rotated_d3_hz.json"));
 
     let repeated =
-        construct_css(CssFamilySpec::Surface(SurfaceSpec::rotated_square(3)).into()).unwrap();
+        construct_css(CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 }).into()).unwrap();
     assert_eq!(
         serde_json::to_string(&result).unwrap(),
         serde_json::to_string(&repeated).unwrap(),
@@ -151,7 +151,7 @@ fn inline_json_and_rust_routes_lower_to_same_spec() {
         r#"{"schema_version":1,"construction":"surface","distance":3}"#,
     )
     .unwrap();
-    let rust_api = CssFamilySpec::Surface(SurfaceSpec::rotated_square(3)).into();
+    let rust_api = CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 }).into();
 
     assert_eq!(inline, json);
     assert_eq!(json, rust_api);

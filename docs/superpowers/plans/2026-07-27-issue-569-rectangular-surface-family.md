@@ -4,7 +4,7 @@
 
 **Goal:** Generalize the requested `surface` CSS construction to rotated and ordinary planar rectangular patches while preserving all legacy rotated-square output.
 
-**Architecture:** Extend the #553 common construction contract in `qec-code/src/family_contract.rs` with `SurfaceLayout` and `SurfaceSpec`, then generate surface sparse supports through that typed route. Keep `surface_rotated:d=<distance>` and legacy JSON `distance` as compatibility adapters that lower to `SurfaceSpec::rotated_square(distance)`.
+**Architecture:** Extend the #553 common construction contract in `qec-code/src/family_contract.rs` with `SurfaceLayout` and `SurfaceSpec`, then generate generalized surface sparse supports through that typed route. Keep `surface_rotated:d=<distance>` and legacy JSON `distance` as `SurfaceFamilySpec { distance }` compatibility adapters backed by the built-in constructor.
 
 **Tech Stack:** Rust 2024, serde/serde_json, clap in-process CLI tests, existing `qec-code` sparse-row and rank helpers.
 
@@ -24,11 +24,11 @@
 
 ## File Structure
 
-- Modify `qec-code/src/family_contract.rs`: public `SurfaceLayout`, public `SurfaceSpec`, compatibility alias, JSON parsing, normalized parameters, known distance stats, and surface support generation.
+- Modify `qec-code/src/family_contract.rs`: public `SurfaceLayout`, public `SurfaceSpec`, legacy `SurfaceFamilySpec` adapter, JSON parsing, normalized parameters, known distance stats, and surface support generation.
 - Add `qec-code/tests/surface_family.rs`: issue-named TDD regression tests for exact fixtures, compatibility, CLI structured JSON export, invalid inputs, and overflow.
 - Add `qec-code/tests/fixtures/css/surface_rotated_d4_hx.json`: pre-change even-distance legacy fixture.
 - Add `qec-code/tests/fixtures/css/surface_rotated_d4_hz.json`: pre-change even-distance legacy fixture.
-- Modify `qec-code/tests/family_contract.rs`: update #553 tests from struct literal `SurfaceFamilySpec { distance: 3 }` to `SurfaceSpec::rotated_square(3)`.
+- Modify `qec-code/tests/family_contract.rs`: retain #553 coverage for `SurfaceFamilySpec { distance: 3 }` and add generalized construction coverage separately.
 - Modify `docs/showcases/qec-code-css-construction.md`: document the structured rectangular surface JSON shape while keeping legacy compact examples.
 
 ### Task 1: Red Tests And Legacy Fixtures
@@ -65,9 +65,11 @@ use std::path::{Path, PathBuf};
 
 use qec_code::QecError;
 use qec_code::cli::{CodeCommands, Commands, CssArgs, CssMatrixKind, run};
+use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    CssConstructionSpec, CssFamilySpec, SurfaceLayout, SurfaceSpec, construct_css,
+    CssConstructionSpec, CssFamilySpec, SurfaceFamilySpec, SurfaceLayout, SurfaceSpec,
+    construct_css,
     parse_css_construction_json, verify_css_orthogonality,
 };
 use tempfile::tempdir;
@@ -225,13 +227,27 @@ fn legacy_rotated_surface_outputs_are_unchanged() {
     for distance in 2..=6 {
         let inline = CssConstructionSpec::from_inline(&format!("surface_rotated:d={distance}"))
             .unwrap();
-        let typed = CssFamilySpec::Surface(SurfaceSpec::rotated_square(distance)).into();
+        let typed = CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into();
         assert_eq!(inline, typed);
 
         let legacy = construct_css(inline).unwrap();
-        let direct = construct_css(typed).unwrap();
-        assert_eq!(legacy.checks, direct.checks);
-        assert_eq!(legacy.stats, direct.stats);
+        let oracle = built_in_css_checks(&format!("surface_rotated:d={distance}")).unwrap();
+        assert_eq!(
+            SparseRowsMatrix::new(legacy.stats.n, legacy.checks.h_x.clone())
+                .unwrap()
+                .to_json_string(),
+            SparseRowsMatrix::new(oracle.num_cols, oracle.hx)
+                .unwrap()
+                .to_json_string()
+        );
+        assert_eq!(
+            SparseRowsMatrix::new(legacy.stats.n, legacy.checks.h_z.clone())
+                .unwrap()
+                .to_json_string(),
+            SparseRowsMatrix::new(oracle.num_cols, oracle.hz)
+                .unwrap()
+                .to_json_string()
+        );
         assert_eq!(legacy.stats.d_x, Some(distance));
         assert_eq!(legacy.stats.d_z, Some(distance));
     }
@@ -281,19 +297,19 @@ fn legacy_rotated_surface_outputs_are_unchanged() {
 
 #[test]
 fn surface_family_rejects_invalid_dimensions() {
-    assert!(construct_css(CssFamilySpec::Surface(SurfaceSpec {
+    assert!(construct_css(SurfaceSpec {
         layout: SurfaceLayout::Rotated,
         row_distance: 1,
         column_distance: 3,
-    })
+    }
     .into())
     .is_err());
 
-    assert!(construct_css(CssFamilySpec::Surface(SurfaceSpec {
+    assert!(construct_css(SurfaceSpec {
         layout: SurfaceLayout::Unrotated,
         row_distance: 3,
         column_distance: 1,
-    })
+    }
     .into())
     .is_err());
 
@@ -322,11 +338,11 @@ fn surface_family_rejects_invalid_dimensions() {
     ));
 
     assert!(matches!(
-        construct_css(CssFamilySpec::Surface(SurfaceSpec {
+        construct_css(SurfaceSpec {
             layout: SurfaceLayout::Unrotated,
             row_distance: usize::MAX,
             column_distance: 2,
-        })
+        }
         .into()),
         Err(QecError::InvalidCssConstruction { construction, reason })
             if construction == "surface" && reason.contains("overflow")
@@ -356,13 +372,14 @@ and `stats.d_z` do not exist yet.
 
 **Interfaces:**
 - Consumes: failing `qec-code/tests/surface_family.rs` tests.
-- Produces: `SurfaceLayout`, `SurfaceSpec`, compatibility `SurfaceFamilySpec`
-  alias, JSON lowering, known distance stats, rotated and ordinary support
+- Produces: `SurfaceLayout`, `SurfaceSpec`, legacy `SurfaceFamilySpec`
+  adapter, JSON lowering, known distance stats, rotated and ordinary support
   generation.
 
-- [ ] **Step 1: Replace the square-only spec with the layout-aware spec**
+- [ ] **Step 1: Add the layout-aware spec alongside the legacy adapter**
 
-In `qec-code/src/family_contract.rs`, replace `SurfaceFamilySpec` with:
+In `qec-code/src/family_contract.rs`, add `SurfaceSpec` beside the legacy
+`SurfaceFamilySpec` adapter:
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -398,7 +415,10 @@ impl SurfaceSpec {
     }
 }
 
-pub type SurfaceFamilySpec = SurfaceSpec;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SurfaceFamilySpec {
+    pub distance: usize,
+}
 ```
 
 - [ ] **Step 2: Add known distances to stats**
@@ -589,16 +609,17 @@ fn unrotated_surface_supports(
 Replace the surface match arm in `construct_css` with:
 
 ```rust
-CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => construct_surface(spec),
+CssConstructionSpec::Family(CssFamilySpec::Surface(spec)) => construct_legacy_surface(spec),
+CssConstructionSpec::Surface(spec) => construct_surface(spec),
 ```
 
 Change inline lowering to:
 
 ```rust
-return Ok(CssFamilySpec::Surface(SurfaceSpec::rotated_square(distance)).into());
+return Ok(CssFamilySpec::Surface(SurfaceFamilySpec { distance }).into());
 ```
 
-Change JSON parsing for `"surface"` to call a `surface_spec_from_json(object,
+Change JSON parsing for `"surface"` to call a `surface_construction_from_json(object,
 construction)` helper that accepts either legacy `distance` or the new
 `layout`/`row_distance`/`column_distance` fields and rejects conflicts.
 
@@ -610,12 +631,12 @@ In `qec-code/tests/family_contract.rs`, update imports and struct literals:
 use qec_code::family_contract::{
     construct_css, parse_css_construction_json, verify_css_orthogonality,
     CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec, HypergraphProductSpec,
-    RequestedFamilyId, SurfaceSpec, CLASSICAL_IDENTITY_2,
+    RequestedFamilyId, SurfaceFamilySpec, SurfaceSpec, CLASSICAL_IDENTITY_2,
 };
 ```
 
-Replace `SurfaceFamilySpec { distance: 3 }` with
-`SurfaceSpec::rotated_square(3)`.
+Keep `SurfaceFamilySpec { distance: 3 }` for the legacy route. Use
+`SurfaceSpec::rotated_square(3).into()` for generalized surface construction.
 
 - [ ] **Step 6: Run exact tests and verify GREEN**
 

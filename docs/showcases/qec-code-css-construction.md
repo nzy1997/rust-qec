@@ -104,7 +104,9 @@ For example:
 
 The legacy JSON request above remains the square rotated adapter: it lowers to
 the same typed surface specification as the inline `surface_rotated:d=3` route
-and the Rust API value `CssFamilySpec::Surface(SurfaceSpec::rotated_square(3))`.
+and the Rust API value `CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`.
+Use `SurfaceSpec::rotated_square(3)` or a fully specified `SurfaceSpec` for
+the generalized route.
 Structured surface requests can select a layout and independent row and column
 distances, for example:
 
