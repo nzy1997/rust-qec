@@ -1,9 +1,9 @@
+use qec_code::QecError;
 use qec_code::finite_group::{
-    left_regular_lift, right_regular_lift, FiniteGroupSpec, GroupAlgebraElement, LeftRegularLift,
-    RightRegularLift, MAX_FINITE_GROUP_ORDER,
+    FiniteGroupSpec, GroupAlgebraElement, LeftRegularLift, MAX_FINITE_GROUP_ORDER,
+    RightRegularLift, left_regular_lift, right_regular_lift,
 };
 use qec_code::sparse_gf2::SparseGf2Matrix;
-use qec_code::QecError;
 
 fn assert_shape_and_rows(
     matrix: &SparseGf2Matrix,
@@ -93,6 +93,7 @@ fn finite_group_left_lift_matches_c3_fixture() {
         ga(&group, vec![2, 1, 2, 2]).to_json_string(),
         r#"{"group_order":3,"support":[1,2]}"#
     );
+    assert_eq!(ga(&group, vec![2, 1, 2]).support(), &[1]);
 
     let matrix = vec![
         vec![
@@ -123,6 +124,13 @@ fn finite_group_left_lift_matches_c3_fixture() {
 
 #[test]
 fn left_and_right_regular_s3_actions_commute() {
+    let c3 = c3_group();
+    let left_c3 = left_regular_lift(&c3, &[vec![ga(&c3, vec![1])]]).unwrap();
+    let right_c3 = right_regular_lift(&c3, &[vec![ga(&c3, vec![1])]]).unwrap();
+    assert_shape_and_rows(&left_c3, 3, 3, &[vec![2], vec![0], vec![1]]);
+    assert_shape_and_rows(&right_c3, 3, 3, &[vec![1], vec![2], vec![0]]);
+    assert_ne!(left_c3, right_c3);
+
     let group = s3_group();
     for g in 0..group.order() {
         for h in 0..group.order() {
