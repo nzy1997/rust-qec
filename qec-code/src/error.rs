@@ -38,6 +38,43 @@ pub enum QecError {
     SparseGf2HorizontalRowMismatch { left_rows: usize, right_rows: usize },
     #[error("sparse GF(2) dimension overflow during {operation}")]
     SparseGf2DimensionOverflow { operation: &'static str },
+    #[error(
+        "invalid boundary map dimensions: domain dimension {domain_dimension}, codomain dimension {codomain_dimension}"
+    )]
+    InvalidBoundaryMapDimensions {
+        domain_dimension: usize,
+        codomain_dimension: usize,
+    },
+    #[error("duplicate boundary map for domain dimension {domain_dimension}")]
+    DuplicateBoundaryMapDimension { domain_dimension: usize },
+    #[error("missing boundary map for domain dimension {domain_dimension}")]
+    MissingBoundaryMap { domain_dimension: usize },
+    #[error(
+        "boundary composition dimension mismatch between dimensions {lower_dimension} and {upper_dimension}: lower domain has {lower_domain_cells} cells, upper codomain has {upper_codomain_cells} cells"
+    )]
+    BoundaryCompositionDimensionMismatch {
+        lower_dimension: usize,
+        upper_dimension: usize,
+        lower_domain_cells: usize,
+        upper_codomain_cells: usize,
+    },
+    #[error(
+        "nonzero boundary composition between dimensions {lower_dimension} and {upper_dimension}: row {row} has support {support:?}"
+    )]
+    NonzeroBoundaryComposition {
+        lower_dimension: usize,
+        upper_dimension: usize,
+        row: usize,
+        support: Vec<usize>,
+    },
+    #[error(
+        "invalid homological CSS view for qubit dimension {qubit_dimension}: H_X has {hx_num_qubits} qubits, H_Z has {hz_num_qubits} qubits"
+    )]
+    InvalidHomologicalCssView {
+        qubit_dimension: usize,
+        hx_num_qubits: usize,
+        hz_num_qubits: usize,
+    },
     #[error("invalid regular classical matrix option {option}: {reason}")]
     InvalidRegularClassicalMatrixConfig {
         option: &'static str,
