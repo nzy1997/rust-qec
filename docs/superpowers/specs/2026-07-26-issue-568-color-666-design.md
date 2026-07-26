@@ -170,7 +170,7 @@ The stable column permutation from color-666 qubit order to existing Steane
 qubit order is:
 
 ```text
-[6, 3, 5, 0, 1, 4, 2]
+[0, 3, 6, 5, 1, 4, 2]
 ```
 
 Applying that permutation to every distance-3 color row and then sorting each
