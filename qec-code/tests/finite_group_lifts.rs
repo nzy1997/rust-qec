@@ -1,9 +1,9 @@
-use qec_code::QecError;
 use qec_code::finite_group::{
-    FiniteGroupSpec, GroupAlgebraElement, LeftRegularLift, MAX_FINITE_GROUP_ORDER,
-    RightRegularLift, left_regular_lift, right_regular_lift,
+    left_regular_lift, right_regular_lift, FiniteGroupSpec, GroupAlgebraElement, LeftRegularLift,
+    RightRegularLift, MAX_FINITE_GROUP_ORDER,
 };
 use qec_code::sparse_gf2::SparseGf2Matrix;
+use qec_code::QecError;
 
 fn assert_shape_and_rows(
     matrix: &SparseGf2Matrix,
@@ -85,10 +85,19 @@ fn canonical_sparse_product(left: &SparseGf2Matrix, right: &SparseGf2Matrix) -> 
 #[test]
 fn finite_group_left_lift_matches_c3_fixture() {
     let group = c3_group();
+    assert_eq!(group.identity(), 0);
+    assert_eq!(
+        group.multiplication_table(),
+        &[vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]]
+    );
+    assert_eq!(group.inverse_table(), &[0, 2, 1]);
+    assert_eq!(group.multiply(2, 2).unwrap(), 1);
+    assert_eq!(group.inverse(2).unwrap(), 1);
     assert_eq!(
         group.to_json_string(),
         r#"{"order":3,"identity":0,"multiplication_table":[[0,1,2],[1,2,0],[2,0,1]]}"#
     );
+    assert_eq!(ga(&group, vec![0, 0, 1]).group_order(), 3);
     assert_eq!(
         ga(&group, vec![2, 1, 2, 2]).to_json_string(),
         r#"{"group_order":3,"support":[1,2]}"#
@@ -148,6 +157,36 @@ fn left_and_right_regular_s3_actions_commute() {
 #[test]
 fn finite_group_lifts_reject_invalid_tables() {
     assert!(matches!(
+        FiniteGroupSpec::new(0, 0, Vec::new()),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("order must be positive")
+    ));
+
+    assert!(matches!(
+        FiniteGroupSpec::new(2, 2, vec![vec![0, 1], vec![1, 0]]),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("identity 2 is out of range")
+    ));
+
+    assert!(matches!(
+        FiniteGroupSpec::new(2, 0, vec![vec![0, 1]]),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("expected 2 rows")
+    ));
+
+    assert!(matches!(
+        FiniteGroupSpec::new(2, 0, vec![vec![0, 1], vec![1]]),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("row 1 has width 1")
+    ));
+
+    assert!(matches!(
+        FiniteGroupSpec::new(2, 1, vec![vec![0, 1], vec![1, 0]]),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("declared identity 1 does not match")
+    ));
+
+    assert!(matches!(
         FiniteGroupSpec::new(2, 0, vec![vec![1, 1], vec![1, 1]]),
         Err(QecError::InvalidFiniteGroupTable { reason })
             if reason.contains("identity")
@@ -180,12 +219,41 @@ fn finite_group_lifts_reject_invalid_tables() {
         })
     );
 
+    let no_inverse = vec![vec![0, 1], vec![1, 1]];
+    assert!(matches!(
+        FiniteGroupSpec::new(2, 0, no_inverse),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("element 1 has no two-sided inverse")
+    ));
+
+    let multiple_inverse = vec![vec![0, 1, 2], vec![1, 0, 0], vec![2, 0, 0]];
+    assert!(matches!(
+        FiniteGroupSpec::new(3, 0, multiple_inverse),
+        Err(QecError::InvalidFiniteGroupTable { reason })
+            if reason.contains("element 1 has multiple two-sided inverses")
+    ));
+
     let wrong_group_element = GroupAlgebraElement::new(&c2_group(), vec![1]).unwrap();
     assert_eq!(
         left_regular_lift(&group, &[vec![wrong_group_element]]),
         Err(QecError::GroupAlgebraOrderMismatch {
             expected: 3,
             actual: 2
+        })
+    );
+
+    assert_eq!(
+        group.multiply(3, 0),
+        Err(QecError::InvalidFiniteGroupElement {
+            element: 3,
+            order: 3
+        })
+    );
+    assert_eq!(
+        left_regular_lift(&group, &[vec![ga(&group, vec![0])], vec![]]),
+        Err(QecError::GroupAlgebraMatrixRowWidthMismatch {
+            expected: 1,
+            actual: 0
         })
     );
 
