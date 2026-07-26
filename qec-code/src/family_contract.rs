@@ -6,11 +6,11 @@ use serde_json::{Map, Value};
 
 use crate::binary::try_binary_rank;
 use crate::codes::built_in_css::{
-    built_in_css_checks, parse_built_in_css_code_spec, BuiltInCssCodeSpec, BuiltInCssFamily,
-    BuiltInCssParams,
+    BuiltInCssCodeSpec, BuiltInCssFamily, BuiltInCssParams, built_in_css_checks,
+    parse_built_in_css_code_spec,
 };
 use crate::codes::quantum_tanner::{
-    quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
+    QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
@@ -335,8 +335,7 @@ fn rotated_surface_supports(
                 continue;
             }
 
-            let support =
-                rotated_surface_measure_support(row_distance, column_distance, ax, ay);
+            let support = rotated_surface_measure_support(row_distance, column_distance, ax, ay);
             if support.is_empty() {
                 continue;
             }
@@ -385,10 +384,7 @@ fn rotated_surface_measure_support(
     support
 }
 
-fn unrotated_surface_num_data_qubits(
-    row_distance: usize,
-    column_distance: usize,
-) -> Result<usize> {
+fn unrotated_surface_num_data_qubits(row_distance: usize, column_distance: usize) -> Result<usize> {
     let grid_rows = checked_surface_grid_extent(row_distance, "row grid extent")?;
     let grid_columns = checked_surface_grid_extent(column_distance, "column grid extent")?;
     grid_rows
@@ -586,7 +582,9 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     }
     let construction = required_string(object, "construction")?;
     match construction {
-        "surface" => Ok(CssFamilySpec::Surface(surface_spec_from_json(object, construction)?).into()),
+        "surface" => {
+            Ok(CssFamilySpec::Surface(surface_spec_from_json(object, construction)?).into())
+        }
         "quantum_tanner" => {
             let spec_value = object.get("spec").unwrap_or(&value);
             let mut spec_object = spec_value.as_object().cloned().ok_or_else(|| {

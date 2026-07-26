@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use qec_code::QecError;
-use qec_code::cli::{CodeCommands, Commands, CssArgs, CssMatrixKind, Cli, run};
+use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     CssConstructionSpec, CssFamilySpec, SurfaceLayout, SurfaceSpec, construct_css,
@@ -82,9 +82,18 @@ fn rectangular_rotated_surface_3x5_matches_fixture() {
     let result = construct_css(CssFamilySpec::Surface(spec.clone()).into()).unwrap();
 
     assert_eq!(result.construction_id, "surface_rotated");
-    assert_eq!(result.normalized_parameters["layout"], serde_json::json!("rotated"));
-    assert_eq!(result.normalized_parameters["row_distance"], serde_json::json!(3));
-    assert_eq!(result.normalized_parameters["column_distance"], serde_json::json!(5));
+    assert_eq!(
+        result.normalized_parameters["layout"],
+        serde_json::json!("rotated")
+    );
+    assert_eq!(
+        result.normalized_parameters["row_distance"],
+        serde_json::json!(3)
+    );
+    assert_eq!(
+        result.normalized_parameters["column_distance"],
+        serde_json::json!(5)
+    );
     assert_eq!(result.stats.n, 15);
     assert_eq!(result.stats.m_x, 6);
     assert_eq!(result.stats.m_z, 8);
@@ -165,8 +174,8 @@ fn ordinary_surface_d3_matches_fixture() {
 #[test]
 fn legacy_rotated_surface_outputs_are_unchanged() {
     for distance in 2..=6 {
-        let inline = CssConstructionSpec::from_inline(&format!("surface_rotated:d={distance}"))
-            .unwrap();
+        let inline =
+            CssConstructionSpec::from_inline(&format!("surface_rotated:d={distance}")).unwrap();
         let typed = CssFamilySpec::Surface(SurfaceSpec::rotated_square(distance)).into();
         assert_eq!(inline, typed);
 
@@ -223,21 +232,29 @@ fn legacy_rotated_surface_outputs_are_unchanged() {
 
 #[test]
 fn surface_family_rejects_invalid_dimensions() {
-    assert!(construct_css(CssFamilySpec::Surface(SurfaceSpec {
-        layout: SurfaceLayout::Rotated,
-        row_distance: 1,
-        column_distance: 3,
-    })
-    .into())
-    .is_err());
+    assert!(
+        construct_css(
+            CssFamilySpec::Surface(SurfaceSpec {
+                layout: SurfaceLayout::Rotated,
+                row_distance: 1,
+                column_distance: 3,
+            })
+            .into()
+        )
+        .is_err()
+    );
 
-    assert!(construct_css(CssFamilySpec::Surface(SurfaceSpec {
-        layout: SurfaceLayout::Unrotated,
-        row_distance: 3,
-        column_distance: 1,
-    })
-    .into())
-    .is_err());
+    assert!(
+        construct_css(
+            CssFamilySpec::Surface(SurfaceSpec {
+                layout: SurfaceLayout::Unrotated,
+                row_distance: 3,
+                column_distance: 1,
+            })
+            .into()
+        )
+        .is_err()
+    );
 
     assert!(matches!(
         parse_css_construction_json(
