@@ -156,6 +156,14 @@ fn assert_fixture_matches(spec: DirectionalCssSpec, fixture: serde_json::Value) 
         result.stats.k,
         fixture["stats"]["k"].as_u64().unwrap() as usize
     );
+    assert_eq!(
+        result.stats.d_x,
+        Some(fixture["distances"]["d_x"].as_u64().unwrap() as usize)
+    );
+    assert_eq!(
+        result.stats.d_z,
+        Some(fixture["distances"]["d_z"].as_u64().unwrap() as usize)
+    );
     verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z)
         .expect("fixture checks should be orthogonal");
     assert_eq!(

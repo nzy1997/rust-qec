@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
+use qec_code::QecError;
 use qec_code::codes::quantum_tanner::quantum_tanner_spec_from_json_str;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, verify_css_orthogonality, CssClassicalCheckSpec,
-    CssConstructionSpec, CssFamilySpec, HypergraphProductSpec, RequestedFamilyId,
-    SurfaceFamilySpec, CLASSICAL_IDENTITY_2,
+    CLASSICAL_IDENTITY_2, CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec,
+    HypergraphProductSpec, RequestedFamilyId, SurfaceFamilySpec, construct_css,
+    parse_css_construction_json, verify_css_orthogonality,
 };
-use qec_code::QecError;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -281,6 +281,8 @@ fn directional_json_adapter_constructs_square_fixture_with_deterministic_metadat
         result.requested_family_id,
         Some(RequestedFamilyId::Directional)
     );
+    assert_eq!(result.stats.d_x, Some(3));
+    assert_eq!(result.stats.d_z, Some(3));
     assert_eq!(
         result.checks.h_x,
         serde_json::from_value::<Vec<Vec<usize>>>(fixture["checks"]["h_x"].clone()).unwrap()
