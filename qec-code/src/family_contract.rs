@@ -12,6 +12,11 @@ use crate::codes::built_in_css::{
 };
 use crate::codes::color_666::{COLOR_666_CONSTRUCTION_ID, color_666_sparse_checks};
 pub use crate::codes::color_666::{Color666FamilySpec, Color666Layout};
+pub use crate::codes::generalized_bicycle::GeneralizedBicycleSpec;
+use crate::codes::generalized_bicycle::{
+    GENERALIZED_BICYCLE_CONSTRUCTION_ID, generalized_bicycle_known_distances,
+    generalized_bicycle_sparse_checks,
+};
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
@@ -122,6 +127,7 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    GeneralizedBicycle(GeneralizedBicycleSpec),
     Color666(Color666FamilySpec),
 }
 
@@ -130,6 +136,7 @@ impl CssFamilySpec {
         &[
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::GeneralizedBicycle,
             RequestedFamilyId::Color666,
         ]
     }
@@ -260,6 +267,32 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "quantum_tanner",
                 "CssFamilySpec::QuantumTanner",
                 None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::GeneralizedBicycle(spec)) => {
+            let checks = generalized_bicycle_sparse_checks(&spec)?;
+            let normalized = checks.normalized_spec;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("order".to_owned(), Value::from(normalized.order));
+            parameters.insert(
+                "a_exponents".to_owned(),
+                serde_json::to_value(&normalized.a_exponents).expect("serializable exponents"),
+            );
+            parameters.insert(
+                "b_exponents".to_owned(),
+                serde_json::to_value(&normalized.b_exponents).expect("serializable exponents"),
+            );
+            let known_distances = generalized_bicycle_known_distances(&normalized);
+            construction_result(
+                GENERALIZED_BICYCLE_CONSTRUCTION_ID,
+                Some(RequestedFamilyId::GeneralizedBicycle),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                GENERALIZED_BICYCLE_CONSTRUCTION_ID,
+                "CssFamilySpec::GeneralizedBicycle",
+                known_distances,
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::Color666(spec)) => {
@@ -678,6 +711,12 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let construction = required_string(object, "construction")?;
     match construction {
         "surface" => surface_construction_from_json(object, construction),
+        "generalized_bicycle" => Ok(CssFamilySpec::GeneralizedBicycle(GeneralizedBicycleSpec {
+            order: required_usize(object, "order", construction)?,
+            a_exponents: required_usize_array(object, "a_exponents", construction)?,
+            b_exponents: required_usize_array(object, "b_exponents", construction)?,
+        })
+        .into()),
         "color_666" => {
             let layout = optional_string(object, "layout")?
                 .map(Color666Layout::parse)
@@ -1013,4 +1052,34 @@ fn required_usize(object: &Map<String, Value>, field: &str, construction: &str) 
         construction: construction.to_owned(),
         reason: format!("{field} is outside usize range"),
     })
+}
+
+fn required_usize_array(
+    object: &Map<String, Value>,
+    field: &'static str,
+    construction: &str,
+) -> Result<Vec<usize>> {
+    let values = object.get(field).and_then(Value::as_array).ok_or_else(|| {
+        QecError::InvalidCssConstruction {
+            construction: construction.to_owned(),
+            reason: format!("missing or invalid {field}"),
+        }
+    })?;
+
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let value = value
+                .as_u64()
+                .ok_or_else(|| QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: format!("{field}[{index}] must be a nonnegative integer"),
+                })?;
+            usize::try_from(value).map_err(|_| QecError::InvalidCssConstruction {
+                construction: construction.to_owned(),
+                reason: format!("{field}[{index}] is outside usize range"),
+            })
+        })
+        .collect()
 }

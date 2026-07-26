@@ -3,13 +3,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli};
+use qec_code::QecError;
+use qec_code::cli::{Cli, run};
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, CssFamilySpec, GeneralizedBicycleSpec,
-    RequestedFamilyId, verify_css_orthogonality,
+    CssFamilySpec, GeneralizedBicycleSpec, RequestedFamilyId, construct_css,
+    parse_css_construction_json, verify_css_orthogonality,
 };
-use qec_code::QecError;
 use tempfile::tempdir;
 
 fn qec_code_bin() -> &'static str {
@@ -84,11 +84,16 @@ fn generalized_bicycle_order5_matches_fixture() {
         serde_json::json!([0, 2])
     );
     assert_eq!(result.provenance.adapter, "generalized_bicycle");
-    assert_eq!(result.provenance.source, "CssFamilySpec::GeneralizedBicycle");
-    assert!(result
-        .provenance
-        .normalized_input_digest
-        .starts_with("sha256:"));
+    assert_eq!(
+        result.provenance.source,
+        "CssFamilySpec::GeneralizedBicycle"
+    );
+    assert!(
+        result
+            .provenance
+            .normalized_input_digest
+            .starts_with("sha256:")
+    );
 
     assert_eq!(result.stats.n, 10);
     assert_eq!(result.stats.m_x, 5);
@@ -108,7 +113,10 @@ fn generalized_bicycle_order5_matches_fixture() {
         r#"{"schema_version":1,"construction":"generalized_bicycle","order":5,"a_exponents":[0,1],"b_exponents":[0,2]}"#,
     )
     .unwrap();
-    assert_eq!(parsed, CssFamilySpec::GeneralizedBicycle(fixture_spec()).into());
+    assert_eq!(
+        parsed,
+        CssFamilySpec::GeneralizedBicycle(fixture_spec()).into()
+    );
     let parsed_result = construct_css(parsed).unwrap();
     assert_eq!(
         serde_json::to_string(&result).unwrap(),
@@ -146,7 +154,12 @@ fn generalized_bicycle_order5_matches_fixture() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be UTF-8");
     assert_eq!(
         stdout,
-        SparseRowsMatrix::new(10, fixture_hx()).unwrap().to_json_string()
+        format!(
+            "{}\n",
+            SparseRowsMatrix::new(10, fixture_hx())
+                .unwrap()
+                .to_json_string()
+        )
     );
 
     let in_process = run_qec_code_in_process_os(vec![
@@ -160,7 +173,9 @@ fn generalized_bicycle_order5_matches_fixture() {
     .unwrap();
     assert_eq!(
         in_process,
-        SparseRowsMatrix::new(10, fixture_hz()).unwrap().to_json_string()
+        SparseRowsMatrix::new(10, fixture_hz())
+            .unwrap()
+            .to_json_string()
     );
 }
 
