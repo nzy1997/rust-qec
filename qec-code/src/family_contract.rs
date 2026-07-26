@@ -116,15 +116,26 @@ pub struct SurfaceFamilySpec {
     pub distance: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShorLikeSpec {
+    pub outer_blocks: usize,
+    pub inner_block: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    ShorLike(ShorLikeSpec),
 }
 
 impl CssFamilySpec {
     pub const fn callable_requested_family_ids() -> &'static [RequestedFamilyId] {
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::ShorLike,
+        ]
     }
 }
 
@@ -244,6 +255,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 None,
             )
         }
+        CssConstructionSpec::Family(CssFamilySpec::ShorLike(spec)) => construct_shor_like(spec),
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
@@ -266,6 +278,103 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 None,
             )
         }
+    }
+}
+
+fn construct_shor_like(spec: ShorLikeSpec) -> Result<CssConstructionResult> {
+    validate_shor_like_spec(&spec)?;
+    let n = spec
+        .outer_blocks
+        .checked_mul(spec.inner_block)
+        .ok_or_else(|| QecError::InvalidCssConstruction {
+            construction: "shor_like".to_owned(),
+            reason: "shor_like dimension overflow during data qubit count".to_owned(),
+        })?;
+    let (h_x, h_z) = shor_like_supports(spec.outer_blocks, spec.inner_block)?;
+    let mut parameters = BTreeMap::new();
+    parameters.insert("inner_block".to_owned(), Value::from(spec.inner_block));
+    parameters.insert("outer_blocks".to_owned(), Value::from(spec.outer_blocks));
+    construction_result(
+        "shor_like",
+        Some(RequestedFamilyId::ShorLike),
+        parameters,
+        n,
+        h_x,
+        h_z,
+        "shor_like",
+        "CssFamilySpec::ShorLike",
+        Some((spec.inner_block, spec.outer_blocks)),
+    )
+}
+
+fn validate_shor_like_spec(spec: &ShorLikeSpec) -> Result<()> {
+    for (parameter, value) in [
+        ("outer_blocks", spec.outer_blocks),
+        ("inner_block", spec.inner_block),
+    ] {
+        if value < 2 {
+            return Err(QecError::InvalidCssConstruction {
+                construction: "shor_like".to_owned(),
+                reason: format!("{parameter} must be at least 2, got {value}"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn shor_like_supports(
+    outer_blocks: usize,
+    inner_block: usize,
+) -> Result<(Vec<Vec<usize>>, Vec<Vec<usize>>)> {
+    let mut h_x = Vec::new();
+    for outer_block in 0..outer_blocks - 1 {
+        let first_base = outer_block
+            .checked_mul(inner_block)
+            .ok_or_else(|| shor_like_overflow("X-check index"))?;
+        let second_base = outer_block
+            .checked_add(1)
+            .and_then(|block| block.checked_mul(inner_block))
+            .ok_or_else(|| shor_like_overflow("X-check index"))?;
+        let mut row = Vec::new();
+        for offset in 0..inner_block {
+            row.push(
+                first_base
+                    .checked_add(offset)
+                    .ok_or_else(|| shor_like_overflow("X-check index"))?,
+            );
+        }
+        for offset in 0..inner_block {
+            row.push(
+                second_base
+                    .checked_add(offset)
+                    .ok_or_else(|| shor_like_overflow("X-check index"))?,
+            );
+        }
+        h_x.push(row);
+    }
+
+    let mut h_z = Vec::new();
+    for outer_block in 0..outer_blocks {
+        let base = outer_block
+            .checked_mul(inner_block)
+            .ok_or_else(|| shor_like_overflow("Z-check index"))?;
+        for inner_index in 0..inner_block - 1 {
+            let first = base
+                .checked_add(inner_index)
+                .ok_or_else(|| shor_like_overflow("Z-check index"))?;
+            let second = first
+                .checked_add(1)
+                .ok_or_else(|| shor_like_overflow("Z-check index"))?;
+            h_z.push(vec![first, second]);
+        }
+    }
+    Ok((h_x, h_z))
+}
+
+fn shor_like_overflow(operation: &'static str) -> QecError {
+    QecError::InvalidCssConstruction {
+        construction: "shor_like".to_owned(),
+        reason: format!("shor_like dimension overflow during {operation}"),
     }
 }
 
@@ -643,6 +752,14 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let construction = required_string(object, "construction")?;
     match construction {
         "surface" => surface_construction_from_json(object, construction),
+        "shor_like" => {
+            let spec = ShorLikeSpec {
+                outer_blocks: required_usize(object, "outer_blocks", construction)?,
+                inner_block: required_usize(object, "inner_block", construction)?,
+            };
+            validate_shor_like_spec(&spec)?;
+            Ok(CssFamilySpec::ShorLike(spec).into())
+        }
         "quantum_tanner" => {
             let spec_value = object.get("spec").unwrap_or(&value);
             let mut spec_object = spec_value.as_object().cloned().ok_or_else(|| {
