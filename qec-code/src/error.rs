@@ -35,6 +35,45 @@ pub enum QecError {
         support: usize,
         num_cols: usize,
     },
+    #[error("sparse GF(2) row count mismatch: expected {expected}, got {actual}")]
+    SparseGf2RowCountMismatch { expected: usize, actual: usize },
+    #[error("out-of-range sparse GF(2) support {support} in row {row} for width {num_cols}")]
+    SparseGf2SupportOutOfRange {
+        row: usize,
+        support: usize,
+        num_cols: usize,
+    },
+    #[error(
+        "sparse GF(2) horizontal concatenation row mismatch: left has {left_rows}, right has {right_rows}"
+    )]
+    SparseGf2HorizontalRowMismatch { left_rows: usize, right_rows: usize },
+    #[error("sparse GF(2) dimension overflow during {operation}")]
+    SparseGf2DimensionOverflow { operation: &'static str },
+    #[error("invalid regular classical matrix option {option}: {reason}")]
+    InvalidRegularClassicalMatrixConfig {
+        option: &'static str,
+        reason: String,
+    },
+    #[error("unsupported regular classical matrix algorithm version {algorithm_version}")]
+    UnsupportedRegularClassicalMatrixAlgorithm { algorithm_version: u32 },
+    #[error("regular classical matrix stub-count overflow for {side}")]
+    RegularClassicalMatrixStubCountOverflow { side: &'static str },
+    #[error(
+        "regular classical matrix stub-count mismatch: column stubs {column_stubs}, row stubs {row_stubs}"
+    )]
+    RegularClassicalMatrixStubCountMismatch {
+        column_stubs: usize,
+        row_stubs: usize,
+    },
+    #[error(
+        "regular classical matrix generation exhausted retry limit {retry_limit} after {attempts} attempts for algorithm version {algorithm_version} seed {seed}"
+    )]
+    RegularClassicalMatrixGenerationExhausted {
+        retry_limit: usize,
+        attempts: usize,
+        algorithm_version: u32,
+        seed: u64,
+    },
     #[error("missing CSS matrix format")]
     MissingCssMatrixFormat,
     #[error("unsupported CSS matrix format: {format}")]
@@ -142,9 +181,7 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error(
-        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
-    )]
+    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,

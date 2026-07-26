@@ -36,6 +36,13 @@ qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-comm
 The repository does not yet declare a project license. Resolve that before
 redistributing this crate or treating it as a released third-party dependency.
 
+## Deterministic regular matrices
+
+`qec_code::regular_classical` provides the versioned pure-Rust generator for
+regular binary parity-check matrices used by random code families. The exact
+version-1 stream, bounded-index rule, retry behavior, and seed-7 fixture are
+documented in [`doc/regular_classical.md`](doc/regular_classical.md).
+
 ## Packed GF(2) example
 
 ```rust
