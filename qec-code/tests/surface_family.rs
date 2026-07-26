@@ -326,4 +326,35 @@ fn surface_family_rejects_invalid_dimensions() {
         Err(QecError::InvalidCssConstruction { construction, reason })
             if construction == "surface" && reason.contains("overflow")
     ));
+
+    assert!(matches!(
+        construct_css(
+            CssFamilySpec::Surface(SurfaceFamilySpec {
+                distance: isize::MAX as usize,
+            })
+            .into()
+        ),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
+
+    let parsed = parse_css_construction_json(&format!(
+        r#"{{"schema_version":1,"construction":"surface","distance":{}}}"#,
+        isize::MAX
+    ))
+    .unwrap();
+    assert!(matches!(
+        construct_css(parsed),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
+
+    let parsed =
+        CssConstructionSpec::from_inline(&format!("surface_rotated:d={}", isize::MAX as usize))
+            .unwrap();
+    assert!(matches!(
+        construct_css(parsed),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
 }

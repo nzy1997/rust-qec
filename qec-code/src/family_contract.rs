@@ -261,6 +261,14 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
 }
 
 fn construct_legacy_surface(spec: SurfaceFamilySpec) -> Result<CssConstructionResult> {
+    validate_surface_distance("distance", spec.distance)?;
+    spec.distance
+        .checked_mul(spec.distance)
+        .ok_or_else(|| surface_overflow("data qubit count"))?;
+    if spec.distance > isize::MAX as usize / 2 {
+        return Err(surface_overflow("rotated coordinate arithmetic"));
+    }
+
     let checks = built_in_css_checks(&format!("surface_rotated:d={}", spec.distance))?;
     let mut parameters = BTreeMap::new();
     parameters.insert("distance".to_owned(), Value::from(spec.distance));
