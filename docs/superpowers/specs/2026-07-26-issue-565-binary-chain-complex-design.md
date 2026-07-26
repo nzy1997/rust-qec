@@ -93,12 +93,6 @@ cell count.
 duplicate domain dimensions, and checks each adjacent pair where
 `lower.domain_dimension == upper.codomain_dimension`.
 
-`BinaryChainComplex::from_boundary_rows(cell_counts, raw_boundary_rows)` is a
-convenience constructor for tests and future small fixtures. The vector index is
-the boundary domain dimension. Entry `d` is an optional list of rows for
-`boundary_d`, and each row lists domain-cell supports for one codomain cell.
-The constructor derives matrix shapes from `cell_counts`.
-
 `BinaryChainComplex::css_view(qubit_dimension)` requires both `boundary_k` and
 `boundary_(k+1)`. It returns `H_X = boundary_k` and
 `H_Z = boundary_(k+1).transpose()`, and validates that both sparse checks have
@@ -179,6 +173,11 @@ Add `qec-code/tests/binary_chain_complex.rs` with the issue's exact tests:
 
 - `square_cell_boundary_maps_match_fixture`
 - `corrupt_face_boundary_is_rejected`
+- `boundary_maps_reject_invalid_cell_dimensions`
+- `chain_complex_rejects_duplicate_boundary_dimensions`
+- `chain_complex_reports_composition_shape_mismatch`, including both cellular
+  dimensions and both mismatched cell counts in the error.
+- `css_view_reports_missing_boundary_maps`
 
 The fixture test checks deterministic canonical row ordering, exact boundary
 rows, exact CSS rows and counts, and sparse orthogonality by attempting to build
