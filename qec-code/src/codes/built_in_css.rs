@@ -997,4 +997,13 @@ mod tests {
             BuiltInCssParams::ApmKasai { p: 96 },
         );
     }
+
+    #[test]
+    #[should_panic(expected = "toric_3d only uses toric_3d params")]
+    fn toric_3d_family_checks_reject_mismatched_internal_params() {
+        let _ = family_css_checks(
+            BuiltInCssFamily::Toric3d,
+            BuiltInCssParams::ApmKasai { p: 96 },
+        );
+    }
 }

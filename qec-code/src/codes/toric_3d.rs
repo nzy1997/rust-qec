@@ -69,20 +69,12 @@ impl Toric3dDimensions {
 
 pub fn toric_3d_chain_complex(spec: Toric3dSpec) -> Result<BinaryChainComplex> {
     let dims = Toric3dDimensions::new(spec)?;
-    let boundary_1 = BinaryBoundaryMap::new(
-        1,
-        0,
-        SparseGf2Matrix::new(dims.volume, dims.num_edges, vertex_edge_rows(&dims)?)?,
-    )?;
-    let boundary_2 = BinaryBoundaryMap::new(
-        2,
-        1,
-        SparseGf2Matrix::new(
-            dims.num_edges,
-            dims.num_plaquettes,
-            edge_plaquette_rows(&dims)?,
-        )?,
-    )?;
+    let vertex_rows = vertex_edge_rows(&dims)?;
+    let b1_matrix = SparseGf2Matrix::new(dims.volume, dims.num_edges, vertex_rows)?;
+    let boundary_1 = BinaryBoundaryMap::new(1, 0, b1_matrix)?;
+    let edge_rows = edge_plaquette_rows(&dims)?;
+    let b2_matrix = SparseGf2Matrix::new(dims.num_edges, dims.num_plaquettes, edge_rows)?;
+    let boundary_2 = BinaryBoundaryMap::new(2, 1, b2_matrix)?;
     BinaryChainComplex::new(vec![boundary_1, boundary_2])
 }
 
