@@ -10,6 +10,7 @@ use crate::codes::built_in_css::{
     built_in_css_checks, parse_built_in_css_code_spec, BuiltInCssCodeSpec, BuiltInCssFamily,
     BuiltInCssParams,
 };
+use crate::codes::directional::{build_directional_css_checks, DirectionalCssSpec};
 use crate::codes::quantum_tanner::{
     quantum_tanner_css_checks, quantum_tanner_spec_from_json_str, QuantumTannerSpec,
 };
@@ -87,11 +88,16 @@ pub struct SurfaceFamilySpec {
 pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
+    Directional(DirectionalCssSpec),
 }
 
 impl CssFamilySpec {
     pub const fn callable_requested_family_ids() -> &'static [RequestedFamilyId] {
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Directional,
+        ]
     }
 }
 
@@ -213,6 +219,20 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "CssFamilySpec::QuantumTanner",
             )
         }
+        CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
+            let checks = build_directional_css_checks(&spec)?;
+            let parameters = directional_normalized_parameters(&spec, &checks);
+            construction_result(
+                checks.code_id,
+                Some(RequestedFamilyId::Directional),
+                parameters,
+                checks.num_cols,
+                checks.hx,
+                checks.hz,
+                "directional",
+                "CssFamilySpec::Directional",
+            )
+        }
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
             let checks = built_in_css_checks(&spec.code_id)?;
@@ -230,6 +250,36 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
             )
         }
     }
+}
+
+fn directional_normalized_parameters(
+    spec: &DirectionalCssSpec,
+    checks: &crate::codes::directional::DirectionalCssChecks,
+) -> BTreeMap<String, Value> {
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "torus".to_owned(),
+        serde_json::to_value(&spec.torus).expect("serializable directional torus"),
+    );
+    parameters.insert("route".to_owned(), Value::from(spec.route.clone()));
+    parameters.insert(
+        "normalized_route".to_owned(),
+        Value::from(checks.normalized_route.clone()),
+    );
+    parameters.insert(
+        "route_support".to_owned(),
+        serde_json::to_value(&checks.route_support)
+            .expect("serializable directional route support"),
+    );
+    parameters.insert(
+        "layout".to_owned(),
+        serde_json::to_value(&spec.layout).expect("serializable directional layout"),
+    );
+    parameters.insert(
+        "connectivity".to_owned(),
+        serde_json::to_value(spec.connectivity).expect("serializable directional connectivity"),
+    );
+    parameters
 }
 
 fn quantum_tanner_normalized_parameters(spec: &QuantumTannerSpec) -> BTreeMap<String, Value> {
@@ -336,6 +386,16 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             let spec_json = serde_json::to_string(&spec_object)
                 .expect("JSON object serialization should not fail");
             Ok(CssFamilySpec::QuantumTanner(quantum_tanner_spec_from_json_str(&spec_json)?).into())
+        }
+        "directional" => {
+            let spec_value = object.get("spec").unwrap_or(&value);
+            let spec = serde_json::from_value(spec_value.clone()).map_err(|error| {
+                QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: error.to_string(),
+                }
+            })?;
+            Ok(CssFamilySpec::Directional(spec).into())
         }
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {

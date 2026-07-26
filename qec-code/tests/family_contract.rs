@@ -161,7 +161,11 @@ fn inline_json_and_rust_routes_lower_to_same_spec() {
 fn planned_families_have_no_callable_stub() {
     assert_eq!(
         CssFamilySpec::callable_requested_family_ids(),
-        &[RequestedFamilyId::Surface, RequestedFamilyId::QuantumTanner]
+        &[
+            RequestedFamilyId::Surface,
+            RequestedFamilyId::QuantumTanner,
+            RequestedFamilyId::Directional,
+        ]
     );
 }
 
@@ -260,6 +264,56 @@ fn quantum_tanner_json_adapter_constructs_fixture() {
         serde_json::to_string(&result.normalized_parameters).unwrap(),
         serde_json::to_string(&repeated.normalized_parameters).unwrap(),
         "quantum Tanner normalized parameters should serialize deterministically"
+    );
+}
+
+#[test]
+fn directional_json_adapter_constructs_square_fixture_with_deterministic_metadata() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/directional/square_ne2n_8x6.json")).unwrap();
+    let request = serde_json::to_string(&fixture["request"]).unwrap();
+
+    let parsed = parse_css_construction_json(&request).unwrap();
+    let result = construct_css(parsed.clone()).unwrap();
+
+    assert_eq!(result.construction_id, "directional");
+    assert_eq!(
+        result.requested_family_id,
+        Some(RequestedFamilyId::Directional)
+    );
+    assert_eq!(
+        result.checks.h_x,
+        serde_json::from_value::<Vec<Vec<usize>>>(fixture["checks"]["h_x"].clone()).unwrap()
+    );
+    assert_eq!(
+        result.checks.h_z,
+        serde_json::from_value::<Vec<Vec<usize>>>(fixture["checks"]["h_z"].clone()).unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(&result.normalized_parameters).unwrap(),
+        serde_json::json!({
+            "torus": {
+                "period_x": 8,
+                "period_y": 6,
+                "vertical_period_x_shift": 4
+            },
+            "route": "NE2N",
+            "normalized_route": "NE2N",
+            "route_support": [[0, 1], [1, 2], [3, 2], [4, 3]],
+            "layout": {
+                "x_ancilla_coset": "odd_even",
+                "z_ancilla_coset": "even_odd"
+            },
+            "connectivity": "square"
+        })
+    );
+    assert_eq!(result.provenance.adapter, "directional");
+    assert_eq!(result.provenance.source, "CssFamilySpec::Directional");
+
+    let repeated = construct_css(parsed).unwrap();
+    assert_eq!(
+        result.provenance.normalized_input_digest, repeated.provenance.normalized_input_digest,
+        "directional normalized metadata digest should be deterministic"
     );
 }
 
