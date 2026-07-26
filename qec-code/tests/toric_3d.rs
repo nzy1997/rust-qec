@@ -1,12 +1,17 @@
 use std::path::PathBuf;
+use std::process::Command;
 
-use qec_code::codes::toric_3d::{toric_3d_css_checks, Toric3dDistances, Toric3dSpec};
+use qec_code::QecError;
+use qec_code::binary_chain_complex::{BinaryBoundaryMap, BinaryChainComplex};
+use qec_code::codes::toric_3d::{
+    Toric3dDistances, Toric3dSpec, toric_3d_chain_complex, toric_3d_css_checks,
+};
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, verify_css_orthogonality, CssFamilySpec,
-    RequestedFamilyId,
+    CssFamilySpec, RequestedFamilyId, construct_css, parse_css_construction_json,
+    verify_css_orthogonality,
 };
-use qec_code::QecError;
+use tempfile::tempdir;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -121,6 +126,71 @@ fn toric_3d_accepts_rectangular_periods() {
     assert_eq!(result.stats.rank_x, 59);
     assert_eq!(result.stats.rank_z, 118);
     assert_eq!(result.stats.k, 3);
+}
+
+#[test]
+fn toric_3d_rectangular_periods_work_through_cli() {
+    let dir = tempdir().unwrap();
+    let spec_path = dir.path().join("toric-3d.json");
+    std::fs::write(
+        &spec_path,
+        r#"{"schema_version":1,"construction":"toric_3d","lx":3,"ly":4,"lz":5}"#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_qec-code"))
+        .args([
+            "code",
+            "css",
+            "construct",
+            "--spec",
+            spec_path.to_str().unwrap(),
+            "hx",
+        ])
+        .output()
+        .expect("qec-code binary should run");
+    assert!(
+        output.status.success(),
+        "CLI failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["format"], "sparse_rows");
+    assert_eq!(value["num_cols"], 180);
+    let rows: Vec<Vec<usize>> = serde_json::from_value(value["rows"].clone()).unwrap();
+    assert_eq!(rows.len(), 60);
+    assert_all_row_weights(&rows, 6);
+}
+
+#[test]
+fn toric_3d_rejects_corrupted_boundary_composition() {
+    let complex = toric_3d_chain_complex(Toric3dSpec {
+        lx: 3,
+        ly: 3,
+        lz: 3,
+    })
+    .unwrap();
+    let boundary_1 = complex.boundary_map(1).unwrap();
+    let boundary_2 = complex.boundary_map(2).unwrap();
+    let mut corrupted_rows = boundary_2.matrix().rows().to_vec();
+    corrupted_rows[0].remove(0);
+    let corrupted_matrix = qec_code::sparse_gf2::SparseGf2Matrix::new(
+        boundary_2.num_codomain_cells(),
+        boundary_2.num_domain_cells(),
+        corrupted_rows,
+    )
+    .unwrap();
+    let corrupted_boundary_2 = BinaryBoundaryMap::new(2, 1, corrupted_matrix).unwrap();
+
+    assert!(matches!(
+        BinaryChainComplex::new(vec![(*boundary_1).clone(), corrupted_boundary_2]),
+        Err(QecError::NonzeroBoundaryComposition {
+            lower_dimension: 1,
+            upper_dimension: 2,
+            ..
+        })
+    ));
 }
 
 #[test]
