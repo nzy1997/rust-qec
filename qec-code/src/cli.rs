@@ -19,6 +19,9 @@ use crate::distance_exact::{
     ExactCssDistanceResult, ExactCssDistanceSolverOptions,
 };
 use crate::error::CssMatrixReadSource;
+use crate::family_contract::{
+    construct_css, parse_css_construction_json, CssConstructionSpec, CssFamilySpec,
+};
 use crate::QecError;
 
 #[derive(Debug, Parser)]
@@ -93,6 +96,11 @@ pub enum CssCommands {
     List,
     Export {
         code_id: String,
+        matrix: CssMatrixKind,
+    },
+    Construct {
+        #[arg(long)]
+        spec: PathBuf,
         matrix: CssMatrixKind,
     },
     QuantumTanner {
@@ -209,6 +217,7 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
     match args.command {
         Some(CssCommands::List) => Ok(run_css_list()),
         Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
+        Some(CssCommands::Construct { spec, matrix }) => run_css_construction_spec(&spec, matrix),
         Some(CssCommands::QuantumTanner { spec, matrix }) => run_css_quantum_tanner(&spec, matrix),
         None => {
             let code_id = args
@@ -246,36 +255,53 @@ fn run_css_list() -> String {
 }
 
 fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
-    let checks = built_in_css_checks(code_id)?;
-    let num_cols = checks.num_cols;
+    let spec = CssConstructionSpec::from_inline(code_id)?;
+    let construction = construct_css(spec)?;
     let rows = match matrix {
-        CssMatrixKind::Hx => checks.hx,
-        CssMatrixKind::Hz => checks.hz,
+        CssMatrixKind::Hx => construction.checks.h_x,
+        CssMatrixKind::Hz => construction.checks.h_z,
     };
 
-    let matrix = SparseRowsMatrix::new(num_cols, rows)?;
+    let matrix = SparseRowsMatrix::new(construction.stats.n, rows)?;
     Ok(matrix.to_json_string())
+}
+
+fn run_css_construction_spec(path: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
+    let input = read_css_spec_file(path)?;
+    let spec = parse_css_construction_json(&input)?;
+    export_css_construction(spec, matrix)
 }
 
 fn run_css_quantum_tanner(spec: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
     let spec = read_quantum_tanner_spec(spec)?;
-    let checks = quantum_tanner_css_checks(&spec)?;
+    export_css_construction(CssFamilySpec::QuantumTanner(spec).into(), matrix)
+}
+
+fn export_css_construction(
+    spec: CssConstructionSpec,
+    matrix: CssMatrixKind,
+) -> Result<String, QecError> {
+    let construction = construct_css(spec)?;
     let rows = match matrix {
-        CssMatrixKind::Hx => checks.hx,
-        CssMatrixKind::Hz => checks.hz,
+        CssMatrixKind::Hx => construction.checks.h_x,
+        CssMatrixKind::Hz => construction.checks.h_z,
     };
 
-    let matrix = SparseRowsMatrix::new(checks.num_cols, rows)?;
+    let matrix = SparseRowsMatrix::new(construction.stats.n, rows)?;
     Ok(matrix.to_json_string())
 }
 
 fn read_quantum_tanner_spec(path: &PathBuf) -> Result<QuantumTannerSpec, QecError> {
-    let input = fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
-        path: path.display().to_string(),
-        source: CssMatrixReadSource(err.to_string()),
-    })?;
+    let input = read_css_spec_file(path)?;
 
     quantum_tanner_spec_from_json_str(&input)
+}
+
+fn read_css_spec_file(path: &PathBuf) -> Result<String, QecError> {
+    fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
+        path: path.display().to_string(),
+        source: CssMatrixReadSource(err.to_string()),
+    })
 }
 
 fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {

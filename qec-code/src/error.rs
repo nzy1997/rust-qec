@@ -6,6 +6,17 @@ pub struct CssMatrixReadSource(pub String);
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum QecError {
+    #[error("unsupported CSS construction schema version: {version}")]
+    UnsupportedCssConstructionSchemaVersion { version: u64 },
+    #[error("invalid CSS construction JSON: {0}")]
+    InvalidCssConstructionJson(String),
+    #[error("unknown CSS construction: {construction}")]
+    UnknownCssConstruction { construction: String },
+    #[error("invalid CSS construction {construction}: {reason}")]
+    InvalidCssConstruction {
+        construction: String,
+        reason: String,
+    },
     #[error("row width mismatch: expected {expected}, got {actual}")]
     RowWidthMismatch { expected: usize, actual: usize },
     #[error("invalid symplectic row width: expected even width, got {width}")]
@@ -170,7 +181,9 @@ pub enum QecError {
     },
     #[error("unexpected built-in CSS parameter {parameter} for family {family}")]
     UnexpectedBuiltInCssParameter { family: String, parameter: String },
-    #[error("out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}")]
+    #[error(
+        "out-of-range built-in CSS integer parameter {parameter} for family {family}: {value}"
+    )]
     OutOfRangeBuiltInCssIntegerParameter {
         family: String,
         parameter: String,
