@@ -24,6 +24,21 @@ pub enum QecError {
         support: usize,
         num_cols: usize,
     },
+    #[error("sparse GF(2) row count mismatch: expected {expected}, got {actual}")]
+    SparseGf2RowCountMismatch { expected: usize, actual: usize },
+    #[error("out-of-range sparse GF(2) support {support} in row {row} for width {num_cols}")]
+    SparseGf2SupportOutOfRange {
+        row: usize,
+        support: usize,
+        num_cols: usize,
+    },
+    #[error("sparse GF(2) horizontal concatenation row mismatch: left has {left_rows}, right has {right_rows}")]
+    SparseGf2HorizontalRowMismatch {
+        left_rows: usize,
+        right_rows: usize,
+    },
+    #[error("sparse GF(2) dimension overflow during {operation}")]
+    SparseGf2DimensionOverflow { operation: &'static str },
     #[error("missing CSS matrix format")]
     MissingCssMatrixFormat,
     #[error("unsupported CSS matrix format: {format}")]
