@@ -107,10 +107,12 @@ For example:
 {"schema_version":1,"construction":"color_666","distance":5}
 ```
 
-The JSON request above lowers to the same typed surface specification as the
+The surface JSON request lowers to the same typed surface specification as the
 inline `surface_rotated:d=3` route and the Rust API value
-`CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`. Unsupported schema
-versions are rejected before construction.
+`CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 })`. The color JSON
+request lowers to `CssFamilySpec::Color666(Color666FamilySpec { distance: 5,
+layout: Color666Layout::Triangular })`. Unsupported schema versions are
+rejected before construction.
 
 ## Code
 
