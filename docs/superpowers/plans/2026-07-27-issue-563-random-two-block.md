@@ -35,7 +35,7 @@
 
 **Interfaces:**
 - Consumes: `qec_code::finite_group::{FiniteGroupSpec, GroupAlgebraElement, left_regular_lift, right_regular_lift}`, `qec_code::regular_classical::{SplitMix64V1, bounded_index_v1}`, `qec_code::sparse_gf2::SparseGf2Matrix`, `qec_code::QecError`.
-- Produces: `qec_code::codes::random_two_block::{RANDOM_TWO_BLOCK_ALGORITHM_V1, RandomTwoBlockSpec, RandomTwoBlockCssChecks, RandomTwoBlockMetadata, random_two_block_css_checks, random_two_block_spec_from_json_str}`.
+- Produces: `qec_code::codes::random_two_block::{RANDOM_TWO_BLOCK_ALGORITHM_V1, RandomTwoBlockSpec, RandomTwoBlockCssChecks, RandomTwoBlockMetadata, random_two_block_css_checks}`.
 
 - [ ] **Step 1: Write failing direct-constructor tests**
 
@@ -207,7 +207,6 @@ pub mod random_two_block;
 Create `qec-code/src/codes/random_two_block.rs` with:
 
 ```rust
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::error::{QecError, Result};
@@ -275,13 +274,14 @@ git commit -m "feat: add random two-block constructor"
 ### Task 2: Common Contract And CLI Integration
 
 **Files:**
+- Modify: `qec-code/src/codes/random_two_block.rs`
 - Modify: `qec-code/src/family_contract.rs`
 - Modify: `qec-code/tests/random_two_block.rs`
 - Modify: `qec-code/tests/family_contract.rs`
 
 **Interfaces:**
-- Consumes: Task 1's `RandomTwoBlockSpec`, `random_two_block_spec_from_json_str`, and `random_two_block_css_checks`.
-- Produces: `CssFamilySpec::RandomTwoBlock`, JSON construction `"random_two_block"`, common-contract normalized metadata, and CLI coverage through existing `code css construct --spec` command.
+- Consumes: Task 1's `RandomTwoBlockSpec` and `random_two_block_css_checks`.
+- Produces: `random_two_block_spec_from_json_str`, `CssFamilySpec::RandomTwoBlock`, JSON construction `"random_two_block"`, common-contract normalized metadata, and CLI coverage through existing `code css construct --spec` command.
 
 - [ ] **Step 1: Expand tests to fail on common-contract gaps**
 
@@ -300,9 +300,10 @@ use tempfile::tempdir;
 Add helpers:
 
 ```rust
-fn s3_request_json(seed_field: &str) -> String {
+fn s3_request_json(include_seed: bool) -> String {
+    let seed_field = if include_seed { r#","seed":7"# } else { "" };
     format!(
-        r#"{{"schema_version":1,"construction":"random_two_block","group":{{"name":"S3","element_order":"0=e,1=r,2=r^2,3=s,4=rs,5=r^2s","order":6,"identity":0,"multiplication_table":{}}},"support_a_weight":2,"support_b_weight":2,{seed_field},"algorithm_version":1}}"#,
+        r#"{{"schema_version":1,"construction":"random_two_block","group":{{"name":"S3","element_order":"0=e,1=r,2=r^2,3=s,4=rs,5=r^2s","order":6,"identity":0,"multiplication_table":{}}},"support_a_weight":2,"support_b_weight":2{seed_field},"algorithm_version":1}}"#,
         serde_json::to_string(&s3_table()).unwrap()
     )
 }
@@ -340,14 +341,14 @@ Extend `random_two_block_s3_seed7_matches_fixture` after direct API assertions:
         serde_json::json!(checks.metadata.group_digest)
     );
 
-    let parsed = parse_css_construction_json(&s3_request_json(r#""seed":7"#)).unwrap();
+    let parsed = parse_css_construction_json(&s3_request_json(true)).unwrap();
     let parsed_common = construct_css(parsed).unwrap();
     assert_eq!(parsed_common.checks, common.checks);
     assert_eq!(parsed_common.normalized_parameters, common.normalized_parameters);
 
     let dir = tempdir().unwrap();
     let spec_path = dir.path().join("random-two-block-s3.json");
-    std::fs::write(&spec_path, s3_request_json(r#""seed":7"#)).unwrap();
+    std::fs::write(&spec_path, s3_request_json(true)).unwrap();
     let cli_hx = run_qec_code_in_process(&[
         "code",
         "css",
@@ -380,7 +381,7 @@ Extend `random_two_block_rejects_invalid_sampling_specs`:
 
 ```rust
     assert!(matches!(
-        parse_css_construction_json(&s3_request_json("")),
+        parse_css_construction_json(&s3_request_json(false)),
         Err(QecError::InvalidRandomTwoBlockSpec { option: "seed", .. })
     ));
     assert!(matches!(
@@ -413,7 +414,54 @@ Expected: compile failure because `CssFamilySpec::RandomTwoBlock` and JSON parsi
 
 - [ ] **Step 3: Implement common contract adapter**
 
-Modify `qec-code/src/family_contract.rs`:
+First modify `qec-code/src/codes/random_two_block.rs` to add JSON parsing:
+
+```rust
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct RandomTwoBlockSpecJson {
+    group: ExplicitRandomTwoBlockGroupJson,
+    support_a_weight: usize,
+    support_b_weight: usize,
+    seed: Option<u64>,
+    algorithm_version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExplicitRandomTwoBlockGroupJson {
+    name: Option<String>,
+    element_order: Option<String>,
+    order: usize,
+    identity: usize,
+    multiplication_table: Vec<Vec<usize>>,
+}
+
+pub fn random_two_block_spec_from_json_str(input: &str) -> Result<RandomTwoBlockSpec> {
+    let parsed: RandomTwoBlockSpecJson = serde_json::from_str(input)
+        .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
+    let seed = parsed.seed.ok_or_else(|| QecError::InvalidRandomTwoBlockSpec {
+        option: "seed",
+        reason: "must be provided".to_owned(),
+    })?;
+    let group = FiniteGroupSpec::new(
+        parsed.group.order,
+        parsed.group.identity,
+        parsed.group.multiplication_table,
+    )?;
+    RandomTwoBlockSpec::new(
+        group,
+        parsed.support_a_weight,
+        parsed.support_b_weight,
+        seed,
+        parsed.algorithm_version,
+    )
+}
+```
+
+The `name` and `element_order` fields are accepted for fixture readability; the parser does not store them because the validated finite-group table is the canonical identity.
+
+Then modify `qec-code/src/family_contract.rs`:
 
 ```rust
 use crate::codes::random_two_block::{
