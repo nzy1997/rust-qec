@@ -2924,6 +2924,7 @@ fn built_in_css_catalog_lists_supported_specs() {
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
             "surface_rotated:d=<distance>",
+            "color_666:d=<distance>",
             "toric:d=<distance>",
             "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>",
         ]
@@ -2965,6 +2966,13 @@ fn built_in_css_catalog_lists_supported_specs() {
             .any(|entry| entry.spec == "surface_rotated:d=<distance>"
                 && entry.description.contains("distance >= 2")),
         "surface_rotated entry should describe the distance constraint: {catalog:?}"
+    );
+    assert!(
+        catalog
+            .iter()
+            .any(|entry| entry.spec == "color_666:d=<distance>"
+                && entry.description.contains("odd distance >= 3")),
+        "color_666 entry should describe the distance constraint: {catalog:?}"
     );
     assert!(
         catalog

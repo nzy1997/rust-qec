@@ -184,6 +184,7 @@ fn planned_families_have_no_callable_stub() {
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::Toric3d,
+            RequestedFamilyId::Color666,
         ]
     );
 }
