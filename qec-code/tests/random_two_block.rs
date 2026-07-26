@@ -86,6 +86,16 @@ fn random_two_block_s3_seed7_matches_fixture() {
 }
 
 #[test]
+fn random_two_block_s3_seed1_uses_swap_sampling() {
+    let spec = RandomTwoBlockSpec::new(s3_group(), 2, 3, 1, RANDOM_TWO_BLOCK_ALGORITHM_V1)
+        .unwrap();
+    let checks = random_two_block_css_checks(&spec).unwrap();
+
+    assert_eq!(checks.support_a, vec![0, 5]);
+    assert_eq!(checks.support_b, vec![0, 1, 3]);
+}
+
+#[test]
 fn random_two_block_rejects_invalid_sampling_specs() {
     assert!(matches!(
         RandomTwoBlockSpec::new(s3_group(), 7, 2, 7, RANDOM_TWO_BLOCK_ALGORITHM_V1),

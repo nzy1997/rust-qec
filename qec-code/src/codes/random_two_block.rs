@@ -89,15 +89,16 @@ pub fn random_two_block_css_checks(spec: &RandomTwoBlockSpec) -> Result<RandomTw
 }
 
 fn sample_support_v1(stream: &mut SplitMix64V1, order: usize, weight: usize) -> Vec<usize> {
-    let mut candidates = (0..order).collect::<Vec<_>>();
-    let mut support = Vec::with_capacity(weight);
-    for _ in 0..weight {
-        let index = bounded_index_v1(stream, candidates.len() as u64)
+    let mut pool = (0..order).collect::<Vec<_>>();
+    for i in 0..weight {
+        let offset = bounded_index_v1(stream, (order - i) as u64)
             .expect("sampling support from nonempty candidates");
-        support.push(candidates.remove(index as usize));
+        let j = i + offset as usize;
+        pool.swap(i, j);
     }
-    support.sort_unstable();
-    support
+    pool[..weight].sort_unstable();
+    pool.truncate(weight);
+    pool
 }
 
 fn verify_random_two_block_spec(spec: &RandomTwoBlockSpec) -> Result<()> {
