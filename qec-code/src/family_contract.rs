@@ -243,6 +243,14 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
+            if let Ok(BuiltInCssCodeSpec::Family {
+                family: BuiltInCssFamily::SurfaceRotated,
+                params: BuiltInCssParams::Distance { distance },
+            }) = parse_built_in_css_code_spec(&spec.code_id)
+            {
+                return construct_legacy_surface(SurfaceFamilySpec { distance });
+            }
+
             let checks = built_in_css_checks(&spec.code_id)?;
             let mut parameters = BTreeMap::new();
             parameters.insert("code_id".to_owned(), Value::from(spec.code_id));

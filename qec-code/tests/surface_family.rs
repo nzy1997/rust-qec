@@ -6,8 +6,8 @@ use qec_code::cli::{Cli, CodeCommands, Commands, CssArgs, CssMatrixKind, run};
 use qec_code::codes::built_in_css::built_in_css_checks;
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
-    CssConstructionSpec, CssFamilySpec, SurfaceFamilySpec, SurfaceLayout, SurfaceSpec,
-    construct_css, parse_css_construction_json, verify_css_orthogonality,
+    CssConstructionSpec, CssFamilySpec, LegacyBuiltInCssSpec, SurfaceFamilySpec, SurfaceLayout,
+    SurfaceSpec, construct_css, parse_css_construction_json, verify_css_orthogonality,
 };
 use tempfile::tempdir;
 
@@ -352,6 +352,25 @@ fn surface_family_rejects_invalid_dimensions() {
     let parsed =
         CssConstructionSpec::from_inline(&format!("surface_rotated:d={}", isize::MAX as usize))
             .unwrap();
+    assert!(matches!(
+        construct_css(parsed),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
+
+    assert!(matches!(
+        construct_css(CssConstructionSpec::LegacyBuiltIn(LegacyBuiltInCssSpec {
+            code_id: format!("surface_rotated:d={}", isize::MAX as usize),
+        })),
+        Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "surface" && reason.contains("overflow")
+    ));
+
+    let parsed = parse_css_construction_json(&format!(
+        r#"{{"schema_version":1,"construction":"legacy_built_in","code_id":"surface_rotated:d={}"}}"#,
+        isize::MAX as usize
+    ))
+    .unwrap();
     assert!(matches!(
         construct_css(parsed),
         Err(QecError::InvalidCssConstruction { construction, reason })
