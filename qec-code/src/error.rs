@@ -99,6 +99,13 @@ pub enum QecError {
     },
     #[error("unsupported regular classical matrix algorithm version {algorithm_version}")]
     UnsupportedRegularClassicalMatrixAlgorithm { algorithm_version: u32 },
+    #[error("invalid random two-block spec option {option}: {reason}")]
+    InvalidRandomTwoBlockSpec {
+        option: &'static str,
+        reason: String,
+    },
+    #[error("unsupported random two-block algorithm version {algorithm_version}")]
+    UnsupportedRandomTwoBlockAlgorithm { algorithm_version: u32 },
     #[error("regular classical matrix stub-count overflow for {side}")]
     RegularClassicalMatrixStubCountOverflow { side: &'static str },
     #[error(
