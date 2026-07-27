@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
+use qec_code::binary::try_in_row_span;
 use qec_code::QecError;
 use qec_code::cli::{Cli, run};
 #[cfg(feature = "distance-ilp-highs")]
@@ -58,6 +59,77 @@ fn assert_canonical_sparse_rows(rows: &[Vec<usize>]) {
             "row must contain sorted unique supports: {row:?}"
         );
     }
+}
+
+fn dense_rows(n: usize, rows: &[Vec<usize>]) -> Vec<Vec<u8>> {
+    rows.iter()
+        .map(|row| {
+            let mut dense = vec![0; n];
+            for &column in row {
+                dense[column] = 1;
+            }
+            dense
+        })
+        .collect()
+}
+
+fn has_component_logical(
+    candidate: &[u8],
+    kernel_checks: &[Vec<u8>],
+    stabilizers: &[Vec<u8>],
+) -> bool {
+    kernel_checks.iter().all(|check| {
+        check
+            .iter()
+            .zip(candidate)
+            .fold(0_u8, |parity, (&entry, &bit)| parity ^ (entry & bit))
+            == 0
+    }) && !try_in_row_span(stabilizers, candidate).expect("fixture rows should be binary")
+}
+
+fn search_supports(
+    n: usize,
+    weight: usize,
+    next: usize,
+    candidate: &mut [u8],
+    kernel_checks: &[Vec<u8>],
+    stabilizers: &[Vec<u8>],
+) -> bool {
+    if weight == 0 {
+        return has_component_logical(candidate, kernel_checks, stabilizers);
+    }
+    for column in next..=n - weight {
+        candidate[column] = 1;
+        if search_supports(
+            n,
+            weight - 1,
+            column + 1,
+            candidate,
+            kernel_checks,
+            stabilizers,
+        ) {
+            return true;
+        }
+        candidate[column] = 0;
+    }
+    false
+}
+
+fn exact_component_distance(
+    n: usize,
+    kernel_checks: &[Vec<usize>],
+    stabilizers: &[Vec<usize>],
+    maximum_distance: usize,
+) -> usize {
+    let kernel_checks = dense_rows(n, kernel_checks);
+    let stabilizers = dense_rows(n, stabilizers);
+    let mut candidate = vec![0; n];
+    for weight in 1..=maximum_distance {
+        if search_supports(n, weight, 0, &mut candidate, &kernel_checks, &stabilizers) {
+            return weight;
+        }
+    }
+    panic!("no component logical support found up to distance {maximum_distance}");
 }
 
 #[cfg(feature = "distance-ilp-highs")]
@@ -138,6 +210,16 @@ fn la_cross_open_5_2_matches_fixture() {
     assert_canonical_sparse_rows(&result.checks.h_x);
     assert_canonical_sparse_rows(&result.checks.h_z);
     verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
+    assert_eq!(
+        exact_component_distance(result.stats.n, &result.checks.h_z, &result.checks.h_x, 3),
+        3,
+        "X logicals must have exact distance 3"
+    );
+    assert_eq!(
+        exact_component_distance(result.stats.n, &result.checks.h_x, &result.checks.h_z, 3),
+        3,
+        "Z logicals must have exact distance 3"
+    );
     #[cfg(feature = "distance-ilp-highs")]
     assert_eq!(
         compute_distance(css_code_from_result(&result).code())
