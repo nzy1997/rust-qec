@@ -47,6 +47,19 @@ use crate::sparse_gf2::SparseGf2Matrix;
 
 pub const CSS_CONSTRUCTION_SCHEMA_VERSION: u64 = 1;
 
+pub const DOCUMENTED_NON_FAMILY_CONSTRUCTION_IDS: &[&str] = &[
+    "hypergraph_product",
+    "legacy_built_in",
+    "steane",
+    "bb72",
+    "apm_kasai",
+    "bb",
+    "repetition_x",
+    "repetition_z",
+    "surface_rotated",
+    "toric",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RequestedFamilyId {
@@ -153,33 +166,35 @@ pub struct ShorLikeSpec {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CssFamilySpec {
-    Surface(SurfaceFamilySpec),
+    Directional(DirectionalCssSpec),
     QuantumTanner(QuantumTannerSpec),
     GeneralizedBicycle(GeneralizedBicycleSpec),
     LaCross(LaCrossSpec),
+    RandomHgp(RandomHgpSpec),
+    LiftedProduct(LiftedProductSpec),
     CoprimeBb(CoprimeBivariateBicycleSpec),
     Toric3d(Toric3dSpec),
-    RandomTwoBlock(RandomTwoBlockSpec),
-    RandomHgp(RandomHgpSpec),
     Color666(Color666FamilySpec),
+    Surface(SurfaceFamilySpec),
     ShorLike(ShorLikeSpec),
-    Directional(DirectionalCssSpec),
+    RandomTwoBlock(RandomTwoBlockSpec),
 }
 
 impl CssFamilySpec {
     pub const fn callable_requested_family_ids() -> &'static [RequestedFamilyId] {
         &[
-            RequestedFamilyId::Surface,
+            RequestedFamilyId::Directional,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::GeneralizedBicycle,
             RequestedFamilyId::LaCross,
+            RequestedFamilyId::RandomHgp,
+            RequestedFamilyId::LiftedProduct,
             RequestedFamilyId::CoprimeBb,
             RequestedFamilyId::Toric3d,
-            RequestedFamilyId::RandomTwoBlock,
-            RequestedFamilyId::RandomHgp,
             RequestedFamilyId::Color666,
+            RequestedFamilyId::Surface,
             RequestedFamilyId::ShorLike,
-            RequestedFamilyId::Directional,
+            RequestedFamilyId::RandomTwoBlock,
         ]
     }
 }
@@ -253,6 +268,10 @@ impl From<SurfaceSpec> for CssConstructionSpec {
 }
 
 impl CssConstructionSpec {
+    pub const fn documented_non_family_construction_ids() -> &'static [&'static str] {
+        DOCUMENTED_NON_FAMILY_CONSTRUCTION_IDS
+    }
+
     pub fn from_inline(input: &str) -> Result<Self> {
         let parsed = parse_built_in_css_code_spec(input)?;
         if let BuiltInCssCodeSpec::Family {
@@ -448,6 +467,9 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "CssFamilySpec::RandomHgp",
             )
         }
+        CssConstructionSpec::Family(CssFamilySpec::LiftedProduct(spec)) => {
+            construct_lifted_product(spec, "CssFamilySpec::LiftedProduct")
+        }
         CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
             let checks = build_directional_css_checks(&spec)?;
             let parameters = directional_normalized_parameters(&spec, &checks);
@@ -483,7 +505,9 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
         CssConstructionSpec::Family(CssFamilySpec::ShorLike(spec)) => construct_shor_like(spec),
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
-        CssConstructionSpec::LiftedProduct(spec) => construct_lifted_product(spec),
+        CssConstructionSpec::LiftedProduct(spec) => {
+            construct_lifted_product(spec, "CssConstructionSpec::LiftedProduct")
+        }
         CssConstructionSpec::LegacyBuiltIn(spec) => {
             if let Some(distance) = legacy_surface_distance_from_code_id(&spec.code_id) {
                 preflight_legacy_surface_overflow(distance)?;
@@ -1179,14 +1203,14 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
                 }
             })?,
         )),
-        "lifted_product" => Ok(CssConstructionSpec::LiftedProduct(
+        "lifted_product" => Ok(CssFamilySpec::LiftedProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
                 QecError::InvalidCssConstruction {
                     construction: construction.to_owned(),
                     reason: error.to_string(),
                 }
             })?,
-        )),
+        ).into()),
         "legacy_built_in" => Ok(CssConstructionSpec::LegacyBuiltIn(LegacyBuiltInCssSpec {
             code_id: required_string(object, "code_id")?.to_owned(),
         })),
@@ -1252,7 +1276,10 @@ pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]
     }
 }
 
-fn construct_lifted_product(spec: LiftedProductSpec) -> Result<CssConstructionResult> {
+fn construct_lifted_product(
+    spec: LiftedProductSpec,
+    provenance_source: &str,
+) -> Result<CssConstructionResult> {
     let group = FiniteGroupSpec::new(
         spec.group.order,
         spec.group.identity,
@@ -1292,7 +1319,7 @@ fn construct_lifted_product(spec: LiftedProductSpec) -> Result<CssConstructionRe
         checks.h_x,
         checks.h_z,
         "lifted_product",
-        "CssConstructionSpec::LiftedProduct",
+        provenance_source,
         known_distances,
     )
 }

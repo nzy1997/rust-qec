@@ -6,9 +6,9 @@ use qec_code::QecError;
 use qec_code::binary::try_in_row_span;
 use qec_code::cli::{Cli, run};
 use qec_code::family_contract::{
-    CssClassicalCheckSpec, CssConstructionSpec, FiniteGroupTableSpec, GroupAlgebraElementSpec,
-    GroupAlgebraProtographSpec, HypergraphProductSpec, LiftedProductSpec, construct_css,
-    parse_css_construction_json, verify_css_orthogonality,
+    CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec, FiniteGroupTableSpec,
+    GroupAlgebraElementSpec, GroupAlgebraProtographSpec, HypergraphProductSpec,
+    LiftedProductSpec, construct_css, parse_css_construction_json, verify_css_orthogonality,
 };
 use qec_code::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
 use qec_code::lifted_product::{
@@ -305,6 +305,20 @@ fn lifted_product_c3_matches_fixture() {
     assert_eq!(result.stats.d_z, Some(3));
     assert_eq!(result.checks.h_x, expected_hx());
     assert_eq!(result.checks.h_z, expected_hz());
+    let family_result = construct_css(
+        CssFamilySpec::LiftedProduct(LiftedProductSpec {
+            group: c3_group_spec(),
+            left: c3_protograph(),
+            right: c3_protograph(),
+        })
+        .into(),
+    )
+    .unwrap();
+    assert_eq!(family_result.checks, result.checks);
+    assert_eq!(
+        family_result.provenance.source,
+        "CssFamilySpec::LiftedProduct"
+    );
     assert_eq!(result.checks.h_x[0], vec![1, 2, 9, 28, 29]);
     assert_eq!(result.checks.h_z[0], vec![1, 2, 3, 28, 29]);
     verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
