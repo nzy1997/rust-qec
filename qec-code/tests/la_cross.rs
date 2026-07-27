@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use qec_code::cli::{run, Cli};
+#[cfg(feature = "distance-ilp-highs")]
 use qec_code::css::{CssCode, SparseRowsMatrix};
+#[cfg(feature = "distance-ilp-highs")]
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
     construct_css, parse_css_construction_json, verify_css_orthogonality, CssFamilySpec,
@@ -58,6 +60,7 @@ fn assert_canonical_sparse_rows(rows: &[Vec<usize>]) {
     }
 }
 
+#[cfg(feature = "distance-ilp-highs")]
 fn css_code_from_result(result: &qec_code::family_contract::CssConstructionResult) -> CssCode {
     let hx = SparseRowsMatrix::new(result.stats.n, result.checks.h_x.clone())
         .unwrap()
@@ -122,9 +125,18 @@ fn la_cross_open_5_2_matches_fixture() {
     assert_eq!(result.stats.k, 4);
     assert_eq!(result.stats.d_x, Some(3));
     assert_eq!(result.stats.d_z, Some(3));
+    assert_eq!(
+        result
+            .stats
+            .d_x
+            .zip(result.stats.d_z)
+            .map(|(d_x, d_z)| d_x.min(d_z)),
+        Some(3)
+    );
     assert_canonical_sparse_rows(&result.checks.h_x);
     assert_canonical_sparse_rows(&result.checks.h_z);
     verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
+    #[cfg(feature = "distance-ilp-highs")]
     assert_eq!(
         compute_distance(css_code_from_result(&result).code())
             .unwrap()
