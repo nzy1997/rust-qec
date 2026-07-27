@@ -1,16 +1,16 @@
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use qec_code::cli::{run, Cli};
+use qec_code::QecError;
+use qec_code::cli::{Cli, run};
 #[cfg(feature = "distance-ilp-highs")]
 use qec_code::css::{CssCode, SparseRowsMatrix};
 #[cfg(feature = "distance-ilp-highs")]
 use qec_code::distance::compute_distance;
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, verify_css_orthogonality, CssFamilySpec,
-    LaCrossBoundary, LaCrossSpec, RequestedFamilyId,
+    CssFamilySpec, LaCrossBoundary, LaCrossSpec, RequestedFamilyId, construct_css,
+    parse_css_construction_json, verify_css_orthogonality,
 };
-use qec_code::QecError;
 use tempfile::tempdir;
 
 fn open_spec() -> LaCrossSpec {
@@ -112,10 +112,12 @@ fn la_cross_open_5_2_matches_fixture() {
     );
     assert_eq!(result.provenance.adapter, "la_cross");
     assert_eq!(result.provenance.source, "CssFamilySpec::LaCross");
-    assert!(result
-        .provenance
-        .normalized_input_digest
-        .starts_with("sha256:"));
+    assert!(
+        result
+            .provenance
+            .normalized_input_digest
+            .starts_with("sha256:")
+    );
 
     assert_eq!(result.stats.n, 34);
     assert_eq!(result.stats.m_x, 15);
