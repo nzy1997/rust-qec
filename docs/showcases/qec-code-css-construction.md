@@ -31,6 +31,7 @@ cargo run -q -p qec-code -- code css export bb72 hz
 cargo run -q -p qec-code -- code css export apm_kasai:p=96 hx > /tmp/apm_p96_hx.json
 cargo run -q -p qec-code -- code css export apm_kasai:p=96 hz > /tmp/apm_p96_hz.json
 cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
+cargo run -q -p qec-code -- code css verify-families
 cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
 cargo run -q -p qec-code -- code css-distance exact --code-id steane --json
 ```
@@ -80,6 +81,64 @@ larger than the Steane and `bb72` examples.
 
 The exact-distance command returns JSON with `"status":"completed"` and
 `"distance":3` for the Steane code.
+
+## Family Verifier
+
+`code css verify-families` is the offline end-to-end catalog check for the 14
+requested CSS families. It reads
+`qec-code/tests/fixtures/family_manifest/manifest.v1.json`, constructs the
+positive fixture for each available family in-process, validates the metadata,
+and prints one stable line per family in manifest order.
+
+The success transcript ends with:
+
+```text
+SUMMARY PASS supported=12 deferred=2 failed=0
+```
+
+A `PASS` line means the manifest entry is `disposition=supported`,
+`availability=available`, its positive fixture parsed and constructed through
+`construct_css`, its dimensions, ranks, row weights, requested-family ID,
+orthogonality, and provenance matched the fixture, and no subprocess or network
+was used.
+
+`DEFERRED` is intentional for `hyperbolic_5_5` and `perturbed_hgp`. Those lines
+include the tracking issue and the research contract path, and they do not imply
+a callable constructor:
+
+```text
+DEFERRED hyperbolic_5_5 tracking_issue=#571 contract=qec-code/doc/hyperbolic_5_5_contract.md
+DEFERRED perturbed_hgp tracking_issue=#572 contract=qec-code/doc/perturbed_hgp_contract.md
+```
+
+Parameterized Rust usage stays on the typed constructor path:
+
+```rust
+use qec_code::family_contract::{
+    construct_css, CssFamilySpec, SurfaceFamilySpec,
+};
+
+let result = construct_css(
+    CssFamilySpec::Surface(SurfaceFamilySpec { distance: 3 }).into(),
+)?;
+assert_eq!(result.stats.n, 9);
+```
+
+Parameterized CLI usage stays on the existing export path:
+
+```sh
+cargo run -q -p qec-code -- code css export surface_rotated:d=3 hx
+cargo run -q -p qec-code -- code css export color_666:d=5 hz
+cargo run -q -p qec-code -- code css export toric_3d:lx=3,ly=3,lz=3 hx
+```
+
+When adding a new supported fixture, update exactly one manifest entry with
+normalized inputs, expected stats, row weights, distance-verification class,
+provenance, and executable positive and negative cases. Then run
+`code css verify-families`, the `family_catalog` tests, and the showcase checker
+before treating the fixture as documented support. Keep deferred families
+deferred until their contract path names an implementation-ready construction
+and the constructor exists.
 
 ## Construction Routing
 
