@@ -24,6 +24,8 @@ use crate::codes::random_two_block::{
 use crate::codes::toric_3d::{Toric3dSpec, toric_3d_css_checks};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
+use crate::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
+use crate::lifted_product::lifted_product_binary_checks;
 use crate::sparse_gf2::SparseGf2Matrix;
 
 pub const CSS_CONSTRUCTION_SCHEMA_VERSION: u64 = 1;
@@ -176,6 +178,30 @@ pub struct HypergraphProductSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FiniteGroupTableSpec {
+    pub order: usize,
+    pub identity: usize,
+    pub multiplication_table: Vec<Vec<usize>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupAlgebraElementSpec {
+    pub support: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupAlgebraProtographSpec {
+    pub rows: Vec<Vec<GroupAlgebraElementSpec>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LiftedProductSpec {
+    pub group: FiniteGroupTableSpec,
+    pub left: GroupAlgebraProtographSpec,
+    pub right: GroupAlgebraProtographSpec,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LegacyBuiltInCssSpec {
     pub code_id: String,
 }
@@ -185,6 +211,7 @@ pub enum CssConstructionSpec {
     Family(CssFamilySpec),
     Surface(SurfaceSpec),
     HypergraphProduct(HypergraphProductSpec),
+    LiftedProduct(LiftedProductSpec),
     LegacyBuiltIn(LegacyBuiltInCssSpec),
 }
 
@@ -360,6 +387,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
         CssConstructionSpec::Family(CssFamilySpec::ShorLike(spec)) => construct_shor_like(spec),
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
+        CssConstructionSpec::LiftedProduct(spec) => construct_lifted_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
             if let Some(distance) = legacy_surface_distance_from_code_id(&spec.code_id) {
                 preflight_legacy_surface_overflow(distance)?;
@@ -974,6 +1002,14 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
                 }
             })?,
         )),
+        "lifted_product" => Ok(CssConstructionSpec::LiftedProduct(
+            serde_json::from_value(value.clone()).map_err(|error| {
+                QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: error.to_string(),
+                }
+            })?,
+        )),
         "legacy_built_in" => Ok(CssConstructionSpec::LegacyBuiltIn(LegacyBuiltInCssSpec {
             code_id: required_string(object, "code_id")?.to_owned(),
         })),
@@ -1037,6 +1073,104 @@ pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]
     } else {
         Err(QecError::InvalidCssOrthogonality)
     }
+}
+
+fn construct_lifted_product(spec: LiftedProductSpec) -> Result<CssConstructionResult> {
+    let group = FiniteGroupSpec::new(
+        spec.group.order,
+        spec.group.identity,
+        spec.group.multiplication_table,
+    )?;
+    let left = group_algebra_protograph_matrix(&group, spec.left)?;
+    let right = group_algebra_protograph_matrix(&group, spec.right)?;
+    let checks = lifted_product_binary_checks(&group, &left, &right)?;
+
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "group".to_owned(),
+        serde_json::json!({
+            "order": group.order(),
+            "identity": group.identity(),
+            "multiplication_table": group.multiplication_table(),
+        }),
+    );
+    parameters.insert(
+        "left".to_owned(),
+        serde_json::to_value(group_algebra_protograph_spec(&left))
+            .expect("serializable lifted-product protograph"),
+    );
+    parameters.insert(
+        "right".to_owned(),
+        serde_json::to_value(group_algebra_protograph_spec(&right))
+            .expect("serializable lifted-product protograph"),
+    );
+    let known_distances = is_canonical_c3_fixture(&group, &left)
+        .then_some((3, 3))
+        .filter(|_| is_canonical_c3_fixture(&group, &right));
+    construction_result(
+        "lifted_product",
+        Some(RequestedFamilyId::LiftedProduct),
+        parameters,
+        checks.num_cols,
+        checks.h_x,
+        checks.h_z,
+        "lifted_product",
+        "CssConstructionSpec::LiftedProduct",
+        known_distances,
+    )
+}
+
+fn group_algebra_protograph_matrix(
+    group: &FiniteGroupSpec,
+    spec: GroupAlgebraProtographSpec,
+) -> Result<Vec<Vec<GroupAlgebraElement>>> {
+    spec.rows
+        .into_iter()
+        .map(|row| {
+            row.into_iter()
+                .map(|entry| GroupAlgebraElement::new(group, entry.support))
+                .collect()
+        })
+        .collect()
+}
+
+fn group_algebra_protograph_spec(
+    matrix: &[Vec<GroupAlgebraElement>],
+) -> GroupAlgebraProtographSpec {
+    GroupAlgebraProtographSpec {
+        rows: matrix
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|entry| GroupAlgebraElementSpec {
+                        support: entry.support().to_vec(),
+                    })
+                    .collect()
+            })
+            .collect(),
+    }
+}
+
+fn is_canonical_c3_fixture(group: &FiniteGroupSpec, matrix: &[Vec<GroupAlgebraElement>]) -> bool {
+    group.order() == 3
+        && group.identity() == 0
+        && group.multiplication_table() == [vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]]
+        && matrix_supports(matrix)
+            == vec![
+                vec![vec![1, 2], vec![0], vec![]],
+                vec![vec![], vec![0, 1], vec![1]],
+            ]
+}
+
+fn matrix_supports(matrix: &[Vec<GroupAlgebraElement>]) -> Vec<Vec<Vec<usize>>> {
+    matrix
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|element| element.support().to_vec())
+                .collect()
+        })
+        .collect()
 }
 
 fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstructionResult> {

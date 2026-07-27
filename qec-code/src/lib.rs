@@ -16,6 +16,7 @@ pub mod error;
 pub mod family_contract;
 pub mod finite_group;
 mod gf2;
+pub mod lifted_product;
 pub mod logical;
 pub mod packed_gf2;
 pub mod pauli;
