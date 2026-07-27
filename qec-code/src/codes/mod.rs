@@ -3,6 +3,7 @@ pub mod built_in_css;
 pub mod color_666;
 pub mod directional;
 pub mod quantum_tanner;
+pub mod random_hgp;
 pub mod random_two_block;
 pub mod steane;
 pub mod toric_3d;

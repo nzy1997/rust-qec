@@ -18,6 +18,10 @@ use crate::codes::directional::{
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
+use crate::codes::random_hgp::{
+    RandomHgpClassicalSample, RandomHgpSpec, random_hgp_spec_from_json_str,
+    sample_random_hgp_classical_matrices, sampled_random_hgp_to_hgp_spec,
+};
 use crate::codes::random_two_block::{
     RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
 };
@@ -138,6 +142,7 @@ pub enum CssFamilySpec {
     QuantumTanner(QuantumTannerSpec),
     Toric3d(Toric3dSpec),
     RandomTwoBlock(RandomTwoBlockSpec),
+    RandomHgp(RandomHgpSpec),
     Color666(Color666FamilySpec),
     ShorLike(ShorLikeSpec),
     Directional(DirectionalCssSpec),
@@ -150,6 +155,7 @@ impl CssFamilySpec {
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
+            RequestedFamilyId::RandomHgp,
             RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,
             RequestedFamilyId::Directional,
@@ -323,6 +329,18 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "random_two_block",
                 "CssFamilySpec::RandomTwoBlock",
                 None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::RandomHgp(spec)) => {
+            let samples = sample_random_hgp_classical_matrices(&spec)?;
+            let hgp = sampled_random_hgp_to_hgp_spec(&samples);
+            construct_hypergraph_product_from_parts(
+                hgp,
+                "random_hgp",
+                Some(RequestedFamilyId::RandomHgp),
+                random_hgp_normalized_parameters(&samples),
+                "random_hgp",
+                "CssFamilySpec::RandomHgp",
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
@@ -905,6 +923,29 @@ fn random_two_block_normalized_parameters(
     parameters
 }
 
+fn random_hgp_normalized_parameters(
+    samples: &crate::codes::random_hgp::RandomHgpClassicalSamples,
+) -> BTreeMap<String, Value> {
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "left".to_owned(),
+        random_hgp_classical_parameters(&samples.left),
+    );
+    parameters.insert(
+        "right".to_owned(),
+        random_hgp_classical_parameters(&samples.right),
+    );
+    parameters
+}
+
+fn random_hgp_classical_parameters(sample: &RandomHgpClassicalSample) -> Value {
+    serde_json::json!({
+        "classical_spec": sample.spec,
+        "rows": sample.rows,
+        "sampler_version": sample.spec.algorithm_version,
+    })
+}
+
 pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
@@ -965,6 +1006,7 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
         "random_two_block" => {
             Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
         }
+        "random_hgp" => Ok(CssFamilySpec::RandomHgp(random_hgp_spec_from_json_str(input)?).into()),
         "directional" => directional_construction_from_json(object, construction),
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
@@ -1040,6 +1082,25 @@ pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]
 }
 
 fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstructionResult> {
+    let parameters = normalized_hypergraph_product_parameters(&spec)?;
+    construct_hypergraph_product_from_parts(
+        spec,
+        "hypergraph_product",
+        None,
+        parameters,
+        "hypergraph_product",
+        "CssConstructionSpec::HypergraphProduct",
+    )
+}
+
+fn construct_hypergraph_product_from_parts(
+    spec: HypergraphProductSpec,
+    construction_id: &'static str,
+    requested_family_id: Option<RequestedFamilyId>,
+    normalized_parameters: BTreeMap<String, Value>,
+    adapter: &'static str,
+    source: &'static str,
+) -> Result<CssConstructionResult> {
     let HypergraphProductSpec {
         left: left_spec,
         right: right_spec,
@@ -1062,6 +1123,24 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         .hconcat(&left_transpose.kron(&right_identity_rows)?)?;
     debug_assert_eq!(h_x.num_cols(), h_z.num_cols());
 
+    construction_result(
+        construction_id,
+        requested_family_id,
+        normalized_parameters,
+        h_x.num_cols(),
+        h_x.rows().to_vec(),
+        h_z.rows().to_vec(),
+        adapter,
+        source,
+        None,
+    )
+}
+
+fn normalized_hypergraph_product_parameters(
+    spec: &HypergraphProductSpec,
+) -> Result<BTreeMap<String, Value>> {
+    let left = classical_check_matrix(spec.left.clone())?;
+    let right = classical_check_matrix(spec.right.clone())?;
     let mut parameters = BTreeMap::new();
     parameters.insert(
         "left".to_owned(),
@@ -1079,17 +1158,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         })
         .expect("serializable spec"),
     );
-    construction_result(
-        "hypergraph_product",
-        None,
-        parameters,
-        h_x.num_cols(),
-        h_x.rows().to_vec(),
-        h_z.rows().to_vec(),
-        "hypergraph_product",
-        "CssConstructionSpec::HypergraphProduct",
-        None,
-    )
+    Ok(parameters)
 }
 
 fn classical_check_matrix(spec: CssClassicalCheckSpec) -> Result<SparseGf2Matrix> {
