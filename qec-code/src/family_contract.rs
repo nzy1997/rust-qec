@@ -12,6 +12,10 @@ use crate::codes::built_in_css::{
 };
 use crate::codes::color_666::{COLOR_666_CONSTRUCTION_ID, color_666_sparse_checks};
 pub use crate::codes::color_666::{Color666FamilySpec, Color666Layout};
+pub use crate::codes::coprime_bb::CoprimeBivariateBicycleSpec;
+use crate::codes::coprime_bb::{
+    COPRIME_BB_CONSTRUCTION_ID, coprime_bb_known_distances, coprime_bb_sparse_checks,
+};
 use crate::codes::directional::{
     DirectionalConnectivity, DirectionalCssSpec, build_directional_css_checks,
 };
@@ -27,12 +31,18 @@ pub use crate::codes::la_cross::{LaCrossBoundary, LaCrossSpec};
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
+use crate::codes::random_hgp::{
+    RandomHgpClassicalSample, RandomHgpSpec, random_hgp_spec_from_json_str,
+    sample_random_hgp_classical_matrices, sampled_random_hgp_to_hgp_spec,
+};
 use crate::codes::random_two_block::{
     RandomTwoBlockSpec, random_two_block_css_checks, random_two_block_spec_from_json_str,
 };
 use crate::codes::toric_3d::{Toric3dSpec, toric_3d_css_checks};
 use crate::css::SparseRowsMatrix;
 use crate::error::{QecError, Result};
+use crate::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
+use crate::lifted_product::lifted_product_binary_checks;
 use crate::sparse_gf2::SparseGf2Matrix;
 
 pub const CSS_CONSTRUCTION_SCHEMA_VERSION: u64 = 1;
@@ -147,8 +157,10 @@ pub enum CssFamilySpec {
     QuantumTanner(QuantumTannerSpec),
     GeneralizedBicycle(GeneralizedBicycleSpec),
     LaCross(LaCrossSpec),
+    CoprimeBb(CoprimeBivariateBicycleSpec),
     Toric3d(Toric3dSpec),
     RandomTwoBlock(RandomTwoBlockSpec),
+    RandomHgp(RandomHgpSpec),
     Color666(Color666FamilySpec),
     ShorLike(ShorLikeSpec),
     Directional(DirectionalCssSpec),
@@ -161,8 +173,10 @@ impl CssFamilySpec {
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::GeneralizedBicycle,
             RequestedFamilyId::LaCross,
+            RequestedFamilyId::CoprimeBb,
             RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
+            RequestedFamilyId::RandomHgp,
             RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,
             RequestedFamilyId::Directional,
@@ -189,6 +203,30 @@ pub struct HypergraphProductSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FiniteGroupTableSpec {
+    pub order: usize,
+    pub identity: usize,
+    pub multiplication_table: Vec<Vec<usize>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupAlgebraElementSpec {
+    pub support: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupAlgebraProtographSpec {
+    pub rows: Vec<Vec<GroupAlgebraElementSpec>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LiftedProductSpec {
+    pub group: FiniteGroupTableSpec,
+    pub left: GroupAlgebraProtographSpec,
+    pub right: GroupAlgebraProtographSpec,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LegacyBuiltInCssSpec {
     pub code_id: String,
 }
@@ -198,6 +236,7 @@ pub enum CssConstructionSpec {
     Family(CssFamilySpec),
     Surface(SurfaceSpec),
     HypergraphProduct(HypergraphProductSpec),
+    LiftedProduct(LiftedProductSpec),
     LegacyBuiltIn(LegacyBuiltInCssSpec),
 }
 
@@ -332,6 +371,38 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::LaCross(spec)) => construct_la_cross(spec),
+        CssConstructionSpec::Family(CssFamilySpec::CoprimeBb(spec)) => {
+            let checks = coprime_bb_sparse_checks(&spec)?;
+            let normalized = checks.normalized_spec;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("l".to_owned(), Value::from(normalized.l));
+            parameters.insert("m".to_owned(), Value::from(normalized.m));
+            parameters.insert(
+                "cyclic_order".to_owned(),
+                Value::from(normalized.l * normalized.m),
+            );
+            parameters.insert("pi".to_owned(), Value::from("xy"));
+            parameters.insert(
+                "a_exponents".to_owned(),
+                serde_json::to_value(&normalized.a_exponents).unwrap(),
+            );
+            parameters.insert(
+                "b_exponents".to_owned(),
+                serde_json::to_value(&normalized.b_exponents).unwrap(),
+            );
+            let known_distances = coprime_bb_known_distances(&normalized);
+            construction_result(
+                COPRIME_BB_CONSTRUCTION_ID,
+                Some(RequestedFamilyId::CoprimeBb),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                "coprime_bb",
+                "CssFamilySpec::CoprimeBb",
+                known_distances,
+            )
+        }
         CssConstructionSpec::Family(CssFamilySpec::Toric3d(spec)) => {
             let checks = toric_3d_css_checks(spec)?;
             let mut parameters = BTreeMap::new();
@@ -363,6 +434,18 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 "random_two_block",
                 "CssFamilySpec::RandomTwoBlock",
                 None,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::RandomHgp(spec)) => {
+            let samples = sample_random_hgp_classical_matrices(&spec)?;
+            let hgp = sampled_random_hgp_to_hgp_spec(&samples);
+            construct_hypergraph_product_from_parts(
+                hgp,
+                "random_hgp",
+                Some(RequestedFamilyId::RandomHgp),
+                random_hgp_normalized_parameters(&samples),
+                "random_hgp",
+                "CssFamilySpec::RandomHgp",
             )
         }
         CssConstructionSpec::Family(CssFamilySpec::Directional(spec)) => {
@@ -400,6 +483,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
         CssConstructionSpec::Family(CssFamilySpec::ShorLike(spec)) => construct_shor_like(spec),
         CssConstructionSpec::Surface(spec) => construct_surface(spec),
         CssConstructionSpec::HypergraphProduct(spec) => construct_hypergraph_product(spec),
+        CssConstructionSpec::LiftedProduct(spec) => construct_lifted_product(spec),
         CssConstructionSpec::LegacyBuiltIn(spec) => {
             if let Some(distance) = legacy_surface_distance_from_code_id(&spec.code_id) {
                 preflight_legacy_surface_overflow(distance)?;
@@ -980,6 +1064,29 @@ fn random_two_block_normalized_parameters(
     parameters
 }
 
+fn random_hgp_normalized_parameters(
+    samples: &crate::codes::random_hgp::RandomHgpClassicalSamples,
+) -> BTreeMap<String, Value> {
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "left".to_owned(),
+        random_hgp_classical_parameters(&samples.left),
+    );
+    parameters.insert(
+        "right".to_owned(),
+        random_hgp_classical_parameters(&samples.right),
+    );
+    parameters
+}
+
+fn random_hgp_classical_parameters(sample: &RandomHgpClassicalSample) -> Value {
+    serde_json::json!({
+        "classical_spec": sample.spec,
+        "rows": sample.rows,
+        "sampler_version": sample.spec.algorithm_version,
+    })
+}
+
 pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
     let value: Value = serde_json::from_str(input)
         .map_err(|error| QecError::InvalidCssConstructionJson(error.to_string()))?;
@@ -997,6 +1104,13 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
         "surface" => surface_construction_from_json(object, construction),
         "generalized_bicycle" => Ok(CssFamilySpec::GeneralizedBicycle(GeneralizedBicycleSpec {
             order: required_usize(object, "order", construction)?,
+            a_exponents: required_usize_array(object, "a_exponents", construction)?,
+            b_exponents: required_usize_array(object, "b_exponents", construction)?,
+        })
+        .into()),
+        "coprime_bb" => Ok(CssFamilySpec::CoprimeBb(CoprimeBivariateBicycleSpec {
+            l: required_usize(object, "l", construction)?,
+            m: required_usize(object, "m", construction)?,
             a_exponents: required_usize_array(object, "a_exponents", construction)?,
             b_exponents: required_usize_array(object, "b_exponents", construction)?,
         })
@@ -1055,8 +1169,17 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
         "random_two_block" => {
             Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
         }
+        "random_hgp" => Ok(CssFamilySpec::RandomHgp(random_hgp_spec_from_json_str(input)?).into()),
         "directional" => directional_construction_from_json(object, construction),
         "hypergraph_product" => Ok(CssConstructionSpec::HypergraphProduct(
+            serde_json::from_value(value.clone()).map_err(|error| {
+                QecError::InvalidCssConstruction {
+                    construction: construction.to_owned(),
+                    reason: error.to_string(),
+                }
+            })?,
+        )),
+        "lifted_product" => Ok(CssConstructionSpec::LiftedProduct(
             serde_json::from_value(value.clone()).map_err(|error| {
                 QecError::InvalidCssConstruction {
                     construction: construction.to_owned(),
@@ -1129,7 +1252,124 @@ pub fn verify_css_orthogonality(n: usize, h_x: &[Vec<usize>], h_z: &[Vec<usize>]
     }
 }
 
+fn construct_lifted_product(spec: LiftedProductSpec) -> Result<CssConstructionResult> {
+    let group = FiniteGroupSpec::new(
+        spec.group.order,
+        spec.group.identity,
+        spec.group.multiplication_table,
+    )?;
+    let left = group_algebra_protograph_matrix(&group, spec.left)?;
+    let right = group_algebra_protograph_matrix(&group, spec.right)?;
+    let checks = lifted_product_binary_checks(&group, &left, &right)?;
+
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "group".to_owned(),
+        serde_json::json!({
+            "order": group.order(),
+            "identity": group.identity(),
+            "multiplication_table": group.multiplication_table(),
+        }),
+    );
+    parameters.insert(
+        "left".to_owned(),
+        serde_json::to_value(group_algebra_protograph_spec(&left))
+            .expect("serializable lifted-product protograph"),
+    );
+    parameters.insert(
+        "right".to_owned(),
+        serde_json::to_value(group_algebra_protograph_spec(&right))
+            .expect("serializable lifted-product protograph"),
+    );
+    let known_distances = is_canonical_c3_fixture(&group, &left)
+        .then_some((3, 3))
+        .filter(|_| is_canonical_c3_fixture(&group, &right));
+    construction_result(
+        "lifted_product",
+        Some(RequestedFamilyId::LiftedProduct),
+        parameters,
+        checks.num_cols,
+        checks.h_x,
+        checks.h_z,
+        "lifted_product",
+        "CssConstructionSpec::LiftedProduct",
+        known_distances,
+    )
+}
+
+fn group_algebra_protograph_matrix(
+    group: &FiniteGroupSpec,
+    spec: GroupAlgebraProtographSpec,
+) -> Result<Vec<Vec<GroupAlgebraElement>>> {
+    spec.rows
+        .into_iter()
+        .map(|row| {
+            row.into_iter()
+                .map(|entry| GroupAlgebraElement::new(group, entry.support))
+                .collect()
+        })
+        .collect()
+}
+
+fn group_algebra_protograph_spec(
+    matrix: &[Vec<GroupAlgebraElement>],
+) -> GroupAlgebraProtographSpec {
+    GroupAlgebraProtographSpec {
+        rows: matrix
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|entry| GroupAlgebraElementSpec {
+                        support: entry.support().to_vec(),
+                    })
+                    .collect()
+            })
+            .collect(),
+    }
+}
+
+fn is_canonical_c3_fixture(group: &FiniteGroupSpec, matrix: &[Vec<GroupAlgebraElement>]) -> bool {
+    group.order() == 3
+        && group.identity() == 0
+        && group.multiplication_table() == [vec![0, 1, 2], vec![1, 2, 0], vec![2, 0, 1]]
+        && matrix_supports(matrix)
+            == vec![
+                vec![vec![1, 2], vec![0], vec![]],
+                vec![vec![], vec![0, 1], vec![1]],
+            ]
+}
+
+fn matrix_supports(matrix: &[Vec<GroupAlgebraElement>]) -> Vec<Vec<Vec<usize>>> {
+    matrix
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|element| element.support().to_vec())
+                .collect()
+        })
+        .collect()
+}
+
 fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstructionResult> {
+    let parameters = normalized_hypergraph_product_parameters(&spec)?;
+    construct_hypergraph_product_from_parts(
+        spec,
+        "hypergraph_product",
+        None,
+        parameters,
+        "hypergraph_product",
+        "CssConstructionSpec::HypergraphProduct",
+    )
+}
+
+fn construct_hypergraph_product_from_parts(
+    spec: HypergraphProductSpec,
+    construction_id: &'static str,
+    requested_family_id: Option<RequestedFamilyId>,
+    normalized_parameters: BTreeMap<String, Value>,
+    adapter: &'static str,
+    source: &'static str,
+) -> Result<CssConstructionResult> {
     let HypergraphProductSpec {
         left: left_spec,
         right: right_spec,
@@ -1152,6 +1392,24 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         .hconcat(&left_transpose.kron(&right_identity_rows)?)?;
     debug_assert_eq!(h_x.num_cols(), h_z.num_cols());
 
+    construction_result(
+        construction_id,
+        requested_family_id,
+        normalized_parameters,
+        h_x.num_cols(),
+        h_x.rows().to_vec(),
+        h_z.rows().to_vec(),
+        adapter,
+        source,
+        None,
+    )
+}
+
+fn normalized_hypergraph_product_parameters(
+    spec: &HypergraphProductSpec,
+) -> Result<BTreeMap<String, Value>> {
+    let left = classical_check_matrix(spec.left.clone())?;
+    let right = classical_check_matrix(spec.right.clone())?;
     let mut parameters = BTreeMap::new();
     parameters.insert(
         "left".to_owned(),
@@ -1169,17 +1427,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
         })
         .expect("serializable spec"),
     );
-    construction_result(
-        "hypergraph_product",
-        None,
-        parameters,
-        h_x.num_cols(),
-        h_x.rows().to_vec(),
-        h_z.rows().to_vec(),
-        "hypergraph_product",
-        "CssConstructionSpec::HypergraphProduct",
-        None,
-    )
+    Ok(parameters)
 }
 
 fn classical_check_matrix(spec: CssClassicalCheckSpec) -> Result<SparseGf2Matrix> {
