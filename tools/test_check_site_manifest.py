@@ -308,6 +308,14 @@ VALID_MANIFEST = {
 
 
 class SiteManifestTest(unittest.TestCase):
+    def test_site_root_does_not_require_benchmark_campaign_route(self) -> None:
+        repo, _, manifest_path = self.write_fixture_manifest()
+        self.assertFalse((repo / "_site/benchmark-campaigns/index.html").exists())
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", manifest_path)
+
+        self.assertEqual(errors, [])
+
     def write_fixture_manifest(self, remove_family: str | None = None, mutation: str | None = None):
         tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(tmpdir.cleanup)
@@ -322,7 +330,10 @@ class SiteManifestTest(unittest.TestCase):
         (root / ".github/workflows").mkdir(parents=True)
         (root / "site").mkdir(parents=True)
         (root / "_site/data").mkdir(parents=True)
-        (root / "_site/benchmarks").mkdir(parents=True)
+        (root / "_site/simulator").mkdir(parents=True)
+        (root / "_site/detector-models").mkdir(parents=True)
+        (root / "_site/decoding").mkdir(parents=True)
+        (root / "_site/css-codes").mkdir(parents=True)
         (root / "_site/js").mkdir(parents=True)
         (root / "benchmarks/out").mkdir(parents=True)
 
@@ -343,15 +354,25 @@ class SiteManifestTest(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(RSTIM_EXPANDED_FIXTURE_CONTENT, encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
-        (root / "_site/benchmarks/index.html").write_text(
-            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
-            '<section id="checked-benchmark-results"><div id="checked-benchmark-result-cards" '
-            'data-checked-items="surface-decoder-full bb-circuit-full"></div></section>\n',
+        (root / "_site/simulator/index.html").write_text(
+            '<section data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></section>\n',
+            encoding="utf-8",
+        )
+        (root / "_site/detector-models/index.html").write_text(
+            '<section data-evidence-items="rstim-vs-stim-full"></section>\n',
+            encoding="utf-8",
+        )
+        (root / "_site/decoding/index.html").write_text(
+            '<section data-evidence-items="surface-decoder-full bb-circuit-full"></section>\n',
+            encoding="utf-8",
+        )
+        (root / "_site/css-codes/index.html").write_text(
+            '<section data-evidence-items="qec-code-smoke"></section>\n',
             encoding="utf-8",
         )
         (root / "_site/js/benchmarks.js").write_text(
-            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
-            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); evidenceContainers; '
+            'renderEvidenceContainers(manifest); container.dataset.evidenceItems; '
             'family.status; family.claims_limit; item.status; item.claims_limit; '
             'item.artifacts; item.commands; item.caveats; item.provenance; renderProvenance; '
             'renderProvenance(item.provenance); artifact.checked; artifact.kind === "image";\n',
@@ -904,15 +925,9 @@ class SiteManifestTest(unittest.TestCase):
 
     def test_accepts_built_site_manifest_when_site_root_is_wired(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
-        (repo / "_site/benchmarks/index.html").write_text(
-            '<section id="benchmarks">Benchmark Methodology Claims Policy<div id="benchmark-manifest"></div></section>\n'
-            '<section id="checked-benchmark-results"><div id="checked-benchmark-result-cards" '
-            'data-checked-items="surface-decoder-full bb-circuit-full"></div></section>\n',
-            encoding="utf-8",
-        )
         (repo / "_site/js/benchmarks.js").write_text(
-            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
-            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); evidenceContainers; '
+            'renderEvidenceContainers(manifest); container.dataset.evidenceItems; '
             'family.status; family.claims_limit; item.status; item.claims_limit; '
             'item.artifacts; item.commands; item.caveats; item.provenance; renderProvenance; '
             'renderProvenance(item.provenance); artifact.checked; artifact.kind === "image";\n',
@@ -925,7 +940,8 @@ class SiteManifestTest(unittest.TestCase):
     def test_rejects_built_site_without_checked_result_wiring(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         (repo / "_site/js/benchmarks.js").write_text(
-            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
+            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); evidenceContainers; '
+            'renderEvidenceContainers(manifest); '
             'family.status; family.claims_limit; item.status; item.claims_limit;\n',
             encoding="utf-8",
         )
@@ -935,8 +951,8 @@ class SiteManifestTest(unittest.TestCase):
     def test_rejects_built_site_without_provenance_renderer_wiring(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
         (repo / "_site/js/benchmarks.js").write_text(
-            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); renderBenchmarkManifest(manifest); '
-            'renderCheckedBenchmarkResults(manifest); checkedBenchmarkItems; '
+            'const ROOT = ".."; fetch(ROOT + "/data/benchmark-site.json"); evidenceContainers; '
+            'renderEvidenceContainers(manifest); container.dataset.evidenceItems; '
             'family.status; family.claims_limit; item.status; item.claims_limit; '
             'item.artifacts; item.commands; item.caveats; artifact.checked; artifact.kind === "image";\n',
             encoding="utf-8",
@@ -951,7 +967,7 @@ class SiteManifestTest(unittest.TestCase):
 
     def test_rejects_built_site_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
-        index = repo / "_site/benchmarks/index.html"
+        index = repo / "_site/decoding/index.html"
         index.write_text(
             index.read_text(encoding="utf-8")
             + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
@@ -965,7 +981,7 @@ class SiteManifestTest(unittest.TestCase):
 
     def test_rejects_built_site_rstim_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
-        index = repo / "_site/benchmarks/index.html"
+        index = repo / "_site/simulator/index.html"
         missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
         index.write_text(
             index.read_text(encoding="utf-8") + f'<a href="../{missing_artifact}">bad</a>\n',

@@ -326,7 +326,6 @@ fn pages_workflow_builds_benchmarked_site() {
 #[test]
 fn qp101_browser_resources_are_preserved() {
     let qp101 = read_repo_file("site/templates/qp101.html");
-    let guide = read_repo_file("site/templates/guide.html");
     let browser = read_repo_file("site/static/js/qp101-browser.js");
 
     for marker in [
@@ -337,6 +336,7 @@ fn qp101_browser_resources_are_preserved() {
         "href=\"../examples/repeat-detector.qp101.json\"",
         "href=\"../examples/atom-loss-sample.qp101.json\"",
         "id=\"schema-browser\"",
+        "id=\"operations\"",
         "id=\"gallery\"",
         "id=\"examples\"",
         "src=\"../gallery/basic-site.svg\"",
@@ -345,11 +345,6 @@ fn qp101_browser_resources_are_preserved() {
     ] {
         assert!(qp101.contains(marker), "QP101 template is missing marker {marker}");
     }
-    assert!(
-        guide.contains("id=\"operations\""),
-        "guide template must preserve the QP101 operations reference"
-    );
-
     assert!(
         browser.contains("fetch(ROOT + \"/qp101.schema.json\")"),
         "schema browser must fetch qp101.schema.json through the relative-root contract"
@@ -370,17 +365,24 @@ fn qp101_browser_resources_are_preserved() {
 }
 
 #[test]
-fn workspace_feature_walkthroughs_are_linked() {
-    let guide = read_repo_file("site/templates/guide.html");
-    let benchmarks = read_repo_file("site/templates/benchmarks.html");
-    let site_sources = format!("{guide}\n{benchmarks}");
+fn task_oriented_content_pages_are_linked() {
+    let index = read_repo_file("site/templates/index.html");
+    let simulator = read_repo_file("site/templates/simulator.html");
+    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let decoding = read_repo_file("site/templates/decoding.html");
+    let css_codes = read_repo_file("site/templates/css-codes.html");
+    let site_sources = format!("{index}\n{simulator}\n{detector_models}\n{decoding}\n{css_codes}");
 
     assert_contains_all(
         &site_sources,
         &[
-            "id=\"workspace-overview\"",
-            "id=\"feature-walkthroughs\"",
-            "id=\"benchmark-evidence\"",
+            "id=\"capabilities\"",
+            "id=\"circuit-simulation\"",
+            "id=\"dem-extraction\"",
+            "id=\"decoder-families\"",
+            "id=\"benchmark-campaigns\"",
+            "id=\"css-construction\"",
+            "id=\"distance-search\"",
             "rstim",
             "rsinter",
             "rmatching",
@@ -388,93 +390,133 @@ fn workspace_feature_walkthroughs_are_linked() {
             "rilpqec",
             "qec-code",
             "qec-ilp-core",
-            "docs/showcases/rstim-cli-dem-pipeline.md",
-            "docs/showcases/rstim-render-svg-atom-loss.md",
-            "docs/showcases/qec-code-css-construction.md",
-            "docs/showcases/benchmark-evidence.md",
-            "docs/showcases/qec-code-random-window-benchmark.md",
-            "docs/showcases/README.md",
-            "rstim/doc/cli.md",
-            "rstim stats",
-            "rstim sample",
-            "rstim sample_dem",
-            "rstim detect",
+            "--bin rstim -- detect",
             "rstim analyze_errors",
-            "rstim render_svg",
-            "rstim export_json",
-            "rsinter bench",
-            "code css",
-            "random-window-upper-bound",
+            "rstim sample_dem",
         ],
-        "workspace walkthrough site source",
+        "task-oriented content site source",
     );
 
     assert_contains_all_case_insensitive(
         &site_sources,
         &[
-            "circuit parsing",
             "sampling",
-            "detection",
-            "dem extraction",
-            "svg/qp101 export",
-            "decoder experiments",
-            "css construction",
-            "distance-search workflows",
+            "detector error models",
+            "decoder families",
+            "benchmark campaigns",
+            "css codes",
+            "distance search",
         ],
-        "workspace walkthrough copy",
+        "task-oriented content copy",
     );
 }
 
 #[test]
+fn decode_campaigns_and_active_navigation_are_unified() {
+    let index = read_repo_file("site/templates/index.html");
+    let base = read_repo_file("site/templates/base.html");
+    let decoding = read_repo_file("site/templates/decoding.html");
+    let styles = read_repo_file("site/static/styles.css");
+
+    for removed in [
+        "Explore the workspace",
+        "RSMP v1 showcase",
+        "href=\"benchmark-campaigns/\"",
+    ] {
+        assert!(
+            !index.contains(removed),
+            "home page still contains removed UI marker {removed}"
+        );
+    }
+    assert!(
+        !base.contains(">Bench</a>"),
+        "top navigation still contains the removed Bench item"
+    );
+    assert!(
+        !repo_root().join("site/templates/benchmark-campaigns.html").exists(),
+        "obsolete benchmark-campaigns template still exists"
+    );
+    assert!(
+        !repo_root()
+            .join("site/content/benchmark-campaigns/_index.md")
+            .exists(),
+        "obsolete benchmark-campaigns content route still exists"
+    );
+
+    assert_contains_all(
+        &decoding,
+        &[
+            "id=\"decoder-families\"",
+            "id=\"benchmark-campaigns\"",
+            "decoder-evidence",
+            "surface-decoder-full",
+            "bb-circuit-full",
+            "surface-decoder-local-smoke",
+            "bb-circuit-local-readiness",
+        ],
+        "merged Decode page",
+    );
+    assert_contains_all(
+        &base,
+        &[
+            "section.extra.nav",
+            "nav-link",
+            "current",
+            "aria-current=\"page\"",
+        ],
+        "active navigation template",
+    );
+    assert_contains_all(
+        &styles,
+        &[".nav-link.current", ".decoder-evidence .result-card.has-plot"],
+        "active navigation and full-width decoder evidence styles",
+    );
+
+    for relative in [
+        "site/content/_index.md",
+        "site/content/simulator/_index.md",
+        "site/content/detector-models/_index.md",
+        "site/content/decoding/_index.md",
+        "site/content/css-codes/_index.md",
+        "site/content/rsmp-v1-showcase/_index.md",
+        "site/content/qp101/_index.md",
+    ] {
+        assert!(
+            read_repo_file(relative).contains("nav ="),
+            "{relative} is missing its active navigation key"
+        );
+    }
+}
+
+#[test]
 fn benchmark_methodology_lists_required_provenance() {
-    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let simulator = read_repo_file("site/templates/simulator.html");
+    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let decoding = read_repo_file("site/templates/decoding.html");
+    let css_codes = read_repo_file("site/templates/css-codes.html");
+    let evidence_pages = format!("{simulator}\n{detector_models}\n{decoding}\n{css_codes}");
     let app = read_repo_file("site/static/js/benchmarks.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
 
     for marker in [
-        "id=\"benchmarks\"",
-        "Benchmark Methodology",
-        "Claims Policy",
-        "smoke",
-        "full",
-        "extended",
-        "reference reproduction",
-        "Publishable Evidence",
-        "Local-Only Evidence",
-        "smoke checks verify wiring",
-        "full evidence can describe the committed checked run",
+        "data-evidence-items=",
+        "Smoke runs check wiring",
+        "checked full artifacts support",
+        "not a general performance claim",
+        "local-only",
     ] {
         assert!(
-            benchmarks.contains(marker),
-            "benchmark methodology is missing marker {marker}"
-        );
-    }
-
-    for field in [
-        "OS",
-        "CPU",
-        "Rust version",
-        "Python version",
-        "dependency versions",
-        "external repository commits",
-        "command line",
-        "seeds",
-        "build profile",
-        "shots or error budgets",
-        "date",
-    ] {
-        assert!(
-            benchmarks.contains(field),
-            "benchmark methodology is missing provenance field {field}"
+            evidence_pages.contains(marker),
+            "distributed benchmark methodology is missing marker {marker}"
         );
     }
 
     for marker in [
-        "id=\"benchmark-manifest\"",
         "fetch(ROOT + \"/data/benchmark-site.json\")",
-        "renderBenchmarkManifest",
+        "evidenceContainers",
+        "renderEvidenceContainers",
         "family.status",
         "family.claims_limit",
         "item.status",
@@ -483,9 +525,8 @@ fn benchmark_methodology_lists_required_provenance() {
         "https://github.com/nzy1997/rstim/blob/master/",
         "repoSourceHref(path)",
     ] {
-        let source = if marker.starts_with("id=") { &benchmarks } else { &app };
         assert!(
-            source.contains(marker),
+            app.contains(marker),
             "manifest-backed benchmark rendering is missing marker {marker}"
         );
     }
@@ -522,7 +563,11 @@ fn benchmark_methodology_lists_required_provenance() {
 
 #[test]
 fn checked_benchmark_artifacts_are_linked() {
-    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let simulator = read_repo_file("site/templates/simulator.html");
+    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let decoding = read_repo_file("site/templates/decoding.html");
+    let css_codes = read_repo_file("site/templates/css-codes.html");
+    let evidence_pages = format!("{simulator}\n{detector_models}\n{decoding}\n{css_codes}");
     let app = read_repo_file("site/static/js/benchmarks.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
@@ -538,56 +583,19 @@ fn checked_benchmark_artifacts_are_linked() {
         "rstim-vs-stim-release-surface-detect",
         "rstim-vs-stim-release-dem-sample",
     ];
-    const CHECKED_ITEM_ORDER: &str = "surface-decoder-full bb-circuit-full rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample";
-
-    assert_contains_all(
-        &benchmarks,
-        &[
-            "id=\"checked-benchmark-results\"",
-            "id=\"checked-benchmark-result-cards\"",
-            &format!("data-checked-items=\"{CHECKED_ITEM_ORDER}\""),
-            "Checked Benchmark Results",
-        ],
-        "checked benchmark result section",
-    );
-
     for item_id in CHECKED_ITEM_IDS {
         assert!(
-            benchmarks.contains(item_id),
-            "benchmarks template is missing checked evidence item ID {item_id}"
+            evidence_pages.contains(item_id),
+            "content pages are missing checked evidence item ID {item_id}"
         );
-        assert!(
-            app.contains(item_id),
-            "benchmarks.js is missing checked evidence item ID {item_id}"
-        );
-    }
-    let app_items_start = app
-        .find("const checkedBenchmarkItems")
-        .expect("benchmarks.js must define checkedBenchmarkItems");
-    let app_items_end = app[app_items_start..]
-        .find("];\n")
-        .map(|offset| app_items_start + offset)
-        .expect("benchmarks.js checkedBenchmarkItems must be an array");
-    let app_items = &app[app_items_start..app_items_end];
-    assert_eq!(
-        app_items.matches('"').count() / 2,
-        CHECKED_ITEM_IDS.len(),
-        "benchmarks.js checkedBenchmarkItems must contain exactly the benchmarks template IDs"
-    );
-    let mut ordered_cursor = 0;
-    for item_id in CHECKED_ITEM_IDS {
-        let marker = format!("\"{item_id}\"");
-        let offset = app_items[ordered_cursor..]
-            .find(&marker)
-            .unwrap_or_else(|| panic!("benchmarks.js checkedBenchmarkItems is out of order at {item_id}"));
-        ordered_cursor += offset + marker.len();
     }
 
     assert_contains_all(
         &app,
         &[
-            "const checkedBenchmarkItems",
-            "renderCheckedBenchmarkResults",
+            "evidenceContainers",
+            "renderEvidenceContainers",
+            "container.dataset.evidenceItems",
             "findEvidenceItem",
             "item.artifacts",
             "artifact.checked",
@@ -615,8 +623,8 @@ fn checked_benchmark_artifacts_are_linked() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !benchmarks.contains(hardcoded_path),
-            "checked artifact path {hardcoded_path} must come from the manifest, not the benchmarks template"
+            !evidence_pages.contains(hardcoded_path),
+            "checked artifact path {hardcoded_path} must come from the manifest, not a content template"
         );
         assert!(
             !app.contains(hardcoded_path),
@@ -892,22 +900,26 @@ fn checked_benchmark_artifacts_are_linked() {
 #[test]
 fn checked_benchmark_provenance_is_manifest_backed() {
     let app = read_repo_file("site/static/js/benchmarks.js");
-    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let simulator = read_repo_file("site/templates/simulator.html");
+    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let decoding = read_repo_file("site/templates/decoding.html");
+    let css_codes = read_repo_file("site/templates/css-codes.html");
+    let evidence_pages = format!("{simulator}\n{detector_models}\n{decoding}\n{css_codes}");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value =
         serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
 
     let checked_renderer = js_function_body(
         &app,
-        "renderCheckedBenchmarkResults",
-        "\n  if (benchmarkManifest || checkedBenchmarkResults)",
+        "renderEvidenceContainers",
+        "\n  if (benchmarkManifest || evidenceContainers.length)",
     );
 
     assert_contains_all(
         checked_renderer,
         &[
-            "checkedBenchmarkResults.innerHTML",
-            "checkedBenchmarkItems",
+            "container.innerHTML",
+            "container.dataset.evidenceItems",
             "findEvidenceItem",
             "renderProvenance(item.provenance)",
         ],
@@ -927,8 +939,8 @@ fn checked_benchmark_provenance_is_manifest_backed() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !benchmarks.contains(hardcoded),
-            "checked provenance value {hardcoded} must come from the manifest renderer, not the benchmarks template"
+            !evidence_pages.contains(hardcoded),
+            "checked provenance value {hardcoded} must come from the manifest renderer, not a content template"
         );
     }
 
@@ -940,52 +952,35 @@ fn checked_benchmark_provenance_is_manifest_backed() {
 
 #[test]
 fn qec_code_and_future_benchmarks_are_classified() {
-    let benchmarks = read_repo_file("site/templates/benchmarks.html");
+    let simulator = read_repo_file("site/templates/simulator.html");
+    let css_codes = read_repo_file("site/templates/css-codes.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value = serde_json::from_str(&manifest_text)
         .expect("site benchmark manifest must be valid JSON");
 
     assert_contains_all(
-        &benchmarks,
+        &css_codes,
         &[
-            "id=\"qec-code-random-window-benchmark\"",
-            "<code>qec-code</code>",
-            "Random-Window Distance Search",
-            "Local-only evidence",
-            "QEC-code random-window upper-bound local-only evidence",
-            "benchmarks/out/qec_code_random_window/",
-            "docs/showcases/qec-code-random-window-benchmark.md",
-            "benchmarks/qec_code_random_window/README.md",
-            "qec-code-random-window-bench-smoke",
-            "qec-code-random-window-bench-full",
-            "qec-code-random-window-bench-no-target-smoke",
-            "qec-code-random-window-bench-no-target-multiseed-smoke",
-            "qec-code-random-window-bench-no-target-ladder-smoke",
-            "qec-code-random-window-bench-issue225-readiness-smoke",
-            "id=\"future-simulator-benchmarks\"",
-            "id=\"rstim-vs-stim-simulator-benchmarks\"",
-            "<code>rstim</code>",
-            "versus Stim Simulator Benchmarks",
-            "Partial checked evidence",
-            "recorded workloads and recorded environments",
-            "not broad rstim/Stim parity",
-            "speed/correctness checks",
-            "docs/showcases/rstim-vs-stim-simulator.md",
-            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "id=\"css-construction\"",
+            "id=\"distance-search\"",
+            "Random-window search",
+            "local-only",
+            "qec-code-random-window-local-pipeline",
         ],
-        "qec-code and future benchmark site sections",
+        "qec-code benchmark content section",
     );
-    let rstim_section_start = benchmarks
-        .find("id=\"future-simulator-benchmarks\"")
-        .expect("rstim-vs-stim site section must exist");
-    let rstim_section_end = benchmarks[rstim_section_start..]
-        .find("</article>")
-        .map(|offset| rstim_section_start + offset)
-        .expect("rstim-vs-stim site section must close");
-    let rstim_section = &benchmarks[rstim_section_start..rstim_section_end];
-    assert!(
-        !rstim_section.contains("DEM extraction") && !rstim_section.contains("conversion"),
-        "rstim-vs-stim site copy must not claim unchecked DEM extraction or conversion evidence"
+    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let simulator_evidence = format!("{simulator}\n{detector_models}");
+    assert_contains_all(
+        &simulator_evidence,
+        &[
+            "rstim-vs-stim-correctness",
+            "rstim-vs-stim-release",
+            "rstim-vs-stim-release-surface-detect",
+            "rstim-vs-stim-release-dem-sample",
+            "named fixtures",
+        ],
+        "rstim-versus-Stim simulator evidence section",
     );
 
     let families = manifest["families"]
@@ -1007,7 +1002,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
         .expect("qec-code family evidence_items must be an array");
     assert!(!qec_items.is_empty(), "qec-code family must list evidence items");
     assert!(
-        !benchmarks.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
+        !css_codes.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
         "qec-code random-window site copy must not describe evidence without local-only or partial status"
     );
     for item in qec_items {

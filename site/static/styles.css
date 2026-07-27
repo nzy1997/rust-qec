@@ -110,10 +110,27 @@ code {
   color: var(--text);
 }
 
+.top-nav .nav-link.current {
+  color: var(--accent-dark);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.35rem;
+}
+
 .hero {
   max-width: 1120px;
   margin: 0 auto;
   padding: 5rem 1.25rem 4.5rem;
+}
+
+.compact-hero {
+  padding-top: 3.75rem;
+  padding-bottom: 3.25rem;
+}
+
+.compact-hero h1 {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
 }
 
 .eyebrow {
@@ -133,8 +150,8 @@ h3 {
 }
 
 h1 {
-  max-width: 14ch;
-  font-size: 5.5rem;
+  max-width: 28ch;
+  font-size: clamp(3rem, 6vw, 4.25rem);
   letter-spacing: 0;
 }
 
@@ -215,6 +232,7 @@ main {
 .evidence-grid,
 .intro-grid,
 .example-grid,
+.workflow-grid,
 .tier-grid,
 .checked-results-grid {
   display: grid;
@@ -236,6 +254,33 @@ main {
 
 .evidence-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.evidence-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.content-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.content-links a {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.task-section,
+.evidence-section,
+[id] {
+  scroll-margin-top: 1.5rem;
 }
 
 .tier-grid {
@@ -267,6 +312,19 @@ main {
 .docs-card p {
   margin: 0.65rem 0 0;
   color: var(--muted);
+}
+
+.card-title-link {
+  color: var(--text);
+  text-decoration-color: rgba(27, 111, 122, 0.45);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+
+.card-title-link:hover,
+.card-title-link:focus-visible {
+  color: var(--accent-dark);
+  text-decoration-color: currentColor;
 }
 
 .compact-card p {
@@ -380,14 +438,75 @@ main {
 
 .result-card {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.9fr);
+  grid-template-columns: 1fr;
   gap: 1rem;
   align-items: start;
-  padding: 1.25rem;
+  padding: 1.1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.result-card-copy > p {
+  margin-bottom: 0;
+}
+
+.evidence-details {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.evidence-details summary,
+.compact-reference summary {
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.evidence-details[open] summary,
+.compact-reference details[open] > summary {
+  margin-bottom: 0.9rem;
+}
+
+.quick-command {
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.result-table {
+  margin-top: 1rem;
+}
+
+.compact-reference {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.compact-reference p {
+  color: var(--muted);
+}
+
+.compact-reference .schema-shell,
+.compact-reference .table-wrap {
+  margin-top: 1rem;
+}
+
+.result-card.has-plot {
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 0.9fr);
+}
+
+.decoder-evidence .result-card.has-plot {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.decoder-evidence .result-card-plot,
+.decoder-evidence .result-plot img {
+  width: 100%;
 }
 
 .result-card-copy,
@@ -632,6 +751,13 @@ section {
 .gallery-copy p {
   margin: 0.65rem 0 0;
   color: var(--muted);
+}
+
+.gallery-copy > a {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .gallery-links {
@@ -913,6 +1039,7 @@ pre code {
   .evidence-grid,
   .intro-grid,
   .example-grid,
+  .workflow-grid,
   .rsmp-hero-grid,
   .rsmp-principles,
   .rsmp-pipeline,
@@ -927,7 +1054,8 @@ pre code {
   }
 
   .gallery-card,
-  .result-card {
+  .result-card,
+  .result-card.has-plot {
     grid-template-columns: 1fr;
   }
 

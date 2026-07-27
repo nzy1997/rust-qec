@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}CSS code construction — rstim{% endblock title %}
+{% block description %}Construct CSS codes and run exact or randomized distance searches.{% endblock description %}
+
+{% block hero %}
+<div class="hero compact-hero">
+  <p class="eyebrow">CSS codes</p>
+  <h1>Construct codes and check distance</h1>
+  <p class="hero-copy">Build sparse parity-check matrices, then use exact ILP or randomized searches.</p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="css-construction" class="task-section" aria-labelledby="css-construction-title">
+  <div class="section-heading"><p class="eyebrow">Run it</p><h2 id="css-construction-title">Build and inspect a code</h2></div>
+  <pre class="quick-command"><code>cargo run -p qec-code --bin qec-code -- list
+cargo run -p qec-code --bin qec-code -- show steane</code></pre>
+</section>
+
+<section id="distance-search" class="task-section" aria-labelledby="distance-search-title">
+  <div class="section-heading">
+    <p class="eyebrow">Results</p>
+    <h2 id="distance-search-title">Exact results for small reference codes</h2>
+    <p class="section-copy">Random-window searches report candidate upper bounds; they do not prove exact distance.</p>
+  </div>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Code</th><th>Method</th><th>Distance</th></tr></thead>
+      <tbody>
+        <tr><td>Steane</td><td>Exact ILP</td><td>3</td></tr>
+        <tr><td>Toric d=4</td><td>Exact ILP</td><td>4</td></tr>
+        <tr><td>Larger constructed codes</td><td>Random windows</td><td>Upper bound only</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="random-window-evidence-title">
+  <div class="section-heading">
+    <p class="eyebrow">Pipeline evidence</p>
+    <h2 id="random-window-evidence-title">Random-window search</h2>
+    <p class="section-copy">This workflow is local-only; generated outputs are not published as checked benchmark claims.</p>
+  </div>
+  <div class="evidence-stack" data-evidence-items="qec-code-random-window-local-pipeline" aria-live="polite"><p>Loading CSS-code evidence.</p></div>
+</section>
+{% endblock main %}
+
+{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

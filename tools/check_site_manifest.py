@@ -699,12 +699,18 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
 def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     errors: list[str] = []
     scope = "site root"
-    benchmarks_path = site_root / "benchmarks/index.html"
+    evidence_page_names = (
+        "simulator/index.html",
+        "detector-models/index.html",
+        "decoding/index.html",
+        "css-codes/index.html",
+    )
+    evidence_paths = [site_root / relative for relative in evidence_page_names]
     benchmarks_js_path = site_root / "js/benchmarks.js"
     expected_manifest = site_root / "data/benchmark-site.json"
 
     for path, label in [
-        (benchmarks_path, "benchmarks/index.html"),
+        *zip(evidence_paths, evidence_page_names),
         (benchmarks_js_path, "js/benchmarks.js"),
         (expected_manifest, "data/benchmark-site.json"),
     ]:
@@ -714,23 +720,12 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     if manifest_path.resolve() != expected_manifest.resolve():
         add_error(errors, scope, "manifest path must be _site/data/benchmark-site.json when --site-root is used")
 
-    benchmarks = benchmarks_path.read_text(encoding="utf-8") if benchmarks_path.is_file() else ""
     benchmarks_js = benchmarks_js_path.read_text(encoding="utf-8") if benchmarks_js_path.is_file() else ""
-
-    for marker in [
-        'id="benchmarks"',
-        'id="benchmark-manifest"',
-        'id="checked-benchmark-results"',
-        'id="checked-benchmark-result-cards"',
-        "Benchmark Methodology",
-        "Claims Policy",
-    ]:
-        if marker not in benchmarks:
-            add_error(errors, scope, f"benchmarks/index.html missing benchmark marker {marker}")
 
     required_app_markers = [
         'fetch(ROOT + "/data/benchmark-site.json")',
-        "renderBenchmarkManifest",
+        "evidenceContainers",
+        "renderEvidenceContainers",
         "family.status",
         "family.claims_limit",
         "item.status",
@@ -745,8 +740,7 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
         )
 
     checked_result_markers = [
-        "checkedBenchmarkItems",
-        "renderCheckedBenchmarkResults",
+        "container.dataset.evidenceItems",
         "item.artifacts",
         "item.commands",
         "item.caveats",
@@ -771,6 +765,29 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     except (FileNotFoundError, json.JSONDecodeError):
         manifest = None
     if isinstance(manifest, dict):
+        expected_item_ids = {
+            item["id"]
+            for family in manifest.get("families", [])
+            if isinstance(family, dict)
+            for item in family.get("evidence_items", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        assigned_item_ids: set[str] = set()
+        for relative, path in zip(evidence_page_names, evidence_paths):
+            if not path.is_file():
+                continue
+            page_text = path.read_text(encoding="utf-8")
+            matches = re.findall(r'data-evidence-items="([^"]*)"', page_text)
+            if not matches:
+                add_error(errors, scope, f"{relative} has no benchmark evidence assignment")
+            for value in matches:
+                assigned_item_ids.update(value.split())
+        missing_assignments = sorted(expected_item_ids - assigned_item_ids)
+        unexpected_assignments = sorted(assigned_item_ids - expected_item_ids)
+        if missing_assignments:
+            add_error(errors, scope, f"benchmark evidence items are not assigned to a content page: {missing_assignments}")
+        if unexpected_assignments:
+            add_error(errors, scope, f"content pages reference unknown benchmark evidence items: {unexpected_assignments}")
         validate_site_artifact_references(site_root, manifest, errors)
 
     return errors
@@ -780,8 +797,10 @@ def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any],
     checked_paths = {artifact_path for _, artifact_path in iter_checked_artifact_paths(manifest)}
     for relative in (
         "index.html",
-        "guide/index.html",
-        "benchmarks/index.html",
+        "simulator/index.html",
+        "detector-models/index.html",
+        "decoding/index.html",
+        "css-codes/index.html",
         "qp101/index.html",
         "js/benchmarks.js",
         "js/qp101-browser.js",
