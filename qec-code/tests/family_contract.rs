@@ -193,21 +193,37 @@ fn inline_json_and_rust_routes_lower_to_same_toric_3d_spec() {
 }
 
 #[test]
-fn planned_families_have_no_callable_stub() {
+fn available_families_have_callable_variants() {
     assert_eq!(
         CssFamilySpec::callable_requested_family_ids(),
         &[
-            RequestedFamilyId::Surface,
+            RequestedFamilyId::Directional,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::GeneralizedBicycle,
             RequestedFamilyId::LaCross,
+            RequestedFamilyId::RandomHgp,
+            RequestedFamilyId::LiftedProduct,
             RequestedFamilyId::CoprimeBb,
             RequestedFamilyId::Toric3d,
-            RequestedFamilyId::RandomTwoBlock,
-            RequestedFamilyId::RandomHgp,
             RequestedFamilyId::Color666,
+            RequestedFamilyId::Surface,
             RequestedFamilyId::ShorLike,
-            RequestedFamilyId::Directional,
+            RequestedFamilyId::RandomTwoBlock,
+        ]
+    );
+    assert_eq!(
+        CssConstructionSpec::documented_non_family_construction_ids(),
+        &[
+            "hypergraph_product",
+            "legacy_built_in",
+            "steane",
+            "bb72",
+            "apm_kasai",
+            "bb",
+            "repetition_x",
+            "repetition_z",
+            "surface_rotated",
+            "toric",
         ]
     );
 }

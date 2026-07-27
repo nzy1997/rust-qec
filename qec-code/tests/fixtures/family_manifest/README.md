@@ -1,12 +1,12 @@
 # QEC Family Manifest Schema
 
 `manifest.v1.json` is the versioned source of truth for the QEC construction
-family targets tracked by issue #552.
+family targets tracked by issues #552 and #573.
 
 ## Version
 
 The top-level `schema_version` and every entry-level `schema_version` must be
-`1`. Serialization is canonicalized by `qec-code/tests/family_manifest.rs` with
+`1`. Serialization is canonicalized by `qec-code/tests/family_catalog.rs` with
 `serde_json::to_string_pretty`.
 
 ## Lifecycle Fields
@@ -21,16 +21,18 @@ Legal pairs are exactly:
 - `(supported, available)`
 - `(deferred, not_applicable)`
 
-For issue #552, every supported family remains `availability=planned`. Promotion
-to `available` is controlled by issue #573 after constructors and executable
-fixture coverage are complete.
+For issue #573, exactly 12 supported families are `availability=available`.
+Exactly `hyperbolic_5_5` and `perturbed_hgp` remain deferred with
+`availability=not_applicable`.
 
 ## Required Entry Fields
 
 Every family entry records `provenance`, `verification`, and
-`intended_consumers` as non-empty arrays. `callable_constructor` must be null
-for planned and deferred entries. Supported entries may declare
-`executable_cases`; each supported entry in this fixture declares one
-`positive`/`success` case and one `negative`/`rejection` case.
+`intended_consumers` as non-empty arrays. Available entries must also record
+`callable_constructor`, `normalized_inputs`, `expected`, `row_weight_summary`,
+`distance_verification`, and `executable_verifier`. Each available entry in
+this fixture declares one `positive`/`success` case and one
+`negative`/`rejection` case under `executable_cases`.
 
-Deferred entries do not declare executable cases.
+Deferred entries record `research_contracts`, keep `callable_constructor` null,
+and do not declare executable cases.

@@ -3,57 +3,132 @@
   "manifest_id": "qec_family_construction_targets_v1",
   "provenance": [
     "GitHub issue #552, Roadmap ID M1-01, requested the 14 normalized QEC family targets.",
-    "Repository design docs/design/2026-07-26-qec-code-family-support.md defines the shared 14-family fixture/provenance manifest direction."
+    "GitHub issue #573, Roadmap ID M4-03, promotes available families after constructor and executable fixture coverage."
   ],
   "verification": [
-    "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-    "cargo test -p qec-code --test family_manifest family_manifest_rejects_invalid_entries -- --exact"
+    "cargo test -p qec-code --test family_catalog complete_catalog_has_12_supported_and_2_deferred_families -- --exact",
+    "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+    "cargo test -p qec-code --test family_catalog catalog_rejects_coverage_gaps -- --exact",
+    "cargo test -p qec-code --test family_catalog requested_and_construction_registries_are_disjoint_and_complete -- --exact"
   ],
   "intended_consumers": [
     "qec-code construction-roadmap tracking",
-    "future qec-code executable fixture gates",
+    "qec-code executable fixture completeness gate",
     "issue #573 availability promotion gate"
   ],
   "availability_promotion_gate": {
     "issue": 573,
-    "rule": "Supported families remain availability=planned until issue #573 verifies constructors and executable positive/negative fixture coverage before promotion to availability=available."
+    "rule": "Supported families become availability=available only when issue #573 verifies callable constructors and executable positive/negative fixture coverage; deferred families remain availability=not_applicable."
   },
   "families": [
     {
       "schema_version": 1,
       "family_id": "directional",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists directional as a supported QEC construction target."
+        "GitHub issue #573 promotes directional after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for directional"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for directional"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::Directional",
+        "construction": "directional"
+      },
+      "normalized_inputs": [
+        "construction",
+        "spec.torus",
+        "spec.route",
+        "spec.layout",
+        "spec.connectivity"
+      ],
+      "expected": {
+        "n": 24,
+        "m_x": 12,
+        "m_z": 12,
+        "rank_x": 11,
+        "rank_z": 11,
+        "k": 2,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 12
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 12
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "Directional square NE2N fixture records exact component distances d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "directional_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid directional construction case for issue #573 availability promotion.",
+          "description": "Small valid directional construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "directional",
+            "schema_version": 1,
+            "spec": {
+              "connectivity": "square",
+              "layout": {
+                "x_ancilla_coset": "odd_even",
+                "z_ancilla_coset": "even_odd"
+              },
+              "route": "NE2N",
+              "torus": {
+                "period_x": 8,
+                "period_y": 6,
+                "vertical_period_x_shift": 4
+              }
+            }
+          }
         },
         {
           "case_id": "directional_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid directional construction case that must reject before availability promotion.",
+          "description": "Invalid directional construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "directional",
+            "schema_version": 1,
+            "spec": {
+              "connectivity": "hex",
+              "route": "NE2N",
+              "torus": {
+                "period_x": 8,
+                "period_y": 6,
+                "vertical_period_x_shift": 4
+              }
+            }
+          },
+          "expected_error_contains": "hex connectivity does not support normalized route NE2N"
         }
       ]
     },
@@ -61,37 +136,735 @@
       "schema_version": 1,
       "family_id": "quantum_tanner",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists quantum_tanner as a supported QEC construction target."
+        "GitHub issue #573 promotes quantum_tanner after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for quantum_tanner"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for quantum_tanner"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::QuantumTanner",
+        "construction": "quantum_tanner"
+      },
+      "normalized_inputs": [
+        "construction",
+        "spec.base_group",
+        "spec.a_generator_indices",
+        "spec.b_generator_indices",
+        "spec.local_codes"
+      ],
+      "expected": {
+        "n": 16,
+        "m_x": 8,
+        "m_z": 8,
+        "rank_x": 7,
+        "rank_z": 7,
+        "k": 2,
+        "d_x": null,
+        "d_z": null
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 8
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 8
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "structural_not_pinned",
+        "description": "The quantum_tanner_contract fixture computes exact distance 4; constructor metadata does not pin d_x or d_z."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "quantum_tanner_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid quantum_tanner construction case for issue #573 availability promotion.",
+          "description": "Small valid quantum_tanner construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "quantum_tanner",
+            "schema_version": 1,
+            "spec": {
+              "a_generator_indices": [
+                4,
+                12
+              ],
+              "b_generator_indices": [
+                1,
+                3
+              ],
+              "base_group": {
+                "element_order": "id = 4*x + y for (x,y) in Z4 x Z4",
+                "identity": 0,
+                "multiplication_table": [
+                  [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15
+                  ],
+                  [
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12
+                  ],
+                  [
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13
+                  ],
+                  [
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14
+                  ],
+                  [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  [
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0
+                  ],
+                  [
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1
+                  ],
+                  [
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2
+                  ],
+                  [
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7
+                  ],
+                  [
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4
+                  ],
+                  [
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5
+                  ],
+                  [
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6
+                  ],
+                  [
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11
+                  ],
+                  [
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8
+                  ],
+                  [
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9
+                  ],
+                  [
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10
+                  ]
+                ],
+                "name": "Z4xZ4",
+                "order": 16
+              },
+              "construction_mode": "lr_cayley_no_cover_v1",
+              "fixture_id": "toric_d4",
+              "local_codes": {
+                "field": "GF(2)",
+                "h_a": [
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "h_b": [
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "matrix_role": "parity_check"
+              }
+            }
+          }
         },
         {
           "case_id": "quantum_tanner_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid quantum_tanner construction case that must reject before availability promotion.",
+          "description": "Invalid quantum_tanner construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "quantum_tanner",
+            "schema_version": 1,
+            "spec": {
+              "a_generator_indices": [
+                4,
+                12
+              ],
+              "b_generator_indices": [
+                1,
+                3
+              ],
+              "base_group": {
+                "element_order": "id = 4*x + y for (x,y) in Z4 x Z4",
+                "identity": 0,
+                "multiplication_table": [
+                  [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14
+                  ],
+                  [
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12
+                  ],
+                  [
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13
+                  ],
+                  [
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14
+                  ],
+                  [
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  [
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0
+                  ],
+                  [
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1
+                  ],
+                  [
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2
+                  ],
+                  [
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7
+                  ],
+                  [
+                    9,
+                    10,
+                    11,
+                    8,
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4
+                  ],
+                  [
+                    10,
+                    11,
+                    8,
+                    9,
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5
+                  ],
+                  [
+                    11,
+                    8,
+                    9,
+                    10,
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6
+                  ],
+                  [
+                    12,
+                    13,
+                    14,
+                    15,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11
+                  ],
+                  [
+                    13,
+                    14,
+                    15,
+                    12,
+                    1,
+                    2,
+                    3,
+                    0,
+                    5,
+                    6,
+                    7,
+                    4,
+                    9,
+                    10,
+                    11,
+                    8
+                  ],
+                  [
+                    14,
+                    15,
+                    12,
+                    13,
+                    2,
+                    3,
+                    0,
+                    1,
+                    6,
+                    7,
+                    4,
+                    5,
+                    10,
+                    11,
+                    8,
+                    9
+                  ],
+                  [
+                    15,
+                    12,
+                    13,
+                    14,
+                    3,
+                    0,
+                    1,
+                    2,
+                    7,
+                    4,
+                    5,
+                    6,
+                    11,
+                    8,
+                    9,
+                    10
+                  ]
+                ],
+                "name": "Z4xZ4",
+                "order": 16
+              },
+              "construction_mode": "lr_cayley_no_cover_v1",
+              "fixture_id": "invalid_bad_table",
+              "local_codes": {
+                "field": "GF(2)",
+                "h_a": [
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "h_b": [
+                  [
+                    1,
+                    1
+                  ]
+                ],
+                "matrix_role": "parity_check"
+              }
+            }
+          },
+          "expected_error_contains": "row 0 has width 15"
         }
       ]
     },
@@ -99,37 +872,103 @@
       "schema_version": 1,
       "family_id": "generalized_bicycle",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists generalized_bicycle as a supported QEC construction target."
+        "GitHub issue #573 promotes generalized_bicycle after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for generalized_bicycle"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for generalized_bicycle"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::GeneralizedBicycle",
+        "construction": "generalized_bicycle"
+      },
+      "normalized_inputs": [
+        "construction",
+        "order",
+        "a_exponents",
+        "b_exponents"
+      ],
+      "expected": {
+        "n": 10,
+        "m_x": 5,
+        "m_z": 5,
+        "rank_x": 4,
+        "rank_z": 4,
+        "k": 2,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 5
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 5
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The order-5 generalized bicycle fixture has known exact distances d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "generalized_bicycle_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid generalized_bicycle construction case for issue #573 availability promotion.",
+          "description": "Small valid generalized_bicycle construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "a_exponents": [
+              0,
+              1
+            ],
+            "b_exponents": [
+              0,
+              2
+            ],
+            "construction": "generalized_bicycle",
+            "order": 5,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "generalized_bicycle_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid generalized_bicycle construction case that must reject before availability promotion.",
+          "description": "Invalid generalized_bicycle construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "a_exponents": [
+              0
+            ],
+            "b_exponents": [
+              0
+            ],
+            "construction": "generalized_bicycle",
+            "order": 0,
+            "schema_version": 1
+          },
+          "expected_error_contains": "order must be nonzero"
         }
       ]
     },
@@ -137,37 +976,110 @@
       "schema_version": 1,
       "family_id": "la_cross",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists la_cross as a supported QEC construction target."
+        "GitHub issue #573 promotes la_cross after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for la_cross"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for la_cross"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::LaCross",
+        "construction": "la_cross"
+      },
+      "normalized_inputs": [
+        "construction",
+        "seed_length",
+        "reach",
+        "boundary",
+        "classical_check"
+      ],
+      "expected": {
+        "n": 34,
+        "m_x": 15,
+        "m_z": 15,
+        "rank_x": 15,
+        "rank_z": 15,
+        "k": 4,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 6
+          },
+          {
+            "weight": 5,
+            "count": 6
+          },
+          {
+            "weight": 6,
+            "count": 3
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 6
+          },
+          {
+            "weight": 5,
+            "count": 6
+          },
+          {
+            "weight": 6,
+            "count": 3
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The open seed_length=5 reach=2 LA-cross fixture has known exact component distances d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "la_cross_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid la_cross construction case for issue #573 availability promotion.",
+          "description": "Small valid la_cross construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "boundary": "open",
+            "construction": "la_cross",
+            "reach": 2,
+            "schema_version": 1,
+            "seed_length": 5
+          }
         },
         {
           "case_id": "la_cross_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid la_cross construction case that must reject before availability promotion.",
+          "description": "Invalid la_cross construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "boundary": "open",
+            "construction": "la_cross",
+            "reach": 0,
+            "schema_version": 1,
+            "seed_length": 5
+          },
+          "expected_error_contains": "reach must be nonzero"
         }
       ]
     },
@@ -175,37 +1087,124 @@
       "schema_version": 1,
       "family_id": "random_hgp",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists random_hgp as a supported QEC construction target."
+        "GitHub issue #573 promotes random_hgp after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for random_hgp"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for random_hgp"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::RandomHgp",
+        "construction": "random_hgp"
+      },
+      "normalized_inputs": [
+        "construction",
+        "left.classical_spec",
+        "left.rows",
+        "right.classical_spec",
+        "right.rows",
+        "sampler_version"
+      ],
+      "expected": {
+        "n": 52,
+        "m_x": 24,
+        "m_z": 24,
+        "rank_x": 21,
+        "rank_z": 21,
+        "k": 10,
+        "d_x": null,
+        "d_z": null
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 5,
+            "count": 24
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 5,
+            "count": 24
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "structural_not_pinned",
+        "description": "The seeded random-HGP fixture verifies deterministic structure and ranks; exact distances are intentionally not pinned."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "random_hgp_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid random_hgp construction case for issue #573 availability promotion.",
+          "description": "Small valid random_hgp construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "random_hgp",
+            "left": {
+              "algorithm_version": 1,
+              "column_count": 6,
+              "column_weight": 2,
+              "retry_limit": 16,
+              "row_count": 4,
+              "row_weight": 3,
+              "seed": 7
+            },
+            "right": {
+              "algorithm_version": 1,
+              "column_count": 6,
+              "column_weight": 2,
+              "retry_limit": 16,
+              "row_count": 4,
+              "row_weight": 3,
+              "seed": 7
+            },
+            "schema_version": 1
+          }
         },
         {
           "case_id": "random_hgp_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid random_hgp construction case that must reject before availability promotion.",
+          "description": "Invalid random_hgp construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "random_hgp",
+            "left": {
+              "algorithm_version": 1,
+              "column_count": 6,
+              "column_weight": 2,
+              "retry_limit": 16,
+              "row_count": 4,
+              "row_weight": 3
+            },
+            "right": {
+              "algorithm_version": 1,
+              "column_count": 6,
+              "column_weight": 2,
+              "retry_limit": 16,
+              "row_count": 4,
+              "row_weight": 3,
+              "seed": 7
+            },
+            "schema_version": 1
+          },
+          "expected_error_contains": "must be provided"
         }
       ]
     },
@@ -213,37 +1212,239 @@
       "schema_version": 1,
       "family_id": "lifted_product",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists lifted_product as a supported QEC construction target."
+        "GitHub issue #573 promotes lifted_product after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for lifted_product"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for lifted_product"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::LiftedProduct",
+        "construction": "lifted_product"
+      },
+      "normalized_inputs": [
+        "construction",
+        "group",
+        "left.rows",
+        "right.rows"
+      ],
+      "expected": {
+        "n": 39,
+        "m_x": 18,
+        "m_z": 18,
+        "rank_x": 18,
+        "rank_z": 18,
+        "k": 3,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 6
+          },
+          {
+            "weight": 5,
+            "count": 6
+          },
+          {
+            "weight": 6,
+            "count": 6
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 6
+          },
+          {
+            "weight": 5,
+            "count": 6
+          },
+          {
+            "weight": 6,
+            "count": 6
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The canonical C3 lifted-product fixture has known exact component distances d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "lifted_product_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid lifted_product construction case for issue #573 availability promotion.",
+          "description": "Small valid lifted_product construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "lifted_product",
+            "group": {
+              "identity": 0,
+              "multiplication_table": [
+                [
+                  0,
+                  1,
+                  2
+                ],
+                [
+                  1,
+                  2,
+                  0
+                ],
+                [
+                  2,
+                  0,
+                  1
+                ]
+              ],
+              "order": 3
+            },
+            "left": {
+              "rows": [
+                [
+                  {
+                    "support": [
+                      1,
+                      2
+                    ]
+                  },
+                  {
+                    "support": [
+                      0
+                    ]
+                  },
+                  {
+                    "support": []
+                  }
+                ],
+                [
+                  {
+                    "support": []
+                  },
+                  {
+                    "support": [
+                      0,
+                      1
+                    ]
+                  },
+                  {
+                    "support": [
+                      1
+                    ]
+                  }
+                ]
+              ]
+            },
+            "right": {
+              "rows": [
+                [
+                  {
+                    "support": [
+                      1,
+                      2
+                    ]
+                  },
+                  {
+                    "support": [
+                      0
+                    ]
+                  },
+                  {
+                    "support": []
+                  }
+                ],
+                [
+                  {
+                    "support": []
+                  },
+                  {
+                    "support": [
+                      0,
+                      1
+                    ]
+                  },
+                  {
+                    "support": [
+                      1
+                    ]
+                  }
+                ]
+              ]
+            },
+            "schema_version": 1
+          }
         },
         {
           "case_id": "lifted_product_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid lifted_product construction case that must reject before availability promotion.",
+          "description": "Invalid lifted_product construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "lifted_product",
+            "group": {
+              "identity": 0,
+              "multiplication_table": [
+                [
+                  0,
+                  1,
+                  2
+                ],
+                [
+                  1,
+                  2,
+                  0
+                ],
+                [
+                  2,
+                  0,
+                  1
+                ]
+              ],
+              "order": 3
+            },
+            "left": {
+              "rows": [
+                [
+                  {
+                    "support": [
+                      3
+                    ]
+                  }
+                ]
+              ]
+            },
+            "right": {
+              "rows": [
+                [
+                  {
+                    "support": [
+                      0
+                    ]
+                  }
+                ]
+              ]
+            },
+            "schema_version": 1
+          },
+          "expected_error_contains": "expected < 3"
         }
       ]
     },
@@ -253,13 +1454,16 @@
       "disposition": "deferred",
       "availability": "not_applicable",
       "provenance": [
-        "GitHub issue #552 explicitly defers hyperbolic_5_5 as a research target."
+        "GitHub issue #573 keeps hyperbolic_5_5 deferred until its research contract is implementation-ready."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact"
+        "cargo test -p qec-code --test family_catalog requested_and_construction_registries_are_disjoint_and_complete -- --exact"
+      ],
+      "research_contracts": [
+        "qec-code/doc/hyperbolic_5_5_contract.md"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
+        "qec-code family catalog completeness gate",
         "research-roadmap tracking for hyperbolic_5_5"
       ],
       "callable_constructor": null,
@@ -269,37 +1473,110 @@
       "schema_version": 1,
       "family_id": "coprime_bb",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists coprime_bb as a supported QEC construction target."
+        "GitHub issue #573 promotes coprime_bb after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for coprime_bb"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for coprime_bb"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::CoprimeBb",
+        "construction": "coprime_bb"
+      },
+      "normalized_inputs": [
+        "construction",
+        "l",
+        "m",
+        "cyclic_order",
+        "pi",
+        "a_exponents",
+        "b_exponents"
+      ],
+      "expected": {
+        "n": 30,
+        "m_x": 15,
+        "m_z": 15,
+        "rank_x": 13,
+        "rank_z": 13,
+        "k": 4,
+        "d_x": 6,
+        "d_z": 6
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 6,
+            "count": 15
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 6,
+            "count": 15
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The coprime 3x5 bivariate bicycle fixture has known exact distances d_x = d_z = 6."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "coprime_bb_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid coprime_bb construction case for issue #573 availability promotion.",
+          "description": "Small valid coprime_bb construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "a_exponents": [
+              0,
+              1,
+              2
+            ],
+            "b_exponents": [
+              0,
+              2,
+              7
+            ],
+            "construction": "coprime_bb",
+            "l": 3,
+            "m": 5,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "coprime_bb_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid coprime_bb construction case that must reject before availability promotion.",
+          "description": "Invalid coprime_bb construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "a_exponents": [
+              0
+            ],
+            "b_exponents": [
+              0
+            ],
+            "construction": "coprime_bb",
+            "l": 3,
+            "m": 6,
+            "schema_version": 1
+          },
+          "expected_error_contains": "must be coprime"
         }
       ]
     },
@@ -307,37 +1584,93 @@
       "schema_version": 1,
       "family_id": "toric_3d",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists toric_3d as a supported QEC construction target."
+        "GitHub issue #573 promotes toric_3d after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for toric_3d"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for toric_3d"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::Toric3d",
+        "construction": "toric_3d"
+      },
+      "normalized_inputs": [
+        "construction",
+        "lx",
+        "ly",
+        "lz"
+      ],
+      "expected": {
+        "n": 81,
+        "m_x": 27,
+        "m_z": 81,
+        "rank_x": 26,
+        "rank_z": 52,
+        "k": 3,
+        "d_x": 9,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 6,
+            "count": 27
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 81
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The 3x3x3 toric-3D fixture records d_x = 9 and d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "toric_3d_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid toric_3d construction case for issue #573 availability promotion.",
+          "description": "Small valid toric_3d construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "toric_3d",
+            "lx": 3,
+            "ly": 3,
+            "lz": 3,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "toric_3d_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid toric_3d construction case that must reject before availability promotion.",
+          "description": "Invalid toric_3d construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "toric_3d",
+            "lx": 2,
+            "ly": 3,
+            "lz": 3,
+            "schema_version": 1
+          },
+          "expected_error_contains": "out-of-range built-in CSS integer parameter lx"
         }
       ]
     },
@@ -345,37 +1678,88 @@
       "schema_version": 1,
       "family_id": "color_666",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists color_666 as a supported QEC construction target."
+        "GitHub issue #573 promotes color_666 after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for color_666"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for color_666"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::Color666",
+        "construction": "color_666"
+      },
+      "normalized_inputs": [
+        "construction",
+        "distance",
+        "layout"
+      ],
+      "expected": {
+        "n": 7,
+        "m_x": 3,
+        "m_z": 3,
+        "rank_x": 3,
+        "rank_z": 3,
+        "k": 1,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 3
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 3
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The triangular distance-3 6.6.6 color fixture is Steane-equivalent with d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "color_666_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid color_666 construction case for issue #573 availability promotion.",
+          "description": "Small valid color_666 construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "color_666",
+            "distance": 3,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "color_666_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid color_666 construction case that must reject before availability promotion.",
+          "description": "Invalid color_666 construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "color_666",
+            "distance": 4,
+            "schema_version": 1
+          },
+          "expected_error_contains": "distance must be odd"
         }
       ]
     },
@@ -383,37 +1767,95 @@
       "schema_version": 1,
       "family_id": "surface",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists surface as a supported QEC construction target."
+        "GitHub issue #573 promotes surface after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for surface"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for surface"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::Surface",
+        "construction": "surface"
+      },
+      "normalized_inputs": [
+        "construction",
+        "distance"
+      ],
+      "expected": {
+        "n": 9,
+        "m_x": 4,
+        "m_z": 4,
+        "rank_x": 4,
+        "rank_z": 4,
+        "k": 1,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 2,
+            "count": 2
+          },
+          {
+            "weight": 4,
+            "count": 2
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 2,
+            "count": 2
+          },
+          {
+            "weight": 4,
+            "count": 2
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The rotated surface distance-3 fixture records d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "surface_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid surface construction case for issue #573 availability promotion.",
+          "description": "Small valid surface construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "surface",
+            "distance": 3,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "surface_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid surface construction case that must reject before availability promotion.",
+          "description": "Invalid surface construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "surface",
+            "distance": 1,
+            "schema_version": 1
+          },
+          "expected_error_contains": "out-of-range built-in CSS integer parameter d"
         }
       ]
     },
@@ -421,37 +1863,90 @@
       "schema_version": 1,
       "family_id": "shor_like",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists shor_like as a supported QEC construction target."
+        "GitHub issue #573 promotes shor_like after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for shor_like"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for shor_like"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::ShorLike",
+        "construction": "shor_like"
+      },
+      "normalized_inputs": [
+        "construction",
+        "outer_blocks",
+        "inner_block"
+      ],
+      "expected": {
+        "n": 9,
+        "m_x": 2,
+        "m_z": 6,
+        "rank_x": 2,
+        "rank_z": 6,
+        "k": 1,
+        "d_x": 3,
+        "d_z": 3
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 6,
+            "count": 2
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 2,
+            "count": 6
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "constructor_known_exact",
+        "description": "The 3x3 Shor-like fixture records exact component distances d_x = d_z = 3."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "shor_like_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid shor_like construction case for issue #573 availability promotion.",
+          "description": "Small valid shor_like construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "construction": "shor_like",
+            "inner_block": 3,
+            "outer_blocks": 3,
+            "schema_version": 1
+          }
         },
         {
           "case_id": "shor_like_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid shor_like construction case that must reject before availability promotion.",
+          "description": "Invalid shor_like construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "construction": "shor_like",
+            "inner_block": 3,
+            "outer_blocks": 1,
+            "schema_version": 1
+          },
+          "expected_error_contains": "outer_blocks must be at least 2"
         }
       ]
     },
@@ -459,37 +1954,160 @@
       "schema_version": 1,
       "family_id": "random_two_block",
       "disposition": "supported",
-      "availability": "planned",
+      "availability": "available",
       "provenance": [
-        "GitHub issue #552 lists random_two_block as a supported QEC construction target."
+        "GitHub issue #573 promotes random_two_block after constructor and executable fixture coverage landed."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact",
-        "issue #573 must verify constructor execution before this family can become availability=available"
+        "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact",
+        "positive and negative executable cases for random_two_block"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
-        "future executable fixture cases for random_two_block"
+        "qec-code family catalog completeness gate",
+        "qec-code code css construct --spec users"
       ],
-      "callable_constructor": null,
+      "callable_constructor": {
+        "rust_path": "CssFamilySpec::RandomTwoBlock",
+        "construction": "random_two_block"
+      },
+      "normalized_inputs": [
+        "construction",
+        "group",
+        "support_a_weight",
+        "support_b_weight",
+        "support_a",
+        "support_b",
+        "seed",
+        "algorithm_version"
+      ],
+      "expected": {
+        "n": 12,
+        "m_x": 6,
+        "m_z": 6,
+        "rank_x": 5,
+        "rank_z": 5,
+        "k": 2,
+        "d_x": null,
+        "d_z": null
+      },
+      "row_weight_summary": {
+        "h_x": [
+          {
+            "weight": 4,
+            "count": 6
+          }
+        ],
+        "h_z": [
+          {
+            "weight": 4,
+            "count": 6
+          }
+        ]
+      },
+      "distance_verification": {
+        "class": "structural_not_pinned",
+        "description": "The S3 seed-7 random two-block fixture computes exact distance 2; constructor metadata does not pin d_x or d_z."
+      },
+      "executable_verifier": {
+        "name": "family_catalog_construct_css_contract_v1",
+        "command": "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact"
+      },
       "executable_cases": [
         {
           "case_id": "random_two_block_positive_smoke",
           "case_kind": "positive",
           "expected_outcome": "success",
-          "description": "Future small valid random_two_block construction case for issue #573 availability promotion.",
+          "description": "Small valid random_two_block construction exercised through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must succeed"
+          ],
+          "request": {
+            "algorithm_version": 1,
+            "construction": "random_two_block",
+            "group": {
+              "element_order": "0=e,1=r,2=r^2,3=s,4=rs,5=r^2s",
+              "identity": 0,
+              "multiplication_table": [
+                [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                [
+                  1,
+                  2,
+                  0,
+                  4,
+                  5,
+                  3
+                ],
+                [
+                  2,
+                  0,
+                  1,
+                  5,
+                  3,
+                  4
+                ],
+                [
+                  3,
+                  5,
+                  4,
+                  0,
+                  2,
+                  1
+                ],
+                [
+                  4,
+                  3,
+                  5,
+                  1,
+                  0,
+                  2
+                ],
+                [
+                  5,
+                  4,
+                  3,
+                  2,
+                  1,
+                  0
+                ]
+              ],
+              "name": "S3",
+              "order": 6
+            },
+            "schema_version": 1,
+            "seed": 7,
+            "support_a_weight": 2,
+            "support_b_weight": 2
+          }
         },
         {
           "case_id": "random_two_block_negative_rejection",
           "case_kind": "negative",
           "expected_outcome": "rejection",
-          "description": "Future invalid random_two_block construction case that must reject before availability promotion.",
+          "description": "Invalid random_two_block construction must reject through the shared CSS contract.",
           "verification": [
-            "planned for issue #573 constructor fixture coverage"
-          ]
+            "parse_css_construction_json followed by construct_css must reject"
+          ],
+          "request": {
+            "algorithm_version": 1,
+            "construction": "random_two_block",
+            "group": {
+              "identity": 0,
+              "multiplication_table": [],
+              "order": 257
+            },
+            "schema_version": 1,
+            "seed": 7,
+            "support_a_weight": 1,
+            "support_b_weight": 1
+          },
+          "expected_error_contains": "exceeds maximum supported order"
         }
       ]
     },
@@ -499,13 +2117,16 @@
       "disposition": "deferred",
       "availability": "not_applicable",
       "provenance": [
-        "GitHub issue #552 explicitly defers perturbed_hgp as a research target."
+        "GitHub issue #573 keeps perturbed_hgp deferred until its research contract is implementation-ready."
       ],
       "verification": [
-        "cargo test -p qec-code --test family_manifest family_manifest_covers_requested_qec_families -- --exact"
+        "cargo test -p qec-code --test family_catalog requested_and_construction_registries_are_disjoint_and_complete -- --exact"
+      ],
+      "research_contracts": [
+        "qec-code/doc/perturbed_hgp_contract.md"
       ],
       "intended_consumers": [
-        "qec-code family manifest readers",
+        "qec-code family catalog completeness gate",
         "research-roadmap tracking for perturbed_hgp"
       ],
       "callable_constructor": null,
