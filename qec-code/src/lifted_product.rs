@@ -1,6 +1,14 @@
 use crate::error::{QecError, Result};
-use crate::finite_group::{FiniteGroupSpec, GroupAlgebraElement, left_regular_lift};
+use crate::finite_group::{
+    left_regular_lift, right_regular_lift, FiniteGroupSpec, GroupAlgebraElement,
+};
 
+/// Maximum number of group-algebra cells in either ring-level lifted-product
+/// check matrix. This bounds CLI input amplification before dense ring rows are
+/// materialized.
+pub const MAX_LIFTED_PRODUCT_RING_CELLS: usize = 1_000_000;
+
+/// Ring-level lifted-product matrix shape before regular binary lifting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LiftedProductRingShape {
     pub h_x_rows: usize,
@@ -8,6 +16,11 @@ pub struct LiftedProductRingShape {
     pub num_cols: usize,
 }
 
+/// Ring-level lifted-product checks over the group algebra.
+///
+/// `h_x` has `shape.h_x_rows` rows and `shape.num_cols` columns; `h_z` has
+/// `shape.h_z_rows` rows and the same columns. Transposed protograph blocks
+/// use group inversion on every support element.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LiftedProductRingChecks {
     pub shape: LiftedProductRingShape,
@@ -15,6 +28,7 @@ pub struct LiftedProductRingChecks {
     pub h_z: Vec<Vec<GroupAlgebraElement>>,
 }
 
+/// Binary CSS checks after applying regular group lifts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LiftedProductBinaryChecks {
     pub num_cols: usize,
@@ -22,6 +36,8 @@ pub struct LiftedProductBinaryChecks {
     pub h_z: Vec<Vec<usize>>,
 }
 
+/// Return the ring-level shape, rejecting overflow and oversized dense ring
+/// materializations.
 pub fn checked_lifted_product_ring_shape(
     left_rows: usize,
     left_cols: usize,
@@ -35,6 +51,8 @@ pub fn checked_lifted_product_ring_shape(
     let num_cols = left_block_cols
         .checked_add(right_block_cols)
         .ok_or(ring_overflow())?;
+    check_ring_cell_limit(h_x_rows, num_cols)?;
+    check_ring_cell_limit(h_z_rows, num_cols)?;
     Ok(LiftedProductRingShape {
         h_x_rows,
         h_z_rows,
@@ -42,6 +60,7 @@ pub fn checked_lifted_product_ring_shape(
     })
 }
 
+/// Return the ring-level shape and also preflight the post-lift binary shape.
 pub fn checked_lifted_product_binary_shape(
     group: &FiniteGroupSpec,
     left_rows: usize,
@@ -60,6 +79,7 @@ pub fn checked_lifted_product_binary_shape(
     Ok(shape)
 }
 
+/// Build ring-level lifted-product checks.
 pub fn lifted_product_ring_checks(
     group: &FiniteGroupSpec,
     left: &[Vec<GroupAlgebraElement>],
@@ -86,22 +106,35 @@ pub fn lifted_product_ring_checks(
     Ok(LiftedProductRingChecks { shape, h_x, h_z })
 }
 
+/// Build binary CSS checks using commuting left/right regular actions.
+///
+/// Left protograph factors use the left regular action and right protograph
+/// factors use the right regular action. This preserves the reviewed abelian
+/// fixtures while keeping noncommutative finite-group inputs orthogonal.
 pub fn lifted_product_binary_checks(
     group: &FiniteGroupSpec,
     left: &[Vec<GroupAlgebraElement>],
     right: &[Vec<GroupAlgebraElement>],
 ) -> Result<LiftedProductBinaryChecks> {
-    let ring = lifted_product_ring_checks(group, left, right)?;
-    checked_lifted_product_binary_shape(
-        group,
-        left.len(),
-        left.first().map_or(0, Vec::len),
-        right.len(),
-        right.first().map_or(0, Vec::len),
-    )?;
-    let h_x = left_regular_lift(group, &ring.h_x)?;
-    let h_z = left_regular_lift(group, &ring.h_z)?;
+    let (left_rows, left_cols) = group_algebra_matrix_shape(left)?;
+    let (right_rows, right_cols) = group_algebra_matrix_shape(right)?;
+    validate_group_orders(group, left)?;
+    validate_group_orders(group, right)?;
+    let shape =
+        checked_lifted_product_binary_shape(group, left_rows, left_cols, right_rows, right_cols)?;
+
+    let h_x_left = matrix_kron_identity(group, left, right_cols)?;
+    let h_x_right = identity_kron_matrix(group, left_rows, &transpose_without_inversion(right)?)?;
+    let h_z_left = identity_kron_matrix(group, left_cols, &invert_entries(group, right)?)?;
+    let h_z_right = matrix_kron_identity(group, &inverse_transpose(group, left)?, right_rows)?;
+
+    let h_x =
+        left_regular_lift(group, &h_x_left)?.hconcat(&right_regular_lift(group, &h_x_right)?)?;
+    let h_z =
+        right_regular_lift(group, &h_z_left)?.hconcat(&left_regular_lift(group, &h_z_right)?)?;
     debug_assert_eq!(h_x.num_cols(), h_z.num_cols());
+    debug_assert_eq!(h_x.num_rows(), shape.h_x_rows * group.order());
+    debug_assert_eq!(h_z.num_rows(), shape.h_z_rows * group.order());
     Ok(LiftedProductBinaryChecks {
         num_cols: h_x.num_cols(),
         h_x: h_x.rows().to_vec(),
@@ -113,6 +146,19 @@ fn ring_overflow() -> QecError {
     QecError::GroupAlgebraDimensionOverflow {
         operation: "lifted product ring shape",
     }
+}
+
+fn check_ring_cell_limit(rows: usize, num_cols: usize) -> Result<()> {
+    let cell_count = rows.checked_mul(num_cols).ok_or(ring_overflow())?;
+    if cell_count > MAX_LIFTED_PRODUCT_RING_CELLS {
+        return Err(QecError::InvalidCssConstruction {
+            construction: "lifted_product".to_owned(),
+            reason: format!(
+                "ring cell count {cell_count} exceeds maximum supported {MAX_LIFTED_PRODUCT_RING_CELLS}"
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn group_algebra_matrix_shape(matrix: &[Vec<GroupAlgebraElement>]) -> Result<(usize, usize)> {
@@ -177,6 +223,43 @@ fn inverse_transpose(
         output.push(row);
     }
     Ok(output)
+}
+
+fn transpose_without_inversion(
+    matrix: &[Vec<GroupAlgebraElement>],
+) -> Result<Vec<Vec<GroupAlgebraElement>>> {
+    let rows = matrix.len();
+    let cols = matrix[0].len();
+    let mut output = Vec::with_capacity(cols);
+    for col in 0..cols {
+        let mut row = Vec::with_capacity(rows);
+        for source_row in matrix {
+            row.push(source_row[col].clone());
+        }
+        output.push(row);
+    }
+    Ok(output)
+}
+
+fn invert_entries(
+    group: &FiniteGroupSpec,
+    matrix: &[Vec<GroupAlgebraElement>],
+) -> Result<Vec<Vec<GroupAlgebraElement>>> {
+    matrix
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|entry| {
+                    let support = entry
+                        .support()
+                        .iter()
+                        .map(|&element| group.inverse(element))
+                        .collect::<Result<Vec<_>>>()?;
+                    GroupAlgebraElement::new(group, support)
+                })
+                .collect()
+        })
+        .collect()
 }
 
 fn matrix_kron_identity(

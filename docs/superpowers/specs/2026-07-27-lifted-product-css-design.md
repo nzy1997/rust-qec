@@ -82,8 +82,10 @@ element. Identity entries are the group identity singleton and zero entries are
 empty supports. The C3 fixture has ring-level shape `6 x 13` on both `H_X` and
 `H_Z`.
 
-Binary lifting uses the existing left regular lift. This matches the finite
-group lift fixture from #557 and preserves the expected leading rows:
+Binary lifting uses commuting regular actions: left protograph factors use the
+left regular action, and right protograph factors use the right regular action.
+For the abelian `C3` fixture this specializes to the reviewed rows from #557
+and preserves the expected leading rows:
 
 - `H_X[0] = [1, 2, 9, 28, 29]`
 - `H_Z[0] = [1, 2, 3, 28, 29]`
@@ -115,6 +117,8 @@ The constructor rejects:
   `InvalidCssConstruction`
 - lift-dimension overflow via existing group-algebra and sparse GF(2) overflow
   errors
+- oversized dense ring-level materializations via a documented ring-cell limit
+  before binary lift allocation
 
 ## Testing
 
@@ -129,7 +133,9 @@ ring-level shape, verifies the leading rows, checks stats
 `n=39, m_x=18, m_z=18, rank_x=18, rank_z=18, k=3, d_x=3, d_z=3`, exercises the
 JSON CLI path, and verifies orthogonality after the binary lift. The trivial
 group test compares byte-identical canonical rows and metadata-equivalent
-dimensions with the ordinary HGP constructor.
+dimensions with the ordinary HGP constructor. A noncommutative `S3` singleton
+test verifies that mixed left/right regular actions keep the binary checks
+orthogonal beyond abelian fixtures.
 
 ## Self-Review
 

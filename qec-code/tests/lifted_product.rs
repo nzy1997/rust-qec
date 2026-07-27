@@ -2,16 +2,16 @@ use std::ffi::OsString;
 use std::path::Path;
 
 use clap::Parser;
-use qec_code::QecError;
 use qec_code::binary::try_in_row_span;
-use qec_code::cli::{Cli, run};
+use qec_code::cli::{run, Cli};
 use qec_code::family_contract::{
-    CssClassicalCheckSpec, CssConstructionSpec, FiniteGroupTableSpec, GroupAlgebraElementSpec,
-    GroupAlgebraProtographSpec, HypergraphProductSpec, LiftedProductSpec, construct_css,
-    parse_css_construction_json, verify_css_orthogonality,
+    construct_css, parse_css_construction_json, verify_css_orthogonality, CssClassicalCheckSpec,
+    CssConstructionSpec, FiniteGroupTableSpec, GroupAlgebraElementSpec, GroupAlgebraProtographSpec,
+    HypergraphProductSpec, LiftedProductSpec,
 };
 use qec_code::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
 use qec_code::lifted_product::{checked_lifted_product_binary_shape, lifted_product_ring_checks};
+use qec_code::QecError;
 use tempfile::tempdir;
 
 fn c3_group_spec() -> FiniteGroupTableSpec {
@@ -27,6 +27,37 @@ fn trivial_group_spec() -> FiniteGroupTableSpec {
         order: 1,
         identity: 0,
         multiplication_table: vec![vec![0]],
+    }
+}
+
+fn s3_group_spec() -> FiniteGroupTableSpec {
+    let elements = vec![
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
+    let mut multiplication_table = Vec::new();
+    for left in &elements {
+        let mut row = Vec::new();
+        for right in &elements {
+            let product = [left[right[0]], left[right[1]], left[right[2]]];
+            row.push(
+                elements
+                    .iter()
+                    .position(|candidate| *candidate == product)
+                    .expect("S3 product should be in fixture list"),
+            );
+        }
+        multiplication_table.push(row);
+    }
+
+    FiniteGroupTableSpec {
+        order: elements.len(),
+        identity: 0,
+        multiplication_table,
     }
 }
 
@@ -51,6 +82,18 @@ fn trivial_2x3_protograph() -> GroupAlgebraProtographSpec {
             vec![ga(&[0]), ga(&[0]), ga(&[])],
             vec![ga(&[]), ga(&[0]), ga(&[0])],
         ],
+    }
+}
+
+fn singleton_protograph(support: usize) -> GroupAlgebraProtographSpec {
+    GroupAlgebraProtographSpec {
+        rows: vec![vec![ga(&[support])]],
+    }
+}
+
+fn empty_square_protograph(size: usize) -> GroupAlgebraProtographSpec {
+    GroupAlgebraProtographSpec {
+        rows: vec![vec![ga(&[]); size]; size],
     }
 }
 
@@ -303,6 +346,23 @@ fn lifted_product_trivial_group_matches_hgp() {
 }
 
 #[test]
+fn lifted_product_s3_noncommuting_singletons_are_orthogonal() {
+    let result = construct_css(CssConstructionSpec::LiftedProduct(LiftedProductSpec {
+        group: s3_group_spec(),
+        left: singleton_protograph(1),
+        right: singleton_protograph(2),
+    }))
+    .unwrap();
+
+    assert_eq!(result.stats.n, 12);
+    assert_eq!(result.stats.m_x, 6);
+    assert_eq!(result.stats.m_z, 6);
+    assert_eq!(result.checks.h_x[0], vec![1, 8]);
+    assert_eq!(result.checks.h_z[0], vec![2, 7]);
+    verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
+}
+
+#[test]
 fn lifted_product_rejects_malformed_protographs() {
     let out_of_range = construct_css(CssConstructionSpec::LiftedProduct(LiftedProductSpec {
         group: c3_group_spec(),
@@ -355,5 +415,18 @@ fn lifted_product_rejects_malformed_protographs() {
         Err(QecError::GroupAlgebraDimensionOverflow {
             operation: "lifted product ring shape"
         })
+    );
+
+    let oversized = construct_css(CssConstructionSpec::LiftedProduct(LiftedProductSpec {
+        group: trivial_group_spec(),
+        left: empty_square_protograph(32),
+        right: empty_square_protograph(32),
+    }));
+    assert!(
+        matches!(&oversized, Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "lifted_product"
+                && reason.contains("ring cell count")
+                && reason.contains("exceeds maximum supported")),
+        "expected public lifted-product construction to reject oversized input, got {oversized:?}"
     );
 }

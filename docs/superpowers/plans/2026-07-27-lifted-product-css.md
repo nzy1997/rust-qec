@@ -4,9 +4,9 @@
 
 **Goal:** Build deterministic lifted-product CSS checks from finite-group group-algebra protographs through the common `qec-code` construction contract.
 
-**Architecture:** Add a focused `qec-code/src/lifted_product.rs` module for ring-level matrix construction, group-inverting transpose, dimension preflight, and binary left-regular lifting. Wire serializable request specs into `family_contract.rs` so Rust callers and the existing `code css construct --spec` CLI use the same path.
+**Architecture:** Add a focused `qec-code/src/lifted_product.rs` module for ring-level matrix construction, group-inverting transpose, dimension preflight, and binary lifting with commuting left/right regular actions. Wire serializable request specs into `family_contract.rs` so Rust callers and the existing `code css construct --spec` CLI use the same path.
 
-**Tech Stack:** Rust 2024, `serde`, existing `FiniteGroupSpec`, `GroupAlgebraElement`, `left_regular_lift`, `SparseGf2Matrix`, and `construct_css`.
+**Tech Stack:** Rust 2024, `serde`, existing `FiniteGroupSpec`, `GroupAlgebraElement`, `left_regular_lift`, `right_regular_lift`, `SparseGf2Matrix`, and `construct_css`.
 
 ## Global Constraints
 
@@ -21,6 +21,7 @@
 - The trivial group specializes exactly to the public ordinary HGP constructor from #556, with byte-identical canonical rows and metadata-equivalent dimensions.
 - Rust API and CLI are parameterized and deterministic.
 - Reject malformed group entries, incompatible protograph shapes, missing inverses, and lift-dimension overflow.
+- Noncommutative groups use commuting left/right regular actions in the binary lift rather than lifting every block with the same side action.
 - Required verification commands:
   - `cargo test -p qec-code --test lifted_product lifted_product_c3_matches_fixture -- --exact`
   - `cargo test -p qec-code --test lifted_product lifted_product_trivial_group_matches_hgp -- --exact`
@@ -31,7 +32,7 @@
 
 ## File Structure
 
-- Create `qec-code/src/lifted_product.rs`: ring-level lifted-product checks, group-algebra transpose with inversion, dimension preflight, and binary left-regular lift.
+- Create `qec-code/src/lifted_product.rs`: ring-level lifted-product checks, group-algebra transpose with inversion, dimension preflight, and binary mixed regular lift.
 - Modify `qec-code/src/lib.rs`: publicly export the new module.
 - Modify `qec-code/src/family_contract.rs`: add serializable lifted-product request specs, parse JSON requests, construct binary CSS checks, normalized parameters, and fixture distance metadata.
 - Create `qec-code/tests/lifted_product.rs`: exact C3 fixture, trivial-group HGP specialization, CLI JSON route, and negative controls.
@@ -45,7 +46,7 @@
 - Test: `qec-code/tests/lifted_product.rs`
 
 **Interfaces:**
-- Consumes: `FiniteGroupSpec`, `GroupAlgebraElement`, `left_regular_lift`, `SparseGf2Matrix`, `construct_css`, `parse_css_construction_json`.
+- Consumes: `FiniteGroupSpec`, `GroupAlgebraElement`, `left_regular_lift`, `right_regular_lift`, `SparseGf2Matrix`, `construct_css`, `parse_css_construction_json`.
 - Produces:
   - `qec_code::lifted_product::LiftedProductRingShape`
   - `qec_code::lifted_product::LiftedProductBinaryChecks`
@@ -441,12 +442,12 @@ Expected: fail to compile because `LiftedProductSpec`, `GroupAlgebraProtographSp
 - [ ] **Step 3: Implement the lifted-product module**
 
 Create `qec-code/src/lifted_product.rs` with ring shape preflight, group-algebra
-Kronecker products, transpose with inversion, and binary left-regular lifts.
+Kronecker products, transpose with inversion, and binary mixed regular lifts.
 Use these exact public shapes and function names:
 
 ```rust
 use crate::error::{QecError, Result};
-use crate::finite_group::{left_regular_lift, FiniteGroupSpec, GroupAlgebraElement};
+use crate::finite_group::{left_regular_lift, right_regular_lift, FiniteGroupSpec, GroupAlgebraElement};
 use crate::sparse_gf2::SparseGf2Matrix;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -487,9 +488,12 @@ Implementation requirements:
   rectangular matrices, preflights the shape, then returns
   `[left kron I(right_cols) | I(left_rows) kron inverse_transpose(right)]` and
   `[I(left_cols) kron right | inverse_transpose(left) kron I(right_rows)]`.
-- `lifted_product_binary_checks(group, left, right)` calls
-  `lifted_product_ring_checks`, lifts both ring matrices with `left_regular_lift`,
-  asserts equal binary column counts, and returns sparse rows.
+- `lifted_product_binary_checks(group, left, right)` preflights ring and binary
+  shapes before dense ring materialization. It uses left regular lifts for left
+  protograph factors and right regular lifts for right protograph factors, then
+  asserts equal binary column counts and returns sparse rows.
+- Dense ring-level materialization is bounded by
+  `MAX_LIFTED_PRODUCT_RING_CELLS = 1_000_000` cells per ring check matrix.
 
 - [ ] **Step 4: Export the module**
 
