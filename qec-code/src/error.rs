@@ -108,6 +108,11 @@ pub enum QecError {
         option: &'static str,
         reason: String,
     },
+    #[error("invalid random HGP spec option {option}: {reason}")]
+    InvalidRandomHgpSpec {
+        option: &'static str,
+        reason: String,
+    },
     #[error("unsupported random two-block algorithm version {algorithm_version}")]
     UnsupportedRandomTwoBlockAlgorithm { algorithm_version: u32 },
     #[error("regular classical matrix stub-count overflow for {side}")]

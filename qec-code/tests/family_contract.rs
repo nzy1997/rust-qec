@@ -202,6 +202,7 @@ fn planned_families_have_no_callable_stub() {
             RequestedFamilyId::GeneralizedBicycle,
             RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
+            RequestedFamilyId::RandomHgp,
             RequestedFamilyId::Color666,
             RequestedFamilyId::ShorLike,
             RequestedFamilyId::Directional,
