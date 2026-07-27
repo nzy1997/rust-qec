@@ -145,6 +145,13 @@ fn s3_element(group: &FiniteGroupSpec, support: &[usize]) -> GroupAlgebraElement
     GroupAlgebraElement::new(group, support.to_vec()).unwrap()
 }
 
+fn support_rows(matrix: &[Vec<GroupAlgebraElement>]) -> Vec<Vec<Vec<usize>>> {
+    matrix
+        .iter()
+        .map(|row| row.iter().map(|entry| entry.support().to_vec()).collect())
+        .collect()
+}
+
 fn expected_hx() -> Vec<Vec<usize>> {
     vec![
         vec![1, 2, 9, 28, 29],
@@ -438,6 +445,34 @@ fn lifted_product_s3_rectangular_multi_support_fixture_is_orthogonal() {
         ]
     );
     verify_css_orthogonality(checks.num_cols, &checks.h_x, &checks.h_z).unwrap();
+}
+
+#[test]
+fn lifted_product_s3_ring_fixture_applies_inverse_transpose() {
+    let group = s3_group();
+    let left = vec![vec![s3_element(&group, &[1, 2]), s3_element(&group, &[3])]];
+    let right = vec![
+        vec![s3_element(&group, &[2, 3])],
+        vec![s3_element(&group, &[1])],
+    ];
+    let ring = lifted_product_ring_checks(&group, &left, &right).unwrap();
+
+    assert_eq!(ring.shape.h_x_rows, 1);
+    assert_eq!(ring.shape.h_z_rows, 4);
+    assert_eq!(ring.shape.num_cols, 4);
+    assert_eq!(
+        support_rows(&ring.h_x),
+        vec![vec![vec![1, 2], vec![3], vec![2, 4], vec![1]]]
+    );
+    assert_eq!(
+        support_rows(&ring.h_z),
+        vec![
+            vec![vec![2, 3], vec![], vec![1, 2], vec![]],
+            vec![vec![1], vec![], vec![], vec![1, 2]],
+            vec![vec![], vec![2, 3], vec![4], vec![]],
+            vec![vec![], vec![1], vec![], vec![4]],
+        ]
+    );
 }
 
 #[test]
