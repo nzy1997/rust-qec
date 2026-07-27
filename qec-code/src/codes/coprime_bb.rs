@@ -53,17 +53,17 @@ pub fn coprime_bb_sparse_checks(
 }
 
 pub fn coprime_bb_known_distances(spec: &CoprimeBivariateBicycleSpec) -> Option<(usize, usize)> {
-    let normalized = normalize_periods(spec.l, spec.m).ok()?;
+    let normalized = normalize_spec(spec).ok()?;
     generalized_bicycle_known_distances(&GeneralizedBicycleSpec {
-        order: normalized.cyclic_order,
-        a_exponents: spec.a_exponents.clone(),
-        b_exponents: spec.b_exponents.clone(),
+        order: normalized.l * normalized.m,
+        a_exponents: normalized.a_exponents.clone(),
+        b_exponents: normalized.b_exponents.clone(),
     })
     .or_else(|| {
-        (spec.l == 3
-            && spec.m == 5
-            && spec.a_exponents == [0, 1, 2]
-            && spec.b_exponents == [0, 2, 7])
+        (normalized.l == 3
+            && normalized.m == 5
+            && normalized.a_exponents == [0, 1, 2]
+            && normalized.b_exponents == [0, 2, 7])
         .then_some((6, 6))
     })
 }
@@ -183,6 +183,19 @@ mod tests {
         assert_eq!(checks.normalized_spec.m, 5);
         assert_eq!(checks.normalized_spec.a_exponents, vec![0, 1, 2]);
         assert_eq!(checks.normalized_spec.b_exponents, vec![0, 2, 7]);
+    }
+
+    #[test]
+    fn known_distances_normalizes_reordered_fixture_exponents() {
+        assert_eq!(
+            coprime_bb_known_distances(&CoprimeBivariateBicycleSpec {
+                l: 3,
+                m: 5,
+                a_exponents: vec![2, 0, 1],
+                b_exponents: vec![7, 0, 2],
+            }),
+            Some((6, 6))
+        );
     }
 
     #[test]
