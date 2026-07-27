@@ -12,6 +12,24 @@ use crate::family_contract::{
 };
 
 const MANIFEST_REL_PATH: &str = "tests/fixtures/family_manifest/manifest.v1.json";
+const EXPECTED_FAMILY_IDS: [&str; 14] = [
+    "directional",
+    "quantum_tanner",
+    "generalized_bicycle",
+    "la_cross",
+    "random_hgp",
+    "lifted_product",
+    "hyperbolic_5_5",
+    "coprime_bb",
+    "toric_3d",
+    "color_666",
+    "surface",
+    "shor_like",
+    "random_two_block",
+    "perturbed_hgp",
+];
+const EXPECTED_SUPPORTED_FAMILIES: usize = 12;
+const EXPECTED_DEFERRED_FAMILIES: usize = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FamilyVerificationReport {
@@ -139,8 +157,8 @@ fn verify_catalog(catalog: &FamilyCatalog) -> FamilyVerificationReport {
         .iter()
         .filter(|entry| entry.disposition == FamilyDisposition::Deferred)
         .count();
-    let mut lines = Vec::with_capacity(catalog.families.len() + 1);
-    let mut failed = 0usize;
+    let mut lines = manifest_contract_failures(catalog, supported, deferred);
+    let mut failed = lines.len();
 
     for entry in &catalog.families {
         match verify_entry(entry) {
@@ -160,6 +178,59 @@ fn verify_catalog(catalog: &FamilyCatalog) -> FamilyVerificationReport {
         output: lines.join("\n"),
         failed,
     }
+}
+
+fn manifest_contract_failures(
+    catalog: &FamilyCatalog,
+    supported: usize,
+    deferred: usize,
+) -> Vec<String> {
+    let mut failures = Vec::new();
+
+    for family_id in EXPECTED_FAMILY_IDS {
+        let occurrences = catalog
+            .families
+            .iter()
+            .filter(|entry| entry.family_id == family_id)
+            .count();
+        match occurrences {
+            0 => failures.push(format!("FAIL manifest missing family_id={family_id}")),
+            1 => {}
+            _ => failures.push(format!("FAIL manifest duplicate family_id={family_id}")),
+        }
+    }
+
+    for entry in &catalog.families {
+        if !EXPECTED_FAMILY_IDS.contains(&entry.family_id.as_str()) {
+            failures.push(format!(
+                "FAIL manifest unexpected family_id={}",
+                entry.family_id
+            ));
+        }
+    }
+
+    for (index, entry) in catalog.families.iter().enumerate() {
+        let expected = EXPECTED_FAMILY_IDS.get(index).copied().unwrap_or("none");
+        if entry.family_id != expected {
+            failures.push(format!(
+                "FAIL manifest family_id_order index={index} expected={expected} actual={}",
+                entry.family_id
+            ));
+        }
+    }
+
+    if supported != EXPECTED_SUPPORTED_FAMILIES {
+        failures.push(format!(
+            "FAIL manifest expected supported={EXPECTED_SUPPORTED_FAMILIES} actual supported={supported}"
+        ));
+    }
+    if deferred != EXPECTED_DEFERRED_FAMILIES {
+        failures.push(format!(
+            "FAIL manifest expected deferred={EXPECTED_DEFERRED_FAMILIES} actual deferred={deferred}"
+        ));
+    }
+
+    failures
 }
 
 fn verify_entry(entry: &FamilyCatalogEntry) -> EntryVerification {

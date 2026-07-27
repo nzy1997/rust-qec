@@ -131,3 +131,55 @@ fn verify_families_cli_fails_when_supported_target_is_planned() {
         .output
         .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1"));
 }
+
+#[test]
+fn verify_families_cli_fails_when_deferred_family_is_missing() {
+    let mut value: serde_json::Value = serde_json::from_str(MANIFEST_TEXT).unwrap();
+    value["families"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["family_id"] != "perturbed_hgp");
+    let text = format!("{}\n", serde_json::to_string_pretty(&value).unwrap());
+
+    let report = verify_family_manifest_text(&text);
+
+    assert!(report.failed > 0);
+    assert!(
+        report
+            .output
+            .contains("FAIL manifest missing family_id=perturbed_hgp")
+    );
+    assert!(
+        report
+            .output
+            .contains("SUMMARY FAIL supported=12 deferred=1")
+    );
+}
+
+#[test]
+fn verify_families_cli_fails_when_family_is_duplicated() {
+    let mut value: serde_json::Value = serde_json::from_str(MANIFEST_TEXT).unwrap();
+    let duplicate = value["families"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["family_id"] == "directional")
+        .unwrap()
+        .clone();
+    value["families"].as_array_mut().unwrap().push(duplicate);
+    let text = format!("{}\n", serde_json::to_string_pretty(&value).unwrap());
+
+    let report = verify_family_manifest_text(&text);
+
+    assert!(report.failed > 0);
+    assert!(
+        report
+            .output
+            .contains("FAIL manifest duplicate family_id=directional")
+    );
+    assert!(
+        report
+            .output
+            .contains("SUMMARY FAIL supported=13 deferred=2")
+    );
+}

@@ -92,6 +92,27 @@ mod tests {
     }
 
     #[test]
+    fn write_result_writes_family_verification_failure_to_stdout() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = write_result(
+            Err(QecError::FamilyVerificationFailed {
+                report: "FAIL manifest missing family_id=perturbed_hgp".to_string(),
+            }),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(exit_code, 1);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "FAIL manifest missing family_id=perturbed_hgp\n"
+        );
+        assert!(stderr.is_empty());
+    }
+
+    #[test]
     fn write_result_writes_stdout_on_success() {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
