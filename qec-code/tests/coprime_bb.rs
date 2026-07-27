@@ -58,6 +58,13 @@ fn coprime_bb_3_5_matches_30_4_6_fixture() {
     assert_eq!(result.stats.k, 4);
     assert_eq!(result.stats.d_x, Some(6));
     assert_eq!(result.stats.d_z, Some(6));
+    assert_eq!(result.provenance.adapter, "coprime_bb");
+    assert_eq!(result.provenance.source, "CssFamilySpec::CoprimeBb");
+    assert!(result.provenance.normalized_input_digest.starts_with("sha256:"));
+    assert_eq!(
+        result.provenance.normalized_input_digest.len(),
+        "sha256:".len() + 64
+    );
     assert_eq!(result.checks.h_x[0], vec![0, 1, 2, 15, 17, 22]);
     assert_eq!(result.checks.h_z[0], vec![0, 8, 13, 15, 28, 29]);
     assert!(result.checks.h_x.iter().all(|row| row.len() == 6));
@@ -138,10 +145,28 @@ fn coprime_bb_rejects_non_coprime_periods() {
             CoprimeBivariateBicycleSpec {
                 l: 3,
                 m: 5,
+                a_exponents: vec![0],
+                b_exponents: vec![15],
+            },
+            "b_exponents exponent 15 is out of range for cyclic order 15",
+        ),
+        (
+            CoprimeBivariateBicycleSpec {
+                l: 3,
+                m: 5,
                 a_exponents: vec![0, 1, 1],
                 b_exponents: vec![0],
             },
             "a_exponents contains duplicate exponent 1",
+        ),
+        (
+            CoprimeBivariateBicycleSpec {
+                l: 3,
+                m: 5,
+                a_exponents: vec![0],
+                b_exponents: vec![2, 0, 2],
+            },
+            "b_exponents contains duplicate exponent 2",
         ),
         (
             CoprimeBivariateBicycleSpec {
