@@ -22,7 +22,7 @@ fn write_result(
 ) -> i32 {
     match result {
         Ok(output) => write_success(stdout, &output),
-        Err(error) => write_error(stderr, &error),
+        Err(error) => write_error(stdout, stderr, &error),
     }
 }
 
@@ -31,8 +31,19 @@ fn write_success(stdout: &mut impl Write, output: &str) -> i32 {
     0
 }
 
-fn write_error(stderr: &mut impl Write, error: &qec_code::QecError) -> i32 {
-    writeln!(stderr, "{error}").expect("stderr write should succeed");
+fn write_error(
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+    error: &qec_code::QecError,
+) -> i32 {
+    match error {
+        QecError::FamilyVerificationFailed { report } => {
+            writeln!(stdout, "{report}").expect("stdout write should succeed");
+        }
+        _ => {
+            writeln!(stderr, "{error}").expect("stderr write should succeed");
+        }
+    }
     1
 }
 

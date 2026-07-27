@@ -23,6 +23,7 @@ use crate::error::CssMatrixReadSource;
 use crate::family_contract::{
     CssConstructionSpec, CssFamilySpec, construct_css, parse_css_construction_json,
 };
+use crate::family_verifier::verify_checked_in_family_manifest;
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -94,6 +95,7 @@ impl CssArgs {
 #[derive(Debug, Subcommand)]
 pub enum CssCommands {
     List,
+    VerifyFamilies,
     Export {
         code_id: String,
         matrix: CssMatrixKind,
@@ -223,6 +225,7 @@ fn run_code(command: CodeCommands) -> Result<String, QecError> {
 fn run_css_args(args: CssArgs) -> Result<String, QecError> {
     match args.command {
         Some(CssCommands::List) => Ok(run_css_list()),
+        Some(CssCommands::VerifyFamilies) => run_css_verify_families(),
         Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
         Some(CssCommands::Construct { spec, output }) => run_css_construction_spec(&spec, output),
         Some(CssCommands::QuantumTanner { spec, matrix }) => run_css_quantum_tanner(&spec, matrix),
@@ -236,6 +239,17 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
 
             run_css(&code_id, matrix)
         }
+    }
+}
+
+fn run_css_verify_families() -> Result<String, QecError> {
+    let report = verify_checked_in_family_manifest()?;
+    if report.failed == 0 {
+        Ok(report.output)
+    } else {
+        Err(QecError::FamilyVerificationFailed {
+            report: report.output,
+        })
     }
 }
 
