@@ -184,7 +184,7 @@
         ]
       },
       "distance_verification": {
-        "class": "external_exact_test",
+        "class": "structural_not_pinned",
         "description": "The quantum_tanner_contract fixture computes exact distance 4; constructor metadata does not pin d_x or d_z."
       },
       "executable_verifier": {
@@ -2005,7 +2005,7 @@
         ]
       },
       "distance_verification": {
-        "class": "external_exact_test",
+        "class": "structural_not_pinned",
         "description": "The S3 seed-7 random two-block fixture computes exact distance 2; constructor metadata does not pin d_x or d_z."
       },
       "executable_verifier": {

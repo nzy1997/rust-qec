@@ -13,6 +13,7 @@ const MANIFEST_SCHEMA_VERSION: u64 = 1;
 const MANIFEST_ID: &str = "qec_family_construction_targets_v1";
 const PROMOTION_GATE_ISSUE: u64 = 573;
 const EXECUTABLE_VERIFIER_NAME: &str = "family_catalog_construct_css_contract_v1";
+const EXECUTABLE_VERIFIER_COMMAND: &str = "cargo test -p qec-code --test family_catalog every_supported_family_has_positive_and_negative_cases -- --exact";
 
 const REQUESTED_FAMILY_IDS: &[&str] = &[
     "directional",
@@ -94,6 +95,14 @@ enum ExecutableCaseKind {
 enum ExpectedOutcome {
     Success,
     Rejection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum DistanceVerificationClass {
+    ConstructorKnownExact,
+    ContractMetadata,
+    StructuralNotPinned,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -179,7 +188,7 @@ struct RowWeightBucket {
 #[serde(deny_unknown_fields)]
 struct DistanceVerification {
     #[serde(rename = "class")]
-    class_name: String,
+    class_name: DistanceVerificationClass,
     description: String,
 }
 
@@ -403,9 +412,7 @@ fn expect_available_metadata(entry: &FamilyCatalogEntry) -> Result<(), String> {
             entry.family_id
         )
     })?;
-    if distance_verification.class_name.trim().is_empty()
-        || distance_verification.description.trim().is_empty()
-    {
+    if distance_verification.description.trim().is_empty() {
         return Err(format!(
             "available family {:?} has empty distance_verification",
             entry.family_id
@@ -418,7 +425,7 @@ fn expect_available_metadata(entry: &FamilyCatalogEntry) -> Result<(), String> {
         )
     })?;
     if executable_verifier.name != EXECUTABLE_VERIFIER_NAME
-        || executable_verifier.command.trim().is_empty()
+        || executable_verifier.command != EXECUTABLE_VERIFIER_COMMAND
     {
         return Err(format!(
             "available family {:?} has invalid executable_verifier",
@@ -903,6 +910,22 @@ fn catalog_rejects_coverage_gaps() {
             cases.retain(|case| case["case_kind"] != "negative");
         },
         "requires at least one negative",
+    );
+    expect_catalog_rejection(
+        "available family with unsupported distance verification class",
+        |value| {
+            value["families"][0]["distance_verification"]["class"] =
+                serde_json::json!("external_exact_test");
+        },
+        "unknown variant",
+    );
+    expect_catalog_rejection(
+        "available family with unrelated executable verifier command",
+        |value| {
+            value["families"][0]["executable_verifier"]["command"] =
+                serde_json::json!("cargo test -p qec-code --test unrelated");
+        },
+        "invalid executable_verifier",
     );
     expect_catalog_rejection(
         "planned family that claims a callable constructor",
