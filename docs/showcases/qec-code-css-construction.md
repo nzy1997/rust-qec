@@ -111,6 +111,14 @@ DEFERRED hyperbolic_5_5 tracking_issue=#571 contract=qec-code/doc/hyperbolic_5_5
 DEFERRED perturbed_hgp tracking_issue=#572 contract=qec-code/doc/perturbed_hgp_contract.md
 ```
 
+A `FAIL` line means the checked-in catalog and the constructor result no longer
+agree, or the catalog state is internally inconsistent. Examples include invalid
+manifest JSON, duplicate or missing requested family IDs, a supported family
+marked unavailable, missing deferred contract metadata, construction failures,
+orthogonality failures, and expected-stat, rank, row-weight, requested-family,
+or provenance mismatches. Any `FAIL` line changes the summary to
+`SUMMARY FAIL supported=12 deferred=2 failed=N` and the CLI exits nonzero.
+
 Parameterized Rust usage stays on the typed constructor path:
 
 ```rust
