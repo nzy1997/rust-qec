@@ -495,6 +495,55 @@ fn lifted_product_rejects_post_lift_binary_overflow() {
 
 #[test]
 fn lifted_product_rejects_malformed_protographs() {
+    let (group, matrix) = c3_group_and_matrix();
+    let empty: Vec<Vec<GroupAlgebraElement>> = Vec::new();
+    let Err(empty_err) = lifted_product_ring_checks(&group, &empty, &matrix) else {
+        panic!("expected empty lifted-product protograph rejection");
+    };
+    assert!(
+        matches!(&empty_err, QecError::InvalidCssConstruction { construction, reason }
+            if construction == "lifted_product"
+                && reason == "must contain at least one row"),
+        "expected empty protograph rejection, got {empty_err:?}"
+    );
+
+    let no_columns = vec![Vec::new()];
+    let Err(no_columns_err) = lifted_product_ring_checks(&group, &no_columns, &matrix) else {
+        panic!("expected zero-column lifted-product protograph rejection");
+    };
+    assert!(
+        matches!(&no_columns_err, QecError::InvalidCssConstruction { construction, reason }
+            if construction == "lifted_product"
+                && reason == "must contain at least one column"),
+        "expected zero-column protograph rejection, got {no_columns_err:?}"
+    );
+
+    let other_group = cyclic_group(2);
+    let mismatched = vec![vec![
+        GroupAlgebraElement::new(&other_group, vec![0]).unwrap(),
+    ]];
+    assert_eq!(
+        lifted_product_ring_checks(&group, &mismatched, &matrix),
+        Err(QecError::GroupAlgebraOrderMismatch {
+            expected: 3,
+            actual: 2
+        })
+    );
+
+    let malformed_json = serde_json::json!({
+        "schema_version": 1,
+        "construction": "lifted_product",
+        "group": c3_group_spec(),
+        "left": c3_protograph()
+    });
+    let parse_err = parse_css_construction_json(&serde_json::to_string(&malformed_json).unwrap());
+    assert!(
+        matches!(&parse_err, Err(QecError::InvalidCssConstruction { construction, reason })
+            if construction == "lifted_product"
+                && reason.contains("missing field `right`")),
+        "expected lifted-product JSON parse rejection, got {parse_err:?}"
+    );
+
     let out_of_range = construct_css(CssConstructionSpec::LiftedProduct(LiftedProductSpec {
         group: c3_group_spec(),
         left: GroupAlgebraProtographSpec {
