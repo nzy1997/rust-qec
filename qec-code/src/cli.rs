@@ -23,7 +23,7 @@ use crate::error::CssMatrixReadSource;
 use crate::family_contract::{
     CssConstructionSpec, CssFamilySpec, construct_css, parse_css_construction_json,
 };
-use crate::family_verifier::verify_checked_in_family_manifest;
+use crate::family_verifier::{FamilyVerificationReport, verify_checked_in_family_manifest};
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -243,13 +243,34 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
 }
 
 fn run_css_verify_families() -> Result<String, QecError> {
-    let report = verify_checked_in_family_manifest()?;
+    family_report_to_cli_result(verify_checked_in_family_manifest()?)
+}
+
+fn family_report_to_cli_result(report: FamilyVerificationReport) -> Result<String, QecError> {
     if report.failed == 0 {
         Ok(report.output)
     } else {
         Err(QecError::FamilyVerificationFailed {
             report: report.output,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn family_report_to_cli_result_returns_error_for_failed_report() {
+        let output = "FAIL generalized_bicycle expected rank_x=5 actual rank_x=4\nSUMMARY FAIL supported=12 deferred=2 failed=1".to_owned();
+        let report = FamilyVerificationReport {
+            output: output.clone(),
+            failed: 1,
+        };
+
+        let error = family_report_to_cli_result(report).unwrap_err();
+
+        assert_eq!(error, QecError::FamilyVerificationFailed { report: output });
     }
 }
 

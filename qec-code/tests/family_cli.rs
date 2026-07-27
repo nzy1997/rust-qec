@@ -48,6 +48,12 @@ fn mutate_family(family_id: &str, mutate: impl FnOnce(&mut serde_json::Value)) -
     format!("{}\n", serde_json::to_string_pretty(&value).unwrap())
 }
 
+fn mutate_manifest(mutate: impl FnOnce(&mut serde_json::Value)) -> String {
+    let mut value: serde_json::Value = serde_json::from_str(MANIFEST_TEXT).unwrap();
+    mutate(&mut value);
+    format!("{}\n", serde_json::to_string_pretty(&value).unwrap())
+}
+
 #[test]
 fn verify_families_cli_reports_12_pass_and_2_deferred() {
     let output = run_qec_code(&["code", "css", "verify-families"]);
@@ -212,4 +218,148 @@ fn verify_families_cli_fails_on_mutated_deferred_contract() {
             .output
             .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1")
     );
+}
+
+#[test]
+fn verify_families_cli_reports_catalog_and_metadata_failure_boundaries() {
+    let cases = [
+        (
+            "invalid JSON",
+            "{".to_owned(),
+            "FAIL manifest invalid_json=",
+        ),
+        (
+            "unexpected deferred family",
+            mutate_manifest(|manifest| {
+                let mut unknown = manifest["families"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|entry| entry["family_id"] == "hyperbolic_5_5")
+                    .unwrap()
+                    .clone();
+                unknown["family_id"] = serde_json::json!("unknown_deferred");
+                unknown["research_contracts"] =
+                    serde_json::json!(["qec-code/doc/unknown_deferred_contract.md"]);
+                manifest["families"].as_array_mut().unwrap().push(unknown);
+            }),
+            "FAIL unknown_deferred unknown deferred family",
+        ),
+        (
+            "supported not_applicable availability",
+            mutate_generalized_bicycle(|family| {
+                family["availability"] = serde_json::json!("not_applicable");
+            }),
+            "FAIL generalized_bicycle disposition=supported availability=not_applicable expected=available",
+        ),
+        (
+            "missing positive success case",
+            mutate_generalized_bicycle(|family| {
+                family["executable_cases"] = serde_json::json!([]);
+            }),
+            "FAIL generalized_bicycle missing positive success case",
+        ),
+        (
+            "positive success case missing request",
+            mutate_generalized_bicycle(|family| {
+                family["executable_cases"][0]["request"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle positive success case missing request",
+        ),
+        (
+            "construction rejection",
+            mutate_generalized_bicycle(|family| {
+                family["executable_cases"][0]["request"]["order"] = serde_json::json!(0);
+            }),
+            "FAIL generalized_bicycle construction=invalid CSS construction generalized_bicycle: order must be nonzero",
+        ),
+        (
+            "requested family id mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["family_id"] = serde_json::json!("generalized_bicycle_alias");
+            }),
+            "FAIL generalized_bicycle_alias expected requested_family_id=generalized_bicycle_alias actual requested_family_id=generalized_bicycle",
+        ),
+        (
+            "missing callable constructor",
+            mutate_generalized_bicycle(|family| {
+                family["callable_constructor"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle missing callable_constructor",
+        ),
+        (
+            "provenance mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["callable_constructor"]["rust_path"] = serde_json::json!("Wrong::Path");
+            }),
+            "FAIL generalized_bicycle expected provenance=Wrong::Path actual provenance=CssFamilySpec::GeneralizedBicycle",
+        ),
+        (
+            "missing expected stats",
+            mutate_generalized_bicycle(|family| {
+                family["expected"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle missing expected stats",
+        ),
+        (
+            "missing row weight summary",
+            mutate_generalized_bicycle(|family| {
+                family["row_weight_summary"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle missing row_weight_summary",
+        ),
+        (
+            "h_x row weight mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["row_weight_summary"]["h_x"][0]["count"] = serde_json::json!(6);
+            }),
+            "FAIL generalized_bicycle expected row_weights_h_x=[w4=6] actual row_weights_h_x=[w4=5]",
+        ),
+        (
+            "h_z row weight mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["row_weight_summary"]["h_z"][0]["count"] = serde_json::json!(6);
+            }),
+            "FAIL generalized_bicycle expected row_weights_h_z=[w4=6] actual row_weights_h_z=[w4=5]",
+        ),
+        (
+            "d_x mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["expected"]["d_x"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle expected d_x=None actual d_x=Some(3)",
+        ),
+        (
+            "d_z mismatch",
+            mutate_generalized_bicycle(|family| {
+                family["expected"]["d_z"] = serde_json::Value::Null;
+            }),
+            "FAIL generalized_bicycle expected d_z=None actual d_z=Some(3)",
+        ),
+        (
+            "deferred available availability",
+            mutate_family("hyperbolic_5_5", |family| {
+                family["availability"] = serde_json::json!("available");
+            }),
+            "FAIL hyperbolic_5_5 disposition=deferred availability=available expected=not_applicable",
+        ),
+        (
+            "missing deferred research contract",
+            mutate_family("hyperbolic_5_5", |family| {
+                family["research_contracts"] = serde_json::json!([]);
+            }),
+            "FAIL hyperbolic_5_5 expected exactly one research_contract",
+        ),
+    ];
+
+    for (label, text, expected) in cases {
+        let report = verify_family_manifest_text(&text);
+
+        assert!(report.failed > 0, "{label} should fail verification");
+        assert!(
+            report.output.contains(expected),
+            "{label} missing {expected:?} in report:\n{}",
+            report.output
+        );
+    }
 }
