@@ -20,6 +20,10 @@ use crate::codes::generalized_bicycle::{
     GENERALIZED_BICYCLE_CONSTRUCTION_ID, generalized_bicycle_known_distances,
     generalized_bicycle_sparse_checks,
 };
+use crate::codes::la_cross::{
+    LA_CROSS_CONSTRUCTION_ID, la_cross_classical_check, la_cross_known_distances,
+};
+pub use crate::codes::la_cross::{LaCrossBoundary, LaCrossSpec};
 use crate::codes::quantum_tanner::{
     QuantumTannerSpec, quantum_tanner_css_checks, quantum_tanner_spec_from_json_str,
 };
@@ -142,6 +146,7 @@ pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
     GeneralizedBicycle(GeneralizedBicycleSpec),
+    LaCross(LaCrossSpec),
     Toric3d(Toric3dSpec),
     RandomTwoBlock(RandomTwoBlockSpec),
     Color666(Color666FamilySpec),
@@ -155,6 +160,7 @@ impl CssFamilySpec {
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::GeneralizedBicycle,
+            RequestedFamilyId::LaCross,
             RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::Color666,
@@ -325,6 +331,7 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 known_distances,
             )
         }
+        CssConstructionSpec::Family(CssFamilySpec::LaCross(spec)) => construct_la_cross(spec),
         CssConstructionSpec::Family(CssFamilySpec::Toric3d(spec)) => {
             let checks = toric_3d_css_checks(spec)?;
             let mut parameters = BTreeMap::new();
@@ -414,6 +421,41 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
             )
         }
     }
+}
+
+fn construct_la_cross(spec: LaCrossSpec) -> Result<CssConstructionResult> {
+    let generated = la_cross_classical_check(&spec)?;
+    let hgp = construct_hypergraph_product(HypergraphProductSpec {
+        left: generated.check.clone(),
+        right: generated.check.clone(),
+    })?;
+    let mut parameters = BTreeMap::new();
+    parameters.insert(
+        "seed_length".to_owned(),
+        Value::from(generated.spec.seed_length),
+    );
+    parameters.insert("reach".to_owned(), Value::from(generated.spec.reach));
+    parameters.insert(
+        "boundary".to_owned(),
+        Value::from(generated.spec.boundary.as_str()),
+    );
+    parameters.insert(
+        "classical_check".to_owned(),
+        serde_json::to_value(&generated.check).expect("serializable classical check"),
+    );
+    let known_distances = la_cross_known_distances(&generated.spec);
+
+    construction_result(
+        LA_CROSS_CONSTRUCTION_ID,
+        Some(RequestedFamilyId::LaCross),
+        parameters,
+        hgp.stats.n,
+        hgp.checks.h_x,
+        hgp.checks.h_z,
+        LA_CROSS_CONSTRUCTION_ID,
+        "CssFamilySpec::LaCross",
+        known_distances,
+    )
 }
 
 fn construct_shor_like(spec: ShorLikeSpec) -> Result<CssConstructionResult> {
@@ -1000,6 +1042,15 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
             };
             toric_3d_css_checks(spec)?;
             Ok(CssFamilySpec::Toric3d(spec).into())
+        }
+        "la_cross" => {
+            let spec = LaCrossSpec {
+                seed_length: required_usize(object, "seed_length", construction)?,
+                reach: required_usize(object, "reach", construction)?,
+                boundary: LaCrossBoundary::parse(required_string(object, "boundary")?)?,
+            };
+            la_cross_classical_check(&spec)?;
+            Ok(CssFamilySpec::LaCross(spec).into())
         }
         "random_two_block" => {
             Ok(CssFamilySpec::RandomTwoBlock(random_two_block_spec_from_json_str(input)?).into())
