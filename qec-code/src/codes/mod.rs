@@ -1,6 +1,7 @@
 pub(crate) mod apm;
 pub mod built_in_css;
 pub mod color_666;
+pub mod coprime_bb;
 pub mod directional;
 pub mod generalized_bicycle;
 pub mod quantum_tanner;
