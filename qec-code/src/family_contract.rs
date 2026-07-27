@@ -1210,7 +1210,8 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
                     reason: error.to_string(),
                 }
             })?,
-        ).into()),
+        )
+        .into()),
         "legacy_built_in" => Ok(CssConstructionSpec::LegacyBuiltIn(LegacyBuiltInCssSpec {
             code_id: required_string(object, "code_id")?.to_owned(),
         })),

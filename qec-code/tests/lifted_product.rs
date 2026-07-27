@@ -7,8 +7,8 @@ use qec_code::binary::try_in_row_span;
 use qec_code::cli::{Cli, run};
 use qec_code::family_contract::{
     CssClassicalCheckSpec, CssConstructionSpec, CssFamilySpec, FiniteGroupTableSpec,
-    GroupAlgebraElementSpec, GroupAlgebraProtographSpec, HypergraphProductSpec,
-    LiftedProductSpec, construct_css, parse_css_construction_json, verify_css_orthogonality,
+    GroupAlgebraElementSpec, GroupAlgebraProtographSpec, HypergraphProductSpec, LiftedProductSpec,
+    construct_css, parse_css_construction_json, verify_css_orthogonality,
 };
 use qec_code::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
 use qec_code::lifted_product::{
