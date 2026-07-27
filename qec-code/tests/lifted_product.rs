@@ -2,16 +2,18 @@ use std::ffi::OsString;
 use std::path::Path;
 
 use clap::Parser;
+use qec_code::QecError;
 use qec_code::binary::try_in_row_span;
-use qec_code::cli::{run, Cli};
+use qec_code::cli::{Cli, run};
 use qec_code::family_contract::{
-    construct_css, parse_css_construction_json, verify_css_orthogonality, CssClassicalCheckSpec,
-    CssConstructionSpec, FiniteGroupTableSpec, GroupAlgebraElementSpec, GroupAlgebraProtographSpec,
-    HypergraphProductSpec, LiftedProductSpec,
+    CssClassicalCheckSpec, CssConstructionSpec, FiniteGroupTableSpec, GroupAlgebraElementSpec,
+    GroupAlgebraProtographSpec, HypergraphProductSpec, LiftedProductSpec, construct_css,
+    parse_css_construction_json, verify_css_orthogonality,
 };
 use qec_code::finite_group::{FiniteGroupSpec, GroupAlgebraElement};
-use qec_code::lifted_product::{checked_lifted_product_binary_shape, lifted_product_ring_checks};
-use qec_code::QecError;
+use qec_code::lifted_product::{
+    checked_lifted_product_binary_shape, lifted_product_binary_checks, lifted_product_ring_checks,
+};
 use tempfile::tempdir;
 
 fn c3_group_spec() -> FiniteGroupTableSpec {
@@ -121,6 +123,26 @@ fn c3_group_and_matrix() -> (FiniteGroupSpec, Vec<Vec<GroupAlgebraElement>>) {
         ],
     ];
     (group, matrix)
+}
+
+fn cyclic_group(order: usize) -> FiniteGroupSpec {
+    let multiplication_table = (0..order)
+        .map(|left| {
+            (0..order)
+                .map(|right| (left + right) % order)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    FiniteGroupSpec::new(order, 0, multiplication_table).unwrap()
+}
+
+fn s3_group() -> FiniteGroupSpec {
+    let spec = s3_group_spec();
+    FiniteGroupSpec::new(spec.order, spec.identity, spec.multiplication_table).unwrap()
+}
+
+fn s3_element(group: &FiniteGroupSpec, support: &[usize]) -> GroupAlgebraElement {
+    GroupAlgebraElement::new(group, support.to_vec()).unwrap()
 }
 
 fn expected_hx() -> Vec<Vec<usize>> {
@@ -360,6 +382,80 @@ fn lifted_product_s3_noncommuting_singletons_are_orthogonal() {
     assert_eq!(result.checks.h_x[0], vec![1, 8]);
     assert_eq!(result.checks.h_z[0], vec![2, 7]);
     verify_css_orthogonality(result.stats.n, &result.checks.h_x, &result.checks.h_z).unwrap();
+}
+
+#[test]
+fn lifted_product_s3_rectangular_multi_support_fixture_is_orthogonal() {
+    let group = s3_group();
+    let left = vec![vec![s3_element(&group, &[1, 2]), s3_element(&group, &[3])]];
+    let right = vec![
+        vec![s3_element(&group, &[2, 3])],
+        vec![s3_element(&group, &[1])],
+    ];
+    let checks = lifted_product_binary_checks(&group, &left, &right).unwrap();
+
+    assert_eq!(checks.num_cols, 24);
+    assert_eq!(checks.h_x.len(), 6);
+    assert_eq!(checks.h_z.len(), 24);
+    assert_eq!(
+        checks.h_x,
+        vec![
+            vec![1, 2, 10, 14, 15, 19],
+            vec![0, 3, 11, 16, 17, 18],
+            vec![0, 4, 7, 12, 13, 21],
+            vec![1, 5, 6, 16, 17, 20],
+            vec![2, 5, 9, 12, 13, 23],
+            vec![3, 4, 8, 14, 15, 22],
+        ]
+    );
+    assert_eq!(
+        checks.h_z,
+        vec![
+            vec![2, 4, 13, 14],
+            vec![2, 4, 12, 15],
+            vec![0, 5, 12, 16],
+            vec![0, 5, 13, 17],
+            vec![1, 3, 14, 17],
+            vec![1, 3, 15, 16],
+            vec![1, 19, 20],
+            vec![0, 18, 21],
+            vec![3, 18, 22],
+            vec![2, 19, 23],
+            vec![5, 20, 23],
+            vec![4, 21, 22],
+            vec![8, 10, 15],
+            vec![8, 10, 14],
+            vec![6, 11, 17],
+            vec![6, 11, 16],
+            vec![7, 9, 12],
+            vec![7, 9, 13],
+            vec![7, 21],
+            vec![6, 20],
+            vec![9, 23],
+            vec![8, 22],
+            vec![11, 18],
+            vec![10, 19],
+        ]
+    );
+    verify_css_orthogonality(checks.num_cols, &checks.h_x, &checks.h_z).unwrap();
+}
+
+#[test]
+fn lifted_product_rejects_post_lift_binary_overflow() {
+    let group = cyclic_group(256);
+    let zero = GroupAlgebraElement::new(&group, Vec::new()).unwrap();
+    let matrix = vec![vec![zero; 18]; 18];
+
+    let Err(err) = lifted_product_binary_checks(&group, &matrix, &matrix) else {
+        panic!("expected post-lift binary size rejection");
+    };
+    assert!(
+        matches!(&err, QecError::InvalidCssConstruction { construction, reason }
+            if construction == "lifted_product"
+                && reason.contains("binary H_X cell count")
+                && reason.contains("exceeds maximum supported")),
+        "expected post-lift binary size rejection, got {err:?}"
+    );
 }
 
 #[test]

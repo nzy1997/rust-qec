@@ -1,12 +1,23 @@
 use crate::error::{QecError, Result};
 use crate::finite_group::{
-    left_regular_lift, right_regular_lift, FiniteGroupSpec, GroupAlgebraElement,
+    FiniteGroupSpec, GroupAlgebraElement, left_regular_lift, right_regular_lift,
 };
 
 /// Maximum number of group-algebra cells in either ring-level lifted-product
 /// check matrix. This bounds CLI input amplification before dense ring rows are
 /// materialized.
 pub const MAX_LIFTED_PRODUCT_RING_CELLS: usize = 1_000_000;
+
+/// Maximum dense binary cells in either lifted CSS check matrix.
+///
+/// The common CSS construction contract verifies orthogonality and ranks after
+/// construction. Those paths use pairwise sparse row intersections and dense
+/// rank matrices, so the lifted-product constructor must bound the post-lift
+/// matrices before materializing them.
+pub const MAX_LIFTED_PRODUCT_BINARY_CELLS: usize = 10_000_000;
+
+/// Maximum row pairs considered by the common CSS orthogonality check.
+pub const MAX_LIFTED_PRODUCT_ORTHOGONALITY_ROW_PAIRS: usize = 10_000_000;
 
 /// Ring-level lifted-product matrix shape before regular binary lifting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,13 +80,12 @@ pub fn checked_lifted_product_binary_shape(
     right_cols: usize,
 ) -> Result<LiftedProductRingShape> {
     let shape = checked_lifted_product_ring_shape(left_rows, left_cols, right_rows, right_cols)?;
-    for value in [shape.h_x_rows, shape.h_z_rows, shape.num_cols] {
-        value
-            .checked_mul(group.order())
-            .ok_or(QecError::GroupAlgebraDimensionOverflow {
-                operation: "lifted product binary shape",
-            })?;
-    }
+    let binary_h_x_rows = checked_binary_dimension(shape.h_x_rows, group.order())?;
+    let binary_h_z_rows = checked_binary_dimension(shape.h_z_rows, group.order())?;
+    let binary_cols = checked_binary_dimension(shape.num_cols, group.order())?;
+    check_binary_cell_limit("H_X", binary_h_x_rows, binary_cols)?;
+    check_binary_cell_limit("H_Z", binary_h_z_rows, binary_cols)?;
+    check_binary_row_pair_limit(binary_h_x_rows, binary_h_z_rows)?;
     Ok(shape)
 }
 
@@ -108,9 +118,21 @@ pub fn lifted_product_ring_checks(
 
 /// Build binary CSS checks using commuting left/right regular actions.
 ///
-/// Left protograph factors use the left regular action and right protograph
-/// factors use the right regular action. This preserves the reviewed abelian
-/// fixtures while keeping noncommutative finite-group inputs orthogonal.
+/// Ring-level rows are ordered as the Kronecker constructors emit them: for
+/// `A kron I_q`, rows are `(a_row, q_index)` and columns are
+/// `(a_col, q_index)` with the left index major; for `I_p kron B`, rows are
+/// `(p_index, b_row)` and columns are `(p_index, b_col)`. The binary lift then
+/// expands every ring column into a contiguous `|G|` basis block.
+///
+/// For support element `g` and basis row `x`, the left action places a 1 at
+/// `g^-1 x`, while the right action places a 1 at `x g`. The binary CSS check
+/// order is:
+///
+/// - `H_X = [left_lift(A kron I), right_lift(I kron B^T)]`
+/// - `H_Z = [right_lift(I kron inverse_entries(B)), left_lift(inverse_transpose(A) kron I)]`
+///
+/// This fixes the left qubit block before the right qubit block and makes the
+/// extra involutions explicit for callers comparing ring and binary outputs.
 pub fn lifted_product_binary_checks(
     group: &FiniteGroupSpec,
     left: &[Vec<GroupAlgebraElement>],
@@ -148,6 +170,16 @@ fn ring_overflow() -> QecError {
     }
 }
 
+fn binary_overflow() -> QecError {
+    QecError::GroupAlgebraDimensionOverflow {
+        operation: "lifted product binary shape",
+    }
+}
+
+fn checked_binary_dimension(value: usize, group_order: usize) -> Result<usize> {
+    value.checked_mul(group_order).ok_or(binary_overflow())
+}
+
 fn check_ring_cell_limit(rows: usize, num_cols: usize) -> Result<()> {
     let cell_count = rows.checked_mul(num_cols).ok_or(ring_overflow())?;
     if cell_count > MAX_LIFTED_PRODUCT_RING_CELLS {
@@ -155,6 +187,32 @@ fn check_ring_cell_limit(rows: usize, num_cols: usize) -> Result<()> {
             construction: "lifted_product".to_owned(),
             reason: format!(
                 "ring cell count {cell_count} exceeds maximum supported {MAX_LIFTED_PRODUCT_RING_CELLS}"
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn check_binary_cell_limit(matrix_name: &str, rows: usize, num_cols: usize) -> Result<()> {
+    let cell_count = rows.checked_mul(num_cols).ok_or(binary_overflow())?;
+    if cell_count > MAX_LIFTED_PRODUCT_BINARY_CELLS {
+        return Err(QecError::InvalidCssConstruction {
+            construction: "lifted_product".to_owned(),
+            reason: format!(
+                "binary {matrix_name} cell count {cell_count} exceeds maximum supported {MAX_LIFTED_PRODUCT_BINARY_CELLS}"
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn check_binary_row_pair_limit(h_x_rows: usize, h_z_rows: usize) -> Result<()> {
+    let row_pairs = h_x_rows.checked_mul(h_z_rows).ok_or(binary_overflow())?;
+    if row_pairs > MAX_LIFTED_PRODUCT_ORTHOGONALITY_ROW_PAIRS {
+        return Err(QecError::InvalidCssConstruction {
+            construction: "lifted_product".to_owned(),
+            reason: format!(
+                "binary orthogonality row-pair count {row_pairs} exceeds maximum supported {MAX_LIFTED_PRODUCT_ORTHOGONALITY_ROW_PAIRS}"
             ),
         });
     }
