@@ -31,6 +31,12 @@ const EXPECTED_FAMILY_IDS: [&str; 14] = [
 const EXPECTED_SUPPORTED_FAMILIES: usize = 12;
 const EXPECTED_DEFERRED_FAMILIES: usize = 2;
 
+#[derive(Debug, Clone, Copy)]
+struct DeferredFamilyBoundary {
+    tracking_issue: usize,
+    contract_path: &'static str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FamilyVerificationReport {
     pub output: String,
@@ -404,15 +410,33 @@ fn verify_deferred_entry(entry: &FamilyCatalogEntry) -> EntryVerification {
             entry.family_id
         ));
     }
-    let tracking_issue = match entry.family_id.as_str() {
-        "hyperbolic_5_5" => 571,
-        "perturbed_hgp" => 572,
-        _ => return failure(format!("FAIL {} unknown deferred family", entry.family_id)),
+    let Some(boundary) = deferred_family_boundary(&entry.family_id) else {
+        return failure(format!("FAIL {} unknown deferred family", entry.family_id));
     };
+    if entry.research_contracts[0] != boundary.contract_path {
+        return failure(format!(
+            "FAIL {} expected contract={} actual contract={}",
+            entry.family_id, boundary.contract_path, entry.research_contracts[0]
+        ));
+    }
     EntryVerification::Line(format!(
-        "DEFERRED {} tracking_issue=#{tracking_issue} contract={}",
-        entry.family_id, entry.research_contracts[0]
+        "DEFERRED {} tracking_issue=#{} contract={}",
+        entry.family_id, boundary.tracking_issue, boundary.contract_path
     ))
+}
+
+fn deferred_family_boundary(family_id: &str) -> Option<DeferredFamilyBoundary> {
+    match family_id {
+        "hyperbolic_5_5" => Some(DeferredFamilyBoundary {
+            tracking_issue: 571,
+            contract_path: "qec-code/doc/hyperbolic_5_5_contract.md",
+        }),
+        "perturbed_hgp" => Some(DeferredFamilyBoundary {
+            tracking_issue: 572,
+            contract_path: "qec-code/doc/perturbed_hgp_contract.md",
+        }),
+        _ => None,
+    }
 }
 
 fn format_pass_line(family_id: &str, result: &CssConstructionResult) -> String {

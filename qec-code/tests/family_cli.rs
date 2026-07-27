@@ -33,12 +33,16 @@ fn family_ids(stdout: &str) -> Vec<&str> {
 }
 
 fn mutate_generalized_bicycle(mutate: impl FnOnce(&mut serde_json::Value)) -> String {
+    mutate_family("generalized_bicycle", mutate)
+}
+
+fn mutate_family(family_id: &str, mutate: impl FnOnce(&mut serde_json::Value)) -> String {
     let mut value: serde_json::Value = serde_json::from_str(MANIFEST_TEXT).unwrap();
     let family = value["families"]
         .as_array_mut()
         .unwrap()
         .iter_mut()
-        .find(|entry| entry["family_id"] == "generalized_bicycle")
+        .find(|entry| entry["family_id"] == family_id)
         .unwrap();
     mutate(family);
     format!("{}\n", serde_json::to_string_pretty(&value).unwrap())
@@ -107,12 +111,16 @@ fn verify_families_cli_fails_on_mutated_rank() {
     let report = verify_family_manifest_text(&text);
 
     assert_eq!(report.failed, 1);
-    assert!(report
-        .output
-        .contains("FAIL generalized_bicycle expected rank_x=5 actual rank_x=4"));
-    assert!(report
-        .output
-        .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1"));
+    assert!(
+        report
+            .output
+            .contains("FAIL generalized_bicycle expected rank_x=5 actual rank_x=4")
+    );
+    assert!(
+        report
+            .output
+            .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1")
+    );
 }
 
 #[test]
@@ -127,9 +135,11 @@ fn verify_families_cli_fails_when_supported_target_is_planned() {
     assert!(report.output.contains(
         "FAIL generalized_bicycle disposition=supported availability=planned expected=available"
     ));
-    assert!(report
-        .output
-        .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1"));
+    assert!(
+        report
+            .output
+            .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1")
+    );
 }
 
 #[test]
@@ -181,5 +191,25 @@ fn verify_families_cli_fails_when_family_is_duplicated() {
         report
             .output
             .contains("SUMMARY FAIL supported=13 deferred=2")
+    );
+}
+
+#[test]
+fn verify_families_cli_fails_on_mutated_deferred_contract() {
+    let text = mutate_family("hyperbolic_5_5", |family| {
+        family["research_contracts"] =
+            serde_json::json!(["qec-code/doc/wrong_hyperbolic_contract.md"]);
+    });
+
+    let report = verify_family_manifest_text(&text);
+
+    assert_eq!(report.failed, 1);
+    assert!(report.output.contains(
+        "FAIL hyperbolic_5_5 expected contract=qec-code/doc/hyperbolic_5_5_contract.md actual contract=qec-code/doc/wrong_hyperbolic_contract.md"
+    ));
+    assert!(
+        report
+            .output
+            .ends_with("SUMMARY FAIL supported=12 deferred=2 failed=1")
     );
 }
