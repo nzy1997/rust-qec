@@ -12,6 +12,10 @@ use crate::codes::built_in_css::{
 };
 use crate::codes::color_666::{COLOR_666_CONSTRUCTION_ID, color_666_sparse_checks};
 pub use crate::codes::color_666::{Color666FamilySpec, Color666Layout};
+pub use crate::codes::coprime_bb::CoprimeBivariateBicycleSpec;
+use crate::codes::coprime_bb::{
+    COPRIME_BB_CONSTRUCTION_ID, coprime_bb_known_distances, coprime_bb_sparse_checks,
+};
 use crate::codes::directional::{
     DirectionalConnectivity, DirectionalCssSpec, build_directional_css_checks,
 };
@@ -148,6 +152,7 @@ pub enum CssFamilySpec {
     Surface(SurfaceFamilySpec),
     QuantumTanner(QuantumTannerSpec),
     GeneralizedBicycle(GeneralizedBicycleSpec),
+    CoprimeBb(CoprimeBivariateBicycleSpec),
     Toric3d(Toric3dSpec),
     RandomTwoBlock(RandomTwoBlockSpec),
     RandomHgp(RandomHgpSpec),
@@ -162,6 +167,7 @@ impl CssFamilySpec {
             RequestedFamilyId::Surface,
             RequestedFamilyId::QuantumTanner,
             RequestedFamilyId::GeneralizedBicycle,
+            RequestedFamilyId::CoprimeBb,
             RequestedFamilyId::Toric3d,
             RequestedFamilyId::RandomTwoBlock,
             RequestedFamilyId::RandomHgp,
@@ -355,6 +361,38 @@ pub fn construct_css(spec: CssConstructionSpec) -> Result<CssConstructionResult>
                 checks.h_z,
                 GENERALIZED_BICYCLE_CONSTRUCTION_ID,
                 "CssFamilySpec::GeneralizedBicycle",
+                known_distances,
+            )
+        }
+        CssConstructionSpec::Family(CssFamilySpec::CoprimeBb(spec)) => {
+            let checks = coprime_bb_sparse_checks(&spec)?;
+            let normalized = checks.normalized_spec;
+            let mut parameters = BTreeMap::new();
+            parameters.insert("l".to_owned(), Value::from(normalized.l));
+            parameters.insert("m".to_owned(), Value::from(normalized.m));
+            parameters.insert(
+                "cyclic_order".to_owned(),
+                Value::from(normalized.l * normalized.m),
+            );
+            parameters.insert("pi".to_owned(), Value::from("xy"));
+            parameters.insert(
+                "a_exponents".to_owned(),
+                serde_json::to_value(&normalized.a_exponents).unwrap(),
+            );
+            parameters.insert(
+                "b_exponents".to_owned(),
+                serde_json::to_value(&normalized.b_exponents).unwrap(),
+            );
+            let known_distances = coprime_bb_known_distances(&normalized);
+            construction_result(
+                COPRIME_BB_CONSTRUCTION_ID,
+                Some(RequestedFamilyId::CoprimeBb),
+                parameters,
+                checks.num_cols,
+                checks.h_x,
+                checks.h_z,
+                "coprime_bb",
+                "CssFamilySpec::CoprimeBb",
                 known_distances,
             )
         }
@@ -1024,6 +1062,13 @@ pub fn parse_css_construction_json(input: &str) -> Result<CssConstructionSpec> {
         "surface" => surface_construction_from_json(object, construction),
         "generalized_bicycle" => Ok(CssFamilySpec::GeneralizedBicycle(GeneralizedBicycleSpec {
             order: required_usize(object, "order", construction)?,
+            a_exponents: required_usize_array(object, "a_exponents", construction)?,
+            b_exponents: required_usize_array(object, "b_exponents", construction)?,
+        })
+        .into()),
+        "coprime_bb" => Ok(CssFamilySpec::CoprimeBb(CoprimeBivariateBicycleSpec {
+            l: required_usize(object, "l", construction)?,
+            m: required_usize(object, "m", construction)?,
             a_exponents: required_usize_array(object, "a_exponents", construction)?,
             b_exponents: required_usize_array(object, "b_exponents", construction)?,
         })
