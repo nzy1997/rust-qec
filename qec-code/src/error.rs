@@ -6,6 +6,8 @@ pub struct CssMatrixReadSource(pub String);
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum QecError {
+    #[error("family verification failed")]
+    FamilyVerificationFailed { report: String },
     #[error("unsupported CSS construction schema version: {version}")]
     UnsupportedCssConstructionSchemaVersion { version: u64 },
     #[error("invalid CSS construction JSON: {0}")]

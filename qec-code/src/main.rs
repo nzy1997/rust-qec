@@ -22,7 +22,7 @@ fn write_result(
 ) -> i32 {
     match result {
         Ok(output) => write_success(stdout, &output),
-        Err(error) => write_error(stderr, &error),
+        Err(error) => write_error(stdout, stderr, &error),
     }
 }
 
@@ -31,8 +31,19 @@ fn write_success(stdout: &mut impl Write, output: &str) -> i32 {
     0
 }
 
-fn write_error(stderr: &mut impl Write, error: &qec_code::QecError) -> i32 {
-    writeln!(stderr, "{error}").expect("stderr write should succeed");
+fn write_error(
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+    error: &qec_code::QecError,
+) -> i32 {
+    match error {
+        QecError::FamilyVerificationFailed { report } => {
+            writeln!(stdout, "{report}").expect("stdout write should succeed");
+        }
+        _ => {
+            writeln!(stderr, "{error}").expect("stderr write should succeed");
+        }
+    }
     1
 }
 
@@ -78,6 +89,27 @@ mod tests {
             String::from_utf8(stderr).unwrap(),
             "distance witness not found\n"
         );
+    }
+
+    #[test]
+    fn write_result_writes_family_verification_failure_to_stdout() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = write_result(
+            Err(QecError::FamilyVerificationFailed {
+                report: "FAIL manifest missing family_id=perturbed_hgp".to_string(),
+            }),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(exit_code, 1);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "FAIL manifest missing family_id=perturbed_hgp\n"
+        );
+        assert!(stderr.is_empty());
     }
 
     #[test]

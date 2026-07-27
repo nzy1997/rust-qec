@@ -14,6 +14,7 @@ pub mod distance_exact;
 pub mod distance_ilp;
 pub mod error;
 pub mod family_contract;
+pub mod family_verifier;
 pub mod finite_group;
 mod gf2;
 pub mod lifted_product;
