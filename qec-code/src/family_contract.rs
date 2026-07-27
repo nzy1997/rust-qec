@@ -1060,17 +1060,7 @@ fn construct_hypergraph_product(spec: HypergraphProductSpec) -> Result<CssConstr
     let h_z = left_identity_cols
         .kron(&right)?
         .hconcat(&left_transpose.kron(&right_identity_rows)?)?;
-
-    if h_x.num_cols() != h_z.num_cols() {
-        return Err(QecError::InvalidCssConstruction {
-            construction: "hypergraph_product".to_owned(),
-            reason: format!(
-                "H_X width {} does not match H_Z width {}",
-                h_x.num_cols(),
-                h_z.num_cols()
-            ),
-        });
-    }
+    debug_assert_eq!(h_x.num_cols(), h_z.num_cols());
 
     let mut parameters = BTreeMap::new();
     parameters.insert(

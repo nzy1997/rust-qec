@@ -258,3 +258,22 @@ fn hypergraph_product_rejects_out_of_range_input() {
         }
     );
 }
+
+#[test]
+fn hypergraph_product_rejects_duplicate_input_support() {
+    let err = construct_css(CssConstructionSpec::HypergraphProduct(
+        HypergraphProductSpec {
+            left: CssClassicalCheckSpec {
+                num_cols: 3,
+                rows: vec![vec![1, 1]],
+            },
+            right: classical_2x3(),
+        },
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        QecError::DuplicateSparseRowSupport { row: 0, support: 1 }
+    );
+}
