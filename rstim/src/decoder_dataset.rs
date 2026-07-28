@@ -5,7 +5,10 @@ use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::fs::{self, File};
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
 
 pub const LOGICAL_FLIP_MARKER: &str = "# RSTIM_LOGICAL_FLIP_POINT";
 const PUBLIC_SCHEMA_VERSION: u32 = 1;
@@ -518,10 +521,346 @@ struct PrivateGenerationManifest {
     seed: Option<u64>,
 }
 
+struct NewDirectoryPath {
+    final_path: PathBuf,
+    parent: PathBuf,
+    name: OsString,
+}
+
+struct ValidatedOutputDirectories {
+    public: NewDirectoryPath,
+    private: NewDirectoryPath,
+}
+
+fn resolve_new_output_directory(path: &Path) -> Result<NewDirectoryPath, String> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| "output directory must have a final path component".to_string())?;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = fs::canonicalize(parent).map_err(|error| {
+        format!(
+            "failed to resolve output parent {}: {error}",
+            parent.display()
+        )
+    })?;
+    if !parent.is_dir() {
+        return Err(format!(
+            "output parent is not a directory: {}",
+            parent.display()
+        ));
+    }
+    let final_path = parent.join(name);
+    if final_path
+        .try_exists()
+        .map_err(|error| format!("failed to inspect {}: {error}", final_path.display()))?
+    {
+        return Err(format!(
+            "output directory already exists: {}",
+            final_path.display()
+        ));
+    }
+    Ok(NewDirectoryPath {
+        final_path,
+        parent,
+        name: name.to_os_string(),
+    })
+}
+
+fn validate_output_directories(
+    public_out: &Path,
+    private_out: &Path,
+) -> Result<ValidatedOutputDirectories, String> {
+    let public = resolve_new_output_directory(public_out)?;
+    let private = resolve_new_output_directory(private_out)?;
+    if public.final_path == private.final_path {
+        return Err("--public_out and --private_out resolve to the same directory".to_string());
+    }
+    if public.final_path.starts_with(&private.final_path)
+        || private.final_path.starts_with(&public.final_path)
+    {
+        return Err("--public_out and --private_out must not be nested".to_string());
+    }
+    Ok(ValidatedOutputDirectories { public, private })
+}
+
+pub trait DirectoryPublisher {
+    fn rename(&mut self, from: &Path, to: &Path) -> std::io::Result<()>;
+}
+
+struct FsDirectoryPublisher {
+    #[cfg(debug_assertions)]
+    fail_rename_at: Option<usize>,
+    calls: usize,
+}
+
+impl FsDirectoryPublisher {
+    fn from_env() -> Self {
+        Self {
+            #[cfg(debug_assertions)]
+            fail_rename_at: std::env::var("RSTIM_TEST_DECODER_DATASET_FAIL_RENAME_AT")
+                .ok()
+                .and_then(|value| value.parse().ok()),
+            calls: 0,
+        }
+    }
+}
+
+impl DirectoryPublisher for FsDirectoryPublisher {
+    fn rename(&mut self, from: &Path, to: &Path) -> std::io::Result<()> {
+        self.calls += 1;
+        #[cfg(debug_assertions)]
+        if self.fail_rename_at == Some(self.calls) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "injected decoder dataset rename failure",
+            ));
+        }
+        fs::rename(from, to)
+    }
+}
+
+struct StagedBundle {
+    final_path: PathBuf,
+    temp_path: PathBuf,
+    published: bool,
+}
+
+impl StagedBundle {
+    fn create(path: &NewDirectoryPath, private: bool) -> Result<Self, String> {
+        let pid = std::process::id();
+        for retry in 0usize..1000 {
+            let temp_path = path.parent.join(format!(
+                ".{}.rstim-decoder-dataset-{pid}-{retry}.tmp",
+                path.name.to_string_lossy()
+            ));
+            let created = if private {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirBuilderExt;
+                    fs::DirBuilder::new().mode(0o700).create(&temp_path)
+                }
+                #[cfg(not(unix))]
+                {
+                    fs::create_dir(&temp_path)
+                }
+            } else {
+                fs::create_dir(&temp_path)
+            };
+            match created {
+                Ok(()) => {
+                    return Ok(Self {
+                        final_path: path.final_path.clone(),
+                        temp_path,
+                        published: false,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to create staging directory {}: {error}",
+                        temp_path.display()
+                    ));
+                }
+            }
+        }
+        Err(format!(
+            "failed to create unique staging directory beside {}",
+            path.final_path.display()
+        ))
+    }
+
+    fn publish_with(&mut self, publisher: &mut impl DirectoryPublisher) -> Result<(), String> {
+        publisher
+            .rename(&self.temp_path, &self.final_path)
+            .map_err(|error| {
+                format!(
+                    "failed to publish bundle {}: {error}",
+                    self.final_path.display()
+                )
+            })?;
+        self.published = true;
+        Ok(())
+    }
+}
+
+impl Drop for StagedBundle {
+    fn drop(&mut self) {
+        if !self.published {
+            let _ = fs::remove_dir_all(&self.temp_path);
+        }
+    }
+}
+
+fn bytes_per_shot(bits: usize) -> Result<usize, String> {
+    bits.checked_add(7)
+        .ok_or_else(|| "b8 row width overflows".to_string())
+        .map(|bits| bits / 8)
+}
+
+fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let file = File::create(path)
+        .map_err(|error| format!("failed to create {}: {error}", path.display()))?;
+    let mut writer = BufWriter::new(file);
+    writer
+        .write_all(bytes)
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
+    writer
+        .flush()
+        .map_err(|error| format!("failed to flush {}: {error}", path.display()))
+}
+
+fn write_manifest(path: &Path, manifest: &impl Serialize) -> Result<(), String> {
+    let mut bytes = serde_json::to_vec_pretty(manifest)
+        .map_err(|error| format!("failed to serialize manifest: {error}"))?;
+    bytes.push(b'\n');
+    write_file(path, &bytes)
+}
+
+fn write_private_bundle(
+    path: &Path,
+    manifest: &PrivateManifest,
+    answers: &[u8],
+    masks: Option<&[u8]>,
+) -> Result<(), String> {
+    write_manifest(&path.join("manifest.json"), manifest)?;
+    write_file(&path.join("answers.b8"), answers)?;
+    if let Some(masks) = masks {
+        write_file(&path.join("masks.b8"), masks)?;
+    }
+    Ok(())
+}
+
+fn write_public_bundle(
+    path: &Path,
+    manifest: &PublicManifest,
+    circuit: &[u8],
+    shots: &[u8],
+) -> Result<(), String> {
+    write_manifest(&path.join("manifest.json"), manifest)?;
+    write_file(&path.join("circuit.stim"), circuit)?;
+    write_file(&path.join("shots.b8"), shots)
+}
+
 pub fn export_decoder_dataset(
-    _config: ExportDecoderDatasetConfig,
+    config: ExportDecoderDatasetConfig,
 ) -> Result<DecoderDatasetSummary, String> {
-    Err("export_decoder_dataset is not implemented".to_string())
+    let mut publisher = FsDirectoryPublisher::from_env();
+    export_decoder_dataset_with_publisher(config, &mut publisher)
+}
+
+#[doc(hidden)]
+pub fn export_decoder_dataset_with_publisher(
+    config: ExportDecoderDatasetConfig,
+    publisher: &mut impl DirectoryPublisher,
+) -> Result<DecoderDatasetSummary, String> {
+    let validated_paths = validate_output_directories(&config.public_out, &config.private_out)?;
+    let artifacts = generate_decoder_dataset_artifacts(&config)?;
+    let public_shots_bytes = bit_table_to_b8_bytes(&artifacts.public_shots)?;
+    let answers_bytes = bit_table_to_b8_bytes(&artifacts.answers)?;
+    let masks_bytes = artifacts
+        .masks
+        .as_ref()
+        .map(bit_table_to_b8_bytes)
+        .transpose()?;
+    let circuit_sha256 = sha256_hex(artifacts.public_circuit_text.as_bytes());
+    let shots_sha256 = sha256_hex(&public_shots_bytes);
+    let dataset_id = sha256_hex(&dataset_id_material(
+        PUBLIC_SCHEMA_VERSION,
+        config.mode,
+        &circuit_sha256,
+        config.shots,
+        artifacts.public_shots.num_major(),
+        &shots_sha256,
+    ));
+    let public_row_bits = artifacts.public_shots.num_major();
+    let answers_bits = artifacts.answers.num_major();
+    let masks_bits = artifacts.masks.as_ref().map(BitTable::num_major);
+    let masks_file = match (&masks_bytes, masks_bits) {
+        (Some(bytes), Some(bits)) => Some(FileManifest {
+            file: "masks.b8",
+            sha256: sha256_hex(bytes),
+            bits,
+            bytes_per_shot: bytes_per_shot(bits)?,
+        }),
+        (None, None) => None,
+        _ => return Err("inconsistent blinded mask artifacts".to_string()),
+    };
+    let public_manifest = PublicManifest {
+        format: DATASET_FORMAT,
+        schema_version: PUBLIC_SCHEMA_VERSION,
+        dataset_id: dataset_id.clone(),
+        mode: config.mode,
+        shots: config.shots,
+        row: PublicRowManifest {
+            kind: artifacts.public_row_kind,
+            bits: public_row_bits,
+            encoding: "b8",
+            bit_order: "lsb_first",
+            bytes_per_shot: bytes_per_shot(public_row_bits)?,
+        },
+        circuit: CircuitManifest {
+            file: "circuit.stim",
+            sha256: circuit_sha256,
+            measurements: artifacts.measurements,
+            detectors: artifacts.detectors,
+            observables: artifacts.observables,
+            sweep_bits: 0,
+        },
+        shots_file: FileManifest {
+            file: "shots.b8",
+            sha256: shots_sha256,
+            bits: public_row_bits,
+            bytes_per_shot: bytes_per_shot(public_row_bits)?,
+        },
+    };
+    let private_manifest = PrivateManifest {
+        format: DATASET_FORMAT,
+        schema_version: PUBLIC_SCHEMA_VERSION,
+        dataset_id: dataset_id.clone(),
+        mode: config.mode,
+        shots: config.shots,
+        answers_file: FileManifest {
+            file: "answers.b8",
+            sha256: sha256_hex(&answers_bytes),
+            bits: answers_bits,
+            bytes_per_shot: bytes_per_shot(answers_bits)?,
+        },
+        masks_file,
+        generation: PrivateGenerationManifest {
+            rstim_version: crate::version(),
+            seed: config.seed,
+        },
+    };
+
+    let mut private_stage = StagedBundle::create(&validated_paths.private, true)?;
+    let mut public_stage = StagedBundle::create(&validated_paths.public, false)?;
+    write_private_bundle(
+        &private_stage.temp_path,
+        &private_manifest,
+        &answers_bytes,
+        masks_bytes.as_deref(),
+    )?;
+    write_public_bundle(
+        &public_stage.temp_path,
+        &public_manifest,
+        artifacts.public_circuit_text.as_bytes(),
+        &public_shots_bytes,
+    )?;
+    private_stage.publish_with(publisher)?;
+    match public_stage.publish_with(publisher) {
+        Ok(()) => Ok(DecoderDatasetSummary {
+            dataset_id,
+            mode: config.mode,
+            shots: config.shots,
+            row_bits: public_row_bits,
+            public_out: config.public_out,
+            private_out: config.private_out,
+        }),
+        Err(error) => Err(format!(
+            "{error}; private bundle retained at {}",
+            private_stage.final_path.display()
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -729,5 +1068,116 @@ mod tests {
             bit_table_to_b8_bytes(a.masks.as_ref().unwrap()).unwrap(),
             bit_table_to_b8_bytes(b.masks.as_ref().unwrap()).unwrap()
         );
+    }
+
+    #[test]
+    fn export_writes_exact_public_and_private_files() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let circuit =
+            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        config.shots = 8;
+        config.seed = Some(7);
+        config.public_out = public_out.clone();
+        config.private_out = private_out.clone();
+
+        let summary = export_decoder_dataset(config).unwrap();
+        assert_eq!(summary.public_out, public_out);
+        assert_eq!(
+            sorted_entries(&public_out),
+            vec!["circuit.stim", "manifest.json", "shots.b8"]
+        );
+        assert_eq!(
+            sorted_entries(&private_out),
+            vec!["answers.b8", "manifest.json", "masks.b8"]
+        );
+
+        let public_manifest = std::fs::read_to_string(public_out.join("manifest.json")).unwrap();
+        assert_no_public_secret_words(&public_manifest);
+        assert!(public_manifest.contains("\"mode\": \"measurements_blinded\""));
+        assert!(std::fs::read_to_string(public_out.join("circuit.stim"))
+            .unwrap()
+            .contains(LOGICAL_FLIP_MARKER));
+    }
+
+    #[test]
+    fn public_directory_is_not_visible_when_public_rename_fails() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let circuit = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let mut config = test_config(circuit, DecoderDatasetMode::Detectors, vec![]);
+        config.public_out = public_out.clone();
+        config.private_out = private_out.clone();
+        config.seed = Some(3);
+
+        let mut publisher = FailingDirectoryPublisher::new(2);
+        let err = export_decoder_dataset_with_publisher(config, &mut publisher).unwrap_err();
+
+        assert!(err.contains("private bundle retained"));
+        assert!(private_out.exists());
+        assert!(!public_out.exists());
+        assert_no_decoder_dataset_temps(root.path());
+    }
+
+    fn sorted_entries(path: &std::path::Path) -> Vec<String> {
+        let mut entries: Vec<String> = std::fs::read_dir(path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        entries.sort();
+        entries
+    }
+
+    fn assert_no_public_secret_words(text: &str) {
+        for forbidden in [
+            "seed",
+            "mask",
+            "answer",
+            "private",
+            "producer",
+            "permutation",
+        ] {
+            assert!(
+                !text.to_ascii_lowercase().contains(forbidden),
+                "public manifest leaked {forbidden}: {text}"
+            );
+        }
+    }
+
+    fn assert_no_decoder_dataset_temps(path: &std::path::Path) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+            assert!(
+                !name.contains(".rstim-decoder-dataset-"),
+                "temporary directory leaked: {name}"
+            );
+        }
+    }
+
+    struct FailingDirectoryPublisher {
+        fail_at: usize,
+        calls: usize,
+    }
+
+    impl FailingDirectoryPublisher {
+        fn new(fail_at: usize) -> Self {
+            Self { fail_at, calls: 0 }
+        }
+    }
+
+    impl DirectoryPublisher for FailingDirectoryPublisher {
+        fn rename(&mut self, from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+            self.calls += 1;
+            if self.calls == self.fail_at {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "injected decoder dataset rename failure",
+                ));
+            }
+            std::fs::rename(from, to)
+        }
     }
 }
