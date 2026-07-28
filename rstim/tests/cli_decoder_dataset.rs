@@ -280,6 +280,9 @@ fn verify_memory_case(name: &str, circuit_text: &str, logical_x_qubits: &str, mo
         vec!["circuit.stim", "manifest.json", "shots.b8"]
     );
     assert!(private_out.join("answers.b8").exists());
+    if mode == "measurements_blinded" {
+        assert!(private_out.join("masks.b8").exists());
+    }
 }
 
 fn export_args(
