@@ -57,7 +57,7 @@ fn detectors_mode_writes_public_circuit_and_detector_rows() {
 
 fn blinded_measurements_masks_recomputed_public_observable() {
     let root = tempfile::tempdir().unwrap();
-    let circuit = root.path().join("circuit.stim");
+    let circuit = root.path().join("producer-input.stim");
     fs::write(
         &circuit,
         "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
@@ -75,7 +75,7 @@ fn blinded_measurements_masks_recomputed_public_observable() {
     assert_success(&output, "blinded export");
 
     let public_manifest = fs::read_to_string(public_out.join("manifest.json")).unwrap();
-    assert_no_public_secret_words(&public_manifest);
+    assert_no_public_secret_words(&public_manifest, &private_out, &circuit);
     assert_eq!(fs::read(private_out.join("answers.b8")).unwrap().len(), 1);
     assert_eq!(fs::read(private_out.join("masks.b8")).unwrap().len(), 1);
 }
@@ -238,12 +238,74 @@ fn sorted_entries(path: &Path) -> Vec<String> {
     entries
 }
 
-fn assert_no_public_secret_words(public_manifest: &str) {
-    for word in ["answer", "mask", "logical_x", "secret"] {
-        assert!(
-            !public_manifest.to_ascii_lowercase().contains(word),
-            "public manifest leaked {word}"
-        );
+fn assert_no_public_secret_words(
+    public_manifest: &str,
+    private_out: &Path,
+    producer_circuit: &Path,
+) {
+    let manifest: Value = serde_json::from_str(public_manifest).expect("public manifest is JSON");
+    let private_path = private_out.display().to_string();
+    let producer_path = producer_circuit.display().to_string();
+    let producer_label = producer_circuit
+        .file_name()
+        .expect("producer circuit has file name")
+        .to_string_lossy()
+        .into_owned();
+    assert_no_public_secret_value(
+        &manifest,
+        "$",
+        &[
+            private_path.as_str(),
+            producer_path.as_str(),
+            producer_label.as_str(),
+        ],
+    );
+}
+
+fn assert_no_public_secret_value(value: &Value, path: &str, forbidden_values: &[&str]) {
+    const FORBIDDEN_WORDS: [&str; 6] = [
+        "seed",
+        "mask",
+        "answer",
+        "private",
+        "producer",
+        "permutation",
+    ];
+
+    match value {
+        Value::Object(values) => {
+            for (key, value) in values {
+                let normalized_key = key.to_ascii_lowercase();
+                for forbidden in FORBIDDEN_WORDS {
+                    assert!(
+                        !normalized_key.contains(forbidden),
+                        "public manifest leaked {forbidden} key at {path}.{key}"
+                    );
+                }
+                assert_no_public_secret_value(value, &format!("{path}.{key}"), forbidden_values);
+            }
+        }
+        Value::Array(values) => {
+            for (index, value) in values.iter().enumerate() {
+                assert_no_public_secret_value(value, &format!("{path}[{index}]"), forbidden_values);
+            }
+        }
+        Value::String(text) => {
+            let normalized_text = text.to_ascii_lowercase();
+            for forbidden in FORBIDDEN_WORDS {
+                assert!(
+                    !normalized_text.contains(forbidden),
+                    "public manifest leaked {forbidden} value at {path}: {text}"
+                );
+            }
+            for forbidden in forbidden_values {
+                assert_ne!(
+                    text, *forbidden,
+                    "public manifest leaked private path or producer-circuit label at {path}: {text}"
+                );
+            }
+        }
+        _ => {}
     }
 }
 
