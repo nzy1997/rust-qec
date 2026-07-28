@@ -4,6 +4,11 @@ This guide covers the operational `pack_samples` and `unpack_samples` CLI
 surface for RSMP v1 archives. The original circuit is required for packing,
 unpacking, and verify-only validation.
 
+RSMP v1 is a lossless circuit-bound archive and is intended for private
+transport or reproducible evidence. For public decoder competitions where
+answers must not be published, use `rstim export_decoder_dataset`; it emits an
+intentionally lossy public bundle plus a private answer bundle.
+
 ## Pack Samples
 
 Pack measurement samples into an RSMP archive:
