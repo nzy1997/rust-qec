@@ -196,6 +196,92 @@ fn rejection_cases_fail_before_outputs_exist() {
     );
 }
 
+fn generated_repetition_memory_with_marker() -> (String, &'static str) {
+    let mut circuit = generated_common_circuit_text("repetition_code", "memory");
+    insert_marker_before_first_tick(&mut circuit);
+    (circuit, "0,1,2")
+}
+
+fn generated_surface_z_memory_with_marker() -> (String, &'static str) {
+    let mut circuit = generated_common_circuit_text("surface_code", "rotated_memory_z");
+    insert_marker_before_first_tick(&mut circuit);
+    (circuit, "1,2,3")
+}
+
+fn generated_common_circuit_text(code: &str, task: &str) -> String {
+    let args = [
+        "gen".to_string(),
+        "--code".to_string(),
+        code.to_string(),
+        "--task".to_string(),
+        task.to_string(),
+        "--distance".to_string(),
+        "3".to_string(),
+        "--rounds".to_string(),
+        "3".to_string(),
+        "--after_clifford_depolarization".to_string(),
+        "0.01".to_string(),
+    ];
+    let output = run_cli(&args);
+    assert_success(&output, &format!("generate {code} {task}"));
+    String::from_utf8(output.stdout).expect("generated circuit is UTF-8")
+}
+
+fn insert_marker_before_first_tick(circuit: &mut String) {
+    let needle = "TICK\n";
+    let index = circuit
+        .find(needle)
+        .expect("generated memory circuit has first TICK");
+    circuit.insert_str(index, "# RSTIM_LOGICAL_FLIP_POINT\n");
+}
+
+#[test]
+fn repetition_and_surface_memory_export_in_both_modes() {
+    for (name, circuit_text, logical_x_qubits) in [
+        {
+            let (text, support) = generated_repetition_memory_with_marker();
+            ("repetition", text, support)
+        },
+        {
+            let (text, support) = generated_surface_z_memory_with_marker();
+            ("surface_z", text, support)
+        },
+    ] {
+        verify_memory_case(name, &circuit_text, logical_x_qubits, "detectors");
+        verify_memory_case(
+            name,
+            &circuit_text,
+            logical_x_qubits,
+            "measurements_blinded",
+        );
+    }
+}
+
+fn verify_memory_case(name: &str, circuit_text: &str, logical_x_qubits: &str, mode: &str) {
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join(format!("{name}.stim"));
+    fs::write(&circuit, circuit_text).unwrap();
+    let public_out = root.path().join(format!("{name}-{mode}-public"));
+    let private_out = root.path().join(format!("{name}-{mode}-private"));
+    let mut extra = vec!["--seed", "20260728"];
+    if mode == "measurements_blinded" {
+        extra.extend(["--logical_x_qubits", logical_x_qubits]);
+    }
+    let output = run_cli(&export_args(
+        &circuit,
+        mode,
+        &public_out,
+        &private_out,
+        &extra,
+    ));
+    assert_success(&output, &format!("{name} {mode}"));
+    assert_eq!(
+        sorted_entries(&public_out),
+        vec!["circuit.stim", "manifest.json", "shots.b8"]
+    );
+    assert!(private_out.join("answers.b8").exists());
+}
+
 fn export_args(
     circuit: &Path,
     mode: &str,
