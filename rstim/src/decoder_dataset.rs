@@ -1,6 +1,7 @@
 #![allow(dead_code)] // Manifest types and schema constants are used by later exporter stages.
 
 use crate::sim::bit_table::BitTable;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -298,6 +299,166 @@ pub fn validate_decoder_dataset_inputs(
     })
 }
 
+#[doc(hidden)]
+pub struct DecoderDatasetArtifacts {
+    pub public_circuit_text: String,
+    pub public_instrs: Vec<crate::ir::StimInstr>,
+    pub public_row_kind: &'static str,
+    pub public_shots: BitTable,
+    pub answers: BitTable,
+    pub masks: Option<BitTable>,
+    pub measurements: usize,
+    pub detectors: usize,
+    pub observables: usize,
+}
+
+struct DatasetRngs {
+    physical: rand::rngs::StdRng,
+    mask: rand::rngs::StdRng,
+    permutation: rand::rngs::StdRng,
+}
+
+fn make_dataset_rngs(seed: Option<u64>) -> DatasetRngs {
+    match seed {
+        Some(seed) => DatasetRngs {
+            physical: domain_rng(seed, b"physical-sampling"),
+            mask: domain_rng(seed, b"logical-mask"),
+            permutation: domain_rng(seed, b"row-permutation"),
+        },
+        None => DatasetRngs {
+            physical: rand::rngs::StdRng::from_entropy(),
+            mask: rand::rngs::StdRng::from_entropy(),
+            permutation: rand::rngs::StdRng::from_entropy(),
+        },
+    }
+}
+
+fn domain_rng(seed: u64, domain: &[u8]) -> rand::rngs::StdRng {
+    let mut hasher = Sha256::new();
+    hasher.update(b"rstim-decoder-dataset-v1\n");
+    hasher.update(domain);
+    hasher.update(b"\n");
+    hasher.update(seed.to_le_bytes());
+    rand::rngs::StdRng::from_seed(hasher.finalize().into())
+}
+
+fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usize) {
+    for row in 0..src.num_major() {
+        if src.get(row, src_shot) {
+            dst.set(row, dst_shot, true);
+        }
+    }
+}
+
+#[doc(hidden)]
+pub fn generate_decoder_dataset_artifacts(
+    config: &ExportDecoderDatasetConfig,
+) -> Result<DecoderDatasetArtifacts, String> {
+    let validated = validate_decoder_dataset_inputs(config)?;
+    let mut rngs = make_dataset_rngs(config.seed);
+    match config.mode {
+        DecoderDatasetMode::Detectors => {
+            let result = crate::sampler::sample_batch_with_options(
+                &validated.public_instrs,
+                config.shots,
+                &mut rngs.physical,
+                crate::sampler::SampleOptions {
+                    output_mode: crate::sampler::SampleOutputMode::Full,
+                    ..crate::sampler::SampleOptions::default()
+                },
+            )?;
+            Ok(DecoderDatasetArtifacts {
+                public_circuit_text: validated.public_circuit_text,
+                public_instrs: validated.public_instrs,
+                public_row_kind: "detectors",
+                public_shots: result.detections,
+                answers: result.observable_flips,
+                masks: None,
+                measurements: validated.measurements,
+                detectors: validated.detectors,
+                observables: validated.observables,
+            })
+        }
+        DecoderDatasetMode::MeasurementsBlinded => {
+            let mut source_labels: Vec<bool> =
+                (0..config.shots).map(|_| rngs.mask.r#gen()).collect();
+            for index in (1..source_labels.len()).rev() {
+                let replacement = rngs.permutation.gen_range(0..=index);
+                source_labels.swap(index, replacement);
+            }
+
+            let zero_count = source_labels.iter().filter(|&&label| !label).count();
+            let one_count = config.shots - zero_count;
+            let zero_samples = crate::sampler::sample_batch_with_options(
+                &validated.public_instrs,
+                zero_count,
+                &mut rngs.physical,
+                crate::sampler::SampleOptions {
+                    output_mode: crate::sampler::SampleOutputMode::Full,
+                    ..crate::sampler::SampleOptions::default()
+                },
+            )?;
+            let private_one_instrs = validated
+                .private_one_instrs
+                .as_ref()
+                .ok_or_else(|| "missing blinded logical-one circuit".to_string())?;
+            let one_samples = crate::sampler::sample_batch_with_options(
+                private_one_instrs,
+                one_count,
+                &mut rngs.physical,
+                crate::sampler::SampleOptions {
+                    output_mode: crate::sampler::SampleOutputMode::Full,
+                    ..crate::sampler::SampleOptions::default()
+                },
+            )?;
+
+            let mut measurements = BitTable::try_new(validated.measurements, config.shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut masks = BitTable::try_new(1, config.shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut next_zero = 0;
+            let mut next_one = 0;
+            for (shot, label) in source_labels.iter().copied().enumerate() {
+                if label {
+                    copy_shot(&one_samples.measurements, next_one, &mut measurements, shot);
+                    masks.set(0, shot, true);
+                    next_one += 1;
+                } else {
+                    copy_shot(
+                        &zero_samples.measurements,
+                        next_zero,
+                        &mut measurements,
+                        shot,
+                    );
+                    next_zero += 1;
+                }
+            }
+
+            let public_interpretation =
+                crate::m2d::measurements_to_detections(&validated.public_instrs, &measurements)?;
+            let mut answers = BitTable::try_new(1, config.shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            for shot in 0..config.shots {
+                let public_observable = public_interpretation.observable_flips.get(0, shot);
+                let mask_bit = masks.get(0, shot);
+                answers.set(0, shot, public_observable ^ mask_bit);
+            }
+
+            Ok(DecoderDatasetArtifacts {
+                public_circuit_text: validated.public_circuit_text,
+                public_instrs: validated.public_instrs,
+                public_row_kind: "measurements",
+                public_shots: measurements,
+                answers,
+                masks: Some(masks),
+                measurements: validated.measurements,
+                detectors: validated.detectors,
+                observables: validated.observables,
+            })
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct PublicManifest {
     format: &'static str,
@@ -501,5 +662,72 @@ mod tests {
         assert_eq!(left, right);
         assert_ne!(left, changed_seed_would_not_be_an_argument);
         assert!(!String::from_utf8(left).unwrap().contains("seed"));
+    }
+
+    #[test]
+    fn detector_artifacts_publish_detections_and_private_answers() {
+        let circuit = "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(circuit, DecoderDatasetMode::Detectors, vec![]);
+        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+
+        assert_eq!(artifacts.public_row_kind, "detectors");
+        assert_eq!(artifacts.public_shots.num_major(), 1);
+        assert_eq!(artifacts.answers.num_major(), 1);
+        assert!(artifacts.public_shots.get(0, 0));
+        assert!(artifacts.answers.get(0, 0));
+        assert!(artifacts.masks.is_none());
+    }
+
+    #[test]
+    fn blinded_measurement_answers_are_public_observable_xor_mask() {
+        let circuit =
+            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        config.shots = 16;
+        config.seed = Some(0xdec0_de01);
+
+        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+        let public_interpretation = crate::m2d::measurements_to_detections(
+            &artifacts.public_instrs,
+            &artifacts.public_shots,
+        )
+        .unwrap();
+        let masks = artifacts.masks.as_ref().unwrap();
+
+        let mut saw_zero = false;
+        let mut saw_one = false;
+        for shot in 0..config.shots {
+            let recomputed =
+                public_interpretation.observable_flips.get(0, shot) ^ masks.get(0, shot);
+            assert_eq!(artifacts.answers.get(0, shot), recomputed);
+            saw_zero |= !masks.get(0, shot);
+            saw_one |= masks.get(0, shot);
+        }
+        assert!(saw_zero);
+        assert!(saw_one);
+    }
+
+    #[test]
+    fn fixed_seed_reproduces_artifacts_byte_for_byte() {
+        let circuit =
+            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        config.shots = 32;
+        config.seed = Some(123);
+
+        let a = generate_decoder_dataset_artifacts(&config).unwrap();
+        let b = generate_decoder_dataset_artifacts(&config).unwrap();
+        assert_eq!(
+            bit_table_to_b8_bytes(&a.public_shots).unwrap(),
+            bit_table_to_b8_bytes(&b.public_shots).unwrap()
+        );
+        assert_eq!(
+            bit_table_to_b8_bytes(&a.answers).unwrap(),
+            bit_table_to_b8_bytes(&b.answers).unwrap()
+        );
+        assert_eq!(
+            bit_table_to_b8_bytes(a.masks.as_ref().unwrap()).unwrap(),
+            bit_table_to_b8_bytes(b.masks.as_ref().unwrap()).unwrap()
+        );
     }
 }
