@@ -41,22 +41,20 @@ class SiteFixture:
 
 PAGE_FILES = (
     "index.html",
-    "guide/index.html",
-    "benchmarks/index.html",
+    "simulator/index.html",
+    "detector-models/index.html",
+    "decoding/index.html",
+    "css-codes/index.html",
     "rsmp-v1-showcase/index.html",
     "qp101/index.html",
 )
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
 PAGE_REQUIRED_ANCHORS = {
-    "index.html": ("capabilities", "quick-start", "headline-benchmark"),
-    "guide/index.html": ("workspace-overview", "feature-walkthroughs", "operations"),
-    "benchmarks/index.html": (
-        "benchmark-evidence",
-        "checked-benchmark-results",
-        "checked-benchmark-result-cards",
-        "benchmarks",
-        "benchmark-manifest",
-    ),
+    "index.html": ("capabilities",),
+    "simulator/index.html": ("circuit-simulation",),
+    "detector-models/index.html": ("dem-extraction",),
+    "decoding/index.html": ("decoder-families", "benchmark-campaigns"),
+    "css-codes/index.html": ("css-construction", "distance-search"),
     "rsmp-v1-showcase/index.html": (
         "rsmp-overview",
         "rsmp-transform",
@@ -65,7 +63,7 @@ PAGE_REQUIRED_ANCHORS = {
         "rsmp-scale",
         "rsmp-evidence",
     ),
-    "qp101/index.html": ("qp101", "schema-browser", "gallery", "examples"),
+    "qp101/index.html": ("qp101", "operations", "schema-browser", "gallery", "examples"),
 }
 REQUIRED_FILES = PAGE_FILES + JS_FILES + (
     "styles.css",
@@ -90,13 +88,10 @@ QP101_REQUIRED_FILES = (
     "gallery/atom-loss-sample.svg",
 )
 CLAIMS_POLICY_PHRASES = (
-    "Claims Policy",
-    "Publishable Evidence",
-    "Local-Only Evidence",
-    "smoke checks verify wiring",
-    "full evidence can describe the committed checked run",
-    "committed-run evidence",
-    "not a general decoder ordering claim",
+    "Smoke runs check wiring",
+    "checked full artifacts support",
+    "not a general performance claim",
+    "local-only",
 )
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
@@ -522,11 +517,18 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
     results.extend(manifest_results)
     results.append(check_checked_provenance(manifest, manifest_site_errors + read_errors))
 
-    benchmarks_entry = page_data.get("benchmarks/index.html")
-    if benchmarks_entry is None:
-        results.append(fail("benchmark methodology", "could not read built-site files: benchmarks/index.html"))
+    evidence_page_names = (
+        "simulator/index.html",
+        "detector-models/index.html",
+        "decoding/index.html",
+        "css-codes/index.html",
+    )
+    evidence_pages = [page_data[name][0] for name in evidence_page_names if name in page_data]
+    if len(evidence_pages) != len(evidence_page_names):
+        missing = [name for name in evidence_page_names if name not in page_data]
+        results.append(fail("benchmark methodology", "could not read built-site files: " + ", ".join(missing)))
     else:
-        results.append(check_benchmark_methodology(benchmarks_entry[0]))
+        results.append(check_benchmark_methodology("\n".join(evidence_pages)))
 
     if read_errors:
         results.append(fail("checked benchmark artifacts", "could not read built-site files: " + "; ".join(read_errors)))
@@ -931,17 +933,19 @@ def make_fixture_site() -> SiteFixture:
 <body data-root=".">
   <nav>
     <a href="./">Home</a>
-    <a href="guide/">Guide</a>
-    <a href="benchmarks/">Benchmarks</a>
+    <a href="simulator/">Simulator</a>
+    <a href="detector-models/">Detector models</a>
+    <a href="decoding/">Decoding</a>
+    <a href="css-codes/">CSS Codes</a>
     <a href="rsmp-v1-showcase/">RSMP v1</a>
     <a href="qp101/">QP101</a>
   </nav>
-  <section id="capabilities"><a href="guide/#feature-walkthroughs">walkthroughs</a></section>
-  <section id="quick-start"></section>
-  <section id="headline-benchmark">
-    <a href="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png">
-      <img src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png" alt="surface">
-    </a>
+  <section id="capabilities">
+    <a href="simulator/#circuit-simulation">simulation</a>
+    <a href="detector-models/#dem-extraction">detector models</a>
+    <a href="decoding/#decoder-families">decoders</a>
+    <a href="decoding/#benchmark-campaigns">campaigns</a>
+    <a href="css-codes/#css-construction">CSS codes</a>
   </section>
 </body>
 </html>
@@ -954,8 +958,9 @@ def make_fixture_site() -> SiteFixture:
 <body data-root="..">
   <nav>
     <a href="../">Home</a>
-    <a href="../guide/">Guide</a>
-    <a href="../benchmarks/">Benchmarks</a>
+    <a href="../simulator/">Simulator</a>
+    <a href="../decoding/">Decoding</a>
+    <a href="../css-codes/">CSS Codes</a>
     <a href="../qp101/">QP101</a>
   </nav>
   <section id="rsmp-overview">
@@ -984,40 +989,57 @@ def make_fixture_site() -> SiteFixture:
 """,
     )
     write_text(
-        site_root / "guide/index.html",
+        site_root / "simulator/index.html",
         """<!doctype html>
 <html lang="en">
 <body data-root="..">
-  <section id="workspace-overview"></section>
-  <section id="feature-walkthroughs">
-    <a href="../qp101/">qp101</a>
-    <a href="#operations">ops</a>
+  <section id="circuit-simulation">
+    <p>Sampling evidence is not a general performance claim.</p>
+    <div data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></div>
   </section>
-  <section id="operations"></section>
+  <script src="../js/benchmarks.js"></script>
 </body>
 </html>
 """,
     )
     write_text(
-        site_root / "benchmarks/index.html",
+        site_root / "detector-models/index.html",
         """<!doctype html>
 <html lang="en">
 <body data-root="..">
-  <section id="benchmark-evidence"></section>
-  <section id="checked-benchmark-results">
-    <div id="checked-benchmark-result-cards"></div>
+  <section id="dem-extraction">
+    <div data-evidence-items="rstim-vs-stim-full"></div>
+  </section>
+  <script src="../js/benchmarks.js"></script>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "decoding/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="decoder-families"></section>
+  <section id="benchmark-campaigns">
+    <p>Smoke runs check wiring; checked full artifacts support only their recorded cases.</p>
+    <div data-evidence-items="surface-decoder-full bb-circuit-full"></div>
     <a href="../benchmarks/surface_decoder_compare/results/full/results.csv">surface csv</a>
   </section>
-  <section id="benchmarks">
-    <h2>Benchmark Methodology</h2>
-    <p>smoke checks verify wiring</p>
-    <p>full evidence can describe the committed checked run only.</p>
-    <p>checked full-tier artifacts are committed-run evidence.</p>
-    <p>not a general decoder ordering claim.</p>
-    <article><h3>Publishable Evidence</h3></article>
-    <article><h3>Local-Only Evidence</h3></article>
-    <article><h3>Claims Policy</h3></article>
-    <div id="benchmark-manifest"></div>
+  <script src="../js/benchmarks.js"></script>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "css-codes/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="css-construction"></section>
+  <section id="distance-search">
+    <p>Random-window results remain local-only.</p>
+    <div data-evidence-items="qec-code-smoke"></div>
   </section>
   <script src="../js/benchmarks.js"></script>
 </body>
@@ -1034,6 +1056,7 @@ def make_fixture_site() -> SiteFixture:
     <a href="../QP101-ZY.md">protocol</a>
     <a href="../examples/basic.qp101.json">basic</a>
   </section>
+  <section id="operations"></section>
   <section id="schema-browser"></section>
   <section id="gallery">
     <img src="../gallery/basic-site.svg" alt="basic">
@@ -1051,9 +1074,11 @@ def make_fixture_site() -> SiteFixture:
     )
     write_text(
         site_root / "js/benchmarks.js",
-        """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
-function renderBenchmarkManifest(manifest) { return manifest; }
-function renderCheckedBenchmarkResults(manifest) { return manifest; }
+        """const evidenceContainers = document.querySelectorAll("[data-evidence-items]");
+function renderEvidenceContainers(manifest) {
+  evidenceContainers.forEach((container) => container.dataset.evidenceItems);
+  return manifest;
+}
 function renderProvenance(provenance) { return provenance; }
 const manifestMarkers = ["family.status", "family.claims_limit", "item.status", "item.claims_limit"];
 const checkedMarkers = ["item.artifacts", "item.commands", "item.caveats", "artifact.checked"];
@@ -1140,17 +1165,19 @@ def run_self_test() -> list[str]:
                 "surface_decoder_compare.png",
             ),
             (
-                "missing_claims_policy",
-                lambda f: (f.site_root / "benchmarks/index.html").write_text(
-                    (f.site_root / "benchmarks/index.html").read_text(encoding="utf-8").replace("Claims Policy", "Claims"),
+                "missing_evidence_boundary",
+                lambda f: (f.site_root / "decoding/index.html").write_text(
+                    (f.site_root / "decoding/index.html").read_text(encoding="utf-8").replace(
+                        "checked full artifacts support", "checked full artifacts describe"
+                    ),
                     encoding="utf-8",
                 ),
-                "Claims Policy",
+                "checked full artifacts support",
             ),
             (
                 "unmanifested_checked_link",
-                lambda f: (f.site_root / "benchmarks/index.html").write_text(
-                    (f.site_root / "benchmarks/index.html").read_text(encoding="utf-8")
+                lambda f: (f.site_root / "decoding/index.html").write_text(
+                    (f.site_root / "decoding/index.html").read_text(encoding="utf-8")
                     + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
                     encoding="utf-8",
                 ),
@@ -1175,7 +1202,7 @@ def run_self_test() -> list[str]:
                     (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
                     (f.site_root / "index.html").write_text(
                         (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                            'href="guide/"', 'href="../outside.txt"', 1
+                            'href="simulator/"', 'href="../outside.txt"', 1
                         ),
                         encoding="utf-8",
                     ),
@@ -1208,7 +1235,7 @@ def run_self_test() -> list[str]:
                 "broken_cross_page_anchor",
                 lambda f: (f.site_root / "index.html").write_text(
                     (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                        'href="guide/#feature-walkthroughs"', 'href="guide/#missing-anchor"', 1
+                        'href="simulator/#circuit-simulation"', 'href="simulator/#missing-anchor"', 1
                     ),
                     encoding="utf-8",
                 ),
@@ -1218,7 +1245,7 @@ def run_self_test() -> list[str]:
                 "root_absolute_href",
                 lambda f: (f.site_root / "index.html").write_text(
                     (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                        'href="guide/"', 'href="/guide/"', 1
+                        'href="simulator/"', 'href="/simulator/"', 1
                     ),
                     encoding="utf-8",
                 ),

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Detector error models — rstim{% endblock title %}
+{% block description %}Extract and sample detector error models with rstim.{% endblock description %}
+
+{% block hero %}
+<div class="hero compact-hero">
+  <p class="eyebrow">Detector error models</p>
+  <h1>Extract a DEM, then sample it</h1>
+  <p class="hero-copy">Turn a noisy circuit into detector-error mechanisms for downstream decoders.</p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="dem-extraction" class="task-section" aria-labelledby="dem-extraction-title">
+  <div class="section-heading">
+    <p class="eyebrow">Run it</p>
+    <h2 id="dem-extraction-title">Analyze once, sample directly</h2>
+  </div>
+  <pre class="quick-command"><code>rstim analyze_errors --in circuit.stim --out model.dem
+rstim sample_dem --in model.dem --shots 1000 --out_format dets</code></pre>
+</section>
+
+<section class="task-section" aria-labelledby="dem-results-title">
+  <div class="section-heading">
+    <p class="eyebrow">Example results</p>
+    <h2 id="dem-results-title">Detection and DEM sampling</h2>
+  </div>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Workload</th><th>Implementation</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Surface d=13, r=13 detect</td><td>rstim compiled</td><td>34.339 ms</td></tr>
+        <tr><td>Surface d=13, r=13 detect</td><td>Stim CLI</td><td>266.172 ms</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>rstim</td><td>329 shots/s</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>Stim</td><td>2,669 shots/s</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="dem-evidence-title">
+  <div class="section-heading"><p class="eyebrow">Benchmark evidence</p><h2 id="dem-evidence-title">Checked DEM results</h2></div>
+  <div class="evidence-stack" data-evidence-items="rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample" aria-live="polite"><p>Loading detector-model evidence.</p></div>
+</section>
+{% endblock main %}
+
+{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

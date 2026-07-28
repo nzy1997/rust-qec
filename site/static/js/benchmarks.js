@@ -10,17 +10,7 @@
   }
 
   const benchmarkManifest = document.getElementById("benchmark-manifest");
-  const checkedBenchmarkResults = document.getElementById("checked-benchmark-result-cards");
-  const checkedBenchmarkItems = [
-    "surface-decoder-full",
-    "bb-circuit-full",
-    "rstim-vs-stim-correctness",
-    "rstim-vs-stim-full",
-    "rstim-vs-stim-release",
-    "rstim-vs-stim-release-repetition-sample",
-    "rstim-vs-stim-release-surface-detect",
-    "rstim-vs-stim-release-dem-sample",
-  ];
+  const evidenceContainers = Array.from(document.querySelectorAll("[data-evidence-items]"));
 
   function renderBadge(label, value) {
     return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;
@@ -242,24 +232,26 @@
     return `<ul class="provenance-card-list">${rows}</ul>`;
   }
 
-  function renderCheckedBenchmarkResults(manifest) {
-    if (!checkedBenchmarkResults) {
-      return;
-    }
-    checkedBenchmarkResults.innerHTML = checkedBenchmarkItems
-      .map((itemId) => {
+  function renderEvidenceContainers(manifest) {
+    evidenceContainers.forEach((container) => {
+      const itemIds = String(container.dataset.evidenceItems || "")
+        .split(/\s+/)
+        .filter(Boolean);
+      container.innerHTML = itemIds
+        .map((itemId) => {
         const found = findEvidenceItem(manifest, itemId);
         if (!found) {
-          return `<article class="result-card error"><h3>${escapeHtml(itemId)}</h3><p>Missing checked benchmark manifest item.</p></article>`;
+          return `<article class="result-card error"><h3>${escapeHtml(itemId)}</h3><p>Missing benchmark manifest item.</p></article>`;
         }
         const { family, item } = found;
+        const plotHtml = renderImageArtifacts(item);
         return `
-        <article class="result-card">
+        <article class="result-card${plotHtml ? " has-plot" : ""}">
           <div class="result-card-copy">
             <div class="manifest-heading">
               <div>
                 <p class="eyebrow">${escapeHtml(family.title || family.id || "Benchmark family")}</p>
-                <h3>${escapeHtml(item.title || item.id || "Checked benchmark result")}</h3>
+                <h3>${escapeHtml(item.title || item.id || "Benchmark evidence")}</h3>
               </div>
               <div class="schema-meta">
                 ${renderBadge("family", family.status)}
@@ -268,27 +260,29 @@
               </div>
             </div>
             <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
-            <h4>Artifacts</h4>
-            ${renderArtifactLinks(item)}
-            <h4>Reproduction</h4>
-            ${renderCommandList(item.commands)}
-            <h4>Provenance</h4>
-            ${renderProvenance(item.provenance)}
-            <h4>Caveats</h4>
-            ${renderTextList(item.caveats)}
-            <h4>Provenance Sources</h4>
-            ${renderSourceLinks(item.provenance_sources || family.source_docs)}
+            <details class="evidence-details">
+              <summary>Reproduce and inspect</summary>
+              <h4>Artifacts</h4>
+              ${renderArtifactLinks(item)}
+              <h4>Reproduction</h4>
+              ${renderCommandList(item.commands)}
+              <h4>Provenance</h4>
+              ${renderProvenance(item.provenance)}
+              <h4>Caveats</h4>
+              ${renderTextList(item.caveats)}
+              <h4>Sources</h4>
+              ${renderSourceLinks(item.provenance_sources || family.source_docs)}
+            </details>
           </div>
-          <div class="result-card-plot">
-            ${renderImageArtifacts(item)}
-          </div>
+          ${plotHtml ? `<div class="result-card-plot">${plotHtml}</div>` : ""}
         </article>
       `;
-      })
-      .join("");
+        })
+        .join("");
+    });
   }
 
-  if (benchmarkManifest || checkedBenchmarkResults) {
+  if (benchmarkManifest || evidenceContainers.length) {
     fetch(ROOT + "/data/benchmark-site.json")
       .then((response) => {
         if (!response.ok) {
@@ -298,7 +292,7 @@
       })
       .then((manifest) => {
         renderBenchmarkManifest(manifest);
-        renderCheckedBenchmarkResults(manifest);
+        renderEvidenceContainers(manifest);
       })
       .catch((error) => {
         if (benchmarkManifest) {
@@ -308,13 +302,13 @@
             <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
           `;
         }
-        if (checkedBenchmarkResults) {
-          checkedBenchmarkResults.classList.add("error");
-          checkedBenchmarkResults.innerHTML = `
-            <p>Checked benchmark results could not be loaded: ${escapeHtml(error.message)}</p>
-            <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
-          `;
-        }
+        evidenceContainers.forEach((container) => {
+          container.classList.add("error");
+          container.innerHTML = `
+              <p>Benchmark evidence could not be loaded: ${escapeHtml(error.message)}</p>
+              <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
+            `;
+        });
       });
   }
 })();

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Circuit simulation — rstim{% endblock title %}
+{% block description %}Parse Stim circuits and sample measurement or detector shots with rstim.{% endblock description %}
+
+{% block hero %}
+<div class="hero compact-hero">
+  <p class="eyebrow">Circuit simulation</p>
+  <h1>Simulate and sample circuits</h1>
+  <p class="hero-copy">Read Stim-format circuits, inspect their structure, and produce measurement or detector shots.</p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="circuit-simulation" class="task-section" aria-labelledby="circuit-simulation-title">
+  <div class="section-heading">
+    <p class="eyebrow">Run it</p>
+    <h2 id="circuit-simulation-title">One command from circuit to detector samples</h2>
+  </div>
+  <pre class="quick-command"><code>cargo run -p rstim --bin rstim -- detect --in circuit.stim --shots 1000 --out_format dets</code></pre>
+  <p class="section-copy">Use <code>stats</code> to inspect a circuit or replace <code>detect</code> with <code>sample</code> for raw measurement shots.</p>
+</section>
+
+<section class="task-section" aria-labelledby="simulation-results-title">
+  <div class="section-heading">
+    <p class="eyebrow">Example results</p>
+    <h2 id="simulation-results-title">Throughput depends strongly on circuit shape</h2>
+    <p class="section-copy">Pinned release measurements for named fixtures; these are not a general performance claim.</p>
+  </div>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Fixture</th><th>Implementation</th><th>Throughput</th><th>Wall time</th></tr></thead>
+      <tbody>
+        <tr><td>Surface d=11, r=100</td><td>rstim compiled</td><td>1,745 shots/s</td><td>586.8 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>Stim CLI</td><td>5,597 shots/s</td><td>183.0 ms</td></tr>
+        <tr><td>Repetition d=13, r=13</td><td>rstim compiled</td><td>11.51M shots/s</td><td>1.738 ms</td></tr>
+        <tr><td>Repetition d=13, r=13</td><td>Stim CLI</td><td>232K shots/s</td><td>86.111 ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="sampling-evidence-title">
+  <div class="section-heading">
+    <p class="eyebrow">Benchmark evidence</p>
+    <h2 id="sampling-evidence-title">Checked simulator results</h2>
+  </div>
+  <div class="evidence-stack" data-evidence-items="rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-perf-ci" aria-live="polite">
+    <p>Loading simulator evidence.</p>
+  </div>
+</section>
+{% endblock main %}
+
+{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

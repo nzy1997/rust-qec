@@ -4,4 +4,5 @@ template = "rsmp-v1-showcase.html"
 
 [extra]
 root = ".."
+nav = "rsmp"
 +++

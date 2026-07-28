@@ -1,4 +1,5 @@
-{% set root = section.extra.root | default(value=".") %}<!doctype html>
+{% set root = section.extra.root | default(value=".") %}
+{% set current_nav = section.extra.nav | default(value="home") %}<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -18,11 +19,13 @@
           <span>rstim</span>
         </a>
         <div class="nav-links">
-          <a href="{{ root }}/">Home</a>
-          <a href="{{ root }}/guide/">Guide</a>
-          <a href="{{ root }}/benchmarks/">Benchmarks</a>
-          <a href="{{ root }}/rsmp-v1-showcase/">RSMP v1</a>
-          <a href="{{ root }}/qp101/">QP101</a>
+          <a class="nav-link{% if current_nav == "home" %} current{% endif %}" href="{{ root }}/"{% if current_nav == "home" %} aria-current="page"{% endif %}>Home</a>
+          <a class="nav-link{% if current_nav == "simulate" %} current{% endif %}" href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate</a>
+          <a class="nav-link{% if current_nav == "dems" %} current{% endif %}" href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>DEMs</a>
+          <a class="nav-link{% if current_nav == "decode" %} current{% endif %}" href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decode</a>
+          <a class="nav-link{% if current_nav == "css" %} current{% endif %}" href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS Codes</a>
+          <a class="nav-link{% if current_nav == "rsmp" %} current{% endif %}" href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP v1</a>
+          <a class="nav-link{% if current_nav == "qp101" %} current{% endif %}" href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>QP101</a>
         </div>
       </nav>
       {% block hero %}{% endblock hero %}

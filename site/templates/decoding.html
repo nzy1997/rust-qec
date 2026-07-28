@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Quantum error correction decoders — rstim{% endblock title %}
+{% block description %}Run MWPM, BP-OSD, and ILP decoders in the rstim workspace.{% endblock description %}
+
+{% block hero %}
+<div class="hero compact-hero">
+  <p class="eyebrow">Decoding</p>
+  <h1>Decode with three solver families</h1>
+  <p class="hero-copy">Use MWPM, BP-OSD, or ILP through a shared experiment path.</p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="decoder-families" class="task-section" aria-labelledby="decoder-families-title">
+  <div class="section-heading">
+    <p class="eyebrow">Choose a decoder</p>
+    <h2 id="decoder-families-title">Three solvers, different trade-offs</h2>
+  </div>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Crate</th><th>Method</th><th>Best fit</th></tr></thead>
+      <tbody>
+        <tr><td><code>rmatching</code></td><td>MWPM</td><td>Graphlike detector error models</td></tr>
+        <tr><td><code>rbposd</code></td><td>BP-OSD</td><td>Sparse parity checks and BB circuits</td></tr>
+        <tr><td><code>rilpqec</code></td><td>ILP</td><td>Exact and comparison-oriented cases</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <pre class="quick-command"><code>make surface-decoder-compare-smoke</code></pre>
+</section>
+
+<section id="benchmark-campaigns" class="task-section" aria-labelledby="benchmark-campaigns-title">
+  <div class="section-heading">
+    <p class="eyebrow">Benchmark campaigns</p>
+    <h2 id="benchmark-campaigns-title">Run and compare decoder cases</h2>
+    <p class="section-copy"><code>rsinter</code> runs cases, merges outputs, and produces comparison plots. Smoke runs check wiring; checked full artifacts support only the recorded cases and environments.</p>
+  </div>
+  <pre class="quick-command"><code>make surface-decoder-compare-smoke
+make bb-circuit-bposd-compare-smoke</code></pre>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Campaign</th><th>What it checks</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>Surface decoder</td><td>End-to-end local wiring</td><td>Smoke and checked comparison</td></tr>
+        <tr><td>BB-circuit BP-OSD</td><td>Environment and dataset readiness</td><td>Readiness and checked comparison</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="decoder-results-title">
+  <div class="section-heading">
+    <p class="eyebrow">Results</p>
+    <h2 id="decoder-results-title">Surface-code and BP-OSD comparisons</h2>
+    <p class="section-copy">The checked plots show only their named cases. Full reproduction details are available inside each result.</p>
+  </div>
+  <div class="evidence-stack decoder-evidence" data-evidence-items="surface-decoder-full bb-circuit-full rbposd-parity-gate" aria-live="polite">
+    <p>Loading decoder evidence.</p>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="campaign-evidence-title">
+  <div class="section-heading">
+    <p class="eyebrow">Local workflow evidence</p>
+    <h2 id="campaign-evidence-title">Smoke and readiness checks</h2>
+  </div>
+  <div class="evidence-stack" data-evidence-items="surface-decoder-local-smoke bb-circuit-local-readiness" aria-live="polite">
+    <p>Loading campaign evidence.</p>
+  </div>
+</section>
+{% endblock main %}
+
+{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

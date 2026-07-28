@@ -11,6 +11,18 @@ RSTIM_DEM_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem
 
 
 class SiteBuildCheckerTest(unittest.TestCase):
+    def test_valid_site_does_not_require_benchmark_campaign_route(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        self.assertFalse((fixture.site_root / "benchmark-campaigns/index.html").exists())
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertFalse(
+            any(result.status == "FAIL" for result in results),
+            check_site_build.format_summary(results),
+        )
+
     def test_self_test_exercises_required_mutations(self) -> None:
         self.assertEqual(check_site_build.run_self_test(), [])
 
@@ -218,16 +230,26 @@ class SiteBuildCheckerTest(unittest.TestCase):
         )
         self.assertNotIn("PASS checked benchmark provenance", summary)
 
-    def test_rejects_missing_claims_policy_caveat(self) -> None:
+    def test_rejects_missing_distributed_evidence_boundary(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "benchmarks/index.html"
-        index.write_text(index.read_text(encoding="utf-8").replace("Claims Policy", "Claims"), encoding="utf-8")
+        index = fixture.site_root / "decoding/index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace(
+                "checked full artifacts support", "checked full artifacts describe"
+            ),
+            encoding="utf-8",
+        )
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
 
         self.assertTrue(
-            any(result.status == "FAIL" and "benchmark methodology" in result.area and "Claims Policy" in result.detail for result in results),
+            any(
+                result.status == "FAIL"
+                and "benchmark methodology" in result.area
+                and "checked full artifacts support" in result.detail
+                for result in results
+            ),
             check_site_build.format_summary(results),
         )
 
@@ -238,7 +260,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         outside.write_text("outside\n", encoding="utf-8")
         index = fixture.site_root / "index.html"
         index.write_text(
-            index.read_text(encoding="utf-8").replace('href="guide/"', 'href="../outside.txt"', 1),
+            index.read_text(encoding="utf-8").replace('href="simulator/"', 'href="../outside.txt"', 1),
             encoding="utf-8",
         )
 
@@ -279,7 +301,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         )
 
     def test_missing_index_or_app_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in ("index.html", "guide/index.html", "js/benchmarks.js"):
+        for relative in ("index.html", "simulator/index.html", "js/benchmarks.js"):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
@@ -310,12 +332,14 @@ class SiteBuildCheckerTest(unittest.TestCase):
                     summary,
                 )
 
-    def test_rejects_missing_claims_policy_phrase_even_if_manifest_keeps_it(self) -> None:
+    def test_rejects_missing_evidence_phrase_even_if_manifest_keeps_it(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "benchmarks/index.html"
+        index = fixture.site_root / "simulator/index.html"
         index.write_text(
-            index.read_text(encoding="utf-8").replace("committed-run evidence", "checked-run evidence"),
+            index.read_text(encoding="utf-8").replace(
+                "not a general performance claim", "not a universal speed ranking"
+            ),
             encoding="utf-8",
         )
 
@@ -325,7 +349,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
             any(
                 result.status == "FAIL"
                 and "benchmark methodology" in result.area
-                and "committed-run evidence" in result.detail
+                and "not a general performance claim" in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),
@@ -334,7 +358,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
     def test_rejects_unmanifested_checked_artifact_link(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "benchmarks/index.html"
+        index = fixture.site_root / "decoding/index.html"
         index.write_text(
             index.read_text(encoding="utf-8")
             + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
@@ -354,7 +378,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         missing_artifact = (
             "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
         )
-        index = fixture.site_root / "benchmarks/index.html"
+        index = fixture.site_root / "simulator/index.html"
         index.write_text(
             index.read_text(encoding="utf-8") + f'<a href="../{missing_artifact}">bad</a>\n',
             encoding="utf-8",
@@ -377,7 +401,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.addCleanup(fixture.cleanup)
         index = fixture.site_root / "index.html"
         index.write_text(
-            index.read_text(encoding="utf-8").replace('href="guide/"', 'href="/guide/"', 1),
+            index.read_text(encoding="utf-8").replace('href="simulator/"', 'href="/simulator/"', 1),
             encoding="utf-8",
         )
 
@@ -399,7 +423,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         index = fixture.site_root / "index.html"
         index.write_text(
             index.read_text(encoding="utf-8").replace(
-                'href="guide/#feature-walkthroughs"', 'href="guide/#missing-anchor"', 1
+                'href="simulator/#circuit-simulation"', 'href="simulator/#missing-anchor"', 1
             ),
             encoding="utf-8",
         )
