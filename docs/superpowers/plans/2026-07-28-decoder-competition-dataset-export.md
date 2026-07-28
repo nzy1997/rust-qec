@@ -1502,7 +1502,7 @@ path = Path(__import__("sys").argv[1])
 text = path.read_text()
 path.write_text(text.replace("TICK\n", "# RSTIM_LOGICAL_FLIP_POINT\nTICK\n", 1))
 PY
-cargo run --locked --quiet -p rstim --bin rstim -- export_decoder_dataset --circuit "$RSTIM_DATASET_TMP/memory.stim" --shots 16 --mode measurements_blinded --logical_x_qubits 0 --public_out "$RSTIM_DATASET_TMP/public" --private_out "$RSTIM_DATASET_TMP/private" --seed 5
+cargo run --locked --quiet -p rstim --bin rstim -- export_decoder_dataset --circuit "$RSTIM_DATASET_TMP/memory.stim" --shots 16 --mode measurements_blinded --logical_x_qubits 0,1,2 --public_out "$RSTIM_DATASET_TMP/public" --private_out "$RSTIM_DATASET_TMP/private" --seed 5
 find "$RSTIM_DATASET_TMP/public" -maxdepth 1 -type f -print | sort
 grep -R -i -E 'seed|mask|answer|private|producer|permutation' "$RSTIM_DATASET_TMP/public/manifest.json" && exit 1 || true
 ```
