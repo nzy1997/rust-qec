@@ -25,6 +25,25 @@
   </div>
 </section>
 
+<section id="decoder-datasets" class="rsmp-section" aria-labelledby="decoder-datasets-title">
+  <div class="section-heading">
+    <p class="eyebrow">Public contests</p>
+    <h2 id="decoder-datasets-title">Need a dataset contestants cannot score from directly?</h2>
+    <p class="section-copy">RSMP is intentionally lossless and private. For public decoder benchmarks, use <code>rstim export_decoder_dataset</code> instead: publish only contestant inputs, and keep the answer bundle private.</p>
+  </div>
+  <div class="rsmp-command-grid">
+    <article class="compact-card">
+      <h3>Two public dataset modes</h3>
+      <p><strong>Detector mode</strong> publishes detector-event rows in <code>shots.b8</code> and keeps logical answers in private <code>answers.b8</code>.</p>
+      <p><strong>Blinded measurement mode</strong> publishes raw measurement rows, privately randomizes the logical state with mask bits, and scores against private <code>answers.b8</code>.</p>
+      <div class="docs-card-links">
+        <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/decoder-dataset.md">Decoder dataset guide</a>
+        <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-cli.md">RSMP CLI guide</a>
+      </div>
+    </article>
+  </div>
+</section>
+
 <section id="rsmp-workflow" class="rsmp-section" aria-labelledby="rsmp-workflow-title">
   <div class="section-heading"><p class="eyebrow">Run it</p><h2 id="rsmp-workflow-title">Pack and verify</h2></div>
   <pre class="quick-command"><code>rstim pack_samples --circuit circuit.stim --in samples.b8 --in_format b8 --out samples.rsmp
