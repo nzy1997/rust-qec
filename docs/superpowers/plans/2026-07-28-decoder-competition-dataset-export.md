@@ -1283,7 +1283,7 @@ fn generated_surface_z_memory_with_marker() -> (String, &'static str) {
     )
     .unwrap();
     insert_marker_before_first_tick(&mut circuit);
-    (circuit, "1,7,13")
+    (circuit, "1,2,3")
 }
 
 fn insert_marker_before_first_tick(circuit: &mut String) {
@@ -1340,7 +1340,7 @@ Run:
 cargo test --locked -p rstim --test cli_decoder_dataset repetition_and_surface_memory_export_in_both_modes -- --exact --nocapture
 ```
 
-Expected: PASS for repetition `--logical_x_qubits 0,1,2` and surface rotated Z `--logical_x_qubits 1,7,13`.
+Expected: PASS for repetition `--logical_x_qubits 0,1,2` and surface rotated Z `--logical_x_qubits 1,2,3`.
 
 - [ ] **Step 4: Commit Task 6**
 
