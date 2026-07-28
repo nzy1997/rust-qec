@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Manifest types and schema constants are used by later exporter stages.
-
 use crate::sim::bit_table::BitTable;
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
@@ -197,7 +195,6 @@ pub fn circuit_with_injected_logical_x(
 struct ValidatedDecoderDatasetInput {
     public_circuit_text: String,
     public_instrs: Vec<crate::ir::StimInstr>,
-    private_one_circuit_text: Option<String>,
     private_one_instrs: Option<Vec<crate::ir::StimInstr>>,
     measurements: usize,
     detectors: usize,
@@ -272,8 +269,8 @@ pub fn validate_decoder_dataset_inputs(
         _ => {}
     }
 
-    let (private_one_circuit_text, private_one_instrs) = match config.mode {
-        DecoderDatasetMode::Detectors => (None, None),
+    let private_one_instrs = match config.mode {
+        DecoderDatasetMode::Detectors => None,
         DecoderDatasetMode::MeasurementsBlinded => {
             for &qubit in &config.logical_x_qubits {
                 if qubit as usize >= stats.num_qubits {
@@ -287,14 +284,13 @@ pub fn validate_decoder_dataset_inputs(
                 circuit_with_injected_logical_x(&config.circuit_text, &config.logical_x_qubits)?;
             let instrs = crate::parser::parse_lines(&circuit_text)?;
             validate_logical_x_effect(&public_instrs, &instrs)?;
-            (Some(circuit_text), Some(instrs))
+            Some(instrs)
         }
     };
 
     Ok(ValidatedDecoderDatasetInput {
         public_circuit_text: config.circuit_text.clone(),
         public_instrs,
-        private_one_circuit_text,
         private_one_instrs,
         measurements: stats.num_measurements,
         detectors: stats.num_detectors,
@@ -536,7 +532,10 @@ fn resolve_new_output_directory(path: &Path) -> Result<NewDirectoryPath, String>
     let name = path
         .file_name()
         .ok_or_else(|| "output directory must have a final path component".to_string())?;
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let parent = fs::canonicalize(parent).map_err(|error| {
         format!(
             "failed to resolve output parent {}: {error}",
@@ -583,6 +582,7 @@ fn validate_output_directories(
     Ok(ValidatedOutputDirectories { public, private })
 }
 
+#[doc(hidden)]
 pub trait DirectoryPublisher {
     fn rename(&mut self, from: &Path, to: &Path) -> std::io::Result<()>;
 }
@@ -939,11 +939,11 @@ mod tests {
         let config = test_config(valid, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
         assert!(validate_decoder_dataset_inputs(&config).is_ok());
 
-        let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(no_flip, DecoderDatasetMode::MeasurementsBlinded, vec![]);
+        let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(no_flip, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
         assert!(validate_decoder_dataset_inputs(&config)
             .unwrap_err()
-            .contains("--logical_x_qubits"));
+            .contains("injected logical X does not flip observable 0"));
 
         let changes_detector = "R 0 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
@@ -954,6 +954,34 @@ mod tests {
         assert!(validate_decoder_dataset_inputs(&config)
             .unwrap_err()
             .contains("changes detector"));
+    }
+
+    #[test]
+    fn input_validation_rejects_observable_sweep_and_qubit_contract_violations() {
+        let no_observable = "R 0\nM 0\n";
+        let config = test_config(no_observable, DecoderDatasetMode::Detectors, vec![]);
+        assert!(validate_decoder_dataset_inputs(&config)
+            .unwrap_err()
+            .contains("exactly one observable, found 0"));
+
+        let multiple_observables =
+            "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
+        let config = test_config(multiple_observables, DecoderDatasetMode::Detectors, vec![]);
+        assert!(validate_decoder_dataset_inputs(&config)
+            .unwrap_err()
+            .contains("exactly one observable, found 2"));
+
+        let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, vec![]);
+        assert!(validate_decoder_dataset_inputs(&config)
+            .unwrap_err()
+            .contains("does not support sweep-bit circuits"));
+
+        let one_qubit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(one_qubit, DecoderDatasetMode::MeasurementsBlinded, vec![1]);
+        assert!(validate_decoder_dataset_inputs(&config)
+            .unwrap_err()
+            .contains("contains qubit 1, but circuit has 1 qubits"));
     }
 
     #[test]

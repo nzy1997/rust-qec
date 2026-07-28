@@ -38,7 +38,7 @@ rstim export_decoder_dataset \
 
 For each shot, the exporter privately chooses a bit `b`, samples either the logical-zero circuit or the circuit with an ideal `X` on `--logical_x_qubits`, publishes the measurement row, and stores `answer = O_public(m) XOR b` privately.
 
-Here `O_public(m)` is the observable computed from the published measurement row. Contestants submit that observable prediction for each row; scoring compares it against the private `answers.b8` bit, while `masks.b8` retains the private per-shot `b` values used to produce the answer key.
+Here `O_public(m)` is the observable computed from the published measurement row. Contestants must decode the underlying unmasked logical-error bit from each measurement row (or its derived syndrome); they must not submit the directly recomputed public observable `O_public(m)`. The organizer's private scoring key remains `answer = O_public(m) XOR b`, while `masks.b8` retains the private per-shot `b` values used to produce that key.
 
 ## Files
 

@@ -17,10 +17,11 @@ fn run_cli(args: &[String]) -> Output {
 #[test]
 fn export_decoder_dataset_cli_contract() {
     detectors_mode_writes_public_circuit_and_detector_rows();
+    bare_relative_output_paths_write_bundles_in_current_directory();
     blinded_measurements_masks_recomputed_public_observable();
     deterministic_seed_reproduces_bundle_bytes();
     rejection_cases_fail_before_outputs_exist();
-    println!("PASS decoder dataset cli detectors=1 blinded=1 deterministic=1 rejections=1");
+    println!("PASS decoder dataset cli detectors=1 relative_paths=1 blinded=1 deterministic=1 rejections=1");
 }
 
 fn detectors_mode_writes_public_circuit_and_detector_rows() {
@@ -56,6 +57,47 @@ fn detectors_mode_writes_public_circuit_and_detector_rows() {
         serde_json::from_slice(&fs::read(public_out.join("manifest.json")).unwrap()).unwrap();
     assert_eq!(manifest["mode"], "detectors");
     assert_eq!(manifest["row"]["kind"], "detectors");
+}
+
+fn bare_relative_output_paths_write_bundles_in_current_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join("circuit.stim");
+    fs::write(
+        &circuit,
+        "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(root.path()).unwrap();
+    let output = run_cli(&[
+        "export_decoder_dataset".to_string(),
+        "--circuit".to_string(),
+        circuit.display().to_string(),
+        "--shots".to_string(),
+        "1".to_string(),
+        "--mode".to_string(),
+        "detectors".to_string(),
+        "--public_out".to_string(),
+        "public-data".to_string(),
+        "--private_out".to_string(),
+        "private-truth".to_string(),
+    ]);
+    std::env::set_current_dir(original_dir).unwrap();
+    assert_success(&output, "bare relative output paths export");
+
+    let public_out = root.path().join("public-data");
+    let private_out = root.path().join("private-truth");
+    assert_eq!(
+        sorted_entries(&public_out),
+        vec!["circuit.stim", "manifest.json", "shots.b8"]
+    );
+    assert_eq!(
+        sorted_entries(&private_out),
+        vec!["answers.b8", "manifest.json"]
+    );
+    assert_eq!(fs::read(public_out.join("shots.b8")).unwrap(), vec![1]);
+    assert_eq!(fs::read(private_out.join("answers.b8")).unwrap(), vec![1]);
 }
 
 fn blinded_measurements_masks_recomputed_public_observable() {
