@@ -3,6 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+const BLINDED_SEED: u64 = 18_446_744_073_709_551_557;
+const BLINDED_SEED_TEXT: &str = "18446744073709551557";
+
 fn rstim_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
@@ -70,12 +73,12 @@ fn blinded_measurements_masks_recomputed_public_observable() {
         "measurements_blinded",
         &public_out,
         &private_out,
-        &["--logical_x_qubits", "0", "--seed", "9"],
+        &["--logical_x_qubits", "0", "--seed", BLINDED_SEED_TEXT],
     ));
     assert_success(&output, "blinded export");
 
     let public_manifest = fs::read_to_string(public_out.join("manifest.json")).unwrap();
-    assert_no_public_secret_words(&public_manifest, &private_out, &circuit);
+    assert_no_public_secret_words(&public_manifest, &private_out, &circuit, BLINDED_SEED);
     assert_eq!(fs::read(private_out.join("answers.b8")).unwrap().len(), 1);
     assert_eq!(fs::read(private_out.join("masks.b8")).unwrap().len(), 1);
 }
@@ -242,6 +245,7 @@ fn assert_no_public_secret_words(
     public_manifest: &str,
     private_out: &Path,
     producer_circuit: &Path,
+    forbidden_seed: u64,
 ) {
     let manifest: Value = serde_json::from_str(public_manifest).expect("public manifest is JSON");
     let private_path = private_out.display().to_string();
@@ -254,6 +258,7 @@ fn assert_no_public_secret_words(
     assert_no_public_secret_value(
         &manifest,
         "$",
+        forbidden_seed,
         &[
             private_path.as_str(),
             producer_path.as_str(),
@@ -262,7 +267,12 @@ fn assert_no_public_secret_words(
     );
 }
 
-fn assert_no_public_secret_value(value: &Value, path: &str, forbidden_values: &[&str]) {
+fn assert_no_public_secret_value(
+    value: &Value,
+    path: &str,
+    forbidden_seed: u64,
+    forbidden_values: &[&str],
+) {
     const FORBIDDEN_WORDS: [&str; 6] = [
         "seed",
         "mask",
@@ -282,13 +292,16 @@ fn assert_no_public_secret_value(value: &Value, path: &str, forbidden_values: &[
                         "public manifest leaked {forbidden} key at {path}.{key}"
                     );
                 }
-                assert_no_public_secret_value(value, &format!("{path}.{key}"), forbidden_values);
+                assert_no_public_secret_value(
+                    value,
+                    &format!("{path}.{key}"),
+                    forbidden_seed,
+                    forbidden_values,
+                );
             }
         }
-        Value::Array(values) => {
-            for (index, value) in values.iter().enumerate() {
-                assert_no_public_secret_value(value, &format!("{path}[{index}]"), forbidden_values);
-            }
+        Value::Array(_) => {
+            panic!("public manifest leaked an array at {path}; arrays can expose row permutations");
         }
         Value::String(text) => {
             let normalized_text = text.to_ascii_lowercase();
@@ -304,6 +317,13 @@ fn assert_no_public_secret_value(value: &Value, path: &str, forbidden_values: &[
                     "public manifest leaked private path or producer-circuit label at {path}: {text}"
                 );
             }
+        }
+        Value::Number(number) => {
+            assert_ne!(
+                number.as_u64(),
+                Some(forbidden_seed),
+                "public manifest leaked seed value at {path}: {number}"
+            );
         }
         _ => {}
     }
