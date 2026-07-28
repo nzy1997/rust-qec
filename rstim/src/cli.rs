@@ -234,6 +234,24 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Export a public decoder dataset and private answer bundle
+    #[command(name = "export_decoder_dataset")]
+    ExportDecoderDataset {
+        #[arg(long = "circuit")]
+        circuit: String,
+        #[arg(long = "shots")]
+        shots: u64,
+        #[arg(long = "mode")]
+        mode: String,
+        #[arg(long = "logical_x_qubits")]
+        logical_x_qubits: Option<String>,
+        #[arg(long = "public_out")]
+        public_out: String,
+        #[arg(long = "private_out")]
+        private_out: String,
+        #[arg(long = "seed")]
+        seed: Option<u64>,
+    },
     /// Pack measurement samples into an RSMP archive
     #[command(name = "pack_samples")]
     PackSamples {
@@ -667,6 +685,23 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
         }
+        Some(Commands::ExportDecoderDataset {
+            circuit,
+            shots,
+            mode,
+            logical_x_qubits,
+            public_out,
+            private_out,
+            seed,
+        }) => run_export_decoder_dataset(
+            &circuit,
+            shots,
+            &mode,
+            logical_x_qubits.as_deref(),
+            &public_out,
+            &private_out,
+            seed,
+        ),
         Some(Commands::PackSamples {
             circuit,
             shots,
@@ -1230,6 +1265,38 @@ fn rsmp_publish_error(final_path: &Path, published: &[PathBuf], cause: Option<&s
 
 fn fail_pack_finish_is_injected() -> bool {
     cfg!(debug_assertions) && std::env::var_os("RSTIM_TEST_RSMP_FAIL_PACK_FINISH").is_some()
+}
+
+pub fn run_export_decoder_dataset(
+    circuit: &str,
+    shots: u64,
+    mode: &str,
+    logical_x_qubits: Option<&str>,
+    public_out: &str,
+    private_out: &str,
+    seed: Option<u64>,
+) -> Result<(), String> {
+    let circuit_text = std::fs::read_to_string(circuit)
+        .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
+    let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
+    let logical_x_qubits = match logical_x_qubits {
+        Some(value) => crate::decoder_dataset::parse_logical_x_qubits(value)?,
+        None => Vec::new(),
+    };
+    let shots =
+        usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
+    crate::decoder_dataset::export_decoder_dataset(
+        crate::decoder_dataset::ExportDecoderDatasetConfig {
+            circuit_text,
+            shots,
+            mode,
+            logical_x_qubits,
+            public_out: std::path::PathBuf::from(public_out),
+            private_out: std::path::PathBuf::from(private_out),
+            seed,
+        },
+    )
+    .map(drop)
 }
 
 fn run_pack_samples(
