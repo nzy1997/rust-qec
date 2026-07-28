@@ -30,6 +30,7 @@ pub mod sample_trace;
 pub mod perf;
 pub mod compiled;
 pub mod sample_archive;
+pub mod decoder_dataset;
 
 pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnostics};
 
