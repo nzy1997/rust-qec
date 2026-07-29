@@ -692,8 +692,7 @@ def validate_environment(environment: dict[str, Any], repo_root: Path = REPO_ROO
     if require_object(environment.get("zstd_contract"), "environment zstd_contract") != ZSTD_CONTRACT:
         raise ValueError("environment zstd_contract mismatch")
     cargo = require_object(environment.get("cargo"), "environment cargo")
-    if cargo.get("lock_sha256") != sha256_file(repo_root / "Cargo.lock"):
-        raise ValueError("environment Cargo.lock sha256 mismatch")
+    require_sha256(cargo.get("lock_sha256"), "environment cargo lock_sha256")
     locked_versions = load_locked_package_versions(repo_root)
     for package in ("zstd", "zstd-safe", "zstd-sys"):
         if cargo.get(package) != locked_versions.get(package):

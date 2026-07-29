@@ -299,6 +299,17 @@ def main() -> int:
         if result.returncode != 0:
             raise AssertionError(f"valid bundle failed:\n{result.stdout}")
 
+        historical_lock = root / "historical-lock"
+        shutil.copytree(valid, historical_lock)
+        mutate_json(
+            historical_lock,
+            "environment.json",
+            lambda environment: environment["cargo"].update({"lock_sha256": "1" * 64}),
+        )
+        result = run_checker(historical_lock)
+        if result.returncode != 0:
+            raise AssertionError(f"historical lock provenance bundle failed:\n{result.stdout}")
+
         expect_failure(
             valid,
             "bad-benchmark-archive-bytes",

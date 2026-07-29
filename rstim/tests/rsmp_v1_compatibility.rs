@@ -49,6 +49,22 @@ fn changed_archive_payload_byte_is_rejected() {
 }
 
 #[test]
+fn historical_generation_lock_is_not_current_reader_lock() {
+    let temp = CopiedFixtureTree::new();
+    let cargo_lock = temp.root.path().join("Cargo.lock");
+    fs::write(
+        &cargo_lock,
+        fs::read_to_string(&cargo_lock).expect("read copied Cargo.lock")
+            + "\n# simulated release metadata-only lock change\n",
+    )
+    .expect("write copied Cargo.lock");
+
+    let report = verify_fixture(temp.root.path()).expect("compatibility fixture");
+
+    assert_eq!(report.success_line, SUCCESS_LINE);
+}
+
+#[test]
 fn changed_expected_measurement_hash_is_rejected() {
     let temp = CopiedFixtureTree::new();
     rewrite_manifest_measurement_hash(&temp.manifest_path, ZERO_SHA256);
@@ -132,7 +148,7 @@ fn verify_fixture(repo_root: &Path) -> CheckResult<CompatReport> {
     let manifest = load_manifest(&manifest_path)?;
     verify_manifest_identity(&manifest)?;
     verify_manifest_consumers(&manifest)?;
-    verify_manifest_generation(repo_root, &manifest)?;
+    verify_manifest_generation(&manifest)?;
 
     let shape = FixtureShape::from_manifest(&manifest)?;
     let paths = FixturePaths::from_manifest(repo_root, &manifest)?;
@@ -221,7 +237,7 @@ fn verify_manifest_consumers(manifest: &TomlValue) -> CheckResult<()> {
     Ok(())
 }
 
-fn verify_manifest_generation(repo_root: &Path, manifest: &TomlValue) -> CheckResult<()> {
+fn verify_manifest_generation(manifest: &TomlValue) -> CheckResult<()> {
     let argv = toml_array(manifest, &["generation", "argv"])?;
     let argv_strings = argv
         .iter()
@@ -267,15 +283,11 @@ fn verify_manifest_generation(repo_root: &Path, manifest: &TomlValue) -> CheckRe
         "zstd-sys 2.0.16+zstd.1.5.7",
         "generation.zstandard_backend",
     )?;
-    let cargo_lock = checked_repo_path(repo_root, "Cargo.lock", "Cargo.lock")?;
-    require_eq(
-        sha256_file(&cargo_lock)?.as_str(),
-        toml_str(manifest, &["generation", "cargo_lock_sha256"])?,
-        "generation.cargo_lock_sha256",
-    )?;
+    let cargo_lock_sha256 = toml_str(manifest, &["generation", "cargo_lock_sha256"])?;
+    require_sha256(cargo_lock_sha256, "generation.cargo_lock_sha256")?;
     require_eq(
         toml_str(manifest, &["hashes", "cargo_lock_sha256"])?,
-        toml_str(manifest, &["generation", "cargo_lock_sha256"])?,
+        cargo_lock_sha256,
         "hashes.cargo_lock_sha256",
     )?;
     let statement = toml_str(manifest, &["generation", "statement"])?;
@@ -1099,6 +1111,18 @@ where
         Err(format!(
             "{label} mismatch: got {actual:?}, expected {expected:?}"
         ))
+    }
+}
+
+fn require_sha256(value: &str, label: &str) -> CheckResult<()> {
+    let is_hex = value
+        .as_bytes()
+        .iter()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte));
+    if value.len() == 64 && is_hex {
+        Ok(())
+    } else {
+        Err(format!("{label} must be a lowercase SHA-256 digest"))
     }
 }
 

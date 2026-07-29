@@ -209,7 +209,7 @@ class RsmpV1ReadinessRepoRootControls(unittest.TestCase):
                 artifact["failed_checks"],
             )
 
-    def test_compression_validation_uses_supplied_repo_root_cargo_lock(self) -> None:
+    def test_compression_validation_accepts_historical_cargo_lock_provenance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="rstim-rsmp-readiness-root-test-") as raw_tmp:
             temp_root = Path(raw_tmp) / "repo"
             artifact_dir = Path(raw_tmp) / "out"
@@ -240,13 +240,14 @@ class RsmpV1ReadinessRepoRootControls(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             combined = result.stdout + result.stderr
-            self.assertIn("compression evidence validation failed", combined)
-            self.assertIn("environment Cargo.lock sha256 mismatch", combined)
+            self.assertIn("not ready: readiness commands were skipped", combined)
+            self.assertNotIn("compression evidence validation failed", combined)
+            self.assertNotIn("environment Cargo.lock sha256 mismatch", combined)
             self.assertNotIn(PASS_LINE, combined)
             artifact = json.loads((artifact_dir / "readiness.json").read_text())
             self.assertEqual(artifact["status"], "fail")
             self.assertTrue(
-                any(item["check"] == "compression.bundle" for item in artifact["failed_checks"]),
+                any(item["check"] == "readiness.commands" for item in artifact["failed_checks"]),
                 artifact["failed_checks"],
             )
 
