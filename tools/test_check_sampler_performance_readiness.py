@@ -164,7 +164,7 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
                 "--out",
                 str(out),
                 "--verify-github",
-                "nzy1997/rstim",
+                "nzy1997/rust-qec",
                 "--github-json",
                 str(github_json),
             )
@@ -196,7 +196,7 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
         ]
 
         with mock.patch.object(checker.subprocess, "run", side_effect=responses) as run:
-            result = checker.verify_milestone_closure("nzy1997/rstim", None)
+            result = checker.verify_milestone_closure("nzy1997/rust-qec", None)
 
         self.assertEqual(result["closed"], 8)
         self.assertEqual(result["open"], 0)
@@ -222,7 +222,7 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
                 "--out",
                 str(out),
                 "--verify-github",
-                "nzy1997/rstim",
+                "nzy1997/rust-qec",
                 "--github-json",
                 str(github_json),
             )
@@ -244,7 +244,7 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
                 "--out",
                 str(out),
                 "--verify-github",
-                "nzy1997/rstim",
+                "nzy1997/rust-qec",
                 "--github-json",
                 str(github_json),
             )
@@ -267,7 +267,7 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
                 "--out",
                 str(out),
                 "--verify-github",
-                "nzy1997/rstim",
+                "nzy1997/rust-qec",
                 "--github-json",
                 str(github_json),
             )
