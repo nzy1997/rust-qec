@@ -55,6 +55,8 @@ class SiteAppRenderingTest(unittest.TestCase):
             async function renderCheckedCards(manifestFixture) {
               const elements = new Map();
               const fetchPromises = [];
+              const checkedCards = makeElement("checked-benchmark-result-cards");
+              checkedCards.dataset = { evidenceItems: "surface-decoder-full bb-circuit-full" };
               const document = {
                 body: { dataset: { root: "." } },
                 getElementById(id) {
@@ -62,6 +64,9 @@ class SiteAppRenderingTest(unittest.TestCase):
                     elements.set(id, makeElement(id));
                   }
                   return elements.get(id);
+                },
+                querySelectorAll(selector) {
+                  return selector === "[data-evidence-items]" ? [checkedCards] : [];
                 },
                 createElement(tagName) {
                   return makeElement(tagName);
@@ -79,7 +84,7 @@ class SiteAppRenderingTest(unittest.TestCase):
               vm.runInNewContext(appJs, { document, fetch }, { filename: "site/static/js/benchmarks.js" });
               await Promise.all(fetchPromises);
               await new Promise((resolve) => setImmediate(resolve));
-              return elements.get("checked-benchmark-result-cards").innerHTML;
+              return checkedCards.innerHTML;
             }
 
             function evidenceItem(manifestFixture, itemId) {

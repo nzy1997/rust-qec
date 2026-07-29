@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}RSMP v1 — rstim{% endblock title %}
+{% block title %}RSMP v1 — RustQEC{% endblock title %}
 {% block description %}A lossless, circuit-bound sample archive with measured compression results.{% endblock description %}
 
 {% block hero %}
@@ -37,8 +37,8 @@
       <p><strong>Detector mode</strong> publishes detector-event rows in <code>shots.b8</code> and keeps logical answers in private <code>answers.b8</code>.</p>
       <p><strong>Blinded measurement mode</strong> publishes raw measurement rows, privately randomizes the logical state with mask bits, and scores against private <code>answers.b8</code>.</p>
       <div class="docs-card-links">
-        <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/decoder-dataset.md">Decoder dataset guide</a>
-        <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-cli.md">RSMP CLI guide</a>
+        <a href="https://github.com/nzy1997/rust-qec/blob/master/rstim/doc/decoder-dataset.md">Decoder dataset guide</a>
+        <a href="https://github.com/nzy1997/rust-qec/blob/master/rstim/doc/rsmp-cli.md">RSMP CLI guide</a>
       </div>
     </article>
   </div>
@@ -87,9 +87,9 @@ rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only</cod
   <details>
     <summary id="rsmp-evidence-title">Evidence and format references</summary>
     <div class="docs-card-links">
-      <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-v1.md">Format</a>
-      <a href="https://github.com/nzy1997/rstim/blob/master/rstim/doc/rsmp-cli.md">CLI guide</a>
-      <a href="https://github.com/nzy1997/rstim/tree/master/benchmarks/rstim_vs_stim_simulator/results/rsmp-v1">Evidence bundle</a>
+      <a href="https://github.com/nzy1997/rust-qec/blob/master/rstim/doc/rsmp-v1.md">Format</a>
+      <a href="https://github.com/nzy1997/rust-qec/blob/master/rstim/doc/rsmp-cli.md">CLI guide</a>
+      <a href="https://github.com/nzy1997/rust-qec/tree/master/benchmarks/rstim_vs_stim_simulator/results/rsmp-v1">Evidence bundle</a>
     </div>
   </details>
 </section>

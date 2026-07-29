@@ -21,6 +21,6 @@ Status: **ready**
 - Site-facing #379 remains separate; this readiness artifact does not update the site or close #379.
 
 ## Issue Links
-- [#38](https://github.com/nzy1997/rstim/issues/38)
-- [#406](https://github.com/nzy1997/rstim/issues/406)
-- [#379](https://github.com/nzy1997/rstim/issues/379)
+- [#38](https://github.com/nzy1997/rust-qec/issues/38)
+- [#406](https://github.com/nzy1997/rust-qec/issues/406)
+- [#379](https://github.com/nzy1997/rust-qec/issues/379)

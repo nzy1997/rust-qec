@@ -174,8 +174,8 @@ class SiteBuildCheckerTest(unittest.TestCase):
         index_path = fixture.site_root / "index.html"
         index_path.write_text(
             index_path.read_text(encoding="utf-8")
-            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/surface_decoder_compare/README.md">surface docs</a>\n'
-            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">rstim docs</a>\n',
+            + '<a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface docs</a>\n'
+            + '<a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">rstim docs</a>\n',
             encoding="utf-8",
         )
 

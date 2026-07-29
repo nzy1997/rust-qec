@@ -1,5 +1,5 @@
 +++
-title = "rstim"
+title = "RustQEC"
 template = "index.html"
 
 [extra]

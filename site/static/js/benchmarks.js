@@ -135,7 +135,7 @@
     if (typeof path !== "string" || /^(?:https?:)?\/\//.test(path) || path.startsWith("#")) {
       return path;
     }
-    return `https://github.com/nzy1997/rstim/blob/master/${path}`;
+    return `https://github.com/nzy1997/rust-qec/blob/master/${path}`;
   }
 
   function renderSourceLinks(paths) {

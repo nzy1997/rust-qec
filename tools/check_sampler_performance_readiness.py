@@ -36,7 +36,7 @@ MILESTONE_TITLES = (
     "M4: Measured Optimization Closure",
 )
 MILESTONE_PASS_LINE = "PASS milestone closure closed=8 open=0"
-ISSUE_BASE_URL = "https://github.com/nzy1997/rstim/issues"
+ISSUE_BASE_URL = "https://github.com/nzy1997/rust-qec/issues"
 
 
 class ReadinessError(RuntimeError):

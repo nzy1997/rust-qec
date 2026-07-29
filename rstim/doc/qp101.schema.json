@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://nzy1997.github.io/rstim/qp101.schema.json",
+  "$id": "https://nzy1997.github.io/rust-qec/qp101.schema.json",
   "title": "QP101-ZY Quantum Circuit JSON Format",
   "description": "Structural JSON Schema for QP101-ZY draft v1.0 quantum circuit documents. Semantic validation rules remain in the QP101-ZY markdown specification.",
   "type": "object",

@@ -267,7 +267,7 @@ fn readme_links_benchmarked_site() {
             context,
         );
         assert!(
-            text.contains("https://nzy1997.github.io/rstim/"),
+            text.contains("https://nzy1997.github.io/rust-qec/"),
             "{context} must link to the GitHub Pages documentation site"
         );
     }
@@ -522,7 +522,7 @@ fn benchmark_methodology_lists_required_provenance() {
         "item.status",
         "item.claims_limit",
         "repoSourceHref",
-        "https://github.com/nzy1997/rstim/blob/master/",
+        "https://github.com/nzy1997/rust-qec/blob/master/",
         "repoSourceHref(path)",
     ] {
         assert!(

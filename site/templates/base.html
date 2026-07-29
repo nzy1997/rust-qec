@@ -4,19 +4,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}rstim{% endblock title %}</title>
+    <title>{% block title %}RustQEC{% endblock title %}</title>
     <meta
       name="description"
-      content="{% block description %}rstim — a quantum error correction workspace in Rust.{% endblock description %}"
+      content="{% block description %}RustQEC — a quantum error correction workspace in Rust{% endblock description %}"
     >
     <link rel="stylesheet" href="{{ root }}/styles.css">
   </head>
   <body data-root="{{ root }}">
     <header class="site-header">
       <nav class="top-nav" aria-label="Primary">
-        <a class="brand" href="{{ root }}/" aria-label="rstim home">
-          <span class="brand-mark">r</span>
-          <span>rstim</span>
+        <a class="brand" href="{{ root }}/" aria-label="RustQEC home">
+          <span class="brand-mark">R</span>
+          <span>RustQEC</span>
         </a>
         <div class="nav-links">
           <a class="nav-link{% if current_nav == "home" %} current{% endif %}" href="{{ root }}/"{% if current_nav == "home" %} aria-current="page"{% endif %}>Home</a>
@@ -36,8 +36,8 @@
     </main>
 
     <footer class="site-footer">
-      <span>rstim — a quantum error correction workspace in Rust</span>
-      <a href="https://github.com/nzy1997/rstim">Repository</a>
+      <span>RustQEC — a quantum error correction workspace in Rust</span>
+      <a href="https://github.com/nzy1997/rust-qec">Repository</a>
     </footer>
     {% block scripts %}{% endblock scripts %}
   </body>

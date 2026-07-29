@@ -1,16 +1,15 @@
-# rstim
+# RustQEC
 
-[![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
+[![CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nzy1997/rust-qec/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rust-qec)
 
-`rstim` is a Rust quantum error correction workspace for Stim-like circuit
-simulation, command-line circuit workflows, decoder experiments, and benchmark
-evidence. Use this README as the map; the detailed workflows live in the linked
-docs.
+RustQEC is a Rust workspace for quantum error correction. It brings together
+the `rstim` Stim-like circuit simulator and CLI, code-construction tools,
+decoder experiments, and reproducible benchmark evidence.
 
 ## Benchmarked Documentation Site
 
-The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
+The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
 is the broad repository reference: workspace walkthroughs, benchmark evidence,
 checked results, methodology and claims limits, plus the QP101 schema browser
 and gallery that used to be the whole Pages surface.
@@ -24,7 +23,7 @@ python3 tools/check_site_build.py _site
 
 ## What You Can Do
 
-With `rstim` you can:
+With RustQEC you can:
 
 - [Trace a circuit through stats, detector events, detector-error-model
   extraction, and DEM sampling](docs/showcases/rstim-cli-dem-pipeline.md).
@@ -53,9 +52,9 @@ With `rstim` you can:
 
 ## Quick Start
 
-Build the workspace:
-
 ```sh
+git clone https://github.com/nzy1997/rust-qec.git
+cd rust-qec
 cargo build --workspace
 ```
 

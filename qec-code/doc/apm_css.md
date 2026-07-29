@@ -7,9 +7,9 @@ vocabulary into the data model used by `qec-code`.
 ## Fixture Scope
 
 - Source manifest: `qec-code/tests/fixtures/apm/table_a1_manifest.json` from
-  <https://github.com/nzy1997/rstim/issues/132>.
+  <https://github.com/nzy1997/rust-qec/issues/132>.
 - Known-answer sparse fixture target:
-  <https://github.com/nzy1997/rstim/issues/133>.
+  <https://github.com/nzy1997/rust-qec/issues/133>.
 - Paper source: <https://arxiv.org/abs/2604.16209>, Appendix A and Table A1.
 - Construction background: <https://arxiv.org/abs/2601.08824>, active
   orthogonality and affine permutation construction.
