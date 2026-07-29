@@ -11,7 +11,7 @@ analyzing quantum error-correcting codes. Its dependency-facing APIs include:
 
 ## Dependency status
 
-This crate is currently developed inside the `rstim` workspace and is not
+This crate is currently developed inside the RustQEC workspace and is not
 published independently. A sibling local checkout can use a path dependency:
 
 ```toml

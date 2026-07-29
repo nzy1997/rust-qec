@@ -140,5 +140,5 @@ python3 -m unittest benchmarks.test_run_surface_dem_benchmark.RunSurfaceDemBench
 
 ## License
 
-Apache-2.0. This crate follows the rstim workspace license policy; see
+Apache-2.0. This crate follows the RustQEC workspace license policy; see
 [`../LICENSE`](../LICENSE) for the full license text.

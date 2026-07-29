@@ -1,6 +1,6 @@
 # Showcase Index
 
-This directory is the stable front door for runnable rstim workspace
+This directory is the stable front door for runnable RustQEC workspace
 showcases. Each showcase page should explain what the example demonstrates,
 how to run it, where the result appears, which code owns it, how to verify it,
 and what its limits are.
