@@ -33,8 +33,10 @@ Enable the open-source exact ILP backend only when it is needed:
 qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
 ```
 
-The repository does not yet declare a project license. Resolve that before
-redistributing this crate or treating it as a released third-party dependency.
+This crate is covered by the repository-wide
+[Apache-2.0 license](../LICENSE), which is also declared in the workspace
+package metadata. The crate is not yet published independently; downstream
+users should continue to pin a reviewed repository revision.
 
 ## Deterministic regular matrices
 
