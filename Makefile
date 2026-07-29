@@ -152,8 +152,9 @@ endif
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rsinter/Cargo.toml
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rbposd/Cargo.toml
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rmatching/Cargo.toml
+	cargo check --offline --workspace
 	cargo check --locked --workspace
-	git add rstim/Cargo.toml rsinter/Cargo.toml rbposd/Cargo.toml rmatching/Cargo.toml
+	git add rstim/Cargo.toml rsinter/Cargo.toml rbposd/Cargo.toml rmatching/Cargo.toml Cargo.lock
 	git commit -m "release: v$(V)"
 	git tag -a "v$(V)" -m "Release v$(V)"
 	git push origin $(DEFAULT_BRANCH) --tags
