@@ -10,7 +10,7 @@ from those artifacts.
 The workload is the Stim-style surface-code sample case
 `stim-style-surface-sample-d11-r100-b1024`. Its canonical circuit input is the
 checked Stim-generated `.stim` fixture introduced by issue
-[#385](https://github.com/nzy1997/rstim/issues/385), not a circuit regenerated
+[#385](https://github.com/nzy1997/rust-qec/issues/385), not a circuit regenerated
 by `rstim`. The full fixture is
 [`benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim`](benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim).
 
@@ -23,7 +23,7 @@ The evidence has two independent tracks:
   `rstim`-vs-Stim ratios.
 
 The older umbrella issue
-[#38](https://github.com/nzy1997/rstim/issues/38) is historical context for the
+[#38](https://github.com/nzy1997/rust-qec/issues/38) is historical context for the
 surface-code benchmark direction. This page narrows that umbrella to the
 recorded simulator workloads, commands, and environments below.
 
@@ -181,10 +181,10 @@ Speed evidence:
 
 Issue context:
 
-- [`#38 Performance Benchmarks on Surface Codes`](https://github.com/nzy1997/rstim/issues/38)
-- [`#385 Add a shared rstim-vs-Stim simulator fixture catalog`](https://github.com/nzy1997/rstim/issues/385)
-- [`#386 Add a statistical sample-correctness verifier against Stim`](https://github.com/nzy1997/rstim/issues/386)
-- [`#390 Report shots/s and rstim-vs-Stim ratios for sample speed evidence`](https://github.com/nzy1997/rstim/issues/390)
+- [`#38 Performance Benchmarks on Surface Codes`](https://github.com/nzy1997/rust-qec/issues/38)
+- [`#385 Add a shared rstim-vs-Stim simulator fixture catalog`](https://github.com/nzy1997/rust-qec/issues/385)
+- [`#386 Add a statistical sample-correctness verifier against Stim`](https://github.com/nzy1997/rust-qec/issues/386)
+- [`#390 Report shots/s and rstim-vs-Stim ratios for sample speed evidence`](https://github.com/nzy1997/rust-qec/issues/390)
 
 ## Verification
 

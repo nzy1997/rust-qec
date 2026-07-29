@@ -16,7 +16,7 @@ published independently. A sibling local checkout can use a path dependency:
 
 ```toml
 [dependencies]
-qec-code = { path = "../rstim/qec-code" }
+qec-code = { path = "../rust-qec/qec-code" }
 ```
 
 Downstream Git-based prototypes should pin an exact repository revision instead
@@ -24,13 +24,13 @@ of following a moving branch:
 
 ```toml
 [dependencies]
-qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-commit>" }
+qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-commit>" }
 ```
 
 Enable the open-source exact ILP backend only when it is needed:
 
 ```toml
-qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
+qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
 ```
 
 This crate is covered by the repository-wide

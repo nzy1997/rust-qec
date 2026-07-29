@@ -1,4 +1,4 @@
-base_url = "https://nzy1997.github.io/rstim"
+base_url = "https://nzy1997.github.io/rust-qec"
 title = "RustQEC"
 compile_sass = false
 build_search_index = false

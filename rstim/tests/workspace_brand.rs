@@ -31,3 +31,46 @@ fn rustqec_is_the_workspace_brand_while_rstim_remains_the_simulator() {
     assert!(simulator_manifest.contains("name = \"rstim\""));
     assert!(readme.contains("cargo run -p rstim --bin rstim"));
 }
+
+#[test]
+fn active_public_links_use_the_rust_qec_slug() {
+    let old_github_slug = ["github.com", "nzy1997", "rstim"].join("/");
+    let old_pages_path = ["nzy1997.github.io", "rstim"].join("/");
+    let old_codecov_slug = ["codecov.io", "gh", "nzy1997", "rstim"].join("/");
+
+    const ACTIVE_FILES: &[&str] = &[
+        "README.md",
+        "docs/showcases/README.md",
+        "site/config.toml",
+        "site/templates/base.html",
+        "site/templates/rsmp-v1-showcase.html",
+        "site/static/js/benchmarks.js",
+        "qec-code/Cargo.toml",
+        "qec-ilp-core/Cargo.toml",
+        "qec-code/README.md",
+        "rmatching/README.md",
+        "rstim/doc/qp101.schema.json",
+        "rstim/tests/site_contract.rs",
+        "tools/test_check_site_build.py",
+    ];
+
+    for path in ACTIVE_FILES {
+        let text = read_repo_file(path);
+        assert!(
+            !text.contains(&old_github_slug),
+            "{path} still contains the old GitHub slug"
+        );
+        assert!(
+            !text.contains(&old_pages_path),
+            "{path} still contains the old Pages path"
+        );
+        assert!(
+            !text.contains(&old_codecov_slug),
+            "{path} still contains the old Codecov slug"
+        );
+    }
+
+    assert!(read_repo_file("README.md").contains("github.com/nzy1997/rust-qec"));
+    assert!(read_repo_file("site/config.toml")
+        .contains("base_url = \"https://nzy1997.github.io/rust-qec\""));
+}

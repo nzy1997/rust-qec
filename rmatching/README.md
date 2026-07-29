@@ -11,7 +11,7 @@ A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWP
 - Standalone DEM (Detector Error Model) text parser — no external dependencies
 - Negative edge weight support
 - Decode API: `decode`, `decode_batch`, `decode_to_edges`
-- Optional [rsinter](https://github.com/nzy1997/rstim) `Decoder` trait integration behind `rsinter` feature flag
+- Optional [rsinter](https://github.com/nzy1997/rust-qec) `Decoder` trait integration behind `rsinter` feature flag
 
 ## Quick Start
 

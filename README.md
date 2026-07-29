@@ -1,7 +1,7 @@
 # RustQEC
 
-[![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
+[![CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nzy1997/rust-qec/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rust-qec)
 
 RustQEC is a Rust workspace for quantum error correction. It brings together
 the `rstim` Stim-like circuit simulator and CLI, code-construction tools,
@@ -9,7 +9,7 @@ decoder experiments, and reproducible benchmark evidence.
 
 ## Benchmarked Documentation Site
 
-The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
+The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
 is the broad repository reference: workspace walkthroughs, benchmark evidence,
 checked results, methodology and claims limits, plus the QP101 schema browser
 and gallery that used to be the whole Pages surface.
@@ -52,9 +52,9 @@ With RustQEC you can:
 
 ## Quick Start
 
-Build the workspace:
-
 ```sh
+git clone https://github.com/nzy1997/rust-qec.git
+cd rust-qec
 cargo build --workspace
 ```
 

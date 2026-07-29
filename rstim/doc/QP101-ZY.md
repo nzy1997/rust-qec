@@ -5,6 +5,12 @@
 **Contributors:** Design Team
 **Date:** 2026-03-21
 
+## Schema identity
+
+During the RustQEC repository rename, the canonical schema URI moved from
+`/rstim/qp101.schema.json` to `/rust-qec/qp101.schema.json`. This does not
+change the schema shape or the QP101 version.
+
 ## Abstract
 
 This standard defines a JSON format for representing quantum circuits in a framework-agnostic manner while preserving ordered execution semantics that cannot be reduced to a flat gate list. The format supports ordinary gates, parameterized operations, nested repeat blocks, explicit timing markers, coordinate annotations, detector and observable annotations, noise operations, and extension points for framework-specific metadata.

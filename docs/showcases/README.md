@@ -10,7 +10,7 @@ Individual showcase pages will be added by follow-up issues. Use
 
 ## Benchmarked Documentation Site
 
-The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
+The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
 turns these runnable showcase pages into a broader Pages reference with
 workspace walkthroughs, benchmark evidence, checked results, methodology and
 claims limits, and the QP101 schema browser.
