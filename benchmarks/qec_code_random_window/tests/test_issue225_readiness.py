@@ -395,6 +395,18 @@ class Issue225ReadinessTest(unittest.TestCase):
         ):
             self.assertIn(token, markdown)
 
+    def test_committed_issue225_evidence_uses_canonical_github_slug(self) -> None:
+        evidence = Path(__file__).resolve().parents[3] / "benchmarks/qec_code_random_window/issue225_evidence.json"
+        old_repo = "/".join(("nzy1997", "rstim"))
+        old_issue_base = f"https://github.com/{old_repo}/issues/"
+        old_pull_base = f"https://github.com/{old_repo}/pull/"
+        content = evidence.read_text(encoding="utf-8")
+
+        self.assertIn("https://github.com/nzy1997/rust-qec/issues/", content)
+        self.assertIn("https://github.com/nzy1997/rust-qec/pull/", content)
+        self.assertNotIn(old_issue_base, content)
+        self.assertNotIn(old_pull_base, content)
+
     def test_rejects_missing_bb144_or_targeted_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             paths = self._good_fixture(Path(tmp))

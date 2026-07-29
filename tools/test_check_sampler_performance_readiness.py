@@ -99,6 +99,16 @@ class SamplerPerformanceReadinessCheckerTest(unittest.TestCase):
 
         self.assertEqual(COMMITTED_MD.read_text(encoding="utf-8"), checker.render_markdown(readiness))
 
+    def test_committed_readiness_artifacts_use_canonical_github_slug(self) -> None:
+        old_repo = "/".join(("nzy1997", "rstim"))
+        old_issue_base = f"https://github.com/{old_repo}/issues/"
+        canonical_issue_base = "https://github.com/nzy1997/rust-qec/issues/"
+
+        for artifact in (COMMITTED_JSON, COMMITTED_MD):
+            content = artifact.read_text(encoding="utf-8")
+            self.assertIn(canonical_issue_base, content)
+            self.assertNotIn(old_issue_base, content)
+
     def test_absolute_catalog_provenance_reports_not_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             temp_repo = Path(tmp) / "repo"
