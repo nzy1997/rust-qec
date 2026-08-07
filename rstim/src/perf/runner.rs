@@ -79,6 +79,25 @@ fn source_text(source: super::PerfCircuitSource) -> Result<String, String> {
     }
 }
 
+fn paired_atom_loss_text(case: PerfBenchmarkCase) -> Result<Option<String>, String> {
+    case.atom_loss_variant
+        .map(|variant| source_text(variant.source))
+        .transpose()
+}
+
+fn circuit_text_for_variant<'a>(
+    baseline_text: &'a str,
+    atom_loss_text: Option<&'a str>,
+    variant: PerfVariant,
+) -> Result<&'a str, String> {
+    if variant == PerfVariant::RstimInterpretedAtomLoss {
+        return atom_loss_text.ok_or_else(|| {
+            "rstim-interpreted-atom-loss requires a paired atom-loss source".to_string()
+        });
+    }
+    Ok(baseline_text)
+}
+
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -145,7 +164,9 @@ fn run_variant(
     match case.workload {
         PerfWorkload::Sample | PerfWorkload::Detect => {
             let backend = match variant {
-                PerfVariant::RstimInterpreted => SamplingBackend::Interpreted,
+                PerfVariant::RstimInterpreted | PerfVariant::RstimInterpretedAtomLoss => {
+                    SamplingBackend::Interpreted
+                }
                 PerfVariant::RstimCompiled => SamplingBackend::Compiled,
                 PerfVariant::StimCli => return Ok(run_stim_cli(case, text)?),
                 _ => SamplingBackend::Auto,
@@ -244,6 +265,7 @@ pub fn run_case_measurements(
     options: PerfRunOptions,
 ) -> Result<Vec<PerfMeasurementRecord>, String> {
     let options = options.validate()?;
+    let atom_loss_text = paired_atom_loss_text(case)?;
     let instrs = parse_lines(text)?;
     let summary = summarize(&instrs);
     let mut records = Vec::new();
@@ -251,10 +273,11 @@ pub fn run_case_measurements(
     let repeat_count = effective_repeat_count(&instrs);
 
     for variant in variants {
+        let variant_text = circuit_text_for_variant(text, atom_loss_text.as_deref(), *variant)?;
         for measurement_index in 0..total_rounds {
             let warmup = measurement_index < options.warmup_rounds;
-            let wall_time_ns =
-                run_variant(case, text, *variant).map_err(|failure| failure.failure_reason)?;
+            let wall_time_ns = run_variant(case, variant_text, *variant)
+                .map_err(|failure| failure.failure_reason)?;
             records.push(PerfMeasurementRecord {
                 case_label: case.label.to_string(),
                 tool_variant: variant.label().to_string(),
@@ -289,6 +312,7 @@ fn run_selected_case_measurements(
     options: PerfRunOptions,
 ) -> Result<Vec<PerfMeasurementRecord>, String> {
     let options = options.validate()?;
+    let atom_loss_text = paired_atom_loss_text(case)?;
     let instrs = parse_lines(text)?;
     let summary = summarize(&instrs);
     let mut records = Vec::new();
@@ -296,9 +320,10 @@ fn run_selected_case_measurements(
     let repeat_count = effective_repeat_count(&instrs);
 
     for variant in variants {
+        let variant_text = circuit_text_for_variant(text, atom_loss_text.as_deref(), *variant)?;
         for measurement_index in 0..total_rounds {
             let warmup = measurement_index < options.warmup_rounds;
-            let result = run_variant(case, text, *variant);
+            let result = run_variant(case, variant_text, *variant);
             let (wall_time_ns, status, failure_reason, stderr) = match result {
                 Ok(wall_time_ns) => (wall_time_ns, PerfRecordStatus::Completed, None, None),
                 Err(failure) => (
@@ -469,6 +494,7 @@ mod tests {
             requires_compiled: true,
             requires_fallback: false,
             comparisons: &[],
+            atom_loss_variant: None,
         };
         let variants = [PerfVariant::RstimInterpreted, PerfVariant::RstimCompiled];
         let mut out = Vec::new();
@@ -539,6 +565,7 @@ mod tests {
             requires_compiled: true,
             requires_fallback: false,
             comparisons: &[],
+            atom_loss_variant: None,
         };
 
         let records = run_selected_case_measurements(
@@ -577,5 +604,41 @@ mod tests {
             record.tool_variant == "rstim-interpreted"
                 && record.status == PerfRecordStatus::Completed
         }));
+    }
+
+    #[test]
+    fn circuit_text_for_variant_selects_only_the_paired_atom_loss_source() {
+        let case = PerfBenchmarkCase {
+            label: "paired-inline",
+            workload: PerfWorkload::Sample,
+            source: PerfCircuitSource::Inline { text: "M 0\n" },
+            atom_loss_variant: Some(crate::perf::PerfAtomLossVariant {
+                source: PerfCircuitSource::Inline {
+                    text: "LOSS(0) 0\nM 0\n",
+                },
+                per_event_probability: 0.0003334445062,
+                aggregate_error_probability: 0.001,
+            }),
+            shots: Some(4),
+            tier: PerfCaseTier::ReportOnly,
+            requires_compiled: true,
+            requires_fallback: false,
+            comparisons: &[],
+        };
+        let paired = paired_atom_loss_text(case).unwrap().unwrap();
+        assert_eq!(
+            circuit_text_for_variant("M 0\n", Some(&paired), PerfVariant::RstimInterpreted)
+                .unwrap(),
+            "M 0\n"
+        );
+        assert_eq!(
+            circuit_text_for_variant(
+                "M 0\n",
+                Some(&paired),
+                PerfVariant::RstimInterpretedAtomLoss,
+            )
+            .unwrap(),
+            "LOSS(0) 0\nM 0\n"
+        );
     }
 }

@@ -6,7 +6,7 @@ mod runner;
 mod summary;
 
 pub use cases::{
-    PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfNoiseMetadata,
+    PerfAtomLossVariant, PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfNoiseMetadata,
     PerfVariant, PerfWorkload, benchmark_case_variants, benchmark_cases, benchmark_variants,
     comparison_variant_labels, effective_repeat_count, expected_variant_labels,
 };
