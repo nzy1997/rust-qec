@@ -170,6 +170,14 @@ The runner builds `target/release/rstim` for `--profile release` or
 `rstim perf summarize`, and `rstim perf report`. It writes `raw.jsonl`,
 `summary.json`, `report.md`, and `environment.json` under `--out-dir`.
 
+The selected public case reports four items: Stim CLI, interpreted rstim,
+compiled rstim, and interpreted rstim with atom loss. Only the fourth item
+uses the paired atom-loss fixture, and the report prints the atom-loss versus
+interpreted ratio. Its probability contract is
+`p = 1 - 0.999^(1/3) ~= 0.0003334445062`: one depolarization event plus two
+independent per-atom loss events per two-qubit gate preserve an aggregate error
+probability of `0.001`.
+
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 

@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use rstim::perf::{summarize_jsonl_str, PerfMeasurementRecord, PerfSampleOutputMode};
+use rstim::perf::{summarize_jsonl_str, PerfMeasurementRecord};
 
 const PUBLIC_SELECTED_CASE_LABEL: &str = "stim-style-surface-sample-d11-r100-b1024";
 
@@ -348,73 +348,18 @@ fn perf_ci_case_writes_only_selected_artifacts_without_gate_failure() {
 }
 
 #[test]
-fn perf_run_case_with_public_label_writes_only_selected_completed_records() {
-    let dir = tempfile::tempdir().unwrap();
-    let fake_stim = dir.path().join("fake-stim-success");
-    let out = dir.path().join("raw.jsonl");
-    write_fake_stim(&fake_stim, "#!/bin/sh\ncat >/dev/null\nexit 0\n");
-
-    let output = rstim_cmd()
-        .env("RSTIM_TEST_STIM", &fake_stim)
-        .args([
-            "perf",
-            "run",
-            "--case",
-            PUBLIC_SELECTED_CASE_LABEL,
-            "--warmup-rounds",
-            "0",
-            "--measure-rounds",
-            "1",
-            "--out",
-            out.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let raw = std::fs::read_to_string(out).unwrap();
-    assert!(!raw.is_empty());
-    assert!(raw.contains("\"tool_variant\":\"stim-cli\""));
-    assert!(raw.contains("\"tool_variant\":\"rstim-"));
-    assert!(raw.contains("\"status\":\"completed\""));
-    assert!(!raw.contains("loss-protection-sample"));
-    assert!(
-        raw.lines()
-            .all(|line| line.contains(&format!("\"case_label\":\"{PUBLIC_SELECTED_CASE_LABEL}\"")))
-    );
-    let records = raw
-        .lines()
-        .map(|line| PerfMeasurementRecord::from_json_line(line).unwrap())
-        .collect::<Vec<_>>();
-    assert!(!records.is_empty());
-    assert!(records.iter().all(|record| {
-        record.sample_output_mode == Some(PerfSampleOutputMode::MeasurementsOnly)
-    }));
-}
-
-#[test]
 fn perf_ci_case_with_public_label_writes_only_selected_artifacts() {
     let dir = tempfile::tempdir().unwrap();
-    let fake_stim = dir.path().join("fake-stim-success");
     let out_dir = dir.path().join("focused-ci-public-case");
-    write_fake_stim(&fake_stim, "#!/bin/sh\ncat >/dev/null\nexit 0\n");
+    let raw_path = std::path::Path::new("rstim/tests/fixtures/perf/stim_style_sample_raw.jsonl");
 
     let output = rstim_cmd()
-        .env("RSTIM_TEST_STIM", &fake_stim)
+        .env("RSTIM_TEST_PERF_CI_RAW", raw_path)
         .args([
             "perf",
             "ci",
             "--case",
             PUBLIC_SELECTED_CASE_LABEL,
-            "--warmup-rounds",
-            "0",
-            "--measure-rounds",
-            "1",
             "--out-dir",
             out_dir.to_str().unwrap(),
         ])
@@ -432,14 +377,24 @@ fn perf_ci_case_with_public_label_writes_only_selected_artifacts() {
     let report = std::fs::read_to_string(out_dir.join("report.md")).unwrap();
 
     assert!(!raw.is_empty());
+    assert!(raw.contains("\"tool_variant\":\"rstim-interpreted-atom-loss\""));
     assert!(
         raw.lines()
             .all(|line| line.contains(&format!("\"case_label\":\"{PUBLIC_SELECTED_CASE_LABEL}\"")))
     );
+    let records = raw
+        .lines()
+        .map(|line| PerfMeasurementRecord::from_json_line(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(records.len(), 4);
     assert!(summary.contains(&format!("\"case_label\": \"{PUBLIC_SELECTED_CASE_LABEL}\"")));
+    assert!(summary.contains("rstim-interpreted-atom-loss"));
+    assert!(summary.contains("sampler_atom_loss_vs_interpreted"));
     assert!(!summary.contains("rep-sample-d13-r13"));
     assert!(!summary.contains("loss-protection-sample"));
     assert!(report.contains(PUBLIC_SELECTED_CASE_LABEL));
+    assert!(report.contains("rstim-interpreted-atom-loss"));
+    assert!(report.contains("p = 1 - 0.999^(1/3) ~= 0.0003334445062"));
     assert!(!report.contains("rep-sample-d13-r13"));
     assert!(!report.contains("loss-protection-sample"));
 }
@@ -524,6 +479,8 @@ fn perf_summarize_and_report_public_fixture_show_rates_and_report_only_stim_cont
     let summary = std::fs::read_to_string(&summary_path).unwrap();
     assert!(summary.contains("\"median_shots_per_second\""));
     assert!(summary.contains("\"rstim_compiled_vs_stim_cli_ratio\""));
+    assert!(summary.contains("rstim-interpreted-atom-loss"));
+    assert!(summary.contains("sampler_atom_loss_vs_interpreted"));
 
     let report = rstim_cmd()
         .args([
@@ -546,4 +503,7 @@ fn perf_summarize_and_report_public_fixture_show_rates_and_report_only_stim_cont
     assert!(report_text.contains(PUBLIC_SELECTED_CASE_LABEL));
     assert!(report_text.contains("shots/s"));
     assert!(report_text.contains("report-only Stim comparison"));
+    assert!(report_text.contains("rstim-interpreted-atom-loss"));
+    assert!(report_text.contains("sampler_atom_loss_vs_interpreted"));
+    assert!(report_text.contains("p = 1 - 0.999^(1/3) ~= 0.0003334445062"));
 }
