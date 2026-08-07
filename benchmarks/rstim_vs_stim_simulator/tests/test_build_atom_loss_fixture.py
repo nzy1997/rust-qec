@@ -27,6 +27,15 @@ class AtomLossFixtureTest(unittest.TestCase):
             "TICK\n",
         )
 
+    def test_transform_inserts_indented_loss_preserving_instruction_indentation(self) -> None:
+        source = "    CX 0 1 2 3\n    DEPOLARIZE2(0.001) 0 1 2 3\n"
+        self.assertEqual(
+            build_atom_loss_fixture.transform_circuit(source),
+            "    CX 0 1 2 3\n"
+            "    LOSS(0.0003334445062) 0 1 2 3\n"
+            "    DEPOLARIZE2(0.0003334445062) 0 1 2 3\n",
+        )
+
     def test_transform_rejects_mismatched_two_qubit_noise_targets(self) -> None:
         source = "CX 0 1\nDEPOLARIZE2(0.001) 1 0\n"
         with self.assertRaisesRegex(ValueError, "targets do not match"):
@@ -38,12 +47,13 @@ class AtomLossFixtureTest(unittest.TestCase):
         self.assertEqual(atom_loss, build_atom_loss_fixture.transform_circuit(baseline))
 
         lines = atom_loss.splitlines()
-        cx_indices = [index for index, line in enumerate(lines) if line.startswith("CX ")]
-        self.assertEqual(len(cx_indices), 4)
+        cx_indices = [index for index, line in enumerate(lines) if line.lstrip().startswith("CX ")]
+        self.assertEqual(len(cx_indices), 8)
         for index in cx_indices:
-            targets = lines[index].removeprefix("CX ")
-            self.assertEqual(lines[index + 1], f"LOSS(0.0003334445062) {targets}")
-            self.assertEqual(lines[index + 2], f"DEPOLARIZE2(0.0003334445062) {targets}")
+            indentation = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
+            targets = lines[index].lstrip().removeprefix("CX ")
+            self.assertEqual(lines[index + 1], f"{indentation}LOSS(0.0003334445062) {targets}")
+            self.assertEqual(lines[index + 2], f"{indentation}DEPOLARIZE2(0.0003334445062) {targets}")
         self.assertFalse(
             any(
                 line.startswith("H ") and lines[index + 1].startswith("LOSS(")

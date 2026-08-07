@@ -17,25 +17,28 @@ def transform_circuit(text: str) -> str:
     index = 0
     while index < len(lines):
         line = lines[index]
-        if not line.startswith("CX "):
-            if line.startswith("DEPOLARIZE2("):
+        instruction = line.lstrip()
+        if not instruction.startswith("CX "):
+            if instruction.startswith("DEPOLARIZE2("):
                 raise ValueError(f"orphan DEPOLARIZE2 layer at line {index + 1}")
             transformed.append(line)
             index += 1
             continue
 
-        if index + 1 >= len(lines) or not lines[index + 1].startswith(BASELINE_DEPOLARIZE2_PREFIX):
+        next_instruction = lines[index + 1].lstrip() if index + 1 < len(lines) else ""
+        if not next_instruction.startswith(BASELINE_DEPOLARIZE2_PREFIX):
             raise ValueError(f"CX layer at line {index + 1} is not followed by DEPOLARIZE2(0.001)")
-        targets = line.removeprefix("CX ")
-        depolarize_targets = lines[index + 1].removeprefix(BASELINE_DEPOLARIZE2_PREFIX)
+        indentation = line[: len(line) - len(instruction)]
+        targets = instruction.removeprefix("CX ")
+        depolarize_targets = next_instruction.removeprefix(BASELINE_DEPOLARIZE2_PREFIX)
         if targets != depolarize_targets:
             raise ValueError(f"CX and DEPOLARIZE2 targets do not match at line {index + 1}")
 
         transformed.extend(
             [
                 line,
-                f"LOSS({PER_EVENT_PROBABILITY_TEXT}) {targets}",
-                f"DEPOLARIZE2({PER_EVENT_PROBABILITY_TEXT}) {targets}",
+                f"{indentation}LOSS({PER_EVENT_PROBABILITY_TEXT}) {targets}",
+                f"{indentation}DEPOLARIZE2({PER_EVENT_PROBABILITY_TEXT}) {targets}",
             ]
         )
         two_qubit_layers += 1
