@@ -1,7 +1,9 @@
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 
 use crate::ir::{StimInstr, StimTarget};
+use crate::rare_error_iterator::RareErrorIndexSampler;
+use crate::sim::bit_table::BitTable;
+#[cfg(test)]
 use crate::sim::packed_inverse_tableau::PackedInverseTableau;
 
 /// A compiled, allocation-light execution plan for the common loss-aware sampling subset.
@@ -68,6 +70,7 @@ impl LossSamplerPlan {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn run_shot<R: Rng + ?Sized>(&self, rng: &mut R) -> Vec<bool> {
         let mut shot = LossShot::new(self.num_qubits, self.num_measurements);
         shot.execute(&self.ops, rng);
@@ -77,51 +80,319 @@ impl LossSamplerPlan {
     pub(crate) fn run_batch<R: Rng + ?Sized>(
         &self,
         num_shots: usize,
+        reference_sample: &[bool],
         rng: &mut R,
-    ) -> Vec<Vec<bool>> {
-        if num_shots == 0 {
-            return Vec::new();
+    ) -> Result<BitTable, String> {
+        if reference_sample.len() != self.num_measurements {
+            return Err(format!(
+                "loss frame expected {} reference measurements, got {}",
+                self.num_measurements,
+                reference_sample.len()
+            ));
         }
-        if num_shots == 1 {
-            return vec![self.run_shot(rng)];
+
+        let mut batch =
+            LossFrameBatch::try_new(self.num_qubits, self.num_measurements, num_shots, rng)?;
+        batch.execute(&self.ops, reference_sample, rng)?;
+        if batch.measurement_index != self.num_measurements {
+            return Err(format!(
+                "loss frame produced {} measurements, expected {}",
+                batch.measurement_index, self.num_measurements
+            ));
         }
-
-        // Deriving one seed per shot makes results independent of scheduling and thread count.
-        // Disjoint output chunks preserve shot order without synchronization.
-        let seeds: Vec<[u8; 32]> = (0..num_shots).map(|_| rng.r#gen()).collect();
-        let worker_count = std::thread::available_parallelism()
-            .map(|count| count.get())
-            .unwrap_or(1)
-            .min(num_shots);
-        let chunk_len = num_shots.div_ceil(worker_count);
-        let mut results = vec![Vec::new(); num_shots];
-
-        std::thread::scope(|scope| {
-            for (seed_chunk, result_chunk) in
-                seeds.chunks(chunk_len).zip(results.chunks_mut(chunk_len))
-            {
-                scope.spawn(move || {
-                    let mut shot = LossShot::new(self.num_qubits, self.num_measurements);
-                    for (seed, result) in seed_chunk.iter().zip(result_chunk) {
-                        shot.reset();
-                        let mut shot_rng = StdRng::from_seed(*seed);
-                        shot.execute(&self.ops, &mut shot_rng);
-                        *result = shot.measurements.clone();
-                    }
-                });
-            }
-        });
-
-        results
+        Ok(batch.measurements)
     }
 }
 
+/// A Pauli-frame batch with one loss bit per qubit and shot.
+///
+/// Loss only changes which Clifford/noise operations propagate a shot's frame. This is the
+/// bit-sliced form of the executor's reset-based loss semantics: a lost target is frozen until
+/// reset, paired gates are masked whenever either endpoint is lost, and lost measurements are
+/// forced to one. Keeping shots in the minor dimension makes every Clifford layer operate on 64
+/// shots per machine word instead of evolving one tableau per shot.
+struct LossFrameBatch {
+    batch_size: usize,
+    x_table: BitTable,
+    z_table: BitTable,
+    lost_table: BitTable,
+    measurements: BitTable,
+    measurement_index: usize,
+}
+
+impl LossFrameBatch {
+    fn try_new<R: Rng + ?Sized>(
+        num_qubits: usize,
+        num_measurements: usize,
+        batch_size: usize,
+        rng: &mut R,
+    ) -> Result<Self, String> {
+        let alloc = |rows| {
+            BitTable::try_new(rows, batch_size)
+                .map_err(|error| format!("loss frame allocation failed: {error:?}"))
+        };
+        let x_table = alloc(num_qubits)?;
+        let mut z_table = alloc(num_qubits)?;
+        for q in 0..num_qubits {
+            z_table.randomize_row(q, rng);
+        }
+        Ok(Self {
+            batch_size,
+            x_table,
+            z_table,
+            lost_table: alloc(num_qubits)?,
+            measurements: alloc(num_measurements)?,
+            measurement_index: 0,
+        })
+    }
+
+    fn execute<R: Rng + ?Sized>(
+        &mut self,
+        ops: &[LossOp],
+        reference_sample: &[bool],
+        rng: &mut R,
+    ) -> Result<(), String> {
+        for op in ops {
+            match op {
+                LossOp::H(qubits) => {
+                    for &q in qubits {
+                        self.h(q);
+                    }
+                }
+                LossOp::Cx(pairs) => {
+                    for &(control, target) in pairs {
+                        self.cx(control, target);
+                    }
+                }
+                // Ideal Pauli gates are already present in the reference sample. If their target
+                // is lost, its frame is unobservable and remains frozen until reset.
+                LossOp::X(qubits) | LossOp::Y(qubits) | LossOp::Z(qubits) => {
+                    self.ignore_reference_paulis(qubits)
+                }
+                LossOp::ResetZ(qubits) => {
+                    for &q in qubits {
+                        self.reset_z(q, rng);
+                    }
+                }
+                LossOp::MeasureZ(targets) => {
+                    for &(q, inverted) in targets {
+                        self.measure_z(q, inverted, false, reference_sample, rng)?;
+                    }
+                }
+                LossOp::MeasureResetZ(targets) => {
+                    for &(q, inverted) in targets {
+                        self.measure_z(q, inverted, true, reference_sample, rng)?;
+                    }
+                }
+                LossOp::XError {
+                    probability,
+                    qubits,
+                } => self.independent_pauli(*probability, qubits, 1, rng)?,
+                LossOp::YError {
+                    probability,
+                    qubits,
+                } => self.independent_pauli(*probability, qubits, 2, rng)?,
+                LossOp::ZError {
+                    probability,
+                    qubits,
+                } => self.independent_pauli(*probability, qubits, 3, rng)?,
+                LossOp::Depolarize1 {
+                    probability,
+                    qubits,
+                } => self.depolarize1(*probability, qubits, rng)?,
+                LossOp::Depolarize2 { probability, pairs } => {
+                    self.depolarize2(*probability, pairs, rng)?
+                }
+                LossOp::Loss {
+                    probability,
+                    qubits,
+                } => self.loss(*probability, qubits, rng)?,
+                LossOp::Repeat { count, body } => {
+                    for _ in 0..*count {
+                        self.execute(body, reference_sample, rng)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn h(&mut self, q: usize) {
+        let words = self.x_table.words_per_row();
+        for word in 0..words {
+            let x = self.x_table.row_words(q)[word];
+            let z = self.z_table.row_words(q)[word];
+            let lost = self.lost_table.row_words(q)[word];
+            let delta = (x ^ z) & !lost;
+            self.x_table.row_words_mut(q)[word] ^= delta;
+            self.z_table.row_words_mut(q)[word] ^= delta;
+        }
+    }
+
+    fn cx(&mut self, control: usize, target: usize) {
+        let words = self.x_table.words_per_row();
+        for word in 0..words {
+            let present = !(self.lost_table.row_words(control)[word]
+                | self.lost_table.row_words(target)[word]);
+            let control_x = self.x_table.row_words(control)[word];
+            let target_z = self.z_table.row_words(target)[word];
+            self.x_table.row_words_mut(target)[word] ^= control_x & present;
+            self.z_table.row_words_mut(control)[word] ^= target_z & present;
+        }
+    }
+
+    fn reset_z<R: Rng + ?Sized>(&mut self, q: usize, rng: &mut R) {
+        self.x_table.clear_row(q);
+        self.z_table.randomize_row(q, rng);
+        self.lost_table.clear_row(q);
+    }
+
+    fn measure_z<R: Rng + ?Sized>(
+        &mut self,
+        q: usize,
+        inverted: bool,
+        reset: bool,
+        reference_sample: &[bool],
+        rng: &mut R,
+    ) -> Result<(), String> {
+        let reference = *reference_sample
+            .get(self.measurement_index)
+            .ok_or_else(|| {
+                format!(
+                    "loss frame measurement {} exceeds the reference sample",
+                    self.measurement_index
+                )
+            })?;
+        let words = self.x_table.words_per_row();
+        for word in 0..words {
+            let lost = self.lost_table.row_words(q)[word];
+            let present_value = if reference {
+                !self.x_table.row_words(q)[word]
+            } else {
+                self.x_table.row_words(q)[word]
+            };
+            self.measurements.row_words_mut(self.measurement_index)[word] = if inverted {
+                present_value & !lost
+            } else {
+                present_value | lost
+            };
+        }
+        self.measurement_index += 1;
+
+        if reset {
+            self.reset_z(q, rng);
+        } else {
+            for word in 0..words {
+                let lost = self.lost_table.row_words(q)[word];
+                let old_z = self.z_table.row_words(q)[word];
+                self.x_table.row_words_mut(q)[word] &= lost;
+                self.z_table.row_words_mut(q)[word] = (old_z & lost) | (rng.r#gen::<u64>() & !lost);
+            }
+        }
+        Ok(())
+    }
+
+    fn independent_pauli<R: Rng + ?Sized>(
+        &mut self,
+        probability: f64,
+        qubits: &[usize],
+        pauli: u8,
+        rng: &mut R,
+    ) -> Result<(), String> {
+        let attempts = self.attempt_count(qubits.len())?;
+        let mut events = RareErrorIndexSampler::new(probability, attempts);
+        while let Some(index) = events.next_index(rng) {
+            let q = qubits[index / self.batch_size];
+            let shot = index % self.batch_size;
+            if !self.lost_table.get(q, shot) {
+                self.apply_pauli(q, shot, pauli);
+            }
+        }
+        Ok(())
+    }
+
+    fn depolarize1<R: Rng + ?Sized>(
+        &mut self,
+        probability: f64,
+        qubits: &[usize],
+        rng: &mut R,
+    ) -> Result<(), String> {
+        let attempts = self.attempt_count(qubits.len())?;
+        let mut events = RareErrorIndexSampler::new(probability, attempts);
+        while let Some(index) = events.next_index(rng) {
+            let q = qubits[index / self.batch_size];
+            let shot = index % self.batch_size;
+            if !self.lost_table.get(q, shot) {
+                self.apply_pauli(q, shot, rng.gen_range(1..=3));
+            }
+        }
+        Ok(())
+    }
+
+    fn depolarize2<R: Rng + ?Sized>(
+        &mut self,
+        probability: f64,
+        pairs: &[(usize, usize)],
+        rng: &mut R,
+    ) -> Result<(), String> {
+        let attempts = self.attempt_count(pairs.len())?;
+        let mut events = RareErrorIndexSampler::new(probability, attempts);
+        while let Some(index) = events.next_index(rng) {
+            let (a, b) = pairs[index / self.batch_size];
+            let shot = index % self.batch_size;
+            if self.lost_table.get(a, shot) || self.lost_table.get(b, shot) {
+                continue;
+            }
+            let (pa, pb) = two_qubit_pauli(rng.gen_range(0..15));
+            self.apply_pauli(a, shot, pa);
+            self.apply_pauli(b, shot, pb);
+        }
+        Ok(())
+    }
+
+    fn loss<R: Rng + ?Sized>(
+        &mut self,
+        probability: f64,
+        qubits: &[usize],
+        rng: &mut R,
+    ) -> Result<(), String> {
+        let attempts = self.attempt_count(qubits.len())?;
+        let mut events = RareErrorIndexSampler::new(probability, attempts);
+        while let Some(index) = events.next_index(rng) {
+            let q = qubits[index / self.batch_size];
+            let shot = index % self.batch_size;
+            self.lost_table.set(q, shot, true);
+        }
+        Ok(())
+    }
+
+    fn apply_pauli(&mut self, q: usize, shot: usize, pauli: u8) {
+        if matches!(pauli, 1 | 2) {
+            self.x_table.toggle(q, shot);
+        }
+        if matches!(pauli, 2 | 3) {
+            self.z_table.toggle(q, shot);
+        }
+    }
+
+    fn attempt_count(&self, target_count: usize) -> Result<usize, String> {
+        target_count
+            .checked_mul(self.batch_size)
+            .ok_or_else(|| "loss frame noise attempt count overflow".to_string())
+    }
+
+    #[inline(always)]
+    fn ignore_reference_paulis(&self, _qubits: &[usize]) {}
+}
+
+#[cfg(test)]
 struct LossShot {
     tableau: PackedInverseTableau,
     lost: Vec<bool>,
     measurements: Vec<bool>,
 }
 
+#[cfg(test)]
 impl LossShot {
     fn new(num_qubits: usize, num_measurements: usize) -> Self {
         Self {
@@ -129,12 +400,6 @@ impl LossShot {
             lost: vec![false; num_qubits],
             measurements: Vec::with_capacity(num_measurements),
         }
-    }
-
-    fn reset(&mut self) {
-        self.tableau.reset_identity();
-        self.lost.fill(false);
-        self.measurements.clear();
     }
 
     fn execute<R: Rng + ?Sized>(&mut self, ops: &[LossOp], rng: &mut R) {
@@ -381,6 +646,7 @@ fn plain_pairs(targets: &[StimTarget]) -> Option<Vec<(usize, usize)>> {
     )
 }
 
+#[cfg(test)]
 fn apply_pauli(tableau: &mut PackedInverseTableau, qubit: usize, pauli: u8) {
     match pauli {
         0 => {}
@@ -398,8 +664,8 @@ fn two_qubit_pauli(index: usize) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use super::LossSamplerPlan;
     use crate::executor::Executor;
@@ -443,18 +709,26 @@ mod tests {
     }
 
     #[test]
-    fn parallel_loss_batch_is_seeded_and_schedule_independent() {
+    fn bit_parallel_loss_batch_is_repeatable_for_a_fixed_seed() {
         let circuit =
             parse_lines("R 0 1\nH 0\nCX 0 1\nDEPOLARIZE2(0.2) 0 1\nLOSS(0.3) 0 1\nM 0 1\n")
                 .unwrap();
         let plan = LossSamplerPlan::try_compile(&circuit).expect("supported loss plan");
+        let reference = crate::data_path::build_reference_sample(
+            &circuit,
+            crate::data_path::ReferenceSampleMode::SimulateNoiseless,
+        )
+        .unwrap();
         let mut first_rng = StdRng::seed_from_u64(0x5eed);
         let mut second_rng = StdRng::seed_from_u64(0x5eed);
 
-        assert_eq!(
-            plan.run_batch(257, &mut first_rng),
-            plan.run_batch(257, &mut second_rng)
-        );
+        let first = plan.run_batch(257, &reference, &mut first_rng).unwrap();
+        let second = plan.run_batch(257, &reference, &mut second_rng).unwrap();
+        for measurement in 0..first.num_major() {
+            for shot in 0..first.num_minor() {
+                assert_eq!(first.get(measurement, shot), second.get(measurement, shot));
+            }
+        }
     }
 
     #[test]

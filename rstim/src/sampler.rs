@@ -329,7 +329,6 @@ fn sample_batch_with_executor(
         ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
     };
     let n_meas = ref_sample.len();
-    let mut measurements = alloc_bit_table(n_meas, n_shots)?;
     let loss_plan = if sweep_bits.is_none() {
         LossSamplerPlan::try_compile(instrs)
     } else {
@@ -341,20 +340,10 @@ fn sample_batch_with_executor(
         None
     };
 
-    if let Some(plan) = &loss_plan {
-        for (shot, shot_measurements) in plan.run_batch(n_shots, rng).into_iter().enumerate() {
-            if shot_measurements.len() != n_meas {
-                return Err(format!(
-                    "executor produced {} measurements but reference sample expects {}",
-                    shot_measurements.len(),
-                    n_meas
-                ));
-            }
-            for (m, bit) in shot_measurements.into_iter().enumerate() {
-                measurements.set(m, shot, bit);
-            }
-        }
+    let measurements = if let Some(plan) = &loss_plan {
+        plan.run_batch(n_shots, &ref_sample, rng)?
     } else {
+        let mut measurements = alloc_bit_table(n_meas, n_shots)?;
         for shot in 0..n_shots {
             let shot_measurements = executor
                 .as_mut()
@@ -372,7 +361,8 @@ fn sample_batch_with_executor(
                 measurements.set(m, shot, bit);
             }
         }
-    }
+        measurements
+    };
 
     if options.output_mode == SampleOutputMode::MeasurementsOnly {
         return BatchOutput::measurements_only(measurements, n_shots);

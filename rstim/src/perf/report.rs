@@ -76,7 +76,7 @@ fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
             "- atom-loss probability: each two-qubit gate has one depolarization event and two independent per-atom loss events; using `p = 1 - 0.999^(1/3) ~= 0.0003334445062` keeps the probability of at least one error equal to `0.001`.\n",
         );
         out.push_str(
-            "- atom-loss execution: shots use deterministic data-parallel execution; the reported wall time includes the complete parallel batch.\n",
+            "- atom-loss execution: loss masks and Pauli frames are propagated in 64-shot bitsets; the reported wall time includes the complete loss-aware batch.\n",
         );
     }
     for variant in &case.variants {

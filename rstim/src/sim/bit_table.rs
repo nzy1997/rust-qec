@@ -119,7 +119,7 @@ impl BitTable {
         }
     }
 
-    pub fn randomize_row(&mut self, row: usize, rng: &mut impl Rng) {
+    pub fn randomize_row(&mut self, row: usize, rng: &mut (impl Rng + ?Sized)) {
         let start = row * self.words_per_row;
         for w in 0..self.words_per_row {
             self.data[start + w] = rng.r#gen();

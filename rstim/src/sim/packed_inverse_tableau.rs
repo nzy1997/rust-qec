@@ -377,16 +377,6 @@ impl PackedInverseTableau {
         self.num_qubits
     }
 
-    pub(crate) fn reset_identity(&mut self) {
-        self.x_plane.fill(0);
-        self.z_plane.fill(0);
-        self.signs.fill(0);
-        for qubit in 0..self.num_qubits {
-            self.set_x_storage_bit(qubit, qubit);
-            self.set_z_storage_bit(self.num_qubits + qubit, qubit);
-        }
-    }
-
     pub fn num_rows(&self) -> usize {
         2 * self.num_qubits
     }
