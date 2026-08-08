@@ -11,7 +11,7 @@ BASELINE_DEPOLARIZE2_PREFIX = "DEPOLARIZE2(0.001) "
 
 
 def transform_circuit(text: str) -> str:
-    lines = text.splitlines()
+    lines = [line.rstrip() for line in text.splitlines()]
     transformed: list[str] = []
     two_qubit_layers = 0
     index = 0
@@ -37,8 +37,8 @@ def transform_circuit(text: str) -> str:
         transformed.extend(
             [
                 line,
-                f"{indentation}LOSS({PER_EVENT_PROBABILITY_TEXT}) {targets}",
                 f"{indentation}DEPOLARIZE2({PER_EVENT_PROBABILITY_TEXT}) {targets}",
+                f"{indentation}LOSS({PER_EVENT_PROBABILITY_TEXT}) {targets}",
             ]
         )
         two_qubit_layers += 1

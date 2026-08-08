@@ -22,8 +22,8 @@ class AtomLossFixtureTest(unittest.TestCase):
         self.assertEqual(
             build_atom_loss_fixture.transform_circuit(source),
             "CX 0 1 2 3\n"
-            "LOSS(0.0003334445062) 0 1 2 3\n"
             "DEPOLARIZE2(0.0003334445062) 0 1 2 3\n"
+            "LOSS(0.0003334445062) 0 1 2 3\n"
             "TICK\n",
         )
 
@@ -32,14 +32,19 @@ class AtomLossFixtureTest(unittest.TestCase):
         self.assertEqual(
             build_atom_loss_fixture.transform_circuit(source),
             "    CX 0 1 2 3\n"
-            "    LOSS(0.0003334445062) 0 1 2 3\n"
-            "    DEPOLARIZE2(0.0003334445062) 0 1 2 3\n",
+            "    DEPOLARIZE2(0.0003334445062) 0 1 2 3\n"
+            "    LOSS(0.0003334445062) 0 1 2 3\n",
         )
 
     def test_transform_rejects_mismatched_two_qubit_noise_targets(self) -> None:
         source = "CX 0 1\nDEPOLARIZE2(0.001) 1 0\n"
         with self.assertRaisesRegex(ValueError, "targets do not match"):
             build_atom_loss_fixture.transform_circuit(source)
+
+    def test_transform_strips_trailing_whitespace_from_copied_lines(self) -> None:
+        source = "# layout row   \nCX 0 1\nDEPOLARIZE2(0.001) 0 1\n"
+        transformed = build_atom_loss_fixture.transform_circuit(source)
+        self.assertFalse(any(line.endswith((" ", "\t")) for line in transformed.splitlines()))
 
     def test_checked_fixture_is_exact_transformation_and_has_no_single_qubit_loss(self) -> None:
         baseline = BASELINE.read_text(encoding="utf-8")
@@ -52,8 +57,8 @@ class AtomLossFixtureTest(unittest.TestCase):
         for index in cx_indices:
             indentation = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
             targets = lines[index].lstrip().removeprefix("CX ")
-            self.assertEqual(lines[index + 1], f"{indentation}LOSS(0.0003334445062) {targets}")
-            self.assertEqual(lines[index + 2], f"{indentation}DEPOLARIZE2(0.0003334445062) {targets}")
+            self.assertEqual(lines[index + 1], f"{indentation}DEPOLARIZE2(0.0003334445062) {targets}")
+            self.assertEqual(lines[index + 2], f"{indentation}LOSS(0.0003334445062) {targets}")
         self.assertFalse(
             any(
                 line.startswith("H ") and lines[index + 1].startswith("LOSS(")
