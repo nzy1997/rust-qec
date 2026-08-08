@@ -12,6 +12,7 @@ use crate::data_path::{
 use crate::executor::max_qubit;
 use crate::executor::Executor;
 use crate::ir::StimInstr;
+use crate::loss_sampler::LossSamplerPlan;
 use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
@@ -329,19 +330,47 @@ fn sample_batch_with_executor(
     };
     let n_meas = ref_sample.len();
     let mut measurements = alloc_bit_table(n_meas, n_shots)?;
+    let loss_plan = if sweep_bits.is_none() {
+        LossSamplerPlan::try_compile(instrs)
+    } else {
+        None
+    };
+    let mut executor = if loss_plan.is_none() {
+        Some(Executor::from_instrs(instrs.to_vec())?)
+    } else {
+        None
+    };
 
-    for shot in 0..n_shots {
-        let mut ex = Executor::from_instrs(instrs.to_vec())?;
-        let out = ex.run_with_sweep_bits(rng, sweep_bits)?;
-        if out.measurements.len() != n_meas {
-            return Err(format!(
-                "executor produced {} measurements but reference sample expects {}",
-                out.measurements.len(),
-                n_meas
-            ));
+    if let Some(plan) = &loss_plan {
+        for (shot, shot_measurements) in plan.run_batch(n_shots, rng).into_iter().enumerate() {
+            if shot_measurements.len() != n_meas {
+                return Err(format!(
+                    "executor produced {} measurements but reference sample expects {}",
+                    shot_measurements.len(),
+                    n_meas
+                ));
+            }
+            for (m, bit) in shot_measurements.into_iter().enumerate() {
+                measurements.set(m, shot, bit);
+            }
         }
-        for (m, &bit) in out.measurements.iter().enumerate() {
-            measurements.set(m, shot, bit);
+    } else {
+        for shot in 0..n_shots {
+            let shot_measurements = executor
+                .as_mut()
+                .expect("legacy executor is available when the loss plan is absent")
+                .run_with_sweep_bits(rng, sweep_bits)?
+                .measurements;
+            if shot_measurements.len() != n_meas {
+                return Err(format!(
+                    "executor produced {} measurements but reference sample expects {}",
+                    shot_measurements.len(),
+                    n_meas
+                ));
+            }
+            for (m, &bit) in shot_measurements.iter().enumerate() {
+                measurements.set(m, shot, bit);
+            }
         }
     }
 
