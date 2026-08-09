@@ -271,11 +271,32 @@ fn direct_collapse_eliminates_multi_x_support_without_padding() {
     assert_eq!(counters.direct_inverse_batches, 1);
     assert_eq!(counters.transposed_collapse_batches, 1);
     assert_eq!(counters.collapse_pivots, 1);
-    assert_snapshot_matches_legacy(
-        &packed,
-        &legacy,
-        "multi-X no-padding collapse snapshot",
-    );
+    assert_snapshot_matches_legacy(&packed, &legacy, "multi-X no-padding collapse snapshot");
+}
+
+#[test]
+fn direct_collapse_public_width_fast_path_matches_legacy() {
+    let num_qubits = 241;
+    let mut packed = PackedInverseTableau::identity(num_qubits);
+    let mut legacy = StabilizerState::new(num_qubits);
+
+    for q in [0, 1] {
+        packed.h(q);
+        legacy.h(q);
+    }
+    packed.cx(0, 1);
+    legacy.cx(0, 1);
+
+    let target = (0..num_qubits)
+        .find(|&q| raw_z_x_support(&packed, q) == [0, 1])
+        .expect("test setup must create a two-column X support row");
+    let targets = [(target, false)];
+    let (packed_bits, counters) = direct_collapse(&mut packed, &targets);
+    let legacy_bits = legacy_measure_z_many(&mut legacy, &targets);
+
+    assert_eq!(packed_bits, legacy_bits);
+    assert_eq!(counters.collapse_pivots, 1);
+    assert_snapshot_matches_legacy(&packed, &legacy, "241-qubit collapse snapshot");
 }
 
 #[test]

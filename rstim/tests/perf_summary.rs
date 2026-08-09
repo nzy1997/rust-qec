@@ -467,7 +467,7 @@ fn summarize_sample_fixture_reports_shot_rates_and_report_only_stim_ratio() {
     assert!(report.contains("p = 1 - 0.999^(1/3) ~= 0.0003334445062"));
     assert!(report.contains("probability of at least one error equal to `0.001`"));
     assert!(report.contains(
-        "circuits where a loss can skip a later CX, including this public fixture, use a parallel per-shot packed-tableau batch"
+        "a per-qubit loss/reset dataflow proof selects between a 64-shot reference-frame kernel and a parallel packed stabilizer-trajectory kernel"
     ));
 }
 

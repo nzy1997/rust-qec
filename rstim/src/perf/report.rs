@@ -76,7 +76,7 @@ fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
             "- atom-loss probability: each two-qubit gate has one depolarization event and two independent per-atom loss events; using `p = 1 - 0.999^(1/3) ~= 0.0003334445062` keeps the probability of at least one error equal to `0.001`.\n",
         );
         out.push_str(
-            "- atom-loss execution: circuits where a loss can skip a later CX, including this public fixture, use a parallel per-shot packed-tableau batch; the 64-shot bit-parallel Pauli-frame path is reserved for circuits where no CX can follow a loss.\n",
+            "- atom-loss execution: a per-qubit loss/reset dataflow proof selects between a 64-shot reference-frame kernel and a parallel packed stabilizer-trajectory kernel; this fixture requires trajectories because loss can suppress later CX gates on the same qubits.\n",
         );
     }
     for variant in &case.variants {
