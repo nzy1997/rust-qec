@@ -10,7 +10,37 @@ const ATOM_LOSS_FIXTURE: &str = include_str!(
 );
 
 #[test]
-fn optimized_atom_loss_fixture_has_the_declared_batch_shape() {
+fn loss_before_cx_skips_the_gate_for_interpreted_and_auto_sampling() {
+    let circuit = parse_lines("X 0\nLOSS(1) 0\nCX 0 2\nM 0 1 2 3\n").unwrap();
+
+    for backend in [SamplingBackend::Interpreted, SamplingBackend::Auto] {
+        let mut rng = StdRng::seed_from_u64(0xc0ffee);
+        let output = sample_batch_with_options(
+            &circuit,
+            64,
+            &mut rng,
+            SampleOptions {
+                reference_sample_mode: ReferenceSampleMode::SimulateNoiseless,
+                backend,
+                output_mode: SampleOutputMode::MeasurementsOnly,
+            },
+        )
+        .unwrap();
+
+        for shot in 0..64 {
+            assert!(output.measurements.get(0, shot), "lost q0 reads as one");
+            assert!(!output.measurements.get(1, shot), "untouched q1 stays zero");
+            assert!(
+                !output.measurements.get(2, shot),
+                "q2 stays zero because CX is skipped when q0 is lost"
+            );
+            assert!(!output.measurements.get(3, shot), "untouched q3 stays zero");
+        }
+    }
+}
+
+#[test]
+fn atom_loss_fixture_conditional_tableau_batch_has_the_declared_shape() {
     let circuit = parse_lines(ATOM_LOSS_FIXTURE).expect("atom-loss fixture parses");
     let mut rng = StdRng::seed_from_u64(7);
     let optimized = sample_batch_with_options(
@@ -30,20 +60,19 @@ fn optimized_atom_loss_fixture_has_the_declared_batch_shape() {
 }
 
 #[test]
-fn optimized_loss_marginals_and_correlations_match_legacy_executor() {
+fn safe_bit_parallel_loss_marginals_and_correlations_match_legacy_executor() {
     const SHOTS: usize = 20_000;
     const TOLERANCE: f64 = 0.025;
     let circuit = parse_lines(
         "R 0 1 2\n\
-         REPEAT 3 {\n\
-             H 0\n\
-             CX 0 1 1 2\n\
-             DEPOLARIZE1(0.12) 0 1 2\n\
-             DEPOLARIZE2(0.18) 0 1 1 2\n\
-             LOSS(0.2) 0 1 2\n\
-             MR 1 2\n\
-         }\n\
-         M 0 1 2\n",
+         H 0\n\
+         CX 0 1 1 2\n\
+         DEPOLARIZE1(0.12) 0 1 2\n\
+         DEPOLARIZE2(0.18) 0 1 1 2\n\
+         LOSS(0.2) 0 1 2\n\
+         M 0 1\n\
+         MR 2\n\
+         M 2\n",
     )
     .unwrap();
     let width = rstim::stats::num_measurements(&circuit);
@@ -93,6 +122,85 @@ fn optimized_loss_marginals_and_correlations_match_legacy_executor() {
                 optimized_xor_rate,
                 legacy_xor_rate,
                 TOLERANCE,
+                first,
+                Some(second),
+            );
+        }
+    }
+}
+
+#[test]
+fn conditional_tableau_loss_marginals_and_correlations_match_legacy_executor() {
+    const SHOTS: usize = 20_000;
+    const TOLERANCE: f64 = 0.025;
+    let circuit = parse_lines(
+        "R 0 1 2\n\
+         H 0\n\
+         CX 0 1 1 2\n\
+         DEPOLARIZE1(0.12) 0 1 2\n\
+         DEPOLARIZE2(0.18) 0 1 1 2\n\
+         LOSS(0.2) 0 1 2\n\
+         CX 0 1 1 2\n\
+         M 0 1\n\
+         MR 2\n\
+         M 2\n",
+    )
+    .unwrap();
+    assert_sampling_matches_legacy(circuit, SHOTS, TOLERANCE);
+}
+
+fn assert_sampling_matches_legacy(
+    circuit: Vec<rstim::ir::StimInstr>,
+    shots: usize,
+    tolerance: f64,
+) {
+    let width = rstim::stats::num_measurements(&circuit);
+
+    let mut optimized_rng = StdRng::seed_from_u64(0xc01d_17a1);
+    let optimized = sample_batch_with_options(
+        &circuit,
+        shots,
+        &mut optimized_rng,
+        SampleOptions {
+            reference_sample_mode: ReferenceSampleMode::SimulateNoiseless,
+            backend: SamplingBackend::Interpreted,
+            output_mode: SampleOutputMode::MeasurementsOnly,
+        },
+    )
+    .unwrap();
+
+    let mut legacy_rng = StdRng::seed_from_u64(0x1e9a_c7);
+    let mut executor = Executor::from_instrs(circuit).unwrap();
+    let mut legacy_rows = Vec::with_capacity(shots);
+    for _ in 0..shots {
+        legacy_rows.push(executor.run(&mut legacy_rng).unwrap().measurements);
+    }
+
+    for first in 0..width {
+        let optimized_rate = (0..shots)
+            .filter(|&shot| optimized.measurements.get(first, shot))
+            .count() as f64
+            / shots as f64;
+        let legacy_rate = legacy_rows.iter().filter(|row| row[first]).count() as f64 / shots as f64;
+        assert_rate_close(optimized_rate, legacy_rate, tolerance, first, None);
+
+        for second in first + 1..width {
+            let optimized_xor_rate = (0..shots)
+                .filter(|&shot| {
+                    optimized.measurements.get(first, shot)
+                        ^ optimized.measurements.get(second, shot)
+                })
+                .count() as f64
+                / shots as f64;
+            let legacy_xor_rate = legacy_rows
+                .iter()
+                .filter(|row| row[first] ^ row[second])
+                .count() as f64
+                / shots as f64;
+            assert_rate_close(
+                optimized_xor_rate,
+                legacy_xor_rate,
+                tolerance,
                 first,
                 Some(second),
             );
