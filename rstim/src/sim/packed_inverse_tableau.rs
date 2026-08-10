@@ -1711,13 +1711,27 @@ fn transpose_packed_plane(
             transpose_64x64(&mut tile);
             for column_offset in 0..columns_in_tile {
                 destination[(source_column_start + column_offset) * destination_words_per_row
-                    + source_row_word] = tile[63 - column_offset].reverse_bits();
+                    + source_row_word] = tile[column_offset];
             }
         }
     }
 }
 
+#[inline]
 fn transpose_64x64(words: &mut [u64; 64]) {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    // SAFETY: AArch64 NEON is enabled for this compilation target, and the backend only loads
+    // and stores pairs of words within the 64-word tile.
+    unsafe {
+        transpose_64x64_neon(words);
+    }
+
+    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    transpose_64x64_portable(words);
+}
+
+#[cfg(any(test, not(all(target_arch = "aarch64", target_feature = "neon"))))]
+fn transpose_64x64_portable(words: &mut [u64; 64]) {
     transpose_64x64_stage::<32>(words, 0x0000_0000_ffff_ffff);
     transpose_64x64_stage::<16>(words, 0x0000_ffff_0000_ffff);
     transpose_64x64_stage::<8>(words, 0x00ff_00ff_00ff_00ff);
@@ -1730,10 +1744,55 @@ fn transpose_64x64(words: &mut [u64; 64]) {
 fn transpose_64x64_stage<const SHIFT: usize>(words: &mut [u64; 64], mask: u64) {
     let mut index = 0usize;
     while index < 64 {
-        let swap = (words[index] ^ (words[index + SHIFT] >> SHIFT)) & mask;
-        words[index] ^= swap;
-        words[index + SHIFT] ^= swap << SHIFT;
+        let swap = ((words[index] >> SHIFT) ^ words[index + SHIFT]) & mask;
+        words[index] ^= swap << SHIFT;
+        words[index + SHIFT] ^= swap;
         index = (index + SHIFT + 1) & !SHIFT;
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[target_feature(enable = "neon")]
+unsafe fn transpose_64x64_neon(words: &mut [u64; 64]) {
+    unsafe {
+        transpose_64x64_stage_neon::<32>(words, 0x0000_0000_ffff_ffff);
+        transpose_64x64_stage_neon::<16>(words, 0x0000_ffff_0000_ffff);
+        transpose_64x64_stage_neon::<8>(words, 0x00ff_00ff_00ff_00ff);
+        transpose_64x64_stage_neon::<4>(words, 0x0f0f_0f0f_0f0f_0f0f);
+        transpose_64x64_stage_neon::<2>(words, 0x3333_3333_3333_3333);
+    }
+    // Adjacent words form one swap pair in the final stage. Keeping this stage scalar avoids
+    // spending more lane-shuffle instructions than the two scalar word operations it replaces.
+    transpose_64x64_stage::<1>(words, 0x5555_5555_5555_5555);
+}
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn transpose_64x64_stage_neon<const SHIFT: i32>(words: &mut [u64; 64], mask: u64) {
+    use core::arch::aarch64::{
+        vandq_u64, vdupq_n_u64, veorq_u64, vld1q_u64, vshlq_n_u64, vshrq_n_u64, vst1q_u64,
+    };
+
+    const { assert!(SHIFT >= 2 && SHIFT <= 32 && (SHIFT & (SHIFT - 1)) == 0) };
+    let shift = SHIFT as usize;
+    let mask = vdupq_n_u64(mask);
+    let mut block = 0usize;
+    while block < words.len() {
+        let mut offset = 0usize;
+        while offset < shift {
+            let low_ptr = unsafe { words.as_mut_ptr().add(block + offset) };
+            let high_ptr = unsafe { low_ptr.add(shift) };
+            let low = unsafe { vld1q_u64(low_ptr) };
+            let high = unsafe { vld1q_u64(high_ptr) };
+            let swap = vandq_u64(veorq_u64(vshrq_n_u64::<SHIFT>(low), high), mask);
+            unsafe {
+                vst1q_u64(low_ptr, veorq_u64(low, vshlq_n_u64::<SHIFT>(swap)));
+                vst1q_u64(high_ptr, veorq_u64(high, swap));
+            }
+            offset += 2;
+        }
+        block += 2 * shift;
     }
 }
 
@@ -1790,4 +1849,77 @@ fn sign_from_canonical_exponent(canonical_exponent: u8, exponent: u8) -> bool {
         "packed Pauli row has non-Hermitian phase exponent {exponent}",
     );
     diff == 2
+}
+
+#[cfg(test)]
+mod transpose_tests {
+    use super::{
+        transpose_64x64, transpose_64x64_portable, transpose_packed_plane, words_for_bits,
+    };
+
+    #[test]
+    fn selected_transpose_backend_matches_portable_backend() {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        for case in 0..256 {
+            let mut actual = [0u64; 64];
+            for (index, word) in actual.iter_mut().enumerate() {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                *word = match case {
+                    0 => 0,
+                    1 => u64::MAX,
+                    2 => 1u64 << (index % 64),
+                    _ => state,
+                };
+            }
+            let mut expected = actual;
+
+            transpose_64x64_portable(&mut expected);
+            transpose_64x64(&mut actual);
+
+            assert_eq!(actual, expected, "backend mismatch for case {case}");
+        }
+    }
+
+    #[test]
+    fn packed_plane_transpose_matches_naive_partial_tiles() {
+        for &(rows, columns) in &[
+            (1, 1),
+            (5, 73),
+            (63, 65),
+            (64, 64),
+            (65, 63),
+            (127, 129),
+            (241, 482),
+            (482, 241),
+        ] {
+            let source_words_per_row = words_for_bits(columns);
+            let destination_words_per_row = words_for_bits(rows);
+            let mut source = vec![0u64; rows * source_words_per_row];
+            for row in 0..rows {
+                for column in 0..columns {
+                    if ((row * 131 + column * 17 + row * column) % 11) < 5 {
+                        source[row * source_words_per_row + column / 64] |= 1u64 << (column % 64);
+                    }
+                }
+            }
+            let mut actual = vec![0u64; columns * destination_words_per_row];
+
+            transpose_packed_plane(&source, rows, columns, source_words_per_row, &mut actual);
+
+            for row in 0..rows {
+                for column in 0..columns {
+                    let source_bit =
+                        (source[row * source_words_per_row + column / 64] >> (column % 64)) & 1;
+                    let transposed_bit =
+                        (actual[column * destination_words_per_row + row / 64] >> (row % 64)) & 1;
+                    assert_eq!(
+                        transposed_bit, source_bit,
+                        "transpose mismatch for {rows}x{columns} at ({row}, {column})",
+                    );
+                }
+            }
+        }
+    }
 }
