@@ -2,44 +2,44 @@
   "measured_records": 35,
   "variants": [
     {
-      "median_call_b8_elapsed_ns": 14671917,
-      "median_call_sample_elapsed_ns": 9543167,
-      "median_worker_total_elapsed_ns": 24215084,
-      "precompile_elapsed_ns": 6110250,
+      "median_call_b8_elapsed_ns": 232500,
+      "median_call_sample_elapsed_ns": 4048500,
+      "median_worker_total_elapsed_ns": 4281000,
+      "precompile_elapsed_ns": 2784625,
       "sample_count": 7,
       "variant": "rstim-precompiled"
     },
     {
-      "median_call_b8_elapsed_ns": 73417,
-      "median_call_sample_elapsed_ns": 27372416,
-      "median_worker_total_elapsed_ns": 27445833,
-      "precompile_elapsed_ns": 1259750,
+      "median_call_b8_elapsed_ns": 41667,
+      "median_call_sample_elapsed_ns": 14713791,
+      "median_worker_total_elapsed_ns": 14755458,
+      "precompile_elapsed_ns": 1061625,
       "sample_count": 7,
       "variant": "stim-precompiled"
     },
     {
-      "median_call_b8_elapsed_ns": 8445667,
-      "median_call_sample_elapsed_ns": 16483292,
-      "median_worker_total_elapsed_ns": 24928959,
+      "median_call_b8_elapsed_ns": 247292,
+      "median_call_sample_elapsed_ns": 7204833,
+      "median_worker_total_elapsed_ns": 7452125,
       "precompile_elapsed_ns": 0,
       "sample_count": 7,
       "variant": "rstim-interpreted"
     },
     {
-      "median_call_b8_elapsed_ns": 106125,
-      "median_call_sample_elapsed_ns": 28254458,
-      "median_worker_total_elapsed_ns": 28360583,
+      "median_call_b8_elapsed_ns": 50458,
+      "median_call_sample_elapsed_ns": 15819709,
+      "median_worker_total_elapsed_ns": 15870167,
       "precompile_elapsed_ns": 0,
       "sample_count": 7,
       "variant": "stim-direct"
     },
     {
-      "median_call_b8_elapsed_ns": 8356166,
-      "median_call_sample_elapsed_ns": 1394900375,
-      "median_worker_total_elapsed_ns": 1403256541,
-      "precompile_elapsed_ns": 0,
+      "median_call_b8_elapsed_ns": 217292,
+      "median_call_sample_elapsed_ns": 3911500,
+      "median_worker_total_elapsed_ns": 4128792,
+      "precompile_elapsed_ns": 2890458,
       "sample_count": 7,
-      "variant": "rstim-interpreted-atom-loss"
+      "variant": "rstim-precompiled-atom-loss"
     }
   ]
 }

@@ -867,12 +867,12 @@
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
-              "value": "2026-08-12T17:06:45+08:00"
+              "value": "2026-08-12T18:31:54+08:00"
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "ce6ecddf68f719980878881ec870a2fa5c57b9d6"
+                "runner_source": "8863648377b678a4150095e55b91b687f32d4d42"
               }
             },
             "commands": {
@@ -938,27 +938,27 @@
                 "warmup_rounds": 2,
                 "measure_rounds": 7,
                 "output_bytes_per_call": 1552384,
-                "rstim_vs_stim_precompiled_worker_total_wall_time_ratio": 0.8822863565481871,
-                "atom_loss_vs_rstim_interpreted_worker_total_wall_time_ratio": 56.29021817557644
+                "rstim_vs_stim_precompiled_worker_total_wall_time_ratio": 0.2901299302264965,
+                "atom_loss_vs_rstim_precompiled_worker_total_wall_time_ratio": 0.9644456902592852
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": {
-                  "sha256": "34037ed3dd67d38b60d5f81cecbe5ea38b1489b496e42bd01fbd543c2b071cb8"
+                  "sha256": "8ffd93341109345c0eb97eee1a18e5526530bd5e3d29b9b79a5cd8b8e94b9f00"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": {
-                  "sha256": "7dfc7f049c1e22208c09286c8a48716ac31bfc90b1845a2a749ab2574d711a84"
+                  "sha256": "4b8313e1843ab5dde4d8ad24af9fbd775cc680b69874a40c2c370b3729a962f1"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": {
-                  "sha256": "adbe42c91f1aa2a988cf39ad99c2eb6f78a02f423351d57c7cecb9f11c8db0cc"
+                  "sha256": "8d8cf453a08e44bb5ff0540cc7e517299bd3b04ed08fa83b357d7c773a2d0532"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": {
-                  "sha256": "dd7243142bea5a38ca4a4351eb94cc95a1ad6f72fe63daa98f65669f38ea764f"
+                  "sha256": "a17e2977da7e6ba1e1f6d8f206a159339433ee8cc0e652a153bce99da40c35dd"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": {
-                  "sha256": "6e0ad33c3df349f16b2f44461b4bcd7c153e46bb7aac27a15a901c7be1044dab"
+                  "sha256": "914162ecdca725251c1b6c3d04a8236c845cd897e73e44462d2e7e9a6026738f"
                 }
               }
             }
@@ -988,7 +988,7 @@
             "The headline total is measured inside each worker and equals the sampling path plus b8 output, excluding both precompilation and pipe transport.",
             "Stim returns bit-packed samples directly, so its packing work remains in its sampling-path phase; its b8 phase is byte serialization.",
             "All five published rows use the same final b8 output boundary.",
-            "For this recorded run, rstim is 1.13x faster in the precompiled pair and atom loss is 56.29x slower than rstim interpreted."
+            "For this recorded run, rstim is 3.45x faster in the precompiled pair; precompiled atom loss is in the same roughly 4.2 ms Sample + output range as rstim precompiled."
           ]
         },
         {
