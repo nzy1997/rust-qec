@@ -45,10 +45,17 @@ def main(argv: list[str] | None = None) -> int:
 
         input_text = args.input.read_text(encoding="utf-8")
         circuit = stim.Circuit(input_text)
-        sampler = circuit.compile_sampler(seed=args.seed) if args.variant == "stim-precompiled" else None
+        if args.variant == "stim-precompiled":
+            precompile_started_ns = time.perf_counter_ns()
+            sampler = circuit.compile_sampler(seed=args.seed)
+            precompile_elapsed_ns = time.perf_counter_ns() - precompile_started_ns
+        else:
+            sampler = None
+            precompile_elapsed_ns = 0
         measurement_count = circuit.num_measurements
         telemetry = {
             "variant": args.variant,
+            "precompile_elapsed_ns": precompile_elapsed_ns,
             "compile_count": 1 if sampler is not None else 0,
             "reference_build_count": 1 if sampler is not None else 0,
             "sample_call_count": 0,
@@ -88,13 +95,16 @@ def main(argv: list[str] | None = None) -> int:
             _write_error(f"invalid SAMPLE JSON: missing {error}")
             continue
         try:
-            started_ns = time.perf_counter_ns()
+            sample_started_ns = time.perf_counter_ns()
             if sampler is None:
                 call_sampler = circuit.compile_sampler(seed=args.seed + telemetry["sample_call_count"])
-                data = call_sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
+                packed = call_sampler.sample(shots=shots, bit_packed=True)
             else:
-                data = sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
-            sample_b8_elapsed_ns = time.perf_counter_ns() - started_ns
+                packed = sampler.sample(shots=shots, bit_packed=True)
+            sample_elapsed_ns = time.perf_counter_ns() - sample_started_ns
+            b8_started_ns = time.perf_counter_ns()
+            data = packed.tobytes(order="C")
+            b8_elapsed_ns = time.perf_counter_ns() - b8_started_ns
         except Exception as error:
             _write_error(error)
             continue
@@ -103,7 +113,11 @@ def main(argv: list[str] | None = None) -> int:
             telemetry["compile_count"] += 1
             telemetry["reference_build_count"] += 1
         result = struct.pack(
-            "<QQQ", request_id, telemetry["sample_call_count"], sample_b8_elapsed_ns
+            "<QQQQ",
+            request_id,
+            telemetry["sample_call_count"],
+            sample_elapsed_ns,
+            b8_elapsed_ns,
         ) + data
         protocol.write_frame(sys.stdout.buffer, protocol.RESULT, result)
 

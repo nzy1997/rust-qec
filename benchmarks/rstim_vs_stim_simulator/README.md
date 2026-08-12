@@ -181,7 +181,7 @@ probability of `0.001`.
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 
-## Unified Sample + `b8` Evidence
+## Split Precompile, Sample, and `b8` Evidence
 
 Compare five surface-code sampling paths under one output boundary:
 
@@ -196,12 +196,20 @@ python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
   --out-dir /tmp/rstim-compiled-steady
 ```
 
-The primary timed region is measured inside each worker and covers the selected
-sampling path plus the same `b8` encoding. Precompiled variants reuse a sampler;
-direct variants include per-batch setup required by that implementation. The
-1,552,384-byte result is still transferred and validated on every call, but
-that pipe cost is recorded separately as an end-to-end duration. Worker process
-startup and initial fixture parsing occur before both timers.
+The worker records one-time precompilation separately, then splits each measured
+call into the implementation's sampling path and its `b8` output step. The
+headline total is the sum of those two worker-local phases and excludes both
+one-time precompilation and stdin/stdout pipe transport. Precompiled variants
+reuse a sampler; direct variants include per-batch setup required by that
+implementation in their sampling-path phase. Worker startup and initial fixture
+parsing occur before all recorded timers.
+
+The phase boundary follows each public API: Stim's `sample(bit_packed=True)`
+returns an already packed array, so its packing work remains inside the sampling
+path and its `b8` step is only byte serialization. `rstim` returns an internal
+bit table and converts it through its `b8` writer. The total is therefore the
+fair output-boundary comparison; phase columns explain where each implementation
+spends that total.
 
 ## Selected DEM Speed Evidence
 

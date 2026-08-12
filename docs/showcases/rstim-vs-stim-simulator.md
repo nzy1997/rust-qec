@@ -141,17 +141,17 @@ In the same refreshed surface-sample run, `rstim-interpreted-atom-loss` records
 1,203.424 ms versus 10.567 ms for `rstim-interpreted`, a 113.88x wall-time
 ratio for this fixture.
 
-The separate [unified sample-plus-`b8` evidence](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json)
-uses one worker-local timer for all five variants. It includes the selected
-sampling path plus identical `b8` encoding and excludes pipe transfer;
-precompiled variants reuse a sampler, while direct variants include their
-per-batch setup. Across 7 measured 1,024-shot calls after 2 warmups, the medians
-are 20.705 ms for `rstim` precompiled, 16.967 ms for Stim precompiled,
-25.148 ms for `rstim` interpreted, 22.884 ms for Stim direct, and 1,104.458 ms
-for `rstim` interpreted with atom loss. The same 1.55 MB result is transferred
-and validated after every call, with its end-to-end duration recorded
-separately. In this recorded run Stim is 1.22x faster in the precompiled pair,
-and atom loss adds 43.92x wall time to the `rstim` interpreted path.
+The separate [split precompile/sample/`b8` evidence](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json)
+records one-time precompilation separately, then splits each call into the
+implementation's sampling path and `b8` output step. The headline total excludes
+both precompilation and pipe transport. Across 7 measured 1,024-shot calls after
+2 warmups, total medians are 24.215 ms for `rstim` precompiled, 27.446 ms for
+Stim precompiled, 24.929 ms for `rstim` interpreted, 28.361 ms for Stim direct,
+and 1,403.257 ms for `rstim` interpreted with atom loss. In this recorded run
+`rstim` is 1.13x faster in the precompiled pair, and atom loss adds 56.29x wall
+time to the `rstim` interpreted path. Stim returns bit-packed samples directly,
+so its packing work is inside its sampling phase; the total remains the
+cross-implementation comparison boundary.
 
 Companion reports and environments are checked at
 [`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),
@@ -159,7 +159,7 @@ Companion reports and environments are checked at
 [`results/release-surface-detect/`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
 and
 [`results/release-dem-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md).
-The unified five-path call-level report and environment are checked under
+The split five-path call-level report and environment are checked under
 [`results/compiled-steady-release/`](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md).
 
 These relationships describe only the named cases under the captured release

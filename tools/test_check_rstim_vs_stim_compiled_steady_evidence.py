@@ -81,6 +81,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(variant, 0)
         telemetry = {
             "variant": variant,
+            "precompile_elapsed_ns": 500 if variant in run_compiled_steady.PRECOMPILED_VARIANTS else 0,
             "compile_count": compile_count,
             "reference_build_count": reference_build_count,
             "sample_call_count": 0,
@@ -99,8 +100,9 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                     "shots": case["shots"],
                     "output_format": case["output_format"],
                     "warmup": request_id < 2,
-                    "sample_b8_elapsed_ns": elapsed_base + request_id,
-                    "end_to_end_elapsed_ns": elapsed_base + request_id + 100,
+                    "sample_elapsed_ns": elapsed_base + request_id,
+                    "b8_elapsed_ns": 100,
+                    "worker_total_elapsed_ns": elapsed_base + request_id + 100,
                     "output_bytes": case["expected_output_bytes"],
                 }
             )
@@ -144,8 +146,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "os": "test-os",
         "cpu_model": "test-cpu",
         "profile": "release",
-        "timer_scope": run_compiled_steady.PRIMARY_TIMER_SCOPE,
-        "secondary_timer_scope": run_compiled_steady.SECONDARY_TIMER_SCOPE,
+        "timer_scope": run_compiled_steady.TIMER_SCOPE,
         "seed_policy": "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
@@ -205,6 +206,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                 "result_hex": "01",
                 "ready": {
                     "variant": variant,
+                    "precompile_elapsed_ns": 500 if variant in run_compiled_steady.PRECOMPILED_VARIANTS else 0,
                     "compile_count": run_compiled_steady._expected_lifecycle_counts(variant, 0)[0],
                     "reference_build_count": run_compiled_steady._expected_lifecycle_counts(variant, 0)[1],
                     "sample_call_count": 0,
@@ -214,6 +216,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                 },
                 "final": {
                     "variant": variant,
+                    "precompile_elapsed_ns": 500 if variant in run_compiled_steady.PRECOMPILED_VARIANTS else 0,
                     "compile_count": run_compiled_steady._expected_lifecycle_counts(variant, 1)[0],
                     "reference_build_count": run_compiled_steady._expected_lifecycle_counts(variant, 1)[1],
                     "sample_call_count": 1,
@@ -261,7 +264,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS unified sample+b8 evidence variants=5 measured=35 lifecycle=verified/9\n",
+            "PASS split precompile/sample/b8 evidence variants=5 measured=35 lifecycle=verified/9\n",
         )
 
     def test_rejects_absolute_fair_manifest_path_with_required_message(self) -> None:
@@ -385,30 +388,30 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("rstim-precompiled output_format for request 3 must be b8, got '01'", result.stderr)
 
-    def test_rejects_missing_worker_sample_b8_timing(self) -> None:
+    def test_rejects_missing_worker_sample_timing(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         next(record for record in records if record["variant"] == "stim-precompiled" and record.get("request_id") == 3).pop(
-            "sample_b8_elapsed_ns"
+            "sample_elapsed_ns"
         )
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "stim-precompiled sample_b8_elapsed_ns for request 3 must be a nonnegative integer",
+            "stim-precompiled sample_elapsed_ns for request 3 must be a nonnegative integer",
             result.stderr,
         )
 
-    def test_rejects_end_to_end_timing_shorter_than_worker_timing(self) -> None:
+    def test_rejects_worker_total_not_equal_to_sample_plus_b8(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         sample = next(
             record for record in records if record["variant"] == "rstim-precompiled" and record.get("request_id") == 3
         )
-        sample["end_to_end_elapsed_ns"] = sample["sample_b8_elapsed_ns"] - 1
+        sample["worker_total_elapsed_ns"] -= 1
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "rstim-precompiled end_to_end_elapsed_ns for request 3 must be at least sample_b8_elapsed_ns",
+            "rstim-precompiled worker_total_elapsed_ns for request 3 must equal sample_elapsed_ns + b8_elapsed_ns",
             result.stderr,
         )
 

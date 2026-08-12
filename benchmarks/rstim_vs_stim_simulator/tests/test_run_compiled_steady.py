@@ -70,6 +70,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
             try:
                 ready = session.read_ready()
                 self.assertEqual(ready["variant"], "rstim-precompiled")
+                self.assertGreater(ready["precompile_elapsed_ns"], 0)
                 self.assertEqual(ready["compile_count"], 1)
                 self.assertEqual(ready["reference_build_count"], 1)
                 self.assertEqual(ready["sample_call_count"], 0)
@@ -77,10 +78,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 self.assertEqual(ready["measurement_count"], 1)
                 self.assertEqual(ready["bytes_per_shot"], 1)
 
-                call_count, data, sample_b8_elapsed_ns, end_to_end_elapsed_ns = session.sample(0, 1)
+                call_count, data, sample_elapsed_ns, b8_elapsed_ns = session.sample(0, 1)
                 self.assertEqual(call_count, 1)
                 self.assertEqual(data, b"\x01")
-                self.assertLessEqual(sample_b8_elapsed_ns, end_to_end_elapsed_ns)
+                self.assertGreaterEqual(sample_elapsed_ns, 0)
+                self.assertGreaterEqual(b8_elapsed_ns, 0)
 
                 final = session.stop()
                 self.assertEqual(final["compile_count"], 1)
@@ -184,6 +186,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
             try:
                 ready = session.read_ready()
                 self.assertEqual(ready["variant"], "stim-precompiled")
+                self.assertGreater(ready["precompile_elapsed_ns"], 0)
                 self.assertEqual(ready["compile_count"], 1)
                 self.assertEqual(ready["reference_build_count"], 1)
                 self.assertEqual(ready["sample_call_count"], 0)
@@ -191,10 +194,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 self.assertEqual(ready["measurement_count"], 1)
                 self.assertEqual(ready["bytes_per_shot"], 1)
 
-                call_count, data, sample_b8_elapsed_ns, end_to_end_elapsed_ns = session.sample(0, 1)
+                call_count, data, sample_elapsed_ns, b8_elapsed_ns = session.sample(0, 1)
                 self.assertEqual(call_count, 1)
                 self.assertEqual(data, b"\x01")
-                self.assertLessEqual(sample_b8_elapsed_ns, end_to_end_elapsed_ns)
+                self.assertGreaterEqual(sample_elapsed_ns, 0)
+                self.assertGreaterEqual(b8_elapsed_ns, 0)
 
                 final = session.stop()
                 self.assertEqual(final["sample_call_count"], 1)
@@ -292,6 +296,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
                     compile_count, reference_build_count = protocol._expected_lifecycle_counts(args.variant, 0)
                     telemetry = {{
                         "variant": telemetry_variant,
+                        "precompile_elapsed_ns": 7 if args.variant in protocol.PRECOMPILED_VARIANTS else 0,
                         "compile_count": compile_count,
                         "reference_build_count": reference_build_count,
                         "sample_call_count": 0,
@@ -320,7 +325,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
                         data = b"\\x00" if {mode!r} == "bad-known-answer" and is_preflight else (
                             b"\\x01" if is_preflight else b"\\x00" * 1552384
                         )
-                        result = struct.pack("<QQQ", request["request_id"], calls, 1) + data
+                        result = struct.pack("<QQQQ", request["request_id"], calls, 1, 2) + data
                         if {mode!r} == "delay-last-byte" and not is_preflight:
                             header = protocol.RESULT + struct.pack("<Q", len(result))
                             sys.stdout.buffer.write(header + result[:-1])
@@ -393,7 +398,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(
-            "PASS unified sample+b8 lifecycle variants=5 calls=9 measured=35",
+            "PASS split precompile/sample/b8 lifecycle variants=5 calls=9 measured=35",
             result.stdout,
         )
         raw = [json.loads(line) for line in (out_dir / "raw.jsonl").read_text().splitlines()]
@@ -404,18 +409,22 @@ class RunCompiledSteadyTest(unittest.TestCase):
             if record["record_type"] == "sample":
                 self.assertEqual(record["shots"], 1024)
                 self.assertEqual(record["output_format"], "b8")
+                self.assertEqual(record["sample_elapsed_ns"], 1)
+                self.assertEqual(record["b8_elapsed_ns"], 2)
+                self.assertEqual(record["worker_total_elapsed_ns"], 3)
         summary = json.loads((out_dir / "summary.json").read_text())
         self.assertEqual(summary["measured_records"], 35)
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})
         report = (out_dir / "report.md").read_text(encoding="utf-8")
         self.assertIn(
-            "| variant | sample_count | median_sample_b8_elapsed_ns | median_end_to_end_elapsed_ns |",
+            "| variant | sample_count | precompile_elapsed_ns | median_call_sample_elapsed_ns | median_call_b8_elapsed_ns | median_worker_total_elapsed_ns |",
             report,
         )
         for variant in summary["variants"]:
             self.assertIn(
                 f"| {variant['variant']} | {variant['sample_count']} | "
-                f"{variant['median_sample_b8_elapsed_ns']} | {variant['median_end_to_end_elapsed_ns']} |",
+                f"{variant['precompile_elapsed_ns']} | {variant['median_call_sample_elapsed_ns']} | "
+                f"{variant['median_call_b8_elapsed_ns']} | {variant['median_worker_total_elapsed_ns']} |",
                 report,
             )
         environment = json.loads((out_dir / "environment.json").read_text())
@@ -425,7 +434,6 @@ class RunCompiledSteadyTest(unittest.TestCase):
             "cpu_model",
             "profile",
             "timer_scope",
-            "secondary_timer_scope",
             "seed_policy",
             "stim_version",
             "rstim_version",
@@ -468,8 +476,8 @@ class RunCompiledSteadyTest(unittest.TestCase):
         known_answer_sha = hashlib.sha256(b"X 0\nM 0\n").hexdigest()
 
         self.assertEqual(environment["profile"], "release")
-        self.assertEqual(environment["timer_scope"], run_compiled_steady.PRIMARY_TIMER_SCOPE)
-        self.assertEqual(environment["secondary_timer_scope"], run_compiled_steady.SECONDARY_TIMER_SCOPE)
+        self.assertEqual(environment["timer_scope"], run_compiled_steady.TIMER_SCOPE)
+        self.assertNotIn("secondary_timer_scope", environment)
         self.assertEqual(environment["stim_version"], "1.15.0")
         self.assertEqual(environment["rstim_version"], "rstim 0.1.1")
         self.assertEqual(environment["seed"], 0)
@@ -512,6 +520,8 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual([record["result_hex"] for record in preflight], ["01"] * 5)
         for record in preflight:
             self.assertEqual(record["ready"]["fixture_sha256"], known_answer_sha)
+            expected_precompile = 7 if record["variant"] in run_compiled_steady.PRECOMPILED_VARIANTS else 0
+            self.assertEqual(record["ready"]["precompile_elapsed_ns"], expected_precompile)
             compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(
                 record["variant"], 0
             )
@@ -523,15 +533,17 @@ class RunCompiledSteadyTest(unittest.TestCase):
             self.assertEqual(record["final"]["fixture_sha256"], known_answer_sha)
             self.assertEqual(record["final"]["sample_call_count"], 1)
 
-    def test_primary_timing_excludes_delayed_pipe_byte_but_end_to_end_includes_it(self) -> None:
+    def test_worker_timings_exclude_delayed_pipe_byte(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("delay-last-byte")
         self.addCleanup(temp_dir.cleanup)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         raw = [json.loads(line) for line in (out_dir / "raw.jsonl").read_text().splitlines()]
         samples = [record for record in raw if record["record_type"] == "sample"]
-        self.assertEqual({record["sample_b8_elapsed_ns"] for record in samples}, {1})
-        self.assertGreaterEqual(max(record["end_to_end_elapsed_ns"] for record in samples), 140_000_000)
+        self.assertEqual({record["sample_elapsed_ns"] for record in samples}, {1})
+        self.assertEqual({record["b8_elapsed_ns"] for record in samples}, {2})
+        self.assertEqual({record["worker_total_elapsed_ns"] for record in samples}, {3})
+        self.assertTrue(all("end_to_end_elapsed_ns" not in record for record in samples))
 
     def test_nonzero_exit_after_final_rejects_before_summary(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("final-then-nonzero")

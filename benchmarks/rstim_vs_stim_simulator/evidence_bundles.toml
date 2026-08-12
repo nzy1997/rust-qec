@@ -101,31 +101,31 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
-sha256 = "d2109c5719fef7a011e6848ac925ec8db37d7488bf4994cdba2301e240978841"
+sha256 = "9e5ef8cdbbf68560c346c93dffa8fcc7137d53b51481c1d7c59684ad1436ad85"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
-sha256 = "e7cfe712007ede2ee72e6a875a073fda8fdd6da186a7533c41c70113b42f11ef"
+sha256 = "29839dbef8c4b51e617eeb161ca5f69975599028c7b9ecb2fc02bb0d0638f785"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "5ac562a0f12928205a76f14d1149a7b837de6b782be8616792f51c90b54ae66b"
+sha256 = "6e0ad33c3df349f16b2f44461b4bcd7c153e46bb7aac27a15a901c7be1044dab"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "ee3d1e08403e3170167decd983e1689d4ba053c000e089f0200c2cd7d9986125"
+sha256 = "dd7243142bea5a38ca4a4351eb94cc95a1ad6f72fe63daa98f65669f38ea764f"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"
-sha256 = "e73e72c09bf3c37bd651d3a07caa366ad6c8abd0bf3418d1ad917695027d160d"
+sha256 = "34037ed3dd67d38b60d5f81cecbe5ea38b1489b496e42bd01fbd543c2b071cb8"
 
 [[bundles.artifacts]]
 path = "report.md"
-sha256 = "e2367c9e270944e752baed4a59c854bf31eeececfd2cec50575e13822d6eb343"
+sha256 = "adbe42c91f1aa2a988cf39ad99c2eb6f78a02f423351d57c7cecb9f11c8db0cc"
 
 [[bundles.artifacts]]
 path = "summary.json"
-sha256 = "9608f4515776b99fa5e198cd287817b23ebd30bfb4e31c913fa2986099b5bb05"
+sha256 = "7dfc7f049c1e22208c09286c8a48716ac31bfc90b1845a2a749ab2574d711a84"
 
 [[bundles.logical_executables]]
 role = "tool://python"
@@ -152,13 +152,13 @@ sha256 = "1905320bed01fa545b5c35e5f584089dc3d9c93625a3b04a4323509ed03f7a3a"
 role = "tool://stim-worker"
 version = "1.15.0"
 basename = "stim_compiled_steady.py"
-sha256 = "e7cfe712007ede2ee72e6a875a073fda8fdd6da186a7533c41c70113b42f11ef"
+sha256 = "29839dbef8c4b51e617eeb161ca5f69975599028c7b9ecb2fc02bb0d0638f785"
 
 [[bundles.runtime_identities]]
 role = "tool://rstim-worker"
 version = "rstim 0.2.0"
 basename = "rstim_compiled_steady_worker"
-sha256 = "338c63982274dc8cd46d7f90629c5e945564009e5d12260c5020ee220398777f"
+sha256 = "051e7bbb9be55412890121e5ac5701a3a884de82e0fd319391d6aa04c5819d6a"
 
 [[bundles.checked_commands]]
 name = "rstim-precompiled-worker"
@@ -182,7 +182,7 @@ argv = ["tool://rstim-worker", "--variant", "rstim-interpreted-atom-loss", "--in
 
 [[bundles.checked_provenance]]
 name = "release-contract"
-value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "worker_variant_sample_path_and_b8_encode", secondary_timer_scope = "request_sample_b8_encode_and_pipe_transfer", protocol_version = "3", source_manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", fair_manifest = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml" }
+value = { case_id = "stim_surface_d11_r100", profile = "release", timer_scope = "worker_sample_path_and_b8_output_excluding_precompile_and_transport", protocol_version = "4", source_manifest = "benchmarks/rstim_vs_stim_simulator/cases.full.toml", fair_manifest = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml" }
 
 [[bundles]]
 id = "reference-build-release"

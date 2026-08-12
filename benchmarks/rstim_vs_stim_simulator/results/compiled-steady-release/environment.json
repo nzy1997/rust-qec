@@ -57,7 +57,7 @@
   "fair_manifest_sha256": "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb",
   "fixture_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
-  "git_commit": "9ba744b180c82655b7573e00756e78f10a884ed4",
+  "git_commit": "ce6ecddf68f719980878881ec870a2fa5c57b9d6",
   "known_answer_preflight": [
     {
       "argv": [
@@ -74,6 +74,7 @@
         "compile_count": 1,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 115041,
         "reference_build_count": 1,
         "sample_call_count": 1,
         "variant": "rstim-precompiled"
@@ -83,6 +84,7 @@
         "compile_count": 1,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 115041,
         "reference_build_count": 1,
         "sample_call_count": 0,
         "variant": "rstim-precompiled"
@@ -107,6 +109,7 @@
         "compile_count": 1,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 65291,
         "reference_build_count": 1,
         "sample_call_count": 1,
         "variant": "stim-precompiled"
@@ -116,6 +119,7 @@
         "compile_count": 1,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 65291,
         "reference_build_count": 1,
         "sample_call_count": 0,
         "variant": "stim-precompiled"
@@ -138,6 +142,7 @@
         "compile_count": 0,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 1,
         "sample_call_count": 1,
         "variant": "rstim-interpreted"
@@ -147,6 +152,7 @@
         "compile_count": 0,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 0,
         "sample_call_count": 0,
         "variant": "rstim-interpreted"
@@ -171,6 +177,7 @@
         "compile_count": 1,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 1,
         "sample_call_count": 1,
         "variant": "stim-direct"
@@ -180,6 +187,7 @@
         "compile_count": 0,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 0,
         "sample_call_count": 0,
         "variant": "stim-direct"
@@ -202,6 +210,7 @@
         "compile_count": 0,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 1,
         "sample_call_count": 1,
         "variant": "rstim-interpreted-atom-loss"
@@ -211,6 +220,7 @@
         "compile_count": 0,
         "fixture_sha256": "809099f4ae885a329173f1af8aa735a97c04a9b79e3fee3a4984192f99611d97",
         "measurement_count": 1,
+        "precompile_elapsed_ns": 0,
         "reference_build_count": 0,
         "sample_call_count": 0,
         "variant": "rstim-interpreted-atom-loss"
@@ -222,7 +232,7 @@
   "measure_rounds": 7,
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
-  "protocol_version": 3,
+  "protocol_version": 4,
   "rstim_version": "rstim 0.2.0",
   "runtime_identities": [
     {
@@ -240,18 +250,17 @@
     {
       "basename": "stim_compiled_steady.py",
       "role": "tool://stim-worker",
-      "sha256": "e7cfe712007ede2ee72e6a875a073fda8fdd6da186a7533c41c70113b42f11ef",
+      "sha256": "29839dbef8c4b51e617eeb161ca5f69975599028c7b9ecb2fc02bb0d0638f785",
       "version": "1.15.0"
     },
     {
       "basename": "rstim_compiled_steady_worker",
       "role": "tool://rstim-worker",
-      "sha256": "338c63982274dc8cd46d7f90629c5e945564009e5d12260c5020ee220398777f",
+      "sha256": "051e7bbb9be55412890121e5ac5701a3a884de82e0fd319391d6aa04c5819d6a",
       "version": "rstim 0.2.0"
     }
   ],
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
-  "secondary_timer_scope": "request_sample_b8_encode_and_pipe_transfer",
   "seed": 0,
   "seed_policy": "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
   "source_manifest_path": "benchmarks/rstim_vs_stim_simulator/cases.full.toml",
@@ -263,8 +272,8 @@
   },
   "stim_version": "1.15.0",
   "stim_worker_module_path": "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py",
-  "stim_worker_module_sha256": "e7cfe712007ede2ee72e6a875a073fda8fdd6da186a7533c41c70113b42f11ef",
-  "timer_scope": "worker_variant_sample_path_and_b8_encode",
+  "stim_worker_module_sha256": "29839dbef8c4b51e617eeb161ca5f69975599028c7b9ecb2fc02bb0d0638f785",
+  "timer_scope": "worker_sample_path_and_b8_output_excluding_precompile_and_transport",
   "warmup_rounds": 2,
   "worker_argv": {
     "rstim-interpreted": [

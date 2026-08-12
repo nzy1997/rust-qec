@@ -520,7 +520,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "ff4cb18f99991a07c75ceae893ed141f1640e68235b8442a7efd1ca6ba11b587"
+                  "sha256": "345bd007861a9a678b358a03ab128ee70096fa2b622365e9ba090d3d308da8e7"
                 }
               }
             }
@@ -829,7 +829,7 @@
         },
         {
           "id": "rstim-vs-stim-compiled-steady",
-          "title": "Checked unified sample plus b8 evidence for five simulator paths",
+          "title": "Checked split precompile, sample, and b8 evidence for five simulator paths",
           "status": "existing",
           "tier": "release",
           "artifacts": [
@@ -867,12 +867,12 @@
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
-              "value": "2026-08-12T16:38:35+08:00"
+              "value": "2026-08-12T17:06:45+08:00"
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "9ba744b180c82655b7573e00756e78f10a884ed4"
+                "runner_source": "ce6ecddf68f719980878881ec870a2fa5c57b9d6"
               }
             },
             "commands": {
@@ -925,10 +925,9 @@
               "status": "recorded",
               "value": {
                 "profile": "release",
-                "protocol_version": 3,
-                "lifecycle_policy": "Precompiled variants build once; direct variants include per-batch setup required by the implementation.",
-                "timer_scope": "worker-local selected sampling path plus b8 encoding after worker readiness",
-                "secondary_timer_scope": "request, sampling, b8 encoding, and bit-packed pipe transfer"
+                "protocol_version": 4,
+                "lifecycle_policy": "Precompiled variants record one-time setup separately; direct variants include per-batch setup required by the implementation in their sampling path.",
+                "timer_scope": "worker-local sampling path plus b8 output, excluding one-time precompilation and pipe transport"
               }
             },
             "shots_or_error_budget": {
@@ -939,27 +938,27 @@
                 "warmup_rounds": 2,
                 "measure_rounds": 7,
                 "output_bytes_per_call": 1552384,
-                "rstim_vs_stim_precompiled_sample_b8_wall_time_ratio": 1.2203207084288,
-                "atom_loss_vs_rstim_interpreted_sample_b8_wall_time_ratio": 43.91875845751608
+                "rstim_vs_stim_precompiled_worker_total_wall_time_ratio": 0.8822863565481871,
+                "atom_loss_vs_rstim_interpreted_worker_total_wall_time_ratio": 56.29021817557644
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": {
-                  "sha256": "e73e72c09bf3c37bd651d3a07caa366ad6c8abd0bf3418d1ad917695027d160d"
+                  "sha256": "34037ed3dd67d38b60d5f81cecbe5ea38b1489b496e42bd01fbd543c2b071cb8"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": {
-                  "sha256": "9608f4515776b99fa5e198cd287817b23ebd30bfb4e31c913fa2986099b5bb05"
+                  "sha256": "7dfc7f049c1e22208c09286c8a48716ac31bfc90b1845a2a749ab2574d711a84"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": {
-                  "sha256": "e2367c9e270944e752baed4a59c854bf31eeececfd2cec50575e13822d6eb343"
+                  "sha256": "adbe42c91f1aa2a988cf39ad99c2eb6f78a02f423351d57c7cecb9f11c8db0cc"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": {
-                  "sha256": "ee3d1e08403e3170167decd983e1689d4ba053c000e089f0200c2cd7d9986125"
+                  "sha256": "dd7243142bea5a38ca4a4351eb94cc95a1ad6f72fe63daa98f65669f38ea764f"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": {
-                  "sha256": "5ac562a0f12928205a76f14d1149a7b837de6b782be8616792f51c90b54ae66b"
+                  "sha256": "6e0ad33c3df349f16b2f44461b4bcd7c153e46bb7aac27a15a901c7be1044dab"
                 }
               }
             }
@@ -983,13 +982,13 @@
             "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json",
             "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json"
           ],
-          "claims_limit": "Checked unified sample-plus-b8 evidence for five paths on one d11/r100 fixture, seven measured calls per path, and one recorded environment only.",
+          "claims_limit": "Checked split precompile/sample/b8 evidence for five paths on one d11/r100 fixture, seven measured calls per path, and one recorded environment only.",
           "caveats": [
-            "Precompiled variants build once before timed calls; direct variants include per-batch setup required by their implementation.",
-            "The primary timer is measured inside each worker and includes the selected sampling path plus b8 encoding, excluding pipe transfer.",
-            "Each call still transfers and validates the same 1,552,384-byte bit-packed result; that cost is recorded separately as end-to-end time.",
-            "All five published rows now use this same output boundary.",
-            "For this recorded run, Stim is 1.22x faster in the precompiled pair and atom loss is 43.92x slower than rstim interpreted."
+            "Precompiled variants record one-time setup separately; direct variants include per-batch setup required by their implementation in the sampling path.",
+            "The headline total is measured inside each worker and equals the sampling path plus b8 output, excluding both precompilation and pipe transport.",
+            "Stim returns bit-packed samples directly, so its packing work remains in its sampling-path phase; its b8 phase is byte serialization.",
+            "All five published rows use the same final b8 output boundary.",
+            "For this recorded run, rstim is 1.13x faster in the precompiled pair and atom loss is 56.29x slower than rstim interpreted."
           ]
         },
         {

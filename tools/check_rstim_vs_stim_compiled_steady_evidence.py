@@ -39,7 +39,6 @@ ENVIRONMENT_KEYS = {
     "cpu_model",
     "profile",
     "timer_scope",
-    "secondary_timer_scope",
     "seed_policy",
     "stim_version",
     "stim_python_probe",
@@ -176,6 +175,7 @@ def _validate_telemetry(
     variant: str,
     stage: str,
     fixture_sha256: str | None,
+    precompile_elapsed_ns: int | None,
     sample_call_count: int,
 ) -> None:
     label = _release_variant(variant)
@@ -193,6 +193,24 @@ def _validate_telemetry(
         ("bytes_per_shot", fair_cli_contract.EXPECTED_CASE["bytes_per_shot"]),
     ):
         _require_int_equal(telemetry.get(field), expected, f"{label} {stage} {field}")
+    actual_precompile_elapsed_ns = telemetry.get("precompile_elapsed_ns")
+    if (
+        not isinstance(actual_precompile_elapsed_ns, int)
+        or isinstance(actual_precompile_elapsed_ns, bool)
+        or actual_precompile_elapsed_ns < 0
+    ):
+        raise ValueError(f"{label} {stage} precompile_elapsed_ns must be a nonnegative integer")
+    if variant in run_compiled_steady.PRECOMPILED_VARIANTS:
+        if actual_precompile_elapsed_ns == 0:
+            raise ValueError(f"{label} {stage} precompile_elapsed_ns must be positive")
+    elif actual_precompile_elapsed_ns != 0:
+        raise ValueError(f"{label} {stage} precompile_elapsed_ns must be zero")
+    if precompile_elapsed_ns is not None:
+        _require_int_equal(
+            actual_precompile_elapsed_ns,
+            precompile_elapsed_ns,
+            f"{label} {stage} precompile_elapsed_ns",
+        )
     digest = telemetry.get("fixture_sha256")
     if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
         raise ValueError(f"{label} {stage} fixture_sha256 must be a lowercase SHA-256 digest")
@@ -225,7 +243,12 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
 
         ready = ready_records[0]
         _validate_telemetry(
-            ready.get("telemetry"), variant=variant, stage="ready", fixture_sha256=None, sample_call_count=0
+            ready.get("telemetry"),
+            variant=variant,
+            stage="ready",
+            fixture_sha256=None,
+            precompile_elapsed_ns=None,
+            sample_call_count=0,
         )
         ready_telemetry = ready["telemetry"]
         request_ids = [record.get("request_id") for record in sample_records]
@@ -250,27 +273,21 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
                 case["output_format"],
                 f"{label} output_format for request {request_id} must be {case['output_format']}",
             )
-            sample_b8_elapsed_ns = record.get("sample_b8_elapsed_ns")
-            if (
-                not isinstance(sample_b8_elapsed_ns, int)
-                or isinstance(sample_b8_elapsed_ns, bool)
-                or sample_b8_elapsed_ns < 0
-            ):
+            timings: dict[str, int] = {}
+            for field in ("sample_elapsed_ns", "b8_elapsed_ns", "worker_total_elapsed_ns"):
+                elapsed_ns = record.get(field)
+                if (
+                    not isinstance(elapsed_ns, int)
+                    or isinstance(elapsed_ns, bool)
+                    or elapsed_ns < 0
+                ):
+                    raise ValueError(
+                        f"{label} {field} for request {request_id} must be a nonnegative integer"
+                    )
+                timings[field] = elapsed_ns
+            if timings["worker_total_elapsed_ns"] != timings["sample_elapsed_ns"] + timings["b8_elapsed_ns"]:
                 raise ValueError(
-                    f"{label} sample_b8_elapsed_ns for request {request_id} must be a nonnegative integer"
-                )
-            end_to_end_elapsed_ns = record.get("end_to_end_elapsed_ns")
-            if (
-                not isinstance(end_to_end_elapsed_ns, int)
-                or isinstance(end_to_end_elapsed_ns, bool)
-                or end_to_end_elapsed_ns < 0
-            ):
-                raise ValueError(
-                    f"{label} end_to_end_elapsed_ns for request {request_id} must be a nonnegative integer"
-                )
-            if end_to_end_elapsed_ns < sample_b8_elapsed_ns:
-                raise ValueError(
-                    f"{label} end_to_end_elapsed_ns for request {request_id} must be at least sample_b8_elapsed_ns"
+                    f"{label} worker_total_elapsed_ns for request {request_id} must equal sample_elapsed_ns + b8_elapsed_ns"
                 )
             _require_int_equal(
                 record.get("output_bytes"), case["expected_output_bytes"],
@@ -281,6 +298,7 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
             variant=variant,
             stage="final",
             fixture_sha256=ready_telemetry["fixture_sha256"],
+            precompile_elapsed_ns=ready_telemetry["precompile_elapsed_ns"],
             sample_call_count=9,
         )
         compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(variant, 9)
@@ -445,6 +463,7 @@ def _validate_preflight_telemetry(
     stage: str,
     sample_call_count: int,
     fixture_sha256: str | None,
+    precompile_elapsed_ns: int | None,
 ) -> str:
     payload = _require_json_object(telemetry, f"environment {variant} preflight {stage}")
     _require_equal(payload.get("variant"), variant, f"environment {variant} preflight {stage} variant must be {variant}")
@@ -459,6 +478,30 @@ def _validate_preflight_telemetry(
         ("bytes_per_shot", 1),
     ):
         _require_int_equal(payload.get(field), expected, f"environment {variant} preflight {stage} {field}")
+    actual_precompile_elapsed_ns = payload.get("precompile_elapsed_ns")
+    if (
+        not isinstance(actual_precompile_elapsed_ns, int)
+        or isinstance(actual_precompile_elapsed_ns, bool)
+        or actual_precompile_elapsed_ns < 0
+    ):
+        raise ValueError(
+            f"environment {variant} preflight {stage} precompile_elapsed_ns must be a nonnegative integer"
+        )
+    if variant in run_compiled_steady.PRECOMPILED_VARIANTS:
+        if actual_precompile_elapsed_ns == 0:
+            raise ValueError(
+                f"environment {variant} preflight {stage} precompile_elapsed_ns must be positive"
+            )
+    elif actual_precompile_elapsed_ns != 0:
+        raise ValueError(
+            f"environment {variant} preflight {stage} precompile_elapsed_ns must be zero"
+        )
+    if precompile_elapsed_ns is not None:
+        _require_int_equal(
+            actual_precompile_elapsed_ns,
+            precompile_elapsed_ns,
+            f"environment {variant} preflight {stage} precompile_elapsed_ns",
+        )
     digest = payload.get("fixture_sha256")
     if not isinstance(digest, str) or SHA256_RE.fullmatch(digest) is None:
         raise ValueError(f"environment {variant} preflight {stage} fixture_sha256 must be a lowercase SHA-256 digest")
@@ -485,8 +528,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
             raise ValueError(f"environment {field} must be nonempty")
     for field, expected in (
         ("profile", "release"),
-        ("timer_scope", run_compiled_steady.PRIMARY_TIMER_SCOPE),
-        ("secondary_timer_scope", run_compiled_steady.SECONDARY_TIMER_SCOPE),
+        ("timer_scope", run_compiled_steady.TIMER_SCOPE),
         ("seed_policy", "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call"),
         ("stim_version", case["stim_version"]),
         ("protocol_version", run_compiled_steady.PROTOCOL_VERSION),
@@ -565,6 +607,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
             stage="ready",
             sample_call_count=0,
             fixture_sha256=None,
+            precompile_elapsed_ns=None,
         )
         _validate_preflight_telemetry(
             item.get("final"),
@@ -572,6 +615,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
             stage="final",
             sample_call_count=1,
             fixture_sha256=preflight_fixture_sha256,
+            precompile_elapsed_ns=item["ready"]["precompile_elapsed_ns"],
         )
 
     expected_lifecycle = derived["lifecycle"]
@@ -624,7 +668,7 @@ def validate_bundle(results_dir: Path) -> tuple[int, int, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate unified sample+b8 sampling evidence.")
+    parser = argparse.ArgumentParser(description="Validate split precompile/sample/b8 sampling evidence.")
     parser.add_argument("--dir", type=Path, required=True, dest="results_dir")
     args = parser.parse_args(argv)
     try:
@@ -632,7 +676,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
-    print(f"PASS unified sample+b8 evidence variants={variants} measured={measured} lifecycle={lifecycle}")
+    print(f"PASS split precompile/sample/b8 evidence variants={variants} measured={measured} lifecycle={lifecycle}")
     return 0
 
 
