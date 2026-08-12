@@ -181,10 +181,9 @@ probability of `0.001`.
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 
-## Precompiled Steady-State Evidence
+## Unified Sample + `b8` Evidence
 
-Compare repeated sample calls after both implementations compile the canonical
-circuit and build their reference sample once:
+Compare five surface-code sampling paths under one output boundary:
 
 ```sh
 python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
@@ -197,12 +196,12 @@ python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
   --out-dir /tmp/rstim-compiled-steady
 ```
 
-The primary timed region is measured inside each worker and covers sampling plus
-the same `b8` encoding. The 1,552,384-byte result is still transferred and
-validated on every call, but that pipe cost is recorded separately as an
-end-to-end duration. Process startup, circuit compilation, and reference-sample
-construction occur before both timers. Compare the two steady-state rows only
-with each other, not with the selected-case runner above.
+The primary timed region is measured inside each worker and covers the selected
+sampling path plus the same `b8` encoding. Precompiled variants reuse a sampler;
+direct variants include per-batch setup required by that implementation. The
+1,552,384-byte result is still transferred and validated on every call, but
+that pipe cost is recorded separately as an end-to-end duration. Worker process
+startup and initial fixture parsing occur before both timers.
 
 ## Selected DEM Speed Evidence
 

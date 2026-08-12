@@ -1,17 +1,35 @@
 {
-  "measured_records": 14,
+  "measured_records": 35,
   "variants": [
     {
-      "median_end_to_end_elapsed_ns": 16464083,
-      "median_sample_b8_elapsed_ns": 16089292,
+      "median_end_to_end_elapsed_ns": 21800375,
+      "median_sample_b8_elapsed_ns": 20705334,
       "sample_count": 7,
-      "variant": "stim"
+      "variant": "rstim-precompiled"
     },
     {
-      "median_end_to_end_elapsed_ns": 13569500,
-      "median_sample_b8_elapsed_ns": 13235750,
+      "median_end_to_end_elapsed_ns": 17976125,
+      "median_sample_b8_elapsed_ns": 16967125,
       "sample_count": 7,
-      "variant": "rstim"
+      "variant": "stim-precompiled"
+    },
+    {
+      "median_end_to_end_elapsed_ns": 26968042,
+      "median_sample_b8_elapsed_ns": 25147750,
+      "sample_count": 7,
+      "variant": "rstim-interpreted"
+    },
+    {
+      "median_end_to_end_elapsed_ns": 24133042,
+      "median_sample_b8_elapsed_ns": 22883625,
+      "sample_count": 7,
+      "variant": "stim-direct"
+    },
+    {
+      "median_end_to_end_elapsed_ns": 1105397250,
+      "median_sample_b8_elapsed_ns": 1104457958,
+      "sample_count": 7,
+      "variant": "rstim-interpreted-atom-loss"
     }
   ]
 }

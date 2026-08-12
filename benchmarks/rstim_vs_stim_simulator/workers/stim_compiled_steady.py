@@ -21,6 +21,7 @@ def _write_error(message: object) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the compiled steady-state Stim worker.")
+    parser.add_argument("--variant", choices=("stim-precompiled", "stim-direct"), required=True)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--seed", type=int, required=True)
     return parser
@@ -44,12 +45,12 @@ def main(argv: list[str] | None = None) -> int:
 
         input_text = args.input.read_text(encoding="utf-8")
         circuit = stim.Circuit(input_text)
-        sampler = circuit.compile_sampler(seed=args.seed)
+        sampler = circuit.compile_sampler(seed=args.seed) if args.variant == "stim-precompiled" else None
         measurement_count = circuit.num_measurements
         telemetry = {
-            "variant": "stim",
-            "compile_count": 1,
-            "reference_build_count": 1,
+            "variant": args.variant,
+            "compile_count": 1 if sampler is not None else 0,
+            "reference_build_count": 1 if sampler is not None else 0,
             "sample_call_count": 0,
             "fixture_sha256": _fixture_sha256(args.input),
             "measurement_count": measurement_count,
@@ -88,12 +89,19 @@ def main(argv: list[str] | None = None) -> int:
             continue
         try:
             started_ns = time.perf_counter_ns()
-            data = sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
+            if sampler is None:
+                call_sampler = circuit.compile_sampler(seed=args.seed + telemetry["sample_call_count"])
+                data = call_sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
+            else:
+                data = sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
             sample_b8_elapsed_ns = time.perf_counter_ns() - started_ns
         except Exception as error:
             _write_error(error)
             continue
         telemetry["sample_call_count"] += 1
+        if sampler is None:
+            telemetry["compile_count"] += 1
+            telemetry["reference_build_count"] += 1
         result = struct.pack(
             "<QQQ", request_id, telemetry["sample_call_count"], sample_b8_elapsed_ns
         ) + data

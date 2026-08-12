@@ -3,17 +3,17 @@ use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use clap::Parser;
-use rand::rngs::StdRng;
+use clap::{Parser, ValueEnum};
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use rstim::CompiledMeasurementSampler;
 use rstim::data_path::ReferenceSampleMode;
 use rstim::output::write_shots_b8;
 use rstim::parser::parse_lines;
-use rstim::sampler::SampleOutputMode;
-use rstim::CompiledMeasurementSampler;
+use rstim::sampler::{SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options};
 
 const READY: u8 = b'R';
 const SAMPLE: u8 = b'S';
@@ -25,10 +25,29 @@ const ERROR: u8 = b'E';
 #[derive(Parser)]
 #[command(name = "rstim", version)]
 struct Args {
+    #[arg(long, value_enum)]
+    variant: WorkerVariant,
     #[arg(long)]
     input: PathBuf,
     #[arg(long)]
     seed: u64,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum WorkerVariant {
+    RstimPrecompiled,
+    RstimInterpreted,
+    RstimInterpretedAtomLoss,
+}
+
+impl WorkerVariant {
+    fn label(self) -> &'static str {
+        match self {
+            Self::RstimPrecompiled => "rstim-precompiled",
+            Self::RstimInterpreted => "rstim-interpreted",
+            Self::RstimInterpretedAtomLoss => "rstim-interpreted-atom-loss",
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -46,6 +65,34 @@ struct Telemetry {
     fixture_sha256: String,
     measurement_count: usize,
     bytes_per_shot: usize,
+}
+
+enum SamplerState {
+    Precompiled(CompiledMeasurementSampler),
+    Interpreted { sample_calls: usize },
+}
+
+impl SamplerState {
+    fn compile_count(&self) -> usize {
+        match self {
+            Self::Precompiled(sampler) => sampler.diagnostics().compiled_ir_builds,
+            Self::Interpreted { .. } => 0,
+        }
+    }
+
+    fn reference_build_count(&self) -> usize {
+        match self {
+            Self::Precompiled(sampler) => sampler.diagnostics().reference_builds,
+            Self::Interpreted { sample_calls } => *sample_calls,
+        }
+    }
+
+    fn sample_call_count(&self) -> usize {
+        match self {
+            Self::Precompiled(sampler) => sampler.diagnostics().sample_calls,
+            Self::Interpreted { sample_calls } => *sample_calls,
+        }
+    }
 }
 
 fn write_frame(frame_type: u8, payload: &[u8]) -> io::Result<()> {
@@ -69,16 +116,16 @@ fn read_frame() -> io::Result<(u8, Vec<u8>)> {
 }
 
 fn telemetry(
-    sampler: &CompiledMeasurementSampler,
+    variant: WorkerVariant,
+    sampler: &SamplerState,
     fixture_sha256: &str,
     measurement_count: usize,
 ) -> Telemetry {
-    let diagnostics = sampler.diagnostics();
     Telemetry {
-        variant: "rstim",
-        compile_count: diagnostics.compiled_ir_builds,
-        reference_build_count: diagnostics.reference_builds,
-        sample_call_count: diagnostics.sample_calls,
+        variant: variant.label(),
+        compile_count: sampler.compile_count(),
+        reference_build_count: sampler.reference_build_count(),
+        sample_call_count: sampler.sample_call_count(),
         fixture_sha256: fixture_sha256.to_owned(),
         measurement_count,
         bytes_per_shot: measurement_count.div_ceil(8),
@@ -99,15 +146,24 @@ fn run(args: Args) -> Result<(), String> {
         .map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
     let input_text = std::str::from_utf8(&input_bytes).map_err(|error| error.to_string())?;
     let instructions = parse_lines(input_text)?;
-    let mut sampler =
-        CompiledMeasurementSampler::compile(&instructions, ReferenceSampleMode::SimulateNoiseless)?;
+    let mut sampler = match args.variant {
+        WorkerVariant::RstimPrecompiled => {
+            SamplerState::Precompiled(CompiledMeasurementSampler::compile(
+                &instructions,
+                ReferenceSampleMode::SimulateNoiseless,
+            )?)
+        }
+        WorkerVariant::RstimInterpreted | WorkerVariant::RstimInterpretedAtomLoss => {
+            SamplerState::Interpreted { sample_calls: 0 }
+        }
+    };
     let measurement_count = rstim::stats::num_measurements(&instructions);
     let fixture_sha256 = format!("{:x}", Sha256::digest(&input_bytes));
     let mut rng = StdRng::seed_from_u64(args.seed);
 
     write_json_frame(
         READY,
-        &telemetry(&sampler, &fixture_sha256, measurement_count),
+        &telemetry(args.variant, &sampler, &fixture_sha256, measurement_count),
     )?;
 
     loop {
@@ -116,7 +172,7 @@ fn run(args: Args) -> Result<(), String> {
             STOP => {
                 write_json_frame(
                     FINAL,
-                    &telemetry(&sampler, &fixture_sha256, measurement_count),
+                    &telemetry(args.variant, &sampler, &fixture_sha256, measurement_count),
                 )?;
                 return Ok(());
             }
@@ -129,11 +185,28 @@ fn run(args: Args) -> Result<(), String> {
                     }
                 };
                 let started = Instant::now();
-                let output = match sampler.sample(
-                    request.shots,
-                    &mut rng,
-                    SampleOutputMode::MeasurementsOnly,
-                ) {
+                let sample_result = match &mut sampler {
+                    SamplerState::Precompiled(sampler) => {
+                        sampler.sample(request.shots, &mut rng, SampleOutputMode::MeasurementsOnly)
+                    }
+                    SamplerState::Interpreted { sample_calls } => {
+                        let result = sample_batch_with_options(
+                            &instructions,
+                            request.shots,
+                            &mut rng,
+                            SampleOptions {
+                                backend: SamplingBackend::Interpreted,
+                                output_mode: SampleOutputMode::MeasurementsOnly,
+                                ..SampleOptions::default()
+                            },
+                        );
+                        if result.is_ok() {
+                            *sample_calls += 1;
+                        }
+                        result
+                    }
+                };
+                let output = match sample_result {
                     Ok(output) => output,
                     Err(error) => {
                         write_error(error)?;
@@ -148,8 +221,7 @@ fn run(args: Args) -> Result<(), String> {
 
                 let mut result = Vec::with_capacity(24 + packed.len());
                 result.extend_from_slice(&request.request_id.to_le_bytes());
-                result
-                    .extend_from_slice(&(sampler.diagnostics().sample_calls as u64).to_le_bytes());
+                result.extend_from_slice(&(sampler.sample_call_count() as u64).to_le_bytes());
                 result.extend_from_slice(&sample_b8_elapsed_ns.to_le_bytes());
                 result.extend_from_slice(&packed);
                 write_frame(RESULT, &result).map_err(|error| error.to_string())?;

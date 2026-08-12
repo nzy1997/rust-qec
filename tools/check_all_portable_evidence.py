@@ -38,7 +38,7 @@ def _fair_cli_pass_line(result: Any) -> str:
 
 def _compiled_steady_pass_line(result: Any) -> str:
     variants, measured, lifecycle = result
-    return f"PASS compiled steady-state sampling evidence variants={variants} measured={measured} lifecycle={lifecycle}"
+    return f"PASS unified sample+b8 evidence variants={variants} measured={measured} lifecycle={lifecycle}"
 
 
 def _reference_build_pass_line(result: Any) -> str:

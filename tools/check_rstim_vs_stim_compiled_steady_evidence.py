@@ -19,10 +19,11 @@ from benchmarks.rstim_vs_stim_simulator import fair_cli_contract, run_compiled_s
 
 REQUIRED_FILES = ("raw.jsonl", "summary.json", "report.md", "environment.json", "artifact-sha256.json")
 ARTIFACT_FILES = REQUIRED_FILES[:-1]
-RAW_VARIANTS = ("stim", "rstim")
-RELEASE_VARIANTS = {"stim": "stim-compiled-steady-b8", "rstim": "rstim-compiled-steady-b8"}
+RAW_VARIANTS = run_compiled_steady.VARIANTS
+RELEASE_VARIANTS = {variant: variant for variant in RAW_VARIANTS}
 CANONICAL_FAIR_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
 CANONICAL_STIM_WORKER_MODULE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"
+CANONICAL_ATOM_LOSS_FIXTURE = REPO_ROOT / run_compiled_steady.ATOM_LOSS_FIXTURE_PATH
 SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 WINDOWS_ABSOLUTE_RE = re.compile(r"[A-Za-z]:[\\/]")
 REQUIRED_RUNTIME_IDENTITY_ROLES = (
@@ -50,6 +51,8 @@ ENVIRONMENT_KEYS = {
     "source_manifest_sha256",
     "fixture_path",
     "fixture_sha256",
+    "atom_loss_fixture_path",
+    "atom_loss_fixture_sha256",
     "worker_argv",
     "canonical_worker_argv",
     "stim_worker_module_path",
@@ -61,7 +64,6 @@ ENVIRONMENT_KEYS = {
     "measure_rounds",
     "known_answer_preflight",
     "workers",
-    "lifecycle",
 }
 OBSOLETE_LIVE_ENVIRONMENT_KEYS = {
     "python_executable",
@@ -156,18 +158,8 @@ def _repo_relative_path(raw: Any, field: str) -> Path:
     return REPO_ROOT / path
 
 
-def _portable_worker_argv(role: str, input_path: str) -> list[str]:
-    if role == "stim":
-        return [
-            "tool://python",
-            "-m",
-            "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
-            "--input",
-            input_path,
-            "--seed",
-            "0",
-        ]
-    return ["tool://rstim-worker", "--input", input_path, "--seed", "0"]
+def _portable_worker_argv(variant: str, input_path: str) -> list[str]:
+    return run_compiled_steady._portable_worker_argv(variant, input_path, seed=0)
 
 
 def _contains_host_absolute_path(value: Any) -> bool:
@@ -190,9 +182,12 @@ def _validate_telemetry(
     if not isinstance(telemetry, dict):
         raise ValueError(f"{label} {stage} telemetry must be a JSON object")
     _require_equal(telemetry.get("variant"), variant, f"{label} {stage} variant must be {variant}")
+    compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(
+        variant, sample_call_count
+    )
     for field, expected in (
-        ("compile_count", 1),
-        ("reference_build_count", 1),
+        ("compile_count", compile_count),
+        ("reference_build_count", reference_build_count),
         ("sample_call_count", sample_call_count),
         ("measurement_count", fair_cli_contract.EXPECTED_CASE["measurement_count"]),
         ("bytes_per_shot", fair_cli_contract.EXPECTED_CASE["bytes_per_shot"]),
@@ -207,7 +202,7 @@ def _validate_telemetry(
 
 def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
     if set(record.get("variant") for record in records) != set(RAW_VARIANTS):
-        raise ValueError("raw.jsonl variants must be stim and rstim")
+        raise ValueError("raw.jsonl variants must match the five canonical sample+b8 variants")
 
     case = fair_cli_contract.EXPECTED_CASE
     lifecycle: dict[str, dict[str, int]] = {}
@@ -288,11 +283,16 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
             fixture_sha256=ready_telemetry["fixture_sha256"],
             sample_call_count=9,
         )
-        lifecycle[variant] = {"compile_count": 1, "reference_build_count": 1, "sample_call_count": 9}
+        compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(variant, 9)
+        lifecycle[variant] = {
+            "compile_count": compile_count,
+            "reference_build_count": reference_build_count,
+            "sample_call_count": 9,
+        }
 
-    if len(records) != 22:
-        raise ValueError("raw.jsonl must contain exactly 22 lifecycle records")
-    return {"lifecycle": lifecycle, "measured_records": 14, "variants": 2}
+    if len(records) != 55:
+        raise ValueError("raw.jsonl must contain exactly 55 lifecycle records")
+    return {"lifecycle": lifecycle, "measured_records": 35, "variants": 5}
 
 
 def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -349,8 +349,14 @@ def _validate_command(value: Any, label: str) -> list[str]:
     return value
 
 
-def _expected_worker_argv(input_path: str) -> dict[str, list[str]]:
-    return {variant: _portable_worker_argv(variant, input_path) for variant in RAW_VARIANTS}
+def _expected_worker_argv(input_path: str, atom_loss_input_path: str) -> dict[str, list[str]]:
+    return {
+        variant: _portable_worker_argv(
+            variant,
+            atom_loss_input_path if variant == run_compiled_steady.ATOM_LOSS_VARIANT else input_path,
+        )
+        for variant in RAW_VARIANTS
+    }
 
 
 def _validate_runtime_identities(environment: dict[str, Any], *, stim_worker_module_path: Path) -> None:
@@ -442,9 +448,12 @@ def _validate_preflight_telemetry(
 ) -> str:
     payload = _require_json_object(telemetry, f"environment {variant} preflight {stage}")
     _require_equal(payload.get("variant"), variant, f"environment {variant} preflight {stage} variant must be {variant}")
+    compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(
+        variant, sample_call_count
+    )
     for field, expected in (
-        ("compile_count", 1),
-        ("reference_build_count", 1),
+        ("compile_count", compile_count),
+        ("reference_build_count", reference_build_count),
         ("sample_call_count", sample_call_count),
         ("measurement_count", 1),
         ("bytes_per_shot", 1),
@@ -464,7 +473,7 @@ def _validate_preflight_telemetry(
 
 def _validate_preflight_argv(item: dict[str, Any], *, variant: str) -> None:
     argv = _validate_command(item.get("argv"), f"environment {variant} preflight argv")
-    if argv != _portable_worker_argv(variant, "fixture://compiled-steady-known-answer"):
+    if argv != _portable_worker_argv(variant, "fixture://sample-b8-known-answer"):
         raise ValueError(f"environment {variant} preflight argv must match canonical shape")
 
 
@@ -478,7 +487,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         ("profile", "release"),
         ("timer_scope", run_compiled_steady.PRIMARY_TIMER_SCOPE),
         ("secondary_timer_scope", run_compiled_steady.SECONDARY_TIMER_SCOPE),
-        ("seed_policy", "seed_once_then_advance_across_9_calls"),
+        ("seed_policy", "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call"),
         ("stim_version", case["stim_version"]),
         ("protocol_version", run_compiled_steady.PROTOCOL_VERSION),
         ("seed", 0),
@@ -491,11 +500,13 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         ("fair_manifest_path", CANONICAL_FAIR_MANIFEST, "fair manifest"),
         ("source_manifest_path", REPO_ROOT / case["source_manifest_path"], "source manifest"),
         ("fixture_path", REPO_ROOT / case["canonical_input_path"], "fixture"),
+        ("atom_loss_fixture_path", CANONICAL_ATOM_LOSS_FIXTURE, "atom-loss fixture"),
         ("stim_worker_module_path", CANONICAL_STIM_WORKER_MODULE, "Stim worker module"),
     )
     for field, canonical_path, description in canonical_paths:
         _validate_canonical_path(environment, field, canonical_path, description)
     fixture_input = environment.get("fixture_path")
+    atom_loss_fixture_input = environment.get("atom_loss_fixture_path")
     stim_worker_module_path = _resolve_environment_path(environment, "stim_worker_module_path")
     if environment.get("fixture_sha256") != case["canonical_input_sha256"]:
         raise ValueError("fixture_sha256 must match canonical fixture SHA-256")
@@ -504,6 +515,7 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         ("fair_manifest_path", "fair_manifest_sha256"),
         ("source_manifest_path", "source_manifest_sha256"),
         ("fixture_path", "fixture_sha256"),
+        ("atom_loss_fixture_path", "atom_loss_fixture_sha256"),
         ("stim_worker_module_path", "stim_worker_module_sha256"),
     ):
         _validate_path_hash(environment, path_field, hash_field)
@@ -513,9 +525,9 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
     worker_argv = environment.get("worker_argv")
     workers = environment.get("workers")
     if not isinstance(worker_argv, dict) or set(worker_argv) != set(RAW_VARIANTS):
-        raise ValueError("environment worker_argv must contain stim and rstim")
-    if not isinstance(workers, list) or len(workers) != 2:
-        raise ValueError("environment workers must contain both variants")
+        raise ValueError("environment worker_argv must contain the five canonical variants")
+    if not isinstance(workers, list) or len(workers) != len(RAW_VARIANTS):
+        raise ValueError("environment workers must contain the five canonical variants")
     worker_commands: dict[Any, list[str]] = {}
     for worker in workers:
         if not isinstance(worker, dict):
@@ -528,21 +540,21 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         raise ValueError("environment workers must match worker_argv")
     canonical_worker_argv = environment.get("canonical_worker_argv")
     if not isinstance(canonical_worker_argv, dict) or set(canonical_worker_argv) != set(RAW_VARIANTS):
-        raise ValueError("environment canonical_worker_argv must contain stim and rstim")
+        raise ValueError("environment canonical_worker_argv must contain the five canonical variants")
     for variant in RAW_VARIANTS:
         _validate_command(worker_argv[variant], f"environment worker_argv {variant}")
         _validate_command(canonical_worker_argv[variant], f"environment canonical_worker_argv {variant}")
     if worker_argv != canonical_worker_argv:
         raise ValueError("environment worker_argv must match canonical_worker_argv")
-    if canonical_worker_argv != _expected_worker_argv(str(fixture_input)):
+    if canonical_worker_argv != _expected_worker_argv(str(fixture_input), str(atom_loss_fixture_input)):
         raise ValueError("environment canonical_worker_argv must match release worker commands")
 
     preflight = environment.get("known_answer_preflight")
-    if not isinstance(preflight, list) or len(preflight) != 2:
-        raise ValueError("environment known_answer_preflight must contain both variants")
+    if not isinstance(preflight, list) or len(preflight) != len(RAW_VARIANTS):
+        raise ValueError("environment known_answer_preflight must contain the five canonical variants")
     preflight_by_variant = {item.get("variant"): item for item in preflight if isinstance(item, dict)}
     if set(preflight_by_variant) != set(RAW_VARIANTS):
-        raise ValueError("environment known_answer_preflight must contain stim and rstim")
+        raise ValueError("environment known_answer_preflight must contain the five canonical variants")
     for variant in RAW_VARIANTS:
         item = preflight_by_variant[variant]
         _require_equal(item.get("result_hex"), "01", f"environment {variant} preflight result_hex must be '01'")
@@ -563,21 +575,23 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
         )
 
     expected_lifecycle = derived["lifecycle"]
-    lifecycle = environment.get("lifecycle")
-    if lifecycle is not None:
-        lifecycle_payload = _require_json_object(lifecycle, "environment lifecycle")
-        if set(lifecycle_payload) != {"compile_count", "reference_build_count", "sample_call_count"}:
-            raise ValueError("environment lifecycle must contain exactly compile_count, reference_build_count, and sample_call_count")
-        _require_int_equal(lifecycle_payload.get("compile_count"), 1, "environment lifecycle compile_count")
-        _require_int_equal(lifecycle_payload.get("reference_build_count"), 1, "environment lifecycle reference_build_count")
-        _require_int_equal(lifecycle_payload.get("sample_call_count"), 9, "environment lifecycle sample_call_count")
     for variant in RAW_VARIANTS:
         telemetry = next(record["telemetry"] for record in records if record.get("variant") == variant and record.get("record_type") == "ready")
         _require_equal(
-            telemetry["fixture_sha256"], environment["fixture_sha256"],
-            f"environment fixture_sha256 must match {variant} ready telemetry",
+            telemetry["fixture_sha256"],
+            environment[
+                "atom_loss_fixture_sha256"
+                if variant == run_compiled_steady.ATOM_LOSS_VARIANT
+                else "fixture_sha256"
+            ],
+            f"environment fixture hash must match {variant} ready telemetry",
         )
-        if expected_lifecycle[variant] != {"compile_count": 1, "reference_build_count": 1, "sample_call_count": 9}:
+        compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(variant, 9)
+        if expected_lifecycle[variant] != {
+            "compile_count": compile_count,
+            "reference_build_count": reference_build_count,
+            "sample_call_count": 9,
+        }:
             raise ValueError(f"raw {variant} lifecycle is not canonical")
 
 
@@ -606,11 +620,11 @@ def validate_bundle(results_dir: Path) -> tuple[int, int, str]:
     environment = load_json_object(results_dir / "environment.json", "environment.json")
     validate_environment(environment, derived, records)
     validate_artifact_hashes(results_dir)
-    return derived["variants"], derived["measured_records"], "1/1/9"
+    return derived["variants"], derived["measured_records"], "verified/9"
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate compiled steady-state sampling evidence.")
+    parser = argparse.ArgumentParser(description="Validate unified sample+b8 sampling evidence.")
     parser.add_argument("--dir", type=Path, required=True, dest="results_dir")
     args = parser.parse_args(argv)
     try:
@@ -618,7 +632,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
-    print(f"PASS compiled steady-state sampling evidence variants={variants} measured={measured} lifecycle={lifecycle}")
+    print(f"PASS unified sample+b8 evidence variants={variants} measured={measured} lifecycle={lifecycle}")
     return 0
 
 

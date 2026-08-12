@@ -63,6 +63,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     case = fair_cli_contract.EXPECTED_CASE
     fixture = (REPO_ROOT / case["canonical_input_path"]).resolve()
+    atom_loss_fixture = (REPO_ROOT / run_compiled_steady.ATOM_LOSS_FIXTURE_PATH).resolve()
     fair_manifest = (REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml").resolve()
     source_manifest = (REPO_ROOT / case["source_manifest_path"]).resolve()
     stim_worker_module = (REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py").resolve()
@@ -74,13 +75,16 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         artifact.write_bytes(contents)
 
     records: list[dict[str, Any]] = []
-    for variant, elapsed_base in (("stim", 1000), ("rstim", 2000)):
+    for variant_index, variant in enumerate(run_compiled_steady.VARIANTS, start=1):
+        elapsed_base = variant_index * 1000
+        variant_fixture = atom_loss_fixture if variant == run_compiled_steady.ATOM_LOSS_VARIANT else fixture
+        compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(variant, 0)
         telemetry = {
             "variant": variant,
-            "compile_count": 1,
-            "reference_build_count": 1,
+            "compile_count": compile_count,
+            "reference_build_count": reference_build_count,
             "sample_call_count": 0,
-            "fixture_sha256": sha256_file(fixture),
+            "fixture_sha256": sha256_file(variant_fixture),
             "measurement_count": case["measurement_count"],
             "bytes_per_shot": case["bytes_per_shot"],
         }
@@ -100,15 +104,24 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                     "output_bytes": case["expected_output_bytes"],
                 }
             )
+        final_compile_count, final_reference_build_count = run_compiled_steady._expected_lifecycle_counts(
+            variant, 9
+        )
         records.append(
             {
                 "record_type": "final",
                 "variant": variant,
-                "telemetry": {**telemetry, "sample_call_count": 9},
+                "telemetry": {
+                    **telemetry,
+                    "compile_count": final_compile_count,
+                    "reference_build_count": final_reference_build_count,
+                    "sample_call_count": 9,
+                },
             }
         )
 
     fixture_rel = fixture.relative_to(REPO_ROOT).as_posix()
+    atom_loss_fixture_rel = atom_loss_fixture.relative_to(REPO_ROOT).as_posix()
     fair_manifest_rel = fair_manifest.relative_to(REPO_ROOT).as_posix()
     source_manifest_rel = source_manifest.relative_to(REPO_ROOT).as_posix()
     stim_worker_module_rel = stim_worker_module.relative_to(REPO_ROOT).as_posix()
@@ -119,16 +132,12 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
     )
     (path / "report.md").write_text(run_compiled_steady._render_report(summary), encoding="utf-8")
     worker_argv = {
-        "stim": [
-            "tool://python",
-            "-m",
-            "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
-            "--input",
-            fixture_rel,
-            "--seed",
-            "0",
-        ],
-        "rstim": ["tool://rstim-worker", "--input", fixture_rel, "--seed", "0"],
+        variant: run_compiled_steady._portable_worker_argv(
+            variant,
+            atom_loss_fixture_rel if variant == run_compiled_steady.ATOM_LOSS_VARIANT else fixture_rel,
+            seed=0,
+        )
+        for variant in run_compiled_steady.VARIANTS
     }
     environment = {
         "git_commit": "test-commit",
@@ -137,7 +146,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "profile": "release",
         "timer_scope": run_compiled_steady.PRIMARY_TIMER_SCOPE,
         "secondary_timer_scope": run_compiled_steady.SECONDARY_TIMER_SCOPE,
-        "seed_policy": "seed_once_then_advance_across_9_calls",
+        "seed_policy": "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
             "status": "ok",
@@ -151,6 +160,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "source_manifest_sha256": sha256_file(source_manifest),
         "fixture_path": fixture_rel,
         "fixture_sha256": sha256_file(fixture),
+        "atom_loss_fixture_path": atom_loss_fixture_rel,
+        "atom_loss_fixture_sha256": sha256_file(atom_loss_fixture),
         "worker_argv": worker_argv,
         "canonical_worker_argv": worker_argv,
         "stim_worker_module_path": stim_worker_module_rel,
@@ -187,71 +198,36 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "measure_rounds": 7,
         "known_answer_preflight": [
             {
-                "variant": "stim",
-                "argv": [
-                    "tool://python",
-                    "-m",
-                    "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
-                    "--input",
-                    "fixture://compiled-steady-known-answer",
-                    "--seed",
-                    "0",
-                ],
+                "variant": variant,
+                "argv": run_compiled_steady._portable_worker_argv(
+                    variant, "fixture://sample-b8-known-answer", seed=0
+                ),
                 "result_hex": "01",
                 "ready": {
-                    "variant": "stim",
-                    "compile_count": 1,
-                    "reference_build_count": 1,
+                    "variant": variant,
+                    "compile_count": run_compiled_steady._expected_lifecycle_counts(variant, 0)[0],
+                    "reference_build_count": run_compiled_steady._expected_lifecycle_counts(variant, 0)[1],
                     "sample_call_count": 0,
                     "measurement_count": 1,
                     "bytes_per_shot": 1,
                     "fixture_sha256": "0" * 64,
                 },
                 "final": {
-                    "variant": "stim",
-                    "compile_count": 1,
-                    "reference_build_count": 1,
+                    "variant": variant,
+                    "compile_count": run_compiled_steady._expected_lifecycle_counts(variant, 1)[0],
+                    "reference_build_count": run_compiled_steady._expected_lifecycle_counts(variant, 1)[1],
                     "sample_call_count": 1,
                     "measurement_count": 1,
                     "bytes_per_shot": 1,
                     "fixture_sha256": "0" * 64,
                 },
-            },
-            {
-                "variant": "rstim",
-                "argv": [
-                    "tool://rstim-worker",
-                    "--input",
-                    "fixture://compiled-steady-known-answer",
-                    "--seed",
-                    "0",
-                ],
-                "result_hex": "01",
-                "ready": {
-                    "variant": "rstim",
-                    "compile_count": 1,
-                    "reference_build_count": 1,
-                    "sample_call_count": 0,
-                    "measurement_count": 1,
-                    "bytes_per_shot": 1,
-                    "fixture_sha256": "0" * 64,
-                },
-                "final": {
-                    "variant": "rstim",
-                    "compile_count": 1,
-                    "reference_build_count": 1,
-                    "sample_call_count": 1,
-                    "measurement_count": 1,
-                    "bytes_per_shot": 1,
-                    "fixture_sha256": "0" * 64,
-                },
-            },
+            }
+            for variant in run_compiled_steady.VARIANTS
         ],
         "workers": [
-            {"variant": "stim", "command": worker_argv["stim"]},
-            {"variant": "rstim", "command": worker_argv["rstim"]},
+            {"variant": variant, "command": worker_argv[variant]}
+            for variant in run_compiled_steady.VARIANTS
         ],
-        "lifecycle": {"compile_count": 1, "reference_build_count": 1, "sample_call_count": 9},
     }
     (path / "environment.json").write_text(
         json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -285,21 +261,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout,
-            "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9\n",
-        )
-
-    def test_accepts_committed_bundle(self) -> None:
-        result = subprocess.run(
-            ["python3", str(CHECKER), "--dir", str(COMMITTED_BUNDLE)],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            result.stdout,
-            "PASS compiled steady-state sampling evidence variants=2 measured=14 lifecycle=1/1/9\n",
+            "PASS unified sample+b8 evidence variants=5 measured=35 lifecycle=verified/9\n",
         )
 
     def test_rejects_absolute_fair_manifest_path_with_required_message(self) -> None:
@@ -371,9 +333,9 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
 
     def test_rejects_host_absolute_worker_argv(self) -> None:
         def mutate(environment: dict[str, Any]) -> None:
-            environment["worker_argv"]["stim"][0] = "/usr/bin/python3"
-            environment["canonical_worker_argv"]["stim"] = environment["worker_argv"]["stim"]
-            environment["workers"][0]["command"] = environment["worker_argv"]["stim"]
+            environment["worker_argv"]["stim-precompiled"][0] = "/usr/bin/python3"
+            environment["canonical_worker_argv"]["stim-precompiled"] = environment["worker_argv"]["stim-precompiled"]
+            environment["workers"][0]["command"] = environment["worker_argv"]["stim-precompiled"]
 
         rewrite_json(self.bundle / "environment.json", mutate)
         rehash_bundle(self.bundle)
@@ -385,85 +347,85 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         records = load_raw(self.bundle / "raw.jsonl")
         rewrite_raw(
             self.bundle / "raw.jsonl",
-            [record for record in records if not (record["variant"] == "stim" and record.get("request_id") == 8)],
+            [record for record in records if not (record["variant"] == "stim-precompiled" and record.get("request_id") == 8)],
         )
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("stim-compiled-steady-b8 must contain exactly 9 sample records", result.stderr)
+        self.assertIn("stim-precompiled must contain exactly 9 sample records", result.stderr)
 
     def test_rejects_duplicate_request_id(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "rstim" and record.get("request_id") == 8)["request_id"] = 7
+        next(record for record in records if record["variant"] == "rstim-precompiled" and record.get("request_id") == 8)["request_id"] = 7
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("rstim-compiled-steady-b8 request IDs must be 0 through 8", result.stderr)
+        self.assertIn("rstim-precompiled request IDs must be 0 through 8", result.stderr)
 
     def test_rejects_changed_cumulative_call_count(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "stim" and record.get("request_id") == 4)["sample_call_count"] = 9
+        next(record for record in records if record["variant"] == "stim-precompiled" and record.get("request_id") == 4)["sample_call_count"] = 9
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("stim-compiled-steady-b8 sample_call_count for request 4 must be 5, got 9", result.stderr)
+        self.assertIn("stim-precompiled sample_call_count for request 4 must be 5, got 9", result.stderr)
 
     def test_rejects_changed_sample_shots(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "stim" and record.get("request_id") == 3)["shots"] = 512
+        next(record for record in records if record["variant"] == "stim-precompiled" and record.get("request_id") == 3)["shots"] = 512
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("stim-compiled-steady-b8 shots for request 3 must be 1024, got 512", result.stderr)
+        self.assertIn("stim-precompiled shots for request 3 must be 1024, got 512", result.stderr)
 
     def test_rejects_changed_sample_output_format(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "rstim" and record.get("request_id") == 3)["output_format"] = "01"
+        next(record for record in records if record["variant"] == "rstim-precompiled" and record.get("request_id") == 3)["output_format"] = "01"
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("rstim-compiled-steady-b8 output_format for request 3 must be b8, got '01'", result.stderr)
+        self.assertIn("rstim-precompiled output_format for request 3 must be b8, got '01'", result.stderr)
 
     def test_rejects_missing_worker_sample_b8_timing(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "stim" and record.get("request_id") == 3).pop(
+        next(record for record in records if record["variant"] == "stim-precompiled" and record.get("request_id") == 3).pop(
             "sample_b8_elapsed_ns"
         )
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "stim-compiled-steady-b8 sample_b8_elapsed_ns for request 3 must be a nonnegative integer",
+            "stim-precompiled sample_b8_elapsed_ns for request 3 must be a nonnegative integer",
             result.stderr,
         )
 
     def test_rejects_end_to_end_timing_shorter_than_worker_timing(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         sample = next(
-            record for record in records if record["variant"] == "rstim" and record.get("request_id") == 3
+            record for record in records if record["variant"] == "rstim-precompiled" and record.get("request_id") == 3
         )
         sample["end_to_end_elapsed_ns"] = sample["sample_b8_elapsed_ns"] - 1
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "rstim-compiled-steady-b8 end_to_end_elapsed_ns for request 3 must be at least sample_b8_elapsed_ns",
+            "rstim-precompiled end_to_end_elapsed_ns for request 3 must be at least sample_b8_elapsed_ns",
             result.stderr,
         )
 
     def test_rejects_boolean_lifecycle_counter(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "stim" and record["record_type"] == "ready")["telemetry"]["compile_count"] = True
+        next(record for record in records if record["variant"] == "stim-precompiled" and record["record_type"] == "ready")["telemetry"]["compile_count"] = True
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("stim-compiled-steady-b8 ready compile_count must be integer 1, got True", result.stderr)
+        self.assertIn("stim-precompiled ready compile_count must be integer 1, got True", result.stderr)
 
     def test_rejects_out_of_order_lifecycle_records(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
         final_index = next(
             index
             for index, record in enumerate(records)
-            if record["variant"] == "stim" and record["record_type"] == "final"
+            if record["variant"] == "stim-precompiled" and record["record_type"] == "final"
         )
         final = records.pop(final_index)
         records.insert(1, final)
@@ -471,17 +433,17 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(
-            "stim-compiled-steady-b8 records must appear as ready, nine samples, then final",
+            "stim-precompiled records must appear as ready, nine samples, then final",
             result.stderr,
         )
 
     def test_rejects_final_compile_count_semantically_before_hashes(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")
-        next(record for record in records if record["variant"] == "rstim" and record["record_type"] == "final")["telemetry"]["compile_count"] = 9
+        next(record for record in records if record["variant"] == "rstim-precompiled" and record["record_type"] == "final")["telemetry"]["compile_count"] = 9
         rewrite_raw(self.bundle / "raw.jsonl", records)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("rstim-compiled-steady-b8 final compile_count must be 1, got 9", result.stderr)
+        self.assertIn("rstim-precompiled final compile_count must be 1, got 9", result.stderr)
         self.assertNotIn("artifact-sha256.json", result.stderr)
 
     def test_rejects_rehashed_summary_not_derived_from_raw(self) -> None:
@@ -510,10 +472,10 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
                 "--seed",
                 "0",
             ]
-            environment["worker_argv"]["stim"] = command
-            environment["canonical_worker_argv"]["stim"] = command
+            environment["worker_argv"]["stim-precompiled"] = command
+            environment["canonical_worker_argv"]["stim-precompiled"] = command
             for worker in environment["workers"]:
-                if worker["variant"] == "stim":
+                if worker["variant"] == "stim-precompiled":
                     worker["command"] = command
 
         rewrite_json(self.bundle / "environment.json", make_noncanonical)
@@ -571,7 +533,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment stim preflight ready must be a JSON object", result.stderr)
+        self.assertIn("environment rstim-precompiled preflight ready must be a JSON object", result.stderr)
 
     def test_rejects_preflight_argv_with_duplicate_seed_flag(self) -> None:
         def duplicate_seed(environment: dict[str, Any]) -> None:
@@ -581,21 +543,7 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         rewrite_artifact_hashes(self.bundle)
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment stim preflight argv must match canonical shape", result.stderr)
-
-    def test_rejects_boolean_environment_lifecycle_counter(self) -> None:
-        def replace_lifecycle(environment: dict[str, Any]) -> None:
-            environment["lifecycle"] = {
-                "compile_count": True,
-                "reference_build_count": 1,
-                "sample_call_count": 9,
-            }
-
-        rewrite_json(self.bundle / "environment.json", replace_lifecycle)
-        rewrite_artifact_hashes(self.bundle)
-        result = self.run_checker()
-        self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("environment lifecycle compile_count must be integer 1, got True", result.stderr)
+        self.assertIn("environment rstim-precompiled preflight argv must match canonical shape", result.stderr)
 
     def test_rejects_extra_bundle_file(self) -> None:
         (self.bundle / "extra.txt").write_text("unexpected\n", encoding="utf-8")
@@ -626,14 +574,15 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
             args=args,
             case=case,
             input_path=fixture,
+            atom_loss_input_path=(REPO_ROOT / run_compiled_steady.ATOM_LOSS_FIXTURE_PATH).resolve(),
             rstim_command=[str(self.rstim_worker)],
             worker_details=[
                 {"variant": "stim", "command": ["python3", "--input", str(fixture), "--seed", "0"]},
                 {"variant": "rstim", "command": [str(self.rstim_worker), "--input", str(fixture), "--seed", "0"]},
             ],
             preflight_results=[
-                {"variant": "stim", "argv": ["python3", "--input", str(stim_extension), "--seed", "0"]},
-                {"variant": "rstim", "argv": [str(self.rstim_worker), "--input", str(stim_extension), "--seed", "0"]},
+                {"variant": variant, "argv": ["placeholder"]}
+                for variant in run_compiled_steady.VARIANTS
             ],
             stim_probe={
                 "status": "ok",
@@ -648,11 +597,13 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         self.assertEqual(environment["fixture_path"], fixture_rel)
         self.assertEqual(environment["seed"], 7)
         self.assertEqual(
-            environment["worker_argv"]["stim"],
+            environment["worker_argv"]["stim-precompiled"],
             [
                 "tool://python",
                 "-m",
                 "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+                "--variant",
+                "stim-precompiled",
                 "--input",
                 fixture_rel,
                 "--seed",
@@ -661,9 +612,19 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         )
         self.assertEqual(
             environment["known_answer_preflight"][1]["argv"],
-            ["tool://rstim-worker", "--input", "fixture://compiled-steady-known-answer", "--seed", "7"],
+            [
+                "tool://python",
+                "-m",
+                "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+                "--variant",
+                "stim-precompiled",
+                "--input",
+                "fixture://sample-b8-known-answer",
+                "--seed",
+                "7",
+            ],
         )
-        self.assertEqual(environment["workers"][1]["command"], environment["worker_argv"]["rstim"])
+        self.assertEqual(environment["workers"][0]["command"], environment["worker_argv"]["rstim-precompiled"])
         self.assertNotIn("python_executable", environment)
         self.assertNotIn("loaded_stim_extension_path", environment)
         self.assertNotIn("rstim_worker_binary_path", environment)

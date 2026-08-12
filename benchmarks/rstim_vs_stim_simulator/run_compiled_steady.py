@@ -24,9 +24,23 @@ RESULT = b"T"
 STOP = b"P"
 FINAL = b"F"
 ERROR = b"E"
-PROTOCOL_VERSION = 2
-PRIMARY_TIMER_SCOPE = "worker_sample_and_b8_encode"
+PROTOCOL_VERSION = 3
+PRIMARY_TIMER_SCOPE = "worker_variant_sample_path_and_b8_encode"
 SECONDARY_TIMER_SCOPE = "request_sample_b8_encode_and_pipe_transfer"
+VARIANTS = (
+    "rstim-precompiled",
+    "stim-precompiled",
+    "rstim-interpreted",
+    "stim-direct",
+    "rstim-interpreted-atom-loss",
+)
+STIM_VARIANTS = {"stim-precompiled", "stim-direct"}
+PRECOMPILED_VARIANTS = {"rstim-precompiled", "stim-precompiled"}
+ATOM_LOSS_VARIANT = "rstim-interpreted-atom-loss"
+ATOM_LOSS_FIXTURE_PATH = Path(
+    "benchmarks/rstim_vs_stim_simulator/fixtures/"
+    "stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
+)
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parents[1]
@@ -87,18 +101,36 @@ def _repo_relative(path: Path) -> str:
     return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
 
 
-def _portable_worker_argv(role: str, input_path: str, *, seed: int) -> list[str]:
-    if role == "stim":
+def _portable_worker_argv(variant: str, input_path: str, *, seed: int) -> list[str]:
+    if variant in STIM_VARIANTS:
         return [
             "tool://python",
             "-m",
             "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            "--variant",
+            variant,
             "--input",
             input_path,
             "--seed",
             str(seed),
         ]
-    return ["tool://rstim-worker", "--input", input_path, "--seed", str(seed)]
+    return [
+        "tool://rstim-worker",
+        "--variant",
+        variant,
+        "--input",
+        input_path,
+        "--seed",
+        str(seed),
+    ]
+
+
+def _expected_lifecycle_counts(variant: str, sample_call_count: int) -> tuple[int, int]:
+    if variant in PRECOMPILED_VARIANTS:
+        return 1, 1
+    if variant == "stim-direct":
+        return sample_call_count, sample_call_count
+    return 0, sample_call_count
 
 
 def _decode_json(payload: bytes, *, context: str) -> dict[str, Any]:
@@ -342,10 +374,11 @@ def _validate_telemetry(
     bytes_per_shot: int,
     sample_call_count: int,
 ) -> None:
+    compile_count, reference_build_count = _expected_lifecycle_counts(variant, sample_call_count)
     expected = {
         "variant": variant,
-        "compile_count": 1,
-        "reference_build_count": 1,
+        "compile_count": compile_count,
+        "reference_build_count": reference_build_count,
         "sample_call_count": sample_call_count,
         "fixture_sha256": fixture_sha256,
         "measurement_count": measurement_count,
@@ -462,7 +495,7 @@ def _run_variant(
 
 def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     variants = []
-    for variant in ("stim", "rstim"):
+    for variant in VARIANTS:
         measured = [
             record
             for record in records
@@ -485,7 +518,7 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _render_report(summary: dict[str, Any]) -> str:
     lines = [
-        "# Compiled steady-state benchmark",
+        "# Unified sample + b8 benchmark",
         "",
         "| variant | sample_count | median_sample_b8_elapsed_ns | median_end_to_end_elapsed_ns |",
         "| --- | ---: | ---: | ---: |",
@@ -505,6 +538,7 @@ def _collect_environment(
     args: argparse.Namespace,
     case: dict[str, Any],
     input_path: Path,
+    atom_loss_input_path: Path,
     rstim_command: list[str],
     worker_details: list[dict[str, Any]],
     preflight_results: list[dict[str, Any]],
@@ -519,16 +553,21 @@ def _collect_environment(
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
     rstim_version = _version_string([*rstim_command, "--version"])
     input_path_relative = _repo_relative(input_path)
+    atom_loss_input_path_relative = _repo_relative(atom_loss_input_path)
     worker_argv = {
-        variant: _portable_worker_argv(variant, input_path_relative, seed=args.seed)
-        for variant in ("stim", "rstim")
+        variant: _portable_worker_argv(
+            variant,
+            atom_loss_input_path_relative if variant == ATOM_LOSS_VARIANT else input_path_relative,
+            seed=args.seed,
+        )
+        for variant in VARIANTS
     }
     portable_preflight_results = []
     for item in preflight_results:
         portable = {**item}
         portable["argv"] = _portable_worker_argv(
             str(item["variant"]),
-            "fixture://compiled-steady-known-answer",
+            "fixture://sample-b8-known-answer",
             seed=args.seed,
         )
         portable_preflight_results.append(portable)
@@ -565,7 +604,7 @@ def _collect_environment(
         "profile": args.profile,
         "timer_scope": PRIMARY_TIMER_SCOPE,
         "secondary_timer_scope": SECONDARY_TIMER_SCOPE,
-        "seed_policy": "seed_once_then_advance_across_9_calls",
+        "seed_policy": "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
             "status": stim_probe.get("status"),
@@ -580,6 +619,8 @@ def _collect_environment(
         "source_manifest_sha256": _sha256(source_manifest_path),
         "fixture_path": input_path_relative,
         "fixture_sha256": case["canonical_input_sha256"],
+        "atom_loss_fixture_path": atom_loss_input_path_relative,
+        "atom_loss_fixture_sha256": _sha256(atom_loss_input_path),
         "worker_argv": worker_argv,
         "canonical_worker_argv": worker_argv,
         "stim_worker_module_path": _repo_relative(stim_worker_module_path),
@@ -590,7 +631,7 @@ def _collect_environment(
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
         "known_answer_preflight": portable_preflight_results,
-        "workers": [{"variant": variant, "command": worker_argv[variant]} for variant in ("stim", "rstim")],
+        "workers": [{"variant": variant, "command": worker_argv[variant]} for variant in VARIANTS],
     }
 
 
@@ -604,6 +645,9 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         raise RunnerError("compiled steady-state runner requires stim==1.15.0")
 
     input_path = (REPO_ROOT / case["canonical_input_path"]).resolve()
+    atom_loss_input_path = (REPO_ROOT / ATOM_LOSS_FIXTURE_PATH).resolve()
+    if not atom_loss_input_path.is_file():
+        raise RunnerError(f"atom-loss fixture does not exist: {atom_loss_input_path}")
     stim_command = args.stim_worker_command or default_stim_worker_command()
     rstim_command = args.rstim_worker_command or build_rstim_worker(args.profile)
     stim_probe = _probe_stim_python()
@@ -613,19 +657,23 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
             f"got {stim_probe.get('version')!r}"
         )
 
-    preflight_results = [
-        _run_preflight(stim_command, variant="stim", seed=args.seed),
-        _run_preflight(rstim_command, variant="rstim", seed=args.seed),
-    ]
+    preflight_results = []
+    for variant in VARIANTS:
+        base_command = stim_command if variant in STIM_VARIANTS else rstim_command
+        preflight_results.append(
+            _run_preflight([*base_command, "--variant", variant], variant=variant, seed=args.seed)
+        )
 
     all_records: list[dict[str, Any]] = []
     worker_details: list[dict[str, Any]] = []
-    for variant, command in (("stim", stim_command), ("rstim", rstim_command)):
+    for variant in VARIANTS:
+        base_command = stim_command if variant in STIM_VARIANTS else rstim_command
+        variant_input_path = atom_loss_input_path if variant == ATOM_LOSS_VARIANT else input_path
         records, details = _run_variant(
             variant=variant,
-            command=command,
-            input_path=input_path,
-            fixture_sha256=case["canonical_input_sha256"],
+            command=[*base_command, "--variant", variant],
+            input_path=variant_input_path,
+            fixture_sha256=_sha256(variant_input_path),
             seed=args.seed,
             shots=case["shots"],
             output_format=case["output_format"],
@@ -647,6 +695,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         args=args,
         case=case,
         input_path=input_path,
+        atom_loss_input_path=atom_loss_input_path,
         rstim_command=rstim_command,
         worker_details=worker_details,
         preflight_results=preflight_results,
@@ -662,7 +711,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         json.dumps(artifact_hashes, indent=2, sort_keys=True) + "\n"
     )
     print(
-        "PASS compiled steady-state lifecycle variants=2 compile=1 reference=1 "
+        "PASS unified sample+b8 lifecycle variants=5 "
         f"calls={args.warmup_rounds + args.measure_rounds} measured={summary['measured_records']}"
     )
 
