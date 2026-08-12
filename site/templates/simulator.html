@@ -28,19 +28,19 @@
     <p class="section-copy">Pinned release measurements for named fixtures; these results are case-scoped and are not a general performance claim.</p>
   </div>
   <h3>Primary comparison: repeated sampling after compilation</h3>
-  <p class="section-copy">Both implementations compile the same circuit and build its reference sample once before timing. Each row is the median of 7 subsequent 1,024-shot calls after 2 warmup calls, including the same 1.55 MB bit-packed result transfer.</p>
+  <p class="section-copy">Both implementations compile the same circuit and build its reference sample once before timing. The primary timer runs inside each worker and includes sampling plus the same <code>b8</code> encoding, but excludes pipe transfer. The 1.55 MB result is still transferred and validated after every call, and its full end-to-end time is shown separately.</p>
   <div class="table-wrap result-table">
     <table>
-      <thead><tr><th>Fixture</th><th>Implementation</th><th>Throughput</th><th>Wall time</th></tr></thead>
+      <thead><tr><th>Fixture</th><th>Implementation</th><th>Throughput</th><th>Sample + b8</th><th>With transfer</th></tr></thead>
       <tbody>
-        <tr><td>Surface d=11, r=100</td><td>rstim precompiled steady-state</td><td>42,949 shots/s</td><td>23.842 ms</td></tr>
-        <tr><td>Surface d=11, r=100</td><td>Stim precompiled steady-state</td><td>46,509 shots/s</td><td>22.017 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>rstim precompiled steady-state</td><td>77,366 shots/s</td><td>13.236 ms</td><td>13.570 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>Stim precompiled steady-state</td><td>63,645 shots/s</td><td>16.089 ms</td><td>16.464 ms</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="section-copy">In this recorded steady-state run, Stim has 1.08× lower wall time.</p>
+  <p class="section-copy">Each value is the median of 7 subsequent 1,024-shot calls after 2 warmups. In this recorded run, rstim has 1.22× lower sample-plus-<code>b8</code> wall time; the separately recorded end-to-end result is consistent at 1.21×.</p>
   <h3>Secondary implementation diagnostics</h3>
-  <p class="section-copy">The single-call runner below measures in-process rstim sampling without serializing or transferring the 1.55 MB <code>b8</code> result; its Stim row uses a separate CLI path. The rstim compiled row includes compilation, but can still be lower than the steady-state result because the latter includes bit-packed serialization and pipe transfer. Use these rows to inspect rstim paths and atom-loss overhead, not as the primary cross-tool comparison.</p>
+  <p class="section-copy">The single-call runner below measures in-process rstim sampling without encoding or transferring the 1.55 MB <code>b8</code> result; its Stim row uses a separate CLI path. The rstim compiled row includes compilation but omits output encoding, so it is not directly comparable with the primary table. Use these rows to inspect rstim paths and atom-loss overhead.</p>
   <div class="table-wrap result-table">
     <table>
       <thead><tr><th>Fixture</th><th>Implementation</th><th>Throughput</th><th>Wall time</th></tr></thead>

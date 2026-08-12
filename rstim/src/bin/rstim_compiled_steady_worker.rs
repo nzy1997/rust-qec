@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use clap::Parser;
 use rand::rngs::StdRng;
@@ -94,8 +95,8 @@ fn write_error(message: impl std::fmt::Display) -> Result<(), String> {
 }
 
 fn run(args: Args) -> Result<(), String> {
-    let input_bytes =
-        fs::read(&args.input).map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
+    let input_bytes = fs::read(&args.input)
+        .map_err(|error| format!("failed to read {}: {error}", args.input.display()))?;
     let input_text = std::str::from_utf8(&input_bytes).map_err(|error| error.to_string())?;
     let instructions = parse_lines(input_text)?;
     let mut sampler =
@@ -127,6 +128,7 @@ fn run(args: Args) -> Result<(), String> {
                         continue;
                     }
                 };
+                let started = Instant::now();
                 let output = match sampler.sample(
                     request.shots,
                     &mut rng,
@@ -138,12 +140,18 @@ fn run(args: Args) -> Result<(), String> {
                         continue;
                     }
                 };
-                let mut result = Vec::new();
+                let mut packed = Vec::new();
+                write_shots_b8(&output.measurements, &mut packed)
+                    .map_err(|error| error.to_string())?;
+                let sample_b8_elapsed_ns = u64::try_from(started.elapsed().as_nanos())
+                    .map_err(|_| "sample+b8 duration does not fit in u64".to_owned())?;
+
+                let mut result = Vec::with_capacity(24 + packed.len());
                 result.extend_from_slice(&request.request_id.to_le_bytes());
                 result
                     .extend_from_slice(&(sampler.diagnostics().sample_calls as u64).to_le_bytes());
-                write_shots_b8(&output.measurements, &mut result)
-                    .map_err(|error| error.to_string())?;
+                result.extend_from_slice(&sample_b8_elapsed_ns.to_le_bytes());
+                result.extend_from_slice(&packed);
                 write_frame(RESULT, &result).map_err(|error| error.to_string())?;
             }
             _ => write_error(format!("unexpected frame: {frame_type:?}"))?,

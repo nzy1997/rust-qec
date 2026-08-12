@@ -144,10 +144,13 @@ ratio for this fixture.
 The separate [precompiled steady-state evidence](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json)
 compiles the circuit and builds the reference sample once per implementation
 before timing repeated calls. Across 7 measured 1,024-shot calls after 2 warmup
-calls, Stim records 22.017 ms and `rstim` records 23.842 ms. Both calls include
-the same 1.55 MB bit-packed result transfer; Stim has 1.08x lower wall time in
-this recorded run. Because this excludes one-time compilation, these two rows
-are compared only with each other, not with the single-batch table above.
+calls, the primary worker-local sample-plus-`b8` medians are 16.089 ms for Stim
+and 13.236 ms for `rstim`. The same 1.55 MB bit-packed result is transferred and
+validated after every call, but pipe transfer is excluded from the primary
+timer; the separately recorded end-to-end medians are 16.464 ms and 13.570 ms,
+respectively. `rstim` has 1.22x lower primary wall time in this recorded run.
+Because this excludes one-time compilation, these two rows are compared only
+with each other, not with the single-batch table above.
 
 Companion reports and environments are checked at
 [`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),

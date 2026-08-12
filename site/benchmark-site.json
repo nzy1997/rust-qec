@@ -520,7 +520,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "fe86b997e9dd44923864d40e1a27baebf17352f0e079f6b9372e1f870308a5c2"
+                  "sha256": "d03e69b81ce1b30be79119d5be10b01457f5092ecbf9fddd3b5408518c241a85"
                 }
               }
             }
@@ -860,25 +860,25 @@
             }
           ],
           "commands": [
-            "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir /tmp/rstim-steady-refresh.rfVSkr",
+            "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release",
             "python3 tools/check_rstim_vs_stim_compiled_steady_evidence.py --dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
           ],
           "provenance": {
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
-              "value": "2026-08-12T15:27:28+08:00"
+              "value": "2026-08-12T16:06:07+08:00"
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "16799e61a0731266039a67044c106eab99032c4e"
+                "runner_source": "81a0b95e516b4193fd290302c3488f2ed1868a6e"
               }
             },
             "commands": {
               "status": "recorded",
               "value": [
-                "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir /tmp/rstim-steady-refresh.rfVSkr",
+                "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release",
                 "python3 tools/check_rstim_vs_stim_compiled_steady_evidence.py --dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
               ]
             },
@@ -925,10 +925,11 @@
               "status": "recorded",
               "value": {
                 "profile": "release",
-                "protocol_version": 1,
+                "protocol_version": 2,
                 "compile_count_per_worker": 1,
                 "reference_build_count_per_worker": 1,
-                "timer_scope": "request, sample, and bit-packed output transfer after worker readiness"
+                "timer_scope": "worker-local sampling plus b8 encoding after worker readiness",
+                "secondary_timer_scope": "request, sampling, b8 encoding, and bit-packed pipe transfer"
               }
             },
             "shots_or_error_budget": {
@@ -939,26 +940,27 @@
                 "warmup_rounds": 2,
                 "measure_rounds": 7,
                 "output_bytes_per_call": 1552384,
-                "rstim_vs_stim_wall_time_ratio": 1.0829012235271334
+                "rstim_vs_stim_sample_b8_wall_time_ratio": 0.8226434078019095,
+                "rstim_vs_stim_end_to_end_wall_time_ratio": 0.8241880218898313
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": {
-                  "sha256": "ae49c2630b41d55d62dadfae9151447afdc4befc2a9a132fc7c33cda1d3ca8a1"
+                  "sha256": "27bb048b0d04ea18aea5b97a61d4b5d0c5ea6c6c49359b1ad277940ac7c054c2"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": {
-                  "sha256": "0cf293f748e36a1d73bac2774511f7a91d1a59957e62ee171d856da5e7b54f51"
+                  "sha256": "6238c2d51a82196b2b0de154c6aa2638d014ded984061c461e31c9a090de6fd7"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": {
-                  "sha256": "6ca70dad09544cca372fee2589af6ec64c4f9257633ad12e65069754524162b0"
+                  "sha256": "edf871ab0bf5fa874991c7129f7ae2e4dfb1fd2f655ea152c9c3295dba4c3477"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": {
-                  "sha256": "a1436e96c802ad88dc7228d310b5cabd2dbb9fdbe847018b41615f1eadc0de8e"
+                  "sha256": "10f56219d505ddd10a2687e50698b5edd9221fe122fe0133c4823ed5ce371582"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": {
-                  "sha256": "32ff4775e9a1a3cb250fd6b3811d1340d0b85bfa824bace37cb085c43c0dd67c"
+                  "sha256": "3319b984b7597a346afde054710ee2509bfa5e8cb09ab317705365a1b6b170f1"
                 }
               }
             }
@@ -985,9 +987,10 @@
           "claims_limit": "Checked precompiled steady-state evidence for one d11/r100 fixture, seven measured calls, and one recorded environment only.",
           "caveats": [
             "Compilation and reference-sample construction occur once before the timed calls for both implementations.",
-            "Each timed call includes request handling, sampling, and transfer of the same 1,552,384-byte bit-packed result.",
+            "The primary timer is measured inside each worker and includes sampling plus b8 encoding, excluding pipe transfer.",
+            "Each call still transfers and validates the same 1,552,384-byte bit-packed result; that cost is recorded separately as end-to-end time.",
             "These steady-state timings use a different boundary from the selected single-batch runner and must not be compared across the two tables.",
-            "For this recorded steady-state run, Stim has a 1.08x lower median wall time than rstim."
+            "For this recorded steady-state run, rstim has a 1.22x lower primary median wall time than Stim."
           ]
         },
         {

@@ -95,7 +95,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                     "shots": case["shots"],
                     "output_format": case["output_format"],
                     "warmup": request_id < 2,
-                    "elapsed_ns": elapsed_base + request_id,
+                    "sample_b8_elapsed_ns": elapsed_base + request_id,
+                    "end_to_end_elapsed_ns": elapsed_base + request_id + 100,
                     "output_bytes": case["expected_output_bytes"],
                 }
             )
@@ -134,7 +135,8 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
         "os": "test-os",
         "cpu_model": "test-cpu",
         "profile": "release",
-        "timer_scope": case["timer_scope"],
+        "timer_scope": run_compiled_steady.PRIMARY_TIMER_SCOPE,
+        "secondary_timer_scope": run_compiled_steady.SECONDARY_TIMER_SCOPE,
         "seed_policy": "seed_once_then_advance_across_9_calls",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
@@ -179,7 +181,7 @@ def write_valid_bundle(path: Path, *, rstim_worker: Path) -> None:
                 "sha256": sha256_file(rstim_worker),
             },
         ],
-        "protocol_version": 1,
+        "protocol_version": run_compiled_steady.PROTOCOL_VERSION,
         "seed": 0,
         "warmup_rounds": 2,
         "measure_rounds": 7,
@@ -420,6 +422,33 @@ class CheckCompiledSteadyEvidenceTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("rstim-compiled-steady-b8 output_format for request 3 must be b8, got '01'", result.stderr)
+
+    def test_rejects_missing_worker_sample_b8_timing(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        next(record for record in records if record["variant"] == "stim" and record.get("request_id") == 3).pop(
+            "sample_b8_elapsed_ns"
+        )
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "stim-compiled-steady-b8 sample_b8_elapsed_ns for request 3 must be a nonnegative integer",
+            result.stderr,
+        )
+
+    def test_rejects_end_to_end_timing_shorter_than_worker_timing(self) -> None:
+        records = load_raw(self.bundle / "raw.jsonl")
+        sample = next(
+            record for record in records if record["variant"] == "rstim" and record.get("request_id") == 3
+        )
+        sample["end_to_end_elapsed_ns"] = sample["sample_b8_elapsed_ns"] - 1
+        rewrite_raw(self.bundle / "raw.jsonl", records)
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "rstim-compiled-steady-b8 end_to_end_elapsed_ns for request 3 must be at least sample_b8_elapsed_ns",
+            result.stderr,
+        )
 
     def test_rejects_boolean_lifecycle_counter(self) -> None:
         records = load_raw(self.bundle / "raw.jsonl")

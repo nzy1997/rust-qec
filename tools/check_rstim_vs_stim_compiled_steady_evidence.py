@@ -38,6 +38,7 @@ ENVIRONMENT_KEYS = {
     "cpu_model",
     "profile",
     "timer_scope",
+    "secondary_timer_scope",
     "seed_policy",
     "stim_version",
     "stim_python_probe",
@@ -254,9 +255,28 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, Any]:
                 case["output_format"],
                 f"{label} output_format for request {request_id} must be {case['output_format']}",
             )
-            elapsed_ns = record.get("elapsed_ns")
-            if not isinstance(elapsed_ns, int) or isinstance(elapsed_ns, bool) or elapsed_ns < 0:
-                raise ValueError(f"{label} elapsed_ns for request {request_id} must be a nonnegative integer")
+            sample_b8_elapsed_ns = record.get("sample_b8_elapsed_ns")
+            if (
+                not isinstance(sample_b8_elapsed_ns, int)
+                or isinstance(sample_b8_elapsed_ns, bool)
+                or sample_b8_elapsed_ns < 0
+            ):
+                raise ValueError(
+                    f"{label} sample_b8_elapsed_ns for request {request_id} must be a nonnegative integer"
+                )
+            end_to_end_elapsed_ns = record.get("end_to_end_elapsed_ns")
+            if (
+                not isinstance(end_to_end_elapsed_ns, int)
+                or isinstance(end_to_end_elapsed_ns, bool)
+                or end_to_end_elapsed_ns < 0
+            ):
+                raise ValueError(
+                    f"{label} end_to_end_elapsed_ns for request {request_id} must be a nonnegative integer"
+                )
+            if end_to_end_elapsed_ns < sample_b8_elapsed_ns:
+                raise ValueError(
+                    f"{label} end_to_end_elapsed_ns for request {request_id} must be at least sample_b8_elapsed_ns"
+                )
             _require_int_equal(
                 record.get("output_bytes"), case["expected_output_bytes"],
                 f"{label} output_bytes for request {request_id}",
@@ -456,10 +476,11 @@ def validate_environment(environment: dict[str, Any], derived: dict[str, Any], r
             raise ValueError(f"environment {field} must be nonempty")
     for field, expected in (
         ("profile", "release"),
-        ("timer_scope", case["timer_scope"]),
+        ("timer_scope", run_compiled_steady.PRIMARY_TIMER_SCOPE),
+        ("secondary_timer_scope", run_compiled_steady.SECONDARY_TIMER_SCOPE),
         ("seed_policy", "seed_once_then_advance_across_9_calls"),
         ("stim_version", case["stim_version"]),
-        ("protocol_version", 1),
+        ("protocol_version", run_compiled_steady.PROTOCOL_VERSION),
         ("seed", 0),
         ("warmup_rounds", 2),
         ("measure_rounds", 7),

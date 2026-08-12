@@ -24,7 +24,9 @@ RESULT = b"T"
 STOP = b"P"
 FINAL = b"F"
 ERROR = b"E"
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
+PRIMARY_TIMER_SCOPE = "worker_sample_and_b8_encode"
+SECONDARY_TIMER_SCOPE = "request_sample_b8_encode_and_pipe_transfer"
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parents[1]
@@ -283,23 +285,30 @@ class WorkerSession:
             raise RunnerError(f"expected READY frame, got {frame_type!r}")
         return _decode_json(payload, context="READY")
 
-    def sample(self, request_id: int, shots: int) -> tuple[int, bytes, int]:
+    def sample(self, request_id: int, shots: int) -> tuple[int, bytes, int, int]:
         payload = json.dumps({"request_id": request_id, "shots": shots}, sort_keys=True).encode()
         started_ns = time.perf_counter_ns()
         write_frame(self.stdin, SAMPLE, payload)
         self.stdin.flush()
         frame_type, result_payload = read_frame(self.stdout)
-        elapsed_ns = time.perf_counter_ns() - started_ns
+        end_to_end_elapsed_ns = time.perf_counter_ns() - started_ns
         if frame_type == ERROR:
             raise RunnerError(f"worker error during sample: {result_payload.decode(errors='replace')}")
         if frame_type != RESULT:
             raise RunnerError(f"expected RESULT frame, got {frame_type!r}")
-        if len(result_payload) < 16:
-            raise RunnerError("RESULT payload is shorter than request and call counters")
-        returned_request_id, sample_call_count = struct.unpack("<QQ", result_payload[:16])
+        if len(result_payload) < 24:
+            raise RunnerError("RESULT payload is shorter than request, call, and worker timing fields")
+        returned_request_id, sample_call_count, sample_b8_elapsed_ns = struct.unpack(
+            "<QQQ", result_payload[:24]
+        )
         if returned_request_id != request_id:
             raise RunnerError(f"RESULT request id {returned_request_id} does not match {request_id}")
-        return sample_call_count, result_payload[16:], elapsed_ns
+        if sample_b8_elapsed_ns > end_to_end_elapsed_ns:
+            raise RunnerError(
+                "worker sample+b8 time exceeds parent-observed end-to-end time: "
+                f"{sample_b8_elapsed_ns} > {end_to_end_elapsed_ns}"
+            )
+        return sample_call_count, result_payload[24:], sample_b8_elapsed_ns, end_to_end_elapsed_ns
 
     def stop(self) -> dict[str, Any]:
         write_frame(self.stdin, STOP, b"")
@@ -362,7 +371,7 @@ def _run_preflight(command: list[str], *, variant: str, seed: int) -> dict[str, 
                 bytes_per_shot=1,
                 sample_call_count=0,
             )
-            call_count, data, _ = session.sample(0, 1)
+            call_count, data, _, _ = session.sample(0, 1)
             if call_count != 1 or data != b"\x01":
                 raise RunnerError("known-answer preflight expected one result byte 0x01")
             final = session.stop()
@@ -416,7 +425,7 @@ def _run_variant(
         )
         records.append({"record_type": "ready", "variant": variant, "telemetry": ready})
         for request_id in range(total_rounds):
-            call_count, data, elapsed_ns = session.sample(request_id, shots)
+            call_count, data, sample_b8_elapsed_ns, end_to_end_elapsed_ns = session.sample(request_id, shots)
             if call_count != request_id + 1:
                 raise RunnerError(f"{variant} RESULT sample count {call_count} does not match {request_id + 1}")
             if len(data) != expected_output_bytes:
@@ -430,7 +439,8 @@ def _run_variant(
                     "shots": shots,
                     "output_format": output_format,
                     "warmup": request_id < warmup_rounds,
-                    "elapsed_ns": elapsed_ns,
+                    "sample_b8_elapsed_ns": sample_b8_elapsed_ns,
+                    "end_to_end_elapsed_ns": end_to_end_elapsed_ns,
                     "output_bytes": len(data),
                 }
             )
@@ -454,7 +464,7 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     variants = []
     for variant in ("stim", "rstim"):
         measured = [
-            record["elapsed_ns"]
+            record
             for record in records
             if record["record_type"] == "sample" and record["variant"] == variant and not record["warmup"]
         ]
@@ -462,7 +472,12 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "variant": variant,
                 "sample_count": len(measured),
-                "median_elapsed_ns": statistics.median(measured),
+                "median_sample_b8_elapsed_ns": statistics.median(
+                    record["sample_b8_elapsed_ns"] for record in measured
+                ),
+                "median_end_to_end_elapsed_ns": statistics.median(
+                    record["end_to_end_elapsed_ns"] for record in measured
+                ),
             }
         )
     return {"measured_records": sum(item["sample_count"] for item in variants), "variants": variants}
@@ -472,13 +487,14 @@ def _render_report(summary: dict[str, Any]) -> str:
     lines = [
         "# Compiled steady-state benchmark",
         "",
-        "| variant | sample_count | median_elapsed_ns |",
-        "| --- | ---: | ---: |",
+        "| variant | sample_count | median_sample_b8_elapsed_ns | median_end_to_end_elapsed_ns |",
+        "| --- | ---: | ---: | ---: |",
     ]
     for variant in summary["variants"]:
         lines.append(
             f"| {variant['variant']} | {variant['sample_count']} | "
-            f"{variant['median_elapsed_ns']} |"
+            f"{variant['median_sample_b8_elapsed_ns']} | "
+            f"{variant['median_end_to_end_elapsed_ns']} |"
         )
     lines.extend(["", f"Measured records: {summary['measured_records']}", ""])
     return "\n".join(lines)
@@ -547,7 +563,8 @@ def _collect_environment(
         "os": platform.platform(),
         "cpu_model": _cpu_model(),
         "profile": args.profile,
-        "timer_scope": case["timer_scope"],
+        "timer_scope": PRIMARY_TIMER_SCOPE,
+        "secondary_timer_scope": SECONDARY_TIMER_SCOPE,
         "seed_policy": "seed_once_then_advance_across_9_calls",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
@@ -637,6 +654,13 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
     )
     (out_dir / "environment.json").write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n")
     (out_dir / "report.md").write_text(_render_report(summary))
+    artifact_hashes = {
+        filename: _sha256(out_dir / filename)
+        for filename in ("raw.jsonl", "summary.json", "report.md", "environment.json")
+    }
+    (out_dir / "artifact-sha256.json").write_text(
+        json.dumps(artifact_hashes, indent=2, sort_keys=True) + "\n"
+    )
     print(
         "PASS compiled steady-state lifecycle variants=2 compile=1 reference=1 "
         f"calls={args.warmup_rounds + args.measure_rounds} measured={summary['measured_records']}"

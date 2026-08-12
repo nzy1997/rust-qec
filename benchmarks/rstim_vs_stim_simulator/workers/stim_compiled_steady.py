@@ -5,6 +5,7 @@ import hashlib
 import json
 import struct
 import sys
+import time
 from pathlib import Path
 
 from benchmarks.rstim_vs_stim_simulator import run_compiled_steady as protocol
@@ -86,12 +87,16 @@ def main(argv: list[str] | None = None) -> int:
             _write_error(f"invalid SAMPLE JSON: missing {error}")
             continue
         try:
+            started_ns = time.perf_counter_ns()
             data = sampler.sample(shots=shots, bit_packed=True).tobytes(order="C")
+            sample_b8_elapsed_ns = time.perf_counter_ns() - started_ns
         except Exception as error:
             _write_error(error)
             continue
         telemetry["sample_call_count"] += 1
-        result = struct.pack("<QQ", request_id, telemetry["sample_call_count"]) + data
+        result = struct.pack(
+            "<QQQ", request_id, telemetry["sample_call_count"], sample_b8_elapsed_ns
+        ) + data
         protocol.write_frame(sys.stdout.buffer, protocol.RESULT, result)
 
 

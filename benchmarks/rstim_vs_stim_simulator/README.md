@@ -197,10 +197,12 @@ python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
   --out-dir /tmp/rstim-compiled-steady
 ```
 
-The timed region covers each request, sampling, and the same bit-packed output
-transfer, while process startup, circuit compilation, and reference-sample
-construction occur before the timed requests. Compare the two steady-state
-rows only with each other, not with the selected-case runner above.
+The primary timed region is measured inside each worker and covers sampling plus
+the same `b8` encoding. The 1,552,384-byte result is still transferred and
+validated on every call, but that pipe cost is recorded separately as an
+end-to-end duration. Process startup, circuit compilation, and reference-sample
+construction occur before both timers. Compare the two steady-state rows only
+with each other, not with the selected-case runner above.
 
 ## Selected DEM Speed Evidence
 
