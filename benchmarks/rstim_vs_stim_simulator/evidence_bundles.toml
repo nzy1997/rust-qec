@@ -105,23 +105,23 @@ sha256 = "2c8fd5c9ad1e72534e12641f6f241d3cb10a7d64b5a546264246b1c793c3bdaf"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"
-sha256 = "7f21f16c1bf214ac546a1c87f8cd27a6d26f790efcfbb536dcf23e7b78692222"
+sha256 = "32ff4775e9a1a3cb250fd6b3811d1340d0b85bfa824bace37cb085c43c0dd67c"
 
 [[bundles.artifacts]]
 path = "environment.json"
-sha256 = "6812b7ef7f3d4b02da32e79662dac14fcbf2f1433ec933031027df903a0e7454"
+sha256 = "a1436e96c802ad88dc7228d310b5cabd2dbb9fdbe847018b41615f1eadc0de8e"
 
 [[bundles.artifacts]]
 path = "raw.jsonl"
-sha256 = "7bb10e3751c6568ff9533994d798a7a6c9f2fe664b7e3968f766f03dbb0d05b9"
+sha256 = "ae49c2630b41d55d62dadfae9151447afdc4befc2a9a132fc7c33cda1d3ca8a1"
 
 [[bundles.artifacts]]
 path = "report.md"
-sha256 = "84b730190bf7554f63dea3fe7629eb8e787db01cbe9ae387a242c2339605d6f4"
+sha256 = "6ca70dad09544cca372fee2589af6ec64c4f9257633ad12e65069754524162b0"
 
 [[bundles.artifacts]]
 path = "summary.json"
-sha256 = "2228e5460be43775d45f30861f28bc36c888557add981eeab8e47deadbfb8680"
+sha256 = "0cf293f748e36a1d73bac2774511f7a91d1a59957e62ee171d856da5e7b54f51"
 
 [[bundles.logical_executables]]
 role = "tool://python"
@@ -134,7 +134,7 @@ role = "tool://rstim-worker"
 
 [[bundles.runtime_identities]]
 role = "tool://python"
-version = "3.14.3"
+version = "Python 3.14.3"
 basename = "python3.14"
 sha256 = "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43"
 
@@ -152,9 +152,9 @@ sha256 = "2c8fd5c9ad1e72534e12641f6f241d3cb10a7d64b5a546264246b1c793c3bdaf"
 
 [[bundles.runtime_identities]]
 role = "tool://rstim-worker"
-version = "rstim 0.1.1"
+version = "rstim 0.2.0"
 basename = "rstim_compiled_steady_worker"
-sha256 = "e3cadbc979a5a30c0f20dab6acf9329f50872c1f732dc87ebd54c8c192b878d4"
+sha256 = "0355f3698a9c7efb1863e65efc12e29becf6612470cea3fdd2d92f7e267b6e6b"
 
 [[bundles.checked_commands]]
 name = "stim-compiled-worker"

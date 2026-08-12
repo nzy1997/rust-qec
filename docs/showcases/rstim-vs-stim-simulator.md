@@ -141,12 +141,22 @@ In the same refreshed surface-sample run, `rstim-interpreted-atom-loss` records
 1,203.424 ms versus 10.567 ms for `rstim-interpreted`, a 113.88x wall-time
 ratio for this fixture.
 
+The separate [precompiled steady-state evidence](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json)
+compiles the circuit and builds the reference sample once per implementation
+before timing repeated calls. Across 7 measured 1,024-shot calls after 2 warmup
+calls, Stim records 22.017 ms and `rstim` records 23.842 ms. Both calls include
+the same 1.55 MB bit-packed result transfer; Stim has 1.08x lower wall time in
+this recorded run. Because this excludes one-time compilation, these two rows
+are compared only with each other, not with the single-batch table above.
+
 Companion reports and environments are checked at
 [`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),
 [`results/release-repetition-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/report.md),
 [`results/release-surface-detect/`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
 and
 [`results/release-dem-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md).
+The precompiled call-level report and environment are checked under
+[`results/compiled-steady-release/`](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md).
 
 These relationships describe only the named cases under the captured release
 profiles and environments. They are not timing thresholds or cross-machine

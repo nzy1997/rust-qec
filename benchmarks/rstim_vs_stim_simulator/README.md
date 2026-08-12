@@ -181,6 +181,27 @@ probability of `0.001`.
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 
+## Precompiled Steady-State Evidence
+
+Compare repeated sample calls after both implementations compile the canonical
+circuit and build their reference sample once:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
+  --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml \
+  --case stim_surface_d11_r100 \
+  --profile release \
+  --warmup-rounds 2 \
+  --measure-rounds 7 \
+  --seed 0 \
+  --out-dir /tmp/rstim-compiled-steady
+```
+
+The timed region covers each request, sampling, and the same bit-packed output
+transfer, while process startup, circuit compilation, and reference-sample
+construction occur before the timed requests. Compare the two steady-state
+rows only with each other, not with the selected-case runner above.
+
 ## Selected DEM Speed Evidence
 
 Run the checked release-profile DEM sampling evidence case:

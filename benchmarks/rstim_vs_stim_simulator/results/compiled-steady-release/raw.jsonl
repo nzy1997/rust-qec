@@ -1,22 +1,22 @@
 {"record_type": "ready", "telemetry": {"bytes_per_shot": 1516, "compile_count": 1, "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurement_count": 12121, "reference_build_count": 1, "sample_call_count": 0, "variant": "stim"}, "variant": "stim"}
-{"elapsed_ns": 35131041, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 0, "sample_call_count": 1, "shots": 1024, "variant": "stim", "warmup": true}
-{"elapsed_ns": 13729375, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 1, "sample_call_count": 2, "shots": 1024, "variant": "stim", "warmup": true}
-{"elapsed_ns": 13671583, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 2, "sample_call_count": 3, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13750166, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 3, "sample_call_count": 4, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13630334, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 4, "sample_call_count": 5, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13537000, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 5, "sample_call_count": 6, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13726583, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 6, "sample_call_count": 7, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13717208, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 7, "sample_call_count": 8, "shots": 1024, "variant": "stim", "warmup": false}
-{"elapsed_ns": 13631958, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 8, "sample_call_count": 9, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 66166833, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 0, "sample_call_count": 1, "shots": 1024, "variant": "stim", "warmup": true}
+{"elapsed_ns": 24463833, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 1, "sample_call_count": 2, "shots": 1024, "variant": "stim", "warmup": true}
+{"elapsed_ns": 22017166, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 2, "sample_call_count": 3, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 20755000, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 3, "sample_call_count": 4, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 16135709, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 4, "sample_call_count": 5, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 28572875, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 5, "sample_call_count": 6, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 31804166, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 6, "sample_call_count": 7, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 19741917, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 7, "sample_call_count": 8, "shots": 1024, "variant": "stim", "warmup": false}
+{"elapsed_ns": 22056333, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 8, "sample_call_count": 9, "shots": 1024, "variant": "stim", "warmup": false}
 {"record_type": "final", "telemetry": {"bytes_per_shot": 1516, "compile_count": 1, "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurement_count": 12121, "reference_build_count": 1, "sample_call_count": 9, "variant": "stim"}, "variant": "stim"}
 {"record_type": "ready", "telemetry": {"bytes_per_shot": 1516, "compile_count": 1, "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurement_count": 12121, "reference_build_count": 1, "sample_call_count": 0, "variant": "rstim"}, "variant": "rstim"}
-{"elapsed_ns": 12028875, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 0, "sample_call_count": 1, "shots": 1024, "variant": "rstim", "warmup": true}
-{"elapsed_ns": 11272625, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 1, "sample_call_count": 2, "shots": 1024, "variant": "rstim", "warmup": true}
-{"elapsed_ns": 11547000, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 2, "sample_call_count": 3, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11318458, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 3, "sample_call_count": 4, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11376458, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 4, "sample_call_count": 5, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11682667, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 5, "sample_call_count": 6, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11687833, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 6, "sample_call_count": 7, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11732458, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 7, "sample_call_count": 8, "shots": 1024, "variant": "rstim", "warmup": false}
-{"elapsed_ns": 11287667, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 8, "sample_call_count": 9, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 22517500, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 0, "sample_call_count": 1, "shots": 1024, "variant": "rstim", "warmup": true}
+{"elapsed_ns": 25342792, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 1, "sample_call_count": 2, "shots": 1024, "variant": "rstim", "warmup": true}
+{"elapsed_ns": 21240542, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 2, "sample_call_count": 3, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 20335833, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 3, "sample_call_count": 4, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 20727958, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 4, "sample_call_count": 5, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 28043000, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 5, "sample_call_count": 6, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 23842416, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 6, "sample_call_count": 7, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 27770542, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 7, "sample_call_count": 8, "shots": 1024, "variant": "rstim", "warmup": false}
+{"elapsed_ns": 28102375, "output_bytes": 1552384, "output_format": "b8", "record_type": "sample", "request_id": 8, "sample_call_count": 9, "shots": 1024, "variant": "rstim", "warmup": false}
 {"record_type": "final", "telemetry": {"bytes_per_shot": 1516, "compile_count": 1, "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229", "measurement_count": 12121, "reference_build_count": 1, "sample_call_count": 9, "variant": "rstim"}, "variant": "rstim"}

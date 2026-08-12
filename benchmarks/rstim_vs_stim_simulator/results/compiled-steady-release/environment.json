@@ -17,12 +17,12 @@
       "0"
     ]
   },
-  "cpu_model": "arm",
+  "cpu_model": "Apple M4",
   "fair_manifest_path": "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml",
   "fair_manifest_sha256": "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb",
   "fixture_path": "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
   "fixture_sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229",
-  "git_commit": "b15b4224f51f73a190d86d24f377994c0f48e71b",
+  "git_commit": "16799e61a0731266039a67044c106eab99032c4e",
   "known_answer_preflight": [
     {
       "argv": [
@@ -89,13 +89,13 @@
   "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
   "profile": "release",
   "protocol_version": 1,
-  "rstim_version": "rstim 0.1.1",
+  "rstim_version": "rstim 0.2.0",
   "runtime_identities": [
     {
       "basename": "python3.14",
       "role": "tool://python",
       "sha256": "cbf84109626aa1013bbe408fbb9590bd0f1c1548f038b2221c6b8b87de26ca43",
-      "version": "3.14.3"
+      "version": "Python 3.14.3"
     },
     {
       "basename": "_stim_polyfill.cpython-314-darwin.so",
@@ -112,8 +112,8 @@
     {
       "basename": "rstim_compiled_steady_worker",
       "role": "tool://rstim-worker",
-      "sha256": "e3cadbc979a5a30c0f20dab6acf9329f50872c1f732dc87ebd54c8c192b878d4",
-      "version": "rstim 0.1.1"
+      "sha256": "0355f3698a9c7efb1863e65efc12e29becf6612470cea3fdd2d92f7e267b6e6b",
+      "version": "rstim 0.2.0"
     }
   ],
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",

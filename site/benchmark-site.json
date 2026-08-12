@@ -363,7 +363,7 @@
         "docs/showcases/rstim-vs-stim-simulator.md",
         "benchmarks/rstim_vs_stim_simulator/README.md"
       ],
-      "claims_limit": "Checked artifacts cover the named correctness cases, the historical #406 debug gap, and four case-scoped release runs in their recorded environments only.",
+      "claims_limit": "Checked artifacts cover the named correctness cases, the historical #406 debug gap, four case-scoped release runs, and one precompiled steady-state run in their recorded environments only.",
       "evidence_items": [
         {
           "id": "rstim-vs-stim-correctness",
@@ -520,7 +520,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "c3a5b095f5c18e49f89ed647c28bea791a2ca540d4ca2144bdbc26452e43e92a"
+                  "sha256": "fe86b997e9dd44923864d40e1a27baebf17352f0e079f6b9372e1f870308a5c2"
                 }
               }
             }
@@ -825,6 +825,169 @@
             "For this recorded fixture, the atom-loss interpreted path has a 113.88x higher median wall time than the baseline interpreted path.",
             "The rstim-vs-Stim timing ratio is report-only context and is not a cross-machine CI gate.",
             "The historical #406 debug-profile artifact remains separate and is not overwritten by this release evidence."
+          ]
+        },
+        {
+          "id": "rstim-vs-stim-compiled-steady",
+          "title": "Checked precompiled steady-state rstim versus Stim sampling evidence",
+          "status": "existing",
+          "tier": "release",
+          "artifacts": [
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl",
+              "kind": "speed-raw",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json",
+              "kind": "speed-summary",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md",
+              "kind": "speed-report",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json",
+              "kind": "environment",
+              "checked": true
+            },
+            {
+              "path": "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json",
+              "kind": "artifact-hashes",
+              "checked": true
+            }
+          ],
+          "commands": [
+            "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir /tmp/rstim-steady-refresh.rfVSkr",
+            "python3 tools/check_rstim_vs_stim_compiled_steady_evidence.py --dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
+          ],
+          "provenance": {
+            "schema_version": 1,
+            "artifact_date": {
+              "status": "recorded",
+              "value": "2026-08-12T15:27:28+08:00"
+            },
+            "source_commit": {
+              "status": "recorded",
+              "value": {
+                "runner_source": "16799e61a0731266039a67044c106eab99032c4e"
+              }
+            },
+            "commands": {
+              "status": "recorded",
+              "value": [
+                "python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml --case stim_surface_d11_r100 --profile release --warmup-rounds 2 --measure-rounds 7 --seed 0 --out-dir /tmp/rstim-steady-refresh.rfVSkr",
+                "python3 tools/check_rstim_vs_stim_compiled_steady_evidence.py --dir benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release"
+              ]
+            },
+            "os": {
+              "status": "recorded",
+              "value": "macOS 26.5.1 (build 25F80)"
+            },
+            "cpu_model": {
+              "status": "recorded",
+              "value": "Apple M4"
+            },
+            "rust_version": {
+              "status": "recorded",
+              "value": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)"
+            },
+            "python_version": {
+              "status": "recorded",
+              "value": "Python 3.14.3"
+            },
+            "dependency_versions": {
+              "status": "recorded",
+              "value": {
+                "rstim": "rstim 0.2.0",
+                "stim": "1.15.0",
+                "output_format": "b8"
+              }
+            },
+            "external_repository_commits": {
+              "status": "recorded",
+              "value": []
+            },
+            "seed_policy": {
+              "status": "recorded",
+              "value": {
+                "correctness_seeds": [
+                  0
+                ],
+                "speed_rstim_variants_seed": 0,
+                "speed_stim_cli_seed_policy": "The Stim compiled worker is seeded once with 0, then advances across two warmup and seven measured calls.",
+                "speed_seed_scope": "Both precompiled workers use seed 0 and advance independently across the same nine-call lifecycle; timings are report-only and sample streams are not compared byte-for-byte."
+              }
+            },
+            "build_profile": {
+              "status": "recorded",
+              "value": {
+                "profile": "release",
+                "protocol_version": 1,
+                "compile_count_per_worker": 1,
+                "reference_build_count_per_worker": 1,
+                "timer_scope": "request, sample, and bit-packed output transfer after worker readiness"
+              }
+            },
+            "shots_or_error_budget": {
+              "status": "recorded",
+              "value": {
+                "case": "stim_surface_d11_r100",
+                "shots_per_call": 1024,
+                "warmup_rounds": 2,
+                "measure_rounds": 7,
+                "output_bytes_per_call": 1552384,
+                "rstim_vs_stim_wall_time_ratio": 1.0829012235271334
+              }
+            },
+            "artifact_hashes": {
+              "status": "recorded",
+              "value": {
+                "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": {
+                  "sha256": "ae49c2630b41d55d62dadfae9151447afdc4befc2a9a132fc7c33cda1d3ca8a1"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": {
+                  "sha256": "0cf293f748e36a1d73bac2774511f7a91d1a59957e62ee171d856da5e7b54f51"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": {
+                  "sha256": "6ca70dad09544cca372fee2589af6ec64c4f9257633ad12e65069754524162b0"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": {
+                  "sha256": "a1436e96c802ad88dc7228d310b5cabd2dbb9fdbe847018b41615f1eadc0de8e"
+                },
+                "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": {
+                  "sha256": "32ff4775e9a1a3cb250fd6b3811d1340d0b85bfa824bace37cb085c43c0dd67c"
+                }
+              }
+            }
+          },
+          "provenance_requirements": [
+            "OS",
+            "CPU model",
+            "Rust version",
+            "Python version",
+            "dependency versions",
+            "Stim version",
+            "external repository commits",
+            "command line",
+            "seeds",
+            "build profile",
+            "shot counts",
+            "date"
+          ],
+          "provenance_sources": [
+            "benchmarks/rstim_vs_stim_simulator/README.md",
+            "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json",
+            "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json"
+          ],
+          "claims_limit": "Checked precompiled steady-state evidence for one d11/r100 fixture, seven measured calls, and one recorded environment only.",
+          "caveats": [
+            "Compilation and reference-sample construction occur once before the timed calls for both implementations.",
+            "Each timed call includes request handling, sampling, and transfer of the same 1,552,384-byte bit-packed result.",
+            "These steady-state timings use a different boundary from the selected single-batch runner and must not be compared across the two tables.",
+            "For this recorded steady-state run, Stim has a 1.08x lower median wall time than rstim."
           ]
         },
         {

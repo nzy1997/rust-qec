@@ -36,7 +36,7 @@ ITEM_REQUIRED_FIELDS = {
 }
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
-    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample|compiled-steady-release)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1
@@ -80,6 +80,13 @@ RSTIM_VS_STIM_REQUIRED_ARTIFACTS = {
     "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "fixture-manifest",
     "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "stim-fixture",
     "docs/showcases/rstim-vs-stim-simulator.md": "showcase",
+}
+RSTIM_VS_STIM_OPTIONAL_ARTIFACTS = {
+    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": "speed-raw",
+    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": "speed-summary",
+    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": "speed-report",
+    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": "environment",
+    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": "artifact-hashes",
 }
 RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS = (
     "OS",
@@ -284,6 +291,7 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
         add_error(errors, scope, f"partial {RSTIM_VS_STIM_FAMILY_ID} family must list checked artifacts")
         return
 
+    accepted_artifacts = {**RSTIM_VS_STIM_REQUIRED_ARTIFACTS, **RSTIM_VS_STIM_OPTIONAL_ARTIFACTS}
     found_required_artifacts: dict[str, tuple[str, str, bool]] = {}
     for item in checked_items:
         item_id = item.get("id", "<missing>")
@@ -297,14 +305,14 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
             artifact_path = artifact.get("path")
             if not isinstance(artifact_path, str):
                 continue
-            if artifact.get("checked") is True and artifact_path not in RSTIM_VS_STIM_REQUIRED_ARTIFACTS:
+            if artifact.get("checked") is True and artifact_path not in accepted_artifacts:
                 add_error(
                     errors,
                     item_scope,
                     f"checked artifact {artifact_path} is not accepted by rstim-vs-Stim site policy",
                 )
                 continue
-            expected_kind = RSTIM_VS_STIM_REQUIRED_ARTIFACTS.get(artifact_path)
+            expected_kind = accepted_artifacts.get(artifact_path)
             if expected_kind is None:
                 continue
             artifact_checked = artifact.get("checked") is True
