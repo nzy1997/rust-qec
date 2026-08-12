@@ -1,9 +1,11 @@
+use rstim::interactive_shot::{CircuitSession, ExpansionLimits};
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document,
-    Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document, Qp101Operation,
+    Qp101PauliBasis, Qp101TargetRef, export_qp101,
 };
 use rstim::qp101_svg::render_svg;
+use rstim::qp101_svg::render_svg_interactive;
 
 #[test]
 fn svg_renderer_draws_wires_gates_and_ticks() {
@@ -1995,4 +1997,37 @@ fn styled_annotation(
         tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
         context: None,
     }
+}
+
+#[test]
+fn interactive_svg_exposes_stable_ids_for_expanded_repeat_instances_and_results() {
+    let source = "REPEAT 2 {\n  X_ERROR(0.1) 0\n  M 0\n  DETECTOR rec[-1]\n  OBSERVABLE_INCLUDE(0) rec[-1]\n}\n";
+    let session = CircuitSession::open(source, ExpansionLimits::default())
+        .expect("interactive fixture should open");
+    let doc = export_qp101(session.instructions()).expect("fixture should export");
+    let svg = render_svg_interactive(&doc, session.circuit_digest())
+        .expect("interactive SVG should render");
+
+    assert_eq!(svg.matches("class=\"noise-site\"").count(), 2, "{svg}");
+    for event in session.catalog().events() {
+        assert!(
+            svg.contains(&format!("data-noise-event-id=\"{}\"", event.id.encode())),
+            "missing expanded event {}: {svg}",
+            event.id
+        );
+    }
+    for marker in [
+        "data-measurement-ids=\"m1\"",
+        "data-measurement-ids=\"m2\"",
+        "data-detector-id=\"d0\"",
+        "data-detector-id=\"d1\"",
+        "data-observable-id=\"l0-0\"",
+        "data-observable-id=\"l0-1\"",
+    ] {
+        assert!(svg.contains(marker), "missing {marker}: {svg}");
+    }
+
+    let plain = render_svg(&doc).expect("plain SVG should still render");
+    assert!(!plain.contains("data-noise-event-id"));
+    assert!(!plain.contains("data-measurement-ids"));
 }

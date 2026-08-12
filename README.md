@@ -96,6 +96,18 @@ stdout for most commands. For static circuit diagrams, prefer:
 rstim render_svg --in circuit.stim --out circuit.svg
 ```
 
+For an interactive single-shot view that can resample the fixed circuit, change
+the realized outcome of existing noise instructions, and export SVG/PDF, run:
+
+```sh
+rstim shot_viewer
+```
+
+The hosted [Shot Lab](https://nzy1997.github.io/rust-qec/interactive/) shows one
+repository-configured circuit. Its
+[local-file entry](https://nzy1997.github.io/rust-qec/interactive/local/) starts
+blank and processes a selected `.stim` file entirely in WebAssembly.
+
 Use `export_json` when you need QP101 structured data for downstream tools,
 fixtures, or the optional `qp101-viz` workflow:
 

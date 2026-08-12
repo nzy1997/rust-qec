@@ -1,0 +1,17 @@
+# Fixed circuit for the hosted interactive-shot page.
+R 0 1 2 3
+H 0
+CX 0 1
+TICK
+REPEAT 2 {
+    DEPOLARIZE1(0.08) 0 1
+    DEPOLARIZE2(0.12) 1 2
+    X_ERROR(0.05) 3
+    CX 1 2
+    M 0 1 2 3
+    DETECTOR rec[-4] rec[-3]
+    DETECTOR rec[-2] rec[-1]
+    OBSERVABLE_INCLUDE(0) rec[-4] rec[-1]
+    R 0 1 2 3
+    TICK
+}

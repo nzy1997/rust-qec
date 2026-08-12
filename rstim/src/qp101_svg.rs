@@ -1,3 +1,4 @@
+use crate::interactive_shot::{CircuitDigest, NoiseEventId, NoiseSiteId};
 use crate::qp101::{
     Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
 };
@@ -75,6 +76,20 @@ struct RenderState {
     measurements: Vec<MeasurementRecord>,
     repeat_groups: Vec<RepeatGroupSpan>,
     repeat_depth: usize,
+    next_observable_sequence: usize,
+    interaction_digest: Option<CircuitDigest>,
+}
+
+struct OperationLayerEntry<'a> {
+    op: &'a Qp101Operation,
+    op_path: Vec<usize>,
+    repeat_iterations: Vec<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct NoiseInteraction {
+    site_id: String,
+    event_id: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -103,7 +118,11 @@ impl LaneSpan {
 }
 
 enum LayerItem<'a> {
-    Operation(&'a Qp101Operation),
+    Operation {
+        op: &'a Qp101Operation,
+        repeat_iterations: Vec<u64>,
+        filter_repeat_annotations: bool,
+    },
     ControlledPair {
         gate: &'a str,
         control_lane: usize,
@@ -118,6 +137,7 @@ enum LayerItem<'a> {
         params: &'a [f64],
         lane: usize,
         annotations: Vec<&'a Qp101Annotation>,
+        interaction: Option<NoiseInteraction>,
     },
     NoisePair {
         gate: &'a str,
@@ -125,22 +145,24 @@ enum LayerItem<'a> {
         lane_a: usize,
         lane_b: usize,
         annotations: Vec<&'a Qp101Annotation>,
+        interaction: Option<NoiseInteraction>,
     },
 }
 
-struct SourceLayerItem<'a> {
+struct SourceLayerItem {
     lane: usize,
     label: String,
     source: String,
-    annotations: &'a [Qp101Annotation],
+    annotations: Vec<Qp101Annotation>,
     highlighted: bool,
     column_span: usize,
+    interaction: Option<(&'static str, String)>,
 }
 
 impl LayerItem<'_> {
     fn span(&self, num_qubits: usize) -> Result<LaneSpan, String> {
         match self {
-            LayerItem::Operation(op) => operation_lane_span(op, num_qubits),
+            LayerItem::Operation { op, .. } => operation_lane_span(op, num_qubits),
             LayerItem::ControlledPair {
                 control_lane,
                 target_lane,
@@ -166,6 +188,20 @@ impl LayerItem<'_> {
 }
 
 pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
+    render_svg_internal(doc, None)
+}
+
+pub fn render_svg_interactive(
+    doc: &Qp101Document,
+    circuit_digest: CircuitDigest,
+) -> Result<String, String> {
+    render_svg_internal(doc, Some(circuit_digest))
+}
+
+fn render_svg_internal(
+    doc: &Qp101Document,
+    interaction_digest: Option<CircuitDigest>,
+) -> Result<String, String> {
     if doc.num_qubits == 0 {
         return Err("cannot render QP101 SVG with num_qubits = 0".to_string());
     }
@@ -184,13 +220,18 @@ pub fn render_svg(doc: &Qp101Document) -> Result<String, String> {
     );
     let mut operation_out = String::new();
     let mut column = 0usize;
-    let mut state = RenderState::default();
+    let mut state = RenderState {
+        interaction_digest,
+        ..RenderState::default()
+    };
     render_operations(
         &mut operation_out,
         &doc.operations,
         doc.num_qubits,
         &mut column,
         &mut state,
+        &[],
+        &[],
     )?;
     if top_reserve > 0 {
         out.push_str(&format!(
@@ -294,7 +335,12 @@ fn count_source_layer_columns(
 ) -> Result<usize, String> {
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
     for op in layer {
-        let item = source_layer_item(op, num_qubits, state)?;
+        let entry = OperationLayerEntry {
+            op,
+            op_path: Vec::new(),
+            repeat_iterations: Vec::new(),
+        };
+        let item = source_layer_item(&entry, num_qubits, state)?;
         let span = LaneSpan {
             min: item.lane,
             max: item.lane,
@@ -336,7 +382,12 @@ fn count_operation_layer_columns(
 ) -> Result<usize, String> {
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
     for op in layer {
-        for item in operation_layer_items(op, num_qubits)? {
+        let entry = OperationLayerEntry {
+            op,
+            op_path: Vec::new(),
+            repeat_iterations: Vec::new(),
+        };
+        for item in operation_layer_items(&entry, num_qubits, None)? {
             let span = item.span(num_qubits)?;
             let assigned_column = first_non_conflicting_column(&column_spans, span);
             if assigned_column == column_spans.len() {
@@ -568,10 +619,14 @@ fn render_operations<'a>(
     num_qubits: usize,
     column: &mut usize,
     state: &mut RenderState,
+    op_prefix: &[usize],
+    repeat_iterations: &[u64],
 ) -> Result<(), String> {
     let mut layer = Vec::new();
     let mut source_layer = Vec::new();
-    for op in ops {
+    for (op_index, op) in ops.iter().enumerate() {
+        let mut op_path = op_prefix.to_vec();
+        op_path.push(op_index);
         match op {
             Qp101Operation::QubitCoords { .. } | Qp101Operation::ShiftCoords { .. } => {}
             Qp101Operation::Tick { annotations } => {
@@ -582,7 +637,11 @@ fn render_operations<'a>(
             }
             Qp101Operation::Gate { .. } | Qp101Operation::Noise { .. } => {
                 flush_source_layer(out, &mut source_layer, num_qubits, column, state)?;
-                layer.push(op);
+                layer.push(OperationLayerEntry {
+                    op,
+                    op_path,
+                    repeat_iterations: repeat_iterations.to_vec(),
+                });
             }
             Qp101Operation::Repeat {
                 count,
@@ -595,9 +654,19 @@ fn render_operations<'a>(
                 let mut iteration_starts = Vec::new();
                 let depth = state.repeat_depth;
                 state.repeat_depth += 1;
-                for _ in 0..*count {
+                for iteration in 0..*count {
                     iteration_starts.push(*column);
-                    render_operations(out, body, num_qubits, column, state)?;
+                    let mut nested_iterations = repeat_iterations.to_vec();
+                    nested_iterations.push(iteration);
+                    render_operations(
+                        out,
+                        body,
+                        num_qubits,
+                        column,
+                        state,
+                        &op_path,
+                        &nested_iterations,
+                    )?;
                 }
                 state.repeat_depth = depth;
                 if *column > start_column {
@@ -614,7 +683,11 @@ fn render_operations<'a>(
             }
             Qp101Operation::Detector { .. } | Qp101Operation::ObservableInclude { .. } => {
                 flush_operation_layer(out, &mut layer, num_qubits, column, state)?;
-                source_layer.push(op);
+                source_layer.push(OperationLayerEntry {
+                    op,
+                    op_path,
+                    repeat_iterations: repeat_iterations.to_vec(),
+                });
             }
             Qp101Operation::Annotation {
                 kind,
@@ -638,7 +711,7 @@ fn render_operations<'a>(
 
 fn flush_operation_layer(
     out: &mut String,
-    layer: &mut Vec<&Qp101Operation>,
+    layer: &mut Vec<OperationLayerEntry<'_>>,
     num_qubits: usize,
     column: &mut usize,
     state: &mut RenderState,
@@ -648,8 +721,9 @@ fn flush_operation_layer(
     }
 
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
-    for op in layer.drain(..) {
-        for item in operation_layer_items(op, num_qubits)? {
+    let interaction_digest = state.interaction_digest;
+    for entry in layer.drain(..) {
+        for item in operation_layer_items(&entry, num_qubits, interaction_digest)? {
             let span = item.span(num_qubits)?;
             let assigned_column = first_non_conflicting_column(&column_spans, span);
             if assigned_column == column_spans.len() {
@@ -669,9 +743,9 @@ fn flush_operation_layer(
     Ok(())
 }
 
-fn flush_source_layer<'a>(
+fn flush_source_layer(
     out: &mut String,
-    layer: &mut Vec<&'a Qp101Operation>,
+    layer: &mut Vec<OperationLayerEntry<'_>>,
     num_qubits: usize,
     column: &mut usize,
     state: &mut RenderState,
@@ -681,8 +755,8 @@ fn flush_source_layer<'a>(
     }
 
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
-    for op in layer.drain(..) {
-        let item = source_layer_item(op, num_qubits, state)?;
+    for entry in layer.drain(..) {
+        let item = source_layer_item(&entry, num_qubits, state)?;
         let span = LaneSpan {
             min: item.lane,
             max: item.lane,
@@ -698,18 +772,20 @@ fn flush_source_layer<'a>(
             &item.label,
             &item.source,
             item.highlighted,
+            item.interaction.as_ref(),
         );
-        render_source_annotations_with_line_offset(out, x, &[item.lane], item.annotations, 1);
+        render_source_annotations_with_line_offset(out, x, &[item.lane], &item.annotations, 1);
     }
     *column += column_spans.len();
     Ok(())
 }
 
-fn source_layer_item<'a>(
-    op: &'a Qp101Operation,
+fn source_layer_item(
+    entry: &OperationLayerEntry<'_>,
     num_qubits: usize,
     state: &mut RenderState,
-) -> Result<SourceLayerItem<'a>, String> {
+) -> Result<SourceLayerItem, String> {
+    let op = entry.op;
     match op {
         Qp101Operation::Detector {
             sources,
@@ -718,15 +794,24 @@ fn source_layer_item<'a>(
         } => {
             let detector_index = state.next_detector_index;
             state.next_detector_index += 1;
+            let annotations = filtered_repeat_annotations(
+                annotations,
+                &entry.repeat_iterations,
+                state.interaction_digest.is_some(),
+            );
             let source = source_label(sources, &state.measurements, num_qubits);
             let source_text = format!("D{detector_index} = {}", source.text);
+            let highlighted = source_block_highlighted(&annotations);
             Ok(SourceLayerItem {
                 lane: source.host_lane,
                 label: "DETECTOR".to_string(),
                 column_span: source_operation_column_span_for_item("DETECTOR", &source_text),
                 source: source_text,
                 annotations,
-                highlighted: source_block_highlighted(annotations),
+                highlighted,
+                interaction: state
+                    .interaction_digest
+                    .map(|_| ("detector", format!("d{detector_index}"))),
             })
         }
         Qp101Operation::ObservableInclude {
@@ -735,16 +820,27 @@ fn source_layer_item<'a>(
             annotations,
             ..
         } => {
+            let sequence_index = state.next_observable_sequence;
+            state.next_observable_sequence += 1;
+            let annotations = filtered_repeat_annotations(
+                annotations,
+                &entry.repeat_iterations,
+                state.interaction_digest.is_some(),
+            );
             let source = source_label(sources, &state.measurements, num_qubits);
             let label = format!("OBS_INCLUDE({index})");
             let source_text = format!("L{index} *= {}", source.text);
+            let highlighted = source_block_highlighted(&annotations);
             Ok(SourceLayerItem {
                 lane: source.host_lane,
                 column_span: source_operation_column_span_for_item(&label, &source_text),
                 source: source_text,
                 annotations,
-                highlighted: source_block_highlighted(annotations),
+                highlighted,
                 label,
+                interaction: state
+                    .interaction_digest
+                    .map(|_| ("observable", format!("l{index}-{sequence_index}"))),
             })
         }
         other => Err(format!(
@@ -819,9 +915,11 @@ fn operation_lane_span(op: &Qp101Operation, num_qubits: usize) -> Result<LaneSpa
 }
 
 fn operation_layer_items<'a>(
-    op: &'a Qp101Operation,
+    entry: &'a OperationLayerEntry<'a>,
     num_qubits: usize,
+    interaction_digest: Option<CircuitDigest>,
 ) -> Result<Vec<LayerItem<'a>>, String> {
+    let op = entry.op;
     match op {
         Qp101Operation::Gate {
             gate,
@@ -868,6 +966,14 @@ fn operation_layer_items<'a>(
                                 annotations,
                                 &[slot],
                                 slot == 0,
+                                &entry.repeat_iterations,
+                                interaction_digest.is_some(),
+                            ),
+                            interaction: noise_interaction(
+                                interaction_digest,
+                                &entry.op_path,
+                                &entry.repeat_iterations,
+                                &[slot],
                             ),
                         })
                         .collect());
@@ -887,6 +993,14 @@ fn operation_layer_items<'a>(
                                     annotations,
                                     &[first_slot, first_slot + 1],
                                     pair_index == 0,
+                                    &entry.repeat_iterations,
+                                    interaction_digest.is_some(),
+                                ),
+                                interaction: noise_interaction(
+                                    interaction_digest,
+                                    &entry.op_path,
+                                    &entry.repeat_iterations,
+                                    &[first_slot, first_slot + 1],
                                 ),
                             }
                         })
@@ -897,27 +1011,82 @@ fn operation_layer_items<'a>(
         }
         _ => {}
     }
-    Ok(vec![LayerItem::Operation(op)])
+    Ok(vec![LayerItem::Operation {
+        op,
+        repeat_iterations: entry.repeat_iterations.clone(),
+        filter_repeat_annotations: interaction_digest.is_some(),
+    }])
+}
+
+fn noise_interaction(
+    circuit_digest: Option<CircuitDigest>,
+    op_path: &[usize],
+    repeat_iterations: &[u64],
+    target_slots: &[usize],
+) -> Option<NoiseInteraction> {
+    let circuit_digest = circuit_digest?;
+    let site = NoiseSiteId {
+        circuit_digest,
+        op_path: op_path.to_vec(),
+        target_slots: target_slots.to_vec(),
+    };
+    let event = NoiseEventId {
+        site: site.clone(),
+        repeat_iterations: repeat_iterations.to_vec(),
+    };
+    Some(NoiseInteraction {
+        site_id: site.encode(),
+        event_id: event.encode(),
+    })
 }
 
 fn annotations_for_target_slots<'a>(
     annotations: &'a [Qp101Annotation],
     target_slots: &[usize],
     include_operation_annotations: bool,
+    repeat_iterations: &[u64],
+    filter_repeat_annotations: bool,
 ) -> Vec<&'a Qp101Annotation> {
     annotations
         .iter()
         .filter(|annotation| {
-            if annotation.target_slots.is_empty() {
+            let target_matches = if annotation.target_slots.is_empty() {
                 include_operation_annotations
             } else {
                 annotation
                     .target_slots
                     .iter()
                     .any(|slot| target_slots.contains(slot))
-            }
+            };
+            target_matches
+                && (!filter_repeat_annotations
+                    || annotation_matches_repeat(annotation, repeat_iterations))
         })
         .collect()
+}
+
+fn annotation_matches_repeat(annotation: &Qp101Annotation, repeat_iterations: &[u64]) -> bool {
+    let Some(context) = annotation.context.as_ref() else {
+        return true;
+    };
+    if context
+        .get("query_kind")
+        .and_then(serde_json::Value::as_str)
+        != Some("sample_trace")
+    {
+        return true;
+    }
+    let Some(iterations) = context
+        .get("repeat_iterations")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return true;
+    };
+    iterations.len() == repeat_iterations.len()
+        && iterations
+            .iter()
+            .zip(repeat_iterations)
+            .all(|(actual, expected)| actual.as_u64() == Some(*expected))
 }
 
 fn render_layer_item(
@@ -945,8 +1114,17 @@ fn render_layer_item(
             params,
             lane,
             annotations,
+            interaction,
         } => {
-            render_known_noise_box(out, x, gate, params, *lane, annotations);
+            render_known_noise_box(
+                out,
+                x,
+                gate,
+                params,
+                *lane,
+                annotations,
+                interaction.as_ref(),
+            );
             Ok(())
         }
         LayerItem::NoisePair {
@@ -955,11 +1133,25 @@ fn render_layer_item(
             lane_a,
             lane_b,
             annotations,
+            interaction,
         } => {
-            render_known_noise_pair(out, x, gate, params, *lane_a, *lane_b, annotations);
+            render_known_noise_pair(
+                out,
+                x,
+                gate,
+                params,
+                *lane_a,
+                *lane_b,
+                annotations,
+                interaction.as_ref(),
+            );
             Ok(())
         }
-        LayerItem::Operation(op) => match op {
+        LayerItem::Operation {
+            op,
+            repeat_iterations,
+            filter_repeat_annotations,
+        } => match op {
             Qp101Operation::Gate {
                 gate,
                 targets,
@@ -968,37 +1160,66 @@ fn render_layer_item(
                 display,
                 annotations,
                 ..
-            } => render_gate(
-                out,
-                x,
-                num_qubits,
-                gate,
-                targets,
-                controls,
-                raw_targets.as_deref(),
-                display.as_ref(),
-                annotations,
-                state,
-            ),
+            } => {
+                let filtered = filtered_repeat_annotations(
+                    annotations,
+                    repeat_iterations,
+                    *filter_repeat_annotations,
+                );
+                render_gate(
+                    out,
+                    x,
+                    num_qubits,
+                    gate,
+                    targets,
+                    controls,
+                    raw_targets.as_deref(),
+                    display.as_ref(),
+                    &filtered,
+                    state,
+                )
+            }
             Qp101Operation::Noise {
                 gate,
                 params,
                 raw_targets,
                 annotations,
                 ..
-            } => render_noise(
-                out,
-                x,
-                num_qubits,
-                gate,
-                params,
-                raw_targets,
-                annotations,
-                state,
-            ),
+            } => {
+                let filtered = filtered_repeat_annotations(
+                    annotations,
+                    repeat_iterations,
+                    *filter_repeat_annotations,
+                );
+                render_noise(
+                    out,
+                    x,
+                    num_qubits,
+                    gate,
+                    params,
+                    raw_targets,
+                    &filtered,
+                    state,
+                )
+            }
             _ => Ok(()),
         },
     }
+}
+
+fn filtered_repeat_annotations(
+    annotations: &[Qp101Annotation],
+    repeat_iterations: &[u64],
+    enabled: bool,
+) -> Vec<Qp101Annotation> {
+    if !enabled {
+        return annotations.to_vec();
+    }
+    annotations
+        .iter()
+        .filter(|annotation| annotation_matches_repeat(annotation, repeat_iterations))
+        .cloned()
+        .collect()
 }
 
 fn render_known_noise_box(
@@ -1008,7 +1229,9 @@ fn render_known_noise_box(
     params: &[f64],
     lane: usize,
     annotations: &[&Qp101Annotation],
+    interaction: Option<&NoiseInteraction>,
 ) {
+    render_noise_interaction_start(out, gate, interaction);
     render_noise_box(out, x, lane_y(lane), noise_label(gate));
     let mut below_line_offset = 0usize;
     if let Some(note) = noise_param_note(params) {
@@ -1016,6 +1239,7 @@ fn render_known_noise_box(
         below_line_offset += 1;
     }
     render_annotation_refs_with_line_offset(out, x, &[lane], annotations, below_line_offset);
+    render_noise_interaction_end(out, interaction);
 }
 
 fn render_known_noise_pair(
@@ -1026,7 +1250,9 @@ fn render_known_noise_pair(
     lane_a: usize,
     lane_b: usize,
     annotations: &[&Qp101Annotation],
+    interaction: Option<&NoiseInteraction>,
 ) {
+    render_noise_interaction_start(out, gate, interaction);
     render_noise_pair(out, x, lane_a, lane_b, noise_label(gate));
     let upper_lane = lane_a.min(lane_b);
     let lower_lane = lane_a.max(lane_b);
@@ -1043,6 +1269,29 @@ fn render_known_noise_pair(
         annotations,
         below_line_offset,
     );
+    render_noise_interaction_end(out, interaction);
+}
+
+fn render_noise_interaction_start(
+    out: &mut String,
+    gate: &str,
+    interaction: Option<&NoiseInteraction>,
+) {
+    let Some(interaction) = interaction else {
+        return;
+    };
+    out.push_str(&format!(
+        "<g class=\"noise-site\" data-noise-site-id=\"{}\" data-noise-event-id=\"{}\" tabindex=\"0\" role=\"button\" aria-label=\"Edit {} noise outcome\">\n",
+        escape_xml(&interaction.site_id),
+        escape_xml(&interaction.event_id),
+        escape_xml(gate),
+    ));
+}
+
+fn render_noise_interaction_end(out: &mut String, interaction: Option<&NoiseInteraction>) {
+    if interaction.is_some() {
+        out.push_str("</g>\n");
+    }
 }
 
 fn lane_y(q: usize) -> i32 {
@@ -1188,11 +1437,7 @@ fn target_ref_text(source: &Qp101TargetRef) -> String {
 }
 
 fn inverted_prefix(inverted: Option<bool>) -> &'static str {
-    if inverted.unwrap_or(false) {
-        "!"
-    } else {
-        ""
-    }
+    if inverted.unwrap_or(false) { "!" } else { "" }
 }
 
 fn pauli_basis_text(basis: &Qp101PauliBasis) -> &'static str {
@@ -1512,7 +1757,12 @@ fn render_gate(
         }
     }
 
-    render_measurement_anchors(out, x, &measurement_targets);
+    render_measurement_anchors(
+        out,
+        x,
+        &measurement_targets,
+        state.interaction_digest.is_some(),
+    );
     render_annotations_with_line_offset(
         out,
         x,
@@ -1575,7 +1825,7 @@ enum NoisePolicy {
 
 fn noise_policy(gate: &str) -> NoisePolicy {
     match gate {
-        "X_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "LOSS" => NoisePolicy::Single,
+        "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "LOSS" => NoisePolicy::Single,
         "DEPOLARIZE2" => NoisePolicy::Pair,
         _ => NoisePolicy::Fallback,
     }
@@ -1584,6 +1834,7 @@ fn noise_policy(gate: &str) -> NoisePolicy {
 fn noise_label(gate: &str) -> &str {
     match gate {
         "X_ERROR" => "XE",
+        "Y_ERROR" => "YE",
         "Z_ERROR" => "ZE",
         "DEPOLARIZE1" => "D1",
         "DEPOLARIZE2" => "D2",
@@ -1649,7 +1900,12 @@ fn render_noise(
         }
     }
 
-    render_measurement_anchors(out, x, &measurement_targets);
+    render_measurement_anchors(
+        out,
+        x,
+        &measurement_targets,
+        state.interaction_digest.is_some(),
+    );
     let annotation_line_offset =
         usize::from(!measurement_targets.is_empty()) + usize::from(note.is_some());
     render_annotations_with_line_offset(out, x, &lanes, annotations, annotation_line_offset);
@@ -1806,7 +2062,14 @@ fn render_source_operation(
     label: &str,
     source: &str,
     highlighted: bool,
+    interaction: Option<&(&'static str, String)>,
 ) {
+    if let Some((kind, id)) = interaction {
+        out.push_str(&format!(
+            "<g class=\"{kind}\" data-{kind}-id=\"{}\" tabindex=\"0\" role=\"button\">\n",
+            escape_xml(id)
+        ));
+    }
     render_source_gate_box(
         out,
         x,
@@ -1820,6 +2083,9 @@ fn render_source_operation(
         below_gate_text_y(lane),
         escape_xml(source)
     ));
+    if interaction.is_some() {
+        out.push_str("</g>\n");
+    }
 }
 
 fn render_source_gate_box(
@@ -2285,13 +2551,31 @@ fn measurement_annotation_line_offset(targets: &[MeasurementTarget]) -> usize {
     usize::from(!targets.is_empty())
 }
 
-fn render_measurement_anchors(out: &mut String, x: i32, targets: &[MeasurementTarget]) {
+fn render_measurement_anchors(
+    out: &mut String,
+    x: i32,
+    targets: &[MeasurementTarget],
+    interactive: bool,
+) {
     for target in targets {
+        if interactive {
+            let ids = (0..target.output_count)
+                .map(|offset| format!("m{}", target.first_index + offset))
+                .collect::<Vec<_>>()
+                .join(" ");
+            out.push_str(&format!(
+                "<g class=\"measurement\" data-measurement-ids=\"{}\" tabindex=\"0\" role=\"button\">\n",
+                escape_xml(&ids)
+            ));
+        }
         out.push_str(&format!(
             "<text class=\"measurement-anchor\" x=\"{x}\" y=\"{}\" fill=\"#2563eb\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",
             below_gate_text_y(target.lane),
             escape_xml(&target.anchor())
         ));
+        if interactive {
+            out.push_str("</g>\n");
+        }
     }
 }
 

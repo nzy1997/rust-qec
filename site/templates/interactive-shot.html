@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive shot — RustQEC{% endblock title %}
+{% block description %}Sample a fixed Stim circuit, override existing physical errors, and export the resulting circuit figure.{% endblock description %}
+{% block head %}
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+<link rel="stylesheet" href="{{ root }}/interactive/shot-viewer.css">
+{% endblock head %}
+
+{% block hero %}
+<div class="hero compact-hero shot-hero">
+  <p class="eyebrow">Interactive circuit laboratory</p>
+  <h1>{% if section.extra.mode == "local" %}Open a circuit on this device{% else %}Inspect one physical-error shot{% endif %}</h1>
+  <p class="hero-copy">The circuit stays fixed. Sampling replaces the whole shot; clicking an existing noise site changes only that realized outcome and recomputes everything downstream.</p>
+  <p class="content-links">{% if section.extra.mode == "local" %}<a href="../">View the fixed example</a>{% else %}<a href="local/">Open your own local circuit</a>{% endif %}</p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section
+  id="shot-viewer"
+  class="shot-app"
+  data-mode="{{ section.extra.mode }}"
+  {% if section.extra.circuit %}data-circuit-url="{{ root }}/interactive/{{ section.extra.circuit }}"{% endif %}
+  data-wasm-url="{{ root }}/interactive/pkg/rstim_shot_web_bg.wasm"
+  aria-label="Interactive quantum circuit shot viewer"
+>
+  <noscript><p class="shot-fallback">This tool needs JavaScript and WebAssembly. The rest of the RustQEC documentation remains available without them.</p></noscript>
+</section>
+{% endblock main %}
+
+{% block scripts %}<script type="module" src="{{ root }}/interactive/app.js"></script>{% endblock scripts %}

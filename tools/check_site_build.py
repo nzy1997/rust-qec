@@ -47,6 +47,8 @@ PAGE_FILES = (
     "css-codes/index.html",
     "rsmp-v1-showcase/index.html",
     "qp101/index.html",
+    "interactive/index.html",
+    "interactive/local/index.html",
 )
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
 PAGE_REQUIRED_ANCHORS = {
@@ -64,6 +66,8 @@ PAGE_REQUIRED_ANCHORS = {
         "rsmp-evidence",
     ),
     "qp101/index.html": ("qp101", "operations", "schema-browser", "gallery", "examples"),
+    "interactive/index.html": ("shot-viewer",),
+    "interactive/local/index.html": ("shot-viewer",),
 }
 REQUIRED_FILES = PAGE_FILES + JS_FILES + (
     "styles.css",
@@ -76,6 +80,10 @@ REQUIRED_FILES = PAGE_FILES + JS_FILES + (
     "gallery/basic-site.svg",
     "gallery/repeat-detector-site.svg",
     "gallery/atom-loss-sample.svg",
+    "interactive/app.js",
+    "interactive/shot-viewer.css",
+    "interactive/fixed-circuit.stim",
+    "interactive/pkg/rstim_shot_web_bg.wasm",
 )
 QP101_REQUIRED_FILES = (
     "qp101.schema.json",

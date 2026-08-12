@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>rstim local shot viewer</title>
+    <meta name="description" content="Open a local Stim circuit, sample it, override existing physical errors, and export the current figure.">
+    <link rel="stylesheet" href="/shot-viewer.css">
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f8fafc; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      .offline-header { padding: 1.25rem max(1rem, calc((100% - 1500px) / 2)); border-bottom: 1px solid #e4e7ec; background: #101828; color: #fff; }
+      .offline-header p { margin: 0.35rem 0 0; color: #d0d5dd; }
+    </style>
+  </head>
+  <body>
+    <header class="offline-header">
+      <strong>rstim · local interactive shot</strong>
+      <p>The selected circuit remains on this device.</p>
+    </header>
+    <main>
+      <section
+        id="shot-viewer"
+        class="shot-app"
+        data-mode="local"
+        data-wasm-url="/pkg/rstim_shot_web_bg.wasm"
+        aria-label="Interactive quantum circuit shot viewer"
+      >
+        <noscript><p class="shot-fallback">This tool needs JavaScript and WebAssembly.</p></noscript>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-.PHONY: help test check build-site release rsmp-v1-readiness bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test check build-shot-viewer build-site release rsmp-v1-readiness bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -23,6 +23,7 @@ help:
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
+	@echo "  build-shot-viewer    - Rebuild the version-matched interactive-shot web bundle"
 	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
@@ -48,7 +49,10 @@ check:
 rsmp-v1-readiness:
 	@python3 tools/check_rsmp_v1_readiness.py --repo-root . --out-dir benchmarks/out/rsmp-v1
 
-build-site:
+build-shot-viewer:
+	tools/build_shot_viewer.sh
+
+build-site: build-shot-viewer
 	rm -rf _site
 	zola --root site build --output-dir $(CURDIR)/_site
 	mkdir -p _site/examples _site/data
