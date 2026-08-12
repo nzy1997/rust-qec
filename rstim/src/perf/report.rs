@@ -67,6 +67,18 @@ fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
         "- present variants: `{}`\n",
         case.present_variants.join("`, `")
     ));
+    if case
+        .expected_variants
+        .iter()
+        .any(|variant| variant == "rstim-interpreted-atom-loss")
+    {
+        out.push_str(
+            "- atom-loss probability: each two-qubit gate has one depolarization event and two independent per-atom loss events; using `p = 1 - 0.999^(1/3) ~= 0.0003334445062` keeps the probability of at least one error equal to `0.001`.\n",
+        );
+        out.push_str(
+            "- atom-loss execution: a per-qubit loss/reset dataflow proof selects between a 64-shot reference-frame kernel and a parallel packed stabilizer-trajectory kernel; this fixture requires trajectories because loss can suppress later CX gates on the same qubits.\n",
+        );
+    }
     for variant in &case.variants {
         if variant.status != "completed" {
             out.push_str(&format!(

@@ -536,9 +536,7 @@ fn is_measurement_reset_operation(name: &str) -> bool {
 fn is_loss_operation(name: &str) -> bool {
     matches!(
         name,
-        "LOSS"
-            | "ML"
-            | "MXL"
+        "ML" | "MXL"
             | "MYL"
             | "MZL"
             | "MRL"
@@ -568,6 +566,7 @@ fn is_noiselessly_skipped_or_metadata_operation(name: &str) -> bool {
     matches!(
         name,
         "I" | "I_ERROR"
+            | "LOSS"
             | "II_ERROR"
             | "X_ERROR"
             | "Y_ERROR"

@@ -455,7 +455,14 @@ fn fallback_routing_reports_typed_reason_at_each_layer() {
             "{} reference",
             case.name
         );
-        assert_legacy_reference_decision(&reference_decision, case.expected_reason);
+        if matches!(case.expected_reason, ExpectedReason::Loss) {
+            // LOSS is a noise instruction and therefore a no-op while constructing the
+            // noiseless reference, even though compiled sampling still routes the circuit to
+            // the loss-aware interpreted backend.
+            assert_packed_reference_decision(&reference_decision);
+        } else {
+            assert_legacy_reference_decision(&reference_decision, case.expected_reason);
+        }
 
         let compile_err = CompiledMeasurementSampler::compile_with_decision(
             &instrs,

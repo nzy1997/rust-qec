@@ -1,9 +1,12 @@
 use rstim::codegen::{repetition_code_memory, rotated_memory_x, NoiseParams};
-use rstim::compiled::{choose_analyzer_path, compile_circuit, CompiledPathDecision};
+use rstim::compiled::{
+    choose_analyzer_path, choose_sampler_path, compile_circuit, CompiledPathDecision,
+    SamplerPathDecision,
+};
 use rstim::parser::parse_lines;
 use rstim::perf::{
-    benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
     PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource, PerfComparisonKind, PerfMeasurementRecord,
+    benchmark_case_variants, benchmark_cases, benchmark_variants, effective_repeat_count,
     PerfRecord, PerfRecordStatus, PerfVariant, PerfWorkload,
 };
 use serde_json::Value;
@@ -263,8 +266,12 @@ fn benchmark_case_variants_and_comparisons_match_declared_contracts() {
                 PerfVariant::StimCli,
                 PerfVariant::RstimInterpreted,
                 PerfVariant::RstimCompiled,
+                PerfVariant::RstimInterpretedAtomLoss,
             ],
-            vec![PerfComparisonKind::SamplerCompiledVsInterpreted],
+            vec![
+                PerfComparisonKind::SamplerCompiledVsInterpreted,
+                PerfComparisonKind::SamplerAtomLossVsInterpreted,
+            ],
         ),
     ];
 
@@ -323,7 +330,11 @@ fn benchmark_cases_include_stim_style_surface_sample_contract() {
     assert!(!case.requires_fallback);
     assert_eq!(
         case.comparisons,
-        [PerfComparisonKind::SamplerCompiledVsInterpreted].as_slice()
+        [
+            PerfComparisonKind::SamplerCompiledVsInterpreted,
+            PerfComparisonKind::SamplerAtomLossVsInterpreted,
+        ]
+        .as_slice()
     );
 
     let (case_id, canonical_input_path, noise) = match case.source {
@@ -362,12 +373,61 @@ fn benchmark_cases_include_stim_style_surface_sample_contract() {
         std::fs::read_to_string(std::path::Path::new("..").join(canonical_input_path))
             .expect("checked Stim fixture");
     let instrs = parse_lines(&fixture_text).expect("fixture parses");
+    let atom_loss = case.atom_loss_variant.expect("paired atom-loss variant");
+    assert_eq!(atom_loss.per_event_probability, 0.0003334445062);
+    assert_eq!(atom_loss.aggregate_error_probability, 0.001);
+    assert!((1.0 - (1.0 - atom_loss.per_event_probability).powi(3) - 0.001).abs() < 1e-12);
+
+    let atom_loss_path = match atom_loss.source {
+        PerfCircuitSource::Fixture {
+            canonical_input_path,
+            noise,
+            ..
+        } => {
+            assert_eq!(
+                noise.after_clifford_depolarization,
+                atom_loss.per_event_probability
+            );
+            canonical_input_path
+        }
+        _ => panic!("atom-loss comparison must use a checked fixture"),
+    };
+    assert_eq!(
+        atom_loss_path,
+        "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
+    );
+    let atom_loss_text = std::fs::read_to_string(std::path::Path::new("..").join(atom_loss_path))
+        .expect("checked atom-loss fixture");
+    let atom_loss_instrs = parse_lines(&atom_loss_text).expect("atom-loss fixture parses");
+    let baseline_stats = rstim::stats::summarize(&instrs);
+    let atom_loss_stats = rstim::stats::summarize(&atom_loss_instrs);
+    assert_eq!(atom_loss_stats.num_qubits, baseline_stats.num_qubits);
+    assert_eq!(
+        atom_loss_stats.num_measurements,
+        baseline_stats.num_measurements
+    );
+    assert_eq!(atom_loss_stats.num_detectors, baseline_stats.num_detectors);
+    assert_eq!(
+        atom_loss_stats.num_observables,
+        baseline_stats.num_observables
+    );
+    assert_eq!(
+        atom_loss_stats.max_repeat_depth,
+        baseline_stats.max_repeat_depth
+    );
+    let compiled =
+        compile_circuit(&atom_loss_instrs).expect("atom-loss fixture compiles to routing IR");
+    assert!(matches!(
+        choose_sampler_path(&compiled),
+        SamplerPathDecision::Fallback(_)
+    ));
     assert_eq!(
         benchmark_case_variants(case, &instrs).unwrap(),
         vec![
             PerfVariant::StimCli,
             PerfVariant::RstimInterpreted,
             PerfVariant::RstimCompiled,
+            PerfVariant::RstimInterpretedAtomLoss,
         ]
     );
 }
@@ -379,6 +439,7 @@ fn benchmark_variants_cover_stim_and_both_rstim_backends() {
     assert!(variants.contains(&PerfVariant::StimCli));
     assert!(variants.contains(&PerfVariant::RstimInterpreted));
     assert!(variants.contains(&PerfVariant::RstimCompiled));
+    assert!(variants.contains(&PerfVariant::RstimInterpretedAtomLoss));
     assert!(variants.contains(&PerfVariant::RstimAnalyzerFlattened));
     assert!(variants.contains(&PerfVariant::RstimAnalyzerCompiled));
 }
@@ -439,6 +500,7 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
         requires_compiled: true,
         requires_fallback: false,
         comparisons: &[],
+        atom_loss_variant: None,
     };
     let analyze_instrs =
         parse_lines("REPEAT 8 {\n  X_ERROR(0.001) 0\n  MR 0\n  DETECTOR rec[-1]\n}\n").unwrap();
@@ -453,6 +515,7 @@ fn benchmark_case_variants_add_compiled_backends_for_supported_paths() {
         requires_compiled: true,
         requires_fallback: false,
         comparisons: &[],
+        atom_loss_variant: None,
     };
 
     assert_eq!(

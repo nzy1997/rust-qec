@@ -1,8 +1,8 @@
 use rstim::codegen::{repetition_code_memory, rotated_memory_x};
 use rstim::ir::circuit_to_string;
 use rstim::perf::{
-    benchmark_cases, run_case_measurements, PerfBenchmarkCase, PerfCaseTier, PerfCircuitSource,
-    PerfRunOptions, PerfVariant, PerfWorkload,
+    benchmark_cases, run_case_measurements, PerfAtomLossVariant, PerfBenchmarkCase, PerfCaseTier,
+    PerfCircuitSource, PerfRunOptions, PerfVariant, PerfWorkload,
 };
 use serde_json::Value;
 use std::fs;
@@ -219,6 +219,7 @@ fn runner_propagates_analyzer_failures() {
         requires_compiled: false,
         requires_fallback: false,
         comparisons: &[],
+        atom_loss_variant: None,
     };
 
     let err = run_case_measurements(
@@ -261,6 +262,7 @@ fn runner_reports_stim_stdin_write_failures() {
         requires_compiled: false,
         requires_fallback: false,
         comparisons: &[],
+        atom_loss_variant: None,
     };
     let text = "M 0\n".repeat(200_000);
     let err = run_case_measurements(
@@ -278,6 +280,40 @@ fn runner_reports_stim_stdin_write_failures() {
     }
 
     assert!(err.contains("failed to write stim stdin"));
+}
+
+#[test]
+fn atom_loss_variant_records_the_paired_interpreted_run() {
+    let case = PerfBenchmarkCase {
+        label: "paired-inline",
+        workload: PerfWorkload::Sample,
+        source: PerfCircuitSource::Inline { text: "M 0\n" },
+        atom_loss_variant: Some(PerfAtomLossVariant {
+            source: PerfCircuitSource::Inline {
+                text: "LOSS(0) 0\nM 0\n",
+            },
+            per_event_probability: 0.0003334445062,
+            aggregate_error_probability: 0.001,
+        }),
+        shots: Some(4),
+        tier: PerfCaseTier::ReportOnly,
+        requires_compiled: true,
+        requires_fallback: false,
+        comparisons: &[],
+    };
+    let records = run_case_measurements(
+        case,
+        "M 0\n",
+        &[PerfVariant::RstimInterpretedAtomLoss],
+        PerfRunOptions {
+            warmup_rounds: 0,
+            measured_rounds: 1,
+        },
+    )
+    .expect("atom-loss variant record");
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].tool_variant, "rstim-interpreted-atom-loss");
+    assert_eq!(records[0].status, rstim::perf::PerfRecordStatus::Completed);
 }
 
 #[test]

@@ -182,7 +182,21 @@ class RunSpeedSuiteWorkflowTest(unittest.TestCase):
                     out_path.write_text(
                         json.dumps(
                             {
-                                "cases": [{"case_label": label, "variants": []}],
+                                "cases": [
+                                    {
+                                        "case_label": label,
+                                        "variants": (
+                                            [{"tool_variant": "rstim-interpreted-atom-loss"}]
+                                            if label == "stim-style-surface-sample-d11-r100-b1024"
+                                            else []
+                                        ),
+                                        "comparisons": (
+                                            [{"kind": "sampler_atom_loss_vs_interpreted", "ratio": 1.5}]
+                                            if label == "stim-style-surface-sample-d11-r100-b1024"
+                                            else []
+                                        ),
+                                    }
+                                ],
                                 "issues": [],
                             }
                         )
@@ -248,6 +262,9 @@ class RunSpeedSuiteWorkflowTest(unittest.TestCase):
                 ],
             )
             self.assertEqual(summary["issues"], [])
+            public_case = summary["cases"][2]
+            self.assertEqual(public_case["variants"][0]["tool_variant"], "rstim-interpreted-atom-loss")
+            self.assertEqual(public_case["comparisons"][0]["kind"], "sampler_atom_loss_vs_interpreted")
             self.assertEqual((out_dir / "report.md").read_text(), "# suite report\n")
             environment = json.loads((out_dir / "environment.json").read_text())
             self.assertEqual(environment["profile"], "release")

@@ -3,6 +3,7 @@ pub fn version() -> &'static str {
 }
 
 pub mod ir;
+mod loss_sampler;
 pub mod recorder;
 pub mod parser;
 pub mod executor;

@@ -410,6 +410,27 @@ fn summarize_sample_fixture_reports_shot_rates_and_report_only_stim_ratio() {
 
     assert_eq!(stim.median_shots_per_second, Some(512_000.0));
     assert_eq!(compiled.median_shots_per_second, Some(256_000.0));
+    let atom_loss = case
+        .variants
+        .iter()
+        .find(|variant| variant.tool_variant == "rstim-interpreted-atom-loss")
+        .expect("atom-loss variant");
+    assert_eq!(
+        atom_loss.median_shots_per_second,
+        Some(1024.0 * 1_000_000_000.0 / 7_500_000.0)
+    );
+
+    let atom_loss_comparison = case
+        .comparisons
+        .iter()
+        .find(|comparison| comparison.kind == "sampler_atom_loss_vs_interpreted")
+        .expect("atom-loss comparison");
+    assert_eq!(
+        atom_loss_comparison.lhs_variant,
+        "rstim-interpreted-atom-loss"
+    );
+    assert_eq!(atom_loss_comparison.rhs_variant, "rstim-interpreted");
+    assert_eq!(atom_loss_comparison.ratio, 1.5);
 
     let comparison = case
         .rstim_compiled_vs_stim_cli_ratio
@@ -441,6 +462,13 @@ fn summarize_sample_fixture_reports_shot_rates_and_report_only_stim_ratio() {
     assert!(report.contains("shots/s"));
     assert!(report.contains("report-only Stim comparison"));
     assert!(report.contains("2.000000"));
+    assert!(report.contains("sampler_atom_loss_vs_interpreted"));
+    assert!(report.contains("1.500000"));
+    assert!(report.contains("p = 1 - 0.999^(1/3) ~= 0.0003334445062"));
+    assert!(report.contains("probability of at least one error equal to `0.001`"));
+    assert!(report.contains(
+        "a per-qubit loss/reset dataflow proof selects between a 64-shot reference-frame kernel and a parallel packed stabilizer-trajectory kernel"
+    ));
 }
 
 #[test]
