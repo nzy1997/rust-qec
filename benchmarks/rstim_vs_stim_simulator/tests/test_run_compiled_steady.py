@@ -291,7 +291,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
                     parser.add_argument("--seed", required=True)
                     args = parser.parse_args()
                     input_bytes = open(args.input, "rb").read()
-                    is_preflight = input_bytes == b"X 0\\nM 0\\n"
+                    is_preflight = input_bytes in (b"X 0\\nM 0\\n", b"X 0\\nLOSS(0) 0\\nM 0\\n")
                     telemetry_variant = "wrong-variant" if {mode!r} == "wrong-variant" else args.variant
                     compile_count, reference_build_count = protocol._expected_lifecycle_counts(args.variant, 0)
                     telemetry = {{
@@ -474,6 +474,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
             for variant in run_compiled_steady.VARIANTS
         }
         known_answer_sha = hashlib.sha256(b"X 0\nM 0\n").hexdigest()
+        atom_loss_known_answer_sha = hashlib.sha256(b"X 0\nLOSS(0) 0\nM 0\n").hexdigest()
 
         self.assertEqual(environment["profile"], "release")
         self.assertEqual(environment["timer_scope"], run_compiled_steady.TIMER_SCOPE)
@@ -519,7 +520,12 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual([record["variant"] for record in preflight], list(run_compiled_steady.VARIANTS))
         self.assertEqual([record["result_hex"] for record in preflight], ["01"] * 5)
         for record in preflight:
-            self.assertEqual(record["ready"]["fixture_sha256"], known_answer_sha)
+            expected_known_answer_sha = (
+                atom_loss_known_answer_sha
+                if record["variant"] == run_compiled_steady.ATOM_LOSS_VARIANT
+                else known_answer_sha
+            )
+            self.assertEqual(record["ready"]["fixture_sha256"], expected_known_answer_sha)
             expected_precompile = 7 if record["variant"] in run_compiled_steady.PRECOMPILED_VARIANTS else 0
             self.assertEqual(record["ready"]["precompile_elapsed_ns"], expected_precompile)
             compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(
@@ -530,7 +536,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
             self.assertEqual(record["ready"]["sample_call_count"], 0)
             self.assertEqual(record["ready"]["measurement_count"], 1)
             self.assertEqual(record["ready"]["bytes_per_shot"], 1)
-            self.assertEqual(record["final"]["fixture_sha256"], known_answer_sha)
+            self.assertEqual(record["final"]["fixture_sha256"], expected_known_answer_sha)
             self.assertEqual(record["final"]["sample_call_count"], 1)
 
     def test_worker_timings_exclude_delayed_pipe_byte(self) -> None:

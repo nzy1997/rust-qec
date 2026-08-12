@@ -211,6 +211,11 @@ bit table and converts it through its `b8` writer. The total is therefore the
 fair output-boundary comparison; phase columns explain where each implementation
 spends that total.
 
+The atom-loss row precompiles and reuses its loss operation plan and noiseless
+reference. Its self-contained CSS frame masks H/CX/Pauli operations independently
+for 64 shots at a time, including CX gates skipped after loss, while preserving
+the same output boundary as the other four rows.
+
 ## Selected DEM Speed Evidence
 
 Run the checked release-profile DEM sampling evidence case:

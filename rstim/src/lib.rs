@@ -33,7 +33,10 @@ pub mod compiled;
 pub mod sample_archive;
 pub mod decoder_dataset;
 
-pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnostics};
+pub use sampler::{
+    CompiledLossMeasurementSampler, CompiledMeasurementSampler,
+    CompiledMeasurementSamplerDiagnostics,
+};
 
 #[doc(hidden)]
 pub mod rare_error_iterator;

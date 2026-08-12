@@ -4,16 +4,16 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::{Parser, ValueEnum};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use rstim::data_path::ReferenceSampleMode;
-use rstim::output::write_shots_b8;
+use rstim::output::append_shots_b8;
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch_with_options, SampleOptions, SampleOutputMode, SamplingBackend};
-use rstim::CompiledMeasurementSampler;
+use rstim::sampler::{SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options};
+use rstim::{CompiledLossMeasurementSampler, CompiledMeasurementSampler};
 
 const READY: u8 = b'R';
 const SAMPLE: u8 = b'S';
@@ -37,7 +37,7 @@ struct Args {
 enum WorkerVariant {
     RstimPrecompiled,
     RstimInterpreted,
-    RstimInterpretedAtomLoss,
+    RstimPrecompiledAtomLoss,
 }
 
 impl WorkerVariant {
@@ -45,7 +45,7 @@ impl WorkerVariant {
         match self {
             Self::RstimPrecompiled => "rstim-precompiled",
             Self::RstimInterpreted => "rstim-interpreted",
-            Self::RstimInterpretedAtomLoss => "rstim-interpreted-atom-loss",
+            Self::RstimPrecompiledAtomLoss => "rstim-precompiled-atom-loss",
         }
     }
 }
@@ -70,6 +70,7 @@ struct Telemetry {
 
 enum SamplerState {
     Precompiled(CompiledMeasurementSampler),
+    PrecompiledLoss(CompiledLossMeasurementSampler),
     Interpreted { sample_calls: usize },
 }
 
@@ -77,6 +78,7 @@ impl SamplerState {
     fn compile_count(&self) -> usize {
         match self {
             Self::Precompiled(sampler) => sampler.diagnostics().compiled_ir_builds,
+            Self::PrecompiledLoss(sampler) => sampler.diagnostics().compiled_ir_builds,
             Self::Interpreted { .. } => 0,
         }
     }
@@ -84,6 +86,7 @@ impl SamplerState {
     fn reference_build_count(&self) -> usize {
         match self {
             Self::Precompiled(sampler) => sampler.diagnostics().reference_builds,
+            Self::PrecompiledLoss(sampler) => sampler.diagnostics().reference_builds,
             Self::Interpreted { sample_calls } => *sample_calls,
         }
     }
@@ -91,6 +94,7 @@ impl SamplerState {
     fn sample_call_count(&self) -> usize {
         match self {
             Self::Precompiled(sampler) => sampler.diagnostics().sample_calls,
+            Self::PrecompiledLoss(sampler) => sampler.diagnostics().sample_calls,
             Self::Interpreted { sample_calls } => *sample_calls,
         }
     }
@@ -163,13 +167,20 @@ fn run(args: Args) -> Result<(), String> {
             )?);
             (sampler, elapsed_ns(started, "precompile")?)
         }
-        WorkerVariant::RstimInterpreted | WorkerVariant::RstimInterpretedAtomLoss => {
-            (SamplerState::Interpreted { sample_calls: 0 }, 0)
+        WorkerVariant::RstimPrecompiledAtomLoss => {
+            let started = Instant::now();
+            let sampler = SamplerState::PrecompiledLoss(CompiledLossMeasurementSampler::compile(
+                &instructions,
+                ReferenceSampleMode::SimulateNoiseless,
+            )?);
+            (sampler, elapsed_ns(started, "loss precompile")?)
         }
+        WorkerVariant::RstimInterpreted => (SamplerState::Interpreted { sample_calls: 0 }, 0),
     };
     let measurement_count = rstim::stats::num_measurements(&instructions);
     let fixture_sha256 = format!("{:x}", Sha256::digest(&input_bytes));
     let mut rng = StdRng::seed_from_u64(args.seed);
+    let mut packed = Vec::new();
 
     write_json_frame(
         READY,
@@ -211,6 +222,9 @@ fn run(args: Args) -> Result<(), String> {
                     SamplerState::Precompiled(sampler) => {
                         sampler.sample(request.shots, &mut rng, SampleOutputMode::MeasurementsOnly)
                     }
+                    SamplerState::PrecompiledLoss(sampler) => {
+                        sampler.sample(request.shots, &mut rng, SampleOutputMode::MeasurementsOnly)
+                    }
                     SamplerState::Interpreted { sample_calls } => {
                         let result = sample_batch_with_options(
                             &instructions,
@@ -237,8 +251,8 @@ fn run(args: Args) -> Result<(), String> {
                 };
                 let sample_elapsed_ns = elapsed_ns(sample_started, "sample path")?;
                 let b8_started = Instant::now();
-                let mut packed = Vec::new();
-                write_shots_b8(&output.measurements, &mut packed)
+                packed.clear();
+                append_shots_b8(&output.measurements, &mut packed)
                     .map_err(|error| error.to_string())?;
                 let b8_elapsed_ns = elapsed_ns(b8_started, "b8 output")?;
 

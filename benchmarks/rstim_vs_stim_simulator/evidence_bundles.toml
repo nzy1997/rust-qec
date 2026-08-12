@@ -177,8 +177,8 @@ name = "stim-direct-worker"
 argv = ["tool://python", "-m", "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady", "--variant", "stim-direct", "--input", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim", "--seed", "0"]
 
 [[bundles.checked_commands]]
-name = "rstim-interpreted-atom-loss-worker"
-argv = ["tool://rstim-worker", "--variant", "rstim-interpreted-atom-loss", "--input", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim", "--seed", "0"]
+name = "rstim-precompiled-atom-loss-worker"
+argv = ["tool://rstim-worker", "--variant", "rstim-precompiled-atom-loss", "--input", "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim", "--seed", "0"]
 
 [[bundles.checked_provenance]]
 name = "release-contract"

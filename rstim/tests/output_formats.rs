@@ -1,4 +1,4 @@
-use rstim::output::{OutputFormat, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64};
+use rstim::output::{OutputFormat, append_shots_b8, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64};
 use rstim::sim::bit_table::BitTable;
 
 #[test]
@@ -108,6 +108,55 @@ fn format_b8_multi_shot() {
     let mut buf = Vec::new();
     write_shots_b8(&table, &mut buf).unwrap();
     assert_eq!(buf, vec![0x01, 0x80]);
+}
+
+#[test]
+fn format_b8_matches_naive_across_partial_tiles_and_shot_words() {
+    let bits = 73;
+    let shots = 130;
+    let mut table = BitTable::new(bits, shots);
+    for bit in 0..bits {
+        for shot in 0..shots {
+            if (bit * 17 + shot * 31 + bit * shot) % 11 < 5 {
+                table.set(bit, shot, true);
+            }
+        }
+    }
+
+    let mut expected = vec![0u8; shots * bits.div_ceil(8)];
+    for shot in 0..shots {
+        for bit in 0..bits {
+            if table.get(bit, shot) {
+                expected[shot * bits.div_ceil(8) + bit / 8] |= 1 << (bit % 8);
+            }
+        }
+    }
+
+    let mut actual = Vec::new();
+    write_shots_b8(&table, &mut actual).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn format_b8_parallel_append_matches_naive() {
+    let bits = 2_050usize;
+    let shots = 1_025usize;
+    let bytes_per_shot = bits.div_ceil(8);
+    let mut table = BitTable::new(bits, shots);
+    let mut expected = vec![0u8; shots * bytes_per_shot];
+    for bit in 0..bits {
+        for shot in 0..shots {
+            if (bit * 17 + shot * 31 + bit * shot) % 11 < 5 {
+                table.set(bit, shot, true);
+                expected[shot * bytes_per_shot + bit / 8] |= 1 << (bit % 8);
+            }
+        }
+    }
+
+    let mut actual = vec![0xaa, 0x55];
+    append_shots_b8(&table, &mut actual).unwrap();
+    assert_eq!(&actual[..2], &[0xaa, 0x55]);
+    assert_eq!(&actual[2..], expected);
 }
 
 #[test]

@@ -30,11 +30,15 @@ VARIANTS = (
     "stim-precompiled",
     "rstim-interpreted",
     "stim-direct",
-    "rstim-interpreted-atom-loss",
+    "rstim-precompiled-atom-loss",
 )
 STIM_VARIANTS = {"stim-precompiled", "stim-direct"}
-PRECOMPILED_VARIANTS = {"rstim-precompiled", "stim-precompiled"}
-ATOM_LOSS_VARIANT = "rstim-interpreted-atom-loss"
+PRECOMPILED_VARIANTS = {
+    "rstim-precompiled",
+    "stim-precompiled",
+    "rstim-precompiled-atom-loss",
+}
+ATOM_LOSS_VARIANT = "rstim-precompiled-atom-loss"
 ATOM_LOSS_FIXTURE_PATH = Path(
     "benchmarks/rstim_vs_stim_simulator/fixtures/"
     "stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
@@ -392,7 +396,10 @@ def _validate_telemetry(
 def _run_preflight(command: list[str], *, variant: str, seed: int) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as temp_dir:
         fixture = Path(temp_dir) / "known_answer.stim"
-        fixture.write_text("X 0\nM 0\n", encoding="utf-8")
+        fixture.write_text(
+            "X 0\nLOSS(0) 0\nM 0\n" if variant == ATOM_LOSS_VARIANT else "X 0\nM 0\n",
+            encoding="utf-8",
+        )
         session = WorkerSession(command, input_path=fixture, seed=seed)
         try:
             ready = session.read_ready()

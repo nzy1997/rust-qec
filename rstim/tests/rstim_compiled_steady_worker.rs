@@ -38,6 +38,8 @@ fn write_fixture(bytes: &[u8]) -> NamedTempFile {
 
 fn run_worker_with_path(path: &Path, seed: u64, stdin_frames: &[u8]) -> Output {
     let mut child = Command::new(worker_bin())
+        .arg("--variant")
+        .arg("rstim-precompiled")
         .arg("--input")
         .arg(path)
         .arg("--seed")
@@ -103,7 +105,7 @@ fn telemetry(payload: &[u8]) -> Value {
 
 fn assert_worker_telemetry(payload: &[u8], sample_calls: u64) {
     let value = telemetry(payload);
-    assert_eq!(value["variant"], "rstim");
+    assert_eq!(value["variant"], "rstim-precompiled");
     assert_eq!(value["compile_count"].as_u64(), Some(1));
     assert_eq!(value["reference_build_count"].as_u64(), Some(1));
     assert_eq!(value["sample_call_count"].as_u64(), Some(sample_calls));
@@ -138,9 +140,10 @@ fn worker_samples_once_then_reports_final_telemetry() {
     assert_worker_telemetry(&frames[0].1, 0);
 
     assert_eq!(frames[1].0, RESULT);
+    assert_eq!(frames[1].1.len(), 33);
     assert_eq!(read_le_u64(&frames[1].1[0..8]), 7);
     assert_eq!(read_le_u64(&frames[1].1[8..16]), 1);
-    assert_eq!(&frames[1].1[16..], &[0x01]);
+    assert_eq!(&frames[1].1[32..], &[0x01]);
 
     assert_eq!(frames[2].0, FINAL);
     assert_worker_telemetry(&frames[2].1, 1);
@@ -253,6 +256,7 @@ fn worker_help_exits_successfully() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("help utf8");
+    assert!(stdout.contains("--variant"));
     assert!(stdout.contains("--input"));
     assert!(stdout.contains("--seed"));
 }
