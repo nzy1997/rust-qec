@@ -28,16 +28,16 @@
     <p class="section-copy">Pinned release measurements for named fixtures; these results are case-scoped and are not a general performance claim.</p>
   </div>
   <h3>Five surface-code sampling paths</h3>
-  <p class="section-copy">One-time precompilation is shown separately. The total is the worker-local sampling path plus <code>b8</code> output and excludes both precompilation and pipe transport. Precompiled rows reuse a sampler; direct rows include their per-batch setup in the sampling-path column.</p>
+  <p class="section-copy">One-time precompilation is shown separately. <strong>Sample + output</strong> is the worker-local sampling path plus <code>b8</code> output and excludes both precompilation and pipe transport. Precompiled rows reuse a sampler; direct rows include their per-batch setup in the sampling-path column. Samples/s is calculated from Sample + output.</p>
   <div class="table-wrap result-table">
     <table>
-      <thead><tr><th>Implementation</th><th>Precompile once</th><th>Sample path</th><th><code>b8</code> output</th><th>Total, no pipe</th><th>Throughput</th></tr></thead>
+      <thead><tr><th>Implementation</th><th>Precompile once</th><th>Sample path</th><th><code>b8</code> output</th><th>Sample + output</th><th>Samples/s</th></tr></thead>
       <tbody>
-        <tr><td>rstim precompiled</td><td>6.110 ms</td><td>9.543 ms</td><td>14.672 ms</td><td>24.215 ms</td><td>42,288 shots/s</td></tr>
-        <tr><td>Stim precompiled</td><td>1.260 ms</td><td>27.372 ms</td><td>0.073 ms</td><td>27.446 ms</td><td>37,310 shots/s</td></tr>
-        <tr><td>rstim interpreted</td><td>—</td><td>16.483 ms</td><td>8.446 ms</td><td>24.929 ms</td><td>41,077 shots/s</td></tr>
-        <tr><td>Stim direct</td><td>—</td><td>28.254 ms</td><td>0.106 ms</td><td>28.361 ms</td><td>36,106 shots/s</td></tr>
-        <tr><td>rstim interpreted + atom loss</td><td>—</td><td>1,394.900 ms</td><td>8.356 ms</td><td>1,403.257 ms</td><td>730 shots/s</td></tr>
+        <tr><td>rstim precompiled</td><td>6.110 ms</td><td>9.543 ms</td><td>14.672 ms</td><td>24.215 ms</td><td>42,288</td></tr>
+        <tr><td>Stim precompiled</td><td>1.260 ms</td><td>27.372 ms</td><td>0.073 ms</td><td>27.446 ms</td><td>37,310</td></tr>
+        <tr><td>rstim interpreted</td><td>—</td><td>16.483 ms</td><td>8.446 ms</td><td>24.929 ms</td><td>41,077</td></tr>
+        <tr><td>Stim direct</td><td>—</td><td>28.254 ms</td><td>0.106 ms</td><td>28.361 ms</td><td>36,106</td></tr>
+        <tr><td>rstim interpreted + atom loss</td><td>—</td><td>1,394.900 ms</td><td>8.356 ms</td><td>1,403.257 ms</td><td>730</td></tr>
       </tbody>
     </table>
   </div>
