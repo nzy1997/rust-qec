@@ -160,8 +160,8 @@ Run a single public speed case with an explicit `rstim` build profile:
 python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case \
   --profile release \
   --case stim-style-surface-sample-d11-r100-b1024 \
-  --warmup-rounds 0 \
-  --measure-rounds 1 \
+  --warmup-rounds 2 \
+  --measure-rounds 11 \
   --out-dir /tmp/rstim-speed-release
 ```
 

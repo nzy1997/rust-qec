@@ -520,7 +520,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "bac3fd38a644829efc67a8e01be99b061e253b0e19227363989ecf5922bcbbf1"
+                  "sha256": "c3a5b095f5c18e49f89ed647c28bea791a2ca540d4ca2144bdbc26452e43e92a"
                 }
               }
             }
@@ -679,7 +679,7 @@
         },
         {
           "id": "rstim-vs-stim-release",
-          "title": "Checked post-optimization release rstim versus Stim selected-case speed evidence",
+          "title": "Checked refreshed release rstim versus Stim and atom-loss selected-case speed evidence",
           "status": "existing",
           "tier": "release",
           "artifacts": [
@@ -700,34 +700,27 @@
             }
           ],
           "commands": [
-            "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run2",
-            "cp /tmp/rstim-speed-release-issue-416-run2/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
-            "cp /tmp/rstim-speed-release-issue-416-run2/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
-            "cp /tmp/rstim-speed-release-issue-416-run2/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+            "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 2 --measure-rounds 11 --out-dir /tmp/rstim-site-refresh.wqyiHo"
           ],
           "provenance": {
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
               "value": {
-                "release_artifacts_commit_time": "2026-07-09T16:47:39+08:00",
-                "release_run_wall_clock_time": "2026-07-09T16:47:39+08:00"
+                "release_run_wall_clock_time": "2026-08-12T14:56:23+08:00"
               }
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "902b0473e20de3cc9ea6915c3cc42fb187dd3e45",
-                "published_by_issue": 416
+                "runner_source": "16ec4730eca4521cdbeda47cdd83e53b033465c5",
+                "atom_loss_sampler_pr": 605
               }
             },
             "commands": {
               "status": "recorded",
               "value": [
-                "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-speed-release-issue-416-run2",
-                "cp /tmp/rstim-speed-release-issue-416-run2/summary.json benchmarks/rstim_vs_stim_simulator/results/release/summary.json",
-                "cp /tmp/rstim-speed-release-issue-416-run2/report.md benchmarks/rstim_vs_stim_simulator/results/release/report.md",
-                "cp /tmp/rstim-speed-release-issue-416-run2/environment.json benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
+                "python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case --profile release --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 2 --measure-rounds 11 --out-dir /tmp/rstim-site-refresh.wqyiHo"
               ]
             },
             "os": {
@@ -749,7 +742,7 @@
             "dependency_versions": {
               "status": "recorded",
               "value": {
-                "rstim": "rstim 0.1.1",
+                "rstim": "rstim 0.2.0",
                 "stim_cli_status": "ok",
                 "stim_cli_version": "1.15.0",
                 "stim_cli_version_source": "python-stim-module",
@@ -776,31 +769,32 @@
               "status": "recorded",
               "value": {
                 "profile": "release",
-                "rstim_binary_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-416-run-1-agent-issue-416-publish-separated-post-optimization-rstim-vs-sti-run-1/target/release/rstim",
+                "rstim_binary_path": "/Users/nzy/rcode/rstim/target/release/rstim",
                 "stim_cli": "stim on PATH",
-                "evidence_kind": "post-optimization release speed evidence"
+                "evidence_kind": "refreshed post-optimization release speed evidence with atom loss"
               }
             },
             "shots_or_error_budget": {
               "status": "recorded",
               "value": {
                 "selected_case": "stim-style-surface-sample-d11-r100-b1024",
-                "warmup_rounds": 0,
-                "measure_rounds": 1,
-                "rstim_compiled_vs_stim_cli_ratio": 3.207173771206738
+                "warmup_rounds": 2,
+                "measure_rounds": 11,
+                "rstim_compiled_vs_stim_cli_ratio": 0.03664424706416814,
+                "rstim_atom_loss_vs_interpreted_ratio": 113.88194742796925
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/release/summary.json": {
-                  "sha256": "841be692e05a889126c404d71a3984b9e377f781f455a518c54b710976823f4f"
+                  "sha256": "de13429bdb5601b8e7a746df2343e9e6af823964a429dd0df8700505dcf0786d"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/release/report.md": {
-                  "sha256": "0f7f976f86a8175d5b8b54083f194c9264ce1225c4dbf33a100e3630618d2587"
+                  "sha256": "0430fc50751f804c721404008ea9e2747104a9ea4595979a32e2db8e74efc497"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/release/environment.json": {
-                  "sha256": "9dfd6472aba1880cd42c31864e91076c41cd21115bb4076a7b4240e5f178deae"
+                  "sha256": "5d579099fa3c85ae0cd79e776dd2b91026d80470d317f9e12aee13cf75c0702d"
                 }
               }
             }
@@ -824,10 +818,11 @@
             "benchmarks/rstim_vs_stim_simulator/README.md",
             "benchmarks/rstim_vs_stim_simulator/results/release/environment.json"
           ],
-          "claims_limit": "Checked post-optimization release evidence for one recorded d11/r100 selected-case workload and one recorded environment only; not broad rstim/Stim parity.",
+          "claims_limit": "Checked refreshed release evidence for one recorded d11/r100 selected-case workload, 11 measured rounds, and one recorded environment only; not broad rstim/Stim parity.",
           "caveats": [
             "The release evidence is one selected d11/r100 sample workload and one recorded release-profile environment only.",
-            "For this recorded release run, rstim-compiled has a higher wall time than stim-cli.",
+            "For this recorded release run, rstim-compiled has a lower wall time than stim-cli.",
+            "For this recorded fixture, the atom-loss interpreted path has a 113.88x higher median wall time than the baseline interpreted path.",
             "The rstim-vs-Stim timing ratio is report-only context and is not a cross-machine CI gate.",
             "The historical #406 debug-profile artifact remains separate and is not overwritten by this release evidence."
           ]

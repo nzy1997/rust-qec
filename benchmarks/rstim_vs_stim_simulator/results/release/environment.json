@@ -1,15 +1,14 @@
 {
   "cargo_version": "cargo 1.93.1 (Homebrew)",
   "case_label": "stim-style-surface-sample-d11-r100-b1024",
-  "evidence_kind": "post-optimization release speed evidence",
-  "measure_rounds": 1,
+  "evidence_kind": "refreshed post-optimization release speed evidence with atom loss",
+  "measure_rounds": 11,
   "profile": "release",
   "published_artifact": true,
-  "rstim_binary_path": "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-416-run-1-agent-issue-416-publish-separated-post-optimization-rstim-vs-sti-run-1/target/release/rstim",
+  "rstim_binary_path": "/Users/nzy/rcode/rstim/target/release/rstim",
   "rstim_status": "ok",
-  "rstim_version": "rstim 0.1.1",
+  "rstim_version": "rstim 0.2.0",
   "rustc_version": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
-  "source_issue": 416,
   "stim_cli": {
     "command": [
       "stim",
@@ -36,5 +35,5 @@
     "version": "1.15.0"
   },
   "stim_python_version": "1.15.0",
-  "warmup_rounds": 0
+  "warmup_rounds": 2
 }

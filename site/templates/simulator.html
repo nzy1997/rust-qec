@@ -25,19 +25,22 @@
   <div class="section-heading">
     <p class="eyebrow">Example results</p>
     <h2 id="simulation-results-title">Throughput depends strongly on circuit shape</h2>
-    <p class="section-copy">Pinned release measurements for named fixtures; these are not a general performance claim.</p>
+    <p class="section-copy">Pinned release measurements for named fixtures; the surface-code rows report the median of 11 measured 1,024-shot batches after 2 warmup rounds and are not a general performance claim.</p>
   </div>
   <div class="table-wrap result-table">
     <table>
       <thead><tr><th>Fixture</th><th>Implementation</th><th>Throughput</th><th>Wall time</th></tr></thead>
       <tbody>
-        <tr><td>Surface d=11, r=100</td><td>rstim compiled</td><td>1,745 shots/s</td><td>586.8 ms</td></tr>
-        <tr><td>Surface d=11, r=100</td><td>Stim CLI</td><td>5,597 shots/s</td><td>183.0 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>rstim compiled (baseline)</td><td>114,717 shots/s</td><td>8.926 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>rstim interpreted (baseline)</td><td>96,903 shots/s</td><td>10.567 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>rstim interpreted + atom loss</td><td>851 shots/s</td><td>1,203.424 ms</td></tr>
+        <tr><td>Surface d=11, r=100</td><td>Stim CLI (baseline)</td><td>4,204 shots/s</td><td>243.594 ms</td></tr>
         <tr><td>Repetition d=13, r=13</td><td>rstim compiled</td><td>11.51M shots/s</td><td>1.738 ms</td></tr>
         <tr><td>Repetition d=13, r=13</td><td>Stim CLI</td><td>232K shots/s</td><td>86.111 ms</td></tr>
       </tbody>
     </table>
   </div>
+  <p class="section-copy">For the atom-loss case, one depolarization event and two independent per-atom loss events after each two-qubit gate all use <code>p = 1 - 0.999^(1/3) ≈ 0.0003334445062</code>, keeping the probability of at least one error at <code>0.001</code>.</p>
 </section>
 
 <section class="evidence-section" aria-labelledby="sampling-evidence-title">
