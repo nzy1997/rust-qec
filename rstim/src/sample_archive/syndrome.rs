@@ -5,9 +5,12 @@ use crate::sample_archive::format::{
 };
 use crate::sim::bit_table::{BitTable, BitTableAllocError};
 use sha2::{Digest, Sha256};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static CURRENT_MATERIALIZED_CANDIDATES: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static CURRENT_MATERIALIZED_CANDIDATES: Cell<usize> = const { Cell::new(0) };
+}
 static MAX_MATERIALIZED_CANDIDATES: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,7 +146,7 @@ pub fn for_each_sparse_syndrome_hit(
 }
 
 pub fn reset_materialization_telemetry() {
-    CURRENT_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
+    CURRENT_MATERIALIZED_CANDIDATES.set(0);
     MAX_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
 }
 
@@ -349,11 +352,12 @@ fn validate_declared_raw_len(raw: &[u8], declared_raw_len: u64) -> Result<(), Sa
 }
 
 fn begin_materialization_window() {
-    CURRENT_MATERIALIZED_CANDIDATES.store(0, Ordering::Relaxed);
+    CURRENT_MATERIALIZED_CANDIDATES.set(0);
 }
 
 fn record_materialized_candidate() {
-    let current = CURRENT_MATERIALIZED_CANDIDATES.fetch_add(1, Ordering::Relaxed) + 1;
+    let current = CURRENT_MATERIALIZED_CANDIDATES.get() + 1;
+    CURRENT_MATERIALIZED_CANDIDATES.set(current);
     let mut observed = MAX_MATERIALIZED_CANDIDATES.load(Ordering::Relaxed);
     while observed < current {
         match MAX_MATERIALIZED_CANDIDATES.compare_exchange_weak(
@@ -482,6 +486,9 @@ mod tests {
         reset_materialization_telemetry();
         begin_materialization_window();
         record_materialized_candidate();
+        std::thread::spawn(begin_materialization_window)
+            .join()
+            .expect("interfering materialization thread");
         record_materialized_candidate();
         assert_eq!(max_materialized_candidates(), 2);
     }
