@@ -122,6 +122,7 @@ enum LayerItem<'a> {
         op: &'a Qp101Operation,
         repeat_iterations: Vec<u64>,
         filter_repeat_annotations: bool,
+        measurement_flip_interactions: Vec<NoiseInteraction>,
     },
     ControlledPair {
         gate: &'a str,
@@ -1046,11 +1047,86 @@ fn operation_layer_items<'a>(
         }
         _ => {}
     }
+    let measurement_flip_interactions = measurement_flip_interactions(
+        op,
+        interaction_digest,
+        &entry.op_path,
+        &entry.repeat_iterations,
+    );
     Ok(vec![LayerItem::Operation {
         op,
         repeat_iterations: entry.repeat_iterations.clone(),
         filter_repeat_annotations: interaction_digest.is_some(),
+        measurement_flip_interactions,
     }])
+}
+
+fn measurement_flip_interactions(
+    op: &Qp101Operation,
+    circuit_digest: Option<CircuitDigest>,
+    op_path: &[usize],
+    repeat_iterations: &[u64],
+) -> Vec<NoiseInteraction> {
+    let Qp101Operation::Gate {
+        gate,
+        params,
+        targets,
+        raw_targets,
+        ..
+    } = op
+    else {
+        return Vec::new();
+    };
+    measurement_flip_target_slots(gate, params, targets, raw_targets.as_deref())
+        .into_iter()
+        .filter_map(|target_slots| {
+            noise_interaction(circuit_digest, op_path, repeat_iterations, &target_slots)
+        })
+        .collect()
+}
+
+fn measurement_flip_target_slots(
+    gate: &str,
+    params: &[f64],
+    targets: &[u32],
+    raw_targets: Option<&[Qp101TargetRef]>,
+) -> Vec<Vec<usize>> {
+    if params.is_empty() {
+        return Vec::new();
+    }
+    match gate {
+        "MPAD" => (0..raw_targets.map_or(targets.len(), <[_]>::len))
+            .map(|slot| vec![slot])
+            .collect(),
+        "MXX" | "MYY" | "MZZ" => (0..targets.len() / 2)
+            .map(|pair_index| vec![pair_index * 2, pair_index * 2 + 1])
+            .collect(),
+        "MPP" => (0..mpp_product_count(raw_targets, targets.len()))
+            .map(|product_index| vec![product_index])
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn mpp_product_count(raw_targets: Option<&[Qp101TargetRef]>, fallback: usize) -> usize {
+    let Some(raw_targets) = raw_targets else {
+        return fallback;
+    };
+    let mut products = 0;
+    let mut has_product = false;
+    let mut after_combiner = false;
+    for target in raw_targets {
+        if matches!(target, Qp101TargetRef::Combiner) {
+            after_combiner = true;
+            continue;
+        }
+        if has_product && !after_combiner {
+            products += 1;
+        }
+        has_product = true;
+        after_combiner = false;
+    }
+    products + usize::from(has_product)
 }
 
 fn noise_interaction(
@@ -1205,6 +1281,7 @@ fn render_layer_item(
             op,
             repeat_iterations,
             filter_repeat_annotations,
+            measurement_flip_interactions,
         } => match op {
             Qp101Operation::Gate {
                 gate,
@@ -1230,6 +1307,7 @@ fn render_layer_item(
                     raw_targets.as_deref(),
                     display.as_ref(),
                     &filtered,
+                    measurement_flip_interactions,
                     state,
                 )
             }
@@ -1773,6 +1851,7 @@ fn render_gate(
     raw_targets: Option<&[Qp101TargetRef]>,
     display: Option<&Qp101Display>,
     annotations: &[Qp101Annotation],
+    measurement_flip_interactions: &[NoiseInteraction],
     state: &mut RenderState,
 ) -> Result<(), String> {
     let label = gate_label(gate, display);
@@ -1816,6 +1895,8 @@ fn render_gate(
         x,
         &measurement_targets,
         state.interaction_digest.is_some(),
+        Some(gate),
+        measurement_flip_interactions,
     );
     render_annotations_with_line_offset(
         out,
@@ -2025,6 +2106,8 @@ fn render_noise(
         x,
         &measurement_targets,
         state.interaction_digest.is_some(),
+        None,
+        &[],
     );
     let annotation_line_offset =
         usize::from(!measurement_targets.is_empty()) + usize::from(note.is_some());
@@ -2063,6 +2146,8 @@ fn render_fallback_noise(
         x,
         &measurement_targets,
         state.interaction_digest.is_some(),
+        None,
+        &[],
     );
     let annotation_line_offset =
         usize::from(!measurement_targets.is_empty()) + usize::from(note.is_some());
@@ -2715,17 +2800,32 @@ fn render_measurement_anchors(
     x: i32,
     targets: &[MeasurementTarget],
     interactive: bool,
+    measurement_flip_gate: Option<&str>,
+    measurement_flip_interactions: &[NoiseInteraction],
 ) {
-    for target in targets {
+    for (target_index, target) in targets.iter().enumerate() {
         if interactive {
             let ids = (0..target.output_count)
                 .map(|offset| format!("m{}", target.first_index + offset))
                 .collect::<Vec<_>>()
                 .join(" ");
-            out.push_str(&format!(
-                "<g class=\"measurement\" data-measurement-ids=\"{}\" tabindex=\"0\" role=\"button\">\n",
-                escape_xml(&ids)
-            ));
+            if let (Some(gate), Some(interaction)) = (
+                measurement_flip_gate,
+                measurement_flip_interactions.get(target_index),
+            ) {
+                out.push_str(&format!(
+                    "<g class=\"noise-site measurement\" data-noise-site-id=\"{}\" data-noise-event-id=\"{}\" data-measurement-ids=\"{}\" tabindex=\"0\" role=\"button\" aria-label=\"Inspect {} measurement flip\">\n",
+                    escape_xml(&interaction.site_id),
+                    escape_xml(&interaction.event_id),
+                    escape_xml(&ids),
+                    escape_xml(gate),
+                ));
+            } else {
+                out.push_str(&format!(
+                    "<g class=\"measurement\" data-measurement-ids=\"{}\" tabindex=\"0\" role=\"button\">\n",
+                    escape_xml(&ids)
+                ));
+            }
         }
         out.push_str(&format!(
             "<text class=\"measurement-anchor\" x=\"{x}\" y=\"{}\" fill=\"#2563eb\" text-anchor=\"middle\" font-size=\"11\">{}</text>\n",

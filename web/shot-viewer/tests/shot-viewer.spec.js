@@ -147,3 +147,40 @@ test("read-only channel sites remain inspectable, stable, and filterable", async
   const after = await sites.evaluateAll((nodes) => nodes.map((node) => node.dataset.noiseEventId));
   expect(after).toEqual(before);
 });
+
+test("measurement flips are read-only noise sites with stable interaction ids", async ({ page }) => {
+  await page.goto("/interactive/local/");
+  await page.locator("#shot-file").setInputFiles({
+    name: "measurement-flips.stim",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "MPAD(1) 0 1\n" +
+      "MXX(1) 2 3 4 5\n" +
+      "MYY(1) 6 7\n" +
+      "MZZ(1) 8 9\n" +
+      "MPP(1) X10*X11 Z12\n" +
+      "MXX 13 14\n",
+    ),
+  });
+
+  const sites = page.locator("[data-noise-event-id]");
+  await expect(sites).toHaveCount(8);
+  const before = await sites.evaluateAll((nodes) => nodes.map((node) => node.dataset.noiseEventId));
+  expect(new Set(before).size).toBe(before.length);
+
+  await sites.first().click();
+  await expect(page.locator("#shot-detail")).toContainText("MPAD");
+  await expect(page.locator("#shot-detail")).toContainText("Flip probability");
+  await expect(page.locator("#shot-detail")).toContainText("read-only");
+  await expect(page.locator("#shot-popover")).toBeHidden();
+
+  await page.locator("#shot-filter-errors").uncheck();
+  await expect(sites.first()).toHaveCSS("opacity", "0.12");
+  await page.locator("#shot-filter-errors").check();
+
+  await page.getByRole("button", { name: "Sample", exact: true }).click();
+  const after = await sites.evaluateAll((nodes) => nodes.map((node) => node.dataset.noiseEventId));
+  expect(after).toEqual(before);
+  await sites.first().click();
+  await expect(page.locator("#shot-detail")).toContainText("FLIPPED");
+});

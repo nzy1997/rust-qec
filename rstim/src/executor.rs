@@ -1110,7 +1110,7 @@ fn execute_op(
             for (target_slot, t) in targets.iter().enumerate() {
                 let q = expect_qubit(t)?;
                 let mut bit = q != 0;
-                if p > 0.0
+                let flipped = p > 0.0
                     && rng.bernoulli(
                         context,
                         &[target_slot],
@@ -1118,9 +1118,16 @@ fn execute_op(
                         0,
                         p,
                         true,
-                    )
-                {
+                    );
+                if flipped {
                     bit = !bit;
+                    exec.record_noise_event(
+                        context,
+                        name,
+                        vec![target_slot],
+                        vec![q as u32],
+                        "flip",
+                    );
                 }
                 exec.recorder.push(bit);
                 exec.record_measurement_event(
@@ -1502,7 +1509,7 @@ fn execute_op(
                     rng.prepare_intrinsic(context, &target_slots, 0);
                     measure_pauli_product(&mut exec.state, &product.terms, product.inverted, rng)
                 };
-                if p > 0.0
+                let flipped = p > 0.0
                     && rng.bernoulli(
                         context,
                         &target_slots,
@@ -1510,9 +1517,20 @@ fn execute_op(
                         0,
                         p,
                         true,
-                    )
-                {
+                    );
+                if flipped {
                     bit = !bit;
+                    exec.record_noise_event(
+                        context,
+                        name,
+                        target_slots.to_vec(),
+                        product
+                            .terms
+                            .iter()
+                            .map(|(qubit, _)| *qubit as u32)
+                            .collect(),
+                        "flip",
+                    );
                 }
                 exec.recorder.push(bit);
                 let loss_cause = product.terms.iter().any(|(q, _)| exec.lost[*q]);
@@ -3245,7 +3263,7 @@ fn pair_measure(
             rng.prepare_intrinsic(context, &target_slots, 0);
             measure_pauli_product(&mut exec.state, &terms, inv_a, rng)
         };
-        if noise_p > 0.0
+        let flipped = noise_p > 0.0
             && rng.bernoulli(
                 context,
                 &target_slots,
@@ -3253,9 +3271,16 @@ fn pair_measure(
                 0,
                 noise_p,
                 true,
-            )
-        {
+            );
+        if flipped {
             bit = !bit;
+            exec.record_noise_event(
+                context,
+                instr_name,
+                target_slots.to_vec(),
+                vec![a as u32, b as u32],
+                "flip",
+            );
         }
         exec.recorder.push(bit);
         exec.record_measurement_event(

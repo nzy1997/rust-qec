@@ -351,13 +351,16 @@ function updateDetail(state, eventId) {
   const site = state.snapshot.noise_sites.find((item) => item.id === event?.site_id);
   if (!event || !site) return;
   const requested = event.override_outcome ? outcomeLabel(event.override_outcome) : "base result";
+  const probabilityRows = site.kind === "measurement_flip"
+    ? `<dt>Flip probability</dt><dd>${formatProbability(site.probability)}</dd>`
+    : `<dt>Channel parameters</dt><dd>${escapeHtml(formatChannelParameters(site))}</dd>
+      <dt>Total probability</dt><dd>${formatProbability(site.probability)}</dd>`;
   state.ui.detail.innerHTML = `
     <p class="eyebrow">Noise event</p>
     <h2>${escapeHtml(event.instruction)}</h2>
     <dl>
       <dt>Qubits</dt><dd>${event.target_qubits.map((q) => `q${q}`).join(", ")}</dd>
-      <dt>Channel parameters</dt><dd>${escapeHtml(formatChannelParameters(site))}</dd>
-      <dt>Total probability</dt><dd>${formatProbability(site.probability)}</dd>
+      ${probabilityRows}
       <dt>Base</dt><dd>${outcomeLabel(event.base_outcome)}</dd>
       <dt>Requested</dt><dd>${escapeHtml(requested)}</dd>
       <dt>Effective</dt><dd>${outcomeLabel(event.effective_outcome)}</dd>

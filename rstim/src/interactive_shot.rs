@@ -272,6 +272,7 @@ impl Pauli {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum NoiseOutcome {
     Identity,
+    Flipped,
     X,
     Y,
     Z,
@@ -284,6 +285,7 @@ impl NoiseOutcome {
     pub fn label(self) -> String {
         match self {
             Self::Identity => "I".to_string(),
+            Self::Flipped => "flipped".to_string(),
             Self::X => "X".to_string(),
             Self::Y => "Y".to_string(),
             Self::Z => "Z".to_string(),
@@ -299,6 +301,7 @@ impl NoiseOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NoiseSiteKind {
+    MeasurementFlip,
     XError,
     YError,
     ZError,
@@ -1219,6 +1222,7 @@ fn trace_outcomes(
 
 fn parse_trace_outcome(kind: NoiseSiteKind, label: &str) -> Result<NoiseOutcome, String> {
     match label {
+        "flip" if kind == NoiseSiteKind::MeasurementFlip => Ok(NoiseOutcome::Flipped),
         "X" => Ok(NoiseOutcome::X),
         "Y" => Ok(NoiseOutcome::Y),
         "Z" => Ok(NoiseOutcome::Z),
@@ -1401,11 +1405,11 @@ fn estimate_instructions(instructions: &[StimInstr]) -> Result<ExpansionSummary,
         let summary = match instruction {
             StimInstr::Op {
                 name,
-                args: _,
+                args,
                 targets,
                 ..
             } => {
-                let noise_events = noise_sites_for_op(name, targets).len() as u64;
+                let noise_events = noise_sites_for_op(name, args, targets).len() as u64;
                 let measurements = measurement_result_count(name, targets);
                 ExpansionSummary {
                     operations: 1,
@@ -1455,7 +1459,7 @@ fn collect_catalog(
                 targets,
                 ..
             } => {
-                for descriptor in noise_sites_for_op(name, targets) {
+                for descriptor in noise_sites_for_op(name, args, targets) {
                     let id = NoiseSiteId {
                         circuit_digest: digest,
                         op_path: op_path.clone(),
@@ -1498,9 +1502,9 @@ struct SiteDescriptor {
     target_qubits: Vec<u32>,
 }
 
-fn noise_sites_for_op(name: &str, targets: &[StimTarget]) -> Vec<SiteDescriptor> {
+fn noise_sites_for_op(name: &str, args: &[f64], targets: &[StimTarget]) -> Vec<SiteDescriptor> {
     let Some(kind) = noise_kind(name) else {
-        return Vec::new();
+        return measurement_flip_sites_for_op(name, args, targets);
     };
     let target_entries: Vec<_> = targets
         .iter()
@@ -1534,6 +1538,73 @@ fn noise_sites_for_op(name: &str, targets: &[StimTarget]) -> Vec<SiteDescriptor>
             })
             .collect(),
     }
+}
+
+fn measurement_flip_sites_for_op(
+    name: &str,
+    args: &[f64],
+    targets: &[StimTarget],
+) -> Vec<SiteDescriptor> {
+    if args.is_empty() {
+        return Vec::new();
+    }
+    let kind = NoiseSiteKind::MeasurementFlip;
+    let target_entries = targets
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, target)| target.qubit_index().map(|qubit| (slot, qubit)))
+        .collect::<Vec<_>>();
+    match name {
+        "MPAD" => target_entries
+            .into_iter()
+            .map(|(slot, qubit)| SiteDescriptor {
+                kind,
+                target_slots: vec![slot],
+                target_qubits: vec![qubit],
+            })
+            .collect(),
+        "MXX" | "MYY" | "MZZ" => target_entries
+            .chunks_exact(2)
+            .map(|pair| SiteDescriptor {
+                kind,
+                target_slots: vec![pair[0].0, pair[1].0],
+                target_qubits: vec![pair[0].1, pair[1].1],
+            })
+            .collect(),
+        "MPP" => mpp_measurement_flip_sites(targets, kind),
+        _ => Vec::new(),
+    }
+}
+
+fn mpp_measurement_flip_sites(targets: &[StimTarget], kind: NoiseSiteKind) -> Vec<SiteDescriptor> {
+    let mut products = Vec::<Vec<u32>>::new();
+    let mut current = Vec::new();
+    let mut after_combiner = false;
+    for target in targets {
+        match target {
+            StimTarget::Pauli { qubit, .. } => {
+                if !after_combiner && !current.is_empty() {
+                    products.push(std::mem::take(&mut current));
+                }
+                current.push(*qubit);
+                after_combiner = false;
+            }
+            StimTarget::Combiner => after_combiner = true,
+            _ => {}
+        }
+    }
+    if !current.is_empty() {
+        products.push(current);
+    }
+    products
+        .into_iter()
+        .enumerate()
+        .map(|(product_index, target_qubits)| SiteDescriptor {
+            kind,
+            target_slots: vec![product_index],
+            target_qubits,
+        })
+        .collect()
 }
 
 fn noise_kind(name: &str) -> Option<NoiseSiteKind> {
@@ -2098,6 +2169,124 @@ mod tests {
         for id in ["m1", "m2", "m3", "m4", "m5", "m6"] {
             assert!(svg.contains(id), "interactive SVG is missing {id}");
         }
+    }
+
+    #[test]
+    fn measurement_flip_arguments_enter_the_read_only_event_catalog() {
+        let mut shot = EditableShot::open(
+            "MPAD(1) 0 1\nMXX(1) 2 3 4 5\nMYY(1) 6 7\nMZZ(1) 8 9\n\
+             MPP(1) X10*X11 Z12\nMXX 13 14\n",
+            ExpansionLimits::default(),
+            23,
+        )
+        .unwrap();
+
+        let sites = shot.session().catalog().sites();
+        assert_eq!(sites.len(), 8);
+        assert_eq!(shot.session().catalog().events().len(), 8);
+        assert_eq!(
+            sites
+                .iter()
+                .map(|site| (site.instruction.as_str(), site.target_slots.as_slice()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("MPAD", &[0][..]),
+                ("MPAD", &[1][..]),
+                ("MXX", &[0, 1][..]),
+                ("MXX", &[2, 3][..]),
+                ("MYY", &[0, 1][..]),
+                ("MZZ", &[0, 1][..]),
+                ("MPP", &[0][..]),
+                ("MPP", &[1][..]),
+            ]
+        );
+        assert!(sites.iter().all(|site| {
+            site.kind == NoiseSiteKind::MeasurementFlip
+                && site.parameters == vec![1.0]
+                && site.probability == Some(1.0)
+                && !site.editable
+                && site.allowed_outcomes.is_empty()
+        }));
+        assert_eq!(sites[6].target_qubits, vec![10, 11]);
+        assert_eq!(sites[7].target_qubits, vec![12]);
+
+        let ids = shot
+            .session()
+            .catalog()
+            .events()
+            .iter()
+            .map(|event| event.id.encode())
+            .collect::<Vec<_>>();
+        let noiseless = shot.view_snapshot().unwrap();
+        assert!(
+            noiseless
+                .shot
+                .result
+                .noise_events
+                .iter()
+                .all(|event| event.effective_outcome == NoiseOutcome::Identity)
+        );
+        assert_eq!(
+            noiseless
+                .svg
+                .matches("class=\"noise-site measurement\"")
+                .count(),
+            8
+        );
+        for id in &ids {
+            assert!(
+                noiseless
+                    .svg
+                    .contains(&format!("data-noise-event-id=\"{id}\""))
+            );
+        }
+        for instruction in ["MPAD", "MXX", "MYY", "MZZ", "MPP"] {
+            assert!(
+                noiseless.warnings.iter().any(|warning| {
+                    warning.contains(instruction) && warning.contains("read-only")
+                })
+            );
+        }
+
+        shot.sample(29).unwrap();
+        let sampled = shot.view_snapshot().unwrap();
+        assert_eq!(
+            sampled
+                .shot
+                .result
+                .noise_events
+                .iter()
+                .map(|event| event.id.as_str())
+                .collect::<Vec<_>>(),
+            ids.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+        assert!(
+            sampled
+                .shot
+                .result
+                .noise_events
+                .iter()
+                .all(|event| event.effective_outcome == NoiseOutcome::Flipped)
+        );
+
+        shot.clear(31).unwrap();
+        let cleared = shot.summary();
+        assert_eq!(
+            cleared
+                .result
+                .noise_events
+                .iter()
+                .map(|event| event.id.as_str())
+                .collect::<Vec<_>>(),
+            ids.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+        assert!(
+            cleared
+                .result
+                .noise_events
+                .iter()
+                .all(|event| event.effective_outcome == NoiseOutcome::Identity)
+        );
     }
 
     #[test]
