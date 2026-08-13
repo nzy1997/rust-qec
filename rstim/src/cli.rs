@@ -701,7 +701,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 logical_x_qubits.as_deref(),
                 logical_z_qubits.as_deref(),
             )?;
-            run_export_decoder_dataset(
+            run_export_decoder_dataset_with_logical_flip(
                 &circuit,
                 shots,
                 &mode,
@@ -1276,7 +1276,37 @@ fn fail_pack_finish_is_injected() -> bool {
     cfg!(debug_assertions) && std::env::var_os("RSTIM_TEST_RSMP_FAIL_PACK_FINISH").is_some()
 }
 
+/// Runs decoder-dataset export through the backward-compatible X-only API.
 pub fn run_export_decoder_dataset(
+    circuit: &str,
+    shots: u64,
+    mode: &str,
+    logical_x_qubits: Option<&str>,
+    public_out: &str,
+    private_out: &str,
+    seed: Option<u64>,
+) -> Result<(), String> {
+    let logical_flip = logical_x_qubits
+        .map(|value| {
+            crate::decoder_dataset::LogicalFlip::parse(
+                crate::decoder_dataset::LogicalPauli::X,
+                value,
+            )
+        })
+        .transpose()?;
+    run_export_decoder_dataset_with_logical_flip(
+        circuit,
+        shots,
+        mode,
+        logical_flip,
+        public_out,
+        private_out,
+        seed,
+    )
+}
+
+/// Runs decoder-dataset export with a generalized X-or-Z logical flip.
+pub fn run_export_decoder_dataset_with_logical_flip(
     circuit: &str,
     shots: u64,
     mode: &str,
@@ -1290,8 +1320,8 @@ pub fn run_export_decoder_dataset(
     let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
     let shots =
         usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
-    crate::decoder_dataset::export_decoder_dataset(
-        crate::decoder_dataset::ExportDecoderDatasetConfig {
+    crate::decoder_dataset::export_decoder_dataset_with_logical_flip(
+        crate::decoder_dataset::ExportDecoderDatasetLogicalFlipConfig {
             circuit_text,
             shots,
             mode,

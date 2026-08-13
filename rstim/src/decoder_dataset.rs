@@ -74,7 +74,20 @@ impl LogicalFlip {
 }
 
 #[derive(Debug, Clone)]
+/// Backward-compatible X-only export configuration from rstim 0.2.0.
 pub struct ExportDecoderDatasetConfig {
+    pub circuit_text: String,
+    pub shots: usize,
+    pub mode: DecoderDatasetMode,
+    pub logical_x_qubits: Vec<u32>,
+    pub public_out: PathBuf,
+    pub private_out: PathBuf,
+    pub seed: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+/// Export configuration supporting either an X or Z logical flip.
+pub struct ExportDecoderDatasetLogicalFlipConfig {
     pub circuit_text: String,
     pub shots: usize,
     pub mode: DecoderDatasetMode,
@@ -82,6 +95,34 @@ pub struct ExportDecoderDatasetConfig {
     pub public_out: PathBuf,
     pub private_out: PathBuf,
     pub seed: Option<u64>,
+}
+
+impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
+    fn from(config: ExportDecoderDatasetConfig) -> Self {
+        let logical_flip = if config.logical_x_qubits.is_empty() {
+            None
+        } else {
+            Some(LogicalFlip {
+                pauli: LogicalPauli::X,
+                qubits: config.logical_x_qubits,
+            })
+        };
+        Self {
+            circuit_text: config.circuit_text,
+            shots: config.shots,
+            mode: config.mode,
+            logical_flip,
+            public_out: config.public_out,
+            private_out: config.private_out,
+            seed: config.seed,
+        }
+    }
+}
+
+impl From<&ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
+    fn from(config: &ExportDecoderDatasetConfig) -> Self {
+        config.clone().into()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -309,6 +350,15 @@ fn validate_logical_flip_effect(
 pub fn validate_decoder_dataset_inputs(
     config: &ExportDecoderDatasetConfig,
 ) -> Result<ValidatedDecoderDatasetInput, String> {
+    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
+    validate_decoder_dataset_logical_flip_inputs(&config)
+}
+
+#[doc(hidden)]
+#[allow(private_interfaces)]
+pub fn validate_decoder_dataset_logical_flip_inputs(
+    config: &ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<ValidatedDecoderDatasetInput, String> {
     if config.shots == 0 {
         return Err("--shots must be positive".to_string());
     }
@@ -434,7 +484,15 @@ fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usiz
 pub fn generate_decoder_dataset_artifacts(
     config: &ExportDecoderDatasetConfig,
 ) -> Result<DecoderDatasetArtifacts, String> {
-    let validated = validate_decoder_dataset_inputs(config)?;
+    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
+    generate_decoder_dataset_artifacts_with_logical_flip(&config)
+}
+
+#[doc(hidden)]
+pub fn generate_decoder_dataset_artifacts_with_logical_flip(
+    config: &ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<DecoderDatasetArtifacts, String> {
+    let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
     let mut rngs = make_dataset_rngs(config.seed);
     match config.mode {
         DecoderDatasetMode::Detectors => {
@@ -822,6 +880,7 @@ fn write_public_bundle(
     write_file(&path.join("shots.b8"), shots)
 }
 
+/// Exports using the backward-compatible X-only configuration.
 pub fn export_decoder_dataset(
     config: ExportDecoderDatasetConfig,
 ) -> Result<DecoderDatasetSummary, String> {
@@ -829,13 +888,29 @@ pub fn export_decoder_dataset(
     export_decoder_dataset_with_publisher(config, &mut publisher)
 }
 
+/// Exports using the generalized X-or-Z logical-flip configuration.
+pub fn export_decoder_dataset_with_logical_flip(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<DecoderDatasetSummary, String> {
+    let mut publisher = FsDirectoryPublisher::from_env();
+    export_decoder_dataset_with_logical_flip_and_publisher(config, &mut publisher)
+}
+
 #[doc(hidden)]
 pub fn export_decoder_dataset_with_publisher(
     config: ExportDecoderDatasetConfig,
     publisher: &mut impl DirectoryPublisher,
 ) -> Result<DecoderDatasetSummary, String> {
+    export_decoder_dataset_with_logical_flip_and_publisher(config.into(), publisher)
+}
+
+#[doc(hidden)]
+pub fn export_decoder_dataset_with_logical_flip_and_publisher(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+    publisher: &mut impl DirectoryPublisher,
+) -> Result<DecoderDatasetSummary, String> {
     let validated_paths = validate_output_directories(&config.public_out, &config.private_out)?;
-    let artifacts = generate_decoder_dataset_artifacts(&config)?;
+    let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config)?;
     let public_shots_bytes = bit_table_to_b8_bytes(&artifacts.public_shots)?;
     let answers_bytes = bit_table_to_b8_bytes(&artifacts.answers)?;
     let masks_bytes = artifacts
@@ -953,8 +1028,8 @@ mod tests {
         circuit_text: &str,
         mode: DecoderDatasetMode,
         logical_flip: Option<LogicalFlip>,
-    ) -> ExportDecoderDatasetConfig {
-        ExportDecoderDatasetConfig {
+    ) -> ExportDecoderDatasetLogicalFlipConfig {
+        ExportDecoderDatasetLogicalFlipConfig {
             circuit_text: circuit_text.to_string(),
             shots: 1,
             mode,
@@ -1041,7 +1116,7 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_inputs(&config).is_ok());
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
 
         let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
@@ -1049,7 +1124,7 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("injected logical X does not flip observable 0"));
 
@@ -1059,7 +1134,7 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("changes detector"));
     }
@@ -1068,20 +1143,20 @@ mod tests {
     fn input_validation_rejects_observable_sweep_and_qubit_contract_violations() {
         let no_observable = "R 0\nM 0\n";
         let config = test_config(no_observable, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("exactly one observable, found 0"));
 
         let multiple_observables =
             "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
         let config = test_config(multiple_observables, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("exactly one observable, found 2"));
 
         let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("does not support sweep-bit circuits"));
 
@@ -1091,7 +1166,7 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![1]),
         );
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("contains qubit 1, but circuit has 1 qubits"));
     }
@@ -1147,7 +1222,7 @@ mod tests {
     fn detector_artifacts_publish_detections_and_private_answers() {
         let circuit = "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(circuit, DecoderDatasetMode::Detectors, None);
-        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+        let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
 
         assert_eq!(artifacts.public_row_kind, "detectors");
         assert_eq!(artifacts.public_shots.num_major(), 1);
@@ -1169,7 +1244,7 @@ mod tests {
         config.shots = 16;
         config.seed = Some(0xdec0_de01);
 
-        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+        let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
         let public_interpretation = crate::m2d::measurements_to_detections(
             &artifacts.public_instrs,
             &artifacts.public_shots,
@@ -1202,8 +1277,8 @@ mod tests {
         config.shots = 32;
         config.seed = Some(123);
 
-        let a = generate_decoder_dataset_artifacts(&config).unwrap();
-        let b = generate_decoder_dataset_artifacts(&config).unwrap();
+        let a = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
+        let b = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
         assert_eq!(
             bit_table_to_b8_bytes(&a.public_shots).unwrap(),
             bit_table_to_b8_bytes(&b.public_shots).unwrap()
@@ -1235,7 +1310,7 @@ mod tests {
         config.public_out = public_out.clone();
         config.private_out = private_out.clone();
 
-        let summary = export_decoder_dataset(config).unwrap();
+        let summary = export_decoder_dataset_with_logical_flip(config).unwrap();
         assert_eq!(summary.public_out, public_out);
         assert_eq!(
             sorted_entries(&public_out),
@@ -1266,7 +1341,8 @@ mod tests {
         config.seed = Some(3);
 
         let mut publisher = FailingDirectoryPublisher::new(2);
-        let err = export_decoder_dataset_with_publisher(config, &mut publisher).unwrap_err();
+        let err = export_decoder_dataset_with_logical_flip_and_publisher(config, &mut publisher)
+            .unwrap_err();
 
         assert!(err.contains("private bundle retained"));
         assert!(private_out.exists());
