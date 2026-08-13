@@ -160,8 +160,8 @@ Run a single public speed case with an explicit `rstim` build profile:
 python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case \
   --profile release \
   --case stim-style-surface-sample-d11-r100-b1024 \
-  --warmup-rounds 0 \
-  --measure-rounds 1 \
+  --warmup-rounds 2 \
+  --measure-rounds 11 \
   --out-dir /tmp/rstim-speed-release
 ```
 
@@ -180,6 +180,41 @@ probability of `0.001`.
 
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
+
+## Split Precompile, Sample, and `b8` Evidence
+
+Compare five surface-code sampling paths under one output boundary:
+
+```sh
+python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
+  --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml \
+  --case stim_surface_d11_r100 \
+  --profile release \
+  --warmup-rounds 2 \
+  --measure-rounds 7 \
+  --seed 0 \
+  --out-dir /tmp/rstim-compiled-steady
+```
+
+The worker records one-time precompilation separately, then splits each measured
+call into the implementation's sampling path and its `b8` output step. The
+headline total is the sum of those two worker-local phases and excludes both
+one-time precompilation and stdin/stdout pipe transport. Precompiled variants
+reuse a sampler; direct variants include per-batch setup required by that
+implementation in their sampling-path phase. Worker startup and initial fixture
+parsing occur before all recorded timers.
+
+The phase boundary follows each public API: Stim's `sample(bit_packed=True)`
+returns an already packed array, so its packing work remains inside the sampling
+path and its `b8` step is only byte serialization. `rstim` returns an internal
+bit table and converts it through its `b8` writer. The total is therefore the
+fair output-boundary comparison; phase columns explain where each implementation
+spends that total.
+
+The atom-loss row precompiles and reuses its loss operation plan and noiseless
+reference. Its self-contained CSS frame masks H/CX/Pauli operations independently
+for 64 shots at a time, including CX gates skipped after loss, while preserving
+the same output boundary as the other four rows.
 
 ## Selected DEM Speed Evidence
 

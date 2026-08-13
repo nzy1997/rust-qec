@@ -1,15 +1,45 @@
 {
-  "measured_records": 14,
+  "measured_records": 35,
   "variants": [
     {
-      "median_elapsed_ns": 13671583,
+      "median_call_b8_elapsed_ns": 272667,
+      "median_call_sample_elapsed_ns": 4207833,
+      "median_worker_total_elapsed_ns": 4480500,
+      "precompile_elapsed_ns": 2924750,
       "sample_count": 7,
-      "variant": "stim"
+      "variant": "rstim-precompiled"
     },
     {
-      "median_elapsed_ns": 11547000,
+      "median_call_b8_elapsed_ns": 35042,
+      "median_call_sample_elapsed_ns": 16092542,
+      "median_worker_total_elapsed_ns": 16127584,
+      "precompile_elapsed_ns": 1114916,
       "sample_count": 7,
-      "variant": "rstim"
+      "variant": "stim-precompiled"
+    },
+    {
+      "median_call_b8_elapsed_ns": 198750,
+      "median_call_sample_elapsed_ns": 7329792,
+      "median_worker_total_elapsed_ns": 7528542,
+      "precompile_elapsed_ns": 0,
+      "sample_count": 7,
+      "variant": "rstim-interpreted"
+    },
+    {
+      "median_call_b8_elapsed_ns": 40416,
+      "median_call_sample_elapsed_ns": 16774916,
+      "median_worker_total_elapsed_ns": 16815332,
+      "precompile_elapsed_ns": 0,
+      "sample_count": 7,
+      "variant": "stim-direct"
+    },
+    {
+      "median_call_b8_elapsed_ns": 263541,
+      "median_call_sample_elapsed_ns": 4002167,
+      "median_worker_total_elapsed_ns": 4265708,
+      "precompile_elapsed_ns": 2978625,
+      "sample_count": 7,
+      "variant": "rstim-precompiled-atom-loss"
     }
   ]
 }

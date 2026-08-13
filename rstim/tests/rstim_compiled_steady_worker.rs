@@ -36,8 +36,15 @@ fn write_fixture(bytes: &[u8]) -> NamedTempFile {
     fixture
 }
 
-fn run_worker_with_path(path: &Path, seed: u64, stdin_frames: &[u8]) -> Output {
+fn run_worker_variant_with_path(
+    variant: &str,
+    path: &Path,
+    seed: u64,
+    stdin_frames: &[u8],
+) -> Output {
     let mut child = Command::new(worker_bin())
+        .arg("--variant")
+        .arg(variant)
         .arg("--input")
         .arg(path)
         .arg("--seed")
@@ -56,9 +63,21 @@ fn run_worker_with_path(path: &Path, seed: u64, stdin_frames: &[u8]) -> Output {
     child.wait_with_output().expect("wait for worker")
 }
 
-fn run_worker_with_fixture(fixture_bytes: &[u8], stdin_frames: &[u8]) -> Output {
+fn run_worker_with_path(path: &Path, seed: u64, stdin_frames: &[u8]) -> Output {
+    run_worker_variant_with_path("rstim-precompiled", path, seed, stdin_frames)
+}
+
+fn run_worker_variant_with_fixture(
+    variant: &str,
+    fixture_bytes: &[u8],
+    stdin_frames: &[u8],
+) -> Output {
     let fixture = write_fixture(fixture_bytes);
-    run_worker_with_path(fixture.path(), 0, stdin_frames)
+    run_worker_variant_with_path(variant, fixture.path(), 0, stdin_frames)
+}
+
+fn run_worker_with_fixture(fixture_bytes: &[u8], stdin_frames: &[u8]) -> Output {
+    run_worker_variant_with_fixture("rstim-precompiled", fixture_bytes, stdin_frames)
 }
 
 fn read_frame(cursor: &mut Cursor<&[u8]>) -> Option<(u8, Vec<u8>)> {
@@ -102,10 +121,23 @@ fn telemetry(payload: &[u8]) -> Value {
 }
 
 fn assert_worker_telemetry(payload: &[u8], sample_calls: u64) {
+    assert_worker_variant_telemetry(payload, "rstim-precompiled", 1, 1, sample_calls);
+}
+
+fn assert_worker_variant_telemetry(
+    payload: &[u8],
+    variant: &str,
+    compile_count: u64,
+    reference_build_count: u64,
+    sample_calls: u64,
+) {
     let value = telemetry(payload);
-    assert_eq!(value["variant"], "rstim");
-    assert_eq!(value["compile_count"].as_u64(), Some(1));
-    assert_eq!(value["reference_build_count"].as_u64(), Some(1));
+    assert_eq!(value["variant"], variant);
+    assert_eq!(value["compile_count"].as_u64(), Some(compile_count));
+    assert_eq!(
+        value["reference_build_count"].as_u64(),
+        Some(reference_build_count)
+    );
     assert_eq!(value["sample_call_count"].as_u64(), Some(sample_calls));
     assert_eq!(value["measurement_count"].as_u64(), Some(1));
     assert_eq!(value["bytes_per_shot"].as_u64(), Some(1));
@@ -138,12 +170,55 @@ fn worker_samples_once_then_reports_final_telemetry() {
     assert_worker_telemetry(&frames[0].1, 0);
 
     assert_eq!(frames[1].0, RESULT);
+    assert_eq!(frames[1].1.len(), 33);
     assert_eq!(read_le_u64(&frames[1].1[0..8]), 7);
     assert_eq!(read_le_u64(&frames[1].1[8..16]), 1);
-    assert_eq!(&frames[1].1[16..], &[0x01]);
+    assert_eq!(&frames[1].1[32..], &[0x01]);
 
     assert_eq!(frames[2].0, FINAL);
     assert_worker_telemetry(&frames[2].1, 1);
+}
+
+#[test]
+fn worker_interpreted_variant_reports_per_call_reference_builds() {
+    let mut stdin_frames = Vec::new();
+    stdin_frames.extend_from_slice(&sample_frame(8, 1));
+    stdin_frames.extend_from_slice(&frame(STOP, &[]));
+
+    let output = run_worker_variant_with_fixture("rstim-interpreted", b"X 0\nM 0\n", &stdin_frames);
+
+    assert!(output.status.success());
+    let frames = read_frames(&output.stdout);
+    assert_eq!(frames.len(), 3);
+    assert_eq!(frames[0].0, READY);
+    assert_worker_variant_telemetry(&frames[0].1, "rstim-interpreted", 0, 0, 0);
+    assert_eq!(frames[1].0, RESULT);
+    assert_eq!(&frames[1].1[32..], &[0x01]);
+    assert_eq!(frames[2].0, FINAL);
+    assert_worker_variant_telemetry(&frames[2].1, "rstim-interpreted", 0, 1, 1);
+}
+
+#[test]
+fn worker_precompiled_atom_loss_variant_reuses_plan_and_reference() {
+    let mut stdin_frames = Vec::new();
+    stdin_frames.extend_from_slice(&sample_frame(9, 1));
+    stdin_frames.extend_from_slice(&frame(STOP, &[]));
+
+    let output = run_worker_variant_with_fixture(
+        "rstim-precompiled-atom-loss",
+        b"LOSS(0) 0\nM 0\n",
+        &stdin_frames,
+    );
+
+    assert!(output.status.success());
+    let frames = read_frames(&output.stdout);
+    assert_eq!(frames.len(), 3);
+    assert_eq!(frames[0].0, READY);
+    assert_worker_variant_telemetry(&frames[0].1, "rstim-precompiled-atom-loss", 1, 1, 0);
+    assert_eq!(frames[1].0, RESULT);
+    assert_eq!(&frames[1].1[32..], &[0x00]);
+    assert_eq!(frames[2].0, FINAL);
+    assert_worker_variant_telemetry(&frames[2].1, "rstim-precompiled-atom-loss", 1, 1, 1);
 }
 
 #[test]
@@ -253,6 +328,7 @@ fn worker_help_exits_successfully() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("help utf8");
+    assert!(stdout.contains("--variant"));
     assert!(stdout.contains("--input"));
     assert!(stdout.contains("--seed"));
 }

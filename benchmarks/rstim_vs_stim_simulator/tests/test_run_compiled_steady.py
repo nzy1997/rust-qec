@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import contextlib
 import hashlib
-import importlib.machinery
 import io
 import subprocess
 import sys
@@ -54,19 +53,24 @@ class RunCompiledSteadyTest(unittest.TestCase):
             text=True,
         )
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertRegex(version.stdout.strip(), r"^rstim 0\.1\.1")
+        self.assertRegex(version.stdout.strip(), r"^rstim 0\.2\.0")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fixture = Path(temp_dir) / "known_answer.stim"
             fixture.write_text("X 0\nM 0\n", encoding="utf-8")
             session = run_compiled_steady.WorkerSession(
-                run_compiled_steady.default_rstim_worker_command("debug"),
+                [
+                    *run_compiled_steady.default_rstim_worker_command("debug"),
+                    "--variant",
+                    "rstim-precompiled",
+                ],
                 input_path=fixture,
                 seed=0,
             )
             try:
                 ready = session.read_ready()
-                self.assertEqual(ready["variant"], "rstim")
+                self.assertEqual(ready["variant"], "rstim-precompiled")
+                self.assertGreater(ready["precompile_elapsed_ns"], 0)
                 self.assertEqual(ready["compile_count"], 1)
                 self.assertEqual(ready["reference_build_count"], 1)
                 self.assertEqual(ready["sample_call_count"], 0)
@@ -74,9 +78,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 self.assertEqual(ready["measurement_count"], 1)
                 self.assertEqual(ready["bytes_per_shot"], 1)
 
-                call_count, data, _ = session.sample(0, 1)
+                call_count, data, sample_elapsed_ns, b8_elapsed_ns = session.sample(0, 1)
                 self.assertEqual(call_count, 1)
                 self.assertEqual(data, b"\x01")
+                self.assertGreaterEqual(sample_elapsed_ns, 0)
+                self.assertGreaterEqual(b8_elapsed_ns, 0)
 
                 final = session.stop()
                 self.assertEqual(final["compile_count"], 1)
@@ -104,6 +110,8 @@ class RunCompiledSteadyTest(unittest.TestCase):
             process = subprocess.Popen(
                 [
                     *run_compiled_steady.default_rstim_worker_command("debug"),
+                    "--variant",
+                    "rstim-precompiled",
                     "--input",
                     str(missing_fixture),
                     "--seed",
@@ -135,7 +143,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
         self.assertEqual(build.returncode, 0, build.stderr)
 
         process = subprocess.Popen(
-            run_compiled_steady.default_rstim_worker_command("debug"),
+            [
+                *run_compiled_steady.default_rstim_worker_command("debug"),
+                "--variant",
+                "rstim-precompiled",
+            ],
             cwd=ROOT,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -163,13 +175,18 @@ class RunCompiledSteadyTest(unittest.TestCase):
             fixture = Path(temp_dir) / "known_answer.stim"
             fixture.write_text("X 0\nM 0\n", encoding="utf-8")
             session = run_compiled_steady.WorkerSession(
-                run_compiled_steady.default_stim_worker_command(),
+                [
+                    *run_compiled_steady.default_stim_worker_command(),
+                    "--variant",
+                    "stim-precompiled",
+                ],
                 input_path=fixture,
                 seed=0,
             )
             try:
                 ready = session.read_ready()
-                self.assertEqual(ready["variant"], "stim")
+                self.assertEqual(ready["variant"], "stim-precompiled")
+                self.assertGreater(ready["precompile_elapsed_ns"], 0)
                 self.assertEqual(ready["compile_count"], 1)
                 self.assertEqual(ready["reference_build_count"], 1)
                 self.assertEqual(ready["sample_call_count"], 0)
@@ -177,9 +194,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 self.assertEqual(ready["measurement_count"], 1)
                 self.assertEqual(ready["bytes_per_shot"], 1)
 
-                call_count, data, _ = session.sample(0, 1)
+                call_count, data, sample_elapsed_ns, b8_elapsed_ns = session.sample(0, 1)
                 self.assertEqual(call_count, 1)
                 self.assertEqual(data, b"\x01")
+                self.assertGreaterEqual(sample_elapsed_ns, 0)
+                self.assertGreaterEqual(b8_elapsed_ns, 0)
 
                 final = session.stop()
                 self.assertEqual(final["sample_call_count"], 1)
@@ -202,13 +221,17 @@ class RunCompiledSteadyTest(unittest.TestCase):
             fixture = Path(temp_dir) / "known_answer.stim"
             fixture.write_text("X 0\nM 0\n", encoding="utf-8")
             session = run_compiled_steady.WorkerSession(
-                run_compiled_steady.default_stim_worker_command(),
+                [
+                    *run_compiled_steady.default_stim_worker_command(),
+                    "--variant",
+                    "stim-precompiled",
+                ],
                 input_path=fixture,
                 seed=0,
             )
             try:
                 ready = session.read_ready()
-                self.assertEqual(ready["variant"], "stim")
+                self.assertEqual(ready["variant"], "stim-precompiled")
                 run_compiled_steady.write_frame(session.stdin, run_compiled_steady.SAMPLE, b"{")
                 frame_type, payload = run_compiled_steady.read_frame(session.stdout)
                 self.assertEqual(frame_type, run_compiled_steady.ERROR)
@@ -221,7 +244,11 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
     def test_stim_worker_emits_error_frame_for_missing_required_args(self) -> None:
         process = subprocess.Popen(
-            run_compiled_steady.default_stim_worker_command(),
+            [
+                *run_compiled_steady.default_stim_worker_command(),
+                "--variant",
+                "stim-precompiled",
+            ],
             cwd=ROOT,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -259,16 +286,19 @@ class RunCompiledSteadyTest(unittest.TestCase):
                     from benchmarks.rstim_vs_stim_simulator import run_compiled_steady as protocol
 
                     parser = argparse.ArgumentParser()
+                    parser.add_argument("--variant", required=True)
                     parser.add_argument("--input", required=True)
                     parser.add_argument("--seed", required=True)
                     args = parser.parse_args()
                     input_bytes = open(args.input, "rb").read()
-                    is_preflight = input_bytes == b"X 0\\nM 0\\n"
-                    telemetry_variant = "wrong-variant" if {mode!r} == "wrong-variant" else "{variant}"
+                    is_preflight = input_bytes in (b"X 0\\nM 0\\n", b"X 0\\nLOSS(0) 0\\nM 0\\n")
+                    telemetry_variant = "wrong-variant" if {mode!r} == "wrong-variant" else args.variant
+                    compile_count, reference_build_count = protocol._expected_lifecycle_counts(args.variant, 0)
                     telemetry = {{
                         "variant": telemetry_variant,
-                        "compile_count": 1,
-                        "reference_build_count": 1,
+                        "precompile_elapsed_ns": 7 if args.variant in protocol.PRECOMPILED_VARIANTS else 0,
+                        "compile_count": compile_count,
+                        "reference_build_count": reference_build_count,
                         "sample_call_count": 0,
                         "fixture_sha256": hashlib.sha256(input_bytes).hexdigest(),
                         "measurement_count": 1 if is_preflight else 12121,
@@ -279,6 +309,9 @@ class RunCompiledSteadyTest(unittest.TestCase):
                     while True:
                         frame_type, payload = protocol.read_frame(sys.stdin.buffer)
                         if frame_type == protocol.STOP:
+                            compile_count, reference_build_count = protocol._expected_lifecycle_counts(args.variant, calls)
+                            telemetry["compile_count"] = compile_count
+                            telemetry["reference_build_count"] = reference_build_count
                             telemetry["sample_call_count"] = calls
                             protocol.write_frame(sys.stdout.buffer, protocol.FINAL, json.dumps(telemetry).encode())
                             sys.stdout.buffer.flush()
@@ -292,7 +325,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
                         data = b"\\x00" if {mode!r} == "bad-known-answer" and is_preflight else (
                             b"\\x01" if is_preflight else b"\\x00" * 1552384
                         )
-                        result = struct.pack("<QQ", request["request_id"], calls) + data
+                        result = struct.pack("<QQQQ", request["request_id"], calls, 1, 2) + data
                         if {mode!r} == "delay-last-byte" and not is_preflight:
                             header = protocol.RESULT + struct.pack("<Q", len(result))
                             sys.stdout.buffer.write(header + result[:-1])
@@ -365,25 +398,33 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(
-            "PASS compiled steady-state lifecycle variants=2 compile=1 reference=1 calls=9 measured=14",
+            "PASS split precompile/sample/b8 lifecycle variants=5 calls=9 measured=35",
             result.stdout,
         )
         raw = [json.loads(line) for line in (out_dir / "raw.jsonl").read_text().splitlines()]
-        self.assertEqual(sum(1 for record in raw if record["record_type"] == "ready"), 2)
-        self.assertEqual(sum(1 for record in raw if record["record_type"] == "sample"), 18)
-        self.assertEqual(sum(1 for record in raw if record["record_type"] == "final"), 2)
+        self.assertEqual(sum(1 for record in raw if record["record_type"] == "ready"), 5)
+        self.assertEqual(sum(1 for record in raw if record["record_type"] == "sample"), 45)
+        self.assertEqual(sum(1 for record in raw if record["record_type"] == "final"), 5)
         for record in raw:
             if record["record_type"] == "sample":
                 self.assertEqual(record["shots"], 1024)
                 self.assertEqual(record["output_format"], "b8")
+                self.assertEqual(record["sample_elapsed_ns"], 1)
+                self.assertEqual(record["b8_elapsed_ns"], 2)
+                self.assertEqual(record["worker_total_elapsed_ns"], 3)
         summary = json.loads((out_dir / "summary.json").read_text())
-        self.assertEqual(summary["measured_records"], 14)
+        self.assertEqual(summary["measured_records"], 35)
         self.assertEqual({variant["sample_count"] for variant in summary["variants"]}, {7})
         report = (out_dir / "report.md").read_text(encoding="utf-8")
-        self.assertIn("| variant | sample_count | median_elapsed_ns |", report)
+        self.assertIn(
+            "| variant | sample_count | precompile_elapsed_ns | median_call_sample_elapsed_ns | median_call_b8_elapsed_ns | median_worker_total_elapsed_ns |",
+            report,
+        )
         for variant in summary["variants"]:
             self.assertIn(
-                f"| {variant['variant']} | {variant['sample_count']} | {variant['median_elapsed_ns']} |",
+                f"| {variant['variant']} | {variant['sample_count']} | "
+                f"{variant['precompile_elapsed_ns']} | {variant['median_call_sample_elapsed_ns']} | "
+                f"{variant['median_call_b8_elapsed_ns']} | {variant['median_worker_total_elapsed_ns']} |",
                 report,
             )
         environment = json.loads((out_dir / "environment.json").read_text())
@@ -403,15 +444,12 @@ class RunCompiledSteadyTest(unittest.TestCase):
             "source_manifest_sha256",
             "fixture_path",
             "fixture_sha256",
+            "atom_loss_fixture_path",
+            "atom_loss_fixture_sha256",
             "worker_argv",
             "stim_worker_module_path",
             "stim_worker_module_sha256",
-            "python_executable",
-            "python_executable_sha256",
-            "loaded_stim_extension_path",
-            "loaded_stim_extension_sha256",
-            "rstim_worker_binary_path",
-            "rstim_worker_binary_sha256",
+            "runtime_identities",
             "protocol_version",
             "known_answer_preflight",
         ):
@@ -422,98 +460,96 @@ class RunCompiledSteadyTest(unittest.TestCase):
         fixture = (ROOT / case["canonical_input_path"]).resolve()
         source_manifest = (ROOT / case["source_manifest_path"]).resolve()
         stim_worker_module = (ROOT / "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py").resolve()
-        stim_worker = Path(temp_dir.name) / "stim_worker.py"
-        rstim_worker = Path(temp_dir.name) / "rstim_worker.py"
+        atom_loss_fixture = ROOT / run_compiled_steady.ATOM_LOSS_FIXTURE_PATH
         expected_worker_argv = {
-            "stim": [sys.executable, str(stim_worker), "--input", str(fixture), "--seed", "0"],
-            "rstim": [sys.executable, str(rstim_worker), "--input", str(fixture), "--seed", "0"],
-        }
-        expected_canonical_argv = {
-            "stim": [
-                "python3",
-                "-m",
-                "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
-                "--input",
-                str(fixture),
-                "--seed",
-                "0",
-            ],
-            "rstim": [
-                "target/release/rstim_compiled_steady_worker",
-                "--input",
-                str(fixture),
-                "--seed",
-                "0",
-            ],
+            variant: run_compiled_steady._portable_worker_argv(
+                variant,
+                (
+                    atom_loss_fixture.relative_to(ROOT).as_posix()
+                    if variant == run_compiled_steady.ATOM_LOSS_VARIANT
+                    else case["canonical_input_path"]
+                ),
+                seed=0,
+            )
+            for variant in run_compiled_steady.VARIANTS
         }
         known_answer_sha = hashlib.sha256(b"X 0\nM 0\n").hexdigest()
+        atom_loss_known_answer_sha = hashlib.sha256(b"X 0\nLOSS(0) 0\nM 0\n").hexdigest()
 
         self.assertEqual(environment["profile"], "release")
-        self.assertEqual(environment["timer_scope"], case["timer_scope"])
+        self.assertEqual(environment["timer_scope"], run_compiled_steady.TIMER_SCOPE)
+        self.assertNotIn("secondary_timer_scope", environment)
         self.assertEqual(environment["stim_version"], "1.15.0")
         self.assertEqual(environment["rstim_version"], "rstim 0.1.1")
         self.assertEqual(environment["seed"], 0)
         self.assertEqual(environment["warmup_rounds"], 2)
         self.assertEqual(environment["measure_rounds"], 7)
         self.assertEqual(environment["protocol_version"], run_compiled_steady.PROTOCOL_VERSION)
-        self.assertEqual(environment["seed_policy"], "seed_once_then_advance_across_9_calls")
-        self.assertEqual(environment["fair_manifest_path"], str(MANIFEST.resolve()))
+        self.assertEqual(
+            environment["seed_policy"],
+            "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
+        )
+        self.assertEqual(environment["fair_manifest_path"], MANIFEST.relative_to(ROOT).as_posix())
         self.assertEqual(environment["fair_manifest_sha256"], hashlib.sha256(MANIFEST.read_bytes()).hexdigest())
-        self.assertEqual(environment["source_manifest_path"], str(source_manifest))
+        self.assertEqual(environment["source_manifest_path"], source_manifest.relative_to(ROOT).as_posix())
         self.assertEqual(environment["source_manifest_sha256"], hashlib.sha256(source_manifest.read_bytes()).hexdigest())
-        self.assertEqual(environment["fixture_path"], str(fixture))
+        self.assertEqual(environment["fixture_path"], fixture.relative_to(ROOT).as_posix())
         self.assertEqual(environment["fixture_sha256"], hashlib.sha256(fixture.read_bytes()).hexdigest())
         self.assertEqual(environment["fixture_sha256"], case["canonical_input_sha256"])
+        self.assertEqual(
+            environment["atom_loss_fixture_path"], atom_loss_fixture.relative_to(ROOT).as_posix()
+        )
+        self.assertEqual(
+            environment["atom_loss_fixture_sha256"], hashlib.sha256(atom_loss_fixture.read_bytes()).hexdigest()
+        )
         self.assertEqual(environment["worker_argv"], expected_worker_argv)
-        self.assertEqual(environment["canonical_worker_argv"], expected_canonical_argv)
-        self.assertEqual(environment["stim_worker_module_path"], str(stim_worker_module))
+        self.assertEqual(environment["canonical_worker_argv"], expected_worker_argv)
+        self.assertEqual(
+            environment["stim_worker_module_path"],
+            stim_worker_module.relative_to(ROOT).as_posix(),
+        )
         self.assertEqual(
             environment["stim_worker_module_sha256"],
             hashlib.sha256(stim_worker_module.read_bytes()).hexdigest(),
         )
-        python_executable = Path(environment["python_executable"])
-        self.assertTrue(python_executable.is_file(), python_executable)
         self.assertEqual(
-            environment["python_executable_sha256"],
-            hashlib.sha256(python_executable.read_bytes()).hexdigest(),
-        )
-        extension_path = Path(environment["loaded_stim_extension_path"])
-        self.assertNotEqual(extension_path.name, "__init__.py")
-        self.assertTrue(
-            any(str(extension_path).endswith(suffix) for suffix in importlib.machinery.EXTENSION_SUFFIXES),
-            extension_path,
-        )
-        self.assertEqual(
-            environment["loaded_stim_extension_sha256"],
-            hashlib.sha256(extension_path.read_bytes()).hexdigest(),
-        )
-        rstim_binary = Path(environment["rstim_worker_binary_path"])
-        self.assertEqual(rstim_binary, Path(sys.executable).resolve())
-        self.assertEqual(
-            environment["rstim_worker_binary_sha256"],
-            hashlib.sha256(rstim_binary.read_bytes()).hexdigest(),
+            {identity["role"] for identity in environment["runtime_identities"]},
+            {"tool://python", "tool://stim-extension", "tool://stim-worker", "tool://rstim-worker"},
         )
         preflight = environment["known_answer_preflight"]
-        self.assertEqual([record["variant"] for record in preflight], ["stim", "rstim"])
-        self.assertEqual([record["result_hex"] for record in preflight], ["01", "01"])
+        self.assertEqual([record["variant"] for record in preflight], list(run_compiled_steady.VARIANTS))
+        self.assertEqual([record["result_hex"] for record in preflight], ["01"] * 5)
         for record in preflight:
-            self.assertEqual(record["ready"]["fixture_sha256"], known_answer_sha)
-            self.assertEqual(record["ready"]["compile_count"], 1)
-            self.assertEqual(record["ready"]["reference_build_count"], 1)
+            expected_known_answer_sha = (
+                atom_loss_known_answer_sha
+                if record["variant"] == run_compiled_steady.ATOM_LOSS_VARIANT
+                else known_answer_sha
+            )
+            self.assertEqual(record["ready"]["fixture_sha256"], expected_known_answer_sha)
+            expected_precompile = 7 if record["variant"] in run_compiled_steady.PRECOMPILED_VARIANTS else 0
+            self.assertEqual(record["ready"]["precompile_elapsed_ns"], expected_precompile)
+            compile_count, reference_build_count = run_compiled_steady._expected_lifecycle_counts(
+                record["variant"], 0
+            )
+            self.assertEqual(record["ready"]["compile_count"], compile_count)
+            self.assertEqual(record["ready"]["reference_build_count"], reference_build_count)
             self.assertEqual(record["ready"]["sample_call_count"], 0)
             self.assertEqual(record["ready"]["measurement_count"], 1)
             self.assertEqual(record["ready"]["bytes_per_shot"], 1)
-            self.assertEqual(record["final"]["fixture_sha256"], known_answer_sha)
+            self.assertEqual(record["final"]["fixture_sha256"], expected_known_answer_sha)
             self.assertEqual(record["final"]["sample_call_count"], 1)
 
-    def test_sample_timing_includes_delayed_final_result_byte(self) -> None:
+    def test_worker_timings_exclude_delayed_pipe_byte(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("delay-last-byte")
         self.addCleanup(temp_dir.cleanup)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         raw = [json.loads(line) for line in (out_dir / "raw.jsonl").read_text().splitlines()]
-        elapsed = [record["elapsed_ns"] for record in raw if record["record_type"] == "sample"]
-        self.assertGreaterEqual(max(elapsed), 140_000_000)
+        samples = [record for record in raw if record["record_type"] == "sample"]
+        self.assertEqual({record["sample_elapsed_ns"] for record in samples}, {1})
+        self.assertEqual({record["b8_elapsed_ns"] for record in samples}, {2})
+        self.assertEqual({record["worker_total_elapsed_ns"] for record in samples}, {3})
+        self.assertTrue(all("end_to_end_elapsed_ns" not in record for record in samples))
 
     def test_nonzero_exit_after_final_rejects_before_summary(self) -> None:
         result, out_dir, temp_dir = self._run_fake_mode("final-then-nonzero")
@@ -613,7 +649,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
         )
         self.assertEqual(args.profile, "debug")
 
-    def test_debug_profile_still_records_release_canonical_worker_argv(self) -> None:
+    def test_debug_profile_records_portable_worker_argv(self) -> None:
         parser = run_compiled_steady.build_parser()
         args = parser.parse_args(
             [
@@ -630,10 +666,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
         manifest = run_compiled_steady.fair_cli_contract.load_manifest(MANIFEST)
         case = run_compiled_steady.fair_cli_contract.find_case(manifest, "stim_surface_d11_r100")
         fixture = (ROOT / case["canonical_input_path"]).resolve()
-        worker_details = [
-            {"variant": "stim", "command": ["fake-stim", "--input", str(fixture), "--seed", "0"]},
-            {"variant": "rstim", "command": ["target/debug/rstim_compiled_steady_worker", "--input", str(fixture), "--seed", "0"]},
-        ]
+        worker_details = []
 
         with (
             unittest.mock.patch.object(run_compiled_steady, "_version_string", return_value=None),
@@ -647,19 +680,23 @@ class RunCompiledSteadyTest(unittest.TestCase):
                 args=args,
                 case=case,
                 input_path=fixture,
+                atom_loss_input_path=(ROOT / run_compiled_steady.ATOM_LOSS_FIXTURE_PATH).resolve(),
                 rstim_command=run_compiled_steady.default_rstim_worker_command("debug"),
                 worker_details=worker_details,
                 preflight_results=[],
-                stim_probe={"path": None, "sha256": None},
+                stim_probe={"path": str(Path(sys.executable).resolve()), "version": "1.15.0"},
             )
 
-        self.assertEqual(environment["worker_argv"]["rstim"][0], "target/debug/rstim_compiled_steady_worker")
+        fixture_path = fixture.relative_to(ROOT).as_posix()
+        self.assertEqual(environment["worker_argv"]["rstim-precompiled"][0], "tool://rstim-worker")
         self.assertEqual(
-            environment["canonical_worker_argv"]["rstim"],
+            environment["canonical_worker_argv"]["rstim-precompiled"],
             [
-                "target/release/rstim_compiled_steady_worker",
+                "tool://rstim-worker",
+                "--variant",
+                "rstim-precompiled",
                 "--input",
-                str(fixture),
+                fixture_path,
                 "--seed",
                 "0",
             ],

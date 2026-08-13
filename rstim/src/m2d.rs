@@ -63,13 +63,37 @@ pub fn measurements_to_detections_with_options(
         }
         ReferenceSampleMode::SimulateNoiseless => None,
     };
+    measurements_to_detections_impl(
+        work_instrs,
+        meas_table,
+        sweep_table,
+        shared_reference.as_deref(),
+        measurement_corrections,
+    )
+}
+
+pub(crate) fn measurements_to_detections_with_reference(
+    instrs: &[StimInstr],
+    meas_table: &BitTable,
+    reference_sample: &[bool],
+) -> Result<M2dOutput, String> {
+    measurements_to_detections_impl(instrs, meas_table, None, Some(reference_sample), &[])
+}
+
+fn measurements_to_detections_impl(
+    work_instrs: &[StimInstr],
+    meas_table: &BitTable,
+    sweep_table: Option<&BitTable>,
+    shared_reference: Option<&[bool]>,
+    measurement_corrections: &[Vec<usize>],
+) -> Result<M2dOutput, String> {
     let layout = CheckedMeasurementLayout::from_circuit_with_limits(
         work_instrs,
         MeasurementTransformLimits::default(),
     )
     .map_err(|err| err.to_string())?;
     let n_meas = layout.num_measurements();
-    if let Some(reference) = shared_reference.as_ref() {
+    if let Some(reference) = shared_reference {
         if reference.len() != n_meas {
             return Err(reference_measurement_count_mismatch(
                 reference.len(),
@@ -106,8 +130,8 @@ pub fn measurements_to_detections_with_options(
 
     for shot in 0..n_shots {
         let per_shot_reference;
-        let reference = if let Some(reference) = shared_reference.as_ref() {
-            reference.as_slice()
+        let reference = if let Some(reference) = shared_reference {
+            reference
         } else {
             let sweep_table = sweep_table.expect("validated above");
             let sweep_row: Vec<bool> = (0..sweep_table.num_major())
@@ -155,6 +179,18 @@ fn reference_measurement_count_mismatch(reference_len: usize, n_meas: usize) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn precomputed_reference_is_used_instead_of_rebuilding_from_the_circuit() {
+        let instrs = crate::parser::parse_lines("X 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+        let mut measurements = BitTable::try_new(1, 1).unwrap();
+        measurements.set(0, 0, true);
+
+        let output =
+            measurements_to_detections_with_reference(&instrs, &measurements, &[false]).unwrap();
+
+        assert!(output.detections.get(0, 0));
+    }
 
     #[test]
     fn reference_measurement_count_mismatch_is_actionable() {

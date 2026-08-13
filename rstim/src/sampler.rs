@@ -13,7 +13,9 @@ use crate::executor::max_qubit;
 use crate::executor::Executor;
 use crate::ir::StimInstr;
 use crate::loss_sampler::LossSamplerPlan;
-use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::m2d::{
+    measurements_to_detections_with_options, measurements_to_detections_with_reference, M2dOptions,
+};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -113,6 +115,19 @@ pub struct CompiledMeasurementSampler {
     diagnostics: CompiledMeasurementSamplerDiagnostics,
 }
 
+/// A reusable sampler for circuits whose `LOSS` instructions can conditionally suppress gates.
+///
+/// Compiling once keeps the loss operation plan and noiseless reference sample out of the timed
+/// steady-state sampling path. When loss can affect a later entangling gate, sampling uses a
+/// self-contained bit-parallel CSS frame so each shot can follow its own Clifford path.
+#[derive(Debug)]
+pub struct CompiledLossMeasurementSampler {
+    instrs: Vec<StimInstr>,
+    plan: LossSamplerPlan,
+    reference_sample: Vec<bool>,
+    diagnostics: CompiledMeasurementSamplerDiagnostics,
+}
+
 impl CompiledMeasurementSampler {
     pub fn compile(
         instrs: &[StimInstr],
@@ -172,6 +187,65 @@ impl CompiledMeasurementSampler {
                 ..SampleOptions::default()
             },
         )
+    }
+
+    #[doc(hidden)]
+    pub fn diagnostics(&self) -> CompiledMeasurementSamplerDiagnostics {
+        self.diagnostics
+    }
+}
+
+impl CompiledLossMeasurementSampler {
+    pub fn compile(
+        instrs: &[StimInstr],
+        reference_mode: ReferenceSampleMode,
+    ) -> Result<Self, String> {
+        let plan = LossSamplerPlan::try_compile(instrs)
+            .ok_or_else(|| "circuit does not support the compiled loss sampler".to_string())?;
+        let reference_sample = match reference_mode {
+            ReferenceSampleMode::SimulateNoiseless => {
+                build_reference_sample(instrs, reference_mode)?
+            }
+            ReferenceSampleMode::AssumeAllZero => vec![false; plan.num_measurements()],
+        };
+        Ok(Self {
+            instrs: instrs.to_vec(),
+            plan,
+            reference_sample,
+            diagnostics: CompiledMeasurementSamplerDiagnostics {
+                compiled_ir_builds: 1,
+                reference_builds: 1,
+                sample_calls: 0,
+            },
+        })
+    }
+
+    pub fn sample(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+        output_mode: SampleOutputMode,
+    ) -> Result<BatchOutput, String> {
+        self.diagnostics.sample_calls += 1;
+        let measurements = self.plan.run_batch(shots, &self.reference_sample, rng)?;
+        if output_mode == SampleOutputMode::MeasurementsOnly {
+            return BatchOutput::measurements_only(measurements, shots);
+        }
+
+        let m2d = measurements_to_detections_with_reference(
+            &self.instrs,
+            &measurements,
+            &self.reference_sample,
+        )?;
+        let (detector_materializations, observable_materializations) =
+            count_output_materialization_ops(&self.instrs);
+        Ok(BatchOutput::full(
+            measurements,
+            m2d.detections,
+            m2d.observable_flips,
+            detector_materializations,
+            observable_materializations,
+        ))
     }
 
     #[doc(hidden)]

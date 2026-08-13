@@ -9,40 +9,52 @@
       "expected_variants": [
         "stim-cli",
         "rstim-interpreted",
-        "rstim-compiled"
+        "rstim-compiled",
+        "rstim-interpreted-atom-loss"
       ],
       "present_variants": [
         "rstim-compiled",
         "rstim-interpreted",
+        "rstim-interpreted-atom-loss",
         "stim-cli"
       ],
       "variants": [
         {
           "tool_variant": "rstim-compiled",
-          "sample_count": 1,
-          "median_wall_time_ns": 586794000,
-          "median_shots_per_second": 1745.0757846876418,
-          "median_peak_memory_bytes": 8011776,
+          "sample_count": 11,
+          "median_wall_time_ns": 8926334,
+          "median_shots_per_second": 114716.74709908906,
+          "median_peak_memory_bytes": 12468224,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
         },
         {
           "tool_variant": "rstim-interpreted",
-          "sample_count": 1,
-          "median_wall_time_ns": 590138250,
-          "median_shots_per_second": 1735.1866278791454,
-          "median_peak_memory_bytes": 7831552,
+          "sample_count": 11,
+          "median_wall_time_ns": 10567292,
+          "median_shots_per_second": 96902.78266182102,
+          "median_peak_memory_bytes": 12206080,
+          "status": "completed",
+          "failure_reason": null,
+          "stderr": null
+        },
+        {
+          "tool_variant": "rstim-interpreted-atom-loss",
+          "sample_count": 11,
+          "median_wall_time_ns": 1203423792,
+          "median_shots_per_second": 850.9055636154483,
+          "median_peak_memory_bytes": 27934720,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
         },
         {
           "tool_variant": "stim-cli",
-          "sample_count": 1,
-          "median_wall_time_ns": 182962958,
-          "median_shots_per_second": 5596.761285418221,
-          "median_peak_memory_bytes": 3850240,
+          "sample_count": 11,
+          "median_wall_time_ns": 243594417,
+          "median_shots_per_second": 4203.708823096713,
+          "median_peak_memory_bytes": 4276224,
           "status": "completed",
           "failure_reason": null,
           "stderr": null
@@ -53,14 +65,20 @@
           "kind": "sampler_compiled_vs_interpreted",
           "lhs_variant": "rstim-compiled",
           "rhs_variant": "rstim-interpreted",
-          "ratio": 0.9943331075387843
+          "ratio": 0.8447134800476792
+        },
+        {
+          "kind": "sampler_atom_loss_vs_interpreted",
+          "lhs_variant": "rstim-interpreted-atom-loss",
+          "rhs_variant": "rstim-interpreted",
+          "ratio": 113.88194742796925
         }
       ],
       "rstim_compiled_vs_stim_cli_ratio": {
         "kind": "rstim_compiled_vs_stim_cli",
         "lhs_variant": "rstim-compiled",
         "rhs_variant": "stim-cli",
-        "ratio": 3.207173771206738,
+        "ratio": 0.03664424706416814,
         "status": "completed",
         "failure_reason": null
       }

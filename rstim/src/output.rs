@@ -1,4 +1,5 @@
 use crate::sim::bit_table::BitTable;
+use crate::sim::bit_transpose::transpose_64x64;
 use std::io::Write;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,22 +42,105 @@ pub fn write_shots_01(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::i
 
 /// Dense binary: ceil(n_bits/8) bytes per shot, LSB-first bit packing.
 pub fn write_shots_b8(table: &BitTable, w: &mut (impl Write + ?Sized)) -> std::io::Result<()> {
+    let mut packed = Vec::new();
+    append_shots_b8(table, &mut packed)?;
+    w.write_all(&packed)
+}
+
+/// Appends dense b8 output directly to a byte vector without an intermediate copy.
+pub fn append_shots_b8(table: &BitTable, packed: &mut Vec<u8>) -> std::io::Result<()> {
     let n_bits = table.num_major();
     let n_shots = table.num_minor();
-    let bytes_per_shot = (n_bits + 7) / 8;
-    for shot in 0..n_shots {
-        for byte_idx in 0..bytes_per_shot {
-            let mut byte_val: u8 = 0;
-            for bit_in_byte in 0..8 {
-                let bit = byte_idx * 8 + bit_in_byte;
-                if bit < n_bits && table.get(bit, shot) {
-                    byte_val |= 1 << bit_in_byte;
+    let bytes_per_shot = n_bits.div_ceil(8);
+    let output_len = bytes_per_shot.checked_mul(n_shots).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "b8 output size overflows")
+    })?;
+    let output_start = packed.len();
+    let output_end = output_start.checked_add(output_len).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "b8 output size overflows")
+    })?;
+    packed
+        .try_reserve_exact(output_len)
+        .map_err(|error| std::io::Error::other(format!("failed to reserve b8 output: {error}")))?;
+    packed.resize(output_end, 0);
+    fill_shots_b8(
+        table,
+        &mut packed[output_start..output_end],
+        bytes_per_shot,
+    );
+    Ok(())
+}
+
+fn fill_shots_b8(table: &BitTable, packed: &mut [u8], bytes_per_shot: usize) {
+    if packed.len() < 256 * 1024 || table.words_per_row() < 2 {
+        fill_shot_word_range(table, packed, bytes_per_shot, 0);
+        return;
+    }
+
+    let worker_count = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        .min(table.words_per_row());
+    let words_per_worker = table.words_per_row().div_ceil(worker_count);
+    let bytes_per_worker = words_per_worker
+        .saturating_mul(64)
+        .saturating_mul(bytes_per_shot);
+
+    std::thread::scope(|scope| {
+        for (worker, chunk) in packed.chunks_mut(bytes_per_worker).enumerate() {
+            scope.spawn(move || {
+                fill_shot_word_range(table, chunk, bytes_per_shot, worker * words_per_worker);
+            });
+        }
+    });
+}
+
+fn fill_shot_word_range(
+    table: &BitTable,
+    packed: &mut [u8],
+    bytes_per_shot: usize,
+    first_shot_word: usize,
+) {
+    let n_bits = table.num_major();
+    let shots_in_range = if bytes_per_shot == 0 {
+        0
+    } else {
+        packed.len() / bytes_per_shot
+    };
+    // BitTable is measurement-major and packs 64 shots per u64, while b8 is shot-major.
+    // Transpose 64x64 tiles, then copy each shot's eight output bytes contiguously. This uses
+    // the same NEON-accelerated transpose kernel as packed tableau materialization.
+    for local_shot_base in (0..shots_in_range).step_by(64) {
+        let shot_word = first_shot_word + local_shot_base / 64;
+        let tile_shots = (shots_in_range - local_shot_base).min(64);
+        for bit_base in (0..n_bits).step_by(64) {
+            let tile_bits = (n_bits - bit_base).min(64);
+            let tile_bytes = tile_bits.div_ceil(8);
+            let output_byte_base = bit_base / 8;
+            let mut tile = [0u64; 64];
+            for bit_offset in 0..tile_bits {
+                tile[bit_offset] = table.row_words(bit_base + bit_offset)[shot_word];
+            }
+            transpose_64x64(&mut tile);
+            for shot_offset in 0..tile_shots {
+                let output_start =
+                    (local_shot_base + shot_offset) * bytes_per_shot + output_byte_base;
+                if tile_bytes == 8 {
+                    // SAFETY: output_start was computed for an in-range shot and full 64-bit
+                    // tile, so eight writable bytes remain. b8 shot strides need not be aligned.
+                    unsafe {
+                        std::ptr::write_unaligned(
+                            packed.as_mut_ptr().add(output_start).cast::<u64>(),
+                            tile[shot_offset].to_le(),
+                        );
+                    }
+                } else {
+                    packed[output_start..output_start + tile_bytes]
+                        .copy_from_slice(&tile[shot_offset].to_le_bytes()[..tile_bytes]);
                 }
             }
-            w.write_all(&[byte_val])?;
         }
     }
-    Ok(())
 }
 
 /// Sparse binary run-length encoding.

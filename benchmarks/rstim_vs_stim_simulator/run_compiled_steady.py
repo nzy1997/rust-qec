@@ -11,7 +11,6 @@ import struct
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -24,7 +23,26 @@ RESULT = b"T"
 STOP = b"P"
 FINAL = b"F"
 ERROR = b"E"
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 4
+TIMER_SCOPE = "worker_sample_path_and_b8_output_excluding_precompile_and_transport"
+VARIANTS = (
+    "rstim-precompiled",
+    "stim-precompiled",
+    "rstim-interpreted",
+    "stim-direct",
+    "rstim-precompiled-atom-loss",
+)
+STIM_VARIANTS = {"stim-precompiled", "stim-direct"}
+PRECOMPILED_VARIANTS = {
+    "rstim-precompiled",
+    "stim-precompiled",
+    "rstim-precompiled-atom-loss",
+}
+ATOM_LOSS_VARIANT = "rstim-precompiled-atom-loss"
+ATOM_LOSS_FIXTURE_PATH = Path(
+    "benchmarks/rstim_vs_stim_simulator/fixtures/"
+    "stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
+)
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parents[1]
@@ -85,18 +103,36 @@ def _repo_relative(path: Path) -> str:
     return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
 
 
-def _portable_worker_argv(role: str, input_path: str, *, seed: int) -> list[str]:
-    if role == "stim":
+def _portable_worker_argv(variant: str, input_path: str, *, seed: int) -> list[str]:
+    if variant in STIM_VARIANTS:
         return [
             "tool://python",
             "-m",
             "benchmarks.rstim_vs_stim_simulator.workers.stim_compiled_steady",
+            "--variant",
+            variant,
             "--input",
             input_path,
             "--seed",
             str(seed),
         ]
-    return ["tool://rstim-worker", "--input", input_path, "--seed", str(seed)]
+    return [
+        "tool://rstim-worker",
+        "--variant",
+        variant,
+        "--input",
+        input_path,
+        "--seed",
+        str(seed),
+    ]
+
+
+def _expected_lifecycle_counts(variant: str, sample_call_count: int) -> tuple[int, int]:
+    if variant in PRECOMPILED_VARIANTS:
+        return 1, 1
+    if variant == "stim-direct":
+        return sample_call_count, sample_call_count
+    return 0, sample_call_count
 
 
 def _decode_json(payload: bytes, *, context: str) -> dict[str, Any]:
@@ -283,23 +319,23 @@ class WorkerSession:
             raise RunnerError(f"expected READY frame, got {frame_type!r}")
         return _decode_json(payload, context="READY")
 
-    def sample(self, request_id: int, shots: int) -> tuple[int, bytes, int]:
+    def sample(self, request_id: int, shots: int) -> tuple[int, bytes, int, int]:
         payload = json.dumps({"request_id": request_id, "shots": shots}, sort_keys=True).encode()
-        started_ns = time.perf_counter_ns()
         write_frame(self.stdin, SAMPLE, payload)
         self.stdin.flush()
         frame_type, result_payload = read_frame(self.stdout)
-        elapsed_ns = time.perf_counter_ns() - started_ns
         if frame_type == ERROR:
             raise RunnerError(f"worker error during sample: {result_payload.decode(errors='replace')}")
         if frame_type != RESULT:
             raise RunnerError(f"expected RESULT frame, got {frame_type!r}")
-        if len(result_payload) < 16:
-            raise RunnerError("RESULT payload is shorter than request and call counters")
-        returned_request_id, sample_call_count = struct.unpack("<QQ", result_payload[:16])
+        if len(result_payload) < 32:
+            raise RunnerError("RESULT payload is shorter than request, call, sample, and b8 timing fields")
+        returned_request_id, sample_call_count, sample_elapsed_ns, b8_elapsed_ns = struct.unpack(
+            "<QQQQ", result_payload[:32]
+        )
         if returned_request_id != request_id:
             raise RunnerError(f"RESULT request id {returned_request_id} does not match {request_id}")
-        return sample_call_count, result_payload[16:], elapsed_ns
+        return sample_call_count, result_payload[32:], sample_elapsed_ns, b8_elapsed_ns
 
     def stop(self) -> dict[str, Any]:
         write_frame(self.stdin, STOP, b"")
@@ -333,15 +369,25 @@ def _validate_telemetry(
     bytes_per_shot: int,
     sample_call_count: int,
 ) -> None:
+    compile_count, reference_build_count = _expected_lifecycle_counts(variant, sample_call_count)
     expected = {
         "variant": variant,
-        "compile_count": 1,
-        "reference_build_count": 1,
+        "precompile_elapsed_ns": telemetry.get("precompile_elapsed_ns"),
+        "compile_count": compile_count,
+        "reference_build_count": reference_build_count,
         "sample_call_count": sample_call_count,
         "fixture_sha256": fixture_sha256,
         "measurement_count": measurement_count,
         "bytes_per_shot": bytes_per_shot,
     }
+    precompile_elapsed_ns = telemetry.get("precompile_elapsed_ns")
+    if not isinstance(precompile_elapsed_ns, int) or isinstance(precompile_elapsed_ns, bool):
+        raise RunnerError("worker telemetry precompile_elapsed_ns must be an integer")
+    if variant in PRECOMPILED_VARIANTS:
+        if precompile_elapsed_ns <= 0:
+            raise RunnerError("precompiled worker telemetry precompile_elapsed_ns must be positive")
+    elif precompile_elapsed_ns != 0:
+        raise RunnerError("direct worker telemetry precompile_elapsed_ns must be zero")
     for key, value in expected.items():
         if telemetry.get(key) != value:
             raise RunnerError(f"worker telemetry {key}: expected {value!r}, got {telemetry.get(key)!r}")
@@ -350,7 +396,10 @@ def _validate_telemetry(
 def _run_preflight(command: list[str], *, variant: str, seed: int) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as temp_dir:
         fixture = Path(temp_dir) / "known_answer.stim"
-        fixture.write_text("X 0\nM 0\n", encoding="utf-8")
+        fixture.write_text(
+            "X 0\nLOSS(0) 0\nM 0\n" if variant == ATOM_LOSS_VARIANT else "X 0\nM 0\n",
+            encoding="utf-8",
+        )
         session = WorkerSession(command, input_path=fixture, seed=seed)
         try:
             ready = session.read_ready()
@@ -362,7 +411,7 @@ def _run_preflight(command: list[str], *, variant: str, seed: int) -> dict[str, 
                 bytes_per_shot=1,
                 sample_call_count=0,
             )
-            call_count, data, _ = session.sample(0, 1)
+            call_count, data, _, _ = session.sample(0, 1)
             if call_count != 1 or data != b"\x01":
                 raise RunnerError("known-answer preflight expected one result byte 0x01")
             final = session.stop()
@@ -416,7 +465,7 @@ def _run_variant(
         )
         records.append({"record_type": "ready", "variant": variant, "telemetry": ready})
         for request_id in range(total_rounds):
-            call_count, data, elapsed_ns = session.sample(request_id, shots)
+            call_count, data, sample_elapsed_ns, b8_elapsed_ns = session.sample(request_id, shots)
             if call_count != request_id + 1:
                 raise RunnerError(f"{variant} RESULT sample count {call_count} does not match {request_id + 1}")
             if len(data) != expected_output_bytes:
@@ -430,7 +479,9 @@ def _run_variant(
                     "shots": shots,
                     "output_format": output_format,
                     "warmup": request_id < warmup_rounds,
-                    "elapsed_ns": elapsed_ns,
+                    "sample_elapsed_ns": sample_elapsed_ns,
+                    "b8_elapsed_ns": b8_elapsed_ns,
+                    "worker_total_elapsed_ns": sample_elapsed_ns + b8_elapsed_ns,
                     "output_bytes": len(data),
                 }
             )
@@ -452,17 +503,29 @@ def _run_variant(
 
 def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     variants = []
-    for variant in ("stim", "rstim"):
+    for variant in VARIANTS:
         measured = [
-            record["elapsed_ns"]
+            record
             for record in records
             if record["record_type"] == "sample" and record["variant"] == variant and not record["warmup"]
+        ]
+        median_call = sorted(measured, key=lambda record: record["worker_total_elapsed_ns"])[
+            len(measured) // 2
         ]
         variants.append(
             {
                 "variant": variant,
                 "sample_count": len(measured),
-                "median_elapsed_ns": statistics.median(measured),
+                "precompile_elapsed_ns": next(
+                    record["telemetry"]["precompile_elapsed_ns"]
+                    for record in records
+                    if record["record_type"] == "ready" and record["variant"] == variant
+                ),
+                "median_call_sample_elapsed_ns": median_call["sample_elapsed_ns"],
+                "median_call_b8_elapsed_ns": median_call["b8_elapsed_ns"],
+                "median_worker_total_elapsed_ns": statistics.median(
+                    record["worker_total_elapsed_ns"] for record in measured
+                ),
             }
         )
     return {"measured_records": sum(item["sample_count"] for item in variants), "variants": variants}
@@ -470,15 +533,18 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _render_report(summary: dict[str, Any]) -> str:
     lines = [
-        "# Compiled steady-state benchmark",
+        "# Split precompile, sample, and b8 benchmark",
         "",
-        "| variant | sample_count | median_elapsed_ns |",
-        "| --- | ---: | ---: |",
+        "| variant | sample_count | precompile_elapsed_ns | median_call_sample_elapsed_ns | median_call_b8_elapsed_ns | median_worker_total_elapsed_ns |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for variant in summary["variants"]:
         lines.append(
             f"| {variant['variant']} | {variant['sample_count']} | "
-            f"{variant['median_elapsed_ns']} |"
+            f"{variant['precompile_elapsed_ns']} | "
+            f"{variant['median_call_sample_elapsed_ns']} | "
+            f"{variant['median_call_b8_elapsed_ns']} | "
+            f"{variant['median_worker_total_elapsed_ns']} |"
         )
     lines.extend(["", f"Measured records: {summary['measured_records']}", ""])
     return "\n".join(lines)
@@ -489,6 +555,7 @@ def _collect_environment(
     args: argparse.Namespace,
     case: dict[str, Any],
     input_path: Path,
+    atom_loss_input_path: Path,
     rstim_command: list[str],
     worker_details: list[dict[str, Any]],
     preflight_results: list[dict[str, Any]],
@@ -503,16 +570,21 @@ def _collect_environment(
     git_commit = _version_string(["git", "rev-parse", "HEAD"])
     rstim_version = _version_string([*rstim_command, "--version"])
     input_path_relative = _repo_relative(input_path)
+    atom_loss_input_path_relative = _repo_relative(atom_loss_input_path)
     worker_argv = {
-        variant: _portable_worker_argv(variant, input_path_relative, seed=args.seed)
-        for variant in ("stim", "rstim")
+        variant: _portable_worker_argv(
+            variant,
+            atom_loss_input_path_relative if variant == ATOM_LOSS_VARIANT else input_path_relative,
+            seed=args.seed,
+        )
+        for variant in VARIANTS
     }
     portable_preflight_results = []
     for item in preflight_results:
         portable = {**item}
         portable["argv"] = _portable_worker_argv(
             str(item["variant"]),
-            "fixture://compiled-steady-known-answer",
+            "fixture://sample-b8-known-answer",
             seed=args.seed,
         )
         portable_preflight_results.append(portable)
@@ -547,8 +619,8 @@ def _collect_environment(
         "os": platform.platform(),
         "cpu_model": _cpu_model(),
         "profile": args.profile,
-        "timer_scope": case["timer_scope"],
-        "seed_policy": "seed_once_then_advance_across_9_calls",
+        "timer_scope": TIMER_SCOPE,
+        "seed_policy": "precompiled_and_rstim_interpreted_seed_once;stim_direct_seed_per_call",
         "stim_version": case["stim_version"],
         "stim_python_probe": {
             "status": stim_probe.get("status"),
@@ -563,6 +635,8 @@ def _collect_environment(
         "source_manifest_sha256": _sha256(source_manifest_path),
         "fixture_path": input_path_relative,
         "fixture_sha256": case["canonical_input_sha256"],
+        "atom_loss_fixture_path": atom_loss_input_path_relative,
+        "atom_loss_fixture_sha256": _sha256(atom_loss_input_path),
         "worker_argv": worker_argv,
         "canonical_worker_argv": worker_argv,
         "stim_worker_module_path": _repo_relative(stim_worker_module_path),
@@ -573,7 +647,7 @@ def _collect_environment(
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
         "known_answer_preflight": portable_preflight_results,
-        "workers": [{"variant": variant, "command": worker_argv[variant]} for variant in ("stim", "rstim")],
+        "workers": [{"variant": variant, "command": worker_argv[variant]} for variant in VARIANTS],
     }
 
 
@@ -587,6 +661,9 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         raise RunnerError("compiled steady-state runner requires stim==1.15.0")
 
     input_path = (REPO_ROOT / case["canonical_input_path"]).resolve()
+    atom_loss_input_path = (REPO_ROOT / ATOM_LOSS_FIXTURE_PATH).resolve()
+    if not atom_loss_input_path.is_file():
+        raise RunnerError(f"atom-loss fixture does not exist: {atom_loss_input_path}")
     stim_command = args.stim_worker_command or default_stim_worker_command()
     rstim_command = args.rstim_worker_command or build_rstim_worker(args.profile)
     stim_probe = _probe_stim_python()
@@ -596,19 +673,23 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
             f"got {stim_probe.get('version')!r}"
         )
 
-    preflight_results = [
-        _run_preflight(stim_command, variant="stim", seed=args.seed),
-        _run_preflight(rstim_command, variant="rstim", seed=args.seed),
-    ]
+    preflight_results = []
+    for variant in VARIANTS:
+        base_command = stim_command if variant in STIM_VARIANTS else rstim_command
+        preflight_results.append(
+            _run_preflight([*base_command, "--variant", variant], variant=variant, seed=args.seed)
+        )
 
     all_records: list[dict[str, Any]] = []
     worker_details: list[dict[str, Any]] = []
-    for variant, command in (("stim", stim_command), ("rstim", rstim_command)):
+    for variant in VARIANTS:
+        base_command = stim_command if variant in STIM_VARIANTS else rstim_command
+        variant_input_path = atom_loss_input_path if variant == ATOM_LOSS_VARIANT else input_path
         records, details = _run_variant(
             variant=variant,
-            command=command,
-            input_path=input_path,
-            fixture_sha256=case["canonical_input_sha256"],
+            command=[*base_command, "--variant", variant],
+            input_path=variant_input_path,
+            fixture_sha256=_sha256(variant_input_path),
             seed=args.seed,
             shots=case["shots"],
             output_format=case["output_format"],
@@ -630,6 +711,7 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
         args=args,
         case=case,
         input_path=input_path,
+        atom_loss_input_path=atom_loss_input_path,
         rstim_command=rstim_command,
         worker_details=worker_details,
         preflight_results=preflight_results,
@@ -637,8 +719,15 @@ def run_compiled_steady(args: argparse.Namespace) -> None:
     )
     (out_dir / "environment.json").write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n")
     (out_dir / "report.md").write_text(_render_report(summary))
+    artifact_hashes = {
+        filename: _sha256(out_dir / filename)
+        for filename in ("raw.jsonl", "summary.json", "report.md", "environment.json")
+    }
+    (out_dir / "artifact-sha256.json").write_text(
+        json.dumps(artifact_hashes, indent=2, sort_keys=True) + "\n"
+    )
     print(
-        "PASS compiled steady-state lifecycle variants=2 compile=1 reference=1 "
+        "PASS split precompile/sample/b8 lifecycle variants=5 "
         f"calls={args.warmup_rounds + args.measure_rounds} measured={summary['measured_records']}"
     )
 
