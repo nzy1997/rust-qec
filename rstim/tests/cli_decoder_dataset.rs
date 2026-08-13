@@ -250,6 +250,12 @@ fn generated_surface_z_memory_with_marker() -> (String, &'static str) {
     (circuit, "1,2,3")
 }
 
+fn generated_surface_x_memory_with_marker() -> String {
+    let mut circuit = generated_common_circuit_text("surface_code", "rotated_memory_x");
+    insert_marker_before_first_tick(&mut circuit);
+    circuit
+}
+
 fn generated_common_circuit_text(code: &str, task: &str) -> String {
     let args = [
         "gen".to_string(),
@@ -296,6 +302,118 @@ fn repetition_and_surface_memory_export_in_both_modes() {
             logical_x_qubits,
             "measurements_blinded",
         );
+    }
+}
+
+#[test]
+fn surface_memory_x_blinded_export_accepts_logical_z_and_rejects_invalid_choices() {
+    const LOGICAL_X_SUPPORT: &str = "1,2,3";
+    const LOGICAL_Z_SUPPORT: &str = "1,7,13";
+
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join("memory-x.stim");
+    fs::write(&circuit, generated_surface_x_memory_with_marker()).unwrap();
+
+    let public_out = root.path().join("success-public");
+    let private_out = root.path().join("success-private");
+    let mut args = export_args(
+        &circuit,
+        "measurements_blinded",
+        &public_out,
+        &private_out,
+        &[
+            "--logical_z_qubits",
+            LOGICAL_Z_SUPPORT,
+            "--seed",
+            "20260813",
+        ],
+    );
+    let shots_index = args.iter().position(|arg| arg == "--shots").unwrap() + 1;
+    args[shots_index] = "64".to_string();
+    assert_success(&run_cli(&args), "memory-X logical-Z blinded export");
+
+    let public_manifest: Value =
+        serde_json::from_slice(&fs::read(public_out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(public_manifest["shots"], 64);
+    assert_eq!(public_manifest["row"]["kind"], "measurements");
+    let measurement_bits = public_manifest["circuit"]["measurements"]
+        .as_u64()
+        .unwrap();
+    assert_eq!(public_manifest["row"]["bits"], measurement_bits);
+    let public_bytes_per_shot = public_manifest["row"]["bytes_per_shot"]
+        .as_u64()
+        .unwrap() as usize;
+    assert_eq!(public_bytes_per_shot, measurement_bits.div_ceil(8) as usize);
+    assert_eq!(
+        fs::read(public_out.join("shots.b8")).unwrap().len(),
+        64 * public_bytes_per_shot
+    );
+
+    let private_manifest: Value =
+        serde_json::from_slice(&fs::read(private_out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(private_manifest["shots"], 64);
+    assert_eq!(private_manifest["answers_file"]["bits"], 1);
+    assert_eq!(private_manifest["answers_file"]["bytes_per_shot"], 1);
+    assert_eq!(private_manifest["masks_file"]["bits"], 1);
+    assert_eq!(private_manifest["masks_file"]["bytes_per_shot"], 1);
+    assert_eq!(fs::read(private_out.join("answers.b8")).unwrap().len(), 64);
+    assert_eq!(fs::read(private_out.join("masks.b8")).unwrap().len(), 64);
+
+    for (name, mode, extra, expected) in [
+        (
+            "logical-X-does-not-flip",
+            "measurements_blinded",
+            vec!["--logical_x_qubits", LOGICAL_X_SUPPORT],
+            "injected logical X does not flip observable 0",
+        ),
+        (
+            "both-logical-options",
+            "measurements_blinded",
+            vec![
+                "--logical_x_qubits",
+                LOGICAL_X_SUPPORT,
+                "--logical_z_qubits",
+                LOGICAL_Z_SUPPORT,
+            ],
+            "--logical_x_qubits and --logical_z_qubits are mutually exclusive",
+        ),
+        (
+            "neither-logical-option",
+            "measurements_blinded",
+            vec![],
+            "measurements_blinded mode requires exactly one of --logical_x_qubits or --logical_z_qubits",
+        ),
+        (
+            "detectors-logical-Z",
+            "detectors",
+            vec!["--logical_z_qubits", LOGICAL_Z_SUPPORT],
+            "detectors mode rejects --logical_z_qubits",
+        ),
+        (
+            "invalid-logical-X",
+            "measurements_blinded",
+            vec!["--logical_x_qubits", "not-a-qubit"],
+            "--logical_x_qubits contains invalid",
+        ),
+        (
+            "invalid-logical-Z",
+            "measurements_blinded",
+            vec!["--logical_z_qubits", "not-a-qubit"],
+            "--logical_z_qubits contains invalid",
+        ),
+    ] {
+        let public_out = root.path().join(format!("{name}-public"));
+        let private_out = root.path().join(format!("{name}-private"));
+        let output = run_cli(&export_args(
+            &circuit,
+            mode,
+            &public_out,
+            &private_out,
+            &extra,
+        ));
+        assert_failure_contains(&output, name, expected);
+        assert!(!public_out.exists(), "{name} created public output");
+        assert!(!private_out.exists(), "{name} created private output");
     }
 }
 
@@ -361,6 +479,15 @@ fn assert_success(output: &Output, context: &str) {
 
 fn assert_failure(output: &Output, context: &str) {
     assert!(!output.status.success(), "{context} unexpectedly succeeded");
+}
+
+fn assert_failure_contains(output: &Output, context: &str, expected: &str) {
+    assert_failure(output, context);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(expected),
+        "{context} stderr did not contain {expected:?}: {stderr}"
+    );
 }
 
 fn sorted_entries(path: &Path) -> Vec<String> {

@@ -36,7 +36,45 @@ impl DecoderDatasetMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogicalPauli {
+    X,
+    Z,
+}
+
+impl LogicalPauli {
+    fn gate_name(self) -> &'static str {
+        match self {
+            Self::X => "X",
+            Self::Z => "Z",
+        }
+    }
+
+    fn option_name(self) -> &'static str {
+        match self {
+            Self::X => "--logical_x_qubits",
+            Self::Z => "--logical_z_qubits",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogicalFlip {
+    pub pauli: LogicalPauli,
+    pub qubits: Vec<u32>,
+}
+
+impl LogicalFlip {
+    pub fn parse(pauli: LogicalPauli, value: &str) -> Result<Self, String> {
+        Ok(Self {
+            pauli,
+            qubits: parse_logical_qubits(pauli.option_name(), value)?,
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
+/// Backward-compatible X-only export configuration from rstim 0.2.0.
 pub struct ExportDecoderDatasetConfig {
     pub circuit_text: String,
     pub shots: usize,
@@ -45,6 +83,46 @@ pub struct ExportDecoderDatasetConfig {
     pub public_out: PathBuf,
     pub private_out: PathBuf,
     pub seed: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+/// Export configuration supporting either an X or Z logical flip.
+pub struct ExportDecoderDatasetLogicalFlipConfig {
+    pub circuit_text: String,
+    pub shots: usize,
+    pub mode: DecoderDatasetMode,
+    pub logical_flip: Option<LogicalFlip>,
+    pub public_out: PathBuf,
+    pub private_out: PathBuf,
+    pub seed: Option<u64>,
+}
+
+impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
+    fn from(config: ExportDecoderDatasetConfig) -> Self {
+        let logical_flip = if config.logical_x_qubits.is_empty() {
+            None
+        } else {
+            Some(LogicalFlip {
+                pauli: LogicalPauli::X,
+                qubits: config.logical_x_qubits,
+            })
+        };
+        Self {
+            circuit_text: config.circuit_text,
+            shots: config.shots,
+            mode: config.mode,
+            logical_flip,
+            public_out: config.public_out,
+            private_out: config.private_out,
+            seed: config.seed,
+        }
+    }
+}
+
+impl From<&ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
+    fn from(config: &ExportDecoderDatasetConfig) -> Self {
+        config.clone().into()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,10 +178,9 @@ pub fn dataset_id_material(
     .into_bytes()
 }
 
-#[doc(hidden)]
-pub fn parse_logical_x_qubits(value: &str) -> Result<Vec<u32>, String> {
+fn parse_logical_qubits(option_name: &str, value: &str) -> Result<Vec<u32>, String> {
     if value.trim().is_empty() {
-        return Err("--logical_x_qubits must be non-empty".to_string());
+        return Err(format!("{option_name} must be non-empty"));
     }
 
     let mut seen = BTreeSet::new();
@@ -112,15 +189,20 @@ pub fn parse_logical_x_qubits(value: &str) -> Result<Vec<u32>, String> {
         let token = token.trim();
         let qubit = token
             .parse::<u32>()
-            .map_err(|_| format!("--logical_x_qubits contains invalid qubit index {token:?}"))?;
+            .map_err(|_| format!("{option_name} contains invalid qubit index {token:?}"))?;
         if !seen.insert(qubit) {
             return Err(format!(
-                "--logical_x_qubits contains duplicate qubit index {qubit}"
+                "{option_name} contains duplicate qubit index {qubit}"
             ));
         }
         qubits.push(qubit);
     }
     Ok(qubits)
+}
+
+#[doc(hidden)]
+pub fn parse_logical_x_qubits(value: &str) -> Result<Vec<u32>, String> {
+    LogicalFlip::parse(LogicalPauli::X, value).map(|flip| flip.qubits)
 }
 
 fn marker_depth_before_line(line: &str, current_depth: usize) -> usize {
@@ -144,9 +226,9 @@ fn marker_depth_after_line(line: &str, current_depth: usize) -> usize {
 }
 
 #[doc(hidden)]
-pub fn circuit_with_injected_logical_x(
+pub fn circuit_with_injected_logical_flip(
     circuit_text: &str,
-    logical_x_qubits: &[u32],
+    logical_flip: &LogicalFlip,
 ) -> Result<String, String> {
     let mut marker_count = 0;
     let mut marker_at_top_level = false;
@@ -171,8 +253,10 @@ pub fn circuit_with_injected_logical_x(
     }
 
     let injected = format!(
-        "X {}\n",
-        logical_x_qubits
+        "{} {}\n",
+        logical_flip.pauli.gate_name(),
+        logical_flip
+            .qubits
             .iter()
             .map(u32::to_string)
             .collect::<Vec<_>>()
@@ -189,6 +273,20 @@ pub fn circuit_with_injected_logical_x(
         }
     }
     Ok(output)
+}
+
+#[doc(hidden)]
+pub fn circuit_with_injected_logical_x(
+    circuit_text: &str,
+    logical_x_qubits: &[u32],
+) -> Result<String, String> {
+    circuit_with_injected_logical_flip(
+        circuit_text,
+        &LogicalFlip {
+            pauli: LogicalPauli::X,
+            qubits: logical_x_qubits.to_vec(),
+        },
+    )
 }
 
 #[derive(Debug)]
@@ -212,9 +310,10 @@ fn one_shot_measurement_table(bits: &[bool]) -> Result<BitTable, String> {
     Ok(table)
 }
 
-fn validate_logical_x_effect(
+fn validate_logical_flip_effect(
     public_instrs: &[crate::ir::StimInstr],
     private_instrs: &[crate::ir::StimInstr],
+    pauli: LogicalPauli,
 ) -> Result<(), String> {
     let m0 = crate::data_path::build_reference_sample(
         public_instrs,
@@ -230,12 +329,18 @@ fn validate_logical_x_effect(
     let out1 = crate::m2d::measurements_to_detections(public_instrs, &t1)?;
     for detector in 0..out0.detections.num_major() {
         if out0.detections.get(detector, 0) != out1.detections.get(detector, 0) {
-            return Err("injected logical X changes detector reference values".to_string());
+            return Err(format!(
+                "injected logical {} changes detector reference values",
+                pauli.gate_name()
+            ));
         }
     }
     let flips = out0.observable_flips.get(0, 0) ^ out1.observable_flips.get(0, 0);
     if !flips {
-        return Err("injected logical X does not flip observable 0".to_string());
+        return Err(format!(
+            "injected logical {} does not flip observable 0",
+            pauli.gate_name()
+        ));
     }
     Ok(())
 }
@@ -244,6 +349,15 @@ fn validate_logical_x_effect(
 #[allow(private_interfaces)]
 pub fn validate_decoder_dataset_inputs(
     config: &ExportDecoderDatasetConfig,
+) -> Result<ValidatedDecoderDatasetInput, String> {
+    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
+    validate_decoder_dataset_logical_flip_inputs(&config)
+}
+
+#[doc(hidden)]
+#[allow(private_interfaces)]
+pub fn validate_decoder_dataset_logical_flip_inputs(
+    config: &ExportDecoderDatasetLogicalFlipConfig,
 ) -> Result<ValidatedDecoderDatasetInput, String> {
     if config.shots == 0 {
         return Err("--shots must be positive".to_string());
@@ -259,12 +373,18 @@ pub fn validate_decoder_dataset_inputs(
     if stats.num_sweep_bits != 0 {
         return Err("export_decoder_dataset does not support sweep-bit circuits".to_string());
     }
-    match config.mode {
-        DecoderDatasetMode::Detectors if !config.logical_x_qubits.is_empty() => {
-            return Err("detectors mode rejects --logical_x_qubits".to_string());
+    match (config.mode, config.logical_flip.as_ref()) {
+        (DecoderDatasetMode::Detectors, Some(logical_flip)) => {
+            return Err(format!(
+                "detectors mode rejects {}",
+                logical_flip.pauli.option_name()
+            ));
         }
-        DecoderDatasetMode::MeasurementsBlinded if config.logical_x_qubits.is_empty() => {
-            return Err("measurements_blinded mode requires --logical_x_qubits".to_string());
+        (DecoderDatasetMode::MeasurementsBlinded, None) => {
+            return Err(
+                "measurements_blinded mode requires exactly one of --logical_x_qubits or --logical_z_qubits"
+                    .to_string(),
+            );
         }
         _ => {}
     }
@@ -272,18 +392,29 @@ pub fn validate_decoder_dataset_inputs(
     let private_one_instrs = match config.mode {
         DecoderDatasetMode::Detectors => None,
         DecoderDatasetMode::MeasurementsBlinded => {
-            for &qubit in &config.logical_x_qubits {
+            let logical_flip = config
+                .logical_flip
+                .as_ref()
+                .expect("measurements_blinded logical flip checked above");
+            if logical_flip.qubits.is_empty() {
+                return Err(format!(
+                    "{} must be non-empty",
+                    logical_flip.pauli.option_name()
+                ));
+            }
+            for &qubit in &logical_flip.qubits {
                 if qubit as usize >= stats.num_qubits {
                     return Err(format!(
-                        "--logical_x_qubits contains qubit {qubit}, but circuit has {} qubits",
+                        "{} contains qubit {qubit}, but circuit has {} qubits",
+                        logical_flip.pauli.option_name(),
                         stats.num_qubits
                     ));
                 }
             }
             let circuit_text =
-                circuit_with_injected_logical_x(&config.circuit_text, &config.logical_x_qubits)?;
+                circuit_with_injected_logical_flip(&config.circuit_text, logical_flip)?;
             let instrs = crate::parser::parse_lines(&circuit_text)?;
-            validate_logical_x_effect(&public_instrs, &instrs)?;
+            validate_logical_flip_effect(&public_instrs, &instrs, logical_flip.pauli)?;
             Some(instrs)
         }
     };
@@ -353,7 +484,15 @@ fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usiz
 pub fn generate_decoder_dataset_artifacts(
     config: &ExportDecoderDatasetConfig,
 ) -> Result<DecoderDatasetArtifacts, String> {
-    let validated = validate_decoder_dataset_inputs(config)?;
+    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
+    generate_decoder_dataset_artifacts_with_logical_flip(&config)
+}
+
+#[doc(hidden)]
+pub fn generate_decoder_dataset_artifacts_with_logical_flip(
+    config: &ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<DecoderDatasetArtifacts, String> {
+    let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
     let mut rngs = make_dataset_rngs(config.seed);
     match config.mode {
         DecoderDatasetMode::Detectors => {
@@ -741,6 +880,7 @@ fn write_public_bundle(
     write_file(&path.join("shots.b8"), shots)
 }
 
+/// Exports using the backward-compatible X-only configuration.
 pub fn export_decoder_dataset(
     config: ExportDecoderDatasetConfig,
 ) -> Result<DecoderDatasetSummary, String> {
@@ -748,13 +888,29 @@ pub fn export_decoder_dataset(
     export_decoder_dataset_with_publisher(config, &mut publisher)
 }
 
+/// Exports using the generalized X-or-Z logical-flip configuration.
+pub fn export_decoder_dataset_with_logical_flip(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<DecoderDatasetSummary, String> {
+    let mut publisher = FsDirectoryPublisher::from_env();
+    export_decoder_dataset_with_logical_flip_and_publisher(config, &mut publisher)
+}
+
 #[doc(hidden)]
 pub fn export_decoder_dataset_with_publisher(
     config: ExportDecoderDatasetConfig,
     publisher: &mut impl DirectoryPublisher,
 ) -> Result<DecoderDatasetSummary, String> {
+    export_decoder_dataset_with_logical_flip_and_publisher(config.into(), publisher)
+}
+
+#[doc(hidden)]
+pub fn export_decoder_dataset_with_logical_flip_and_publisher(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+    publisher: &mut impl DirectoryPublisher,
+) -> Result<DecoderDatasetSummary, String> {
     let validated_paths = validate_output_directories(&config.public_out, &config.private_out)?;
-    let artifacts = generate_decoder_dataset_artifacts(&config)?;
+    let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config)?;
     let public_shots_bytes = bit_table_to_b8_bytes(&artifacts.public_shots)?;
     let answers_bytes = bit_table_to_b8_bytes(&artifacts.answers)?;
     let masks_bytes = artifacts
@@ -871,44 +1027,63 @@ mod tests {
     fn test_config(
         circuit_text: &str,
         mode: DecoderDatasetMode,
-        logical_x_qubits: Vec<u32>,
-    ) -> ExportDecoderDatasetConfig {
-        ExportDecoderDatasetConfig {
+        logical_flip: Option<LogicalFlip>,
+    ) -> ExportDecoderDatasetLogicalFlipConfig {
+        ExportDecoderDatasetLogicalFlipConfig {
             circuit_text: circuit_text.to_string(),
             shots: 1,
             mode,
-            logical_x_qubits,
+            logical_flip,
             public_out: std::path::PathBuf::from("public-unused"),
             private_out: std::path::PathBuf::from("private-unused"),
             seed: Some(1),
         }
     }
 
+    fn logical_x(qubits: Vec<u32>) -> Option<LogicalFlip> {
+        Some(LogicalFlip {
+            pauli: LogicalPauli::X,
+            qubits,
+        })
+    }
+
     #[test]
-    fn parse_logical_x_qubits_rejects_empty_duplicate_and_bad_tokens() {
-        assert_eq!(parse_logical_x_qubits("0,2,4").unwrap(), vec![0, 2, 4]);
-        assert!(parse_logical_x_qubits("")
+    fn parse_logical_flip_rejects_empty_duplicate_and_bad_tokens() {
+        assert_eq!(
+            LogicalFlip::parse(LogicalPauli::Z, "0,2,4").unwrap(),
+            LogicalFlip {
+                pauli: LogicalPauli::Z,
+                qubits: vec![0, 2, 4],
+            }
+        );
+        assert!(LogicalFlip::parse(LogicalPauli::Z, "")
             .unwrap_err()
-            .contains("non-empty"));
-        assert!(parse_logical_x_qubits("0,2,2")
+            .contains("--logical_z_qubits must be non-empty"));
+        assert!(LogicalFlip::parse(LogicalPauli::X, "0,2,2")
             .unwrap_err()
-            .contains("duplicate"));
-        assert!(parse_logical_x_qubits("0,nope")
+            .contains("--logical_x_qubits contains duplicate"));
+        assert!(LogicalFlip::parse(LogicalPauli::Z, "0,nope")
             .unwrap_err()
-            .contains("invalid"));
+            .contains("--logical_z_qubits contains invalid"));
+        assert_eq!(parse_logical_x_qubits("1,3").unwrap(), vec![1, 3]);
     }
 
     #[test]
     fn marker_must_be_unique_standalone_and_top_level() {
         let good = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(good, &[0])
+        let logical_z = LogicalFlip {
+            pauli: LogicalPauli::Z,
+            qubits: vec![0],
+        };
+        assert!(circuit_with_injected_logical_flip(good, &logical_z)
             .unwrap()
-            .contains("\nX 0\n"));
+            .contains("\nZ 0\n"));
 
         let marker_without_trailing_newline = "R 0\n# RSTIM_LOGICAL_FLIP_POINT";
         assert_eq!(
-            circuit_with_injected_logical_x(marker_without_trailing_newline, &[0]).unwrap(),
-            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX 0\n"
+            circuit_with_injected_logical_flip(marker_without_trailing_newline, &logical_z)
+                .unwrap(),
+            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nZ 0\n"
         );
 
         let missing = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
@@ -936,12 +1111,20 @@ mod tests {
     #[test]
     fn logical_validation_requires_observable_flip_without_detector_change() {
         let valid = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(valid, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
-        assert!(validate_decoder_dataset_inputs(&config).is_ok());
+        let config = test_config(
+            valid,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
 
         let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(no_flip, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
-        assert!(validate_decoder_dataset_inputs(&config)
+        let config = test_config(
+            no_flip,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("injected logical X does not flip observable 0"));
 
@@ -949,9 +1132,9 @@ mod tests {
         let config = test_config(
             changes_detector,
             DecoderDatasetMode::MeasurementsBlinded,
-            vec![0],
+            logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_inputs(&config)
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("changes detector"));
     }
@@ -959,29 +1142,46 @@ mod tests {
     #[test]
     fn input_validation_rejects_observable_sweep_and_qubit_contract_violations() {
         let no_observable = "R 0\nM 0\n";
-        let config = test_config(no_observable, DecoderDatasetMode::Detectors, vec![]);
-        assert!(validate_decoder_dataset_inputs(&config)
+        let config = test_config(no_observable, DecoderDatasetMode::Detectors, None);
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("exactly one observable, found 0"));
 
         let multiple_observables =
             "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
-        let config = test_config(multiple_observables, DecoderDatasetMode::Detectors, vec![]);
-        assert!(validate_decoder_dataset_inputs(&config)
+        let config = test_config(multiple_observables, DecoderDatasetMode::Detectors, None);
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("exactly one observable, found 2"));
 
         let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, vec![]);
-        assert!(validate_decoder_dataset_inputs(&config)
+        let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, None);
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("does not support sweep-bit circuits"));
 
         let one_qubit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(one_qubit, DecoderDatasetMode::MeasurementsBlinded, vec![1]);
-        assert!(validate_decoder_dataset_inputs(&config)
+        let config = test_config(
+            one_qubit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![1]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("contains qubit 1, but circuit has 1 qubits"));
+
+        let config = test_config(
+            one_qubit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            Some(LogicalFlip {
+                pauli: LogicalPauli::Z,
+                qubits: Vec::new(),
+            }),
+        );
+        assert_eq!(
+            validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err(),
+            "--logical_z_qubits must be non-empty"
+        );
     }
 
     #[test]
@@ -1034,8 +1234,8 @@ mod tests {
     #[test]
     fn detector_artifacts_publish_detections_and_private_answers() {
         let circuit = "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let config = test_config(circuit, DecoderDatasetMode::Detectors, vec![]);
-        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+        let config = test_config(circuit, DecoderDatasetMode::Detectors, None);
+        let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
 
         assert_eq!(artifacts.public_row_kind, "detectors");
         assert_eq!(artifacts.public_shots.num_major(), 1);
@@ -1049,11 +1249,15 @@ mod tests {
     fn blinded_measurement_answers_are_public_observable_xor_mask() {
         let circuit =
             "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        let mut config = test_config(
+            circuit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
         config.shots = 16;
         config.seed = Some(0xdec0_de01);
 
-        let artifacts = generate_decoder_dataset_artifacts(&config).unwrap();
+        let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
         let public_interpretation = crate::m2d::measurements_to_detections(
             &artifacts.public_instrs,
             &artifacts.public_shots,
@@ -1078,12 +1282,16 @@ mod tests {
     fn fixed_seed_reproduces_artifacts_byte_for_byte() {
         let circuit =
             "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        let mut config = test_config(
+            circuit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
         config.shots = 32;
         config.seed = Some(123);
 
-        let a = generate_decoder_dataset_artifacts(&config).unwrap();
-        let b = generate_decoder_dataset_artifacts(&config).unwrap();
+        let a = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
+        let b = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
         assert_eq!(
             bit_table_to_b8_bytes(&a.public_shots).unwrap(),
             bit_table_to_b8_bytes(&b.public_shots).unwrap()
@@ -1105,13 +1313,17 @@ mod tests {
         let private_out = root.path().join("private");
         let circuit =
             "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
+        let mut config = test_config(
+            circuit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
         config.shots = 8;
         config.seed = Some(7);
         config.public_out = public_out.clone();
         config.private_out = private_out.clone();
 
-        let summary = export_decoder_dataset(config).unwrap();
+        let summary = export_decoder_dataset_with_logical_flip(config).unwrap();
         assert_eq!(summary.public_out, public_out);
         assert_eq!(
             sorted_entries(&public_out),
@@ -1136,15 +1348,42 @@ mod tests {
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
         let circuit = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        let mut config = test_config(circuit, DecoderDatasetMode::Detectors, vec![]);
+        let mut config = test_config(circuit, DecoderDatasetMode::Detectors, None);
         config.public_out = public_out.clone();
         config.private_out = private_out.clone();
         config.seed = Some(3);
 
         let mut publisher = FailingDirectoryPublisher::new(2);
-        let err = export_decoder_dataset_with_publisher(config, &mut publisher).unwrap_err();
+        let err = export_decoder_dataset_with_logical_flip_and_publisher(config, &mut publisher)
+            .unwrap_err();
 
         assert!(err.contains("private bundle retained"));
+        assert!(private_out.exists());
+        assert!(!public_out.exists());
+        assert_no_decoder_dataset_temps(root.path());
+    }
+
+    #[test]
+    fn released_x_only_validation_and_publisher_wrappers_delegate() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let config = ExportDecoderDatasetConfig {
+            circuit_text: "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+                .to_string(),
+            shots: 1,
+            mode: DecoderDatasetMode::MeasurementsBlinded,
+            logical_x_qubits: vec![0],
+            public_out: public_out.clone(),
+            private_out: private_out.clone(),
+            seed: Some(3),
+        };
+
+        assert!(validate_decoder_dataset_inputs(&config).is_ok());
+        let mut publisher = FailingDirectoryPublisher::new(2);
+        let error = export_decoder_dataset_with_publisher(config, &mut publisher).unwrap_err();
+
+        assert!(error.contains("private bundle retained"));
         assert!(private_out.exists());
         assert!(!public_out.exists());
         assert_no_decoder_dataset_temps(root.path());
