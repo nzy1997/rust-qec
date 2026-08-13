@@ -1,18 +1,21 @@
 use rand::Rng;
 
 use crate::compiled::{
-    CompiledCircuit, SamplerPathDecision, SamplingFallbackReason, choose_sampler_path,
-    compile_circuit, sample_compiled_batch_with_reference,
+    choose_sampler_path, compile_circuit, sample_compiled_batch_with_reference, CompiledCircuit,
+    SamplerPathDecision, SamplingFallbackReason,
 };
 use crate::data_path::{
-    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample,
-    build_reference_sample_with_decision, build_reference_sample_with_sweep_bits_and_decision,
+    build_reference_sample, build_reference_sample_with_decision,
+    build_reference_sample_with_sweep_bits_and_decision, ReferenceSampleDecision,
+    ReferenceSampleMode,
 };
-use crate::executor::Executor;
 use crate::executor::max_qubit;
+use crate::executor::Executor;
 use crate::ir::StimInstr;
 use crate::loss_sampler::LossSamplerPlan;
-use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
+use crate::m2d::{
+    measurements_to_detections_with_options, measurements_to_detections_with_reference, M2dOptions,
+};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -122,7 +125,6 @@ pub struct CompiledLossMeasurementSampler {
     instrs: Vec<StimInstr>,
     plan: LossSamplerPlan,
     reference_sample: Vec<bool>,
-    reference_mode: ReferenceSampleMode,
     diagnostics: CompiledMeasurementSamplerDiagnostics,
 }
 
@@ -210,7 +212,6 @@ impl CompiledLossMeasurementSampler {
             instrs: instrs.to_vec(),
             plan,
             reference_sample,
-            reference_mode,
             diagnostics: CompiledMeasurementSamplerDiagnostics {
                 compiled_ir_builds: 1,
                 reference_builds: 1,
@@ -231,14 +232,10 @@ impl CompiledLossMeasurementSampler {
             return BatchOutput::measurements_only(measurements, shots);
         }
 
-        let m2d = measurements_to_detections_with_options(
+        let m2d = measurements_to_detections_with_reference(
             &self.instrs,
             &measurements,
-            None,
-            M2dOptions {
-                reference_sample_mode: self.reference_mode,
-                ran_without_feedback: false,
-            },
+            &self.reference_sample,
         )?;
         let (detector_materializations, observable_materializations) =
             count_output_materialization_ops(&self.instrs);
@@ -563,8 +560,8 @@ fn is_sweep_dependent_operation(name: &str, targets: &[crate::ir::StimTarget]) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;

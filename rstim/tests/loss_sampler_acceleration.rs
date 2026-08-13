@@ -1,10 +1,10 @@
-use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rstim::CompiledLossMeasurementSampler;
+use rand::SeedableRng;
 use rstim::data_path::ReferenceSampleMode;
 use rstim::executor::Executor;
 use rstim::parser::parse_lines;
-use rstim::sampler::{SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options};
+use rstim::sampler::{sample_batch_with_options, SampleOptions, SampleOutputMode, SamplingBackend};
+use rstim::CompiledLossMeasurementSampler;
 
 const ATOM_LOSS_FIXTURE: &str = include_str!(
     "../../benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100_atom_loss.stim"
@@ -25,6 +25,33 @@ fn compiled_loss_sampler_reuses_its_plan_and_reference() {
         for shot in 0..64 {
             assert!(output.measurements.get(0, shot));
             assert!(!output.measurements.get(2, shot));
+        }
+    }
+
+    let diagnostics = sampler.diagnostics();
+    assert_eq!(diagnostics.compiled_ir_builds, 1);
+    assert_eq!(diagnostics.reference_builds, 1);
+    assert_eq!(diagnostics.sample_calls, 2);
+}
+
+#[test]
+fn compiled_loss_sampler_reuses_nonzero_reference_for_full_output() {
+    let circuit =
+        parse_lines("X 0\nLOSS(0) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
+            .unwrap();
+    let mut sampler =
+        CompiledLossMeasurementSampler::compile(&circuit, ReferenceSampleMode::SimulateNoiseless)
+            .unwrap();
+    let mut rng = StdRng::seed_from_u64(0xc0ffee);
+
+    for _ in 0..2 {
+        let output = sampler
+            .sample(64, &mut rng, SampleOutputMode::Full)
+            .unwrap();
+        for shot in 0..64 {
+            assert!(output.measurements.get(0, shot));
+            assert!(!output.detections.get(0, shot));
+            assert!(!output.observable_flips.get(0, shot));
         }
     }
 
