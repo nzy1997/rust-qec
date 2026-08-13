@@ -2,42 +2,42 @@
   "measured_records": 35,
   "variants": [
     {
-      "median_call_b8_elapsed_ns": 232500,
-      "median_call_sample_elapsed_ns": 4048500,
-      "median_worker_total_elapsed_ns": 4281000,
-      "precompile_elapsed_ns": 2784625,
+      "median_call_b8_elapsed_ns": 272667,
+      "median_call_sample_elapsed_ns": 4207833,
+      "median_worker_total_elapsed_ns": 4480500,
+      "precompile_elapsed_ns": 2924750,
       "sample_count": 7,
       "variant": "rstim-precompiled"
     },
     {
-      "median_call_b8_elapsed_ns": 41667,
-      "median_call_sample_elapsed_ns": 14713791,
-      "median_worker_total_elapsed_ns": 14755458,
-      "precompile_elapsed_ns": 1061625,
+      "median_call_b8_elapsed_ns": 35042,
+      "median_call_sample_elapsed_ns": 16092542,
+      "median_worker_total_elapsed_ns": 16127584,
+      "precompile_elapsed_ns": 1114916,
       "sample_count": 7,
       "variant": "stim-precompiled"
     },
     {
-      "median_call_b8_elapsed_ns": 247292,
-      "median_call_sample_elapsed_ns": 7204833,
-      "median_worker_total_elapsed_ns": 7452125,
+      "median_call_b8_elapsed_ns": 198750,
+      "median_call_sample_elapsed_ns": 7329792,
+      "median_worker_total_elapsed_ns": 7528542,
       "precompile_elapsed_ns": 0,
       "sample_count": 7,
       "variant": "rstim-interpreted"
     },
     {
-      "median_call_b8_elapsed_ns": 50458,
-      "median_call_sample_elapsed_ns": 15819709,
-      "median_worker_total_elapsed_ns": 15870167,
+      "median_call_b8_elapsed_ns": 40416,
+      "median_call_sample_elapsed_ns": 16774916,
+      "median_worker_total_elapsed_ns": 16815332,
       "precompile_elapsed_ns": 0,
       "sample_count": 7,
       "variant": "stim-direct"
     },
     {
-      "median_call_b8_elapsed_ns": 217292,
-      "median_call_sample_elapsed_ns": 3911500,
-      "median_worker_total_elapsed_ns": 4128792,
-      "precompile_elapsed_ns": 2890458,
+      "median_call_b8_elapsed_ns": 263541,
+      "median_call_sample_elapsed_ns": 4002167,
+      "median_worker_total_elapsed_ns": 4265708,
+      "precompile_elapsed_ns": 2978625,
       "sample_count": 7,
       "variant": "rstim-precompiled-atom-loss"
     }

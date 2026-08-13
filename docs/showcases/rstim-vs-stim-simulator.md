@@ -145,13 +145,14 @@ The separate [split precompile/sample/`b8` evidence](benchmarks/rstim_vs_stim_si
 records one-time precompilation separately, then splits each call into the
 implementation's sampling path and `b8` output step. The headline total excludes
 both precompilation and pipe transport. Across 7 measured 1,024-shot calls after
-2 warmups, total medians are 24.215 ms for `rstim` precompiled, 27.446 ms for
-Stim precompiled, 24.929 ms for `rstim` interpreted, 28.361 ms for Stim direct,
-and 1,403.257 ms for `rstim` interpreted with atom loss. In this recorded run
-`rstim` is 1.13x faster in the precompiled pair, and atom loss adds 56.29x wall
-time to the `rstim` interpreted path. Stim returns bit-packed samples directly,
-so its packing work is inside its sampling phase; the total remains the
-cross-implementation comparison boundary.
+2 warmups, total medians are 4.481 ms for `rstim` precompiled, 16.128 ms for
+Stim precompiled, 7.529 ms for `rstim` interpreted, 16.815 ms for Stim direct,
+and 4.266 ms for `rstim` precompiled with atom loss. In this recorded run
+`rstim` is 3.60x faster in the precompiled pair. The atom-loss result is in the
+same roughly 4 ms range as `rstim` precompiled; its small lead is within
+run-to-run variation and is not treated as an atom-loss speedup claim. Stim
+returns bit-packed samples directly, so its packing work is inside its sampling
+phase; the total remains the cross-implementation comparison boundary.
 
 Companion reports and environments are checked at
 [`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),

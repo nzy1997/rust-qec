@@ -520,7 +520,7 @@
                   "sha256": "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
                 },
                 "docs/showcases/rstim-vs-stim-simulator.md": {
-                  "sha256": "345bd007861a9a678b358a03ab128ee70096fa2b622365e9ba090d3d308da8e7"
+                  "sha256": "622c78463c6ffbd750fbd189c1b1c6cbd649b4155f8c198309f7d387450f6c56"
                 }
               }
             }
@@ -867,12 +867,12 @@
             "schema_version": 1,
             "artifact_date": {
               "status": "recorded",
-              "value": "2026-08-12T18:31:54+08:00"
+              "value": "2026-08-13T10:52:41+08:00"
             },
             "source_commit": {
               "status": "recorded",
               "value": {
-                "runner_source": "8863648377b678a4150095e55b91b687f32d4d42"
+                "runner_source": "bae463dfa33238a2c4acdaaaa09795189228007b"
               }
             },
             "commands": {
@@ -884,7 +884,7 @@
             },
             "os": {
               "status": "recorded",
-              "value": "macOS 26.5.1 (build 25F80)"
+              "value": "macOS 26.6.1 (arm64)"
             },
             "cpu_model": {
               "status": "recorded",
@@ -938,27 +938,27 @@
                 "warmup_rounds": 2,
                 "measure_rounds": 7,
                 "output_bytes_per_call": 1552384,
-                "rstim_vs_stim_precompiled_worker_total_wall_time_ratio": 0.2901299302264965,
-                "atom_loss_vs_rstim_precompiled_worker_total_wall_time_ratio": 0.9644456902592852
+                "rstim_vs_stim_precompiled_worker_total_wall_time_ratio": 0.27781594564939177,
+                "atom_loss_vs_rstim_precompiled_worker_total_wall_time_ratio": 0.9520607075103225
               }
             },
             "artifact_hashes": {
               "status": "recorded",
               "value": {
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": {
-                  "sha256": "8ffd93341109345c0eb97eee1a18e5526530bd5e3d29b9b79a5cd8b8e94b9f00"
+                  "sha256": "162ff5ad44f51b30137326b81560fb1877b1b08cbf961299346bc689163ca34d"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": {
-                  "sha256": "4b8313e1843ab5dde4d8ad24af9fbd775cc680b69874a40c2c370b3729a962f1"
+                  "sha256": "0ba2c54a8fe5d91bd83e9060e6f1a281c22aeaea2cf5893964eb794392aff226"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": {
-                  "sha256": "8d8cf453a08e44bb5ff0540cc7e517299bd3b04ed08fa83b357d7c773a2d0532"
+                  "sha256": "75bcae893bbcccbd37b78406527276a3bf1a218a0e10859b40d6ec5390e92063"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": {
-                  "sha256": "a17e2977da7e6ba1e1f6d8f206a159339433ee8cc0e652a153bce99da40c35dd"
+                  "sha256": "af97220d60a0b28a37a457975a1cc9b23fa565f0ccdbebf8798c24df9c9fe7a3"
                 },
                 "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": {
-                  "sha256": "914162ecdca725251c1b6c3d04a8236c845cd897e73e44462d2e7e9a6026738f"
+                  "sha256": "87c14de7f762ea6008c5fe24de982153a498c21e44c877dd8ee4b17c5e0adcc3"
                 }
               }
             }
@@ -988,7 +988,7 @@
             "The headline total is measured inside each worker and equals the sampling path plus b8 output, excluding both precompilation and pipe transport.",
             "Stim returns bit-packed samples directly, so its packing work remains in its sampling-path phase; its b8 phase is byte serialization.",
             "All five published rows use the same final b8 output boundary.",
-            "For this recorded run, rstim is 3.45x faster in the precompiled pair; precompiled atom loss is in the same roughly 4.2 ms Sample + output range as rstim precompiled."
+            "For this recorded run, rstim is 3.60x faster in the precompiled pair; precompiled atom loss is in the same roughly 4.3 ms Sample + output range as rstim precompiled."
           ]
         },
         {

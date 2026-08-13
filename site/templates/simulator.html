@@ -33,15 +33,15 @@
     <table>
       <thead><tr><th>Implementation</th><th>Precompile once</th><th>Sample</th><th><code>b8</code> output</th><th>Sample + output</th><th>Samples/s</th></tr></thead>
       <tbody>
-        <tr><td>rstim precompiled</td><td>2.785 ms</td><td>4.048 ms</td><td>0.233 ms</td><td>4.281 ms</td><td>239,196</td></tr>
-        <tr><td>Stim precompiled</td><td>1.062 ms</td><td>14.714 ms</td><td>0.042 ms</td><td>14.755 ms</td><td>69,398</td></tr>
-        <tr><td>rstim interpreted</td><td>—</td><td>7.205 ms</td><td>0.247 ms</td><td>7.452 ms</td><td>137,410</td></tr>
-        <tr><td>Stim direct</td><td>—</td><td>15.820 ms</td><td>0.050 ms</td><td>15.870 ms</td><td>64,524</td></tr>
-        <tr><td>rstim precompiled + atom loss</td><td>2.890 ms</td><td>3.912 ms</td><td>0.217 ms</td><td>4.129 ms</td><td>248,014</td></tr>
+        <tr><td>rstim precompiled</td><td>2.925 ms</td><td>4.208 ms</td><td>0.273 ms</td><td>4.481 ms</td><td>228,545</td></tr>
+        <tr><td>Stim precompiled</td><td>1.115 ms</td><td>16.093 ms</td><td>0.035 ms</td><td>16.128 ms</td><td>63,493</td></tr>
+        <tr><td>rstim interpreted</td><td>—</td><td>7.330 ms</td><td>0.199 ms</td><td>7.529 ms</td><td>136,015</td></tr>
+        <tr><td>Stim direct</td><td>—</td><td>16.775 ms</td><td>0.040 ms</td><td>16.815 ms</td><td>60,896</td></tr>
+        <tr><td>rstim precompiled + atom loss</td><td>2.979 ms</td><td>4.002 ms</td><td>0.264 ms</td><td>4.266 ms</td><td>240,053</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="section-copy">All rows use the surface d=11, r=100 fixture with 1,024 shots. Each phase is the breakdown of the same median-total call selected from 7 calls after 2 warmups; precompile is one observed setup. Stim produces an already bit-packed array inside <code>sample</code>, so its packing work appears under “Sample” and its <code>b8</code> step is only byte serialization. In this recorded run, rstim is 3.45× faster in the precompiled comparison. The precompiled atom-loss path is in the same 4 ms range as rstim precompiled; its small lead is within run-to-run variation and is not treated as an atom-loss speedup claim.</p>
+  <p class="section-copy">All rows use the surface d=11, r=100 fixture with 1,024 shots. Each phase is the breakdown of the same median-total call selected from 7 calls after 2 warmups; precompile is one observed setup. Stim produces an already bit-packed array inside <code>sample</code>, so its packing work appears under “Sample” and its <code>b8</code> step is only byte serialization. In this recorded run, rstim is 3.60× faster in the precompiled comparison. The precompiled atom-loss path is in the same 4 ms range as rstim precompiled; its small lead is within run-to-run variation and is not treated as an atom-loss speedup claim.</p>
   <p class="section-copy">For the atom-loss case, one depolarization event and two independent per-atom loss events after each two-qubit gate all use <code>p = 1 - 0.999^(1/3) ≈ 0.0003334445062</code>, keeping the probability of at least one error at <code>0.001</code>.</p>
 </section>
 

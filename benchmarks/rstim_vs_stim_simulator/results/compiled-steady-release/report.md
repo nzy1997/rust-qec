@@ -2,10 +2,10 @@
 
 | variant | sample_count | precompile_elapsed_ns | median_call_sample_elapsed_ns | median_call_b8_elapsed_ns | median_worker_total_elapsed_ns |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| rstim-precompiled | 7 | 2784625 | 4048500 | 232500 | 4281000 |
-| stim-precompiled | 7 | 1061625 | 14713791 | 41667 | 14755458 |
-| rstim-interpreted | 7 | 0 | 7204833 | 247292 | 7452125 |
-| stim-direct | 7 | 0 | 15819709 | 50458 | 15870167 |
-| rstim-precompiled-atom-loss | 7 | 2890458 | 3911500 | 217292 | 4128792 |
+| rstim-precompiled | 7 | 2924750 | 4207833 | 272667 | 4480500 |
+| stim-precompiled | 7 | 1114916 | 16092542 | 35042 | 16127584 |
+| rstim-interpreted | 7 | 0 | 7329792 | 198750 | 7528542 |
+| stim-direct | 7 | 0 | 16774916 | 40416 | 16815332 |
+| rstim-precompiled-atom-loss | 7 | 2978625 | 4002167 | 263541 | 4265708 |
 
 Measured records: 35
