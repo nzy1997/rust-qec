@@ -193,23 +193,37 @@ fn open_browser(_url: &str) {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::TcpStream;
+    use std::net::{Shutdown, TcpStream};
     use std::thread;
 
-    fn round_trip(request: &str) -> Vec<u8> {
+    fn round_trip_result(request: &str) -> (Result<(), String>, Vec<u8>) {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let request = request.replace("{port}", &port.to_string());
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            handle_connection(&mut stream, port).unwrap();
+            handle_connection(&mut stream, port)
         });
         let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
         stream.write_all(request.as_bytes()).unwrap();
+        stream.shutdown(Shutdown::Write).unwrap();
         let mut response = Vec::new();
         stream.read_to_end(&mut response).unwrap();
-        server.join().unwrap();
+        (server.join().unwrap(), response)
+    }
+
+    fn round_trip(request: &str) -> Vec<u8> {
+        let (result, response) = round_trip_result(request);
+        result.unwrap();
         response
+    }
+
+    #[test]
+    fn default_options_bind_ephemerally_and_open_the_browser() {
+        let options = ShotViewerOptions::default();
+        assert_eq!(options.port, 0);
+        assert!(options.open_browser);
+        assert!(!options.serve_once);
     }
 
     #[test]
@@ -239,5 +253,43 @@ mod tests {
     fn rejects_path_traversal_instead_of_touching_the_filesystem() {
         let response = round_trip("GET /../Cargo.toml HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n");
         assert!(response.starts_with(b"HTTP/1.1 404 Not Found\r\n"));
+    }
+
+    #[test]
+    fn rejects_malformed_requests_and_unsupported_methods() {
+        let malformed = round_trip("GET / HTTP/1.1 unexpected\r\nHost: localhost:{port}\r\n\r\n");
+        assert!(malformed.starts_with(b"HTTP/1.1 400 Bad Request\r\n"));
+
+        let unsupported = round_trip("POST / HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n");
+        assert!(unsupported.starts_with(b"HTTP/1.1 405 Method Not Allowed\r\n"));
+
+        let missing_host = round_trip("GET / HTTP/1.1\r\n\r\n");
+        assert!(missing_host.starts_with(b"HTTP/1.1 403 Forbidden\r\n"));
+    }
+
+    #[test]
+    fn head_and_favicon_responses_do_not_write_bodies() {
+        let head = round_trip("HEAD /app.js HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n");
+        let (_, head_body) = head.split_at(
+            head.windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .unwrap()
+                + 4,
+        );
+        assert!(head.starts_with(b"HTTP/1.1 200 OK\r\n"));
+        assert!(head_body.is_empty());
+
+        let favicon = round_trip("GET /favicon.ico HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n");
+        assert!(favicon.starts_with(b"HTTP/1.1 204 No Content\r\n"));
+    }
+
+    #[test]
+    fn reports_incomplete_request_headers() {
+        let (result, response) = round_trip_result("GET / HTTP/1.1\r\nHost: localhost:{port}\r\n");
+        assert!(response.is_empty());
+        assert_eq!(
+            result.unwrap_err(),
+            "shot viewer request headers are incomplete or too large"
+        );
     }
 }

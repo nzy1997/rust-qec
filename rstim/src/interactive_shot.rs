@@ -1803,7 +1803,33 @@ mod tests {
         let event = &session.catalog().events()[1].id;
         assert_eq!(NoiseSiteId::decode(&site.encode()).unwrap(), *site);
         assert_eq!(NoiseEventId::decode(&event.encode()).unwrap(), *event);
+        assert_eq!(site.to_string(), site.encode());
+        assert_eq!(event.to_string(), event.encode());
         assert_eq!(event.repeat_iterations, vec![1]);
+
+        assert!(CircuitDigest::parse_hex("not-a-digest").is_err());
+        assert!(NoiseSiteId::decode("ns0:bad:-:-").is_err());
+        assert!(NoiseEventId::decode("ne0:bad:-:-:-").is_err());
+
+        assert_eq!(
+            [Pauli::I, Pauli::X, Pauli::Y, Pauli::Z].map(Pauli::label),
+            ['I', 'X', 'Y', 'Z']
+        );
+        assert_eq!(NoiseOutcome::Identity.label(), "I");
+        assert_eq!(NoiseOutcome::Flipped.label(), "flipped");
+        assert_eq!(NoiseOutcome::X.label(), "X");
+        assert_eq!(NoiseOutcome::Y.label(), "Y");
+        assert_eq!(NoiseOutcome::Z.label(), "Z");
+        assert_eq!(
+            NoiseOutcome::PauliPair {
+                first: Pauli::Y,
+                second: Pauli::Z,
+            }
+            .label(),
+            "YZ"
+        );
+        assert_eq!(NoiseOutcome::Lost.label(), "L");
+        assert_eq!(NoiseOutcome::Correlated.label(), "correlated");
     }
 
     #[test]

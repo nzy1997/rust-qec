@@ -1,7 +1,10 @@
 use rstim::interactive_shot::{
     EditableShot, ExpansionLimits, NoiseEventId, NoiseOutcome, Pauli, ViewSnapshot,
 };
-use wasm_bindgen::prelude::*;
+
+mod wasm_bindings;
+
+pub use wasm_bindings::WasmShotSession;
 
 /// Target-independent state holder used by both the browser binding and native contract tests.
 pub struct ShotSessionCore {
@@ -75,93 +78,6 @@ fn parse_pauli(value: char) -> Result<Pauli, String> {
     }
 }
 
-#[wasm_bindgen(js_name = ShotSession)]
-pub struct WasmShotSession {
-    core: ShotSessionCore,
-}
-
-#[wasm_bindgen(js_class = ShotSession)]
-impl WasmShotSession {
-    #[wasm_bindgen(constructor)]
-    pub fn new(source: &str, seed_low: u32, seed_high: u32) -> Result<WasmShotSession, JsValue> {
-        let seed = seed_from_halves(seed_low, seed_high);
-        let core =
-            ShotSessionCore::open(source, seed, ExpansionLimits::default()).map_err(js_error)?;
-        Ok(Self { core })
-    }
-
-    #[wasm_bindgen(js_name = withLimits)]
-    pub fn with_limits(
-        source: &str,
-        seed_low: u32,
-        seed_high: u32,
-        max_expanded_operations: u32,
-        max_noise_events: u32,
-        max_measurements: u32,
-        max_svg_nodes: u32,
-    ) -> Result<WasmShotSession, JsValue> {
-        let limits = ExpansionLimits {
-            max_operations: u64::from(max_expanded_operations),
-            max_noise_events: u64::from(max_noise_events),
-            max_measurements: u64::from(max_measurements),
-            max_svg_nodes: u64::from(max_svg_nodes),
-            max_qubits: ExpansionLimits::default().max_qubits,
-        };
-        let core = ShotSessionCore::open(source, seed_from_halves(seed_low, seed_high), limits)
-            .map_err(js_error)?;
-        Ok(Self { core })
-    }
-
-    pub fn sample(&mut self, seed_low: u32, seed_high: u32) -> Result<String, JsValue> {
-        self.core
-            .sample(seed_from_halves(seed_low, seed_high))
-            .map_err(js_error)?;
-        self.snapshot()
-    }
-
-    pub fn clear(&mut self, seed_low: u32, seed_high: u32) -> Result<String, JsValue> {
-        self.core
-            .clear(seed_from_halves(seed_low, seed_high))
-            .map_err(js_error)?;
-        self.snapshot()
-    }
-
-    #[wasm_bindgen(js_name = setNoise)]
-    pub fn set_noise(&mut self, event_id: &str, outcome: &str) -> Result<String, JsValue> {
-        self.core.set_noise(event_id, outcome).map_err(js_error)?;
-        self.snapshot()
-    }
-
-    #[wasm_bindgen(js_name = restoreNoise)]
-    pub fn restore_noise(&mut self, event_id: &str) -> Result<String, JsValue> {
-        self.core.restore_noise(event_id).map_err(js_error)?;
-        self.snapshot()
-    }
-
-    pub fn undo(&mut self) -> Result<String, JsValue> {
-        self.core.undo().map_err(js_error)?;
-        self.snapshot()
-    }
-
-    pub fn redo(&mut self) -> Result<String, JsValue> {
-        self.core.redo().map_err(js_error)?;
-        self.snapshot()
-    }
-
-    pub fn snapshot(&self) -> Result<String, JsValue> {
-        let snapshot = self.core.snapshot().map_err(js_error)?;
-        serde_json::to_string(&snapshot).map_err(js_error)
-    }
-}
-
-fn seed_from_halves(low: u32, high: u32) -> u64 {
-    u64::from(low) | (u64::from(high) << 32)
-}
-
-fn js_error(error: impl ToString) -> JsValue {
-    JsValue::from_str(&error.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,5 +117,46 @@ mod tests {
         .err()
         .unwrap();
         assert!(error.contains("exceeds limit 2"), "{error}");
+    }
+
+    #[test]
+    fn session_lifecycle_forwards_sample_clear_and_restore() {
+        let mut session = ShotSessionCore::open(
+            "X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\n",
+            1,
+            ExpansionLimits::default(),
+        )
+        .unwrap();
+        let event_id = session.snapshot().unwrap().shot.result.noise_events[0]
+            .id
+            .clone();
+
+        session.sample(2).unwrap();
+        session.clear(3).unwrap();
+        session.set_noise(&event_id, "X").unwrap();
+        session.restore_noise(&event_id).unwrap();
+    }
+
+    #[test]
+    fn outcome_parser_accepts_aliases_and_rejects_invalid_paulis() {
+        for identity in ["I", "identity", " none "] {
+            assert_eq!(parse_outcome(identity).unwrap().label(), "I");
+        }
+        for (text, label) in [
+            ("X", "X"),
+            ("Y", "Y"),
+            ("Z", "Z"),
+            ("lost", "L"),
+            ("loss", "L"),
+            ("L", "L"),
+            ("II", "II"),
+            ("XX", "XX"),
+            ("YY", "YY"),
+            ("ZZ", "ZZ"),
+        ] {
+            assert_eq!(parse_outcome(text).unwrap().label(), label);
+        }
+        assert!(parse_outcome("QX").unwrap_err().contains("unknown Pauli"));
+        assert!(parse_outcome("invalid").unwrap_err().contains("unknown noise outcome"));
     }
 }
