@@ -5,7 +5,8 @@ use rstim::decoder_dataset::{
     export_decoder_dataset, export_decoder_dataset_with_logical_flip,
     generate_decoder_dataset_artifacts,
 };
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn released_x_only_rust_api_remains_source_compatible() {
@@ -40,6 +41,46 @@ fn released_x_only_rust_api_remains_source_compatible() {
 }
 
 #[test]
+fn released_x_only_cli_wrapper_delegates_for_present_and_absent_flips() {
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join("circuit.stim");
+    fs::write(
+        &circuit,
+        "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    let circuit = circuit.to_str().unwrap();
+    let public_out = path_text(root.path(), "public");
+    let private_out = path_text(root.path(), "private");
+
+    for logical_x_qubits in [Some("0"), None] {
+        let error = run_export_decoder_dataset(
+            circuit,
+            1,
+            "unknown",
+            logical_x_qubits,
+            &public_out,
+            &private_out,
+            Some(1),
+        )
+        .unwrap_err();
+        assert!(error.contains("unknown decoder dataset mode"));
+    }
+
+    let error = run_export_decoder_dataset(
+        circuit,
+        1,
+        "measurements_blinded",
+        Some("not-a-qubit"),
+        &public_out,
+        &private_out,
+        Some(1),
+    )
+    .unwrap_err();
+    assert!(error.contains("--logical_x_qubits contains invalid"));
+}
+
+#[test]
 fn generalized_rust_api_accepts_a_logical_z_flip() {
     let config = ExportDecoderDatasetLogicalFlipConfig {
         circuit_text: "RX 0\n# RSTIM_LOGICAL_FLIP_POINT\nMX 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
@@ -58,4 +99,8 @@ fn generalized_rust_api_accepts_a_logical_z_flip() {
     let _: fn(ExportDecoderDatasetLogicalFlipConfig) -> Result<DecoderDatasetSummary, String> =
         export_decoder_dataset_with_logical_flip;
     assert_eq!(config.logical_flip.unwrap().pauli, LogicalPauli::Z);
+}
+
+fn path_text(root: &Path, name: &str) -> String {
+    root.join(name).to_string_lossy().into_owned()
 }

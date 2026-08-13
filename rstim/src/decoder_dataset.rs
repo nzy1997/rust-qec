@@ -1169,6 +1169,19 @@ mod tests {
         assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
             .contains("contains qubit 1, but circuit has 1 qubits"));
+
+        let config = test_config(
+            one_qubit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            Some(LogicalFlip {
+                pauli: LogicalPauli::Z,
+                qubits: Vec::new(),
+            }),
+        );
+        assert_eq!(
+            validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err(),
+            "--logical_z_qubits must be non-empty"
+        );
     }
 
     #[test]
@@ -1345,6 +1358,32 @@ mod tests {
             .unwrap_err();
 
         assert!(err.contains("private bundle retained"));
+        assert!(private_out.exists());
+        assert!(!public_out.exists());
+        assert_no_decoder_dataset_temps(root.path());
+    }
+
+    #[test]
+    fn released_x_only_validation_and_publisher_wrappers_delegate() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let config = ExportDecoderDatasetConfig {
+            circuit_text: "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+                .to_string(),
+            shots: 1,
+            mode: DecoderDatasetMode::MeasurementsBlinded,
+            logical_x_qubits: vec![0],
+            public_out: public_out.clone(),
+            private_out: private_out.clone(),
+            seed: Some(3),
+        };
+
+        assert!(validate_decoder_dataset_inputs(&config).is_ok());
+        let mut publisher = FailingDirectoryPublisher::new(2);
+        let error = export_decoder_dataset_with_publisher(config, &mut publisher).unwrap_err();
+
+        assert!(error.contains("private bundle retained"));
         assert!(private_out.exists());
         assert!(!public_out.exists());
         assert_no_decoder_dataset_temps(root.path());

@@ -389,6 +389,18 @@ fn surface_memory_x_blinded_export_accepts_logical_z_and_rejects_invalid_choices
             vec!["--logical_z_qubits", LOGICAL_Z_SUPPORT],
             "detectors mode rejects --logical_z_qubits",
         ),
+        (
+            "invalid-logical-X",
+            "measurements_blinded",
+            vec!["--logical_x_qubits", "not-a-qubit"],
+            "--logical_x_qubits contains invalid",
+        ),
+        (
+            "invalid-logical-Z",
+            "measurements_blinded",
+            vec!["--logical_z_qubits", "not-a-qubit"],
+            "--logical_z_qubits contains invalid",
+        ),
     ] {
         let public_out = root.path().join(format!("{name}-public"));
         let private_out = root.path().join(format!("{name}-private"));
