@@ -59,6 +59,31 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
   expect(measurementResults.at(-1).text).toContain("L=0");
   expect(measurementResults.at(-1).text).toContain("M=0");
 
+  const canvas = page.locator("#shot-canvas");
+  const scale = () => canvas.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a);
+  const initialScale = await scale();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  expect(await scale()).toBeGreaterThan(initialScale);
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  expect(await scale()).toBeCloseTo(initialScale, 5);
+
+  const stage = page.locator("#shot-stage");
+  await stage.hover();
+  const transformBeforeWheel = await canvas.getAttribute("style");
+  const scrollBeforeWheel = await page.evaluate(() => window.scrollY);
+  await page.mouse.wheel(0, 320);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollBeforeWheel);
+  expect(await canvas.getAttribute("style")).toBe(transformBeforeWheel);
+
+  await stage.hover();
+  const stageBox = await stage.boundingBox();
+  const transformBeforeDrag = await canvas.getAttribute("style");
+  await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + stageBox.height - 18);
+  await page.mouse.down();
+  await page.mouse.move(stageBox.x + stageBox.width / 2 + 32, stageBox.y + stageBox.height - 38);
+  await page.mouse.up();
+  expect(await canvas.getAttribute("style")).not.toBe(transformBeforeDrag);
+
   await page.locator("[data-noise-event-id]").first().click();
   await page.locator("#shot-popover").getByRole("button", { name: "X", exact: true }).click();
   await expect(page.locator("#shot-summary")).toContainText("1 active errors");
@@ -174,6 +199,10 @@ test("read-only channel sites remain inspectable, stable, and filterable", async
   await expect(page.locator("#shot-detail")).toContainText("0.6");
   await expect(page.locator("#shot-detail")).toContainText("read-only");
   await expect(page.locator("#shot-popover")).toBeHidden();
+  await expect.poll(() => page.locator("#shot-detail").evaluate((detail) => {
+    const rect = detail.getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  })).toBe(true);
 
   await page.locator("#shot-filter-errors").uncheck();
   await expect(sites.first()).toHaveCSS("opacity", "0.12");

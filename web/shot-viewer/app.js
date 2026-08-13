@@ -63,6 +63,8 @@ function shellMarkup(mode) {
           <span id="shot-summary">0 errors · 0 detectors</span>
         </div>
         <div class="shot-toolbar-group shot-toolbar-actions">
+          <button class="shot-icon-button" id="shot-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+          <button class="shot-icon-button" id="shot-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
           <button class="shot-button" id="shot-fit" type="button">Fit</button>
           <button class="shot-button" id="shot-export-svg" type="button">Export SVG</button>
           <button class="shot-button" id="shot-export-pdf" type="button">Export PDF</button>
@@ -75,7 +77,7 @@ function shellMarkup(mode) {
         <label><input id="shot-filter-measurements" type="checkbox" checked> Measurements</label>
         <label><input id="shot-filter-detectors" type="checkbox" checked> Detectors</label>
         <label><input id="shot-filter-observables" type="checkbox" checked> Observables</label>
-        <span class="shot-help">Drag to pan · wheel to zoom · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrow keys pan</span>
+        <span class="shot-help">Drag to pan · wheel scrolls the page · use −/+ to zoom · arrow keys pan</span>
         <div id="shot-warnings" class="shot-warnings"></div>
       </section>
       <div class="shot-layout">
@@ -107,6 +109,8 @@ function collectUi() {
     clear: find("shot-clear"),
     undo: find("shot-undo"),
     redo: find("shot-redo"),
+    zoomOut: find("shot-zoom-out"),
+    zoomIn: find("shot-zoom-in"),
     fit: find("shot-fit"),
     exportSvg: find("shot-export-svg"),
     exportPdf: find("shot-export-pdf"),
@@ -133,6 +137,8 @@ function bindControls(state) {
   ui.clear.addEventListener("click", () => mutate(state, () => state.session.clear(...randomSeed())));
   ui.undo.addEventListener("click", () => mutate(state, () => state.session.undo()));
   ui.redo.addEventListener("click", () => mutate(state, () => state.session.redo()));
+  ui.zoomOut.addEventListener("click", () => zoomAroundCenter(state, 1 / 1.2));
+  ui.zoomIn.addEventListener("click", () => zoomAroundCenter(state, 1.2));
   ui.fit.addEventListener("click", () => fitDiagram(state));
   ui.exportSvg.addEventListener("click", () => exportSvg(state));
   ui.exportPdf.addEventListener("click", () => exportPdf(state));
@@ -342,7 +348,7 @@ function selectNoise(state, eventId, targetRect) {
   state.ui.canvas.querySelectorAll(".is-selected").forEach((node) => node.classList.remove("is-selected"));
   state.ui.canvas.querySelector(`[data-noise-event-id="${cssEscape(eventId)}"]`)?.classList.add("is-selected");
   updateDetail(state, eventId);
-  showPopover(state, eventId, targetRect);
+  if (!showPopover(state, eventId, targetRect)) revealDetail(state);
 }
 
 function updateDetail(state, eventId) {
@@ -393,6 +399,12 @@ function updateResultDetail(state, kind, ids) {
     <h2>${ids.map(escapeHtml).join(", ")}</h2>
     ${results.map((result) => `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`).join("")}
   `;
+  revealDetail(state);
+}
+
+function revealDetail(state) {
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  state.ui.detail.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
 }
 
 function showPopover(state, eventId, targetRect) {
@@ -400,7 +412,7 @@ function showPopover(state, eventId, targetRect) {
   const site = state.snapshot.noise_sites.find((item) => item.id === event?.site_id);
   if (!event || !site || !event.editable) {
     hidePopover(state);
-    return;
+    return false;
   }
   const current = outcomeLabel(event.override_outcome ?? event.base_outcome);
   state.ui.popover.innerHTML = `
@@ -420,6 +432,7 @@ function showPopover(state, eventId, targetRect) {
   state.ui.popover.style.left = `${left}px`;
   state.ui.popover.style.top = `${top}px`;
   state.ui.popover.querySelector("button:not([disabled])")?.focus({ preventScroll: true });
+  return true;
 }
 
 function handleOutcomeChoice(state, click) {
@@ -437,18 +450,6 @@ function hidePopover(state) {
 
 function bindPanZoom(state) {
   const { stage } = state.ui;
-  stage.addEventListener("wheel", (event) => {
-    event.preventDefault();
-    const rect = stage.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left;
-    const pointerY = event.clientY - rect.top;
-    const oldScale = state.transform.scale;
-    const scale = clamp(oldScale * Math.exp(-event.deltaY * 0.0015), 0.2, 4);
-    state.transform.x = pointerX - ((pointerX - state.transform.x) / oldScale) * scale;
-    state.transform.y = pointerY - ((pointerY - state.transform.y) / oldScale) * scale;
-    state.transform.scale = scale;
-    applyTransform(state);
-  }, { passive: false });
   stage.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || event.target.closest("[data-noise-event-id], [data-measurement-ids], [data-detector-id], [data-observable-id]")) return;
     stage.setPointerCapture(event.pointerId);
