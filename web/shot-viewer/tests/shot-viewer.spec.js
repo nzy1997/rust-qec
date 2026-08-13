@@ -11,17 +11,53 @@ REPEAT 2 {
 }
 `;
 
-test("fixed mode expands repeats, edits downstream state, and resets history on sample", async ({ page }) => {
+test("fixed gadget gallery edits downstream state and resets history on sample", async ({ page }) => {
   await page.goto("/interactive/");
   await expect(page.getByRole("button", { name: "Sample", exact: true })).toBeVisible();
   await expect(page.locator("#shot-file")).toHaveCount(0);
   await expect(page.locator("#shot-close")).toHaveCount(0);
 
+  const layout = await page.locator(".shot-workspace").evaluate((workspace) => {
+    const stage = workspace.querySelector("#shot-stage").getBoundingClientRect();
+    const view = workspace.querySelector(".shot-view-panel").getBoundingClientRect();
+    const detail = workspace.querySelector("#shot-detail").getBoundingClientRect();
+    const bounds = workspace.getBoundingClientRect();
+    return {
+      stageWidth: stage.width,
+      workspaceWidth: bounds.width,
+      viewAboveStage: view.bottom <= stage.top,
+      detailBelowStage: detail.top >= stage.bottom,
+    };
+  });
+  expect(layout.stageWidth / layout.workspaceWidth).toBeGreaterThan(0.98);
+  expect(layout.viewAboveStage).toBe(true);
+  expect(layout.detailBelowStage).toBe(true);
+
   const ids = await page.locator("[data-noise-event-id]").evaluateAll((nodes) =>
     nodes.map((node) => node.dataset.noiseEventId),
   );
-  expect(ids.length).toBe(8);
+  expect(ids.length).toBe(9);
   expect(new Set(ids).size).toBe(ids.length);
+  await expect(page.locator("#shot-summary")).toContainText("0/2 detectors");
+
+  const measurementResults = await page.locator("#shot-stage svg").evaluate((svg) => {
+    const measurementXs = new Set(
+      [...svg.querySelectorAll("text")]
+        .filter((node) => ["M", "MR", "MRL"].includes(node.textContent))
+        .map((node) => node.getAttribute("x")),
+    );
+    return [...svg.querySelectorAll(".annotation")]
+      .filter(
+        (node) =>
+          node.dataset.annotationTags?.includes("query-result") &&
+          measurementXs.has(node.getAttribute("x")),
+      )
+      .map((node) => ({ text: node.textContent, y: node.getAttribute("y") }));
+  });
+  expect(measurementResults).toHaveLength(4);
+  expect(new Set(measurementResults.map(({ y }) => y)).size).toBe(4);
+  expect(measurementResults.at(-1).text).toContain("L=0");
+  expect(measurementResults.at(-1).text).toContain("M=0");
 
   await page.locator("[data-noise-event-id]").first().click();
   await page.locator("#shot-popover").getByRole("button", { name: "X", exact: true }).click();

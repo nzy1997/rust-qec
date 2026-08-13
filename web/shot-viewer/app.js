@@ -69,29 +69,28 @@ function shellMarkup(mode) {
           ${mode === "local" ? '<button class="shot-button shot-button-quiet" id="shot-close" type="button">Close circuit</button>' : ""}
         </div>
       </div>
+      <section class="shot-view-panel" aria-label="Display filters">
+        <strong>View</strong>
+        <label><input id="shot-filter-errors" type="checkbox" checked> Noise sites</label>
+        <label><input id="shot-filter-measurements" type="checkbox" checked> Measurements</label>
+        <label><input id="shot-filter-detectors" type="checkbox" checked> Detectors</label>
+        <label><input id="shot-filter-observables" type="checkbox" checked> Observables</label>
+        <span class="shot-help">Drag to pan · wheel to zoom · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrow keys pan</span>
+        <div id="shot-warnings" class="shot-warnings"></div>
+      </section>
       <div class="shot-layout">
-        <aside class="shot-panel shot-filter-panel" aria-label="Display filters">
-          <h2>View</h2>
-          <label><input id="shot-filter-errors" type="checkbox" checked> Noise sites</label>
-          <label><input id="shot-filter-measurements" type="checkbox" checked> Measurements</label>
-          <label><input id="shot-filter-detectors" type="checkbox" checked> Detectors</label>
-          <label><input id="shot-filter-observables" type="checkbox" checked> Observables</label>
-          <hr>
-          <p class="shot-help"><strong>Navigate</strong><br>Drag to pan · wheel to zoom · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrow keys pan.</p>
-          <div id="shot-warnings" class="shot-warnings"></div>
-        </aside>
         <div class="shot-stage-wrap">
           <div id="shot-stage" class="shot-stage" tabindex="0" aria-label="Circuit diagram. Click a noise site to edit its realized outcome.">
             <div id="shot-canvas" class="shot-canvas"></div>
           </div>
           <div id="shot-popover" class="shot-popover" role="dialog" aria-label="Choose realized noise outcome" hidden></div>
         </div>
-        <aside id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
-          <p class="eyebrow">Selection</p>
-          <h2>Choose a noise site</h2>
-          <p>Click an orange noise box in the circuit to inspect or override that event.</p>
-        </aside>
       </div>
+      <section id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
+        <p class="eyebrow">Selection</p>
+        <h2>Choose a noise site</h2>
+        <p>Click an orange noise box in the circuit to inspect or override that event.</p>
+      </section>
     </div>`;
 }
 

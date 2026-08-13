@@ -30,6 +30,7 @@ const REPEAT_ANNOTATION_LINE_OFFSET: usize = 1;
 #[derive(Debug, Clone)]
 struct MeasurementTarget {
     lane: usize,
+    target_slot: usize,
     first_index: usize,
     output_count: usize,
 }
@@ -391,19 +392,27 @@ fn count_operation_layer_columns(
     num_qubits: usize,
 ) -> Result<usize, String> {
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    let mut lane_next_columns = vec![0usize; num_qubits];
     for op in layer {
         let entry = OperationLayerEntry {
             op,
             op_path: Vec::new(),
             repeat_iterations: Vec::new(),
         };
+        let mut placements = Vec::new();
         for item in operation_layer_items(&entry, num_qubits, None)? {
             let span = item.span(num_qubits)?;
-            let assigned_column = first_non_conflicting_column(&column_spans, span);
+            let earliest_column = earliest_column_for_span(&lane_next_columns, span);
+            let assigned_column =
+                first_non_conflicting_column_from(&column_spans, span, earliest_column);
             if assigned_column == column_spans.len() {
                 column_spans.push(Vec::new());
             }
             column_spans[assigned_column].push(span);
+            placements.push((span, assigned_column));
+        }
+        for (span, assigned_column) in placements {
+            advance_lanes_after_placement(&mut lane_next_columns, span, assigned_column);
         }
     }
     Ok(column_spans.len())
@@ -731,11 +740,15 @@ fn flush_operation_layer(
     }
 
     let mut column_spans: Vec<Vec<LaneSpan>> = Vec::new();
+    let mut lane_next_columns = vec![0usize; num_qubits];
     let interaction_digest = state.interaction_digest;
     for entry in layer.drain(..) {
+        let mut placements = Vec::new();
         for item in operation_layer_items(&entry, num_qubits, interaction_digest)? {
             let span = item.span(num_qubits)?;
-            let assigned_column = first_non_conflicting_column(&column_spans, span);
+            let earliest_column = earliest_column_for_span(&lane_next_columns, span);
+            let assigned_column =
+                first_non_conflicting_column_from(&column_spans, span, earliest_column);
             if assigned_column == column_spans.len() {
                 column_spans.push(Vec::new());
             }
@@ -747,6 +760,10 @@ fn flush_operation_layer(
                 &item,
                 state,
             )?;
+            placements.push((span, assigned_column));
+        }
+        for (span, assigned_column) in placements {
+            advance_lanes_after_placement(&mut lane_next_columns, span, assigned_column);
         }
     }
     *column += column_spans.len();
@@ -859,11 +876,41 @@ fn source_layer_item(
     }
 }
 
-fn first_non_conflicting_column(column_spans: &[Vec<LaneSpan>], span: LaneSpan) -> usize {
+fn first_non_conflicting_column_from(
+    column_spans: &[Vec<LaneSpan>],
+    span: LaneSpan,
+    start: usize,
+) -> usize {
     column_spans
         .iter()
-        .position(|spans| spans.iter().all(|existing| !existing.conflicts(span)))
-        .unwrap_or(column_spans.len())
+        .enumerate()
+        .skip(start)
+        .find_map(|(column, spans)| {
+            spans
+                .iter()
+                .all(|existing| !existing.conflicts(span))
+                .then_some(column)
+        })
+        .unwrap_or(column_spans.len().max(start))
+}
+
+fn earliest_column_for_span(lane_next_columns: &[usize], span: LaneSpan) -> usize {
+    lane_next_columns
+        .get(span.min..=span.max)
+        .and_then(|columns| columns.iter().copied().max())
+        .unwrap_or(0)
+}
+
+fn advance_lanes_after_placement(
+    lane_next_columns: &mut [usize],
+    span: LaneSpan,
+    assigned_column: usize,
+) {
+    if let Some(columns) = lane_next_columns.get_mut(span.min..=span.max) {
+        for next_column in columns {
+            *next_column = (*next_column).max(assigned_column + 1);
+        }
+    }
 }
 
 fn first_non_conflicting_column_with_width(
@@ -1688,9 +1735,9 @@ fn record_target_measurements(
     num_qubits: usize,
     gate: &str,
 ) -> Result<(), String> {
-    for &target in targets {
+    for (target_slot, &target) in targets.iter().enumerate() {
         let lane = validate_lane(target, num_qubits, gate)?;
-        record_measurement_target(measurement_targets, state, lane, output_count);
+        record_measurement_target(measurement_targets, state, lane, target_slot, output_count);
     }
     Ok(())
 }
@@ -1703,10 +1750,16 @@ fn record_pair_measurements(
     gate: &str,
 ) -> Result<(), String> {
     let mut chunks = targets.chunks_exact(2);
-    for chunk in &mut chunks {
+    for (pair_index, chunk) in (&mut chunks).enumerate() {
         let lane_a = validate_lane(chunk[0], num_qubits, gate)?;
         let lane_b = validate_lane(chunk[1], num_qubits, gate)?;
-        record_measurement_target(measurement_targets, state, lane_a.min(lane_b), 1);
+        record_measurement_target(
+            measurement_targets,
+            state,
+            lane_a.min(lane_b),
+            pair_index * 2,
+            1,
+        );
     }
     for &target in chunks.remainder() {
         validate_lane(target, num_qubits, gate)?;
@@ -1734,6 +1787,7 @@ fn record_mpp_measurements(
     };
 
     let mut group_lanes = Vec::new();
+    let mut group_index = 0usize;
     let mut group_has_target = false;
     let mut previous_was_combiner = false;
     for target in raw_targets {
@@ -1743,7 +1797,14 @@ fn record_mpp_measurements(
         }
 
         if group_has_target && !previous_was_combiner {
-            record_mpp_group(measurement_targets, state, &group_lanes, group_has_target);
+            record_mpp_group(
+                measurement_targets,
+                state,
+                &group_lanes,
+                group_has_target,
+                group_index,
+            );
+            group_index += 1;
             group_lanes.clear();
         }
         group_has_target = true;
@@ -1752,7 +1813,13 @@ fn record_mpp_measurements(
             group_lanes.push(lane);
         }
     }
-    record_mpp_group(measurement_targets, state, &group_lanes, group_has_target);
+    record_mpp_group(
+        measurement_targets,
+        state,
+        &group_lanes,
+        group_has_target,
+        group_index,
+    );
     Ok(())
 }
 
@@ -1761,12 +1828,13 @@ fn record_mpp_group(
     state: &mut RenderState,
     group_lanes: &[usize],
     group_has_target: bool,
+    group_index: usize,
 ) {
     if !group_has_target {
         return;
     }
     let lane = group_lanes.iter().copied().min().unwrap_or(0);
-    record_measurement_target(measurement_targets, state, lane, 1);
+    record_measurement_target(measurement_targets, state, lane, group_index, 1);
 }
 
 fn record_raw_target_measurements(
@@ -1778,12 +1846,12 @@ fn record_raw_target_measurements(
     gate: &str,
 ) -> Result<(), String> {
     if let Some(raw_targets) = raw_targets {
-        for target in raw_targets {
+        for (target_slot, target) in raw_targets.iter().enumerate() {
             if matches!(target, Qp101TargetRef::Combiner) {
                 continue;
             }
             let lane = validated_target_ref_lane(target, num_qubits, gate)?.unwrap_or(0);
-            record_measurement_target(measurement_targets, state, lane, 1);
+            record_measurement_target(measurement_targets, state, lane, target_slot, 1);
         }
         return Ok(());
     }
@@ -1809,6 +1877,7 @@ fn record_measurement_target(
     measurement_targets: &mut Vec<MeasurementTarget>,
     state: &mut RenderState,
     lane: usize,
+    target_slot: usize,
     output_count: usize,
 ) {
     if output_count == 0 {
@@ -1825,6 +1894,7 @@ fn record_measurement_target(
     }
     measurement_targets.push(MeasurementTarget {
         lane,
+        target_slot,
         first_index,
         output_count,
     });
@@ -1882,7 +1952,7 @@ fn render_gate(
             }
         }
         _ => {
-            if controls.is_empty() && is_simple_single_qubit_gate(gate) && !lanes.is_empty() {
+            if controls.is_empty() && is_independent_single_qubit_gate(gate) && !lanes.is_empty() {
                 render_single_qubit_boxes(out, x, &label, &lanes);
             } else {
                 render_generic_box(out, x, num_qubits, &label, &lanes, "#ffffff")?;
@@ -1898,11 +1968,12 @@ fn render_gate(
         Some(gate),
         measurement_flip_interactions,
     );
-    render_annotations_with_line_offset(
+    render_gate_annotations_with_line_offset(
         out,
         x,
         &lanes,
         annotations,
+        &measurement_targets,
         measurement_annotation_line_offset(&measurement_targets),
     );
     Ok(())
@@ -1948,8 +2019,35 @@ fn target_pairs(
     Ok(Some(pairs))
 }
 
-fn is_simple_single_qubit_gate(gate: &str) -> bool {
-    matches!(gate, "H" | "X" | "Y" | "Z" | "S" | "T" | "R" | "RX")
+fn is_independent_single_qubit_gate(gate: &str) -> bool {
+    matches!(
+        gate,
+        "H" | "X"
+            | "Y"
+            | "Z"
+            | "S"
+            | "T"
+            | "R"
+            | "RX"
+            | "RY"
+            | "RZ"
+            | "M"
+            | "MX"
+            | "MY"
+            | "MZ"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "MRZ"
+            | "ML"
+            | "MXL"
+            | "MYL"
+            | "MZL"
+            | "MRL"
+            | "MRXL"
+            | "MRYL"
+            | "MRZL"
+    )
 }
 
 enum NoisePolicy {
@@ -2244,7 +2342,10 @@ fn render_swap_pair(out: &mut String, x: i32, lane_a: usize, lane_b: usize) {
             y - 7
         ));
     }
-    render_top_note(out, x, "SWAP");
+    out.push_str(&format!(
+        "<text x=\"{x}\" y=\"{}\" fill=\"#475467\" text-anchor=\"middle\" font-size=\"11\">SWAP</text>\n",
+        above_gate_text_y_for_row(lane_a.min(lane_b), 0)
+    ));
 }
 
 fn render_generic_box(
@@ -2517,6 +2618,39 @@ fn render_annotations_with_line_offset(
     line_offset: usize,
 ) {
     render_sample_annotations(out, x, lanes, annotations);
+    render_below_annotations_with_line_offset(out, x, lanes, annotations, line_offset);
+}
+
+fn render_gate_annotations_with_line_offset(
+    out: &mut String,
+    x: i32,
+    lanes: &[usize],
+    annotations: &[Qp101Annotation],
+    measurement_targets: &[MeasurementTarget],
+    line_offset: usize,
+) {
+    if measurement_targets.is_empty() {
+        render_annotations_with_line_offset(out, x, lanes, annotations, line_offset);
+        return;
+    }
+
+    let operation_annotations = annotations
+        .iter()
+        .filter(|annotation| is_sample_annotation(annotation) && annotation.target_slots.is_empty())
+        .collect::<Vec<_>>();
+    render_sample_annotation_slice(out, x, lanes, &operation_annotations);
+
+    for target in measurement_targets {
+        let target_annotations = annotations
+            .iter()
+            .filter(|annotation| {
+                is_sample_annotation(annotation)
+                    && annotation.target_slots.contains(&target.target_slot)
+            })
+            .collect::<Vec<_>>();
+        render_sample_annotation_slice(out, x, &[target.lane], &target_annotations);
+    }
+
     render_below_annotations_with_line_offset(out, x, lanes, annotations, line_offset);
 }
 

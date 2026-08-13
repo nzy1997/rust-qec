@@ -159,8 +159,39 @@
 
 .shot-layout {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 610px;
+}
+
+.shot-view-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid #e4e7ec;
+  background: #fcfcfd;
+  color: #475467;
+  font-size: 0.86rem;
+}
+
+.shot-view-panel label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.shot-view-panel input {
+  accent-color: #6941c6;
+}
+
+.shot-view-panel .shot-help {
+  margin-left: auto;
+}
+
+.shot-view-panel .shot-warnings {
+  flex-basis: 100%;
 }
 
 .shot-panel {
@@ -174,21 +205,6 @@
   font-size: 1rem;
 }
 
-.shot-filter-panel {
-  border-right: 1px solid #e4e7ec;
-}
-
-.shot-filter-panel label {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin: 0.7rem 0;
-}
-
-.shot-filter-panel input {
-  accent-color: #6941c6;
-}
-
 .shot-panel hr {
   margin: 1.1rem 0;
   border: 0;
@@ -196,7 +212,8 @@
 }
 
 .shot-detail {
-  border-left: 1px solid #e4e7ec;
+  min-height: 116px;
+  border-top: 1px solid #e4e7ec;
   overflow-wrap: anywhere;
 }
 
@@ -214,6 +231,11 @@
 .shot-detail dd {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.shot-detail pre {
+  max-height: 240px;
+  overflow: auto;
 }
 
 .shot-stage-wrap {
@@ -372,17 +394,6 @@ kbd {
 }
 
 @media (max-width: 1050px) {
-  .shot-layout {
-    grid-template-columns: 170px minmax(0, 1fr);
-  }
-
-  .shot-detail {
-    grid-column: 1 / -1;
-    min-height: 150px;
-    border-top: 1px solid #e4e7ec;
-    border-left: 0;
-  }
-
   .shot-stage-wrap {
     min-height: 500px;
   }
@@ -397,23 +408,9 @@ kbd {
     width: calc(100% - 1rem);
   }
 
-  .shot-layout {
-    display: block;
-  }
-
-  .shot-filter-panel {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 0.9rem;
-    border-right: 0;
-    border-bottom: 1px solid #e4e7ec;
-  }
-
-  .shot-filter-panel h2,
-  .shot-filter-panel hr,
-  .shot-filter-panel .shot-help,
-  .shot-warnings {
+  .shot-view-panel .shot-help {
     width: 100%;
+    margin-left: 0;
   }
 
   .shot-stage-wrap {

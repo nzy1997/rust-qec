@@ -117,29 +117,28 @@ end`};e.events.push(["putFont",function(i){(function(a){var s=a.font,o=a.out,l=a
           ${t==="local"?'<button class="shot-button shot-button-quiet" id="shot-close" type="button">Close circuit</button>':""}
         </div>
       </div>
+      <section class="shot-view-panel" aria-label="Display filters">
+        <strong>View</strong>
+        <label><input id="shot-filter-errors" type="checkbox" checked> Noise sites</label>
+        <label><input id="shot-filter-measurements" type="checkbox" checked> Measurements</label>
+        <label><input id="shot-filter-detectors" type="checkbox" checked> Detectors</label>
+        <label><input id="shot-filter-observables" type="checkbox" checked> Observables</label>
+        <span class="shot-help">Drag to pan \xB7 wheel to zoom \xB7 <kbd>+</kbd>/<kbd>\u2212</kbd> zoom \xB7 arrow keys pan</span>
+        <div id="shot-warnings" class="shot-warnings"></div>
+      </section>
       <div class="shot-layout">
-        <aside class="shot-panel shot-filter-panel" aria-label="Display filters">
-          <h2>View</h2>
-          <label><input id="shot-filter-errors" type="checkbox" checked> Noise sites</label>
-          <label><input id="shot-filter-measurements" type="checkbox" checked> Measurements</label>
-          <label><input id="shot-filter-detectors" type="checkbox" checked> Detectors</label>
-          <label><input id="shot-filter-observables" type="checkbox" checked> Observables</label>
-          <hr>
-          <p class="shot-help"><strong>Navigate</strong><br>Drag to pan \xB7 wheel to zoom \xB7 <kbd>+</kbd>/<kbd>\u2212</kbd> zoom \xB7 arrow keys pan.</p>
-          <div id="shot-warnings" class="shot-warnings"></div>
-        </aside>
         <div class="shot-stage-wrap">
           <div id="shot-stage" class="shot-stage" tabindex="0" aria-label="Circuit diagram. Click a noise site to edit its realized outcome.">
             <div id="shot-canvas" class="shot-canvas"></div>
           </div>
           <div id="shot-popover" class="shot-popover" role="dialog" aria-label="Choose realized noise outcome" hidden></div>
         </div>
-        <aside id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
-          <p class="eyebrow">Selection</p>
-          <h2>Choose a noise site</h2>
-          <p>Click an orange noise box in the circuit to inspect or override that event.</p>
-        </aside>
       </div>
+      <section id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
+        <p class="eyebrow">Selection</p>
+        <h2>Choose a noise site</h2>
+        <p>Click an orange noise box in the circuit to inspect or override that event.</p>
+      </section>
     </div>`}function Z9(){let t=e=>document.getElementById(e);return{loading:t("shot-loading"),error:t("shot-error"),empty:t("shot-empty"),workspace:t("shot-workspace"),file:t("shot-file"),drop:t("shot-drop-target"),sample:t("shot-sample"),clear:t("shot-clear"),undo:t("shot-undo"),redo:t("shot-redo"),fit:t("shot-fit"),exportSvg:t("shot-export-svg"),exportPdf:t("shot-export-pdf"),close:t("shot-close"),badge:t("shot-base-badge"),summary:t("shot-summary"),warnings:t("shot-warnings"),stage:t("shot-stage"),canvas:t("shot-canvas"),popover:t("shot-popover"),detail:t("shot-detail"),filters:{noise:t("shot-filter-errors"),measurements:t("shot-filter-measurements"),detectors:t("shot-filter-detectors"),observables:t("shot-filter-observables")}}}function $9(t){let{ui:e}=t;e.sample.addEventListener("click",()=>wl(t,()=>t.session.sample(...mw()))),e.clear.addEventListener("click",()=>wl(t,()=>t.session.clear(...mw()))),e.undo.addEventListener("click",()=>wl(t,()=>t.session.undo())),e.redo.addEventListener("click",()=>wl(t,()=>t.session.redo())),e.fit.addEventListener("click",()=>ww(t)),e.exportSvg.addEventListener("click",()=>uK(t)),e.exportPdf.addEventListener("click",()=>cK(t)),e.close?.addEventListener("click",()=>eK(t)),e.file?.addEventListener("change",async()=>{let[A]=e.file.files;A&&await TU(t,A)});for(let A of["dragenter","dragover"])e.drop?.addEventListener(A,r=>{r.preventDefault(),e.drop.classList.add("is-dragging")});for(let A of["dragleave","drop"])e.drop?.addEventListener(A,r=>{r.preventDefault(),e.drop.classList.remove("is-dragging")});e.drop?.addEventListener("drop",async A=>{let[r]=A.dataTransfer.files;r&&await TU(t,r)}),e.canvas.addEventListener("click",A=>nK(t,A)),e.canvas.addEventListener("keydown",A=>{(A.key==="Enter"||A.key===" ")&&A.target.dataset.noiseEventId&&(A.preventDefault(),DU(t,A.target.dataset.noiseEventId,A.target.getBoundingClientRect()))}),e.popover.addEventListener("click",A=>sK(t,A));for(let[A,r]of Object.entries(e.filters))r.addEventListener("change",()=>{e.canvas.classList.toggle(`hide-${A}`,!r.checked)});oK(t),document.addEventListener("keydown",A=>lK(t,A)),document.addEventListener("pointerdown",A=>{!e.popover.hidden&&!e.popover.contains(A.target)&&!A.target.closest(".noise-site")&&Bl(t)}),window.addEventListener("resize",()=>{t.snapshot&&ww(t,!1)})}async function TU(t,e){if(e.size>2e6){mp(t,"This file exceeds the 2 MB local-file limit.");return}try{await kU(t,await e.text(),e.name)}catch(A){mp(t,yp(A))}finally{t.ui.file.value=""}}async function kU(t,e,A){ju(t,!0),yw(t);try{await jU();let[r,n]=mw(),i=new Xl(e,r,n),a=VU(i.snapshot());if(a.format_version!=="rstim-shot-view-v1")throw i.free?.(),new Error("The page and simulation engine versions do not match. Refresh this page and try again.");t.session?.free?.(),t.session=i,t.snapshot=a,t.sourceName=A,t.selectedEventId=null,t.transform={x:28,y:28,scale:1},t.ui.empty&&(t.ui.empty.hidden=!0),t.ui.workspace.hidden=!1,PU(t,a,{fit:!0})}finally{ju(t,!1)}}function eK(t){t.session?.free?.(),t.session=null,t.snapshot=null,t.sourceName=null,t.selectedEventId=null,t.ui.canvas.replaceChildren(),t.ui.workspace.hidden=!0,Bl(t),MU(t)}function MU(t){yw(t),t.ui.empty.hidden=!1,t.ui.workspace.hidden=!0}async function wl(t,e){if(t.session){ju(t,!0),yw(t),await jU();try{let A=VU(e());t.snapshot=A,PU(t,A)}catch(A){mp(t,yp(A))}finally{ju(t,!1)}}}function PU(t,e,A={}){let{ui:r}=t,n={...t.transform};if(r.canvas.innerHTML=e.svg,rK(t),RU(t),tK(t),AK(t),t.selectedEventId){let i=r.canvas.querySelector(`[data-noise-event-id="${$f(t.selectedEventId)}"]`);i&&i.classList.add("is-selected"),KU(t,t.selectedEventId)}A.fit?requestAnimationFrame(()=>ww(t)):(t.transform=n,Vu(t))}function RU(t){let{snapshot:e,ui:A}=t,r=e.shot.base.kind,n=e.shot.result.noise_events.filter(a=>a.effective_outcome.kind!=="identity"&&a.applicable).length,i=e.shot.result.detectors.filter(a=>a.flipped).length;A.badge.textContent=r==="sampled"?"Sampled":"No-error",A.badge.classList.toggle("is-sampled",r==="sampled"),A.summary.textContent=`${n} active errors \xB7 ${i}/${e.shot.result.detectors.length} detectors`,A.undo.disabled=!e.shot.can_undo,A.redo.disabled=!e.shot.can_redo}function tK(t){t.ui.warnings.replaceChildren(...t.snapshot.warnings.map(e=>{let A=document.createElement("p");return A.textContent=e,A}))}function AK(t){let e=t.snapshot.shot.changed_by_last_action,A=[...e.measurements.map(r=>`[data-measurement-ids~="${$f(r)}"]`),...e.detectors.map(r=>`[data-detector-id="${$f(r)}"]`),...e.observables.map(r=>`[data-observable-id="${$f(r)}"]`)];for(let r of A)t.ui.canvas.querySelector(r)?.classList.add("is-changed")}function rK(t){for(let[e,A]of Object.entries(t.ui.filters))t.ui.canvas.classList.toggle(`hide-${e}`,!A.checked)}function nK(t,e){let A=e.target.closest("[data-noise-event-id]");if(A){DU(t,A.dataset.noiseEventId,A.getBoundingClientRect());return}let r=e.target.closest("[data-measurement-ids]"),n=e.target.closest("[data-detector-id]"),i=e.target.closest("[data-observable-id]");r?vw(t,"measurement",r.dataset.measurementIds.split(" ")):n?vw(t,"detector",[n.dataset.detectorId]):i&&vw(t,"observable",[i.dataset.observableId])}function DU(t,e,A){t.selectedEventId=e,t.ui.canvas.querySelectorAll(".is-selected").forEach(r=>r.classList.remove("is-selected")),t.ui.canvas.querySelector(`[data-noise-event-id="${$f(e)}"]`)?.classList.add("is-selected"),KU(t,e),aK(t,e,A)}function KU(t,e){let A=t.snapshot.shot.result.noise_events.find(a=>a.id===e),r=t.snapshot.noise_sites.find(a=>a.id===A?.site_id);if(!A||!r)return;let n=A.override_outcome?Zf(A.override_outcome):"base result",i=r.kind==="measurement_flip"?`<dt>Flip probability</dt><dd>${NU(r.probability)}</dd>`:`<dt>Channel parameters</dt><dd>${Ss(iK(r))}</dd>
       <dt>Total probability</dt><dd>${NU(r.probability)}</dd>`;t.ui.detail.innerHTML=`
     <p class="eyebrow">Noise event</p>

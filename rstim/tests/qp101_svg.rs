@@ -128,6 +128,11 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
         svg.contains(">SWAP</text>"),
         "SWAP should retain its note label: {svg}"
     );
+    assert_eq!(
+        text_y(&svg, "SWAP"),
+        Some(122),
+        "SWAP note should sit above its upper endpoint instead of at the top of the diagram: {svg}"
+    );
 }
 
 #[test]
@@ -1204,6 +1209,28 @@ fn svg_renderer_packs_lane_disjoint_known_noise_boxes() {
 }
 
 #[test]
+fn svg_renderer_preserves_source_order_per_lane_within_a_tick_layer() {
+    let instrs =
+        parse_lines("CX 1 3 0 2\nLOSS(0.1) 0\nTICK\n").expect("causal-order fixture should parse");
+    let doc = export_qp101(&instrs).expect("causal-order fixture should export");
+    let svg = render_svg(&doc).expect("causal-order fixture should render");
+
+    let cx_positions = text_positions(&svg, "CX");
+    assert_eq!(
+        cx_positions.len(),
+        2,
+        "fixture should render two CX pairs: {svg}"
+    );
+    let loss_x = text_xy(&svg, "LOSS")
+        .expect("LOSS label should be positioned")
+        .0;
+    assert!(
+        loss_x > cx_positions[1].0,
+        "later q0 LOSS must render after the earlier q0 CX pair: {svg}"
+    );
+}
+
+#[test]
 fn svg_renderer_preserves_explicit_combiner_sources() {
     let doc = Qp101Document {
         standard: "QP101-ZY".to_string(),
@@ -1465,6 +1492,50 @@ fn svg_renderer_labels_measurements_with_global_anchors() {
         !reset_svg.contains(">m1</text>"),
         "reset-only gates must not receive measurement anchors: {reset_svg}"
     );
+}
+
+#[test]
+fn svg_renderer_draws_multi_target_measurements_as_independent_boxes() {
+    let instrs = parse_lines("M 0 2\nMR 1 3\n").expect("measurement fixture should parse");
+    let doc = export_qp101(&instrs).expect("measurement fixture should export");
+    let svg = render_svg(&doc).expect("measurement fixture should render");
+
+    assert_eq!(
+        svg.matches("class=\"gate-box\"").count(),
+        4,
+        "each measurement target should have one gate box: {svg}"
+    );
+    assert_eq!(svg.matches(">M</text>").count(), 2, "{svg}");
+    assert_eq!(svg.matches(">MR</text>").count(), 2, "{svg}");
+    assert_eq!(
+        svg.matches("height=\"28\"").count(),
+        4,
+        "measurement boxes must not span unrelated qubit lanes: {svg}"
+    );
+}
+
+#[test]
+fn svg_renderer_places_sample_results_over_their_measurement_targets() {
+    let instrs = parse_lines("M 0 2\n").expect("measurement result fixture should parse");
+    let mut doc = export_qp101(&instrs).expect("measurement result fixture should export");
+    match &mut doc.operations[0] {
+        Qp101Operation::Gate { annotations, .. } => {
+            let mut first = annotation("marker", Some("0"), None);
+            first.target_slots = vec![0];
+            first.tags = vec!["sample-trace".to_string(), "query-result".to_string()];
+            annotations.push(first);
+
+            let mut second = annotation("marker", Some("1"), None);
+            second.target_slots = vec![1];
+            second.tags = vec!["sample-trace".to_string(), "query-result".to_string()];
+            annotations.push(second);
+        }
+        op => panic!("expected measurement gate, got {op:?}"),
+    }
+
+    let svg = render_svg(&doc).expect("measurement result fixture should render");
+    assert_eq!(text_y(&svg, "0"), Some(34), "{svg}");
+    assert_eq!(text_y(&svg, "1"), Some(210), "{svg}");
 }
 
 #[test]
