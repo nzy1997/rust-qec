@@ -1,6 +1,11 @@
-use rand::Rng;
+use std::collections::BTreeMap;
+
+use rand::{Rng, RngCore};
 
 use crate::coords::CoordState;
+use crate::interactive_shot::{
+    ChoiceKind, CircuitDigest, KeyedRng, NoiseEventId, NoiseOutcome, NoiseSiteId, Pauli, RandomKey,
+};
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
 use crate::recorder::Recorder;
 use crate::sample_trace::{
@@ -17,7 +22,25 @@ pub struct ExecOutput {
     pub detectors: Vec<bool>,
     pub detector_coords: Vec<Vec<f64>>,
     pub observables: Vec<(u32, bool)>,
+    pub observable_events: Vec<ObservableEvent>,
+    pub inapplicable_noise_events: Vec<NoiseApplicabilityEvent>,
     pub qubit_coords: std::collections::HashMap<u32, Vec<f64>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoiseApplicabilityEvent {
+    pub op_path: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
+    pub target_slots: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservableEvent {
+    pub op_path: Vec<usize>,
+    pub repeat_iterations: Vec<u64>,
+    pub sequence_index: usize,
+    pub observable_index: u32,
+    pub bit: bool,
 }
 
 impl Executor {
@@ -52,16 +75,257 @@ impl Executor {
         trace_enabled: bool,
         sweep_bits: Option<&[bool]>,
     ) -> Result<(ExecOutput, SampleTrace), String> {
+        let mut randomness = ExecutionRandom::Sequential(rng);
+        self.run_internal_with_randomness(&mut randomness, trace_enabled, sweep_bits)
+    }
+
+    pub fn run_with_choices(
+        &self,
+        config: InteractiveExecutionConfig<'_>,
+    ) -> Result<(ExecOutput, SampleTrace), String> {
+        let mut randomness = ExecutionRandom::interactive(config);
+        self.run_internal_with_randomness(&mut randomness, true, None)
+    }
+
+    fn run_internal_with_randomness(
+        &self,
+        randomness: &mut ExecutionRandom<'_>,
+        trace_enabled: bool,
+        sweep_bits: Option<&[bool]>,
+    ) -> Result<(ExecOutput, SampleTrace), String> {
         let n = max_qubit(&self.instrs)?;
         let mut exec = ExecutionState::new(n, trace_enabled);
         execute_instrs(
             &self.instrs,
             &ExecutionTraversalContext::default(),
             &mut exec,
-            rng,
+            randomness,
             sweep_bits,
         )?;
         Ok(exec.into_output())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct InteractiveExecutionConfig<'a> {
+    pub circuit_digest: CircuitDigest,
+    pub seed: u64,
+    pub force_noiseless: bool,
+    pub overrides: &'a BTreeMap<NoiseEventId, NoiseOutcome>,
+}
+
+struct InteractiveRandom<'a> {
+    circuit_digest: CircuitDigest,
+    force_noiseless: bool,
+    overrides: &'a BTreeMap<NoiseEventId, NoiseOutcome>,
+    keyed: KeyedRng,
+}
+
+enum ExecutionRandom<'a> {
+    Sequential(&'a mut dyn RngCore),
+    Interactive(InteractiveRandom<'a>),
+}
+
+impl<'a> ExecutionRandom<'a> {
+    fn interactive(config: InteractiveExecutionConfig<'a>) -> Self {
+        let initial_key = RandomKey {
+            circuit_digest: config.circuit_digest,
+            op_path: Vec::new(),
+            repeat_iterations: Vec::new(),
+            target_slots: Vec::new(),
+            choice_kind: ChoiceKind::IntrinsicMeasurement,
+            subchoice: 0,
+        };
+        Self::Interactive(InteractiveRandom {
+            circuit_digest: config.circuit_digest,
+            force_noiseless: config.force_noiseless,
+            overrides: config.overrides,
+            keyed: KeyedRng::new(config.seed, initial_key),
+        })
+    }
+
+    fn set_key(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+    ) {
+        if let Self::Interactive(random) = self {
+            random.keyed.set_key(RandomKey {
+                circuit_digest: random.circuit_digest,
+                op_path: context.op_path.clone(),
+                repeat_iterations: context.repeat_iterations.clone(),
+                target_slots: target_slots.to_vec(),
+                choice_kind,
+                subchoice,
+            });
+        }
+    }
+
+    fn bernoulli(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+        probability: f64,
+        declared_noise: bool,
+    ) -> bool {
+        self.unit_interval(
+            context,
+            target_slots,
+            choice_kind,
+            subchoice,
+            declared_noise,
+        ) < probability
+    }
+
+    fn unit_interval(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+        declared_noise: bool,
+    ) -> f64 {
+        if declared_noise
+            && matches!(
+                self,
+                Self::Interactive(InteractiveRandom {
+                    force_noiseless: true,
+                    ..
+                })
+            )
+        {
+            return 1.0;
+        }
+        self.set_key(context, target_slots, choice_kind, subchoice);
+        self.r#gen::<f64>()
+    }
+
+    fn prepare_uniform(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+    ) {
+        self.set_key(context, target_slots, choice_kind, subchoice);
+    }
+
+    fn uniform_i32(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+        upper: i32,
+    ) -> i32 {
+        self.prepare_uniform(context, target_slots, choice_kind, subchoice);
+        self.gen_range(0..upper)
+    }
+
+    fn uniform_u32(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+        upper: u32,
+    ) -> u32 {
+        assert!(upper > 0, "uniform upper bound must be positive");
+        self.prepare_uniform(context, target_slots, choice_kind, subchoice);
+        match self {
+            // Preserve the established native seeded sequence for non-interactive callers.
+            Self::Sequential(rng) => rng.gen_range(0..upper as usize) as u32,
+            Self::Interactive(random) => bounded_u32(&mut random.keyed, upper),
+        }
+    }
+
+    fn uniform_u8(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        choice_kind: ChoiceKind,
+        subchoice: u16,
+        upper: u8,
+    ) -> u8 {
+        self.prepare_uniform(context, target_slots, choice_kind, subchoice);
+        self.gen_range(0..upper)
+    }
+
+    fn prepare_intrinsic(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+        subchoice: u16,
+    ) {
+        self.set_key(
+            context,
+            target_slots,
+            ChoiceKind::IntrinsicMeasurement,
+            subchoice,
+        );
+    }
+
+    fn override_outcome(
+        &self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+    ) -> Option<NoiseOutcome> {
+        let Self::Interactive(random) = self else {
+            return None;
+        };
+        let id = NoiseEventId {
+            site: NoiseSiteId {
+                circuit_digest: random.circuit_digest,
+                op_path: context.op_path.clone(),
+                target_slots: target_slots.to_vec(),
+            },
+            repeat_iterations: context.repeat_iterations.clone(),
+        };
+        random.overrides.get(&id).copied()
+    }
+}
+
+fn bounded_u32(rng: &mut impl RngCore, upper: u32) -> u32 {
+    let threshold = upper.wrapping_neg() % upper;
+    loop {
+        let value = rng.next_u32();
+        if value >= threshold {
+            return value % upper;
+        }
+    }
+}
+
+impl RngCore for ExecutionRandom<'_> {
+    fn next_u32(&mut self) -> u32 {
+        match self {
+            Self::Sequential(rng) => rng.next_u32(),
+            Self::Interactive(random) => random.keyed.next_u32(),
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        match self {
+            Self::Sequential(rng) => rng.next_u64(),
+            Self::Interactive(random) => random.keyed.next_u64(),
+        }
+    }
+
+    fn fill_bytes(&mut self, destination: &mut [u8]) {
+        match self {
+            Self::Sequential(rng) => rng.fill_bytes(destination),
+            Self::Interactive(random) => random.keyed.fill_bytes(destination),
+        }
+    }
+
+    fn try_fill_bytes(&mut self, destination: &mut [u8]) -> Result<(), rand::Error> {
+        match self {
+            Self::Sequential(rng) => rng.try_fill_bytes(destination),
+            Self::Interactive(random) => random.keyed.try_fill_bytes(destination),
+        }
     }
 }
 
@@ -100,6 +364,8 @@ struct ExecutionState {
     detectors: Vec<bool>,
     detector_coords: Vec<Vec<f64>>,
     observables: Vec<(u32, bool)>,
+    observable_events: Vec<ObservableEvent>,
+    inapplicable_noise_events: Vec<NoiseApplicabilityEvent>,
     coords: CoordState,
     last_correlated_error_occurred: bool,
     trace_enabled: bool,
@@ -115,6 +381,8 @@ impl ExecutionState {
             detectors: Vec::new(),
             detector_coords: Vec::new(),
             observables: Vec::new(),
+            observable_events: Vec::new(),
+            inapplicable_noise_events: Vec::new(),
             coords: CoordState::default(),
             last_correlated_error_occurred: false,
             trace_enabled,
@@ -133,6 +401,8 @@ impl ExecutionState {
                 detectors: self.detectors,
                 detector_coords: self.detector_coords,
                 observables: self.observables,
+                observable_events: self.observable_events,
+                inapplicable_noise_events: self.inapplicable_noise_events,
                 qubit_coords: self.coords.qubit_coords,
             },
             self.trace,
@@ -159,6 +429,21 @@ impl ExecutionState {
             occurred: true,
             branch_label: Some(branch_label.to_string()),
         });
+    }
+
+    fn record_inapplicable_noise_event(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        target_slots: &[usize],
+    ) {
+        if self.trace_enabled {
+            self.inapplicable_noise_events
+                .push(NoiseApplicabilityEvent {
+                    op_path: context.op_path.clone(),
+                    repeat_iterations: context.repeat_iterations.clone(),
+                    target_slots: target_slots.to_vec(),
+                });
+        }
     }
 
     fn record_measurement_event(
@@ -203,6 +488,25 @@ impl ExecutionState {
             flipped,
         });
     }
+
+    fn record_observable_event(
+        &mut self,
+        context: &ExecutionTraversalContext,
+        sequence_index: usize,
+        observable_index: u32,
+        bit: bool,
+    ) {
+        if !self.trace_enabled {
+            return;
+        }
+        self.observable_events.push(ObservableEvent {
+            op_path: context.op_path.clone(),
+            repeat_iterations: context.repeat_iterations.clone(),
+            sequence_index,
+            observable_index,
+            bit,
+        });
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,11 +521,11 @@ struct LossVisibleMeasurementOutcome {
     value: MeasurementOutcome,
 }
 
-fn execute_instrs<R: Rng>(
+fn execute_instrs(
     instrs: &[StimInstr],
     context: &ExecutionTraversalContext,
     exec: &mut ExecutionState,
-    rng: &mut R,
+    rng: &mut ExecutionRandom<'_>,
     sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     for (op_index, instr) in instrs.iter().enumerate() {
@@ -246,13 +550,13 @@ fn execute_instrs<R: Rng>(
     Ok(())
 }
 
-fn execute_op<R: Rng>(
+fn execute_op(
     name: &str,
     args: &[f64],
     targets: &[StimTarget],
     context: &ExecutionTraversalContext,
     exec: &mut ExecutionState,
-    rng: &mut R,
+    rng: &mut ExecutionRandom<'_>,
     sweep_bits: Option<&[bool]>,
 ) -> Result<(), String> {
     match name {
@@ -479,6 +783,7 @@ fn execute_op<R: Rng>(
         }
         "M" | "MZ" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_z(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
                 exec.record_measurement_event(
@@ -494,6 +799,7 @@ fn execute_op<R: Rng>(
         }
         "MX" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_x(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
                 exec.record_measurement_event(
@@ -509,6 +815,7 @@ fn execute_op<R: Rng>(
         }
         "MY" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_y(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
                 exec.record_measurement_event(
@@ -524,6 +831,7 @@ fn execute_op<R: Rng>(
         }
         "MR" | "MRZ" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome = measure_reset_z(
                     &mut exec.state,
                     &mut exec.lost,
@@ -545,6 +853,7 @@ fn execute_op<R: Rng>(
         }
         "MRX" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome = measure_reset_x(
                     &mut exec.state,
                     &mut exec.lost,
@@ -566,6 +875,7 @@ fn execute_op<R: Rng>(
         }
         "MRY" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome = measure_reset_y(
                     &mut exec.state,
                     &mut exec.lost,
@@ -587,6 +897,7 @@ fn execute_op<R: Rng>(
         }
         "ML" | "MZL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = record_loss_visible_measure_z(
                     &mut exec.state,
@@ -621,6 +932,7 @@ fn execute_op<R: Rng>(
         }
         "MXL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = record_loss_visible_measure_x(
                     &mut exec.state,
@@ -655,6 +967,7 @@ fn execute_op<R: Rng>(
         }
         "MYL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = record_loss_visible_measure_y(
                     &mut exec.state,
@@ -689,6 +1002,7 @@ fn execute_op<R: Rng>(
         }
         "MRL" | "MRZL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = measure_reset_loss_visible_z(
                     &mut exec.state,
@@ -723,6 +1037,7 @@ fn execute_op<R: Rng>(
         }
         "MRXL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = measure_reset_loss_visible_x(
                     &mut exec.state,
@@ -757,6 +1072,7 @@ fn execute_op<R: Rng>(
         }
         "MRYL" => {
             for (target_slot, q, inv) in qubits_with_inversion_slots(targets)? {
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 let base_index = exec.recorder.len();
                 let outcome = measure_reset_loss_visible_y(
                     &mut exec.state,
@@ -791,87 +1107,273 @@ fn execute_op<R: Rng>(
         }
         "MPAD" => {
             let p = args.first().copied().unwrap_or(0.0);
-            for t in targets {
+            for (target_slot, t) in targets.iter().enumerate() {
                 let q = expect_qubit(t)?;
                 let mut bit = q != 0;
-                if p > 0.0 && rng.r#gen::<f64>() < p {
+                let flipped = p > 0.0
+                    && rng.bernoulli(
+                        context,
+                        &[target_slot],
+                        ChoiceKind::MeasurementFlip,
+                        0,
+                        p,
+                        true,
+                    );
+                if flipped {
                     bit = !bit;
+                    exec.record_noise_event(
+                        context,
+                        name,
+                        vec![target_slot],
+                        vec![q as u32],
+                        "flip",
+                    );
                 }
                 exec.recorder.push(bit);
+                exec.record_measurement_event(
+                    context,
+                    name,
+                    target_slot,
+                    q as u32,
+                    exec.recorder.len(),
+                    MeasurementOutcome {
+                        bit,
+                        loss_cause: false,
+                    },
+                    MeasurementComponent::Value,
+                );
             }
         }
         "R" | "RZ" => {
-            for q in qubits(targets)? {
+            for (target_slot, q) in qubit_slots(targets)? {
                 exec.lost[q] = false;
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 exec.state.reset_z(q, rng);
             }
         }
         "RX" => {
-            for q in qubits(targets)? {
+            for (target_slot, q) in qubit_slots(targets)? {
                 exec.lost[q] = false;
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 exec.state.reset_x(q, rng);
             }
         }
         "RY" => {
-            for q in qubits(targets)? {
+            for (target_slot, q) in qubit_slots(targets)? {
                 exec.lost[q] = false;
+                rng.prepare_intrinsic(context, &[target_slot], 0);
                 exec.state.reset_y(q, rng);
             }
         }
         "LOSS" => {
             let p = args.first().copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
-                if rng.r#gen::<f64>() < p {
+                let target_slots = [target_slot];
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::Lost
+                        } else {
+                            NoiseOutcome::Identity
+                        }
+                    });
+                if outcome == NoiseOutcome::Lost {
                     exec.lost[q] = true;
                     exec.record_noise_event(context, name, vec![target_slot], vec![q as u32], "L");
+                } else if outcome != NoiseOutcome::Identity {
+                    return Err(format!("invalid override {} for LOSS", outcome.label()));
                 }
             }
         }
         "X_ERROR" => {
             let p = args.first().copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
-                if !exec.lost[q] && rng.r#gen::<f64>() < p {
+                let target_slots = [target_slot];
+                if exec.lost[q] {
+                    exec.record_inapplicable_noise_event(context, &target_slots);
+                    if let Some(outcome) = rng.override_outcome(context, &target_slots)
+                        && !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::X)
+                    {
+                        return Err(format!("invalid override {} for X_ERROR", outcome.label()));
+                    }
+                    continue;
+                }
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::X
+                        } else {
+                            NoiseOutcome::Identity
+                        }
+                    });
+                if outcome == NoiseOutcome::X {
                     exec.state.x_gate(q);
                     exec.record_noise_event(context, name, vec![target_slot], vec![q as u32], "X");
+                } else if !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::X) {
+                    return Err(format!("invalid override {} for X_ERROR", outcome.label()));
                 }
             }
         }
         "Y_ERROR" => {
             let p = args.first().copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
-                if !exec.lost[q] && rng.r#gen::<f64>() < p {
+                let target_slots = [target_slot];
+                if exec.lost[q] {
+                    exec.record_inapplicable_noise_event(context, &target_slots);
+                    if let Some(outcome) = rng.override_outcome(context, &target_slots)
+                        && !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::Y)
+                    {
+                        return Err(format!("invalid override {} for Y_ERROR", outcome.label()));
+                    }
+                    continue;
+                }
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::Y
+                        } else {
+                            NoiseOutcome::Identity
+                        }
+                    });
+                if outcome == NoiseOutcome::Y {
                     exec.state.y_gate(q);
                     exec.record_noise_event(context, name, vec![target_slot], vec![q as u32], "Y");
+                } else if !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::Y) {
+                    return Err(format!("invalid override {} for Y_ERROR", outcome.label()));
                 }
             }
         }
         "Z_ERROR" => {
             let p = args.first().copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
-                if !exec.lost[q] && rng.r#gen::<f64>() < p {
+                let target_slots = [target_slot];
+                if exec.lost[q] {
+                    exec.record_inapplicable_noise_event(context, &target_slots);
+                    if let Some(outcome) = rng.override_outcome(context, &target_slots)
+                        && !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::Z)
+                    {
+                        return Err(format!("invalid override {} for Z_ERROR", outcome.label()));
+                    }
+                    continue;
+                }
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::Z
+                        } else {
+                            NoiseOutcome::Identity
+                        }
+                    });
+                if outcome == NoiseOutcome::Z {
                     exec.state.z_gate(q);
                     exec.record_noise_event(context, name, vec![target_slot], vec![q as u32], "Z");
+                } else if !matches!(outcome, NoiseOutcome::Identity | NoiseOutcome::Z) {
+                    return Err(format!("invalid override {} for Z_ERROR", outcome.label()));
                 }
             }
         }
         "DEPOLARIZE1" => {
             let p = args.first().copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
-                if !exec.lost[q] && rng.r#gen::<f64>() < p {
-                    let branch = match rng.gen_range(0..3) {
-                        0 => {
-                            exec.state.x_gate(q);
-                            "X"
+                let target_slots = [target_slot];
+                if exec.lost[q] {
+                    exec.record_inapplicable_noise_event(context, &target_slots);
+                    if let Some(outcome) = rng.override_outcome(context, &target_slots)
+                        && !matches!(
+                            outcome,
+                            NoiseOutcome::Identity
+                                | NoiseOutcome::X
+                                | NoiseOutcome::Y
+                                | NoiseOutcome::Z
+                        )
+                    {
+                        return Err(format!(
+                            "invalid override {} for DEPOLARIZE1",
+                            outcome.label()
+                        ));
+                    }
+                    continue;
+                }
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if !rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::Identity
+                        } else {
+                            match rng.uniform_i32(
+                                context,
+                                &target_slots,
+                                ChoiceKind::NoiseBranch,
+                                0,
+                                3,
+                            ) {
+                                0 => NoiseOutcome::X,
+                                1 => NoiseOutcome::Y,
+                                _ => NoiseOutcome::Z,
+                            }
                         }
-                        1 => {
-                            exec.state.y_gate(q);
-                            "Y"
-                        }
-                        _ => {
-                            exec.state.z_gate(q);
-                            "Z"
-                        }
-                    };
+                    });
+                let branch = match outcome {
+                    NoiseOutcome::Identity => None,
+                    NoiseOutcome::X => Some({
+                        exec.state.x_gate(q);
+                        "X"
+                    }),
+                    NoiseOutcome::Y => Some({
+                        exec.state.y_gate(q);
+                        "Y"
+                    }),
+                    NoiseOutcome::Z => Some({
+                        exec.state.z_gate(q);
+                        "Z"
+                    }),
+                    _ => {
+                        return Err(format!(
+                            "invalid override {} for DEPOLARIZE1",
+                            outcome.label()
+                        ));
+                    }
+                };
+                if let Some(branch) = branch {
                     exec.record_noise_event(
                         context,
                         name,
@@ -884,9 +1386,62 @@ fn execute_op<R: Rng>(
         }
         "DEPOLARIZE2" => {
             let p = args.first().copied().unwrap_or(0.0);
-            for ((slot_a, a), (slot_b, b)) in present_qubit_pair_slots(targets, &exec.lost)? {
-                if rng.r#gen::<f64>() < p {
-                    let (pa, pb) = two_qubit_pauli(rng.gen_range(0..15));
+            for ((slot_a, a), (slot_b, b)) in qubit_pair_slots(targets)? {
+                let target_slots = [slot_a, slot_b];
+                if exec.lost[a] || exec.lost[b] {
+                    exec.record_inapplicable_noise_event(context, &target_slots);
+                    if let Some(outcome) = rng.override_outcome(context, &target_slots)
+                        && !matches!(
+                            outcome,
+                            NoiseOutcome::Identity | NoiseOutcome::PauliPair { .. }
+                        )
+                    {
+                        return Err(format!(
+                            "invalid override {} for DEPOLARIZE2",
+                            outcome.label()
+                        ));
+                    }
+                    continue;
+                }
+                let outcome = rng
+                    .override_outcome(context, &target_slots)
+                    .unwrap_or_else(|| {
+                        if !rng.bernoulli(
+                            context,
+                            &target_slots,
+                            ChoiceKind::NoiseOccurrence,
+                            0,
+                            p,
+                            true,
+                        ) {
+                            NoiseOutcome::Identity
+                        } else {
+                            let (pa, pb) = two_qubit_pauli(rng.uniform_u32(
+                                context,
+                                &target_slots,
+                                ChoiceKind::NoiseBranch,
+                                0,
+                                15,
+                            ) as usize);
+                            NoiseOutcome::PauliPair {
+                                first: pauli_from_code(pa),
+                                second: pauli_from_code(pb),
+                            }
+                        }
+                    });
+                let pair = match outcome {
+                    NoiseOutcome::Identity => None,
+                    NoiseOutcome::PauliPair { first, second } => {
+                        Some((pauli_code(first), pauli_code(second)))
+                    }
+                    _ => {
+                        return Err(format!(
+                            "invalid override {} for DEPOLARIZE2",
+                            outcome.label()
+                        ));
+                    }
+                };
+                if let Some((pa, pb)) = pair {
                     apply_pauli(&mut exec.state, a, pa);
                     apply_pauli(&mut exec.state, b, pb);
                     let label = pauli_pair_label(pa, pb);
@@ -927,57 +1482,68 @@ fn execute_op<R: Rng>(
         "OBSERVABLE_INCLUDE" => {
             let index = args.first().copied().unwrap_or(0.0) as u32;
             let bit = xor_recs(&exec.recorder, targets)?;
+            let sequence_index = exec.observables.len();
             exec.observables.push((index, bit));
+            exec.record_observable_event(context, sequence_index, index, bit);
         }
         "MXX" => {
             let p = args.first().copied().unwrap_or(0.0);
-            pair_measure(
-                &mut exec.state,
-                &exec.lost,
-                targets,
-                PauliBasis::X,
-                p,
-                rng,
-                &mut exec.recorder,
-            )?;
+            pair_measure(exec, name, targets, PauliBasis::X, p, context, rng)?;
         }
         "MYY" => {
             let p = args.first().copied().unwrap_or(0.0);
-            pair_measure(
-                &mut exec.state,
-                &exec.lost,
-                targets,
-                PauliBasis::Y,
-                p,
-                rng,
-                &mut exec.recorder,
-            )?;
+            pair_measure(exec, name, targets, PauliBasis::Y, p, context, rng)?;
         }
         "MZZ" => {
             let p = args.first().copied().unwrap_or(0.0);
-            pair_measure(
-                &mut exec.state,
-                &exec.lost,
-                targets,
-                PauliBasis::Z,
-                p,
-                rng,
-                &mut exec.recorder,
-            )?;
+            pair_measure(exec, name, targets, PauliBasis::Z, p, context, rng)?;
         }
         "MPP" => {
             let p = args.first().copied().unwrap_or(0.0);
             let products = split_pauli_products(targets)?;
-            for product in &products {
+            for (product_index, product) in products.iter().enumerate() {
+                let target_slots = [product_index];
                 let mut bit = if product.terms.iter().any(|(q, _)| exec.lost[*q]) {
                     true
                 } else {
+                    rng.prepare_intrinsic(context, &target_slots, 0);
                     measure_pauli_product(&mut exec.state, &product.terms, product.inverted, rng)
                 };
-                if p > 0.0 && rng.r#gen::<f64>() < p {
+                let flipped = p > 0.0
+                    && rng.bernoulli(
+                        context,
+                        &target_slots,
+                        ChoiceKind::MeasurementFlip,
+                        0,
+                        p,
+                        true,
+                    );
+                if flipped {
                     bit = !bit;
+                    exec.record_noise_event(
+                        context,
+                        name,
+                        target_slots.to_vec(),
+                        product
+                            .terms
+                            .iter()
+                            .map(|(qubit, _)| *qubit as u32)
+                            .collect(),
+                        "flip",
+                    );
                 }
                 exec.recorder.push(bit);
+                let loss_cause = product.terms.iter().any(|(q, _)| exec.lost[*q]);
+                let target_qubit = product.terms.first().map_or(0, |(q, _)| *q as u32);
+                exec.record_measurement_event(
+                    context,
+                    name,
+                    product_index,
+                    target_qubit,
+                    exec.recorder.len(),
+                    MeasurementOutcome { bit, loss_cause },
+                    MeasurementComponent::Value,
+                );
             }
         }
         "SPP" => {
@@ -998,9 +1564,11 @@ fn execute_op<R: Rng>(
             let pz = args.get(2).copied().unwrap_or(0.0);
             for (target_slot, q) in qubit_slots(targets)? {
                 if exec.lost[q] {
+                    exec.record_inapplicable_noise_event(context, &[target_slot]);
                     continue;
                 }
-                let r: f64 = rng.r#gen();
+                let r =
+                    rng.unit_interval(context, &[target_slot], ChoiceKind::NoiseBranch, 0, true);
                 let branch = if r < px {
                     exec.state.x_gate(q);
                     Some("X")
@@ -1045,8 +1613,13 @@ fn execute_op<R: Rng>(
                 (3, 2),
                 (3, 3),
             ];
-            for ((slot_a, a), (slot_b, b)) in present_qubit_pair_slots(targets, &exec.lost)? {
-                let r: f64 = rng.r#gen();
+            for ((slot_a, a), (slot_b, b)) in qubit_pair_slots(targets)? {
+                if exec.lost[a] || exec.lost[b] {
+                    exec.record_inapplicable_noise_event(context, &[slot_a, slot_b]);
+                    continue;
+                }
+                let r =
+                    rng.unit_interval(context, &[slot_a, slot_b], ChoiceKind::NoiseBranch, 0, true);
                 let mut cumulative = 0.0;
                 let mut chosen = None;
                 for (i, &(pa, pb)) in paulis.iter().enumerate() {
@@ -1072,18 +1645,54 @@ fn execute_op<R: Rng>(
         }
         "HERALDED_ERASE" => {
             let p = args.first().copied().unwrap_or(0.0);
-            for q in qubits(targets)? {
-                if p > 0.0 && rng.r#gen::<f64>() < p {
-                    exec.recorder.push(true);
-                    match rng.gen_range(0u8..4) {
-                        1 => exec.state.x_gate(q),
-                        2 => exec.state.y_gate(q),
-                        3 => exec.state.z_gate(q),
-                        _ => {}
+            for (target_slot, q) in qubit_slots(targets)? {
+                let heralded = p > 0.0
+                    && rng.bernoulli(context, &[target_slot], ChoiceKind::Herald, 0, p, true);
+                if heralded {
+                    let branch = match rng.uniform_u8(
+                        context,
+                        &[target_slot],
+                        ChoiceKind::NoiseBranch,
+                        0,
+                        4,
+                    ) {
+                        1 => {
+                            exec.state.x_gate(q);
+                            Some("X")
+                        }
+                        2 => {
+                            exec.state.y_gate(q);
+                            Some("Y")
+                        }
+                        3 => {
+                            exec.state.z_gate(q);
+                            Some("Z")
+                        }
+                        _ => None,
+                    };
+                    if let Some(branch) = branch {
+                        exec.record_noise_event(
+                            context,
+                            name,
+                            vec![target_slot],
+                            vec![q as u32],
+                            branch,
+                        );
                     }
-                } else {
-                    exec.recorder.push(false);
                 }
+                exec.recorder.push(heralded);
+                exec.record_measurement_event(
+                    context,
+                    name,
+                    target_slot,
+                    q as u32,
+                    exec.recorder.len(),
+                    MeasurementOutcome {
+                        bit: heralded,
+                        loss_cause: false,
+                    },
+                    MeasurementComponent::Value,
+                );
             }
         }
         "HERALDED_PAULI_CHANNEL_1" => {
@@ -1092,31 +1701,67 @@ fn execute_op<R: Rng>(
             let py = args.get(2).copied().unwrap_or(0.0);
             let pz = args.get(3).copied().unwrap_or(0.0);
             let total = pi + px + py + pz;
-            for q in qubits(targets)? {
-                let r: f64 = rng.r#gen();
-                if r < total {
-                    exec.recorder.push(true);
+            for (target_slot, q) in qubit_slots(targets)? {
+                let r = rng.unit_interval(context, &[target_slot], ChoiceKind::Herald, 0, true);
+                let heralded = r < total;
+                if heralded {
                     let inner = r;
-                    if inner < pi {
+                    let branch = if inner < pi {
+                        None
                     } else if inner < pi + px {
                         exec.state.x_gate(q);
+                        Some("X")
                     } else if inner < pi + px + py {
                         exec.state.y_gate(q);
+                        Some("Y")
                     } else {
                         exec.state.z_gate(q);
+                        Some("Z")
+                    };
+                    if let Some(branch) = branch {
+                        exec.record_noise_event(
+                            context,
+                            name,
+                            vec![target_slot],
+                            vec![q as u32],
+                            branch,
+                        );
                     }
-                } else {
-                    exec.recorder.push(false);
                 }
+                exec.recorder.push(heralded);
+                exec.record_measurement_event(
+                    context,
+                    name,
+                    target_slot,
+                    q as u32,
+                    exec.recorder.len(),
+                    MeasurementOutcome {
+                        bit: heralded,
+                        loss_cause: false,
+                    },
+                    MeasurementComponent::Value,
+                );
             }
         }
         "CORRELATED_ERROR" | "E" => {
             let p = args.first().copied().unwrap_or(0.0);
-            if p > 0.0 && rng.r#gen::<f64>() < p {
+            let payload = correlated_trace_payload(targets)?;
+            let target_slots = payload
+                .as_ref()
+                .map(|(slots, _, _)| slots.as_slice())
+                .unwrap_or(&[]);
+            if p > 0.0
+                && rng.bernoulli(
+                    context,
+                    target_slots,
+                    ChoiceKind::CorrelatedOccurrence,
+                    0,
+                    p,
+                    true,
+                )
+            {
                 apply_pauli_targets(&mut exec.state, targets)?;
-                if let Some((target_slots, target_qubits, label)) =
-                    correlated_trace_payload(targets)?
-                {
+                if let Some((target_slots, target_qubits, label)) = payload {
                     exec.record_noise_event(context, name, target_slots, target_qubits, &label);
                 }
                 exec.last_correlated_error_occurred = true;
@@ -1125,13 +1770,32 @@ fn execute_op<R: Rng>(
             }
         }
         "ELSE_CORRELATED_ERROR" => {
-            if !exec.last_correlated_error_occurred {
+            if exec.last_correlated_error_occurred {
+                let payload = correlated_trace_payload(targets)?;
+                let target_slots = payload
+                    .as_ref()
+                    .map(|(slots, _, _)| slots.as_slice())
+                    .unwrap_or(&[]);
+                exec.record_inapplicable_noise_event(context, target_slots);
+            } else {
                 let p = args.first().copied().unwrap_or(0.0);
-                if p > 0.0 && rng.r#gen::<f64>() < p {
+                let payload = correlated_trace_payload(targets)?;
+                let target_slots = payload
+                    .as_ref()
+                    .map(|(slots, _, _)| slots.as_slice())
+                    .unwrap_or(&[]);
+                if p > 0.0
+                    && rng.bernoulli(
+                        context,
+                        target_slots,
+                        ChoiceKind::CorrelatedOccurrence,
+                        0,
+                        p,
+                        true,
+                    )
+                {
                     apply_pauli_targets(&mut exec.state, targets)?;
-                    if let Some((target_slots, target_qubits, label)) =
-                        correlated_trace_payload(targets)?
-                    {
+                    if let Some((target_slots, target_qubits, label)) = payload {
                         exec.record_noise_event(context, name, target_slots, target_qubits, &label);
                     }
                     exec.last_correlated_error_occurred = true;
@@ -1844,26 +2508,32 @@ where
     Ok(())
 }
 
-fn present_qubit_pair_slots(
+fn qubit_pair_slots(
     targets: &[StimTarget],
-    lost: &[bool],
 ) -> Result<Vec<((usize, usize), (usize, usize))>, String> {
     if targets.len() % 2 != 0 {
         return Err("odd number of targets".to_string());
     }
     let mut out = Vec::new();
-    let mut it = targets.iter().enumerate();
-    while let (Some((slot_a, a)), Some((slot_b, b))) = (it.next(), it.next()) {
+    let mut iterator = targets.iter().enumerate();
+    while let (Some((slot_a, a)), Some((slot_b, b))) = (iterator.next(), iterator.next()) {
         if matches!(a, StimTarget::Sweep(_)) || matches!(b, StimTarget::Sweep(_)) {
             continue;
         }
-        let a = expect_qubit(a)?;
-        let b = expect_qubit(b)?;
-        if !lost[a] && !lost[b] {
-            out.push(((slot_a, a), (slot_b, b)));
-        }
+        out.push(((slot_a, expect_qubit(a)?), (slot_b, expect_qubit(b)?)));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+fn present_qubit_pair_slots(
+    targets: &[StimTarget],
+    lost: &[bool],
+) -> Result<Vec<((usize, usize), (usize, usize))>, String> {
+    Ok(qubit_pair_slots(targets)?
+        .into_iter()
+        .filter(|((_, a), (_, b))| !lost[*a] && !lost[*b])
+        .collect())
 }
 
 fn xor_recs(r: &Recorder, targets: &[StimTarget]) -> Result<bool, String> {
@@ -1937,6 +2607,25 @@ fn pauli_pair_label(pa: u8, pb: u8) -> String {
         _ => '?',
     });
     label
+}
+
+fn pauli_code(pauli: Pauli) -> u8 {
+    match pauli {
+        Pauli::I => 0,
+        Pauli::X => 1,
+        Pauli::Y => 2,
+        Pauli::Z => 3,
+    }
+}
+
+fn pauli_from_code(code: u8) -> Pauli {
+    match code {
+        0 => Pauli::I,
+        1 => Pauli::X,
+        2 => Pauli::Y,
+        3 => Pauli::Z,
+        _ => unreachable!("two-qubit Pauli code must be in 0..=3"),
+    }
 }
 
 fn apply_pauli(state: &mut StabilizerState, q: usize, p: u8) {
@@ -2555,26 +3244,54 @@ fn apply_spp(
 }
 
 fn pair_measure(
-    state: &mut StabilizerState,
-    lost: &[bool],
+    exec: &mut ExecutionState,
+    instr_name: &str,
     targets: &[StimTarget],
     basis: PauliBasis,
     noise_p: f64,
-    rng: &mut impl Rng,
-    recorder: &mut Recorder,
+    context: &ExecutionTraversalContext,
+    rng: &mut ExecutionRandom<'_>,
 ) -> Result<(), String> {
     let pairs = qubits_with_inversion_pairs(targets)?;
-    for ((a, inv_a), (b, _inv_b)) in pairs {
-        let mut bit = if lost[a] || lost[b] {
+    for (pair_index, ((a, inv_a), (b, _inv_b))) in pairs.into_iter().enumerate() {
+        let target_slots = [pair_index * 2, pair_index * 2 + 1];
+        let loss_cause = exec.lost[a] || exec.lost[b];
+        let mut bit = if loss_cause {
             true ^ inv_a
         } else {
             let terms = vec![(a, basis), (b, basis)];
-            measure_pauli_product(state, &terms, inv_a, rng)
+            rng.prepare_intrinsic(context, &target_slots, 0);
+            measure_pauli_product(&mut exec.state, &terms, inv_a, rng)
         };
-        if noise_p > 0.0 && rng.r#gen::<f64>() < noise_p {
+        let flipped = noise_p > 0.0
+            && rng.bernoulli(
+                context,
+                &target_slots,
+                ChoiceKind::MeasurementFlip,
+                0,
+                noise_p,
+                true,
+            );
+        if flipped {
             bit = !bit;
+            exec.record_noise_event(
+                context,
+                instr_name,
+                target_slots.to_vec(),
+                vec![a as u32, b as u32],
+                "flip",
+            );
         }
-        recorder.push(bit);
+        exec.recorder.push(bit);
+        exec.record_measurement_event(
+            context,
+            instr_name,
+            target_slots[0],
+            a as u32,
+            exec.recorder.len(),
+            MeasurementOutcome { bit, loss_cause },
+            MeasurementComponent::Value,
+        );
     }
     Ok(())
 }
@@ -2623,6 +3340,19 @@ mod tests {
             self.fill_bytes(dest);
             Ok(())
         }
+    }
+
+    fn execute_op_with_script(
+        name: &str,
+        args: &[f64],
+        targets: &[StimTarget],
+        context: &ExecutionTraversalContext,
+        exec: &mut ExecutionState,
+        values: Vec<u64>,
+    ) -> Result<(), String> {
+        let mut script = ScriptRng::new(values);
+        let mut randomness = ExecutionRandom::Sequential(&mut script);
+        execute_op(name, args, targets, context, exec, &mut randomness, None)
     }
 
     #[test]
@@ -2728,86 +3458,78 @@ mod tests {
         let ctx = ExecutionTraversalContext::default();
         let mut exec = ExecutionState::new(4, true);
 
-        execute_op(
+        execute_op_with_script(
             "DEPOLARIZE1",
             &[1.0],
             &[StimTarget::Qubit(0)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0, 0]),
-            None,
+            vec![0, 0],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "DEPOLARIZE1",
             &[1.0],
             &[StimTarget::Qubit(1)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0, 1]),
-            None,
+            vec![0, 1],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "DEPOLARIZE1",
             &[1.0],
             &[StimTarget::Qubit(2)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0, 2]),
-            None,
+            vec![0, 2],
         )
         .unwrap();
 
         exec.lost[3] = true;
-        execute_op(
+        execute_op_with_script(
             "PAULI_CHANNEL_1",
             &[1.0, 0.0, 0.0],
             &[StimTarget::Qubit(3)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0]),
-            None,
+            vec![0],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "PAULI_CHANNEL_1",
             &[1.0, 0.0, 0.0],
             &[StimTarget::Qubit(0)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0]),
-            None,
+            vec![0],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "PAULI_CHANNEL_1",
             &[0.0, 1.0, 0.0],
             &[StimTarget::Qubit(1)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0]),
-            None,
+            vec![0],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "PAULI_CHANNEL_1",
             &[0.0, 0.0, 1.0],
             &[StimTarget::Qubit(2)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0]),
-            None,
+            vec![0],
         )
         .unwrap();
-        execute_op(
+        execute_op_with_script(
             "PAULI_CHANNEL_1",
             &[0.0, 0.0, 0.0],
             &[StimTarget::Qubit(2)],
             &ctx,
             &mut exec,
-            &mut ScriptRng::new(vec![0]),
-            None,
+            vec![0],
         )
         .unwrap();
 
@@ -2822,18 +3544,7 @@ mod tests {
         assert!(branches.contains(&Some("Y")));
         assert!(branches.contains(&Some("Z")));
 
-        assert!(
-            execute_op(
-                "BOGUS",
-                &[],
-                &[],
-                &ctx,
-                &mut exec,
-                &mut ScriptRng::new(vec![0]),
-                None,
-            )
-            .is_err()
-        );
+        assert!(execute_op_with_script("BOGUS", &[], &[], &ctx, &mut exec, vec![0],).is_err());
 
         assert_eq!(
             qubits(&[StimTarget::Qubit(0), StimTarget::Sweep(1)]).unwrap(),

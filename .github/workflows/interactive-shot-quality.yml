@@ -1,0 +1,84 @@
+name: Interactive shot quality
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "Makefile"
+      - "rstim/Cargo.toml"
+      - "rstim/src/cli.rs"
+      - "rstim/src/executor.rs"
+      - "rstim/src/interactive_shot.rs"
+      - "rstim/src/lib.rs"
+      - "rstim/src/qp101_svg.rs"
+      - "rstim/src/shot_viewer.rs"
+      - "rstim/assets/shot-viewer/**"
+      - "rstim-shot-web/**"
+      - "tools/build_shot_viewer.sh"
+      - "tools/shot_viewer_assets.py"
+      - "site/content/interactive/**"
+      - "site/static/interactive/**"
+      - "site/templates/interactive-shot.html"
+      - "web/shot-viewer/**"
+      - "fuzz/**"
+      - ".github/workflows/interactive-shot-quality.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust and WebAssembly target
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/shot-viewer/package-lock.json
+      - name: Install build tools
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+          curl -fsSL https://github.com/getzola/zola/releases/download/v0.22.1/zola-v0.22.1-x86_64-unknown-linux-gnu.tar.gz | sudo tar -xz -C /usr/local/bin zola
+      - name: Build site and install browsers
+        run: |
+          cargo test -p rstim --test interactive_shot_properties
+          cargo test -p rstim-shot-web
+          make build-site
+          npm --prefix web/shot-viewer ci
+          npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
+      - name: Run browser and export tests
+        run: npm --prefix web/shot-viewer run test:e2e
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - interactive_open
+          - interactive_event_ids
+          - interactive_commands
+          - interactive_qp101_svg
+          - interactive_svg_escape
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fuzz toolchain
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-fuzz --locked
+      - uses: Swatinem/rust-cache@v2
+      - name: Run deterministic fuzz budget
+        env:
+          FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '60' || '5' }}
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time="$FUZZ_SECONDS" -seed=7

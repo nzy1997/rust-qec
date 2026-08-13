@@ -1,0 +1,51 @@
+[package]
+name = "rstim-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+rstim = { path = "../rstim" }
+
+[[bin]]
+name = "interactive_open"
+path = "fuzz_targets/interactive_open.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "interactive_event_ids"
+path = "fuzz_targets/interactive_event_ids.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "interactive_commands"
+path = "fuzz_targets/interactive_commands.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "interactive_qp101_svg"
+path = "fuzz_targets/interactive_qp101_svg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "interactive_svg_escape"
+path = "fuzz_targets/interactive_svg_escape.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

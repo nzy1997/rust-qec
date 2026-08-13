@@ -234,6 +234,16 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
+    /// Open the interactive local-file shot viewer on loopback
+    #[command(name = "shot_viewer")]
+    ShotViewer {
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+        #[arg(long = "no_open")]
+        no_open: bool,
+        #[arg(long, hide = true)]
+        serve_once: bool,
+    },
     /// Export a public decoder dataset and private answer bundle
     #[command(name = "export_decoder_dataset")]
     ExportDecoderDataset {
@@ -734,6 +744,15 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             run_rsmp_zstd_frame(&r#in, &out, level)
         }
         Some(Commands::RsmpZstdInfo { out }) => run_rsmp_zstd_info(out.as_deref()),
+        Some(Commands::ShotViewer {
+            port,
+            no_open,
+            serve_once,
+        }) => crate::shot_viewer::serve(crate::shot_viewer::ShotViewerOptions {
+            port,
+            open_browser: !no_open,
+            serve_once,
+        }),
         Some(Commands::Perf { command }) => {
             match command {
                 PerfCommands::Run {

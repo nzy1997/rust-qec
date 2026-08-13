@@ -10,6 +10,7 @@
       content="{% block description %}RustQEC — a quantum error correction workspace in Rust{% endblock description %}"
     >
     <link rel="stylesheet" href="{{ root }}/styles.css">
+    {% block head %}{% endblock head %}
   </head>
   <body data-root="{{ root }}">
     <header class="site-header">
@@ -26,6 +27,7 @@
           <a class="nav-link{% if current_nav == "css" %} current{% endif %}" href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS Codes</a>
           <a class="nav-link{% if current_nav == "rsmp" %} current{% endif %}" href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP v1</a>
           <a class="nav-link{% if current_nav == "qp101" %} current{% endif %}" href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>QP101</a>
+          <a class="nav-link{% if current_nav == "shot" %} current{% endif %}" href="{{ root }}/interactive/"{% if current_nav == "shot" %} aria-current="page"{% endif %}>Shot Lab</a>
         </div>
       </nav>
       {% block hero %}{% endblock hero %}

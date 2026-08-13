@@ -1,0 +1,44 @@
+# Hosted example: compact four-qubit gadget gallery.
+# The circuit is intentionally short while covering the operations most useful
+# when exploring a sampled physical-error shot.
+QUBIT_COORDS(0, 0) 0
+QUBIT_COORDS(1, 0) 1
+QUBIT_COORDS(2, 0) 2
+QUBIT_COORDS(3, 0) 3
+
+# Preparation and a compact pair of representative single-qubit Clifford gates.
+R 0 1 2 3
+H 0
+S 1
+TICK
+
+# Editable single-qubit physical errors plus atom loss. Sampling typically
+# produces a small number of visible events, while No-error keeps all identity.
+X_ERROR(0.06) 0
+Y_ERROR(0.06) 1
+Z_ERROR(0.06) 2
+DEPOLARIZE1(0.08) 3
+LOSS(0.05) 0 3
+TICK
+
+# Close the temporary basis change so the ideal circuit measures deterministically.
+H 0
+TICK
+
+# Common two-qubit gadgets. Each gate is immediately followed by its matching
+# two-qubit depolarizing channel, so pair-error propagation can be inspected.
+CX 0 1
+DEPOLARIZE2(0.08) 0 1
+CZ 1 2
+DEPOLARIZE2(0.08) 1 2
+SWAP 2 3
+DEPOLARIZE2(0.08) 2 3
+TICK
+
+# Three measurement styles, two detector parities, and one logical observable.
+M 0 1
+MR 2
+MRL 3
+DETECTOR rec[-5] rec[-4]
+DETECTOR rec[-3] rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-5] rec[-1]

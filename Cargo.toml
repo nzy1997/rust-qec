@@ -3,6 +3,7 @@ members = [
     "qec-ilp-core",
     "qec-code",
     "rstim",
+    "rstim-shot-web",
     "rsinter",
     "rbposd",
     "rmatching",

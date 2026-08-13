@@ -7,3 +7,8 @@ coverage:
     patch:
       default:
         target: 95%
+
+ignore:
+  # Playwright exercises this thin export adapter through the version-matched
+  # WebAssembly bundle; target-independent session logic remains accountable here.
+  - "rstim-shot-web/src/wasm_bindings.rs"

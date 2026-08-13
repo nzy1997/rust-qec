@@ -25,7 +25,13 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal && rustup default stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install WebAssembly bindings tool
+        run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
 
       - uses: Swatinem/rust-cache@v2
 
@@ -40,6 +46,14 @@ jobs:
 
       - name: Check built site
         run: python3 tools/check_site_build.py _site
+
+      - name: Install browser test engines
+        run: |
+          npm --prefix web/shot-viewer ci
+          npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
+
+      - name: Test interactive shot viewer
+        run: npm --prefix web/shot-viewer run test:e2e
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

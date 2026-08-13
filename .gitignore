@@ -22,6 +22,10 @@ cobertura.xml
 # Build artifacts
 *.rlib
 /_site/
+/web/shot-viewer/node_modules/
+/web/shot-viewer/playwright-report/
+/web/shot-viewer/test-results/
+/fuzz/target/
 
 drafts/
 .DS_Store

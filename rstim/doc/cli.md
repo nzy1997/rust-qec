@@ -20,6 +20,31 @@ The main command families are:
 - transforms: `convert`, `m2d`
 - analysis: `analyze_errors`, `explain_errors`
 - generation and export: `gen`, `render_svg`, `export_json`
+- interactive visualization: `shot_viewer`
+
+## Open the Interactive Shot Viewer
+
+`shot_viewer` starts the version-matched web application on a random loopback
+port and opens it in the default browser:
+
+```sh
+rstim shot_viewer
+```
+
+The page begins empty. Choose a local `.stim` file, sample a shot, or click an
+existing noise site to override that event's realized outcome. The circuit is
+parsed and executed locally; the server accepts only loopback requests and does
+not receive the selected file. Use `--no_open` when you want to open the printed
+URL yourself, or `--port <n>` to request a specific loopback port.
+
+The current diagram can be exported as SVG or single-page vector PDF. Both
+exports include the circuit digest, source hash, base seed, rstim version, and
+manual overrides as provenance metadata.
+
+The first version fully expands `REPEAT` blocks and rejects oversized inputs
+before simulation. Defaults allow at most 256 qubits, 5,000 expanded operations,
+5,000 noise events, 5,000 measurement results, and an estimated 100,000 SVG
+nodes.
 
 ## Inspect Circuits with `stats`
 

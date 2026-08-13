@@ -647,22 +647,29 @@
 )
 
 #let measurement-render-spec(gate) = (
-  "M": (output_count: 1),
-  "MX": (output_count: 1),
-  "MY": (output_count: 1),
-  "MZ": (output_count: 1),
-  "MR": (output_count: 1),
-  "MRX": (output_count: 1),
-  "MRY": (output_count: 1),
-  "MRZ": (output_count: 1),
-  "ML": (output_count: 2),
-  "MXL": (output_count: 2),
-  "MYL": (output_count: 2),
-  "MZL": (output_count: 2),
-  "MRL": (output_count: 2),
-  "MRXL": (output_count: 2),
-  "MRYL": (output_count: 2),
-  "MRZL": (output_count: 2),
+  "M": (output_count: 1, target_mode: "each"),
+  "MX": (output_count: 1, target_mode: "each"),
+  "MY": (output_count: 1, target_mode: "each"),
+  "MZ": (output_count: 1, target_mode: "each"),
+  "MR": (output_count: 1, target_mode: "each"),
+  "MRX": (output_count: 1, target_mode: "each"),
+  "MRY": (output_count: 1, target_mode: "each"),
+  "MRZ": (output_count: 1, target_mode: "each"),
+  "ML": (output_count: 2, target_mode: "each"),
+  "MXL": (output_count: 2, target_mode: "each"),
+  "MYL": (output_count: 2, target_mode: "each"),
+  "MZL": (output_count: 2, target_mode: "each"),
+  "MRL": (output_count: 2, target_mode: "each"),
+  "MRXL": (output_count: 2, target_mode: "each"),
+  "MRYL": (output_count: 2, target_mode: "each"),
+  "MRZL": (output_count: 2, target_mode: "each"),
+  "MPP": (output_count: 1, target_mode: "pauli-products"),
+  "MXX": (output_count: 1, target_mode: "pairs"),
+  "MYY": (output_count: 1, target_mode: "pairs"),
+  "MZZ": (output_count: 1, target_mode: "pairs"),
+  "MPAD": (output_count: 1, target_mode: "raw-each"),
+  "HERALDED_ERASE": (output_count: 1, target_mode: "raw-each"),
+  "HERALDED_PAULI_CHANNEL_1": (output_count: 1, target_mode: "raw-each"),
 ).at(gate, default: none)
 
 #let measurement-output-count(gate) = {
@@ -710,7 +717,8 @@
 }
 
 #let measurement-targets(op) = {
-  if op.at("type", default: "") != "gate" {
+  let kind = op.at("type", default: "")
+  if kind != "gate" and kind != "noise" {
     return none
   }
   let gate = op.at("gate", default: "")
@@ -718,14 +726,75 @@
   if spec == none {
     return none
   }
+
   let out = ()
-  for (target_index, qubit) in op.at("targets", default: ()).enumerate() {
-    out.push((
-      target_index: target_index,
-      qubit: qubit,
-      gate: gate,
-      output_count: spec.output_count,
-    ))
+  let make-target(target_index, qubit) = (
+    target_index: target_index,
+    qubit: qubit,
+    gate: gate,
+    output_count: spec.output_count,
+  )
+  let plain-targets = op.at("targets", default: ())
+  let raw-targets = op.at("raw_targets", default: ())
+
+  if spec.target_mode == "each" {
+    for (target_index, qubit) in plain-targets.enumerate() {
+      out.push(make-target(target_index, qubit))
+    }
+  } else if spec.target_mode == "pairs" {
+    for pair-index in range(calc.floor(plain-targets.len() / 2)) {
+      let target-index = pair-index * 2
+      out.push(make-target(
+        target-index,
+        calc.min(plain-targets.at(target-index), plain-targets.at(target-index + 1)),
+      ))
+    }
+  } else if spec.target_mode == "raw-each" {
+    if raw-targets.len() == 0 {
+      for (target_index, qubit) in plain-targets.enumerate() {
+        out.push(make-target(target_index, qubit))
+      }
+    } else {
+      for (target_index, target) in raw-targets.enumerate() {
+        let qubit = ref-target-qubit(target)
+        if qubit != none {
+          out.push(make-target(target_index, qubit))
+        } else if target.at("kind", default: "") != "combiner" {
+          out.push(make-target(target_index, 0))
+        }
+      }
+    }
+  } else if spec.target_mode == "pauli-products" {
+    if raw-targets.len() == 0 {
+      for (target_index, qubit) in plain-targets.enumerate() {
+        out.push(make-target(target_index, qubit))
+      }
+    } else {
+      let product-index = 0
+      let product-qubits = ()
+      let product-started = false
+      let previous-was-combiner = false
+      for target in raw-targets {
+        if target.at("kind", default: "") == "combiner" {
+          previous-was-combiner = true
+        } else {
+          if product-started and not previous-was-combiner {
+            out.push(make-target(product-index, product-qubits.sorted().first()))
+            product-index += 1
+            product-qubits = ()
+          }
+          let qubit = ref-target-qubit(target)
+          if qubit != none {
+            product-qubits.push(qubit)
+          }
+          product-started = true
+          previous-was-combiner = false
+        }
+      }
+      if product-started {
+        out.push(make-target(product-index, product-qubits.sorted().first()))
+      }
+    }
   }
   out
 }
