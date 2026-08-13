@@ -260,7 +260,10 @@
 
 .shot-canvas .noise-site:hover .noise-box,
 .shot-canvas .noise-site:focus .noise-box,
-.shot-canvas .is-selected .noise-box {
+.shot-canvas .is-selected .noise-box,
+.shot-canvas .noise-site:hover .gate-box,
+.shot-canvas .noise-site:focus .gate-box,
+.shot-canvas .is-selected .gate-box {
   stroke: #7f56d9;
   stroke-width: 2.5px;
 }

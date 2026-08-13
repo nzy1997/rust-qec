@@ -356,7 +356,8 @@ function updateDetail(state, eventId) {
     <h2>${escapeHtml(event.instruction)}</h2>
     <dl>
       <dt>Qubits</dt><dd>${event.target_qubits.map((q) => `q${q}`).join(", ")}</dd>
-      <dt>Probability</dt><dd>${site.probability ?? "channel"}</dd>
+      <dt>Channel parameters</dt><dd>${escapeHtml(formatChannelParameters(site))}</dd>
+      <dt>Total probability</dt><dd>${formatProbability(site.probability)}</dd>
       <dt>Base</dt><dd>${outcomeLabel(event.base_outcome)}</dd>
       <dt>Requested</dt><dd>${escapeHtml(requested)}</dd>
       <dt>Effective</dt><dd>${outcomeLabel(event.effective_outcome)}</dd>
@@ -364,6 +365,21 @@ function updateDetail(state, eventId) {
     </dl>
     <p>${event.editable ? "This existing noise outcome can be overridden for the current shot." : "This stochastic instruction is read-only in the first version."}</p>
   `;
+}
+
+function formatChannelParameters(site) {
+  const labels = {
+    pauli_channel1: ["pX", "pY", "pZ"],
+    pauli_channel2: ["pIX", "pIY", "pIZ", "pXI", "pXX", "pXY", "pXZ", "pYI", "pYX", "pYY", "pYZ", "pZI", "pZX", "pZY", "pZZ"],
+    heralded_pauli_channel1: ["pI", "pX", "pY", "pZ"],
+  }[site.kind];
+  if (!site.parameters.length) return "none";
+  if (!labels) return site.parameters.map((value, index) => `p${index ? index + 1 : ""}=${value}`).join(", ");
+  return site.parameters.map((value, index) => `${labels[index] ?? `p${index + 1}`}=${value}`).join(", ");
+}
+
+function formatProbability(value) {
+  return value == null ? "not specified" : Number(value.toPrecision(12)).toString();
 }
 
 function updateResultDetail(state, kind, ids) {

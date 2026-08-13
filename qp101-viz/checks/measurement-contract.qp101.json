@@ -1,0 +1,36 @@
+{
+  "standard": "QP101-ZY",
+  "version": "1.0",
+  "num_qubits": 8,
+  "operations": [
+    { "type": "gate", "gate": "MXX", "targets": [0, 1] },
+    { "type": "gate", "gate": "MYY", "targets": [2, 3] },
+    { "type": "gate", "gate": "MZZ", "targets": [4, 5] },
+    {
+      "type": "gate",
+      "gate": "MPP",
+      "targets": [0, 1, 2],
+      "raw_targets": [
+        { "kind": "pauli", "basis": "X", "qubit": 0 },
+        { "kind": "combiner" },
+        { "kind": "pauli", "basis": "Z", "qubit": 1 },
+        { "kind": "pauli", "basis": "Y", "qubit": 2 }
+      ]
+    },
+    { "type": "gate", "gate": "MPAD", "targets": [6, 7] },
+    {
+      "type": "noise",
+      "gate": "HERALDED_ERASE",
+      "params": [0.25],
+      "raw_targets": [{ "kind": "qubit", "index": 0 }]
+    },
+    {
+      "type": "noise",
+      "gate": "HERALDED_PAULI_CHANNEL_1",
+      "params": [0.1, 0.2, 0.3, 0.4],
+      "raw_targets": [{ "kind": "qubit", "index": 1 }]
+    },
+    { "type": "detector", "coords": [], "sources": [{ "kind": "rec", "offset": -9 }] },
+    { "type": "detector", "coords": [], "sources": [{ "kind": "rec", "offset": -1 }] }
+  ]
+}

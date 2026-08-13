@@ -1,6 +1,8 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use serde_json::Value;
+
 fn rstim_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
@@ -315,17 +317,35 @@ fn export_json_reports_unsupported_highlight_instruction_clearly() {
 }
 
 #[test]
-fn export_json_reports_unsupported_sample_visualization_instruction_clearly() {
-    let output = run_export_json_with_stdin(
-        &["--sample_shot", "--seed", "1"],
-        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
-    );
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains(
-        "--sample_shot currently supports a subset of sample visualization instructions"
-    ));
-    assert!(stderr.contains("HERALDED_ERASE"));
+fn export_json_sample_visualization_supports_all_measurement_instruction_families() {
+    for (gate, circuit) in [
+        ("MXX", "MXX 0 1\nDETECTOR rec[-1]\n"),
+        ("MYY", "MYY 0 1\nDETECTOR rec[-1]\n"),
+        ("MZZ", "MZZ 0 1\nDETECTOR rec[-1]\n"),
+        ("MPP", "MPP X0*Z1\nDETECTOR rec[-1]\n"),
+        ("MPAD", "MPAD(0) 0\nDETECTOR rec[-1]\n"),
+        ("HERALDED_ERASE", "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n"),
+        (
+            "HERALDED_PAULI_CHANNEL_1",
+            "HERALDED_PAULI_CHANNEL_1(0,1,0,0) 0\nDETECTOR rec[-1]\n",
+        ),
+    ] {
+        let output = run_export_json_with_stdin(&["--sample_shot", "--seed", "7"], circuit);
+        assert!(
+            output.status.success(),
+            "sample export failed for {gate}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let document: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(
+            document["operations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|op| op["gate"] == gate),
+            "sample export omitted {gate}: {document}"
+        );
+    }
 }
 
 #[test]

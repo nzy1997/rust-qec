@@ -115,3 +115,35 @@ test("WASM uses the fixed-width DEPOLARIZE2 golden branch", async ({ page }) => 
   });
   expect(outcome).toEqual({ kind: "pauli_pair", first: "y", second: "x" });
 });
+
+test("read-only channel sites remain inspectable, stable, and filterable", async ({ page }) => {
+  await page.goto("/interactive/local/");
+  await page.locator("#shot-file").setInputFiles({
+    name: "channels.stim",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "PAULI_CHANNEL_1(0.1,0.2,0.3) 0\n" +
+      "HERALDED_PAULI_CHANNEL_1(0.1,0.2,0.3,0.4) 1\n" +
+      "CORRELATED_ERROR(0.25) X2 Y3\n",
+    ),
+  });
+
+  const sites = page.locator("[data-noise-event-id]");
+  await expect(sites).toHaveCount(3);
+  const before = await sites.evaluateAll((nodes) => nodes.map((node) => node.dataset.noiseEventId));
+
+  await sites.first().click();
+  await expect(page.locator("#shot-detail")).toContainText("pX=0.1, pY=0.2, pZ=0.3");
+  await expect(page.locator("#shot-detail")).toContainText("Total probability");
+  await expect(page.locator("#shot-detail")).toContainText("0.6");
+  await expect(page.locator("#shot-detail")).toContainText("read-only");
+  await expect(page.locator("#shot-popover")).toBeHidden();
+
+  await page.locator("#shot-filter-errors").uncheck();
+  await expect(sites.first()).toHaveCSS("opacity", "0.12");
+  await page.locator("#shot-filter-errors").check();
+
+  await page.getByRole("button", { name: "Sample", exact: true }).click();
+  const after = await sites.evaluateAll((nodes) => nodes.map((node) => node.dataset.noiseEventId));
+  expect(after).toEqual(before);
+});

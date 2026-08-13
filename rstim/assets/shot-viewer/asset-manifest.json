@@ -1,16 +1,16 @@
 {
   "files": {
     "app.js": {
-      "sha256": "481b4834763f019f7330661a93c55236549410f660b999ee1a5a288b16b140f9"
+      "sha256": "cddb62cfd6eb1fff8fa90665583cfd97bbbbe582a155b6b9f71bf16e9eccb5a1"
     },
     "index.html": {
       "sha256": "f8f545e8766c893d47bb1ed67fd66c55a1f604cd8186aaeb61ffdfc23ebda91f"
     },
     "pkg/rstim_shot_web_bg.wasm": {
-      "sha256": "35d8e57c9f0f0d4ca2e3b02377e6bfdd19722b775bcb5a83da072b272604c87f"
+      "sha256": "8afe641b5061246247bb8b77355234f37c5804ddc611b6acf253ad4f9dd11de2"
     },
     "shot-viewer.css": {
-      "sha256": "18e2444a47a10afa52c97414e566a11332eeab80a403975214f82a5471770930"
+      "sha256": "e3ead88683f6e6d3d58aba7f68dd8a0592a7e164732ea70230fa73b151f39445"
     }
   },
   "format_version": "rstim-shot-assets-v1",

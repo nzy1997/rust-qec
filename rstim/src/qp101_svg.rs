@@ -147,6 +147,14 @@ enum LayerItem<'a> {
         annotations: Vec<&'a Qp101Annotation>,
         interaction: Option<NoiseInteraction>,
     },
+    NoiseFallback {
+        gate: &'a str,
+        params: &'a [f64],
+        lanes: Vec<usize>,
+        raw_targets: Vec<Qp101TargetRef>,
+        annotations: Vec<Qp101Annotation>,
+        interaction: Option<NoiseInteraction>,
+    },
 }
 
 struct SourceLayerItem {
@@ -183,6 +191,7 @@ impl LayerItem<'_> {
                 min: (*lane_a).min(*lane_b),
                 max: (*lane_a).max(*lane_b),
             }),
+            LayerItem::NoiseFallback { lanes, .. } => Ok(LaneSpan::from_lanes(lanes, num_qubits)),
         }
     }
 }
@@ -1006,6 +1015,32 @@ fn operation_layer_items<'a>(
                         })
                         .collect());
                 }
+                NoisePolicy::Fallback if interaction_digest.is_some() => {
+                    let filtered = filtered_repeat_annotations(
+                        annotations,
+                        &entry.repeat_iterations,
+                        interaction_digest.is_some(),
+                    );
+                    return Ok(noise_fallback_groups(gate, raw_targets, num_qubits)?
+                        .into_iter()
+                        .map(|group| LayerItem::NoiseFallback {
+                            gate,
+                            params,
+                            lanes: group.lanes,
+                            raw_targets: group.raw_targets,
+                            annotations: annotations_for_owned_target_slots(
+                                &filtered,
+                                &group.target_slots,
+                            ),
+                            interaction: noise_interaction(
+                                interaction_digest,
+                                &entry.op_path,
+                                &entry.repeat_iterations,
+                                &group.target_slots,
+                            ),
+                        })
+                        .collect());
+                }
                 _ => {}
             }
         }
@@ -1147,6 +1182,25 @@ fn render_layer_item(
             );
             Ok(())
         }
+        LayerItem::NoiseFallback {
+            gate,
+            params,
+            lanes,
+            raw_targets,
+            annotations,
+            interaction,
+        } => render_fallback_noise(
+            out,
+            x,
+            num_qubits,
+            gate,
+            params,
+            lanes,
+            raw_targets,
+            annotations,
+            interaction.as_ref(),
+            state,
+        ),
         LayerItem::Operation {
             op,
             repeat_iterations,
@@ -1281,7 +1335,7 @@ fn render_noise_interaction_start(
         return;
     };
     out.push_str(&format!(
-        "<g class=\"noise-site\" data-noise-site-id=\"{}\" data-noise-event-id=\"{}\" tabindex=\"0\" role=\"button\" aria-label=\"Edit {} noise outcome\">\n",
+        "<g class=\"noise-site\" data-noise-site-id=\"{}\" data-noise-event-id=\"{}\" tabindex=\"0\" role=\"button\" aria-label=\"Inspect {} noise outcome\">\n",
         escape_xml(&interaction.site_id),
         escape_xml(&interaction.event_id),
         escape_xml(gate),
@@ -1831,6 +1885,72 @@ fn noise_policy(gate: &str) -> NoisePolicy {
     }
 }
 
+struct FallbackNoiseGroup {
+    target_slots: Vec<usize>,
+    lanes: Vec<usize>,
+    raw_targets: Vec<Qp101TargetRef>,
+}
+
+fn noise_fallback_groups(
+    gate: &str,
+    raw_targets: &[Qp101TargetRef],
+    num_qubits: usize,
+) -> Result<Vec<FallbackNoiseGroup>, String> {
+    let entries = raw_targets
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, target)| {
+            target_ref_lane_unchecked(target).map(|qubit| (slot, qubit, target.clone()))
+        })
+        .collect::<Vec<_>>();
+    let group_width = match gate {
+        "PAULI_CHANNEL_2" => 2,
+        "CORRELATED_ERROR" | "ELSE_CORRELATED_ERROR" | "E" => entries.len().max(1),
+        _ => 1,
+    };
+    entries
+        .chunks(group_width)
+        .map(|group| {
+            let lanes = group
+                .iter()
+                .map(|(_, qubit, _)| validate_lane(*qubit, num_qubits, gate))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(FallbackNoiseGroup {
+                target_slots: group.iter().map(|(slot, _, _)| *slot).collect(),
+                lanes,
+                raw_targets: group.iter().map(|(_, _, target)| target.clone()).collect(),
+            })
+        })
+        .collect()
+}
+
+fn target_ref_lane_unchecked(target: &Qp101TargetRef) -> Option<u32> {
+    match target {
+        Qp101TargetRef::Qubit { index, .. } => Some(*index),
+        Qp101TargetRef::Pauli { qubit, .. } => Some(*qubit),
+        Qp101TargetRef::Rec { .. } | Qp101TargetRef::Combiner | Qp101TargetRef::Sweep { .. } => {
+            None
+        }
+    }
+}
+
+fn annotations_for_owned_target_slots(
+    annotations: &[Qp101Annotation],
+    target_slots: &[usize],
+) -> Vec<Qp101Annotation> {
+    annotations
+        .iter()
+        .filter(|annotation| {
+            annotation.target_slots.is_empty()
+                || annotation
+                    .target_slots
+                    .iter()
+                    .any(|slot| target_slots.contains(slot))
+        })
+        .cloned()
+        .collect()
+}
+
 fn noise_label(gate: &str) -> &str {
     match gate {
         "X_ERROR" => "XE",
@@ -1909,6 +2029,45 @@ fn render_noise(
     let annotation_line_offset =
         usize::from(!measurement_targets.is_empty()) + usize::from(note.is_some());
     render_annotations_with_line_offset(out, x, &lanes, annotations, annotation_line_offset);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_fallback_noise(
+    out: &mut String,
+    x: i32,
+    num_qubits: usize,
+    gate: &str,
+    params: &[f64],
+    lanes: &[usize],
+    raw_targets: &[Qp101TargetRef],
+    annotations: &[Qp101Annotation],
+    interaction: Option<&NoiseInteraction>,
+    state: &mut RenderState,
+) -> Result<(), String> {
+    render_noise_interaction_start(out, gate, interaction);
+    let note = noise_param_note(params);
+    let measurement_targets = measurement_targets(gate, &[], Some(raw_targets), num_qubits, state)?;
+    if let Some(note) = note.as_deref() {
+        render_param_note(
+            out,
+            x,
+            lanes,
+            note,
+            usize::from(!measurement_targets.is_empty()),
+        );
+    }
+    render_generic_box(out, x, num_qubits, gate, lanes, "#fff7ed")?;
+    render_measurement_anchors(
+        out,
+        x,
+        &measurement_targets,
+        state.interaction_digest.is_some(),
+    );
+    let annotation_line_offset =
+        usize::from(!measurement_targets.is_empty()) + usize::from(note.is_some());
+    render_annotations_with_line_offset(out, x, lanes, annotations, annotation_line_offset);
+    render_noise_interaction_end(out, interaction);
     Ok(())
 }
 

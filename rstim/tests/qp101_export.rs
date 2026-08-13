@@ -728,7 +728,7 @@ fn export_qp101_with_sample_trace_rejects_missing_loss_visible_components() {
 }
 
 #[test]
-fn export_qp101_with_sample_trace_rejects_unsupported_measurement_instruction_families() {
+fn export_qp101_with_sample_trace_accepts_supported_measurement_instruction_families() {
     let trace = SampleTrace {
         noise_events: vec![],
         measurement_events: vec![],
@@ -748,12 +748,12 @@ fn export_qp101_with_sample_trace_rejects_unsupported_measurement_instruction_fa
         ),
     ] {
         let circuit = parse_lines(circuit_text).unwrap();
-        let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
-        assert!(
-            err.contains(&format!(
-                "sample trace visualization does not yet support instruction {gate}"
-            )),
-            "unexpected error for {gate}: {err}"
+        let document = export_qp101_with_sample_trace(&circuit, &trace)
+            .unwrap_or_else(|error| panic!("sample export failed for {gate}: {error}"));
+        assert_eq!(
+            document.operations.len(),
+            2,
+            "unexpected document for {gate}"
         );
     }
 }

@@ -362,6 +362,7 @@ pub struct NoiseSite {
     pub id: NoiseSiteId,
     pub instruction: String,
     pub kind: NoiseSiteKind,
+    pub parameters: Vec<f64>,
     pub probability: Option<f64>,
     pub target_slots: Vec<usize>,
     pub target_qubits: Vec<u32>,
@@ -665,6 +666,7 @@ pub struct NoiseSiteSummary {
     pub id: String,
     pub instruction: String,
     pub kind: NoiseSiteKind,
+    pub parameters: Vec<f64>,
     pub probability: Option<f64>,
     pub target_qubits: Vec<u32>,
     pub editable: bool,
@@ -884,6 +886,7 @@ impl EditableShot {
                     id: site.id.encode(),
                     instruction: site.instruction.clone(),
                     kind: site.kind,
+                    parameters: site.parameters.clone(),
                     probability: site.probability,
                     target_qubits: site.target_qubits.clone(),
                     editable: site.editable,
@@ -1462,7 +1465,8 @@ fn collect_catalog(
                         id: id.clone(),
                         instruction: name.clone(),
                         kind: descriptor.kind,
-                        probability: args.first().copied(),
+                        parameters: args.clone(),
+                        probability: noise_total_probability(descriptor.kind, args),
                         target_slots: descriptor.target_slots,
                         target_qubits: descriptor.target_qubits,
                         editable: descriptor.kind.editable(),
@@ -1548,6 +1552,15 @@ fn noise_kind(name: &str) -> Option<NoiseSiteKind> {
         "ELSE_CORRELATED_ERROR" => NoiseSiteKind::ElseCorrelatedError,
         _ => return None,
     })
+}
+
+fn noise_total_probability(kind: NoiseSiteKind, args: &[f64]) -> Option<f64> {
+    match kind {
+        NoiseSiteKind::PauliChannel1
+        | NoiseSiteKind::PauliChannel2
+        | NoiseSiteKind::HeraldedPauliChannel1 => (!args.is_empty()).then(|| args.iter().sum()),
+        _ => args.first().copied(),
+    }
 }
 
 fn measurement_result_count(name: &str, targets: &[StimTarget]) -> u64 {
@@ -1947,6 +1960,66 @@ mod tests {
         assert_eq!(
             correlated.summary().result.noise_events[0].effective_outcome,
             NoiseOutcome::Correlated
+        );
+    }
+
+    #[test]
+    fn read_only_noise_sites_keep_stable_interactions_and_channel_parameters() {
+        let source = "PAULI_CHANNEL_1(0.1,0.2,0.3) 0 1\n\
+                      PAULI_CHANNEL_2(0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15) 2 3\n\
+                      HERALDED_ERASE(0.4) 4\n\
+                      HERALDED_PAULI_CHANNEL_1(0.1,0.2,0.3,0.4) 5\n\
+                      CORRELATED_ERROR(0.25) X6 Y7\n";
+        let mut shot = EditableShot::open(source, ExpansionLimits::default(), 7).unwrap();
+        let first = shot.view_snapshot().unwrap();
+
+        assert_eq!(first.noise_sites.len(), 6);
+        assert_eq!(first.shot.result.noise_events.len(), 6);
+        assert_eq!(first.svg.matches("class=\"noise-site\"").count(), 6);
+        for event in &first.shot.result.noise_events {
+            assert!(
+                first
+                    .svg
+                    .contains(&format!("data-noise-event-id=\"{}\"", event.id))
+            );
+            assert!(!event.editable);
+        }
+
+        let channel = first
+            .noise_sites
+            .iter()
+            .find(|site| site.kind == NoiseSiteKind::PauliChannel1)
+            .unwrap();
+        assert_eq!(channel.parameters, vec![0.1, 0.2, 0.3]);
+        assert!((channel.probability.unwrap() - 0.6).abs() < f64::EPSILON);
+        assert_eq!(
+            serde_json::to_value(channel.kind).unwrap(),
+            json!("pauli_channel1")
+        );
+        let heralded = first
+            .noise_sites
+            .iter()
+            .find(|site| site.kind == NoiseSiteKind::HeraldedPauliChannel1)
+            .unwrap();
+        assert_eq!(heralded.parameters, vec![0.1, 0.2, 0.3, 0.4]);
+        assert_eq!(heralded.probability, Some(1.0));
+
+        let ids = first
+            .shot
+            .result
+            .noise_events
+            .iter()
+            .map(|event| event.id.clone())
+            .collect::<Vec<_>>();
+        shot.sample(11).unwrap();
+        assert_eq!(
+            shot.summary()
+                .result
+                .noise_events
+                .iter()
+                .map(|event| event.id.clone())
+                .collect::<Vec<_>>(),
+            ids
         );
     }
 
