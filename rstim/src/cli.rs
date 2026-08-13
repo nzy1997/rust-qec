@@ -245,6 +245,8 @@ pub enum Commands {
         mode: String,
         #[arg(long = "logical_x_qubits")]
         logical_x_qubits: Option<String>,
+        #[arg(long = "logical_z_qubits")]
+        logical_z_qubits: Option<String>,
         #[arg(long = "public_out")]
         public_out: String,
         #[arg(long = "private_out")]
@@ -690,18 +692,25 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             shots,
             mode,
             logical_x_qubits,
+            logical_z_qubits,
             public_out,
             private_out,
             seed,
-        }) => run_export_decoder_dataset(
-            &circuit,
-            shots,
-            &mode,
-            logical_x_qubits.as_deref(),
-            &public_out,
-            &private_out,
-            seed,
-        ),
+        }) => {
+            let logical_flip = parse_cli_logical_flip(
+                logical_x_qubits.as_deref(),
+                logical_z_qubits.as_deref(),
+            )?;
+            run_export_decoder_dataset(
+                &circuit,
+                shots,
+                &mode,
+                logical_flip,
+                &public_out,
+                &private_out,
+                seed,
+            )
+        }
         Some(Commands::PackSamples {
             circuit,
             shots,
@@ -1271,7 +1280,7 @@ pub fn run_export_decoder_dataset(
     circuit: &str,
     shots: u64,
     mode: &str,
-    logical_x_qubits: Option<&str>,
+    logical_flip: Option<crate::decoder_dataset::LogicalFlip>,
     public_out: &str,
     private_out: &str,
     seed: Option<u64>,
@@ -1279,10 +1288,6 @@ pub fn run_export_decoder_dataset(
     let circuit_text = std::fs::read_to_string(circuit)
         .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
     let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
-    let logical_x_qubits = match logical_x_qubits {
-        Some(value) => crate::decoder_dataset::parse_logical_x_qubits(value)?,
-        None => Vec::new(),
-    };
     let shots =
         usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
     crate::decoder_dataset::export_decoder_dataset(
@@ -1290,13 +1295,36 @@ pub fn run_export_decoder_dataset(
             circuit_text,
             shots,
             mode,
-            logical_x_qubits,
+            logical_flip,
             public_out: std::path::PathBuf::from(public_out),
             private_out: std::path::PathBuf::from(private_out),
             seed,
         },
     )
     .map(drop)
+}
+
+fn parse_cli_logical_flip(
+    logical_x_qubits: Option<&str>,
+    logical_z_qubits: Option<&str>,
+) -> Result<Option<crate::decoder_dataset::LogicalFlip>, String> {
+    let logical_flip = match (logical_x_qubits, logical_z_qubits) {
+        (Some(_), Some(_)) => {
+            return Err(
+                "--logical_x_qubits and --logical_z_qubits are mutually exclusive".to_string(),
+            );
+        }
+        (Some(value), None) => Some(crate::decoder_dataset::LogicalFlip::parse(
+            crate::decoder_dataset::LogicalPauli::X,
+            value,
+        )?),
+        (None, Some(value)) => Some(crate::decoder_dataset::LogicalFlip::parse(
+            crate::decoder_dataset::LogicalPauli::Z,
+            value,
+        )?),
+        (None, None) => None,
+    };
+    Ok(logical_flip)
 }
 
 fn run_pack_samples(
