@@ -62,6 +62,48 @@ fn compiled_loss_sampler_reuses_nonzero_reference_for_full_output() {
 }
 
 #[test]
+fn compiled_loss_sampler_inverts_present_m_and_mr_but_not_lost_measurements() {
+    let circuit = parse_lines("LOSS(0) 0 1\nLOSS(1) 2 3\nM !0 !2\nMR !1 !3\nM 1 3\n").unwrap();
+    let mut sampler =
+        CompiledLossMeasurementSampler::compile(&circuit, ReferenceSampleMode::SimulateNoiseless)
+            .unwrap();
+    let mut rng = StdRng::seed_from_u64(0xc0ffee);
+
+    let output = sampler
+        .sample(64, &mut rng, SampleOutputMode::MeasurementsOnly)
+        .unwrap();
+
+    let expected = [true, false, true, false, false, false];
+    for shot in 0..64 {
+        for (measurement, &expected_value) in expected.iter().enumerate() {
+            assert_eq!(
+                output.measurements.get(measurement, shot),
+                expected_value,
+                "measurement {measurement}, shot {shot}",
+            );
+        }
+    }
+}
+
+#[test]
+fn compiled_loss_sampler_assume_zero_reference_handles_ideal_y_and_z() {
+    let circuit = parse_lines("LOSS(0) 0 1\nY 0\nZ 1\nM 0 1\n").unwrap();
+    let mut sampler =
+        CompiledLossMeasurementSampler::compile(&circuit, ReferenceSampleMode::AssumeAllZero)
+            .unwrap();
+    let mut rng = StdRng::seed_from_u64(0xc0ffee);
+
+    let output = sampler
+        .sample(64, &mut rng, SampleOutputMode::MeasurementsOnly)
+        .unwrap();
+
+    for shot in 0..64 {
+        assert!(output.measurements.get(0, shot));
+        assert!(!output.measurements.get(1, shot));
+    }
+}
+
+#[test]
 fn loss_before_cx_skips_the_gate_for_interpreted_and_auto_sampling() {
     let circuit = parse_lines("X 0\nLOSS(1) 0\nCX 0 2\nM 0 1 2 3\n").unwrap();
 

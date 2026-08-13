@@ -245,7 +245,7 @@ impl LossFrameBatch {
             let lost = self.lost_table.row_words(q)[word];
             let present_value = self.x_table.row_words(q)[word];
             self.measurements.row_words_mut(self.measurement_index)[word] = if inverted {
-                present_value & !lost
+                !present_value & !lost
             } else {
                 present_value | lost
             };
@@ -577,8 +577,8 @@ fn two_qubit_pauli(index: usize) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     use super::LossSamplerPlan;
     use crate::executor::Executor;
