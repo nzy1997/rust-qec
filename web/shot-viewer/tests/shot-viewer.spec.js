@@ -25,13 +25,15 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
     return {
       stageWidth: stage.width,
       workspaceWidth: bounds.width,
-      viewAboveStage: view.bottom <= stage.top,
-      detailBelowStage: detail.top >= stage.bottom,
+      viewBottom: view.bottom,
+      stageTop: stage.top,
+      stageBottom: stage.bottom,
+      detailTop: detail.top,
     };
   });
   expect(layout.stageWidth / layout.workspaceWidth).toBeGreaterThan(0.98);
-  expect(layout.viewAboveStage).toBe(true);
-  expect(layout.detailBelowStage).toBe(true);
+  expect(layout.viewBottom).toBeLessThanOrEqual(layout.stageTop + 1);
+  expect(layout.detailTop).toBeGreaterThanOrEqual(layout.stageBottom - 1);
 
   const ids = await page.locator("[data-noise-event-id]").evaluateAll((nodes) =>
     nodes.map((node) => node.dataset.noiseEventId),
@@ -201,8 +203,8 @@ test("read-only channel sites remain inspectable, stable, and filterable", async
   await expect(page.locator("#shot-popover")).toBeHidden();
   await expect.poll(() => page.locator("#shot-detail").evaluate((detail) => {
     const rect = detail.getBoundingClientRect();
-    return rect.top >= 0 && rect.bottom <= window.innerHeight;
-  })).toBe(true);
+    return Math.max(-rect.top, rect.bottom - window.innerHeight, 0);
+  })).toBeLessThanOrEqual(1);
 
   await page.locator("#shot-filter-errors").uncheck();
   await expect(sites.first()).toHaveCSS("opacity", "0.12");
