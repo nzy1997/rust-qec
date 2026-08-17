@@ -262,27 +262,6 @@ fn same_path(left: &Path, right: &Path) -> Result<bool, String> {
 }
 
 fn resolve_for_comparison(path: &Path) -> Result<PathBuf, String> {
-    let absolute = lexical_absolute(path)?;
-    let mut existing = absolute.as_path();
-    let mut suffix = Vec::new();
-    while !existing.exists() {
-        let name = existing
-            .file_name()
-            .ok_or_else(|| format!("failed to resolve path {}", path.display()))?;
-        suffix.push(name.to_os_string());
-        existing = existing
-            .parent()
-            .ok_or_else(|| format!("failed to resolve path {}", path.display()))?;
-    }
-    let mut resolved = fs::canonicalize(existing)
-        .map_err(|error| format!("failed to canonicalize {}: {error}", existing.display()))?;
-    for component in suffix.into_iter().rev() {
-        resolved.push(component);
-    }
-    Ok(resolved)
-}
-
-fn lexical_absolute(path: &Path) -> Result<PathBuf, String> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -290,17 +269,24 @@ fn lexical_absolute(path: &Path) -> Result<PathBuf, String> {
             .map_err(|error| format!("failed to resolve current directory: {error}"))?
             .join(path)
     };
-    let mut normalized = PathBuf::new();
+    let mut resolved = PathBuf::new();
     for component in absolute.components() {
         match component {
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
-                normalized.pop();
+                resolved.pop();
             }
-            other => normalized.push(other.as_os_str()),
+            other => {
+                resolved.push(other.as_os_str());
+                if resolved.exists() {
+                    resolved = fs::canonicalize(&resolved).map_err(|error| {
+                        format!("failed to canonicalize {}: {error}", resolved.display())
+                    })?;
+                }
+            }
         }
     }
-    Ok(normalized)
+    Ok(resolved)
 }
 
 fn infer_num_shots(
@@ -753,5 +739,16 @@ mod tests {
         symlink(&real, &alias).unwrap();
 
         assert!(same_path(&real.join("result"), &alias.join("result")).unwrap());
+        let nested = temp.path().join("nested");
+        std::fs::create_dir(&nested).unwrap();
+        let nested_alias = temp.path().join("nested-alias");
+        symlink(&nested, &nested_alias).unwrap();
+        assert!(
+            same_path(
+                &nested_alias.join("..").join("result"),
+                &temp.path().join("result")
+            )
+            .unwrap()
+        );
     }
 }

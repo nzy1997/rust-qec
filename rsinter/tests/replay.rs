@@ -347,6 +347,30 @@ fn replay_rejects_outputs_aliased_through_a_symlinked_parent() {
     assert!(!options.predictions_out.exists());
 }
 
+#[cfg(all(unix, feature = "rmatching-runner"))]
+#[test]
+fn replay_rejects_output_alias_with_parent_after_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().join("base");
+    let other = temp.path().join("other");
+    let nested = other.join("nested");
+    fs::create_dir(&base).unwrap();
+    fs::create_dir_all(&nested).unwrap();
+    symlink(&nested, base.join("link")).unwrap();
+    let mut options = options(&temp);
+    options.predictions_out = base.join("link").join("..").join("result");
+    options.stats_out = other.join("result");
+    fs::write(&options.dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&options.dets, [0u8]).unwrap();
+
+    let error = run_replay(&options).unwrap_err();
+
+    assert!(error.contains("must use different paths"), "{error}");
+    assert!(!options.stats_out.exists());
+}
+
 #[cfg(feature = "rmatching-runner")]
 #[test]
 fn replay_rmatching_rejects_unrepresentable_observable_semantics() {

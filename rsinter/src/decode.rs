@@ -7,7 +7,7 @@ pub use crate::rbposd_adapter::{RbposdDemDecoder, RbposdLsdDemDecoder};
 #[cfg(feature = "rmatching-runner")]
 pub use crate::rmatching_adapter::RmatchingDemDecoder;
 
-pub trait CompiledDecoder {
+pub trait CompiledDecoder: Send {
     /// Decode bit-packed detection events into bit-packed observable predictions.
     /// `dets`: `num_shots * ceil(num_dets/8)` bytes, b8 format.
     /// Returns: `num_shots * ceil(num_obs/8)` bytes, b8 format.
