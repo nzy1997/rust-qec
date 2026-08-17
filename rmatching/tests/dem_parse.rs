@@ -116,6 +116,15 @@ fn detector_like_tokens_in_inline_comments_are_ignored() {
 }
 
 #[test]
+fn hash_inside_instruction_tag_is_not_treated_as_a_comment() {
+    let g = parse_dem("error[tag#detail](0.1) D0 D1 L0 # D2 D3").unwrap();
+
+    assert_eq!(g.edges.len(), 1);
+    assert_eq!((g.edges[0].node1, g.edges[0].node2), (0, 1));
+    assert_eq!(g.edges[0].observable_indices, vec![0]);
+}
+
+#[test]
 fn braces_in_inline_comments_do_not_change_repeat_structure() {
     let dem = "repeat 2 { # } ignored\n    error(0.1) D0 D1 # D2\n    shift_detectors 2\n} # { ignored";
     let g = parse_dem(dem).unwrap();
