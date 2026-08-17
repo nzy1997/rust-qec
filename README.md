@@ -84,6 +84,8 @@ cargo test --workspace
   `analyze_errors`, `render_svg`, `export_json`, and related commands.
 - [`rmatching` decoder docs](rmatching/README.md): MWPM decoder entry point for
   detector-error-model workflows.
+- [`rsinter replay`](docs/rsinter-replay.md): decode frozen `.dem` plus b8
+  detector rows into b8 predictions and a reproducibility report.
 - [Surface decoder benchmark docs](benchmarks/surface_decoder_compare/README.md):
   benchmark setup, smoke commands, and generated artifacts.
 

@@ -1,4 +1,4 @@
-use rsinter::decode::{Decoder, VacuousDecoder};
+use rsinter::decode::{CompiledDecoder, Decoder, VacuousDecoder};
 use rstim::dem::DetectorErrorModel;
 
 #[test]
@@ -21,4 +21,11 @@ fn vacuous_decoder_multi_obs() {
     let dets = vec![0b1]; // 1 shot
     let predictions = compiled.decode_shots_bit_packed(&dets, 1, 1, 2).unwrap();
     assert_eq!(predictions, vec![0u8]);
+}
+
+#[test]
+fn compiled_decoder_trait_objects_remain_send() {
+    fn assert_send<T: Send>() {}
+
+    assert_send::<Box<dyn CompiledDecoder>>();
 }

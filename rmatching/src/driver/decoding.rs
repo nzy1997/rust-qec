@@ -58,6 +58,11 @@ impl Matching {
             .set_boundary(boundary.iter().copied().collect());
     }
 
+    /// Eagerly build and cache the matching solver.
+    pub fn prepare(&mut self) {
+        self.user_graph.get_mwpm();
+    }
+
     /// Decode a syndrome bit-vector into observable predictions.
     ///
     /// `syndrome` has one byte per detector; non-zero means that detector fired.

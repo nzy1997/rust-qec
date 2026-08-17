@@ -27,11 +27,11 @@ serde_json = "1"
 csv = "1"
 sha2 = "0.10"
 toml = "0.8"
+tempfile = "3"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
 qec-code = { path = "../qec-code" }
-tempfile = "3"
 
 [[bin]]
 name = "rsinter"

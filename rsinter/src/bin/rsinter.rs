@@ -22,6 +22,7 @@ use rsinter::bench::run::{run_rust_benchmark_with_options, BenchRunOptions};
 use rsinter::bench::spec::BenchmarkSpec;
 #[cfg(feature = "plotting")]
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
+use rsinter::replay::{ReplayOptions, run_replay};
 
 #[derive(Parser)]
 #[command(
@@ -37,6 +38,28 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Decode a frozen b8 detector file against a detector error model.
+    Replay {
+        #[arg(long)]
+        dem: PathBuf,
+        #[arg(long)]
+        dets: PathBuf,
+        #[arg(long)]
+        decoder: String,
+        #[arg(long)]
+        decoder_config: Option<PathBuf>,
+        #[arg(long)]
+        predictions_out: PathBuf,
+        #[arg(long)]
+        stats_out: PathBuf,
+        #[arg(long, default_value_t = 65_536)]
+        batch_size: usize,
+        #[arg(
+            long,
+            help = "Validate the inferred shot count; required for zero-detector DEMs"
+        )]
+        shots: Option<usize>,
+    },
     Bench {
         #[command(subcommand)]
         command: BenchCommands,
@@ -138,6 +161,27 @@ fn main() {
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::Replay {
+            dem,
+            dets,
+            decoder,
+            decoder_config,
+            predictions_out,
+            stats_out,
+            batch_size,
+            shots,
+        } => {
+            run_replay(&ReplayOptions {
+                dem,
+                dets,
+                decoder,
+                decoder_config,
+                predictions_out,
+                stats_out,
+                batch_size,
+                shots,
+            })?;
+        }
         Commands::Bench { command } => match command {
             BenchCommands::Run {
                 spec,

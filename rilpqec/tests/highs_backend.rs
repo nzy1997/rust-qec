@@ -1,9 +1,9 @@
-use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::BinaryIlpConfig;
 use qec_ilp_core::BinaryIlpModel;
+use qec_ilp_core::backend::build_binary_backend;
 use rilpqec::{
-    lower_dem_to_problem, BackendConfig, BackendKind, IlpDecodeError, IlpDecoderConfig,
-    IlpDemDecoder,
+    BackendConfig, BackendKind, IlpDecodeError, IlpDecoderConfig, IlpDemDecoder,
+    lower_dem_to_problem,
 };
 use rstim::dem::DetectorErrorModel;
 
@@ -65,6 +65,36 @@ fn highs_reuses_one_batch_backend_for_multiple_shots() {
         .unwrap();
 
     assert_eq!(predictions, vec![0b0000_0001, 0b0000_0000]);
+}
+
+#[test]
+fn compiled_highs_decoder_reuses_backend_across_batches() {
+    let dem = DetectorErrorModel::parse("error(0.1) D0 L0\nerror(0.1) D1\n").unwrap();
+    let mut decoder = IlpDemDecoder::from_dem(
+        &dem,
+        IlpDecoderConfig {
+            backend: BackendConfig {
+                kind: BackendKind::Highs,
+                time_limit_seconds: None,
+                mip_gap: None,
+                threads: Some(1),
+                verbose: false,
+            },
+        },
+    )
+    .unwrap()
+    .into_compiled()
+    .unwrap();
+
+    let first = decoder
+        .decode_batch_bit_packed(&[0b0000_0001], 1, 2, 1)
+        .unwrap();
+    let second = decoder
+        .decode_batch_bit_packed(&[0b0000_0000], 1, 2, 1)
+        .unwrap();
+
+    assert_eq!(first, vec![0b0000_0001]);
+    assert_eq!(second, vec![0b0000_0000]);
 }
 
 #[test]

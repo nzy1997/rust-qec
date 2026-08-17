@@ -22,7 +22,7 @@ pub trait CompiledDecoder: Send {
 
 pub trait Decoder: Send + Sync {
     fn compile_for_dem(&self, dem: &DetectorErrorModel)
-        -> Result<Box<dyn CompiledDecoder>, String>;
+    -> Result<Box<dyn CompiledDecoder>, String>;
 }
 
 /// Always predicts no observable flips. Useful for testing the pipeline.
