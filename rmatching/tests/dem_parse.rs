@@ -116,6 +116,16 @@ fn detector_like_tokens_in_inline_comments_are_ignored() {
 }
 
 #[test]
+fn braces_in_inline_comments_do_not_change_repeat_structure() {
+    let dem = "repeat 2 { # } ignored\n    error(0.1) D0 D1 # D2\n    shift_detectors 2\n} # { ignored";
+    let g = parse_dem(dem).unwrap();
+
+    assert_eq!(g.edges.len(), 2);
+    assert_eq!((g.edges[0].node1, g.edges[0].node2), (0, 1));
+    assert_eq!((g.edges[1].node1, g.edges[1].node2), (2, 3));
+}
+
+#[test]
 fn reject_non_graphlike_component_inside_repeat() {
     let dem = "repeat 2 {\n    error(0.1) D0 D1 D2 L0\n    shift_detectors 3\n}";
     let error = match parse_dem(dem) {

@@ -6,7 +6,10 @@ use crate::driver::user_graph::UserGraph;
 /// comments (`#`), blank lines, `^` separator, and unknown instructions.
 pub fn parse_dem(text: &str) -> Result<UserGraph, String> {
     let mut graph = UserGraph::new();
-    let lines: Vec<&str> = text.lines().collect();
+    let lines: Vec<&str> = text
+        .lines()
+        .map(|line| line.split('#').next().unwrap_or_default())
+        .collect();
     let mut detector_offset = 0usize;
     parse_block(&lines, &mut graph, &mut detector_offset)?;
     Ok(graph)
@@ -21,7 +24,7 @@ fn parse_block(
     let mut max_detector: usize = 0;
     let mut i = 0;
     while i < lines.len() {
-        let line = lines[i].split('#').next().unwrap_or_default().trim();
+        let line = lines[i].trim();
         // Skip blank lines and comments
         if line.is_empty() {
             i += 1;
