@@ -21,9 +21,9 @@ fn parse_block(
     let mut max_detector: usize = 0;
     let mut i = 0;
     while i < lines.len() {
-        let line = lines[i].trim();
+        let line = lines[i].split('#').next().unwrap_or_default().trim();
         // Skip blank lines and comments
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
             i += 1;
             continue;
         }
