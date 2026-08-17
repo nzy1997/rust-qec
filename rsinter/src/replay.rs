@@ -7,7 +7,6 @@ use rstim::dem::DetectorErrorModel;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(any(
-    test,
     feature = "rbposd-runner",
     feature = "rmatching-runner",
     feature = "ilp-runner"
@@ -625,18 +624,21 @@ mod tests {
 
     #[test]
     fn decoder_configs_reject_invalid_values_and_unknown_names() {
+        #[cfg(feature = "rbposd-runner")]
         assert!(
             build_decoder("rbplsd", "lsd_order = 2\n")
                 .err()
                 .unwrap()
                 .contains("0 or 1")
         );
+        #[cfg(feature = "rbposd-runner")]
         assert!(
             build_decoder("rbposd", "osd_method = \"osd0\"\nosd_order = 1\n")
                 .err()
                 .unwrap()
                 .contains("requires osd_order=0")
         );
+        #[cfg(feature = "ilp-runner")]
         assert!(
             build_decoder("rilpqec", "mip_gap = 1.0\n")
                 .err()
