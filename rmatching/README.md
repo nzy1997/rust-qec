@@ -8,10 +8,15 @@ A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWP
 ## Features
 
 - Full Sparse Blossom algorithm with alternating trees and blossom contraction/shattering
-- Standalone DEM (Detector Error Model) text parser — no external dependencies
+- Standalone graphlike DEM (Detector Error Model) text parser — no external dependencies
 - Negative edge weight support
 - Decode API: `decode`, `decode_batch`, `decode_to_edges`
 - Optional [rsinter](https://github.com/nzy1997/rust-qec) `Decoder` trait integration behind `rsinter` feature flag
+
+`Matching::from_dem` accepts graphlike DEMs, where each error component contains
+at most two detectors. It returns an error for higher-degree hyperedges instead
+of silently dropping them. Decompose errors into graphlike components before
+using `rmatching`.
 
 ## Quick Start
 

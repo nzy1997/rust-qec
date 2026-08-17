@@ -81,6 +81,32 @@ fn parse_correlated_segments_from_single_error_instruction() {
 }
 
 #[test]
+fn reject_non_graphlike_error_component() {
+    let dem = "error(0.1) D0 D1 D2 L0";
+    let error = match parse_dem(dem) {
+        Ok(_) => panic!("expected a non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+    assert!(error.contains(dem));
+}
+
+#[test]
+fn reject_non_graphlike_correlated_component() {
+    let dem = "error(0.1) D0 D1 ^ D2 D3 D4 L0";
+    let error = match parse_dem(dem) {
+        Ok(_) => panic!("expected a non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+    assert!(error.contains(dem));
+}
+
+#[test]
 fn parse_repeat_with_coordinate_shift_and_detector_shift() {
     let dem = "\
 repeat 2 {

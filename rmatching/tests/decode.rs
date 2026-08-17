@@ -1,5 +1,17 @@
 use rmatching::Matching;
 
+#[test]
+fn from_dem_rejects_non_graphlike_errors() {
+    let dem = "error(0.1) D0 D1 D2 L0";
+    let error = match Matching::from_dem(dem) {
+        Ok(_) => panic!("expected a non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+}
+
 /// 3-node chain: D0 -- D1 -- D2, with L0 on the D0-D1 edge.
 /// Fire D0 and D1 => should predict L0 flipped.
 #[test]

@@ -509,7 +509,6 @@ fn user_graph_get_num_detectors_with_boundary() {
 
 // =========================================================================
 // 20. UserGraph handle_dem_instruction with 0 or 3+ detectors
-//     (user_graph.rs line 277 — the _ => {} branch)
 // =========================================================================
 
 #[test]
@@ -518,11 +517,16 @@ fn user_graph_dem_instruction_zero_detectors() {
 
     let mut g = UserGraph::new();
     // 0 detectors => no edge added
-    g.handle_dem_instruction(0.1, &[], vec![0]);
+    g.handle_dem_instruction(0.1, &[], vec![0]).unwrap();
     assert_eq!(g.get_num_edges(), 0);
 
-    // 3 detectors => no edge added (hyperedge, ignored)
-    g.handle_dem_instruction(0.1, &[0, 1, 2], vec![0]);
+    // 3 detectors => reject an unsupported hyperedge instead of silently
+    // changing the model.
+    let error = g
+        .handle_dem_instruction(0.1, &[0, 1, 2], vec![0])
+        .unwrap_err();
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
     assert_eq!(g.get_num_edges(), 0);
 }
 

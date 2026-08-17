@@ -302,13 +302,14 @@ impl UserGraph {
     /// Handle a detector-error-model instruction.
     ///
     /// Converts probability `p` to weight `ln((1-p)/p)` and adds the
-    /// appropriate edge.
+    /// appropriate edge. Components with more than two detectors are
+    /// hyperedges and cannot be represented by the matching graph.
     pub fn handle_dem_instruction(
         &mut self,
         p: f64,
         detectors: &[usize],
         observables: Vec<usize>,
-    ) {
+    ) -> Result<(), String> {
         let weight = ((1.0 - p) / p).ln();
         match detectors.len() {
             2 => self.add_edge(
@@ -319,8 +320,14 @@ impl UserGraph {
                 p,
             ),
             1 => self.add_boundary_edge(detectors[0], observables, weight, p),
-            _ => {}
+            0 => {}
+            count => {
+                return Err(format!(
+                    "rmatching requires a graphlike DEM, but an error component has {count} detectors: {detectors:?}"
+                ));
+            }
         }
+        Ok(())
     }
 
     pub fn get_num_edges(&self) -> usize {

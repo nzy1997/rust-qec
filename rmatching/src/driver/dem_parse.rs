@@ -81,7 +81,9 @@ fn parse_error_line(
             }
         }
 
-        graph.handle_dem_instruction(p, &detectors, observables);
+        graph
+            .handle_dem_instruction(p, &detectors, observables)
+            .map_err(|error| format!("{error}; while parsing `{line}`"))?;
     }
     Ok(max_det)
 }
