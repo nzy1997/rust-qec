@@ -13,6 +13,7 @@ pub mod csv_io;
 pub mod decode;
 pub mod failure;
 pub mod plot;
+pub mod replay;
 pub mod stats;
 pub mod task;
 pub mod task_stats;
