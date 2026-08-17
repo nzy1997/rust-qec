@@ -603,7 +603,9 @@ fn build_rilpqec(_text: &str) -> Result<(Box<dyn Decoder>, Value), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::build_decoder;
+    use std::path::Path;
+
+    use super::{build_decoder, same_path};
 
     #[test]
     fn rbposd_and_rbplsd_configs_are_normalized() {
@@ -617,6 +619,9 @@ mod tests {
         assert_eq!(osd["osd_method"], "ldpc_osd_cs");
         assert_eq!(osd["osd_order"], 3);
 
+        let (_, legacy) = build_decoder("rbposd", "osd_method = \"combination_sweep\"\n").unwrap();
+        assert_eq!(legacy["osd_method"], "legacy_combination_sweep");
+
         let (_, lsd) = build_decoder("rbplsd", "lsd_order = 1\n").unwrap();
         assert_eq!(lsd["lsd_method"], "localized_statistics");
         assert_eq!(lsd["lsd_order"], 1);
@@ -624,6 +629,34 @@ mod tests {
 
     #[test]
     fn decoder_configs_reject_invalid_values_and_unknown_names() {
+        #[cfg(feature = "rbposd-runner")]
+        assert!(
+            build_decoder("rbposd", "bp_method = \"sum_product\"\n")
+                .err()
+                .unwrap()
+                .contains("unknown bp_method")
+        );
+        #[cfg(feature = "rbposd-runner")]
+        assert!(
+            build_decoder("rbposd", "bp_schedule = \"random\"\n")
+                .err()
+                .unwrap()
+                .contains("unknown bp_schedule")
+        );
+        #[cfg(feature = "rbposd-runner")]
+        assert!(
+            build_decoder("rbposd", "osd_method = \"mystery\"\n")
+                .err()
+                .unwrap()
+                .contains("unknown osd_method")
+        );
+        #[cfg(feature = "rbposd-runner")]
+        assert!(
+            build_decoder("rbplsd", "lsd_method = \"mystery\"\n")
+                .err()
+                .unwrap()
+                .contains("unknown lsd_method")
+        );
         #[cfg(feature = "rbposd-runner")]
         assert!(
             build_decoder("rbplsd", "lsd_order = 2\n")
@@ -645,11 +678,50 @@ mod tests {
                 .unwrap()
                 .contains("[0, 1)")
         );
+        #[cfg(feature = "ilp-runner")]
+        assert!(
+            build_decoder("rilpqec", "backend = \"mystery\"\n")
+                .err()
+                .unwrap()
+                .contains("unknown rilpqec backend")
+        );
+        #[cfg(feature = "ilp-runner")]
+        assert!(
+            build_decoder("rilpqec", "time_limit_s = 0.0\n")
+                .err()
+                .unwrap()
+                .contains("positive and finite")
+        );
+        #[cfg(feature = "ilp-runner")]
+        assert!(
+            build_decoder("rilpqec", "threads = 0\n")
+                .err()
+                .unwrap()
+                .contains("threads must be positive")
+        );
+        #[cfg(feature = "ilp-runner")]
+        for backend in ["highs", "gurobi"] {
+            let (_, normalized) = build_decoder(
+                "rilpqec",
+                &format!(
+                    "backend = \"{backend}\"\ntime_limit_s = 1.0\nmip_gap = 0.25\nthreads = 1\nverbose = true\n"
+                ),
+            )
+            .unwrap();
+            assert_eq!(normalized["backend"], backend);
+            assert_eq!(normalized["threads"], 1);
+        }
         assert!(
             build_decoder("mystery", "")
                 .err()
                 .unwrap()
                 .contains("unknown decoder")
         );
+    }
+
+    #[test]
+    fn path_comparison_normalizes_relative_parent_components() {
+        assert!(same_path(Path::new("replay/a/../out"), Path::new("replay/out")).unwrap());
+        assert!(!same_path(Path::new("replay/left"), Path::new("replay/right")).unwrap());
     }
 }

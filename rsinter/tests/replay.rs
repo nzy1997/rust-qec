@@ -85,20 +85,142 @@ fn replay_validates_shot_count_and_decoder_config() {
 #[test]
 fn replay_rejects_lexically_aliased_output_paths() {
     let temp = tempfile::tempdir().unwrap();
-    let mut options = options(&temp);
-    fs::write(&options.dem, "error(0.1) D0 L0\n").unwrap();
-    fs::write(&options.dets, [0u8]).unwrap();
-    options.stats_out = options
+    let mut prediction_options = options(&temp);
+    fs::write(&prediction_options.dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&prediction_options.dets, [0u8]).unwrap();
+    prediction_options.stats_out = prediction_options
         .predictions_out
         .parent()
         .unwrap()
         .join(".")
         .join("predictions.b8");
 
-    let error = run_replay(&options).unwrap_err();
+    let error = run_replay(&prediction_options).unwrap_err();
 
     assert!(error.contains("must use different paths"), "{error}");
-    assert!(!options.predictions_out.exists());
+    assert!(!prediction_options.predictions_out.exists());
+}
+
+#[test]
+fn replay_reports_invalid_dem_detector_and_config_inputs() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut options = options(&temp);
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("failed to read DEM")
+    );
+
+    fs::write(&options.dem, [0xff]).unwrap();
+    assert!(run_replay(&options).unwrap_err().contains("is not UTF-8"));
+
+    fs::write(&options.dem, "error(nope) D0\n").unwrap();
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("failed to parse DEM")
+    );
+
+    fs::write(&options.dem, "error(0.1) D0 L0\n").unwrap();
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("failed to stat detectors")
+    );
+
+    fs::write(&options.dets, [0u8]).unwrap();
+    options.decoder_config = Some(temp.path().join("missing.toml"));
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("failed to read decoder config")
+    );
+
+    options.decoder_config = None;
+    options.batch_size = 0;
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("batch_size must be positive")
+    );
+}
+
+#[test]
+fn replay_validates_zero_detector_and_multibyte_row_lengths() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut options = options(&temp);
+    fs::write(&options.dem, "error(0.1) D8 L0\n").unwrap();
+    fs::write(&options.dets, [0u8]).unwrap();
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("not divisible by row width 2")
+    );
+
+    fs::write(&options.dem, "").unwrap();
+    fs::write(&options.dets, []).unwrap();
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("--shots is required")
+    );
+    fs::write(&options.dets, [0u8]).unwrap();
+    options.shots = Some(1);
+    assert!(
+        run_replay(&options)
+            .unwrap_err()
+            .contains("requires an empty detector input")
+    );
+
+    fs::write(&options.dets, []).unwrap();
+    options.decoder = "rbposd".into();
+    options.shots = Some(2);
+    let stats = run_replay(&options).unwrap();
+    assert_eq!(stats.num_shots, 2);
+    assert_eq!(stats.num_detectors, 0);
+    assert_eq!(stats.num_observables, 0);
+    assert_eq!(stats.batches, 1);
+    assert!(fs::read(&options.predictions_out).unwrap().is_empty());
+}
+
+#[test]
+fn replay_reports_output_directory_creation_errors() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut prediction_options = options(&temp);
+    fs::write(&prediction_options.dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&prediction_options.dets, [0u8]).unwrap();
+    let parent_file = temp.path().join("not-a-directory");
+    fs::write(&parent_file, b"file").unwrap();
+    prediction_options.predictions_out = parent_file.join("predictions.b8");
+
+    let error = run_replay(&prediction_options).unwrap_err();
+
+    assert!(
+        error.contains("failed to create output directory"),
+        "{error}"
+    );
+
+    let mut stats_options = options(&temp);
+    stats_options.stats_out = parent_file.join("stats.json");
+    let error = run_replay(&stats_options).unwrap_err();
+    assert!(
+        error.contains("failed to create output directory"),
+        "{error}"
+    );
+}
+
+#[test]
+fn replay_accepts_an_inferred_zero_shot_dataset() {
+    let temp = tempfile::tempdir().unwrap();
+    let options = options(&temp);
+    fs::write(&options.dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&options.dets, []).unwrap();
+
+    let stats = run_replay(&options).unwrap();
+
+    assert_eq!(stats.num_shots, 0);
+    assert_eq!(stats.batches, 0);
+    assert_eq!(stats.shots_per_second, 0.0);
 }
 
 #[test]
@@ -153,4 +275,44 @@ fn replay_command_is_documented_in_cli_help() {
     ] {
         assert!(stdout.contains(option), "missing {option} in {stdout}");
     }
+}
+
+#[test]
+fn replay_command_runs_the_public_cli_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let dem = temp.path().join("model.dem");
+    let dets = temp.path().join("detectors.b8");
+    let predictions = temp.path().join("predictions.b8");
+    let stats = temp.path().join("stats.json");
+    fs::write(&dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&dets, [1u8]).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "replay",
+            "--dem",
+            dem.to_str().unwrap(),
+            "--dets",
+            dets.to_str().unwrap(),
+            "--decoder",
+            "rmatching",
+            "--predictions-out",
+            predictions.to_str().unwrap(),
+            "--stats-out",
+            stats.to_str().unwrap(),
+            "--batch-size",
+            "1",
+            "--shots",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(predictions).unwrap(), [1]);
+    assert!(stats.exists());
 }
