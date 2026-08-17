@@ -64,7 +64,7 @@ fn user_graph_to_search_graph() {
 fn user_graph_dem_instruction() {
     let mut g = UserGraph::new();
     let p = 0.1;
-    g.handle_dem_instruction(p, &[0, 1], vec![0]);
+    g.handle_dem_instruction(p, &[0, 1], vec![0]).unwrap();
 
     assert_eq!(g.get_num_edges(), 1);
     let expected_weight = ((1.0 - p) / p).ln();
@@ -75,7 +75,7 @@ fn user_graph_dem_instruction() {
 #[test]
 fn user_graph_dem_instruction_boundary() {
     let mut g = UserGraph::new();
-    g.handle_dem_instruction(0.2, &[3], vec![0, 1]);
+    g.handle_dem_instruction(0.2, &[3], vec![0, 1]).unwrap();
 
     assert_eq!(g.get_num_edges(), 1);
     assert_eq!(g.edges[0].node1, 3);

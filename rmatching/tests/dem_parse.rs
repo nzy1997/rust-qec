@@ -81,6 +81,73 @@ fn parse_correlated_segments_from_single_error_instruction() {
 }
 
 #[test]
+fn reject_non_graphlike_error_component() {
+    let dem = "error(0.1) D0 D1 D2 L0";
+    let error = match parse_dem(dem) {
+        Ok(_) => panic!("expected a non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+    assert!(error.contains(dem));
+}
+
+#[test]
+fn reject_non_graphlike_correlated_component() {
+    let dem = "error(0.1) D0 D1 ^ D2 D3 D4 L0";
+    let error = match parse_dem(dem) {
+        Ok(_) => panic!("expected a non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+    assert!(error.contains(dem));
+}
+
+#[test]
+fn detector_like_tokens_in_inline_comments_are_ignored() {
+    let g = parse_dem("error(0.1) D0 D1 L0 # D2 D3").unwrap();
+
+    assert_eq!(g.edges.len(), 1);
+    assert_eq!((g.edges[0].node1, g.edges[0].node2), (0, 1));
+    assert_eq!(g.edges[0].observable_indices, vec![0]);
+}
+
+#[test]
+fn hash_inside_instruction_tag_is_not_treated_as_a_comment() {
+    let g = parse_dem("error[tag#detail](0.1) D0 D1 L0 # D2 D3").unwrap();
+
+    assert_eq!(g.edges.len(), 1);
+    assert_eq!((g.edges[0].node1, g.edges[0].node2), (0, 1));
+    assert_eq!(g.edges[0].observable_indices, vec![0]);
+}
+
+#[test]
+fn braces_in_inline_comments_do_not_change_repeat_structure() {
+    let dem = "repeat 2 { # } ignored\n    error(0.1) D0 D1 # D2\n    shift_detectors 2\n} # { ignored";
+    let g = parse_dem(dem).unwrap();
+
+    assert_eq!(g.edges.len(), 2);
+    assert_eq!((g.edges[0].node1, g.edges[0].node2), (0, 1));
+    assert_eq!((g.edges[1].node1, g.edges[1].node2), (2, 3));
+}
+
+#[test]
+fn reject_non_graphlike_component_inside_repeat() {
+    let dem = "repeat 2 {\n    error(0.1) D0 D1 D2 L0\n    shift_detectors 3\n}";
+    let error = match parse_dem(dem) {
+        Ok(_) => panic!("expected a repeated non-graphlike DEM to be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.contains("requires a graphlike DEM"));
+    assert!(error.contains("3 detectors"));
+    assert!(error.contains("error(0.1) D0 D1 D2 L0"));
+}
+
+#[test]
 fn parse_repeat_with_coordinate_shift_and_detector_shift() {
     let dem = "\
 repeat 2 {

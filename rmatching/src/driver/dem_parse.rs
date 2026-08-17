@@ -6,10 +6,25 @@ use crate::driver::user_graph::UserGraph;
 /// comments (`#`), blank lines, `^` separator, and unknown instructions.
 pub fn parse_dem(text: &str) -> Result<UserGraph, String> {
     let mut graph = UserGraph::new();
-    let lines: Vec<&str> = text.lines().collect();
+    let lines: Vec<&str> = text.lines().map(strip_comment).collect();
     let mut detector_offset = 0usize;
     parse_block(&lines, &mut graph, &mut detector_offset)?;
     Ok(graph)
+}
+
+/// Strip an inline comment without treating `#` inside an instruction tag as
+/// the start of a comment.
+fn strip_comment(line: &str) -> &str {
+    let mut in_tag = false;
+    for (index, character) in line.char_indices() {
+        match character {
+            '[' if !in_tag => in_tag = true,
+            ']' if in_tag => in_tag = false,
+            '#' if !in_tag => return &line[..index],
+            _ => {}
+        }
+    }
+    line
 }
 
 /// Parse a slice of lines into `graph`, applying `detector_offset` to all D indices.
@@ -23,7 +38,7 @@ fn parse_block(
     while i < lines.len() {
         let line = lines[i].trim();
         // Skip blank lines and comments
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
             i += 1;
             continue;
         }
@@ -81,7 +96,9 @@ fn parse_error_line(
             }
         }
 
-        graph.handle_dem_instruction(p, &detectors, observables);
+        graph
+            .handle_dem_instruction(p, &detectors, observables)
+            .map_err(|error| format!("{error}; while parsing `{line}`"))?;
     }
     Ok(max_det)
 }
