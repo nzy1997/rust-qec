@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use rilpqec::{BackendKind, IlpDecoderConfig};
 use rstim::dem::DetectorErrorModel;
 
@@ -22,7 +24,7 @@ impl Default for IlpDemDecoder {
 }
 
 struct CompiledIlpDemDecoder {
-    decoder: rilpqec::IlpDemDecoder,
+    decoder: Mutex<rilpqec::CompiledIlpDemDecoder>,
 }
 
 impl Decoder for IlpDemDecoder {
@@ -31,8 +33,11 @@ impl Decoder for IlpDemDecoder {
         dem: &DetectorErrorModel,
     ) -> Result<Box<dyn CompiledDecoder>, String> {
         let decoder = rilpqec::IlpDemDecoder::from_dem(dem, self.config.clone())
+            .and_then(rilpqec::IlpDemDecoder::into_compiled)
             .map_err(|error| error.to_string())?;
-        Ok(Box::new(CompiledIlpDemDecoder { decoder }))
+        Ok(Box::new(CompiledIlpDemDecoder {
+            decoder: Mutex::new(decoder),
+        }))
     }
 }
 
@@ -45,6 +50,8 @@ impl CompiledDecoder for CompiledIlpDemDecoder {
         num_obs: usize,
     ) -> Result<Vec<u8>, String> {
         self.decoder
+            .lock()
+            .map_err(|error| error.to_string())?
             .decode_batch_bit_packed(dets, num_shots, num_dets, num_obs)
             .map_err(|error| error.to_string())
     }

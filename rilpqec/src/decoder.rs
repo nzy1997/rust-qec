@@ -1,6 +1,6 @@
-use rstim::dem::DetectorErrorModel;
 use qec_ilp_core::BinaryIlpConfig;
 use qec_ilp_core::backend::build_binary_backend;
+use rstim::dem::DetectorErrorModel;
 
 use crate::config::IlpDecoderConfig;
 use crate::error::IlpDecodeError;
@@ -11,6 +11,12 @@ use crate::problem::LoweredDemProblem;
 pub struct IlpDemDecoder {
     problem: LoweredDemProblem,
     config: IlpDecoderConfig,
+}
+
+#[derive(Debug)]
+pub struct CompiledIlpDemDecoder {
+    problem: LoweredDemProblem,
+    backend: Option<Box<dyn qec_ilp_core::backend::BinaryBackend>>,
 }
 
 impl IlpDemDecoder {
@@ -31,28 +37,42 @@ impl IlpDemDecoder {
         num_dets: usize,
         num_obs: usize,
     ) -> Result<Vec<u8>, IlpDecodeError> {
-        if num_dets != self.problem.num_detectors {
-            return Err(IlpDecodeError::DetectorWidthMismatch {
-                expected: self.problem.num_detectors,
-                actual: num_dets,
-            });
-        }
-        if num_obs != self.problem.num_observables {
-            return Err(IlpDecodeError::ObservableWidthMismatch {
-                expected: self.problem.num_observables,
-                actual: num_obs,
-            });
-        }
+        validate_input(&self.problem, dets, num_shots, num_dets, num_obs)?;
+        self.clone()
+            .into_compiled()?
+            .decode_batch_bit_packed(dets, num_shots, num_dets, num_obs)
+    }
 
+    pub fn into_compiled(self) -> Result<CompiledIlpDemDecoder, IlpDecodeError> {
+        let backend = if self.problem.columns.is_empty() {
+            None
+        } else {
+            let base_model = self.problem.to_binary_ilp_model()?;
+            Some(build_binary_backend(
+                &base_model,
+                &BinaryIlpConfig {
+                    backend: self.config.backend,
+                },
+            )?)
+        };
+        Ok(CompiledIlpDemDecoder {
+            problem: self.problem,
+            backend,
+        })
+    }
+}
+
+impl CompiledIlpDemDecoder {
+    pub fn decode_batch_bit_packed(
+        &mut self,
+        dets: &[u8],
+        num_shots: usize,
+        num_dets: usize,
+        num_obs: usize,
+    ) -> Result<Vec<u8>, IlpDecodeError> {
+        validate_input(&self.problem, dets, num_shots, num_dets, num_obs)?;
         let det_bytes = num_dets.div_ceil(8);
         let obs_bytes = num_obs.div_ceil(8);
-        let expected_det_len = num_shots * det_bytes;
-        if dets.len() != expected_det_len {
-            return Err(IlpDecodeError::PackedDetectionsLengthMismatch {
-                expected: expected_det_len,
-                actual: dets.len(),
-            });
-        }
         let mut out = vec![0u8; num_shots * obs_bytes];
         if self.problem.columns.is_empty() {
             for shot in 0..num_shots {
@@ -64,13 +84,10 @@ impl IlpDemDecoder {
             }
             return Ok(out);
         }
-        let base_model = self.problem.to_binary_ilp_model()?;
-        let mut backend = build_binary_backend(
-            &base_model,
-            &BinaryIlpConfig {
-                backend: self.config.backend.clone(),
-            },
-        )?;
+        let backend = self
+            .backend
+            .as_mut()
+            .expect("non-empty problem has a compiled backend");
 
         for shot in 0..num_shots {
             let mut syndrome = vec![false; num_dets];
@@ -79,7 +96,11 @@ impl IlpDemDecoder {
                 syndrome[det] = ((byte >> (det % 8)) & 1) != 0;
             }
 
-            for (row, (&bit, &forced)) in syndrome.iter().zip(&self.problem.forced_syndrome).enumerate() {
+            for (row, (&bit, &forced)) in syndrome
+                .iter()
+                .zip(&self.problem.forced_syndrome)
+                .enumerate()
+            {
                 let rhs = if bit ^ forced { 1.0 } else { 0.0 };
                 backend.set_rhs(row, rhs)?;
             }
@@ -95,4 +116,33 @@ impl IlpDemDecoder {
 
         Ok(out)
     }
+}
+
+fn validate_input(
+    problem: &LoweredDemProblem,
+    dets: &[u8],
+    num_shots: usize,
+    num_dets: usize,
+    num_obs: usize,
+) -> Result<(), IlpDecodeError> {
+    if num_dets != problem.num_detectors {
+        return Err(IlpDecodeError::DetectorWidthMismatch {
+            expected: problem.num_detectors,
+            actual: num_dets,
+        });
+    }
+    if num_obs != problem.num_observables {
+        return Err(IlpDecodeError::ObservableWidthMismatch {
+            expected: problem.num_observables,
+            actual: num_obs,
+        });
+    }
+    let expected_det_len = num_shots * num_dets.div_ceil(8);
+    if dets.len() != expected_det_len {
+        return Err(IlpDecodeError::PackedDetectionsLengthMismatch {
+            expected: expected_det_len,
+            actual: dets.len(),
+        });
+    }
+    Ok(())
 }

@@ -62,10 +62,17 @@ pub fn run_replay(options: &ReplayOptions) -> Result<ReplayStats, String> {
     let detector_row_bytes = num_detectors.div_ceil(8);
     let prediction_row_bytes = num_observables.div_ceil(8);
 
-    let detector_bytes = fs::metadata(&options.dets)
+    let detector_file = File::open(&options.dets).map_err(|error| {
+        format!(
+            "failed to open detectors {}: {error}",
+            options.dets.display()
+        )
+    })?;
+    let detector_bytes = detector_file
+        .metadata()
         .map_err(|error| {
             format!(
-                "failed to stat detectors {}: {error}",
+                "failed to stat open detectors {}: {error}",
                 options.dets.display()
             )
         })?
@@ -102,12 +109,7 @@ pub fn run_replay(options: &ReplayOptions) -> Result<ReplayStats, String> {
 
     let mut prediction_temp = tempfile::NamedTempFile::new_in(prediction_parent)
         .map_err(|error| format!("failed to create prediction temp file: {error}"))?;
-    let mut detector_reader = BufReader::new(File::open(&options.dets).map_err(|error| {
-        format!(
-            "failed to open detectors {}: {error}",
-            options.dets.display()
-        )
-    })?);
+    let mut detector_reader = BufReader::new(detector_file);
     let mut prediction_writer = BufWriter::new(prediction_temp.as_file_mut());
     let mut detector_hasher = Sha256::new();
     let mut prediction_hasher = Sha256::new();
@@ -256,15 +258,28 @@ fn validate_options(options: &ReplayOptions) -> Result<(), String> {
 }
 
 fn same_path(left: &Path, right: &Path) -> Result<bool, String> {
-    if left == right {
-        return Ok(true);
+    Ok(resolve_for_comparison(left)? == resolve_for_comparison(right)?)
+}
+
+fn resolve_for_comparison(path: &Path) -> Result<PathBuf, String> {
+    let absolute = lexical_absolute(path)?;
+    let mut existing = absolute.as_path();
+    let mut suffix = Vec::new();
+    while !existing.exists() {
+        let name = existing
+            .file_name()
+            .ok_or_else(|| format!("failed to resolve path {}", path.display()))?;
+        suffix.push(name.to_os_string());
+        existing = existing
+            .parent()
+            .ok_or_else(|| format!("failed to resolve path {}", path.display()))?;
     }
-    if left.exists() && right.exists() {
-        let left = fs::canonicalize(left).map_err(|error| error.to_string())?;
-        let right = fs::canonicalize(right).map_err(|error| error.to_string())?;
-        return Ok(left == right);
+    let mut resolved = fs::canonicalize(existing)
+        .map_err(|error| format!("failed to canonicalize {}: {error}", existing.display()))?;
+    for component in suffix.into_iter().rev() {
+        resolved.push(component);
     }
-    Ok(lexical_absolute(left)? == lexical_absolute(right)?)
+    Ok(resolved)
 }
 
 fn lexical_absolute(path: &Path) -> Result<PathBuf, String> {
@@ -607,6 +622,7 @@ mod tests {
 
     use super::{build_decoder, same_path};
 
+    #[cfg(feature = "rbposd-runner")]
     #[test]
     fn rbposd_and_rbplsd_configs_are_normalized() {
         let (_, osd) = build_decoder(
@@ -723,5 +739,19 @@ mod tests {
     fn path_comparison_normalizes_relative_parent_components() {
         assert!(same_path(Path::new("replay/a/../out"), Path::new("replay/out")).unwrap());
         assert!(!same_path(Path::new("replay/left"), Path::new("replay/right")).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_comparison_resolves_symlinked_existing_ancestors() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().unwrap();
+        let real = temp.path().join("real");
+        let alias = temp.path().join("alias");
+        std::fs::create_dir(&real).unwrap();
+        symlink(&real, &alias).unwrap();
+
+        assert!(same_path(&real.join("result"), &alias.join("result")).unwrap());
     }
 }

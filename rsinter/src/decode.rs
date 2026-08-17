@@ -7,7 +7,7 @@ pub use crate::rbposd_adapter::{RbposdDemDecoder, RbposdLsdDemDecoder};
 #[cfg(feature = "rmatching-runner")]
 pub use crate::rmatching_adapter::RmatchingDemDecoder;
 
-pub trait CompiledDecoder: Send {
+pub trait CompiledDecoder {
     /// Decode bit-packed detection events into bit-packed observable predictions.
     /// `dets`: `num_shots * ceil(num_dets/8)` bytes, b8 format.
     /// Returns: `num_shots * ceil(num_obs/8)` bytes, b8 format.
@@ -22,7 +22,7 @@ pub trait CompiledDecoder: Send {
 
 pub trait Decoder: Send + Sync {
     fn compile_for_dem(&self, dem: &DetectorErrorModel)
-        -> Result<Box<dyn CompiledDecoder>, String>;
+    -> Result<Box<dyn CompiledDecoder>, String>;
 }
 
 /// Always predicts no observable flips. Useful for testing the pipeline.

@@ -1,5 +1,3 @@
-#![cfg(feature = "rmatching-runner")]
-
 use std::fs;
 use std::process::Command;
 
@@ -19,6 +17,7 @@ fn options(temp: &tempfile::TempDir) -> ReplayOptions {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_rmatching_writes_predictions_and_stats() {
     let temp = tempfile::tempdir().unwrap();
     let options = options(&temp);
@@ -46,6 +45,7 @@ fn replay_rmatching_writes_predictions_and_stats() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_rejects_nonzero_padding_without_replacing_outputs() {
     let temp = tempfile::tempdir().unwrap();
     let options = options(&temp);
@@ -65,6 +65,7 @@ fn replay_rejects_nonzero_padding_without_replacing_outputs() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_validates_shot_count_and_decoder_config() {
     let temp = tempfile::tempdir().unwrap();
     let mut options = options(&temp);
@@ -83,6 +84,7 @@ fn replay_validates_shot_count_and_decoder_config() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_rejects_lexically_aliased_output_paths() {
     let temp = tempfile::tempdir().unwrap();
     let mut prediction_options = options(&temp);
@@ -125,7 +127,7 @@ fn replay_reports_invalid_dem_detector_and_config_inputs() {
     assert!(
         run_replay(&options)
             .unwrap_err()
-            .contains("failed to stat detectors")
+            .contains("failed to open detectors")
     );
 
     fs::write(&options.dets, [0u8]).unwrap();
@@ -146,6 +148,7 @@ fn replay_reports_invalid_dem_detector_and_config_inputs() {
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn replay_validates_zero_detector_and_multibyte_row_lengths() {
     let temp = tempfile::tempdir().unwrap();
     let mut options = options(&temp);
@@ -184,6 +187,7 @@ fn replay_validates_zero_detector_and_multibyte_row_lengths() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_reports_output_directory_creation_errors() {
     let temp = tempfile::tempdir().unwrap();
     let mut prediction_options = options(&temp);
@@ -210,6 +214,7 @@ fn replay_reports_output_directory_creation_errors() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_accepts_an_inferred_zero_shot_dataset() {
     let temp = tempfile::tempdir().unwrap();
     let options = options(&temp);
@@ -224,6 +229,7 @@ fn replay_accepts_an_inferred_zero_shot_dataset() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_surfaces_rmatching_hyperedge_error() {
     let temp = tempfile::tempdir().unwrap();
     let options = options(&temp);
@@ -238,6 +244,7 @@ fn replay_surfaces_rmatching_hyperedge_error() {
 }
 
 #[test]
+#[cfg(feature = "rbposd-runner")]
 fn replay_rbposd_families_accept_non_graphlike_dems() {
     for decoder in ["rbposd", "rbplsd"] {
         let temp = tempfile::tempdir().unwrap();
@@ -278,6 +285,7 @@ fn replay_command_is_documented_in_cli_help() {
 }
 
 #[test]
+#[cfg(feature = "rmatching-runner")]
 fn replay_command_runs_the_public_cli_path() {
     let temp = tempfile::tempdir().unwrap();
     let dem = temp.path().join("model.dem");
@@ -315,4 +323,51 @@ fn replay_command_runs_the_public_cli_path() {
     );
     assert_eq!(fs::read(predictions).unwrap(), [1]);
     assert!(stats.exists());
+}
+
+#[cfg(all(unix, feature = "rmatching-runner"))]
+#[test]
+fn replay_rejects_outputs_aliased_through_a_symlinked_parent() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().unwrap();
+    let real = temp.path().join("real");
+    let alias = temp.path().join("alias");
+    fs::create_dir(&real).unwrap();
+    symlink(&real, &alias).unwrap();
+    let mut options = options(&temp);
+    options.predictions_out = real.join("result");
+    options.stats_out = alias.join("result");
+    fs::write(&options.dem, "error(0.1) D0 L0\n").unwrap();
+    fs::write(&options.dets, [0u8]).unwrap();
+
+    let error = run_replay(&options).unwrap_err();
+
+    assert!(error.contains("must use different paths"), "{error}");
+    assert!(!options.predictions_out.exists());
+}
+
+#[cfg(feature = "rmatching-runner")]
+#[test]
+fn replay_rmatching_rejects_unrepresentable_observable_semantics() {
+    for (dem, expected) in [
+        ("error(0.1) D0 L64\n", "at most 64 observables"),
+        ("error(1) L0\n", "observable-only DEM error components"),
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        let mut options = options(&temp);
+        fs::write(&options.dem, dem).unwrap();
+        if dem.contains("D0") {
+            fs::write(&options.dets, [0u8]).unwrap();
+        } else {
+            fs::write(&options.dets, []).unwrap();
+            options.shots = Some(1);
+        }
+
+        let error = run_replay(&options).unwrap_err();
+
+        assert!(error.contains(expected), "{error}");
+        assert!(!options.predictions_out.exists());
+        assert!(!options.stats_out.exists());
+    }
 }
