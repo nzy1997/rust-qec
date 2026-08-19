@@ -19,6 +19,11 @@ jobs:
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
+          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+            fi
+          done
           sudo timeout 5m apt-get \
             -o Acquire::Retries=3 \
             -o Acquire::http::Timeout=30 \
@@ -73,6 +78,11 @@ jobs:
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
+          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+            fi
+          done
           sudo timeout 5m apt-get \
             -o Acquire::Retries=3 \
             -o Acquire::http::Timeout=30 \
@@ -124,6 +134,11 @@ jobs:
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
+          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+            fi
+          done
           sudo timeout 5m apt-get \
             -o Acquire::Retries=3 \
             -o Acquire::http::Timeout=30 \
@@ -168,6 +183,11 @@ jobs:
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
+          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+            fi
+          done
           sudo timeout 5m apt-get \
             -o Acquire::Retries=3 \
             -o Acquire::http::Timeout=30 \
