@@ -1,4 +1,4 @@
-use gurobi::{attr, param, Constr, ConstrSense, Env, Model, Status, Var, VarType};
+use gurobi::{Constr, ConstrSense, Env, Model, Status, Var, VarType, attr, param};
 
 use crate::backend::BinaryBackend;
 use crate::config::{BackendKind, BinaryIlpConfig};
@@ -111,6 +111,13 @@ impl BinaryBackend for GurobiBinaryBackend {
                 ))
             })?;
 
+        if solution_status == ModelSolutionStatus::Infeasible {
+            return Ok(ModelSolution {
+                binary_values: Vec::new(),
+                status: solution_status,
+            });
+        }
+
         let values = self
             .model
             .get_values(attr::X, &self.solution_vars)
@@ -169,6 +176,7 @@ fn gurobi_constraint_sense(sense: ConstraintSense) -> ConstrSense {
 fn accepted_gurobi_solution_status(status: Status, sol_count: i32) -> Option<ModelSolutionStatus> {
     match status {
         Status::Optimal => Some(ModelSolutionStatus::Optimal),
+        Status::Infeasible => Some(ModelSolutionStatus::Infeasible),
         Status::TimeLimit if sol_count > 0 => Some(ModelSolutionStatus::TimeLimit),
         Status::SolutionLimit if sol_count > 0 => Some(ModelSolutionStatus::SolutionLimit),
         Status::SubOptimal if sol_count > 0 => Some(ModelSolutionStatus::SubOptimal),
@@ -209,6 +217,14 @@ mod tests {
         assert_eq!(
             accepted_gurobi_solution_status(Status::TimeLimit, 1),
             Some(ModelSolutionStatus::TimeLimit),
+        );
+    }
+
+    #[test]
+    fn maps_gurobi_infeasible_status_without_an_incumbent() {
+        assert_eq!(
+            accepted_gurobi_solution_status(Status::Infeasible, 0),
+            Some(ModelSolutionStatus::Infeasible),
         );
     }
 

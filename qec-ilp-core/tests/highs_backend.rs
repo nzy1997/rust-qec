@@ -1,7 +1,7 @@
 use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::{
     BackendConfig, BackendKind, BinaryIlpConfig, BinaryIlpModel, ConstraintSense, LinearConstraint,
-    ModelVar,
+    ModelSolutionStatus, ModelVar,
 };
 
 fn single_column_flip_model() -> BinaryIlpModel {
@@ -71,6 +71,54 @@ fn highs_respects_optional_solver_settings() {
     let solution = backend.solve().unwrap();
 
     assert_eq!(solution.binary_values, vec![true]);
+}
+
+#[test]
+fn highs_reports_infeasible_without_fabricating_a_solution() {
+    let model = BinaryIlpModel {
+        binary_vars: vec![ModelVar {
+            name: "x".into(),
+            objective: 0.0,
+            lower: 0.0,
+            upper: 1.0,
+        }],
+        integer_vars: vec![],
+        constraints: vec![
+            LinearConstraint {
+                name: "x-is-zero".into(),
+                sense: ConstraintSense::Eq,
+                binary_terms: vec![(0, 1.0)],
+                integer_terms: vec![],
+                rhs: 0.0,
+            },
+            LinearConstraint {
+                name: "x-is-one".into(),
+                sense: ConstraintSense::Eq,
+                binary_terms: vec![(0, 1.0)],
+                integer_terms: vec![],
+                rhs: 1.0,
+            },
+        ],
+        solution_binary_prefix_len: 1,
+    };
+    let mut backend = build_binary_backend(
+        &model,
+        &BinaryIlpConfig {
+            backend: BackendConfig {
+                kind: BackendKind::Highs,
+                time_limit_seconds: None,
+                mip_gap: None,
+                threads: Some(1),
+                verbose: false,
+            },
+        },
+    )
+    .unwrap();
+
+    let solution = backend.solve().unwrap();
+
+    assert_eq!(solution.status, ModelSolutionStatus::Infeasible);
+    assert!(solution.binary_values.is_empty());
 }
 
 #[test]
@@ -171,7 +219,7 @@ fn highs_backend_supports_mutating_ge_rhs_between_solves() {
 }
 
 #[test]
-fn highs_backend_remains_usable_after_a_solve_error() {
+fn highs_backend_remains_usable_after_an_infeasible_solve() {
     let model = BinaryIlpModel {
         binary_vars: vec![ModelVar {
             name: "x".into(),
@@ -208,17 +256,11 @@ fn highs_backend_remains_usable_after_a_solve_error() {
     )
     .unwrap();
 
-    let first = backend.solve().unwrap_err();
-    let second = backend.solve().unwrap_err();
+    let first = backend.solve().unwrap();
+    let second = backend.solve().unwrap();
 
-    let first_message = format!("{first}");
-    assert!(
-        !first_message.contains("model already in use"),
-        "unexpected poisoned backend error: {first_message}"
-    );
-    let second_message = format!("{second}");
-    assert!(
-        !second_message.contains("model already in use"),
-        "unexpected poisoned backend error: {second_message}"
-    );
+    assert_eq!(first.status, ModelSolutionStatus::Infeasible);
+    assert!(first.binary_values.is_empty());
+    assert_eq!(second.status, ModelSolutionStatus::Infeasible);
+    assert!(second.binary_values.is_empty());
 }

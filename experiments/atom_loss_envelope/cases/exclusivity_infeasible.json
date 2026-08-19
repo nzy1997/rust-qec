@@ -1,0 +1,26 @@
+{
+  "schema_version": "atom-loss-envelope.v0",
+  "num_detectors": 2,
+  "num_observables": 1,
+  "observed_detectors": [0, 1],
+  "independent_effects": [],
+  "loss_envelopes": [
+    {
+      "loss_id": "loss-q1-t4",
+      "candidates": [
+        {
+          "id": "d0",
+          "detectors": [0],
+          "observables": [],
+          "weight": 1.0
+        },
+        {
+          "id": "d1-l0",
+          "detectors": [1],
+          "observables": [0],
+          "weight": 1.0
+        }
+      ]
+    }
+  ]
+}

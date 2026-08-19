@@ -74,6 +74,7 @@ fn compute_distance_via_ilp(
     let mut backend = qec_ilp_core::backend::build_binary_backend(&lowered.model, &config)?;
     let backend_kind = backend.kind();
     let solution = backend.solve()?;
+    let solver_status = solver_status_from_ilp(solution.status)?;
     let start = lowered.symplectic_var_offset;
     let end = start + code.n() * 2;
     let row = solution.binary_values[start..end]
@@ -91,7 +92,7 @@ fn compute_distance_via_ilp(
         },
         solver_report: Some(ExactCssDistanceSolverReport {
             backend: backend_kind_from_ilp(backend_kind),
-            status: solver_status_from_ilp(solution.status),
+            status: solver_status,
         }),
     })
 }
@@ -265,9 +266,12 @@ fn backend_kind_from_ilp(kind: qec_ilp_core::BackendKind) -> ExactCssDistanceBac
 #[cfg(feature = "distance-ilp-highs")]
 fn solver_status_from_ilp(
     status: qec_ilp_core::model::ModelSolutionStatus,
-) -> ExactCssDistanceSolverStatus {
-    match status {
+) -> Result<ExactCssDistanceSolverStatus> {
+    Ok(match status {
         qec_ilp_core::model::ModelSolutionStatus::Optimal => ExactCssDistanceSolverStatus::Optimal,
+        qec_ilp_core::model::ModelSolutionStatus::Infeasible => {
+            return Err(QecError::IlpInfeasible);
+        }
         qec_ilp_core::model::ModelSolutionStatus::TimeLimit => {
             ExactCssDistanceSolverStatus::TimeLimit
         }
@@ -277,7 +281,7 @@ fn solver_status_from_ilp(
         qec_ilp_core::model::ModelSolutionStatus::SubOptimal => {
             ExactCssDistanceSolverStatus::SubOptimal
         }
-    }
+    })
 }
 
 #[cfg(feature = "distance-ilp-highs")]
@@ -366,6 +370,15 @@ mod tests {
         assert_eq!(
             super::post_validate_distance_witness(&code, &witness),
             Err(QecError::IlpInfeasible)
+        );
+    }
+
+    #[cfg(feature = "distance-ilp-highs")]
+    #[test]
+    fn infeasible_solver_status_is_rejected_before_reading_solution_values() {
+        assert_eq!(
+            super::solver_status_from_ilp(qec_ilp_core::ModelSolutionStatus::Infeasible),
+            Err(QecError::IlpInfeasible),
         );
     }
 }
