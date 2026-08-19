@@ -9,6 +9,7 @@ pub fn parse_dem(text: &str) -> Result<UserGraph, String> {
     let lines: Vec<&str> = text.lines().map(strip_comment).collect();
     let mut detector_offset = 0usize;
     parse_block(&lines, &mut graph, &mut detector_offset)?;
+    graph.merge_parallel_dem_edges();
     Ok(graph)
 }
 
