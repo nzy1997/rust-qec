@@ -256,10 +256,16 @@ rstim gen \
 For this task, `--after_clifford_depolarization` is the Pauli-noise parameter,
 `--operation_loss_probability` controls gate/reset loss, and
 `--measurement_loss_probability` controls loss immediately before measurement.
+Reset and measurement bit noise use `X_ERROR`; the single-qubit `H` and
+two-qubit `CX` channels remain `DEPOLARIZE1` and `DEPOLARIZE2`, respectively.
+Measurement-stage loss is physical atom loss reported by the loss flag, not
+state-selective readout confusion.
 `--after_clifford_loss_probability` is intentionally rejected to keep the two
 loss channels unambiguous. The generated `# MIDSWAP_SHUTTLE` comments expose
 each persistent logical-to-physical remapping without changing circuit
-semantics.
+semantics. The generator emits exactly one `# RSTIM_LOGICAL_FLIP_POINT`
+immediately after the data reset and before data reset noise or loss, so the
+circuit can be validated for blinded measurement export.
 
 CSS memory circuits can be generated from explicit matrix wrappers:
 

@@ -192,6 +192,7 @@ fn gen_midswap_is_parseable_and_sampleable_from_cli() {
     );
     let text = std::fs::read_to_string(&circuit_path).unwrap();
     assert_eq!(text.matches("# MIDSWAP_SHUTTLE").count(), 2);
+    assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
     assert_eq!(
         text.lines().filter(|line| line.starts_with("MRL ")).count(),
         2
@@ -202,7 +203,7 @@ fn gen_midswap_is_parseable_and_sampleable_from_cli() {
     );
     assert!(text.contains("DEPOLARIZE1(0.002)"));
     assert!(text.contains("DEPOLARIZE2(0.002)"));
-    assert!(!text.contains("X_ERROR"));
+    assert!(text.contains("X_ERROR(0.002)"));
     assert!(text.contains("LOSS(0.001)"));
     assert!(text.contains("LOSS(0.003)"));
 
