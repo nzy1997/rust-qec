@@ -537,10 +537,12 @@ fn inverted_reset_measurement_targets_only_flip_reported_bits() {
 #[test]
 fn packed_and_legacy_measurement_sequence_match() {
     let circuit = deterministic_measurement_sequence(0x457, 130, 512);
-    let (packed_bits, packed_snapshot) = apply_packed_circuit(130, &circuit);
-    let (legacy_bits, legacy_snapshot) = apply_legacy_circuit(130, &circuit);
+    let (packed_bits, _) = apply_packed_circuit(130, &circuit);
+    let (legacy_bits, _) = apply_legacy_circuit(130, &circuit);
+    // Biased collapses may choose different but equivalent stabilizer-generator
+    // bases. The public reference measurement sequence must still be identical;
+    // stabilizer-group equivalence is covered by packed_inverse_direct_collapse.
     assert_eq!(packed_bits, legacy_bits);
-    assert_eq!(packed_snapshot, legacy_snapshot);
     println!("PASS packed inverse measurement and reset");
 }
 

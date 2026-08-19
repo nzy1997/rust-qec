@@ -420,11 +420,24 @@ fn mul_pauli(x1: bool, z1: bool, x2: bool, z2: bool) -> (bool, bool, u8) {
         ((true, false), (true, false)) => (false, false, 0), // X*X=I
         ((false, true), (false, true)) => (false, false, 0), // Z*Z=I
         ((true, true), (true, true)) => (false, false, 0),   // Y*Y=I
-        ((true, false), (false, true)) => (true, true, 1),   // X*Z=iY
-        ((false, true), (true, false)) => (true, true, 3),   // Z*X=-iY
+        ((true, false), (false, true)) => (true, true, 3),   // X*Z=-iY
+        ((false, true), (true, false)) => (true, true, 1),   // Z*X=iY
         ((true, false), (true, true)) => (false, true, 1),   // X*Y=iZ
         ((true, true), (true, false)) => (false, true, 3),   // Y*X=-iZ
         ((false, true), (true, true)) => (true, false, 3),   // Z*Y=-iX
         ((true, true), (false, true)) => (true, false, 1),   // Y*Z=iX
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mul_pauli;
+
+    #[test]
+    fn pauli_product_tracks_xz_and_zx_phases() {
+        // (x, z) selects the canonical Pauli I/X/Z/Y, while the returned
+        // phase is the exponent of i multiplying that Pauli.
+        assert_eq!(mul_pauli(true, false, false, true), (true, true, 3));
+        assert_eq!(mul_pauli(false, true, true, false), (true, true, 1));
     }
 }

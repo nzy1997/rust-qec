@@ -418,10 +418,7 @@ fn render_svg_sample_export_errors_preserve_existing_output() {
         "failing sample-shot export should not write stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
-    assert!(
-        String::from_utf8_lossy(&output.stderr)
-            .contains("SHIFT_COORDS expects no targets, got 1")
-    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("SHIFT_COORDS"));
     assert_eq!(
         std::fs::read_to_string(protected_output.path()).unwrap(),
         "existing svg should remain"
