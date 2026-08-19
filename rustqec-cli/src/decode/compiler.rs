@@ -638,3 +638,154 @@ impl CompiledCircuit {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn error_message<T>(result: Result<T, DecodeFailure>) -> String {
+        let error = result.err().expect("operation must be rejected");
+        assert_eq!(error.code, "unsupported_circuit");
+        error.message
+    }
+
+    #[test]
+    fn normalization_rejects_invalid_loss_windows_and_targets() {
+        let inline_noise = [StimInstr::new("ML", vec![0.1], vec![StimTarget::Qubit(0)])];
+        assert!(error_message(normalize_supported_circuit(&inline_noise)).contains("inline noise"));
+
+        let missing_loss = [StimInstr::new("ML", Vec::new(), vec![StimTarget::Qubit(0)])];
+        assert!(
+            error_message(normalize_supported_circuit(&missing_loss))
+                .contains("no LOSS opportunity")
+        );
+
+        let incomplete_cx = [StimInstr::new("CX", Vec::new(), vec![StimTarget::Qubit(0)])];
+        assert!(
+            error_message(normalize_supported_circuit(&incomplete_cx))
+                .contains("complete qubit pairs")
+        );
+
+        let invalid_target = [StimInstr::new(
+            "LOSS",
+            Vec::new(),
+            vec![StimTarget::Sweep(0)],
+        )];
+        assert!(
+            error_message(normalize_supported_circuit(&invalid_target))
+                .contains("non-inverted qubits")
+        );
+
+        let no_readout = [StimInstr::new("R", Vec::new(), vec![StimTarget::Qubit(0)])];
+        assert!(
+            error_message(normalize_supported_circuit(&no_readout))
+                .contains("no supported loss-visible measurements")
+        );
+    }
+
+    #[test]
+    fn dem_validation_reports_each_unsupported_graph_shape() {
+        for (text, expected) in [
+            (
+                "detector(0,0) D0\nerror(0.1) D0\n",
+                "at least x,y,t coordinates",
+            ),
+            (
+                "detector(0,0,0) D0\nerror(0.5) D0\n",
+                "finite and below 0.5",
+            ),
+            ("error(0.1) L0\n", "observable-only"),
+            (
+                concat!(
+                    "detector(0,0,0) D0\n",
+                    "detector(1,0,0) D1\n",
+                    "detector(2,0,0) D2\n",
+                    "error(0.1) D0 D1 D2\n",
+                ),
+                "non-graphlike",
+            ),
+            ("error(0.1) D0 D1\n", "detector 0 has no coordinates"),
+            (
+                "detector(0,0,0) D0\nerror(0.1) D0 D1\n",
+                "detector 1 has no coordinates",
+            ),
+            ("", "no decodable independent Pauli effects"),
+        ] {
+            let dem = DetectorErrorModel::parse(text).unwrap();
+            assert!(
+                error_message(effects_and_edges_from_dem(&dem)).contains(expected),
+                "expected {expected:?} for {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn dem_graph_classification_handles_time_space_boundary_and_separators() {
+        let dem = DetectorErrorModel::parse(concat!(
+            "detector(0,0,0) D0\n",
+            "detector(0,0,1) D1\n",
+            "detector(1,0,0) D2\n",
+            "error(0) D0\n",
+            "error(0.1) D0 D1 ^ D0 D2 ^ D2 L0\n",
+        ))
+        .unwrap();
+        let (effects, edges) = effects_and_edges_from_dem(&dem).unwrap();
+        assert_eq!(effects.len(), 1);
+        assert_eq!(edges.len(), 3);
+        assert_eq!(edges[0].kind, EdgeKind::TimeLike);
+        assert_eq!(edges[1].kind, EdgeKind::SpaceLike);
+        assert_eq!(edges[2].kind, EdgeKind::Boundary);
+        assert_eq!(edges[2].observables, [0]);
+    }
+
+    #[test]
+    fn primitive_probe_limits_and_invalid_timelines_fail_explicitly() {
+        let probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 0,
+            onset_sites: vec![0],
+            basis_sites: Vec::new(),
+            readout_site: 0,
+        };
+        let filler = Effect {
+            id: "cached".to_string(),
+            detectors: Vec::new(),
+            observables: Vec::new(),
+            weight: 0.0,
+        };
+        let mut cache: HashMap<_, _> = (0..MAX_PRIMITIVE_PROBES)
+            .map(|site| ((site, 0, "X_ERROR"), filler.clone()))
+            .collect();
+        assert!(
+            error_message(compile_loss_candidates(&[], &probe, &mut cache))
+                .contains("primitive probe limit")
+        );
+
+        assert!(
+            error_message(probe_effect(&[], 1, 0, "X_ERROR"))
+                .contains("outside normalized circuit")
+        );
+        let unsupported = [StimInstr::new(
+            "LOSS",
+            vec![0.1],
+            vec![StimTarget::Qubit(0)],
+        )];
+        assert!(error_message(probe_effect(&unsupported, 0, 0, "X_ERROR")).contains("LOSS"));
+    }
+
+    #[test]
+    fn primitive_probe_rejects_multiple_independent_mechanisms() {
+        let circuit = rstim::validation::parse_and_validate(concat!(
+            "R 0 1\n",
+            "X_ERROR(0.1) 1\n",
+            "M 0 1\n",
+            "DETECTOR rec[-2]\n",
+            "DETECTOR rec[-1]\n",
+        ))
+        .unwrap();
+        assert!(
+            error_message(probe_effect(&circuit, 1, 0, "X_ERROR"))
+                .contains("multiple DEM mechanisms")
+        );
+    }
+}

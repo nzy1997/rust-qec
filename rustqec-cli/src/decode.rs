@@ -407,10 +407,10 @@ mod tests {
         "OBSERVABLE_INCLUDE(0) rec[-3]\n",
     );
 
-    fn compiled(circuit_text: &str) -> CompiledCircuit {
+    fn dataset_for(circuit_text: &str) -> Dataset {
         let instrs = rstim::validation::parse_and_validate(circuit_text).unwrap();
         let stats = rstim::stats::summarize(&instrs);
-        compile_circuit(&Dataset {
+        Dataset {
             manifest: PublicManifest {
                 format: "rstim_decoder_dataset".to_string(),
                 schema_version: 1,
@@ -441,8 +441,11 @@ mod tests {
             },
             circuit_text: circuit_text.to_string(),
             shots_path: PathBuf::new(),
-        })
-        .unwrap()
+        }
+    }
+
+    fn compiled(circuit_text: &str) -> CompiledCircuit {
+        compile_circuit(&dataset_for(circuit_text)).unwrap()
     }
 
     fn observed(bits: &[u8]) -> Vec<usize> {
@@ -742,6 +745,95 @@ mod tests {
         let error = validate_unambiguous_parallel_edges(&ambiguous).unwrap_err();
         assert_eq!(error.code, "unsupported_circuit");
         assert!(error.message.contains("ambiguous observable labels"));
+    }
+
+    #[test]
+    fn matching_rejects_unmapped_candidates_and_empty_loss_edge_sets() {
+        let mut unmapped = compiled(PERSISTENT_CIRCUIT);
+        unmapped.envelopes[0].candidates = vec![Effect {
+            id: "unmapped".to_string(),
+            detectors: vec![usize::MAX],
+            observables: vec![0],
+            weight: 0.0,
+        }];
+        let error = CompiledMatching::new(&unmapped).err().unwrap();
+        assert_eq!(error.code, "unsupported_circuit");
+        assert!(error.message.contains("no compatible matching edge"));
+
+        let mut empty_map = compiled(PERSISTENT_CIRCUIT);
+        empty_map.envelopes[0].candidates = vec![Effect {
+            id: "identity".to_string(),
+            detectors: Vec::new(),
+            observables: Vec::new(),
+            weight: 0.0,
+        }];
+        empty_map.loss_edges[0].clear();
+        let error = CompiledMatching::new(&empty_map).err().unwrap();
+        assert_eq!(error.code, "unsupported_circuit");
+        assert!(error.message.contains("loss envelope"));
+
+        let mut time_like = CompiledMatching {
+            edges: vec![GraphEdge {
+                node1: 0,
+                node2: Some(1),
+                observables: vec![0],
+                weight: 2.0,
+                kind: EdgeKind::TimeLike,
+            }],
+            loss_edges: vec![vec![0]],
+            mean_weight: 2.0,
+            num_observables: 1,
+            cache: HashMap::new(),
+        };
+        assert_eq!(time_like.decode(&[1, 1], &[0]).unwrap(), [0]);
+    }
+
+    #[test]
+    fn compile_and_decode_boundaries_report_structured_errors() {
+        let mut mismatched = dataset_for(PERSISTENT_CIRCUIT);
+        mismatched.manifest.circuit.detectors += 1;
+        let error = compile_circuit(&mismatched).err().unwrap();
+        assert_eq!(error.code, "invalid_dataset");
+        assert!(error.message.contains("circuit counts"));
+
+        let no_observable = dataset_for(concat!(
+            "R 0\n",
+            "LOSS(0.1) 0\n",
+            "X_ERROR(0.1) 0\n",
+            "ML 0\n",
+            "DETECTOR(0,0,0) rec[-1]\n",
+        ));
+        let error = compile_circuit(&no_observable).err().unwrap();
+        assert_eq!(error.code, "unsupported_circuit");
+        assert!(error.message.contains("1..=64 observables"));
+
+        let circuit = compiled(PERSISTENT_CIRCUIT);
+        let wrong_width = BitTable::try_new(1, 1).unwrap();
+        let error = circuit.syndromes(&wrong_width).unwrap_err();
+        assert_eq!(error.code, "invalid_dataset");
+        assert!(error.message.contains("width"));
+    }
+
+    #[test]
+    fn output_paths_must_be_distinct_and_new() {
+        let root = tempfile::tempdir().unwrap();
+        let shared = root.path().join("shared");
+        let mut options = DecodeOptions {
+            decoder: DecoderKind::EnvelopeMle,
+            dataset: root.path().join("dataset"),
+            predictions_out: shared.clone(),
+            stats_out: shared,
+            shot_timeout_ms: None,
+        };
+        let error = validate_output_paths(&options).unwrap_err();
+        assert_eq!(error.code, "invalid_arguments");
+        assert!(error.message.contains("different paths"));
+
+        fs::write(&options.predictions_out, b"occupied").unwrap();
+        options.stats_out = root.path().join("stats.json");
+        let error = validate_output_paths(&options).unwrap_err();
+        assert_eq!(error.code, "output_error");
+        assert!(error.message.contains("already exists"));
     }
 
     #[test]

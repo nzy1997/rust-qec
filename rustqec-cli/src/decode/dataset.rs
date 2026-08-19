@@ -202,3 +202,191 @@ fn dataset_id_material(
     )
     .into_bytes()
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    fn write_valid_dataset(root: &Path) -> Value {
+        let circuit = b"R 0\n";
+        let shots = b"\0";
+        fs::write(root.join("circuit.stim"), circuit).unwrap();
+        fs::write(root.join("shots.b8"), shots).unwrap();
+        let circuit_sha = sha256_hex(circuit);
+        let shots_sha = sha256_hex(shots);
+        let manifest = json!({
+            "format": DATASET_FORMAT,
+            "schema_version": DATASET_SCHEMA_VERSION,
+            "dataset_id": sha256_hex(&dataset_id_material(
+                DATASET_SCHEMA_VERSION,
+                "measurements_blinded",
+                &circuit_sha,
+                1,
+                1,
+                &shots_sha,
+            )),
+            "mode": "measurements_blinded",
+            "shots": 1,
+            "row": {
+                "kind": "measurements",
+                "bits": 1,
+                "encoding": "b8",
+                "bit_order": "lsb_first",
+                "bytes_per_shot": 1,
+            },
+            "circuit": {
+                "file": "circuit.stim",
+                "sha256": circuit_sha,
+                "measurements": 0,
+                "detectors": 0,
+                "observables": 0,
+                "sweep_bits": 0,
+            },
+            "shots_file": {
+                "file": "shots.b8",
+                "sha256": shots_sha,
+                "bits": 1,
+                "bytes_per_shot": 1,
+            },
+        });
+        write_manifest(root, &manifest);
+        manifest
+    }
+
+    fn write_manifest(root: &Path, manifest: &Value) {
+        fs::write(
+            root.join("manifest.json"),
+            serde_json::to_vec(manifest).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn refresh_dataset_id(manifest: &mut Value) {
+        manifest["dataset_id"] = json!(sha256_hex(&dataset_id_material(
+            manifest["schema_version"].as_u64().unwrap() as u32,
+            manifest["mode"].as_str().unwrap(),
+            manifest["circuit"]["sha256"].as_str().unwrap(),
+            manifest["shots"].as_u64().unwrap() as usize,
+            manifest["row"]["bits"].as_u64().unwrap() as usize,
+            manifest["shots_file"]["sha256"].as_str().unwrap(),
+        )));
+    }
+
+    fn assert_error(root: &Path, code: &str, message: &str) {
+        let error = read_dataset(root).err().expect("dataset must be rejected");
+        assert_eq!(error.code, code);
+        assert!(error.message.contains(message), "{}", error.message);
+    }
+
+    #[test]
+    fn manifest_structure_and_public_contract_are_strict() {
+        let root = tempfile::tempdir().unwrap();
+        write_valid_dataset(root.path());
+        fs::write(root.path().join("manifest.json"), b"{").unwrap();
+        assert_error(root.path(), "invalid_dataset", "invalid manifest.json");
+
+        for (pointer, value, code, message) in [
+            ("format", json!("other"), "invalid_dataset", "format"),
+            (
+                "schema_version",
+                json!(2),
+                "invalid_dataset",
+                "schema version",
+            ),
+            (
+                "mode",
+                json!("detectors"),
+                "unsupported_dataset_mode",
+                "measurements_blinded",
+            ),
+            (
+                "row.kind",
+                json!("detectors"),
+                "unsupported_dataset_mode",
+                "measurements_blinded",
+            ),
+            ("row.encoding", json!("01"), "invalid_dataset", "b8"),
+            (
+                "row.bit_order",
+                json!("msb_first"),
+                "invalid_dataset",
+                "lsb_first",
+            ),
+            (
+                "circuit.file",
+                json!("other.stim"),
+                "invalid_dataset",
+                "circuit.stim",
+            ),
+            (
+                "shots_file.file",
+                json!("other.b8"),
+                "invalid_dataset",
+                "shots.b8",
+            ),
+            (
+                "row.bytes_per_shot",
+                json!(2),
+                "invalid_dataset",
+                "row widths",
+            ),
+            ("shots_file.bits", json!(2), "invalid_dataset", "row widths"),
+        ] {
+            let case = tempfile::tempdir().unwrap();
+            let mut manifest = write_valid_dataset(case.path());
+            let (parent, field) = pointer.split_once('.').unwrap_or(("", pointer));
+            if parent.is_empty() {
+                manifest[field] = value;
+            } else {
+                manifest[parent][field] = value;
+            }
+            write_manifest(case.path(), &manifest);
+            assert_error(case.path(), code, message);
+        }
+    }
+
+    #[test]
+    fn hashes_identity_size_and_utf8_are_verified_independently() {
+        let root = tempfile::tempdir().unwrap();
+        write_valid_dataset(root.path());
+        fs::write(root.path().join("shots.b8"), b"\x01").unwrap();
+        assert_error(root.path(), "invalid_dataset", "SHA256");
+
+        let root = tempfile::tempdir().unwrap();
+        let mut manifest = write_valid_dataset(root.path());
+        manifest["dataset_id"] = json!("wrong");
+        write_manifest(root.path(), &manifest);
+        assert_error(root.path(), "invalid_dataset", "dataset_id");
+
+        let root = tempfile::tempdir().unwrap();
+        let mut manifest = write_valid_dataset(root.path());
+        fs::write(root.path().join("shots.b8"), b"\0\0").unwrap();
+        manifest["shots_file"]["sha256"] = json!(sha256_hex(b"\0\0"));
+        refresh_dataset_id(&mut manifest);
+        write_manifest(root.path(), &manifest);
+        assert_error(root.path(), "invalid_dataset", "2 bytes, expected 1");
+
+        let root = tempfile::tempdir().unwrap();
+        let mut manifest = write_valid_dataset(root.path());
+        fs::write(root.path().join("circuit.stim"), [0xff]).unwrap();
+        manifest["circuit"]["sha256"] = json!(sha256_hex(&[0xff]));
+        refresh_dataset_id(&mut manifest);
+        write_manifest(root.path(), &manifest);
+        assert_error(root.path(), "invalid_dataset", "not UTF-8");
+
+        let root = tempfile::tempdir().unwrap();
+        let mut manifest = write_valid_dataset(root.path());
+        fs::write(root.path().join("shots.b8"), []).unwrap();
+        manifest["shots"] = json!(u64::MAX);
+        manifest["row"]["bits"] = json!(9);
+        manifest["row"]["bytes_per_shot"] = json!(2);
+        manifest["shots_file"]["bits"] = json!(9);
+        manifest["shots_file"]["bytes_per_shot"] = json!(2);
+        manifest["shots_file"]["sha256"] = json!(sha256_hex(&[]));
+        refresh_dataset_id(&mut manifest);
+        write_manifest(root.path(), &manifest);
+        assert_error(root.path(), "invalid_dataset", "size overflows");
+    }
+}
