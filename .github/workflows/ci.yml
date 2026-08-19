@@ -2,19 +2,33 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig1-dev
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
@@ -39,11 +53,10 @@ jobs:
           cargo test --locked -p rsinter --no-default-features --features rbposd-runner
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
-      - name: Install system dependencies
-        run: sudo apt-get install -y libfontconfig1-dev
       - run: cargo test --locked --workspace
   checked-evidence-portability:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Check portable evidence bundles
@@ -54,13 +67,22 @@ jobs:
           test ! -d target
   rsmp-v1-readiness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig1-dev
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
@@ -96,13 +118,22 @@ jobs:
       (github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'run-perf'))
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig1-dev
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
@@ -131,20 +162,27 @@ jobs:
         run: exit 1
   coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libfontconfig1-dev
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo timeout 5m apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install system dependencies
-        run: sudo apt-get install -y libfontconfig1-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
