@@ -3,7 +3,9 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use atom_loss_envelope::{AtomLossCase, DecodeOutcome, decode};
+use atom_loss_envelope::{
+    AtomLossCase, DecodeOutcome, EnvelopeMatchingCase, decode, decode_matching,
+};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 
@@ -28,6 +30,15 @@ enum Command {
         #[arg(long, value_enum)]
         backend: BackendArg,
     },
+    /// Decode shots by rescaling MWPM edges compatible with reported losses.
+    Matching {
+        /// Input atom-loss-envelope-matching.v0 JSON file.
+        #[arg(long = "in", value_name = "CASE_JSON")]
+        input: PathBuf,
+        /// Destination result JSON file.
+        #[arg(long, value_name = "RESULT_JSON")]
+        out: PathBuf,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -42,6 +53,26 @@ fn main() -> ExitCode {
             out,
             backend: BackendArg::Highs,
         } => run_decode(&input, &out),
+        Command::Matching { input, out } => run_matching(&input, &out),
+    }
+}
+
+fn run_matching(input: &Path, output: &Path) -> ExitCode {
+    let result = (|| -> Result<(), String> {
+        let handle = File::open(input)
+            .map_err(|error| format!("failed to open input {}: {error}", input.display()))?;
+        let case: EnvelopeMatchingCase = serde_json::from_reader(BufReader::new(handle))
+            .map_err(|error| format!("failed to parse input {}: {error}", input.display()))?;
+        let outcome = decode_matching(&case).map_err(|error| format!("decode failed: {error}"))?;
+        write_result(output, &outcome)
+    })();
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -80,4 +111,11 @@ fn write_outcome(output: &Path, outcome: &DecodeOutcome) -> Result<(), String> {
 
 fn write_json(writer: BufWriter<File>, value: &impl Serialize) -> serde_json::Result<()> {
     serde_json::to_writer_pretty(writer, value)
+}
+
+fn write_result(output: &Path, value: &impl Serialize) -> Result<(), String> {
+    let handle = File::create(output)
+        .map_err(|error| format!("failed to create output {}: {error}", output.display()))?;
+    write_json(BufWriter::new(handle), value)
+        .map_err(|error| format!("failed to write output {}: {error}", output.display()))
 }

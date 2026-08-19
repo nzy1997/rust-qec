@@ -1,0 +1,34 @@
+{
+  "schema_version": "atom-loss-envelope-matching.v0",
+  "num_detectors": 1,
+  "num_observables": 1,
+  "edges": [
+    {
+      "id": "base",
+      "node1": 0,
+      "node2": null,
+      "observable_indices": [],
+      "weight": 2.0,
+      "kind": "boundary"
+    },
+    {
+      "id": "loss-compatible",
+      "node1": 0,
+      "node2": null,
+      "observable_indices": [0],
+      "weight": 4.0,
+      "kind": "boundary"
+    }
+  ],
+  "loss_edge_map": [
+    {
+      "loss_id": "loss-q0-t0",
+      "edge_ids": ["loss-compatible"]
+    }
+  ],
+  "shots": [
+    { "observed_detectors": [0], "observed_losses": [] },
+    { "observed_detectors": [0], "observed_losses": ["loss-q0-t0"] },
+    { "observed_detectors": [0], "observed_losses": ["loss-q0-t0"] }
+  ]
+}
