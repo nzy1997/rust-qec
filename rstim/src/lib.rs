@@ -34,6 +34,7 @@ pub mod perf;
 pub mod compiled;
 pub mod sample_archive;
 pub mod decoder_dataset;
+pub mod validation;
 
 pub use sampler::{
     CompiledLossMeasurementSampler, CompiledMeasurementSampler,

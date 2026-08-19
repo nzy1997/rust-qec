@@ -35,9 +35,13 @@ fn executor_qubit_coords_bad_target() {
     assert!(
         result.is_err() || {
             let instrs = result.unwrap();
-            let mut exec = Executor::from_instrs(instrs).unwrap();
-            let mut rng = StdRng::seed_from_u64(0);
-            exec.run(&mut rng).is_err()
+            match Executor::from_instrs(instrs) {
+                Err(_) => true,
+                Ok(mut exec) => {
+                    let mut rng = StdRng::seed_from_u64(0);
+                    exec.run(&mut rng).is_err()
+                }
+            }
         }
     );
 }
@@ -47,9 +51,7 @@ fn executor_qubit_coords_bad_target() {
 fn executor_sweep_in_single_qubit_gate_errors() {
     // H with sweep target — executor rejects sweep in non-CX context
     let instrs = parse_lines("H sweep[0]\nM 0").unwrap();
-    let mut exec = Executor::from_instrs(instrs).unwrap();
-    let mut rng = StdRng::seed_from_u64(0);
-    assert!(exec.run(&mut rng).is_err());
+    assert!(Executor::from_instrs(instrs).is_err());
 }
 
 // --- executor.rs: QubitInv in qubits_with_inversion (line 793-794) ---

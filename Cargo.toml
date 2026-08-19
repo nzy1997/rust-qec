@@ -3,6 +3,7 @@ members = [
     "experiments/atom_loss_envelope",
     "qec-ilp-core",
     "qec-code",
+    "rustqec-cli",
     "rstim",
     "rstim-shot-web",
     "rsinter",

@@ -2063,7 +2063,7 @@ mod tests {
     #[test]
     fn read_only_noise_sites_keep_stable_interactions_and_channel_parameters() {
         let source = "PAULI_CHANNEL_1(0.1,0.2,0.3) 0 1\n\
-                      PAULI_CHANNEL_2(0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15) 2 3\n\
+                      PAULI_CHANNEL_2(0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01) 2 3\n\
                       HERALDED_ERASE(0.4) 4\n\
                       HERALDED_PAULI_CHANNEL_1(0.1,0.2,0.3,0.4) 5\n\
                       CORRELATED_ERROR(0.25) X6 Y7\n";
