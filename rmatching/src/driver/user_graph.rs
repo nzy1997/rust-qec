@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::flooder::graph::MatchingGraph;
 use crate::flooder::graph_flooder::GraphFlooder;
@@ -328,6 +328,38 @@ impl UserGraph {
             }
         }
         Ok(())
+    }
+
+    /// Merge parallel edges from a freshly parsed DEM before weight
+    /// discretization. The first mechanism's observable indices are retained,
+    /// matching PyMatching's detector-error-model ingestion semantics.
+    pub(crate) fn merge_parallel_dem_edges(&mut self) {
+        let mut merged_edges: Vec<UserEdge> = Vec::with_capacity(self.edges.len());
+        let mut edge_indices: HashMap<(usize, usize), usize> = HashMap::new();
+
+        for edge in std::mem::take(&mut self.edges) {
+            let key = if edge.node1 <= edge.node2 {
+                (edge.node1, edge.node2)
+            } else {
+                (edge.node2, edge.node1)
+            };
+
+            if let Some(&edge_index) = edge_indices.get(&key) {
+                let merged_edge = &mut merged_edges[edge_index];
+                let probability = (1.0
+                    - (1.0 - 2.0 * merged_edge.error_probability)
+                        * (1.0 - 2.0 * edge.error_probability))
+                    / 2.0;
+                merged_edge.error_probability = probability;
+                merged_edge.weight = ((1.0 - probability) / probability).ln();
+            } else {
+                edge_indices.insert(key, merged_edges.len());
+                merged_edges.push(edge);
+            }
+        }
+
+        self.edges = merged_edges;
+        self.mwpm = None;
     }
 
     pub fn get_num_edges(&self) -> usize {
