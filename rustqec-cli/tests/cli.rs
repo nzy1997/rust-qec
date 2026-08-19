@@ -188,6 +188,7 @@ fn invalid_circuit_semantics_are_rejected_without_execution() {
 fn json_intent_wraps_command_line_parse_errors() {
     for args in [
         vec!["circuit", "stats", "--format", "yaml"],
+        vec!["circuit", "stats", "--format=yaml"],
         vec!["circuit", "stats", "--format", "json", "--in"],
         vec!["--error-format", "json", "circuit", "stats", "--unknown"],
     ] {
@@ -201,6 +202,45 @@ fn json_intent_wraps_command_line_parse_errors() {
         assert_eq!(value["error"]["code"], "invalid_arguments");
         assert!(!value["error"]["message"].as_str().unwrap().is_empty());
     }
+}
+
+#[test]
+fn input_errors_follow_the_requested_json_channel() {
+    let dir = tempfile::tempdir().unwrap();
+    let missing = dir.path().join("missing.stim");
+    let output = rustqec_cmd()
+        .args([
+            "--error-format",
+            "json",
+            "circuit",
+            "stats",
+            "--in",
+            missing.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let value: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(value["error"]["code"], "input_error");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("missing.stim")
+    );
+}
+
+#[test]
+fn human_parse_errors_stay_on_the_human_channel() {
+    let output = rustqec_cmd()
+        .args(["circuit", "stats", "--unknown"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(serde_json::from_slice::<serde_json::Value>(&output.stderr).is_err());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--unknown"));
 }
 
 #[test]
