@@ -7,7 +7,7 @@ fn main() -> ExitCode {
     match rustqec_cli::run(std::env::args_os(), &mut stdin, &mut stdout) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            rustqec_cli::write_error(&error, &mut io::stderr().lock());
+            rustqec_cli::write_error(&error, &mut stdout, &mut io::stderr().lock());
             ExitCode::from(rustqec_cli::exit_code(&error))
         }
     }

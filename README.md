@@ -72,6 +72,10 @@ Discover the currently implemented automation contract:
 cargo run -p rustqec-cli --bin rustqec -- capabilities --format json
 ```
 
+Automation clients can request structured errors independently of successful
+output formatting by adding `--error-format json`. Capability discovery lists
+the concrete argv path, supported arguments, error codes, and exit codes.
+
 The existing crate-specific CLIs remain available. For example, the same
 circuit can be inspected with `rstim stats`:
 

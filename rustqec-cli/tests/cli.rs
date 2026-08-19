@@ -115,6 +115,7 @@ fn capabilities_describes_the_implemented_contract() {
 
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema_version"], "rustqec.cli.v1");
+    assert_eq!(value["global_arguments"][0]["flag"], "--error-format");
     let commands = value["commands"].as_array().unwrap();
     let stats = commands
         .iter()
@@ -123,6 +124,19 @@ fn capabilities_describes_the_implemented_contract() {
     assert_eq!(stats["input_sources"], serde_json::json!(["stdin", "file"]));
     assert_eq!(stats["formats"], serde_json::json!(["human", "json"]));
     assert_eq!(stats["output_schema"], "rustqec.cli.v1");
+    assert_eq!(stats["argv"], serde_json::json!(["circuit", "stats"]));
+    assert_eq!(stats["success_exit_code"], 0);
+    let errors = stats["errors"].as_array().unwrap();
+    assert!(
+        errors
+            .iter()
+            .any(|entry| { entry["code"] == "invalid_arguments" && entry["exit_code"] == 2 })
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|entry| { entry["code"] == "invalid_circuit" && entry["exit_code"] == 2 })
+    );
 }
 
 #[test]
@@ -132,16 +146,88 @@ fn invalid_circuit_uses_the_structured_json_error_channel() {
     assert!(output.stdout.is_empty());
 
     let value: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
-    assert_eq!(
-        value,
-        serde_json::json!({
-            "schema_version": "rustqec.cli.v1",
-            "status": "error",
-            "command": "circuit.stats",
-            "error": {
-                "code": "invalid_circuit",
-                "message": "unsupported instruction NOT_A_GATE",
-            },
-        })
+    assert_eq!(value["schema_version"], "rustqec.cli.v1");
+    assert_eq!(value["status"], "error");
+    assert_eq!(value["command"], "circuit.stats");
+    assert_eq!(value["error"]["code"], "invalid_circuit");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("NOT_A_GATE")
     );
+}
+
+#[test]
+fn invalid_circuit_semantics_are_rejected_without_execution() {
+    for circuit in [
+        "CX 0\n",
+        "M rec[-1]\n",
+        "X_ERROR(1.1) 0\n",
+        "M(0.1,0.2) 0\n",
+        "PAULI_CHANNEL_1(0.5,0.5,0.5) 0\n",
+    ] {
+        let output = run_with_stdin(&["circuit", "stats", "--format", "json"], circuit);
+        assert_eq!(output.status.code(), Some(2), "circuit: {circuit}");
+        assert!(output.stdout.is_empty(), "circuit: {circuit}");
+        let value: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
+        assert_eq!(value["status"], "error", "circuit: {circuit}");
+        assert_eq!(value["command"], "circuit.stats", "circuit: {circuit}");
+        assert_eq!(
+            value["error"]["code"], "invalid_circuit",
+            "circuit: {circuit}"
+        );
+        assert!(
+            !value["error"]["message"].as_str().unwrap().is_empty(),
+            "circuit: {circuit}"
+        );
+    }
+}
+
+#[test]
+fn json_intent_wraps_command_line_parse_errors() {
+    for args in [
+        vec!["circuit", "stats", "--format", "yaml"],
+        vec!["circuit", "stats", "--format", "json", "--in"],
+        vec!["--error-format", "json", "circuit", "stats", "--unknown"],
+    ] {
+        let output = rustqec_cmd().args(&args).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "args: {args:?}");
+        assert!(output.stdout.is_empty(), "args: {args:?}");
+        let value: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
+        assert_eq!(value["schema_version"], "rustqec.cli.v1");
+        assert_eq!(value["status"], "error");
+        assert_eq!(value["command"], "circuit.stats");
+        assert_eq!(value["error"]["code"], "invalid_arguments");
+        assert!(!value["error"]["message"].as_str().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn help_and_version_use_stdout() {
+    for arg in ["--help", "--version"] {
+        let output = rustqec_cmd().arg(arg).output().unwrap();
+        assert_eq!(output.status.code(), Some(0), "arg: {arg}");
+        assert!(!output.stdout.is_empty(), "arg: {arg}");
+        assert!(output.stderr.is_empty(), "arg: {arg}");
+    }
+}
+
+#[test]
+fn explicit_human_error_format_overrides_json_success_format() {
+    let output = run_with_stdin(
+        &[
+            "--error-format",
+            "human",
+            "circuit",
+            "stats",
+            "--format",
+            "json",
+        ],
+        "CX 0\n",
+    );
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(serde_json::from_slice::<serde_json::Value>(&output.stderr).is_err());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("even number"));
 }

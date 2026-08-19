@@ -45,6 +45,7 @@ pub struct ObservableEvent {
 
 impl Executor {
     pub fn from_instrs(instrs: Vec<StimInstr>) -> Result<Self, String> {
+        crate::validation::validate_circuit(&instrs)?;
         Ok(Self { instrs })
     }
 
