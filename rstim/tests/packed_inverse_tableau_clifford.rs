@@ -1,8 +1,8 @@
 use rstim::sim::packed_inverse_tableau::{CanonicalTableauSnapshot, PackedInverseTableau};
 use rstim::sim::tableau::StabilizerState;
 
-const AUDITED_TABLEAU_LEN: usize = 11_842;
-const AUDITED_TABLEAU_FNV1A64: u64 = 0x5b0d_b6c8_9bbf_a95c;
+const AUDITED_TABLEAU_LEN: usize = 12_248;
+const AUDITED_TABLEAU_FNV1A64: u64 = 0x855e_a7dc_4a84_99c6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Gate {
