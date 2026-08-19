@@ -65,3 +65,18 @@ fn programmatic_parallel_edges_remain_separate() {
     assert_eq!(graph.edges[0].observable_indices, vec![0]);
     assert_eq!(graph.edges[1].observable_indices, vec![1]);
 }
+
+#[test]
+fn dem_parallel_edges_preserve_tiny_probabilities() {
+    let graph = parse_dem(
+        "error(1e-17) D0 D1\n\
+         error(1e-17) D0 D1",
+    )
+    .unwrap();
+
+    assert_eq!(graph.edges.len(), 1);
+    let edge = &graph.edges[0];
+    assert_eq!(edge.error_probability, 2e-17);
+    assert!(edge.weight.is_finite());
+    assert!((edge.weight - 38.45079940033883).abs() < 1e-12);
+}

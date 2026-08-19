@@ -346,10 +346,10 @@ impl UserGraph {
 
             if let Some(&edge_index) = edge_indices.get(&key) {
                 let merged_edge = &mut merged_edges[edge_index];
-                let probability = (1.0
-                    - (1.0 - 2.0 * merged_edge.error_probability)
-                        * (1.0 - 2.0 * edge.error_probability))
-                    / 2.0;
+                let previous_probability = merged_edge.error_probability;
+                // Avoid subtracting nearly equal values when both probabilities are tiny.
+                let probability = previous_probability * (1.0 - edge.error_probability)
+                    + edge.error_probability * (1.0 - previous_probability);
                 merged_edge.error_probability = probability;
                 merged_edge.weight = ((1.0 - probability) / probability).ln();
             } else {
