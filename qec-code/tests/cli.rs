@@ -2174,6 +2174,32 @@ fn code_css_distance_exact_accepts_highs_backend_and_solver_limits() {
     assert_eq!(json["options"]["backend"], "highs");
 }
 
+#[cfg(feature = "distance-ilp-highs")]
+#[test]
+fn code_css_distance_exact_reports_timeout_without_incumbent_instead_of_panicking() {
+    let output = run_qec_code(&[
+        "code",
+        "css-distance",
+        "exact",
+        "--code-id",
+        "steane",
+        "--backend",
+        "highs",
+        "--time-limit-seconds",
+        "0.000000000001",
+        "--json",
+    ]);
+
+    assert!(!output.status.success());
+    assert_eq!(output.stdout, b"");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("time limit without a feasible incumbent"),
+        "unexpected stderr: {stderr}"
+    );
+    assert!(!stderr.contains("panicked"), "unexpected panic: {stderr}");
+}
+
 #[test]
 fn code_css_distance_exact_rejects_gurobi_backend_without_feature() {
     let output = run_qec_code(&[

@@ -10,9 +10,13 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+qec-ilp-core = { path = "../qec-ilp-core" }
+rmatching = { path = "../rmatching" }
 rstim = { path = "../rstim" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
 
 [dev-dependencies]
-tempfile = "3"
+atom-loss-envelope = { path = "../experiments/atom_loss_envelope" }
