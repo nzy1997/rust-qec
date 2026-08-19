@@ -397,6 +397,38 @@ fn render_svg_sample_supports_heralded_measurement_sources() {
 }
 
 #[test]
+fn render_svg_sample_export_errors_preserve_existing_output() {
+    let protected_output = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(protected_output.path(), "existing svg should remain").unwrap();
+
+    let output = run_render_svg_with_stdin_args(
+        &[
+            "--sample_shot",
+            "--seed",
+            "7",
+            "--out",
+            protected_output.path().to_str().unwrap(),
+        ],
+        "SHIFT_COORDS(1) 0\nM 0\n",
+    );
+
+    assert!(!output.status.success(), "invalid export should fail");
+    assert!(
+        output.stdout.is_empty(),
+        "failing sample-shot export should not write stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("SHIFT_COORDS expects no targets, got 1")
+    );
+    assert_eq!(
+        std::fs::read_to_string(protected_output.path()).unwrap(),
+        "existing svg should remain"
+    );
+}
+
+#[test]
 fn render_svg_documented_workflow_matches_cli() {
     let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
