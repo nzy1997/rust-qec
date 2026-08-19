@@ -115,6 +115,12 @@ pub enum Commands {
         noise: f64,
         #[arg(long = "after_clifford_loss_probability", default_value = "0")]
         after_clifford_loss_probability: f64,
+        /// Operation-loss probability for gates and resets in Mid-SWAP circuits.
+        #[arg(long = "operation_loss_probability", default_value = "0")]
+        operation_loss_probability: f64,
+        /// Atom-loss probability immediately before a Mid-SWAP measurement.
+        #[arg(long = "measurement_loss_probability", default_value = "0")]
+        measurement_loss_probability: f64,
         #[arg(long)]
         hx: Option<String>,
         #[arg(long)]
@@ -505,6 +511,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             rounds,
             noise,
             after_clifford_loss_probability,
+            operation_loss_probability,
+            measurement_loss_probability,
             hx,
             hz,
             basis,
@@ -512,6 +520,37 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             observables,
             out,
         }) => {
+            let is_midswap = code == "surface_code" && task == "rotated_memory_z_midswap";
+            if is_midswap {
+                if after_clifford_loss_probability != 0.0 {
+                    return Err(
+                        "after_clifford_loss_probability is not used by the Mid-SWAP task; use operation_loss_probability"
+                            .to_string(),
+                    );
+                }
+                let distance = distance
+                    .ok_or_else(|| "distance is required for common generators".to_string())?;
+                let circuit = crate::codegen::rotated_memory_z_midswap(
+                    crate::codegen::MidSwapConfig {
+                        distance,
+                        rounds,
+                        pauli_probability: noise,
+                        operation_loss_probability,
+                        measurement_loss_probability,
+                    },
+                )
+                .map_err(|error| error.to_string())?;
+                let mut writer = open_output(out.as_deref())?;
+                return writer
+                    .write_all(circuit.as_bytes())
+                    .map_err(|error| format!("write error: {error}"));
+            }
+            if operation_loss_probability != 0.0 || measurement_loss_probability != 0.0 {
+                return Err(
+                    "operation_loss_probability and measurement_loss_probability are only valid for surface_code/rotated_memory_z_midswap"
+                        .to_string(),
+                );
+            }
             if code == "css" {
                 let mut buffer = Vec::new();
                 run_css_gen(
@@ -3765,6 +3804,8 @@ mod tests {
                 rounds: 2,
                 noise: 0.0,
                 after_clifford_loss_probability: 0.0,
+                operation_loss_probability: 0.0,
+                measurement_loss_probability: 0.0,
                 hx: Some(hx),
                 hz: Some(hz),
                 basis: Some("Z".to_string()),
@@ -3966,6 +4007,8 @@ mod tests {
                 rounds: 1,
                 noise: 0.0,
                 after_clifford_loss_probability: 0.0,
+                operation_loss_probability: 0.0,
+                measurement_loss_probability: 0.0,
                 hx: None,
                 hz: None,
                 basis: None,

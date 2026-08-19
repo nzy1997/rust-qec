@@ -9,6 +9,9 @@ pub use surface_code::{rotated_memory_x, rotated_memory_z, unrotated_memory_x, u
     rotated_memory_x_with_params, rotated_memory_z_with_params,
     unrotated_memory_x_with_params, unrotated_memory_z_with_params};
 
+pub mod midswap;
+pub use midswap::{MidSwapConfig, MidSwapError, rotated_memory_z_midswap};
+
 pub mod color_code;
 pub use color_code::{memory_xyz, memory_xyz_with_params};
 
