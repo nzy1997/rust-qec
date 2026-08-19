@@ -18,6 +18,8 @@ pub enum BinaryIlpError {
     UnknownConstraintRow(usize),
     #[error("no ILP backend is available for kind {requested:?}")]
     BackendUnavailable { requested: BackendKind },
+    #[error("{backend:?} reached its time limit without a feasible incumbent")]
+    TimeLimitWithoutIncumbent { backend: BackendKind },
     #[error("HiGHS backend error: {0}")]
     Highs(String),
     #[cfg(feature = "gurobi")]

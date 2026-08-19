@@ -1289,10 +1289,14 @@ dependencies = [
 name = "rustqec-cli"
 version = "0.1.0"
 dependencies = [
+ "atom-loss-envelope",
  "clap",
+ "qec-ilp-core",
+ "rmatching",
  "rstim",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 

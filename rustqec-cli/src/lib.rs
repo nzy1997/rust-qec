@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand, ValueEnum, error::ErrorKind};
 use serde::Serialize;
 
+mod decode;
+
 pub const SCHEMA_VERSION: &str = "rustqec.cli.v1";
 const CIRCUIT_STATS_COMMAND: &str = "circuit.stats";
 
@@ -34,6 +36,24 @@ enum Command {
     Capabilities {
         #[arg(long, value_enum)]
         format: CapabilitiesFormat,
+    },
+    /// Decode a public loss-visible decoder dataset
+    Decode {
+        /// Loss-aware decoder implementation
+        #[arg(long, value_enum)]
+        decoder: DecodeDecoder,
+        /// Directory containing manifest.json, circuit.stim, and shots.b8
+        #[arg(long)]
+        dataset: PathBuf,
+        /// Destination bit-packed observable predictions
+        #[arg(long)]
+        out: PathBuf,
+        /// Destination structured decode statistics
+        #[arg(long = "stats-out")]
+        stats_out: PathBuf,
+        /// Per-shot Envelope-MLE time limit
+        #[arg(long = "shot-timeout-ms")]
+        shot_timeout_ms: Option<u64>,
     },
 }
 
@@ -67,6 +87,21 @@ enum ErrorFormat {
     Json,
 }
 
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum DecodeDecoder {
+    EnvelopeMatching,
+    EnvelopeMle,
+}
+
+impl From<DecodeDecoder> for decode::DecoderKind {
+    fn from(value: DecodeDecoder) -> Self {
+        match value {
+            DecodeDecoder::EnvelopeMatching => Self::EnvelopeMatching,
+            DecodeDecoder::EnvelopeMle => Self::EnvelopeMle,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum RunError {
     Clap {
@@ -83,6 +118,7 @@ pub struct CommandError {
     pub code: &'static str,
     pub message: String,
     json: bool,
+    exit_code: u8,
 }
 
 #[derive(Serialize)]
@@ -126,6 +162,17 @@ struct Capability {
     arguments: Vec<ArgumentCapability>,
     success_exit_code: u8,
     errors: Vec<ErrorCapability>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    decoders: Vec<&'static str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    artifacts: Vec<ArtifactCapability>,
+}
+
+#[derive(Serialize)]
+struct ArtifactCapability {
+    name: &'static str,
+    flag: &'static str,
+    format: &'static str,
 }
 
 #[derive(Serialize)]
@@ -166,6 +213,33 @@ where
         Command::Capabilities { format } => {
             write_capabilities(format, error_format, stdout).map_err(RunError::Command)
         }
+        Command::Decode {
+            decoder,
+            dataset,
+            out,
+            stats_out,
+            shot_timeout_ms,
+        } => decode::run(&decode::DecodeOptions {
+            decoder: decoder.into(),
+            dataset,
+            predictions_out: out,
+            stats_out,
+            shot_timeout_ms,
+        })
+        .map(|_| ())
+        .map_err(|failure| {
+            RunError::Command(CommandError {
+                command: decode::COMMAND,
+                code: failure.code,
+                message: failure.message,
+                json: !matches!(error_format, Some(ErrorFormat::Human)),
+                exit_code: if matches!(failure.code, "decode_timeout" | "decode_infeasible") {
+                    3
+                } else {
+                    2
+                },
+            })
+        }),
     }
 }
 
@@ -187,6 +261,7 @@ fn run_circuit_stats(
             code: "input_error",
             message: format!("failed to read {}: {error}", path.display()),
             json,
+            exit_code: 2,
         })?,
         None => {
             let mut text = String::new();
@@ -197,6 +272,7 @@ fn run_circuit_stats(
                     code: "input_error",
                     message: format!("failed to read stdin: {error}"),
                     json,
+                    exit_code: 2,
                 })?;
             text
         }
@@ -207,6 +283,7 @@ fn run_circuit_stats(
         code: "invalid_circuit",
         message,
         json,
+        exit_code: 2,
     })?;
 
     match format {
@@ -228,6 +305,7 @@ fn run_circuit_stats(
         code: "output_error",
         message,
         json,
+        exit_code: 2,
     })
 }
 
@@ -248,52 +326,161 @@ fn write_capabilities(
                 values: vec!["human", "json"],
                 default: None,
             }],
-            commands: vec![Capability {
-                name: CIRCUIT_STATS_COMMAND,
-                argv: vec!["circuit", "stats"],
-                input_sources: vec!["stdin", "file"],
-                formats: vec!["human", "json"],
-                output_schema: SCHEMA_VERSION,
-                arguments: vec![
-                    ArgumentCapability {
-                        name: "input",
-                        flag: "--in",
-                        required: false,
-                        values: vec!["path"],
-                        default: Some("stdin"),
-                    },
-                    ArgumentCapability {
-                        name: "format",
-                        flag: "--format",
-                        required: false,
-                        values: vec!["human", "json"],
-                        default: Some("human"),
-                    },
-                ],
-                success_exit_code: 0,
-                errors: vec![
-                    ErrorCapability {
-                        code: "invalid_arguments",
-                        exit_code: 2,
-                        channel: "stderr",
-                    },
-                    ErrorCapability {
-                        code: "invalid_circuit",
-                        exit_code: 2,
-                        channel: "stderr",
-                    },
-                    ErrorCapability {
-                        code: "input_error",
-                        exit_code: 2,
-                        channel: "stderr",
-                    },
-                    ErrorCapability {
-                        code: "output_error",
-                        exit_code: 2,
-                        channel: "stderr",
-                    },
-                ],
-            }],
+            commands: vec![
+                Capability {
+                    name: CIRCUIT_STATS_COMMAND,
+                    argv: vec!["circuit", "stats"],
+                    input_sources: vec!["stdin", "file"],
+                    formats: vec!["human", "json"],
+                    output_schema: SCHEMA_VERSION,
+                    arguments: vec![
+                        ArgumentCapability {
+                            name: "input",
+                            flag: "--in",
+                            required: false,
+                            values: vec!["path"],
+                            default: Some("stdin"),
+                        },
+                        ArgumentCapability {
+                            name: "format",
+                            flag: "--format",
+                            required: false,
+                            values: vec!["human", "json"],
+                            default: Some("human"),
+                        },
+                    ],
+                    success_exit_code: 0,
+                    errors: vec![
+                        ErrorCapability {
+                            code: "invalid_arguments",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_circuit",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "input_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "output_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                    ],
+                    decoders: Vec::new(),
+                    artifacts: Vec::new(),
+                },
+                Capability {
+                    name: decode::COMMAND,
+                    argv: vec!["decode"],
+                    input_sources: vec!["public_decoder_dataset_directory"],
+                    formats: vec!["b8", "json"],
+                    output_schema: decode::STATS_SCHEMA_VERSION,
+                    arguments: vec![
+                        ArgumentCapability {
+                            name: "decoder",
+                            flag: "--decoder",
+                            required: true,
+                            values: vec!["envelope-matching", "envelope-mle"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "dataset",
+                            flag: "--dataset",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "predictions",
+                            flag: "--out",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "stats",
+                            flag: "--stats-out",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "shot_timeout_ms",
+                            flag: "--shot-timeout-ms",
+                            required: false,
+                            values: vec!["non_negative_integer"],
+                            default: None,
+                        },
+                    ],
+                    success_exit_code: 0,
+                    errors: vec![
+                        ErrorCapability {
+                            code: "invalid_arguments",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "missing_dataset_file",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_dataset",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "unsupported_dataset_mode",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "unsupported_circuit",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "decode_timeout",
+                            exit_code: 3,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "decode_infeasible",
+                            exit_code: 3,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "decode_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "output_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                    ],
+                    decoders: vec!["envelope-matching", "envelope-mle"],
+                    artifacts: vec![
+                        ArtifactCapability {
+                            name: "predictions",
+                            flag: "--out",
+                            format: "b8",
+                        },
+                        ArtifactCapability {
+                            name: "stats",
+                            flag: "--stats-out",
+                            format: "rustqec.decode-stats.v1+json",
+                        },
+                    ],
+                },
+            ],
         },
     )
     .map_err(|message| CommandError {
@@ -301,6 +488,7 @@ fn write_capabilities(
         code: "output_error",
         message,
         json,
+        exit_code: 2,
     })
 }
 
@@ -360,7 +548,7 @@ pub fn write_error(error: &RunError, stdout: &mut dyn Write, stderr: &mut dyn Wr
 pub fn exit_code(error: &RunError) -> u8 {
     match error {
         RunError::Clap { error, .. } => error.exit_code() as u8,
-        RunError::Command(_) => 2,
+        RunError::Command(error) => error.exit_code,
     }
 }
 
@@ -375,10 +563,13 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         .windows(2)
         .any(|pair| pair[0] == "circuit" && pair[1] == "stats");
     let is_capabilities = command_words.contains(&"capabilities");
+    let is_decode = command_words.contains(&"decode");
     let command = if is_stats {
         CIRCUIT_STATS_COMMAND
     } else if is_capabilities {
         "capabilities"
+    } else if is_decode {
+        decode::COMMAND
     } else {
         "rustqec"
     };
@@ -388,7 +579,7 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let json = match explicit_error_format {
         Some(Some("human")) => false,
         Some(_) => true,
-        None if is_capabilities => true,
+        None if is_capabilities || is_decode => true,
         None if is_stats => match explicit_output_format {
             Some(Some("human")) => false,
             Some(_) => true,
