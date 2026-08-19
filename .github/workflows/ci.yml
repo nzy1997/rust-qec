@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.head_ref || github.ref_name }}
