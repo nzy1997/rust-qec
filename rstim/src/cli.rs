@@ -2162,8 +2162,7 @@ pub fn try_merge_detections_observables(
 }
 
 pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), String> {
-    let instrs = parse_lines(text)?;
-    let summary = crate::stats::summarize(&instrs);
+    let summary = crate::stats::summarize_text(text)?;
     if json {
         serde_json::to_writer_pretty(&mut *out, &summary)
             .map_err(|e| format!("write error: {e}"))?;
@@ -2172,16 +2171,7 @@ pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), Stri
         return Ok(());
     }
 
-    writeln!(out, "instruction_count: {}", summary.instruction_count).map_err(|e| e.to_string())?;
-    writeln!(out, "repeat_blocks: {}", summary.repeat_blocks).map_err(|e| e.to_string())?;
-    writeln!(out, "max_repeat_depth: {}", summary.max_repeat_depth).map_err(|e| e.to_string())?;
-    writeln!(out, "num_qubits: {}", summary.num_qubits).map_err(|e| e.to_string())?;
-    writeln!(out, "num_measurements: {}", summary.num_measurements).map_err(|e| e.to_string())?;
-    writeln!(out, "num_detectors: {}", summary.num_detectors).map_err(|e| e.to_string())?;
-    writeln!(out, "num_observables: {}", summary.num_observables).map_err(|e| e.to_string())?;
-    writeln!(out, "num_ticks: {}", summary.num_ticks).map_err(|e| e.to_string())?;
-    writeln!(out, "num_sweep_bits: {}", summary.num_sweep_bits).map_err(|e| e.to_string())?;
-    Ok(())
+    crate::stats::write_human(&summary, out)
 }
 
 fn write_detection_outputs(

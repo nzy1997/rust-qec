@@ -27,12 +27,17 @@ on:
     - cron: "17 3 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: interactive-shot-quality-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   browser:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust and WebAssembly target
@@ -56,12 +61,19 @@ jobs:
           cargo test -p rstim-shot-web
           make build-site
           npm --prefix web/shot-viewer ci
-          npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
+          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
+          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
+            fi
+          done
+          timeout 10m npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
       - name: Run browser and export tests
         run: npm --prefix web/shot-viewer run test:e2e
 
   fuzz-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

@@ -46,7 +46,7 @@ fn stats_text_output_from_stdin() {
 fn stats_json_output_from_stdin() {
     let output = run_with_stdin(
         &["stats", "--json"],
-        "CX sweep[3] 0\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
+        "CX sweep[3] 0\nM 0\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
     );
     assert!(
         output.status.success(),
@@ -54,11 +54,11 @@ fn stats_json_output_from_stdin() {
         String::from_utf8_lossy(&output.stderr)
     );
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(value["instruction_count"], 2);
+    assert_eq!(value["instruction_count"], 3);
     assert_eq!(value["repeat_blocks"], 0);
     assert_eq!(value["max_repeat_depth"], 0);
     assert_eq!(value["num_qubits"], 1);
-    assert_eq!(value["num_measurements"], 0);
+    assert_eq!(value["num_measurements"], 1);
     assert_eq!(value["num_observables"], 3);
     assert_eq!(value["num_sweep_bits"], 4);
 }
@@ -89,6 +89,15 @@ fn stats_invalid_input_fails_cleanly() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("REPEAT") || stderr.contains("repeat"));
     assert!(!stderr.contains("panicked"));
+}
+
+#[test]
+fn stats_rejects_unknown_instruction_names() {
+    let output = run_with_stdin(&["stats", "--json"], "NOT_A_GATE 0\n");
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unsupported instruction NOT_A_GATE"));
 }
 
 #[test]
