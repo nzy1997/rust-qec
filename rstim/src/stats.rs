@@ -1,5 +1,6 @@
 use crate::ir::StimInstr;
 use serde::Serialize;
+use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CircuitStatsSummary {
@@ -12,6 +13,137 @@ pub struct CircuitStatsSummary {
     pub num_observables: usize,
     pub num_ticks: usize,
     pub num_sweep_bits: usize,
+}
+
+pub fn summarize_text(text: &str) -> Result<CircuitStatsSummary, String> {
+    let instrs = crate::parser::parse_lines(text)?;
+    validate_instruction_names(&instrs)?;
+    Ok(summarize(&instrs))
+}
+
+pub fn write_human(summary: &CircuitStatsSummary, out: &mut dyn Write) -> Result<(), String> {
+    writeln!(out, "instruction_count: {}", summary.instruction_count).map_err(|e| e.to_string())?;
+    writeln!(out, "repeat_blocks: {}", summary.repeat_blocks).map_err(|e| e.to_string())?;
+    writeln!(out, "max_repeat_depth: {}", summary.max_repeat_depth).map_err(|e| e.to_string())?;
+    writeln!(out, "num_qubits: {}", summary.num_qubits).map_err(|e| e.to_string())?;
+    writeln!(out, "num_measurements: {}", summary.num_measurements).map_err(|e| e.to_string())?;
+    writeln!(out, "num_detectors: {}", summary.num_detectors).map_err(|e| e.to_string())?;
+    writeln!(out, "num_observables: {}", summary.num_observables).map_err(|e| e.to_string())?;
+    writeln!(out, "num_ticks: {}", summary.num_ticks).map_err(|e| e.to_string())?;
+    writeln!(out, "num_sweep_bits: {}", summary.num_sweep_bits).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn validate_instruction_names(instrs: &[StimInstr]) -> Result<(), String> {
+    for instr in instrs {
+        match instr {
+            StimInstr::Repeat { body, .. } => validate_instruction_names(body)?,
+            StimInstr::Op { name, .. } if !is_supported_instruction_name(name) => {
+                return Err(format!("unsupported instruction {name}"));
+            }
+            StimInstr::Op { .. } => {}
+        }
+    }
+    Ok(())
+}
+
+fn is_supported_instruction_name(name: &str) -> bool {
+    // Keep this non-executing validator aligned with executor::execute_op.
+    // Stats must validate REPEAT bodies without expanding their iteration counts.
+    matches!(
+        name,
+        "I" | "I_ERROR"
+            | "II_ERROR"
+            | "H"
+            | "H_XY"
+            | "H_YZ"
+            | "S"
+            | "SQRT_Z"
+            | "S_DAG"
+            | "SQRT_Z_DAG"
+            | "SQRT_X"
+            | "SQRT_X_DAG"
+            | "SQRT_Y"
+            | "SQRT_Y_DAG"
+            | "X"
+            | "Y"
+            | "Z"
+            | "C_XYZ"
+            | "C_ZYX"
+            | "C_NXYZ"
+            | "C_NZYX"
+            | "C_XNYZ"
+            | "C_XYNZ"
+            | "C_ZNYX"
+            | "C_ZYNX"
+            | "H_NXY"
+            | "H_NXZ"
+            | "H_NYZ"
+            | "CX"
+            | "CNOT"
+            | "ZCX"
+            | "CY"
+            | "ZCY"
+            | "CZ"
+            | "ZCZ"
+            | "XCX"
+            | "XCY"
+            | "XCZ"
+            | "YCX"
+            | "YCY"
+            | "YCZ"
+            | "SWAP"
+            | "ISWAP"
+            | "ISWAP_DAG"
+            | "CXSWAP"
+            | "SWAPCX"
+            | "CZSWAP"
+            | "M"
+            | "MZ"
+            | "MX"
+            | "MY"
+            | "MR"
+            | "MRZ"
+            | "MRX"
+            | "MRY"
+            | "ML"
+            | "MZL"
+            | "MXL"
+            | "MYL"
+            | "MRL"
+            | "MRZL"
+            | "MRXL"
+            | "MRYL"
+            | "MPAD"
+            | "R"
+            | "RZ"
+            | "RX"
+            | "RY"
+            | "LOSS"
+            | "X_ERROR"
+            | "Y_ERROR"
+            | "Z_ERROR"
+            | "DEPOLARIZE1"
+            | "DEPOLARIZE2"
+            | "QUBIT_COORDS"
+            | "SHIFT_COORDS"
+            | "TICK"
+            | "DETECTOR"
+            | "OBSERVABLE_INCLUDE"
+            | "MXX"
+            | "MYY"
+            | "MZZ"
+            | "MPP"
+            | "SPP"
+            | "SPP_DAG"
+            | "PAULI_CHANNEL_1"
+            | "PAULI_CHANNEL_2"
+            | "HERALDED_ERASE"
+            | "HERALDED_PAULI_CHANNEL_1"
+            | "CORRELATED_ERROR"
+            | "E"
+            | "ELSE_CORRELATED_ERROR"
+    )
 }
 
 pub fn summarize(instrs: &[StimInstr]) -> CircuitStatsSummary {

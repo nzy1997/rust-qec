@@ -92,6 +92,15 @@ fn stats_invalid_input_fails_cleanly() {
 }
 
 #[test]
+fn stats_rejects_unknown_instruction_names() {
+    let output = run_with_stdin(&["stats", "--json"], "NOT_A_GATE 0\n");
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("unsupported instruction NOT_A_GATE"));
+}
+
+#[test]
 fn stats_text_output_has_stable_order_and_all_fields() {
     let output = run_with_stdin(&["stats"], "");
     assert!(

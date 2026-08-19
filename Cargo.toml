@@ -2,6 +2,7 @@
 members = [
     "qec-ilp-core",
     "qec-code",
+    "rustqec-cli",
     "rstim",
     "rstim-shot-web",
     "rsinter",

@@ -40,6 +40,7 @@ With RustQEC you can:
 
 | Path | Role |
 | --- | --- |
+| `rustqec-cli/` | Unified automation-ready `rustqec` CLI and capability discovery |
 | `rstim/` | Simulator crate and `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, and QP101 export |
 | `rstim/doc/` | Simulator getting-started guide, CLI reference, QP101 notes, and parity documentation |
 | `docs/showcases/` | Stable index for runnable workspace showcases |
@@ -58,7 +59,21 @@ cd rust-qec
 cargo build --workspace
 ```
 
-Inspect a small circuit with `rstim stats`:
+Inspect a small circuit through the unified CLI:
+
+```sh
+printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | \
+  cargo run -p rustqec-cli --bin rustqec -- circuit stats --format json
+```
+
+Discover the currently implemented automation contract:
+
+```sh
+cargo run -p rustqec-cli --bin rustqec -- capabilities --format json
+```
+
+The existing crate-specific CLIs remain available. For example, the same
+circuit can be inspected with `rstim stats`:
 
 ```sh
 printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
