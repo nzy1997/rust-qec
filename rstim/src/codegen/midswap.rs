@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::ir::{StimInstr, StimTarget, circuit_to_string};
+use crate::decoder_dataset::LOGICAL_FLIP_MARKER;
+use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 
 const CNOT_SCHEDULE: &str = "paper_alternating_ab";
 
@@ -194,10 +195,11 @@ impl MidSwapBuilder {
         let data = self.mapped_sites(&self.data.clone());
         let checks = self.mapped_sites(&self.checks.clone());
         self.emit("R", vec![], qubit_targets(&data));
-        self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &data);
+        self.comment(LOGICAL_FLIP_MARKER.trim_start_matches("# "));
+        self.emit_noise("X_ERROR", self.config.pauli_probability, &data);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &data);
         self.emit("R", vec![], qubit_targets(&checks));
-        self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &checks);
+        self.emit_noise("X_ERROR", self.config.pauli_probability, &checks);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &checks);
         self.emit("TICK", vec![], vec![]);
     }
@@ -360,14 +362,14 @@ impl MidSwapBuilder {
     ) -> Vec<i32> {
         let wires = self.mapped_sites(sites);
         self.emit_noise("LOSS", self.config.measurement_loss_probability, &wires);
-        self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &wires);
+        self.emit_noise("X_ERROR", self.config.pauli_probability, &wires);
         self.emit(instruction, vec![], qubit_targets(&wires));
         let values: Vec<i32> = (0..sites.len())
             .map(|index| self.measurement_count + 2 * index as i32 + 1)
             .collect();
         self.measurement_count += 2 * sites.len() as i32;
         if resets {
-            self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &wires);
+            self.emit_noise("X_ERROR", self.config.pauli_probability, &wires);
             self.emit_noise("LOSS", self.config.operation_loss_probability, &wires);
         }
         values
@@ -553,6 +555,58 @@ mod tests {
             }
         }
         assert_eq!(measurement_count, 50);
+    }
+
+    #[test]
+    fn initialization_places_one_flip_marker_before_first_loss() {
+        let mut config = noiseless_config(1);
+        config.pauli_probability = 0.01;
+        config.operation_loss_probability = 0.02;
+        let text = rotated_memory_z_midswap(config).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        let data_reset = lines
+            .iter()
+            .position(|line| line.starts_with("R "))
+            .unwrap();
+
+        assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
+        assert_eq!(lines[data_reset + 1], "# RSTIM_LOGICAL_FLIP_POINT");
+        assert!(lines[data_reset + 2].starts_with("X_ERROR(0.01) "));
+        assert!(lines[data_reset + 3].starts_with("LOSS(0.02) "));
+    }
+
+    #[test]
+    fn reset_and_measurement_bit_noise_use_x_error_channels() {
+        let mut config = noiseless_config(1);
+        config.pauli_probability = 0.01;
+        config.operation_loss_probability = 0.02;
+        config.measurement_loss_probability = 0.03;
+        let text = rotated_memory_z_midswap(config).unwrap();
+        let circuit = parse_lines(&text).unwrap();
+
+        for (index, instruction) in circuit.iter().enumerate() {
+            match instruction.name().unwrap() {
+                "R" => assert_eq!(circuit[index + 1].name(), Some("X_ERROR")),
+                "MRL" => {
+                    assert_eq!(circuit[index - 1].name(), Some("X_ERROR"));
+                    assert_eq!(circuit[index + 1].name(), Some("X_ERROR"));
+                }
+                "ML" => assert_eq!(circuit[index - 1].name(), Some("X_ERROR")),
+                "H" => assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE1")),
+                "CX" => assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE2")),
+                _ => {}
+            }
+        }
+
+        let depolarize1_count = circuit
+            .iter()
+            .filter(|instruction| instruction.name() == Some("DEPOLARIZE1"))
+            .count();
+        let h_count = circuit
+            .iter()
+            .filter(|instruction| instruction.name() == Some("H"))
+            .count();
+        assert_eq!(depolarize1_count, h_count);
     }
 
     #[test]

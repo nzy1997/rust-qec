@@ -345,6 +345,48 @@ fn validate_logical_flip_effect(
     Ok(())
 }
 
+fn first_logical_support_loss_before_marker(
+    circuit_text: &str,
+    logical_flip: &LogicalFlip,
+) -> Result<Option<u32>, String> {
+    fn find_loss(instrs: &[crate::ir::StimInstr], logical_support: &BTreeSet<u32>) -> Option<u32> {
+        for instruction in instrs {
+            match instruction {
+                crate::ir::StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } if name == "LOSS"
+                    && args.first().is_some_and(|probability| *probability > 0.0) =>
+                {
+                    if let Some(qubit) = targets
+                        .iter()
+                        .filter_map(crate::ir::StimTarget::qubit_index)
+                        .find(|qubit| logical_support.contains(qubit))
+                    {
+                        return Some(qubit);
+                    }
+                }
+                crate::ir::StimInstr::Repeat { count, body } if *count > 0 => {
+                    if let Some(qubit) = find_loss(body, logical_support) {
+                        return Some(qubit);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    let marker_offset = circuit_text
+        .find(LOGICAL_FLIP_MARKER)
+        .ok_or_else(|| "logical flip marker must appear exactly once".to_string())?;
+    let prefix = crate::parser::parse_lines(&circuit_text[..marker_offset])?;
+    let logical_support = logical_flip.qubits.iter().copied().collect();
+    Ok(find_loss(&prefix, &logical_support))
+}
+
 #[doc(hidden)]
 #[allow(private_interfaces)]
 pub fn validate_decoder_dataset_inputs(
@@ -413,6 +455,13 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
             }
             let circuit_text =
                 circuit_with_injected_logical_flip(&config.circuit_text, logical_flip)?;
+            if let Some(qubit) =
+                first_logical_support_loss_before_marker(&config.circuit_text, logical_flip)?
+            {
+                return Err(format!(
+                    "logical-support qubit {qubit} can be lost before {LOGICAL_FLIP_MARKER}; move the marker before the first LOSS on the logical support"
+                ));
+            }
             let instrs = crate::parser::parse_lines(&circuit_text)?;
             validate_logical_flip_effect(&public_instrs, &instrs, logical_flip.pauli)?;
             Some(instrs)
@@ -1182,6 +1231,97 @@ mod tests {
             validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err(),
             "--logical_z_qubits must be non-empty"
         );
+    }
+
+    #[test]
+    fn blinded_validation_rejects_loss_on_logical_support_before_marker() {
+        let unsafe_circuit = "R 0 1\nLOSS(0.1) 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let config = test_config(
+            unsafe_circuit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
+        assert!(error.contains("qubit 0 can be lost before"), "{error}");
+        assert!(error.contains(LOGICAL_FLIP_MARKER), "{error}");
+        assert!(
+            error.contains("move the marker before the first LOSS"),
+            "{error}"
+        );
+
+        let loss_in_repeat = "R 0 1\nREPEAT 2 {\n  LOSS(0.1) 0\n}\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let config = test_config(
+            loss_in_repeat,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
+        assert!(error.contains("qubit 0 can be lost before"), "{error}");
+
+        let zero_probability_loss =
+            "R 0 1\nLOSS(0) 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let config = test_config(
+            zero_probability_loss,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
+
+        let loss_off_support = "R 0 1\nLOSS(0.1) 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let config = test_config(
+            loss_off_support,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
+    }
+
+    #[test]
+    fn deterministic_midswap_blinded_rows_cover_both_hidden_flip_paths() {
+        let circuit = crate::codegen::rotated_memory_z_midswap(crate::codegen::MidSwapConfig {
+            distance: 3,
+            rounds: 1,
+            pauli_probability: 0.0,
+            operation_loss_probability: 0.0,
+            measurement_loss_probability: 0.0,
+        })
+        .unwrap();
+        let mut config = test_config(
+            &circuit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![1, 8, 15]),
+        );
+        config.shots = 16;
+        config.seed = Some(0x629);
+
+        let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config).unwrap();
+        let masks = artifacts.masks.as_ref().unwrap();
+        assert_eq!(artifacts.measurements, 34);
+        assert_eq!(artifacts.public_shots.num_major(), 34);
+        assert_eq!(artifacts.public_shots.num_minor(), 16);
+        assert_eq!(artifacts.answers.num_major(), 1);
+        assert_eq!(masks.num_major(), 1);
+        assert!((0..config.shots).any(|shot| !masks.get(0, shot)));
+        assert!((0..config.shots).any(|shot| masks.get(0, shot)));
+
+        let public_interpretation = crate::m2d::measurements_to_detections(
+            &artifacts.public_instrs,
+            &artifacts.public_shots,
+        )
+        .unwrap();
+        for shot in 0..config.shots {
+            for loss_flag in (0..artifacts.measurements).step_by(2) {
+                assert!(
+                    !artifacts.public_shots.get(loss_flag, shot),
+                    "loss flag {loss_flag}, shot {shot}"
+                );
+            }
+            assert_eq!(
+                artifacts.answers.get(0, shot),
+                public_interpretation.observable_flips.get(0, shot) ^ masks.get(0, shot),
+                "shot {shot}"
+            );
+        }
     }
 
     #[test]

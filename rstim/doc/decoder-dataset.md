@@ -28,6 +28,13 @@ R 0 1 2
 # RSTIM_LOGICAL_FLIP_POINT
 ```
 
+Every qubit named by `--logical_x_qubits` or `--logical_z_qubits` must remain
+loss-free before the marker. The exporter rejects a positive-probability
+`LOSS` on that logical support before the insertion point; move the marker
+before the first such `LOSS`. Loss after the marker, including physical loss
+immediately before a loss-visible measurement, remains part of the sampled
+circuit.
+
 ```console
 rstim export_decoder_dataset \
   --circuit memory.stim \
