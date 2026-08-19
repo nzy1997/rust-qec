@@ -105,7 +105,6 @@ fn validate_operation(
         }
         "MPAD" => {
             expect_optional_probability(name, args)?;
-            expect_nonempty_targets(targets)?;
             for target in targets {
                 match target {
                     StimTarget::Qubit(0 | 1) => {}
@@ -261,7 +260,6 @@ fn expect_qubit_targets(
     targets: &[StimTarget],
     allow_inverted: bool,
 ) -> Result<(), String> {
-    expect_nonempty_targets(targets)?;
     for target in targets {
         match target {
             StimTarget::Qubit(_) => {}
@@ -276,7 +274,6 @@ fn expect_qubit_targets(
 }
 
 fn validate_measurement_targets(targets: &[StimTarget]) -> Result<usize, String> {
-    expect_nonempty_targets(targets)?;
     let mut measurements = 0;
     for target in targets {
         match target {
@@ -304,7 +301,6 @@ fn validate_controlled_pairs(
     targets: &[StimTarget],
     measurements: usize,
 ) -> Result<(), String> {
-    expect_nonempty_targets(targets)?;
     if !targets.len().is_multiple_of(2) {
         return Err("expected an even number of targets".to_string());
     }
@@ -356,13 +352,6 @@ fn expect_no_targets(_name: &str, targets: &[StimTarget]) -> Result<(), String> 
     Ok(())
 }
 
-fn expect_nonempty_targets(targets: &[StimTarget]) -> Result<(), String> {
-    if targets.is_empty() {
-        return Err("expected at least one target".to_string());
-    }
-    Ok(())
-}
-
 fn expect_observable_index(args: &[f64]) -> Result<(), String> {
     expect_arg_count("OBSERVABLE_INCLUDE", args, 1)?;
     let value = args[0];
@@ -377,7 +366,7 @@ fn expect_observable_index(args: &[f64]) -> Result<(), String> {
 
 fn validate_pauli_products(name: &str, targets: &[StimTarget]) -> Result<usize, String> {
     if targets.is_empty() {
-        return Err("expected at least one Pauli product".to_string());
+        return Ok(0);
     }
     let mut products = 0;
     let mut after_combiner = false;
@@ -409,9 +398,6 @@ fn validate_pauli_products(name: &str, targets: &[StimTarget]) -> Result<usize, 
 }
 
 fn expect_pauli_targets(_name: &str, targets: &[StimTarget]) -> Result<(), String> {
-    if targets.is_empty() {
-        return Err("expected at least one Pauli target".to_string());
-    }
     for target in targets {
         match target {
             StimTarget::Pauli {

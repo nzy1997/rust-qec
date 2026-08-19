@@ -164,7 +164,7 @@ where
             run_circuit_stats(input, format, error_format, stdin, stdout).map_err(RunError::Command)
         }
         Command::Capabilities { format } => {
-            write_capabilities(format, stdout).map_err(RunError::Command)
+            write_capabilities(format, error_format, stdout).map_err(RunError::Command)
         }
     }
 }
@@ -233,8 +233,10 @@ fn run_circuit_stats(
 
 fn write_capabilities(
     _format: CapabilitiesFormat,
+    error_format: Option<ErrorFormat>,
     stdout: &mut dyn Write,
 ) -> Result<(), CommandError> {
+    let json = !matches!(error_format, Some(ErrorFormat::Human));
     write_json(
         stdout,
         &CapabilitiesDocument {
@@ -298,7 +300,7 @@ fn write_capabilities(
         command: "capabilities",
         code: "output_error",
         message,
-        json: true,
+        json,
     })
 }
 
@@ -368,10 +370,11 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         .skip(1)
         .map(|value| value.to_string_lossy())
         .collect::<Vec<_>>();
-    let is_stats = words
+    let command_words = words_without_global_options(&words);
+    let is_stats = command_words
         .windows(2)
         .any(|pair| pair[0] == "circuit" && pair[1] == "stats");
-    let is_capabilities = words.iter().any(|word| word == "capabilities");
+    let is_capabilities = command_words.contains(&"capabilities");
     let command = if is_stats {
         CIRCUIT_STATS_COMMAND
     } else if is_capabilities {
@@ -394,6 +397,23 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         None => false,
     };
     (command, json)
+}
+
+fn words_without_global_options<'a>(words: &'a [std::borrow::Cow<'a, str>]) -> Vec<&'a str> {
+    let mut command_words = Vec::new();
+    let mut index = 0;
+    while index < words.len() {
+        let word = words[index].as_ref();
+        if word == "--error-format" {
+            index += 2;
+        } else if word.starts_with("--error-format=") {
+            index += 1;
+        } else {
+            command_words.push(word);
+            index += 1;
+        }
+    }
+    command_words
 }
 
 fn option_value<'a>(words: &'a [std::borrow::Cow<'a, str>], flag: &str) -> Option<Option<&'a str>> {

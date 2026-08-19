@@ -59,6 +59,29 @@ fn executor_uses_the_same_preflight_validator() {
 }
 
 #[test]
+fn zero_target_instructions_remain_valid_noops() {
+    let circuit = concat!(
+        "H\n",
+        "M\n",
+        "X_ERROR(0.1)\n",
+        "MPP\n",
+        "SPP\n",
+        "CX\n",
+        "MXX\n",
+        "DEPOLARIZE2(0.1)\n",
+        "CORRELATED_ERROR(0.1)\n",
+        "ELSE_CORRELATED_ERROR(0.2)\n",
+    );
+    let instrs = parse_and_validate(circuit).unwrap();
+    Executor::from_instrs(instrs).unwrap();
+
+    let summary = rstim::stats::summarize_text(circuit).unwrap();
+    assert_eq!(summary.instruction_count, 10);
+    assert_eq!(summary.num_qubits, 0);
+    assert_eq!(summary.num_measurements, 0);
+}
+
+#[test]
 fn rejects_additional_argument_target_and_chain_errors() {
     let invalid = [
         ("ELSE_CORRELATED_ERROR(0.1) X0\n", "must immediately follow"),
@@ -66,10 +89,7 @@ fn rejects_additional_argument_target_and_chain_errors() {
         ("DEPOLARIZE2(0.1) 0\n", "even number"),
         ("CX 0 rec[-1]\n", "expected qubit pair"),
         ("DETECTOR 0\n", "expected rec[] target"),
-        ("H\n", "expected at least one target"),
         ("OBSERVABLE_INCLUDE(-1)\n", "observable index"),
-        ("MPP\n", "at least one Pauli product"),
-        ("CORRELATED_ERROR(0.1)\n", "at least one Pauli target"),
         ("CORRELATED_ERROR(0.1) !X0\n", "inverted Pauli"),
     ];
     for (circuit, expected) in invalid {

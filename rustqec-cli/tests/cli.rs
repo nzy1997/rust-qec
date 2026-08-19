@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
 fn rustqec_cmd() -> Command {
@@ -20,6 +20,21 @@ fn run_with_stdin(args: &[&str], input: &str) -> std::process::Output {
         .write_all(input.as_bytes())
         .unwrap();
     child.wait_with_output().unwrap()
+}
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "injected stdout failure",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -191,6 +206,9 @@ fn json_intent_wraps_command_line_parse_errors() {
         vec!["circuit", "stats", "--format=yaml"],
         vec!["circuit", "stats", "--format", "json", "--in"],
         vec!["--error-format", "json", "circuit", "stats", "--unknown"],
+        vec!["circuit", "--error-format", "json", "stats", "--unknown"],
+        vec!["circuit", "--error-format=json", "stats", "--unknown"],
+        vec!["circuit", "stats", "--error-format", "json", "--unknown"],
     ] {
         let output = rustqec_cmd().args(&args).output().unwrap();
         assert_eq!(output.status.code(), Some(2), "args: {args:?}");
@@ -201,6 +219,43 @@ fn json_intent_wraps_command_line_parse_errors() {
         assert_eq!(value["command"], "circuit.stats");
         assert_eq!(value["error"]["code"], "invalid_arguments");
         assert!(!value["error"]["message"].as_str().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn capabilities_output_errors_follow_the_requested_error_channel() {
+    for (error_format, expect_json) in [(None, true), (Some("json"), true), (Some("human"), false)]
+    {
+        let mut args = vec!["rustqec"];
+        if let Some(error_format) = error_format {
+            args.extend(["--error-format", error_format]);
+        }
+        args.extend(["capabilities", "--format", "json"]);
+
+        let error = rustqec_cli::run(args, &mut io::empty(), &mut FailingWriter).unwrap_err();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        rustqec_cli::write_error(&error, &mut stdout, &mut stderr);
+
+        assert!(stdout.is_empty());
+        if expect_json {
+            let value: serde_json::Value = serde_json::from_slice(&stderr).unwrap();
+            assert_eq!(value["command"], "capabilities");
+            assert_eq!(value["error"]["code"], "output_error");
+            assert!(
+                value["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("injected stdout failure")
+            );
+        } else {
+            assert!(serde_json::from_slice::<serde_json::Value>(&stderr).is_err());
+            assert!(
+                String::from_utf8(stderr)
+                    .unwrap()
+                    .contains("injected stdout failure")
+            );
+        }
     }
 }
 
