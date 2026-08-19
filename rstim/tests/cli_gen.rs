@@ -159,6 +159,166 @@ fn gen_surface_code_atom_loss_is_opt_in_from_cli() {
 }
 
 #[test]
+fn gen_midswap_is_parseable_and_sampleable_from_cli() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("midswap.stim");
+    let shots_path = directory.path().join("midswap.b8");
+    let generated = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z_midswap",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.002",
+            "--operation_loss_probability",
+            "0.002",
+            "--measurement_loss_probability",
+            "0.003",
+            "--out",
+            circuit_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let text = std::fs::read_to_string(&circuit_path).unwrap();
+    assert_eq!(text.matches("# MIDSWAP_SHUTTLE").count(), 2);
+    assert_eq!(
+        text.lines().filter(|line| line.starts_with("MRL ")).count(),
+        2
+    );
+    assert_eq!(
+        text.lines().filter(|line| line.starts_with("ML ")).count(),
+        1
+    );
+    assert!(text.contains("DEPOLARIZE1(0.002)"));
+    assert!(text.contains("DEPOLARIZE2(0.002)"));
+    assert!(!text.contains("X_ERROR"));
+    assert!(text.contains("LOSS(0.001)"));
+    assert!(text.contains("LOSS(0.003)"));
+
+    let sampled = rstim_cmd()
+        .args([
+            "sample",
+            "--in",
+            circuit_path.to_str().unwrap(),
+            "--shots",
+            "8",
+            "--seed",
+            "7",
+            "--out_format",
+            "b8",
+            "--out",
+            shots_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        sampled.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&sampled.stderr)
+    );
+    assert_eq!(std::fs::metadata(shots_path).unwrap().len(), 8 * 7);
+}
+
+#[test]
+fn gen_midswap_rejects_invalid_input_without_touching_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("midswap.stim");
+    for (flag, value, expected_error) in [
+        ("--distance", "4", "odd and at least 3"),
+        (
+            "--operation_loss_probability",
+            "NaN",
+            "finite and in [0, 1]",
+        ),
+        (
+            "--measurement_loss_probability",
+            "1.01",
+            "finite and in [0, 1]",
+        ),
+    ] {
+        std::fs::write(&circuit_path, "keep me").unwrap();
+        let mut command = rstim_cmd();
+        command.args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z_midswap",
+            "--rounds",
+            "2",
+        ]);
+        if flag != "--distance" {
+            command.args(["--distance", "3"]);
+        }
+        let output = command
+            .args([flag, value, "--out", circuit_path.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected_error),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(std::fs::read_to_string(&circuit_path).unwrap(), "keep me");
+    }
+}
+
+#[test]
+fn new_loss_flags_do_not_change_conventional_surface_generation() {
+    let base = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.002",
+        ])
+        .output()
+        .unwrap();
+    let explicit_zero = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.002",
+            "--operation_loss_probability",
+            "0",
+            "--measurement_loss_probability",
+            "0",
+        ])
+        .output()
+        .unwrap();
+    assert!(base.status.success());
+    assert!(explicit_zero.status.success());
+    assert_eq!(base.stdout, explicit_zero.stdout);
+}
+
+#[test]
 fn gen_common_without_distance_does_not_touch_out() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out.stim");

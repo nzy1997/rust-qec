@@ -234,6 +234,32 @@ Current generator controls:
 - `--distance`
 - `--rounds`
 - `--after_clifford_depolarization`
+- `--operation_loss_probability` (Mid-SWAP only)
+- `--measurement_loss_probability` (Mid-SWAP only)
+
+The native Mid-SWAP rotated-memory generator is selected by its dedicated
+surface-code task. It requires an odd distance of at least 3 and emits
+loss-visible `MRL`/`ML` records in `loss_flag,value_bit` order:
+
+```sh
+rstim gen \
+  --code surface_code \
+  --task rotated_memory_z_midswap \
+  --distance 3 \
+  --rounds 2 \
+  --after_clifford_depolarization 0.001 \
+  --operation_loss_probability 0.002 \
+  --measurement_loss_probability 0.003 \
+  --out midswap.stim
+```
+
+For this task, `--after_clifford_depolarization` is the Pauli-noise parameter,
+`--operation_loss_probability` controls gate/reset loss, and
+`--measurement_loss_probability` controls loss immediately before measurement.
+`--after_clifford_loss_probability` is intentionally rejected to keep the two
+loss channels unambiguous. The generated `# MIDSWAP_SHUTTLE` comments expose
+each persistent logical-to-physical remapping without changing circuit
+semantics.
 
 CSS memory circuits can be generated from explicit matrix wrappers:
 

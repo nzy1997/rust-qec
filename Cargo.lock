@@ -68,6 +68,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "atom-loss-envelope"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "qec-ilp-core",
+ "rmatching",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

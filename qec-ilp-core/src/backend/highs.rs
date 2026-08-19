@@ -109,6 +109,13 @@ impl BinaryBackend for HighsBinaryBackend {
                 ))
             })?;
 
+        if solution_status == ModelSolutionStatus::Infeasible {
+            return Ok(ModelSolution {
+                binary_values: Vec::new(),
+                status: solution_status,
+            });
+        }
+
         let columns = read_solution_columns(model)?;
 
         if columns.len() < self.solution_binary_prefix_len {
@@ -225,6 +232,7 @@ fn accepted_model_solution_status(
 ) -> Option<ModelSolutionStatus> {
     match model_status {
         HighsModelStatus::Optimal => Some(ModelSolutionStatus::Optimal),
+        HighsModelStatus::Infeasible => Some(ModelSolutionStatus::Infeasible),
         HighsModelStatus::ReachedTimeLimit if primal_status == HighsSolutionStatus::Feasible => {
             Some(ModelSolutionStatus::TimeLimit)
         }
@@ -258,6 +266,17 @@ mod tests {
                 HighsSolutionStatus::Feasible,
             ),
             Some(ModelSolutionStatus::TimeLimit),
+        );
+    }
+
+    #[test]
+    fn maps_infeasible_solution_status_without_a_primal_solution() {
+        assert_eq!(
+            accepted_model_solution_status(
+                HighsModelStatus::Infeasible,
+                HighsSolutionStatus::Infeasible,
+            ),
+            Some(ModelSolutionStatus::Infeasible),
         );
     }
 
