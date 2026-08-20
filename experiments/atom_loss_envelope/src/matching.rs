@@ -7,7 +7,7 @@ use thiserror::Error;
 pub const MATCHING_INPUT_SCHEMA_VERSION: &str = "atom-loss-envelope-matching.v0";
 pub const MATCHING_RESULT_SCHEMA_VERSION: &str = "atom-loss-envelope-matching-result.v0";
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnvelopeMatchingCase {
     pub schema_version: String,
@@ -18,7 +18,7 @@ pub struct EnvelopeMatchingCase {
     pub shots: Vec<EnvelopeMatchingShot>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnvelopeMatchingEdge {
     pub id: String,
@@ -29,7 +29,7 @@ pub struct EnvelopeMatchingEdge {
     pub kind: EdgeKind,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeKind {
     TimeLike,
@@ -37,14 +37,14 @@ pub enum EdgeKind {
     Boundary,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LossEdgeMap {
     pub loss_id: String,
     pub edge_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnvelopeMatchingShot {
     pub observed_detectors: Vec<usize>,
@@ -155,6 +155,12 @@ pub fn decode_matching(
         predictions,
         compiled_loss_configurations,
     })
+}
+
+pub(crate) fn validate_matching_case(
+    case: &EnvelopeMatchingCase,
+) -> Result<(), EnvelopeMatchingError> {
+    validate(case).map(|_| ())
 }
 
 struct ValidatedCase {

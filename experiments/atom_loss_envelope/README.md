@@ -6,11 +6,66 @@ the detector-parity and per-loss exclusivity reduction used by Envelope-MLE in
 the Pauli Envelope framework, but does not claim to reproduce the paper's
 circuits or numerical results.
 
-The input is intentionally offline. A caller supplies independent Pauli effects
-and one non-empty candidate list for each observed loss. Detector and observable
-index lists are interpreted modulo two. Candidate `weight` values are additive
-non-negative objective costs; they can encode a chosen negative-log prior, but
-this v0 schema does not prescribe how those priors are calibrated.
+The decoders remain intentionally offline. Inputs may be supplied directly as
+versioned JSON, or prepared from an RStim Mid-SWAP circuit and b8 measurement
+rows with the `prepare` command. Detector and observable index lists are
+interpreted modulo two. Candidate `weight` values are additive non-negative
+objective costs.
+
+## Prepare circuit-bound loss data
+
+For ordinary circuits, `rstim analyze_errors` produces the DEM and `rstim m2d`
+converts measurements into detector rows. `prepare` is the loss-aware equivalent
+of those two steps: it additionally learns per-readout loss patterns from a
+pure-loss calibration file.
+
+```sh
+cargo run -q -p atom-loss-envelope -- prepare \
+  --circuit midswap.stim \
+  --calibration_in pure-loss-calibration.b8 \
+  --calibration_shots 10000 \
+  --in target-measurements.b8 \
+  --shots 1000 \
+  --out /tmp/atom-loss-prepared
+```
+
+Both inputs contain complete loss-visible measurement rows in RStim's b8
+format. Every `MRL` or `ML` target contributes adjacent
+`loss_flag,value_bit` records. Calibration rows with exactly one asserted loss
+flag contribute candidates; zero- and multi-loss calibration rows are ignored.
+Every circuit loss readout must acquire at least one calibrated pattern.
+Sweep-dependent circuits are rejected because this v0 interface does not accept
+the per-shot sweep sidecar needed for correct detector conversion.
+
+The output bundle contains:
+
+- `manifest.json`, including input SHA-256 values, row widths, shot counts, and
+  calibration/graph diagnostics;
+- `observables.b8`, a decoder-neutral target-observable stream for scoring;
+- `mle/shot-000000.json` and one subsequent `atom-loss-envelope.v0` file per
+  target shot; and
+- `matching.json`, one batched `atom-loss-envelope-matching.v0` input.
+
+All inputs and outputs are materialized before the bundle is installed. An
+existing non-empty output directory is rejected; an absent or empty output
+directory is installed from a same-filesystem staging directory.
+
+`decode` and `matching` never read `observables.b8`; it remains a separate
+truth stream, matching the ordinary `rsinter replay` separation between
+detector inputs, predictions, and scoring answers.
+
+Prepared files feed the existing decoders without another conversion step:
+
+```sh
+cargo run -q -p atom-loss-envelope -- decode \
+  --in /tmp/atom-loss-prepared/mle/shot-000000.json \
+  --out /tmp/mle-result.json \
+  --backend highs
+
+cargo run -q -p atom-loss-envelope -- matching \
+  --in /tmp/atom-loss-prepared/matching.json \
+  --out /tmp/matching-result.json
+```
 
 Run the checked positive case with the open-source HiGHS backend:
 
@@ -30,9 +85,10 @@ A valid but infeasible model exits `3` and still writes a result with status
 
 This crate does not yet:
 
-- derive envelope candidates from an `rstim` circuit or a live loss event;
 - implement the paper's Mid-SWAP syndrome-extraction circuit;
-- widen the stable DEM-only `rsinter::Decoder` interface; or
+- widen the stable DEM-only `rsinter::Decoder` interface;
+- expose a unified streaming `predictions.b8` replay command for prepared loss
+  bundles; or
 - run threshold, effective-distance, or publication-scale studies.
 
 Those layers can be added in separate PRs after this explicit-input kernel is
@@ -58,9 +114,10 @@ The result uses `atom-loss-envelope-matching-result.v0`. Each entry in
 `predictions` is a bit mask: bit `i` is the predicted value of logical
 observable `i`. The current format supports up to 64 observables.
 
-This command requires explicit, pre-calibrated loss-to-edge memberships. It
-does not infer them from a circuit and does not make a SOTA performance or
-logical-error-rate claim.
+When invoked directly, this command requires explicit, pre-calibrated
+loss-to-edge memberships. The `prepare` command can generate them from a
+supported circuit and calibration set. Neither path makes a SOTA performance
+or logical-error-rate claim.
 
 The input fields are:
 

@@ -74,8 +74,10 @@ dependencies = [
  "clap",
  "qec-ilp-core",
  "rmatching",
+ "rstim",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
 ]
