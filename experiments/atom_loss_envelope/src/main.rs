@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use atom_loss_envelope::{
-    AtomLossCase, DecodeOutcome, EnvelopeMatchingCase, decode, decode_matching,
+    AtomLossCase, DecodeOutcome, EnvelopeMatchingCase, PrepareConfig, decode, decode_matching,
+    prepare,
 };
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
@@ -18,6 +19,27 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Prepare loss-visible measurements for the experimental decoders.
+    Prepare {
+        /// RStim Mid-SWAP circuit containing loss-visible measurements.
+        #[arg(long, value_name = "CIRCUIT")]
+        circuit: PathBuf,
+        /// Pure-loss calibration measurements in b8 format.
+        #[arg(long = "calibration_in", value_name = "CALIBRATION_B8")]
+        calibration_in: PathBuf,
+        /// Number of calibration shots in calibration_in.
+        #[arg(long = "calibration_shots", value_name = "N")]
+        calibration_shots: usize,
+        /// Target measurement shots in b8 format.
+        #[arg(long = "in", value_name = "MEASUREMENTS_B8")]
+        input: PathBuf,
+        /// Number of target shots in the input file.
+        #[arg(long, value_name = "M")]
+        shots: usize,
+        /// Destination directory for the prepared decoder bundle.
+        #[arg(long, value_name = "PREPARED_DIRECTORY")]
+        out: PathBuf,
+    },
     /// Decode one versioned JSON envelope case.
     Decode {
         /// Input atom-loss-envelope.v0 JSON file.
@@ -48,12 +70,51 @@ enum BackendArg {
 
 fn main() -> ExitCode {
     match Cli::parse().command {
+        Command::Prepare {
+            circuit,
+            calibration_in,
+            calibration_shots,
+            input,
+            shots,
+            out,
+        } => run_prepare(
+            &circuit,
+            &calibration_in,
+            calibration_shots,
+            &input,
+            shots,
+            &out,
+        ),
         Command::Decode {
             input,
             out,
             backend: BackendArg::Highs,
         } => run_decode(&input, &out),
         Command::Matching { input, out } => run_matching(&input, &out),
+    }
+}
+
+fn run_prepare(
+    circuit: &Path,
+    calibration_in: &Path,
+    calibration_shots: usize,
+    input: &Path,
+    shots: usize,
+    out: &Path,
+) -> ExitCode {
+    match prepare(&PrepareConfig {
+        circuit: circuit.to_path_buf(),
+        calibration_in: calibration_in.to_path_buf(),
+        calibration_shots,
+        input: input.to_path_buf(),
+        shots,
+        out: out.to_path_buf(),
+    }) {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 

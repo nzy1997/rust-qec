@@ -252,3 +252,322 @@ fn matching_empty_shots_are_rejected_without_writing_a_result() {
     );
     assert!(!output_path.exists());
 }
+
+#[test]
+fn prepare_bridge_fixture_flows_through_both_decoders() {
+    let directory = tempfile::tempdir().unwrap();
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x03]).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            case_path("bridge_single_loss.stim").to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(prepared_path.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(
+        manifest["schema_version"],
+        "atom-loss-envelope-preparation.v0"
+    );
+    assert_eq!(manifest["loss_readout_count"], 1);
+    assert_eq!(manifest["retained_single_loss_calibration_rows"], 1);
+    assert_eq!(manifest["calibrated_pattern_count"], 1);
+    assert_eq!(manifest["matching_edge_count"], 1);
+    assert_eq!(manifest["loss_edge_membership_count"], 1);
+    assert_eq!(manifest["raw_measurement_row_bits"], 2);
+    assert_eq!(manifest["compact_value_row_bits"], 1);
+    assert_eq!(manifest["observable_row_bits"], 1);
+    assert_eq!(manifest["observable_row_bytes"], 1);
+    assert_eq!(manifest["observables_sha256"].as_str().unwrap().len(), 64);
+    assert_eq!(manifest["circuit_sha256"].as_str().unwrap().len(), 64);
+    assert_eq!(manifest["calibration_sha256"].as_str().unwrap().len(), 64);
+    assert_eq!(manifest["shots_sha256"].as_str().unwrap().len(), 64);
+
+    let mle_path = prepared_path.join("mle/shot-000000.json");
+    let mle: serde_json::Value = serde_json::from_slice(&fs::read(&mle_path).unwrap()).unwrap();
+    assert_eq!(mle["observed_detectors"], json!([0]));
+    assert_eq!(mle["independent_effects"].as_array().unwrap().len(), 1);
+    assert_eq!(mle["independent_effects"][0]["id"], "dem-e0");
+    assert_eq!(mle["independent_effects"][0]["detectors"], json!([0]));
+    assert_eq!(mle["independent_effects"][0]["observables"], json!([0]));
+    let weight = mle["independent_effects"][0]["weight"].as_f64().unwrap();
+    assert!((weight - 9.0_f64.ln()).abs() < 1e-12);
+    assert_eq!(mle["loss_envelopes"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        mle["loss_envelopes"][0]["candidates"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        mle["loss_envelopes"][0]["candidates"][0]["detectors"],
+        json!([0])
+    );
+    assert_eq!(
+        mle["loss_envelopes"][0]["candidates"][0]["observables"],
+        json!([0])
+    );
+    assert_eq!(
+        mle["loss_envelopes"][0]["candidates"][0]["weight"].as_f64(),
+        Some(0.0)
+    );
+
+    let matching_path = prepared_path.join("matching.json");
+    let matching: serde_json::Value =
+        serde_json::from_slice(&fs::read(&matching_path).unwrap()).unwrap();
+    assert_eq!(matching["edges"].as_array().unwrap().len(), 1);
+    assert_eq!(matching["edges"][0]["node1"], 0);
+    assert_eq!(matching["edges"][0]["node2"], serde_json::Value::Null);
+    assert_eq!(matching["edges"][0]["observable_indices"], json!([0]));
+    assert_eq!(matching["edges"][0]["kind"], "boundary");
+    assert_eq!(matching["loss_edge_map"][0]["edge_ids"], json!(["dem-e0"]));
+    assert_eq!(matching["shots"][0]["observed_detectors"], json!([0]));
+    assert_eq!(matching["shots"][0]["observed_losses"], json!(["loss-m0"]));
+
+    let mle_result_path = directory.path().join("mle-result.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "decode",
+            "--in",
+            mle_path.to_str().unwrap(),
+            "--out",
+            mle_result_path.to_str().unwrap(),
+            "--backend",
+            "highs",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mle_result: serde_json::Value =
+        serde_json::from_slice(&fs::read(mle_result_path).unwrap()).unwrap();
+    assert_eq!(mle_result["predicted_observables"], json!([0]));
+
+    let matching_result_path = directory.path().join("matching-result.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "matching",
+            "--in",
+            matching_path.to_str().unwrap(),
+            "--out",
+            matching_result_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let matching_result: serde_json::Value =
+        serde_json::from_slice(&fs::read(matching_result_path).unwrap()).unwrap();
+    assert_eq!(matching_result["predictions"], json!([1]));
+    assert_eq!(
+        fs::read(prepared_path.join("observables.b8")).unwrap(),
+        [0x01]
+    );
+
+    let second_prepared_path = directory.path().join("prepared-again");
+    fs::create_dir(&second_prepared_path).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            case_path("bridge_single_loss.stim").to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            second_prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for relative in [
+        "manifest.json",
+        "observables.b8",
+        "mle/shot-000000.json",
+        "matching.json",
+    ] {
+        assert_eq!(
+            fs::read(prepared_path.join(relative)).unwrap(),
+            fs::read(second_prepared_path.join(relative)).unwrap(),
+            "prepared output {relative} was not deterministic"
+        );
+    }
+}
+
+#[test]
+fn prepare_rejects_loss_flag_detector_before_creating_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x03]).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            case_path("bridge_loss_flag_detector.stim")
+                .to_str()
+                .unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("invalid loss-flag reference"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!prepared_path.exists());
+}
+
+#[test]
+fn prepare_rejects_truncated_b8_before_creating_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("truncated.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, []).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            case_path("bridge_single_loss.stim").to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("target b8 input has 0 bytes; expected 1"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!prepared_path.exists());
+}
+
+#[test]
+fn prepare_help_documents_normal_workflow_flag_names() {
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args(["prepare", "--help"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for flag in [
+        "--circuit",
+        "--calibration_in",
+        "--calibration_shots",
+        "--in",
+        "--shots",
+        "--out",
+    ] {
+        assert!(stdout.contains(flag), "missing {flag} in help:\n{stdout}");
+    }
+}
+
+#[test]
+fn prepare_refuses_a_nonempty_output_directory() {
+    let directory = tempfile::tempdir().unwrap();
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x03]).unwrap();
+    fs::create_dir(&prepared_path).unwrap();
+    fs::write(prepared_path.join("keep.txt"), b"user data").unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            case_path("bridge_single_loss.stim").to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("is not empty"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(prepared_path.join("keep.txt")).unwrap(),
+        b"user data"
+    );
+    assert!(!prepared_path.join("manifest.json").exists());
+}

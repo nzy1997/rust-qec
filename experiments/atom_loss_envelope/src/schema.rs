@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 pub const INPUT_SCHEMA_VERSION: &str = "atom-loss-envelope.v0";
 pub const RESULT_SCHEMA_VERSION: &str = "atom-loss-envelope-result.v0";
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AtomLossCase {
     pub schema_version: String,
@@ -14,7 +14,7 @@ pub struct AtomLossCase {
     pub loss_envelopes: Vec<LossEnvelope>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Effect {
     pub id: String,
@@ -23,7 +23,7 @@ pub struct Effect {
     pub weight: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LossEnvelope {
     pub loss_id: String,
