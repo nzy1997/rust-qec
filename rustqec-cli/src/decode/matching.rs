@@ -31,25 +31,25 @@ pub(super) struct CompiledMatching {
 impl CompiledMatching {
     pub(super) fn new(circuit: &CompiledCircuit) -> Result<Self, DecodeFailure> {
         validate_unambiguous_parallel_edges(&circuit.graph_edges)?;
-        for envelope in &circuit.envelopes {
-            for candidate in &envelope.candidates {
-                if candidate.detectors.is_empty() && candidate.observables.is_empty() {
-                    continue;
-                }
-                if !circuit
-                    .graph_edges
-                    .iter()
-                    .any(|edge| candidate_affects_edge(candidate, edge))
-                {
-                    return Err(DecodeFailure::new(
-                        "unsupported_circuit",
-                        format!(
-                            "loss candidate {:?} of {:?} has no compatible matching edge",
-                            candidate.id, envelope.id
-                        ),
-                    ));
-                }
-            }
+        // `loss_edges` is the union of graphlike primitive effects present in an
+        // envelope. The compiler validates each primitive while building it; a
+        // composite candidate can span a multi-edge path and does not itself
+        // need to contain both endpoints of one base edge.
+        if let Some((envelope, primitive)) = circuit
+            .envelopes
+            .iter()
+            .zip(&circuit.unmapped_loss_primitives)
+            .find_map(|(envelope, primitives)| {
+                primitives.first().map(|primitive| (envelope, primitive))
+            })
+        {
+            return Err(DecodeFailure::new(
+                "unsupported_circuit",
+                format!(
+                    "primitive loss effect {primitive} of {:?} has no compatible matching edge",
+                    envelope.id
+                ),
+            ));
         }
         if let Some(envelope) = circuit
             .loss_edges
