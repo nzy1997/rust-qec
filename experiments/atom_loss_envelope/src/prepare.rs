@@ -1005,6 +1005,221 @@ mod tests {
             Some(&[1.0, 2.0, 3.0]),
             Some(&[1.0, 4.0, 3.0])
         ));
+        assert!(same_spatial_coordinates(
+            Some(&[1.0, 2.0]),
+            Some(&[1.0, 2.0])
+        ));
         assert!(!same_spatial_coordinates(None, Some(&[1.0, 2.0])));
+    }
+
+    #[test]
+    fn prepare_rejects_invalid_counts_and_unsupported_circuits() {
+        let directory = tempfile::tempdir().unwrap();
+        let circuit = directory.path().join("case.stim");
+        let calibration = directory.path().join("calibration.b8");
+        let input = directory.path().join("input.b8");
+        fs::write(&calibration, [0]).unwrap();
+        fs::write(&input, [0]).unwrap();
+        let mut config = PrepareConfig {
+            circuit: circuit.clone(),
+            calibration_in: calibration,
+            calibration_shots: 0,
+            input,
+            shots: 1,
+            out: directory.path().join("prepared"),
+        };
+
+        assert_eq!(
+            prepare(&config).unwrap_err(),
+            "--calibration_shots must be greater than zero"
+        );
+        config.calibration_shots = 1;
+        config.shots = 0;
+        assert_eq!(
+            prepare(&config).unwrap_err(),
+            "--shots must be greater than zero"
+        );
+
+        config.shots = 1;
+        fs::write(&circuit, "R 0\nMRL 0\nDETECTOR rec[-1]\n").unwrap();
+        assert!(
+            prepare(&config)
+                .unwrap_err()
+                .contains("requires exactly one logical observable")
+        );
+
+        fs::write(
+            &circuit,
+            "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        )
+        .unwrap();
+        assert_eq!(
+            prepare(&config).unwrap_err(),
+            "prepare requires at least one loss-visible measurement"
+        );
+
+        fs::write(
+            &circuit,
+            "R 0\nMRL 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        )
+        .unwrap();
+        fs::write(&config.calibration_in, []).unwrap();
+        assert!(
+            prepare(&config)
+                .unwrap_err()
+                .contains("calibration b8 input has 0 bytes")
+        );
+
+        fs::write(&config.calibration_in, [0]).unwrap();
+        assert!(
+            prepare(&config)
+                .unwrap_err()
+                .contains("has no pure single-loss calibration pattern")
+        );
+
+        fs::write(&config.calibration_in, [0x03]).unwrap();
+        fs::write(&config.input, [0x03]).unwrap();
+        assert_eq!(
+            prepare(&config).unwrap_err(),
+            "Pauli-only detector error model produced no matching edges"
+        );
+    }
+
+    #[test]
+    fn exact_b8_and_calibration_reject_ambiguous_rows() {
+        let error = read_exact_b8(&[0b1000_0000], 1, 1, "test").unwrap_err();
+        assert!(error.contains("shot 0 has nonzero unused high bits"));
+        let error = read_exact_b8(&[], 0, 1, "zero-width").unwrap_err();
+        assert!(error.contains("decoded 0 shots; expected 1"));
+
+        let raw = BitTable::try_new(1, 1).unwrap();
+        let detections = BitTable::try_new(1, 1).unwrap();
+        let observables = BitTable::try_new(1, 1).unwrap();
+        let losses = [LossReadout {
+            id: "loss-m0".to_string(),
+            raw_flag_index: 0,
+        }];
+        let error = calibrate_patterns(&raw, &detections, &observables, &losses)
+            .err()
+            .unwrap();
+        assert!(error.contains("has no pure single-loss calibration pattern"));
+    }
+
+    #[test]
+    fn record_and_output_validation_report_actionable_errors() {
+        let mut targets = [StimTarget::Rec(-1)];
+        let error = rewrite_record_targets("DETECTOR", &mut targets, 0, 0, &[]).unwrap_err();
+        assert!(error.contains("invalid record target rec[-1]"));
+        let mut targets = [StimTarget::Rec(-1)];
+        let error = rewrite_record_targets("DETECTOR", &mut targets, 1, 0, &[Some(0)]).unwrap_err();
+        assert!(error.contains("does not refer to an earlier compact value"));
+
+        let directory = tempfile::tempdir().unwrap();
+        let missing_parent = directory.path().join("missing/prepare-output");
+        let error = validate_output_target(&missing_parent).unwrap_err();
+        assert!(error.contains("output parent directory"));
+
+        let file = directory.path().join("not-a-directory");
+        fs::write(&file, b"existing data").unwrap();
+        let error = validate_output_target(&file).unwrap_err();
+        assert!(error.contains("exists and is not a directory"));
+
+        let error = normalize_circuit(&[StimInstr::new("ML", vec![], vec![])]).unwrap_err();
+        assert_eq!(error, "ML must contain at least one qubit target");
+
+        let staged_out = directory.path().join("staged-output");
+        let error = install_bundle(
+            &staged_out,
+            &[(PathBuf::from("missing-parent/file.json"), vec![])],
+        )
+        .unwrap_err();
+        assert!(error.contains("failed to write staged output"));
+        assert!(!staged_out.exists());
+    }
+
+    #[test]
+    fn dem_expansion_applies_repeated_detector_and_coordinate_shifts() {
+        let mut body = DetectorErrorModel::new();
+        body.add_detector(0, vec![1.0, 2.0, 3.0]);
+        body.add_detector(1, vec![1.0, 2.0, 4.0]);
+        body.add_error(
+            0.1,
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Separator,
+                DemTarget::Detector(2),
+                DemTarget::Observable(0),
+            ],
+        );
+        body.add_observable(0);
+        body.add_shift_detectors(3, vec![10.0, 0.0, 1.0]);
+        let mut dem = DetectorErrorModel::new();
+        dem.add_repeat(2, body);
+
+        let artifacts = dem_artifacts(&dem).unwrap();
+        assert_eq!(artifacts.independent_effects.len(), 2);
+        assert_eq!(artifacts.edges.len(), 4);
+        assert_eq!(
+            artifacts
+                .edges
+                .iter()
+                .map(|edge| (edge.id.as_str(), edge.node1, edge.node2, edge.kind))
+                .collect::<Vec<_>>(),
+            vec![
+                ("dem-e0-c0", 0, Some(1), EdgeKind::TimeLike),
+                ("dem-e0-c1", 2, None, EdgeKind::Boundary),
+                ("dem-e1-c0", 3, Some(4), EdgeKind::TimeLike),
+                ("dem-e1-c1", 5, None, EdgeKind::Boundary),
+            ]
+        );
+    }
+
+    #[test]
+    fn dem_artifacts_reject_non_graphlike_and_invalid_effects() {
+        let mut observable_only = DetectorErrorModel::new();
+        observable_only.add_error(0.1, vec![DemTarget::Observable(0)]);
+        assert!(
+            dem_artifacts(&observable_only)
+                .unwrap_err()
+                .contains("changes an observable without a detector")
+        );
+
+        let mut non_graphlike = DetectorErrorModel::new();
+        non_graphlike.add_error(
+            0.1,
+            vec![
+                DemTarget::Detector(0),
+                DemTarget::Detector(1),
+                DemTarget::Detector(2),
+            ],
+        );
+        assert!(
+            dem_artifacts(&non_graphlike)
+                .unwrap_err()
+                .contains("is not graphlike after decomposition")
+        );
+
+        assert!(llr_weight(0.0, "zero").unwrap_err().contains("in (0, 0.5]"));
+        assert!(
+            llr_weight(f64::NAN, "nan")
+                .unwrap_err()
+                .contains("must be finite")
+        );
+        assert_eq!(
+            component_pattern(&[
+                DemTarget::Detector(0),
+                DemTarget::Detector(0),
+                DemTarget::Observable(0),
+                DemTarget::Observable(0),
+            ]),
+            (vec![], vec![])
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "components do not contain separators")]
+    fn component_pattern_enforces_separator_invariant() {
+        component_pattern(&[DemTarget::Separator]);
     }
 }
