@@ -93,6 +93,66 @@ fn write_dataset(root: &Path, circuit: &str, shots: &[u8]) -> PathBuf {
     dataset
 }
 
+fn write_decoder_server_dataset(root: &Path, circuit: &str, shots: &[u8]) -> PathBuf {
+    let dataset = root.join("decoder-server-dataset");
+    fs::create_dir(&dataset).unwrap();
+    fs::write(dataset.join("circuit.stim"), circuit).unwrap();
+    fs::write(dataset.join("shots.b8"), shots).unwrap();
+    let circuit_sha = sha256(circuit.as_bytes());
+    let shots_sha = sha256(shots);
+    let manifest = json!({
+        "format": "qude_decoder_dataset",
+        "schema_version": 3,
+        "benchmark_id": "surface_d3_r1_p001_loss_midswap_measurements",
+        "code_family": "surface_code",
+        "task": "rotated_memory_z_midswap_alt",
+        "code_params": {"distance": 3},
+        "noise_model": "circuit_depolarization_and_atom_loss",
+        "p": 0.001,
+        "rounds": 1,
+        "mode": "measurements_blinded",
+        "shots": shots.len(),
+        "num_detectors": 2,
+        "num_measurements": 4,
+        "num_observables": 1,
+        "row": {
+            "kind": "measurements",
+            "bits": 4,
+            "encoding": "b8",
+            "bit_order": "little_endian",
+            "bytes_per_shot": 1
+        },
+        "circuit": {
+            "file": "circuit.stim",
+            "sha256": circuit_sha,
+            "measurements": 4,
+            "detectors": 2,
+            "observables": 1
+        },
+        "shots_file": {
+            "file": "shots.b8",
+            "sha256": shots_sha,
+            "encoding": "b8",
+            "bit_order": "little_endian",
+            "bits_per_shot": 4,
+            "bytes_per_shot": 1
+        },
+        "predictions": {
+            "encoding": "b8",
+            "bit_order": "little_endian",
+            "bits_per_shot": 1,
+            "bytes_per_shot": 1,
+            "padding": "zero"
+        }
+    });
+    fs::write(
+        dataset.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+    dataset
+}
+
 fn run_decode(dataset: &Path, decoder: &str, root: &Path) -> std::process::Output {
     rustqec()
         .args([
@@ -140,6 +200,63 @@ fn both_loss_decoders_run_public_only_and_reuse_compiled_state() {
         } else {
             assert_eq!(stats["mle_model_builds"], 1);
         }
+    }
+}
+
+#[test]
+fn decoder_server_v3_public_bundle_decodes_without_translation() {
+    let root = tempfile::tempdir().unwrap();
+    let dataset = write_decoder_server_dataset(root.path(), CIRCUIT, SHOTS);
+    for decoder in ["envelope-matching", "envelope-mle"] {
+        let output = run_decode(&dataset, decoder, root.path());
+        assert!(
+            output.status.success(),
+            "{decoder}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            fs::read(root.path().join(format!("{decoder}.b8"))).unwrap(),
+            EXPECTED_PREDICTIONS,
+        );
+    }
+}
+
+#[test]
+fn decoder_server_v3_contract_mismatches_are_rejected() {
+    for (name, mutate, expected) in [
+        (
+            "counts",
+            (|manifest: &mut Value| manifest["num_measurements"] = json!(5)) as fn(&mut Value),
+            "counts disagree",
+        ),
+        (
+            "bit-order",
+            (|manifest: &mut Value| manifest["shots_file"]["bit_order"] = json!("msb_first"))
+                as fn(&mut Value),
+            "little_endian b8",
+        ),
+        (
+            "predictions",
+            (|manifest: &mut Value| manifest["predictions"]["bits_per_shot"] = json!(2))
+                as fn(&mut Value),
+            "prediction row width",
+        ),
+        (
+            "unknown",
+            (|manifest: &mut Value| manifest["private_seed"] = json!(123)) as fn(&mut Value),
+            "unknown field",
+        ),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let dataset = write_decoder_server_dataset(root.path(), CIRCUIT, SHOTS);
+        rewrite_manifest(&dataset, mutate);
+        let output = run_decode(&dataset, "envelope-mle", root.path());
+        assert_json_error(&output, "invalid_dataset");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{name}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }
 

@@ -72,23 +72,21 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
     let (independent_effects, graph_edges) = effects_and_edges_from_dem(&dem)?;
     let mut envelopes = Vec::new();
     let mut loss_edges = Vec::new();
+    let mut unmapped_loss_primitives = Vec::new();
     let mut primitive_cache = HashMap::new();
     for probe in normalized.probes {
-        let candidates =
-            compile_loss_candidates(&normalized.noiseless, &probe, &mut primitive_cache)?;
-        let mut mapped = BTreeSet::new();
-        for candidate in &candidates {
-            for (edge_index, edge) in graph_edges.iter().enumerate() {
-                if candidate_affects_edge(candidate, edge) {
-                    mapped.insert(edge_index);
-                }
-            }
-        }
+        let compiled = compile_loss_candidates(
+            &normalized.noiseless,
+            &probe,
+            &graph_edges,
+            &mut primitive_cache,
+        )?;
         envelopes.push(LossEnvelope {
             id: format!("loss-m{}-q{}", probe.flag_measurement, probe.qubit),
-            candidates,
+            candidates: compiled.candidates,
         });
-        loss_edges.push(mapped.into_iter().collect());
+        loss_edges.push(compiled.mapped_edges);
+        unmapped_loss_primitives.push(compiled.unmapped_primitives);
     }
     Ok(CompiledCircuit {
         layout,
@@ -98,6 +96,7 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
         envelopes,
         graph_edges,
         loss_edges,
+        unmapped_loss_primitives,
         num_detectors: stats.num_detectors,
         num_observables: stats.num_observables,
     })
@@ -428,12 +427,21 @@ fn effects_and_edges_from_dem(
     Ok((effects, edges))
 }
 
+struct CompiledLossEnvelope {
+    candidates: Vec<Effect>,
+    mapped_edges: Vec<usize>,
+    unmapped_primitives: Vec<String>,
+}
+
 fn compile_loss_candidates(
     noiseless: &[StimInstr],
     probe: &LossProbe,
+    graph_edges: &[GraphEdge],
     primitive_cache: &mut HashMap<(usize, u32, &'static str), Effect>,
-) -> Result<Vec<Effect>, DecodeFailure> {
+) -> Result<CompiledLossEnvelope, DecodeFailure> {
     let mut union = BTreeSet::<(Vec<usize>, Vec<usize>)>::new();
+    let mut mapped = BTreeSet::new();
+    let mut unmapped = BTreeSet::new();
     for &onset in &probe.onset_sites {
         let mut sites = vec![onset];
         sites.extend(
@@ -463,6 +471,18 @@ fn compile_loss_candidates(
                     primitive_cache.insert((site, probe.qubit, name), effect.clone());
                     effect
                 };
+                if !effect.detectors.is_empty() || !effect.observables.is_empty() {
+                    let mut primitive_mapped = false;
+                    for (edge_index, edge) in graph_edges.iter().enumerate() {
+                        if candidate_affects_edge(&effect, edge) {
+                            mapped.insert(edge_index);
+                            primitive_mapped = true;
+                        }
+                    }
+                    if !primitive_mapped {
+                        unmapped.insert(format!("{name} at site {site} for qubit {}", probe.qubit));
+                    }
+                }
                 choices.push((effect.detectors, effect.observables));
             }
             let mut next = BTreeSet::new();
@@ -496,20 +516,24 @@ fn compile_loss_candidates(
             ));
         }
     }
-    Ok(union
-        .into_iter()
-        .enumerate()
-        .map(|(index, (detectors, observables))| Effect {
-            id: if detectors.is_empty() && observables.is_empty() {
-                "identity".to_string()
-            } else {
-                format!("candidate-{index}")
-            },
-            detectors,
-            observables,
-            weight: 0.0,
-        })
-        .collect())
+    Ok(CompiledLossEnvelope {
+        candidates: union
+            .into_iter()
+            .enumerate()
+            .map(|(index, (detectors, observables))| Effect {
+                id: if detectors.is_empty() && observables.is_empty() {
+                    "identity".to_string()
+                } else {
+                    format!("candidate-{index}")
+                },
+                detectors,
+                observables,
+                weight: 0.0,
+            })
+            .collect(),
+        mapped_edges: mapped.into_iter().collect(),
+        unmapped_primitives: unmapped.into_iter().collect(),
+    })
 }
 
 fn xor_indices(left: &[usize], right: &[usize]) -> Vec<usize> {
@@ -757,9 +781,22 @@ mod tests {
             .map(|site| ((site, 0, "X_ERROR"), filler.clone()))
             .collect();
         assert!(
-            error_message(compile_loss_candidates(&[], &probe, &mut cache))
+            error_message(compile_loss_candidates(&[], &probe, &[], &mut cache))
                 .contains("primitive probe limit")
         );
+
+        let unmapped = Effect {
+            id: "unmapped".to_string(),
+            detectors: vec![0],
+            observables: Vec::new(),
+            weight: 0.0,
+        };
+        let mut cache = ["X_ERROR", "Y_ERROR", "Z_ERROR"]
+            .into_iter()
+            .map(|name| ((0, 0, name), unmapped.clone()))
+            .collect();
+        let compiled = compile_loss_candidates(&[], &probe, &[], &mut cache).unwrap();
+        assert_eq!(compiled.unmapped_primitives.len(), 3);
 
         assert!(
             error_message(probe_effect(&[], 1, 0, "X_ERROR"))

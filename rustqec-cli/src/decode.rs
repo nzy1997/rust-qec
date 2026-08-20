@@ -115,6 +115,7 @@ struct CompiledCircuit {
     envelopes: Vec<LossEnvelope>,
     graph_edges: Vec<GraphEdge>,
     loss_edges: Vec<Vec<usize>>,
+    unmapped_loss_primitives: Vec<Vec<String>>,
     num_detectors: usize,
     num_observables: usize,
 }
@@ -412,9 +413,8 @@ mod tests {
         let stats = rstim::stats::summarize(&instrs);
         Dataset {
             manifest: PublicManifest {
-                format: "rstim_decoder_dataset".to_string(),
                 schema_version: 1,
-                dataset_id: String::new(),
+                dataset_id: None,
                 mode: "measurements_blinded".to_string(),
                 shots: 0,
                 row: RowManifest {
@@ -748,17 +748,21 @@ mod tests {
     }
 
     #[test]
-    fn matching_rejects_unmapped_candidates_and_empty_loss_edge_sets() {
+    fn matching_accepts_composites_but_rejects_unmapped_primitives_and_empty_edge_sets() {
         let mut unmapped = compiled(PERSISTENT_CIRCUIT);
         unmapped.envelopes[0].candidates = vec![Effect {
-            id: "unmapped".to_string(),
-            detectors: vec![usize::MAX],
+            id: "composite".to_string(),
+            detectors: vec![0, 1, usize::MAX],
             observables: vec![0],
             weight: 0.0,
         }];
+        unmapped.unmapped_loss_primitives[0] = vec!["X_ERROR at site 1".to_string()];
         let error = CompiledMatching::new(&unmapped).err().unwrap();
         assert_eq!(error.code, "unsupported_circuit");
-        assert!(error.message.contains("no compatible matching edge"));
+        assert!(error.message.contains("primitive loss effect"));
+
+        unmapped.unmapped_loss_primitives[0].clear();
+        assert!(CompiledMatching::new(&unmapped).is_ok());
 
         let mut empty_map = compiled(PERSISTENT_CIRCUIT);
         empty_map.envelopes[0].candidates = vec![Effect {
@@ -837,17 +841,19 @@ mod tests {
     }
 
     #[test]
-    fn native_distance_three_and_five_midswap_circuits_compile_persistent_envelopes() {
-        for (distance, loss_flags) in [(3, 17), (5, 49)] {
+    fn native_benchmark_depth_midswap_circuits_compile_persistent_envelopes() {
+        for distance in [3, 5] {
+            let rounds = distance;
             let text = rstim::codegen::rotated_memory_z_midswap(rstim::codegen::MidSwapConfig {
                 distance,
-                rounds: 1,
+                rounds,
                 pauli_probability: 0.001,
                 operation_loss_probability: 0.002,
                 measurement_loss_probability: 0.003,
             })
             .unwrap();
             let circuit = compiled(&text);
+            let loss_flags = rounds * (distance * distance - 1) + distance * distance;
             assert_eq!(circuit.loss_flags.len(), loss_flags);
             assert_eq!(circuit.envelopes.len(), loss_flags);
             assert!(
