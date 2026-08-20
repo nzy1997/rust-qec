@@ -11,7 +11,7 @@ use rstim::sim::bit_table::BitTable;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::matching::MATCHING_INPUT_SCHEMA_VERSION;
+use crate::matching::{MATCHING_INPUT_SCHEMA_VERSION, validate_matching_case};
 use crate::schema::INPUT_SCHEMA_VERSION;
 use crate::{
     AtomLossCase, EdgeKind, Effect, EnvelopeMatchingCase, EnvelopeMatchingEdge,
@@ -126,6 +126,12 @@ pub fn prepare(config: &PrepareConfig) -> Result<PreparationManifest, String> {
             rstim::stats::num_observables(&circuit)
         ));
     }
+    let num_sweep_bits = rstim::stats::num_sweep_bits(&circuit);
+    if num_sweep_bits != 0 {
+        return Err(format!(
+            "prepare does not support sweep-dependent circuits without a sweep sidecar; found {num_sweep_bits} sweep bit(s)"
+        ));
+    }
     let normalized = normalize_circuit(&circuit)?;
     if normalized.loss_readouts.is_empty() {
         return Err("prepare requires at least one loss-visible measurement".to_string());
@@ -199,6 +205,8 @@ pub fn prepare(config: &PrepareConfig) -> Result<PreparationManifest, String> {
         loss_edge_map: loss_edge_map.clone(),
         shots: prepared_shots,
     };
+    validate_matching_case(&matching_case)
+        .map_err(|error| format!("generated matching input is invalid: {error}"))?;
     let mut observable_bytes = Vec::new();
     rstim::output::append_shots_b8(&target_m2d.observable_flips, &mut observable_bytes)
         .map_err(|error| format!("failed to encode target observable values: {error}"))?;

@@ -571,3 +571,94 @@ fn prepare_refuses_a_nonempty_output_directory() {
     );
     assert!(!prepared_path.join("manifest.json").exists());
 }
+
+#[test]
+fn prepare_rejects_generated_matching_case_that_matching_cannot_accept() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("boundaryless.stim");
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(
+        &circuit_path,
+        "R 0 1\nX_ERROR(0.1) 1\nMRL 0\nM 1\nDETECTOR rec[-1]\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
+    )
+    .unwrap();
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x03]).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            circuit_path.to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("generated matching input is invalid"),
+        "stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("boundaryless graph component"),
+        "stderr: {stderr}"
+    );
+    assert!(!prepared_path.exists());
+}
+
+#[test]
+fn prepare_rejects_sweep_dependent_circuits_without_a_sidecar() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("sweep.stim");
+    let calibration_path = directory.path().join("calibration.b8");
+    let shots_path = directory.path().join("shots.b8");
+    let prepared_path = directory.path().join("prepared");
+    fs::write(
+        &circuit_path,
+        "R 0\nCX sweep[0] 0\nX_ERROR(0.1) 0\nMRL 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    fs::write(&calibration_path, [0x03]).unwrap();
+    fs::write(&shots_path, [0x03]).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+        .args([
+            "prepare",
+            "--circuit",
+            circuit_path.to_str().unwrap(),
+            "--calibration_in",
+            calibration_path.to_str().unwrap(),
+            "--calibration_shots",
+            "1",
+            "--in",
+            shots_path.to_str().unwrap(),
+            "--shots",
+            "1",
+            "--out",
+            prepared_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not support sweep-dependent circuits"),
+        "stderr: {stderr}"
+    );
+    assert!(stderr.contains("1 sweep bit"), "stderr: {stderr}");
+    assert!(!prepared_path.exists());
+}

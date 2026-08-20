@@ -157,6 +157,12 @@ pub fn decode_matching(
     })
 }
 
+pub(crate) fn validate_matching_case(
+    case: &EnvelopeMatchingCase,
+) -> Result<(), EnvelopeMatchingError> {
+    validate(case).map(|_| ())
+}
+
 struct ValidatedCase {
     mean_weight: f64,
     loss_edges: HashMap<String, Vec<usize>>,

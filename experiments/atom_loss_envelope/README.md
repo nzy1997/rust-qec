@@ -34,6 +34,8 @@ format. Every `MRL` or `ML` target contributes adjacent
 `loss_flag,value_bit` records. Calibration rows with exactly one asserted loss
 flag contribute candidates; zero- and multi-loss calibration rows are ignored.
 Every circuit loss readout must acquire at least one calibrated pattern.
+Sweep-dependent circuits are rejected because this v0 interface does not accept
+the per-shot sweep sidecar needed for correct detector conversion.
 
 The output bundle contains:
 
