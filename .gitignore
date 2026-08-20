@@ -2,6 +2,8 @@
 /yao-rs/
 /ldpc/
 /.worktrees/
+.knowledge/.raw/
+.knowledge/.figures/
 
 # Added by cargo
 
