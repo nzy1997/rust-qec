@@ -3,6 +3,7 @@ name = "rstim"
 version = "0.2.0"
 edition = "2024"
 license.workspace = true
+description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]
 benchmark-telemetry = []
@@ -14,7 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 libc = "0.2"
-qec-code = { path = "../qec-code" }
+qec-code = { version = "0.1.0", path = "../qec-code" }
 zstd = "0.13"
 toml = "0.8"
 

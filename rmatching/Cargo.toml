@@ -3,15 +3,16 @@ name = "rmatching"
 version = "0.2.0"
 edition = "2024"
 license.workspace = true
+description = "Rust minimum-weight perfect-matching decoder for detector-error-model workflows"
 
 [features]
 bench = ["dep:rstim", "dep:rand", "dep:serde", "dep:serde_json"]
 
 [dependencies]
-rstim = { path = "../rstim", optional = true }
+rstim = { version = "0.2.0", path = "../rstim", optional = true }
 rand = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
-rstim = { path = "../rstim" }
+rstim = { version = "0.2.0", path = "../rstim" }

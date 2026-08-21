@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 
 #[derive(Debug, Parser)]
-#[command(about = "Experimental decoder for explicit atom-loss Pauli envelopes")]
+#[command(about = "Reference decoders for explicit atom-loss Pauli envelopes")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -19,7 +19,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Prepare loss-visible measurements for the experimental decoders.
+    /// Prepare loss-visible measurements for the reference decoders.
     Prepare {
         /// RStim Mid-SWAP circuit containing loss-visible measurements.
         #[arg(long, value_name = "CIRCUIT")]
