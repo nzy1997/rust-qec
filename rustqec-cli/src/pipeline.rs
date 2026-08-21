@@ -322,7 +322,7 @@ pub fn run_sample(
         &mut buffer,
     )
     .map_err(|message| {
-        let code = if message.contains("format") {
+        let code = if message.starts_with("unknown output format") {
             "invalid_arguments"
         } else {
             "execution_error"
@@ -406,7 +406,7 @@ pub fn run_detect(
 }
 
 fn detect_error_code(message: String, json: bool) -> CommandError {
-    let code = if message.contains("format") {
+    let code = if message.starts_with("unknown output format") {
         "invalid_arguments"
     } else {
         "execution_error"

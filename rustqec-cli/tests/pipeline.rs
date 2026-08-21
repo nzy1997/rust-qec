@@ -495,6 +495,24 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         .iter()
         .find(|entry| entry["name"] == "dataset.export")
         .unwrap();
+    let export_errors = export["errors"].as_array().unwrap();
+    assert!(
+        !export_errors
+            .iter()
+            .any(|error| error["code"] == "output_error"),
+        "dataset.export performs no direct file writes; output_error is unreachable"
+    );
+    let gen_entry = commands
+        .iter()
+        .find(|entry| entry["name"] == "circuit.gen")
+        .unwrap();
+    let gen_arguments = gen_entry["arguments"].as_array().unwrap();
+    assert!(
+        gen_arguments
+            .iter()
+            .any(|argument| argument["flag"] == "--after-clifford-loss-probability"),
+        "circuit.gen must declare --after-clifford-loss-probability"
+    );
     let mode = export["arguments"]
         .as_array()
         .unwrap()
@@ -505,4 +523,34 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         mode["values"],
         serde_json::json!(["detectors", "measurements_blinded"])
     );
+}
+
+#[test]
+fn unknown_output_format_is_invalid_arguments_not_execution_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("shots.out");
+    let output = run_with_stdin(
+        &[
+            "circuit",
+            "sample",
+            "--shots",
+            "1",
+            "--out-format",
+            "yaml",
+            "--out",
+            out.to_str().unwrap(),
+        ],
+        "M 0\n",
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let value = stderr_json(&output);
+    assert_eq!(value["command"], "circuit.sample");
+    assert_eq!(value["error"]["code"], "invalid_arguments");
+    assert!(
+        value["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unknown output format")
+    );
+    assert!(!out.exists());
 }

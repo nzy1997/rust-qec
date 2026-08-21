@@ -819,6 +819,13 @@ fn write_capabilities(
                             default: Some("0"),
                         },
                         ArgumentCapability {
+                            name: "after_clifford_loss_probability",
+                            flag: "--after-clifford-loss-probability",
+                            required: false,
+                            values: vec!["probability"],
+                            default: Some("0"),
+                        },
+                        ArgumentCapability {
                             name: "operation_loss_probability",
                             flag: "--operation-loss-probability",
                             required: false,
@@ -1247,11 +1254,6 @@ fn write_capabilities(
                         },
                         ErrorCapability {
                             code: "execution_error",
-                            exit_code: 2,
-                            channel: "stderr",
-                        },
-                        ErrorCapability {
-                            code: "output_error",
                             exit_code: 2,
                             channel: "stderr",
                         },
