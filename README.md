@@ -46,6 +46,7 @@ With RustQEC you can:
 | `docs/showcases/` | Stable index for runnable workspace showcases |
 | `rsinter/` | Parallel collection and benchmark harness for decoder experiments |
 | `rmatching/` | Rust MWPM decoder for detector-error-model workflows |
+| `renvelope/` | Reference decoders for explicit atom-loss Pauli envelopes (exact MLE and matching) |
 | `rbposd/`, `rilpqec/` | Additional decoder components used by benchmark and comparison flows |
 | `qec-code/`, `qec-ilp-core/` | Code construction helpers and ILP-backed checks |
 | `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness and benchmark artifacts |

@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "experiments/atom_loss_envelope",
     "qec-ilp-core",
     "qec-code",
+    "renvelope",
     "rustqec-cli",
     "rstim",
     "rstim-shot-web",

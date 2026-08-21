@@ -3,7 +3,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use atom_loss_envelope::{
+use renvelope::{
     AtomLossCase, DecodeOutcome, EnvelopeMatchingCase, PrepareConfig, decode, decode_matching,
     prepare,
 };

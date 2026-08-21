@@ -1,10 +1,21 @@
-# Atom-loss Envelope-MLE experiment
+# renvelope: atom-loss envelope reference decoders
 
-This unpublished crate is a deterministic correctness reference for decoding an
-explicit set of Pauli effects compatible with observed atom losses. It follows
-the detector-parity and per-loss exclusivity reduction used by Envelope-MLE in
-the Pauli Envelope framework, but does not claim to reproduce the paper's
-circuits or numerical results.
+This crate is the deterministic correctness reference for decoding an explicit
+set of Pauli effects compatible with observed atom losses. It follows the
+detector-parity and per-loss exclusivity reduction used by Envelope-MLE in the
+Pauli Envelope framework, but does not claim to reproduce the paper's circuits
+or numerical results.
+
+## Role in the workspace
+
+`renvelope` is the reference layer of the atom-loss decoding stack: it decodes
+explicit, versioned `AtomLossCase` envelopes through an exact MLE backend and a
+matching approximation, and ships a standalone CLI for prepared loss bundles.
+The production batched decoder in `rustqec-cli` (`rustqec decode`) compiles the
+public dataset contract (`manifest.json`, `circuit.stim`, `shots.b8`) directly
+and cross-validates its compiled MLE and matching paths against this crate in
+its test suite. Correctness claims for the production path therefore trace back
+to the checked cases and known-answer fixtures in this crate.
 
 The decoders remain intentionally offline. Inputs may be supplied directly as
 versioned JSON, or prepared from an RStim Mid-SWAP circuit and b8 measurement
@@ -20,7 +31,7 @@ of those two steps: it additionally learns per-readout loss patterns from a
 pure-loss calibration file.
 
 ```sh
-cargo run -q -p atom-loss-envelope -- prepare \
+cargo run -q -p renvelope -- prepare \
   --circuit midswap.stim \
   --calibration_in pure-loss-calibration.b8 \
   --calibration_shots 10000 \
@@ -57,12 +68,12 @@ detector inputs, predictions, and scoring answers.
 Prepared files feed the existing decoders without another conversion step:
 
 ```sh
-cargo run -q -p atom-loss-envelope -- decode \
+cargo run -q -p renvelope -- decode \
   --in /tmp/atom-loss-prepared/mle/shot-000000.json \
   --out /tmp/mle-result.json \
   --backend highs
 
-cargo run -q -p atom-loss-envelope -- matching \
+cargo run -q -p renvelope -- matching \
   --in /tmp/atom-loss-prepared/matching.json \
   --out /tmp/matching-result.json
 ```
@@ -70,9 +81,9 @@ cargo run -q -p atom-loss-envelope -- matching \
 Run the checked positive case with the open-source HiGHS backend:
 
 ```sh
-cargo run -q -p atom-loss-envelope -- \
+cargo run -q -p renvelope -- \
   decode \
-  --in experiments/atom_loss_envelope/cases/single_loss_observable.json \
+  --in renvelope/cases/single_loss_observable.json \
   --out /tmp/atom-loss-envelope-result.json \
   --backend highs
 ```
@@ -105,8 +116,8 @@ global mean base weight, assigns affected space-like or boundary edges `0.5`
 times that mean, and decodes the corresponding syndromes as a batch.
 
 ```sh
-cargo run -q -p atom-loss-envelope -- matching \
-  --in experiments/atom_loss_envelope/cases/matching_known_answer.json \
+cargo run -q -p renvelope -- matching \
+  --in renvelope/cases/matching_known_answer.json \
   --out /tmp/envelope-matching-result.json
 ```
 
