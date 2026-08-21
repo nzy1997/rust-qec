@@ -100,10 +100,18 @@ claiming an independent replacement ecosystem.
 
 RustQEC organizes its central data path as a sequence from Stim-aligned circuit
 inputs through simulation and loss-aware decoding to logical predictions and
-versioned evidence. The command-line contract spans this complete workflow,
-while crate boundaries separate circuit execution, code construction,
-decoding, and evidence generation. This keeps the user-facing interface
-cohesive without forcing unrelated algorithms into one library API.
+versioned evidence. The unified `rustqec` command exposes this complete
+workflow as seven discoverable commands: `circuit gen` generates built-in code
+families including native Mid-SWAP circuits; `circuit sample` and
+`circuit detect` produce seeded measurement and detection-event streams;
+`circuit dem` extracts detector error models; `circuit stats` inspects circuit
+structure; `dataset export` publishes a public decoder dataset together with a
+private answer bundle; and `decode` runs loss-aware batch decoding. The full
+loop from circuit generation to decoded predictions therefore runs behind one
+machine-facing interface, while crate boundaries separate circuit execution,
+code construction, decoding, and evidence generation. This keeps the
+user-facing interface cohesive without forcing unrelated algorithms into one
+library API.
 
 The simulation layer parses Stim-style circuits, samples measurements and
 detector events, extracts detector error models, and exports structured or
@@ -120,13 +128,19 @@ is compiled once into measurement-to-detector relations, independent Pauli
 effects, loss envelopes, and a matching graph. Each shot then supplies only its
 syndrome and observed loss set. One backend uses an ILP model as an exact
 small-scale correctness reference; the other updates and caches matching graphs
-for repeated loss patterns. They are implementation choices behind the same
-workflow, not separate user-facing research products.
+for repeated loss patterns. The `renvelope` crate holds the reference decoders
+for explicit, versioned envelope cases, and the production backends
+cross-validate against it in the test suite, so correctness claims trace to
+checked reference cases rather than to the optimized implementation alone.
+Both backends are implementation choices behind the same workflow, not
+separate user-facing research products.
 
-CLI-first design is part of the scientific contract. Successful commands can
-write stable JSON or packed binary artifacts, while failures use documented
-error codes and nonzero exits. Capability discovery reports concrete command
-paths, arguments, outputs, and error behavior in JSON. Decode statistics record
+CLI-first design is part of the scientific contract. Successful commands write
+stable JSON or packed binary artifacts, while failures use documented error
+codes and nonzero exits. The `capabilities` command reports every verb's
+argument list, input sources, output formats, artifacts, and error behavior in
+JSON, and the test suite pins this document against the implementation so the
+advertised contract cannot drift from behavior. Decode statistics record
 the circuit hash, shot count, compile and decode time, distinct loss patterns,
 cache reuse, timeouts, and infeasible shots. Prediction and statistics files
 are published atomically so that a partial run cannot resemble a completed
