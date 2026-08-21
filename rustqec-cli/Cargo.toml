@@ -19,4 +19,4 @@ sha2 = "0.10"
 tempfile = "3"
 
 [dev-dependencies]
-atom-loss-envelope = { path = "../experiments/atom_loss_envelope" }
+renvelope = { path = "../renvelope" }

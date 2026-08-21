@@ -14,7 +14,7 @@ fn case_path(name: &str) -> PathBuf {
 fn positive_fixture_has_the_exact_known_answer() {
     let directory = tempfile::tempdir().unwrap();
     let output_path = directory.path().join("result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "decode",
             "--in",
@@ -54,7 +54,7 @@ fn positive_fixture_has_the_exact_known_answer() {
 fn exclusivity_fixture_is_reported_as_infeasible() {
     let directory = tempfile::tempdir().unwrap();
     let output_path = directory.path().join("result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "decode",
             "--in",
@@ -99,7 +99,7 @@ fn malformed_input_is_rejected_without_writing_a_result() {
     )
     .unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "decode",
             "--in",
@@ -123,7 +123,7 @@ fn malformed_input_is_rejected_without_writing_a_result() {
 fn matching_fixture_changes_prediction_and_groups_loss_patterns() {
     let directory = tempfile::tempdir().unwrap();
     let output_path = directory.path().join("matching-result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "matching",
             "--in",
@@ -156,7 +156,7 @@ fn matching_fixture_changes_prediction_and_groups_loss_patterns() {
 fn matching_dangling_edge_is_rejected_without_writing_a_result() {
     let directory = tempfile::tempdir().unwrap();
     let output_path = directory.path().join("matching-result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "matching",
             "--in",
@@ -202,7 +202,7 @@ fn matching_unmatchable_syndrome_is_rejected_without_writing_a_result() {
     )
     .unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "matching",
             "--in",
@@ -233,7 +233,7 @@ fn matching_empty_shots_are_rejected_without_writing_a_result() {
     case["shots"] = json!([]);
     fs::write(&input_path, serde_json::to_vec_pretty(&case).unwrap()).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "matching",
             "--in",
@@ -262,7 +262,7 @@ fn prepare_bridge_fixture_flows_through_both_decoders() {
     fs::write(&calibration_path, [0x03]).unwrap();
     fs::write(&shots_path, [0x03]).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -349,7 +349,7 @@ fn prepare_bridge_fixture_flows_through_both_decoders() {
     assert_eq!(matching["shots"][0]["observed_losses"], json!(["loss-m0"]));
 
     let mle_result_path = directory.path().join("mle-result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "decode",
             "--in",
@@ -371,7 +371,7 @@ fn prepare_bridge_fixture_flows_through_both_decoders() {
     assert_eq!(mle_result["predicted_observables"], json!([0]));
 
     let matching_result_path = directory.path().join("matching-result.json");
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "matching",
             "--in",
@@ -396,7 +396,7 @@ fn prepare_bridge_fixture_flows_through_both_decoders() {
 
     let second_prepared_path = directory.path().join("prepared-again");
     fs::create_dir(&second_prepared_path).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -442,7 +442,7 @@ fn prepare_rejects_loss_flag_detector_before_creating_output() {
     fs::write(&calibration_path, [0x03]).unwrap();
     fs::write(&shots_path, [0x03]).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -481,7 +481,7 @@ fn prepare_rejects_truncated_b8_before_creating_output() {
     fs::write(&calibration_path, [0x03]).unwrap();
     fs::write(&shots_path, []).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -511,7 +511,7 @@ fn prepare_rejects_truncated_b8_before_creating_output() {
 
 #[test]
 fn prepare_help_documents_normal_workflow_flag_names() {
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args(["prepare", "--help"])
         .output()
         .unwrap();
@@ -540,7 +540,7 @@ fn prepare_refuses_a_nonempty_output_directory() {
     fs::create_dir(&prepared_path).unwrap();
     fs::write(prepared_path.join("keep.txt"), b"user data").unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -587,7 +587,7 @@ fn prepare_rejects_generated_matching_case_that_matching_cannot_accept() {
     fs::write(&calibration_path, [0x03]).unwrap();
     fs::write(&shots_path, [0x03]).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",
@@ -634,7 +634,7 @@ fn prepare_rejects_sweep_dependent_circuits_without_a_sidecar() {
     fs::write(&calibration_path, [0x03]).unwrap();
     fs::write(&shots_path, [0x03]).unwrap();
 
-    let output = Command::new(env!("CARGO_BIN_EXE_atom-loss-envelope"))
+    let output = Command::new(env!("CARGO_BIN_EXE_renvelope"))
         .args([
             "prepare",
             "--circuit",

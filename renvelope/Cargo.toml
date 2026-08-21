@@ -1,0 +1,17 @@
+[package]
+name = "renvelope"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+description = "Reference decoders for explicit atom-loss Pauli envelopes (exact MLE and matching)"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core" }
+rmatching = { version = "0.2.0", path = "../rmatching" }
+rstim = { version = "0.2.0", path = "../rstim" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+thiserror = "2"

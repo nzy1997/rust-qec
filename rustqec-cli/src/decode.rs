@@ -381,7 +381,7 @@ fn parent_dir(path: &Path) -> &Path {
 
 #[cfg(test)]
 mod tests {
-    use atom_loss_envelope::{
+    use renvelope::{
         AtomLossCase, DecodeOutcome, EdgeKind as ReferenceEdgeKind, Effect as ReferenceEffect,
         EnvelopeMatchingCase, EnvelopeMatchingEdge, EnvelopeMatchingShot, LossEdgeMap,
         LossEnvelope as ReferenceLossEnvelope, decode as decode_reference_mle,
