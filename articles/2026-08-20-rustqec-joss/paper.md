@@ -1,5 +1,5 @@
 ---
-title: "RustQEC: A CLI-first, Stim-aligned Rust toolkit for reproducible atom-loss-aware quantum error correction"
+title: "RustQEC: Loss-visible circuit sampling and Pauli-Envelope decoding for atom-loss-aware quantum error correction"
 tags:
   - Rust
   - quantum error correction
@@ -19,37 +19,45 @@ bibliography: paper.bib
 
 # Summary
 
-Quantum error-correction studies commonly connect circuit construction,
-stabilizer simulation, detector extraction, decoding, and statistical analysis.
-Each stage is individually familiar, but moving data between them often relies
-on experiment-specific scripts. This fragmentation makes it difficult to audit
-which circuit, noise model, random seed, decoder configuration, and output
-format produced a reported result. Atom loss adds a further challenge because
-the location of a loss is useful side information that must remain associated
-with the corresponding measurement record and decoder model.
+Neutral-atom quantum computers lose atoms during operation, and a heralded
+loss is valuable side information: the Pauli Envelope framework
+[@Liu_2026] turns each observed per-shot loss pattern into an exact decoding
+problem through Mid-SWAP syndrome extraction and envelope-aware decoders.
+Realizing this loop end to end places unusual demands on the software stack.
+The simulator must carry a persistent per-shot loss state that suppresses
+gates acting on lost atoms and re-randomizes them on reset; the measurement
+record must preserve each `(loss flag, value bit)` pair; and the circuit,
+seed, noise model, and decoder configuration behind a reported result must
+remain auditable.
 
-RustQEC is an open-source Rust workspace for reproducible quantum
-error-correction workflows. It combines Stim-aligned circuit processing,
-simulation, detector-error-model tooling, code construction, decoder
-experiments, and checked benchmark evidence behind command-line interfaces.
-For neutral-atom studies, RustQEC generates native Mid-SWAP syndrome-extraction
-circuits, records loss flags alongside measurement values, and decodes public
-loss-visible datasets in batches. A unified `rustqec` command exposes
-machine-readable capability metadata, structured errors, and versioned output
-artifacts. These interfaces support interactive use, conventional scripting,
-workflow engines, and agentic clients without defining separate automation
-paths for each consumer.
+RustQEC is an open-source Rust workspace that implements this complete loop
+as a reference pipeline. It generates native Mid-SWAP syndrome-extraction
+circuits, samples them with the persistent-loss noise model while emitting
+adjacent flag and value records, and publishes the results as hash-pinned,
+schema-versioned public datasets. Its decoder compiles each circuit once into
+loss envelopes and a matching graph, then decodes batches of shots — each
+supplying only its syndrome and observed loss set — with an exact
+envelope-MLE backend and a cached envelope-matching backend. Acceptance is
+capability-checked against a published circuit-subset specification rather
+than tied to the built-in generators, and the conformance suite proves this
+with a Stim-generated circuit decoded shot-exactly against private answers.
+
+The full loop runs behind one `rustqec` command whose machine-readable
+capability metadata, structured error codes, and atomically published
+artifacts are pinned against behavior by the test suite. Externally produced
+datasets enter through the same validated contract, serving interactive use,
+conventional scripting, workflow engines, and automated agents alike.
 
 # Statement of need
 
 Stim provides a high-performance foundation for stabilizer-circuit simulation
 and detector error models [@Gidney_2021], while specialized decoders provide
 efficient inference from detector events [@Higgott_2022]. In practice, a study
-still needs to preserve contracts across circuit generation, sampling, binary
-row layouts, decoder compilation, and evidence generation. Ad hoc wrappers can
-silently disagree about record ordering, observable conventions, padding bits,
-or failure handling. They also make it hard to reproduce an interrupted batch
-or to distinguish an infeasible decode from an all-zero prediction.
+still needs contracts across circuit generation, sampling, binary row layouts,
+decoder compilation, and evidence generation that ad hoc wrappers silently
+violate — disagreeing about record ordering, observable conventions, or
+padding bits, leaving interrupted batches unresumable, and blurring the line
+between an infeasible decode and an all-zero prediction.
 
 Heralded atom loss makes this interface problem scientifically important. A
 realized loss can correspond to several mutually exclusive Pauli effects, and
@@ -63,9 +71,9 @@ losses with circuit locations, and compile the corresponding decoder state.
 RustQEC targets QEC researchers who need inspectable command-line experiments,
 Rust developers embedding QEC components, and automated systems that require a
 stable machine-facing contract. Its purpose is not to replace every simulator
-or decoder. It provides an integrated path in which supported circuits,
-datasets, predictions, statistics, and failure states can be validated and
-replayed together.
+or decoder, but to provide an integrated path in which supported circuits,
+datasets, predictions, statistics, and failure states validate and replay
+together.
 
 # State of the field
 
@@ -73,9 +81,22 @@ Stim is the reference point for RustQEC's circuit language and detector-model
 workflow [@Gidney_2021]. RustQEC preserves familiar circuit and detector
 concepts so that researchers do not need a new conceptual model, but its
 `rstim` implementation and extended loss instructions are not presented as a
-drop-in replacement for every Stim feature or performance regime. Compatibility
-tests adapted from Stim retain source-level provenance, and unsupported
-operations fail explicitly rather than being approximated silently.
+drop-in replacement for every Stim feature or performance regime.
+Compatibility tests adapted from Stim retain source-level provenance, and
+unsupported operations fail explicitly rather than being approximated
+silently. The loss noise model is where the two deliberately diverge: Stim's
+heralded Pauli channels record a herald bit and apply a Pauli error at the
+herald site, whereas atom loss in RustQEC is a persistent per-shot state —
+gates acting on a lost atom are suppressed, a reset clears the loss and
+re-randomizes the qubit, and readouts emit a stable `(flag, value)` record
+layout that a loss-aware decoder consumes directly. Stim's companion tool
+sinter orchestrates large sampling campaigns and decoder statistics but
+inherits the same record model and offers no per-shot loss-driven decoding.
+On checked surface-code workloads, RustQEC's compiled sampling runs about
+27–50x faster than the Stim command line while detector-error-model sampling
+runs about 8x slower; both figures are published with their methodology,
+environments, and claim limits on the project's benchmarked documentation
+site rather than as broad performance parity claims.
 
 PyMatching supplies a mature minimum-weight perfect-matching decoder
 [@Higgott_2022], and mdopt demonstrates a code-agnostic tensor-network approach
@@ -101,22 +122,17 @@ claiming an independent replacement ecosystem.
 RustQEC organizes its central data path as a sequence from Stim-aligned circuit
 inputs through simulation and loss-aware decoding to logical predictions and
 versioned evidence. The unified `rustqec` command exposes this complete
-workflow as eight discoverable commands: `circuit gen` generates built-in code
-families including native Mid-SWAP circuits; `circuit sample` and
-`circuit detect` produce seeded measurement and detection-event streams;
-`circuit dem` extracts detector error models; `circuit stats` inspects circuit
-structure; `dataset export` publishes a public decoder dataset together with a
-private answer bundle; `dataset import` packages externally produced circuits
-and shot records into validated public datasets; and `decode` runs loss-aware
-batch decoding. The full
+workflow as eight discoverable commands covering circuit generation (including
+native Mid-SWAP families), seeded measurement and detection-event sampling,
+detector-error-model extraction, circuit statistics, public dataset export and
+import, and loss-aware batch decoding. The full
 loop from circuit generation to decoded predictions therefore runs behind one
 machine-facing interface, while crate boundaries separate circuit execution,
 code construction, decoding, and evidence generation. This keeps the
 user-facing interface cohesive without forcing unrelated algorithms into one
 library API.
 
-The simulation layer parses Stim-style circuits, samples measurements and
-detector events, extracts detector error models, and exports structured or
+The simulation layer samples Stim-style circuits and exports structured or
 bit-packed data. Native Mid-SWAP generation adds an alternating syndrome-
 extraction schedule and a persistent logical-site-to-wire permutation. Loss-
 visible `MRL` and `ML` instructions emit an adjacent flag and value for each
@@ -137,9 +153,12 @@ checked reference cases rather than to the optimized implementation alone.
 Both backends are implementation choices behind the same workflow, not
 separate user-facing research products.
 
-CLI-first design is part of the scientific contract. Successful commands write
-stable JSON or packed binary artifacts, while failures use documented error
-codes and nonzero exits. The `capabilities` command reports every verb's
+The command-line contract is the enforcement layer of this scientific
+contract, and each of its properties exists to prevent a specific
+reproducibility failure mode. Successful commands write stable JSON or packed
+binary artifacts, while failures use documented error codes and nonzero
+exits, so an infeasible decode or a timeout can never read as an all-zero
+prediction. The `capabilities` command reports every verb's
 argument list, input sources, output formats, artifacts, and error behavior in
 JSON, and the test suite pins this document against the implementation so the
 advertised contract cannot drift from behavior. Decode statistics record
@@ -191,9 +210,9 @@ patterns reuse state. The documentation site exposes runnable showcases and
 checked artifacts so a reader can distinguish implementation smoke tests from
 publication-scale evidence.
 
-The project has a public issue and pull-request history, continuous integration,
-an Apache-2.0 license, and reproducible build and test commands. These practices
-make the software inspectable by researchers who did not participate in its
+A public issue and pull-request history, continuous integration,
+an Apache-2.0 license, and reproducible build and test commands keep the
+software inspectable by researchers who did not participate in its
 development. Before submission, the authors will add explicit contribution and
 support guidance, a tagged archive DOI, and the companion-paper citation. They
 will report external research use without implying adoption that has not
