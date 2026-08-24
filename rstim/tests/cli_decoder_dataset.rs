@@ -200,6 +200,23 @@ fn rejection_cases_fail_before_outputs_exist() {
         assert!(!private_out.exists(), "{name} created private output");
     }
 
+    let public_out = root.path().join("zero-batch-public");
+    let private_out = root.path().join("zero-batch-private");
+    let args = export_args(
+        &circuit,
+        "detectors",
+        &public_out,
+        &private_out,
+        &["--batch_shots", "0"],
+    );
+    assert_failure_contains(
+        &run_cli(&args),
+        "zero batch shots",
+        "--batch_shots must be positive",
+    );
+    assert!(!public_out.exists());
+    assert!(!private_out.exists());
+
     let public_out = root.path().join("existing-public");
     let private_out = root.path().join("existing-private");
     fs::create_dir(&public_out).unwrap();
@@ -330,6 +347,7 @@ fn surface_memory_x_blinded_export_accepts_logical_z_and_rejects_invalid_choices
     );
     let shots_index = args.iter().position(|arg| arg == "--shots").unwrap() + 1;
     args[shots_index] = "64".to_string();
+    args.extend(["--batch_shots".to_string(), "7".to_string()]);
     assert_success(&run_cli(&args), "memory-X logical-Z blinded export");
 
     let public_manifest: Value =
@@ -352,6 +370,7 @@ fn surface_memory_x_blinded_export_accepts_logical_z_and_rejects_invalid_choices
     let private_manifest: Value =
         serde_json::from_slice(&fs::read(private_out.join("manifest.json")).unwrap()).unwrap();
     assert_eq!(private_manifest["shots"], 64);
+    assert_eq!(private_manifest["generation"]["batch_shots"], 7);
     assert_eq!(private_manifest["answers_file"]["bits"], 1);
     assert_eq!(private_manifest["answers_file"]["bytes_per_shot"], 1);
     assert_eq!(private_manifest["masks_file"]["bits"], 1);

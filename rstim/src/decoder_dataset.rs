@@ -9,6 +9,7 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 pub const LOGICAL_FLIP_MARKER: &str = "# RSTIM_LOGICAL_FLIP_POINT";
+pub const DEFAULT_DECODER_DATASET_BATCH_SHOTS: usize = 10_000;
 const PUBLIC_SCHEMA_VERSION: u32 = 1;
 const DATASET_FORMAT: &str = "rstim_decoder_dataset";
 
@@ -491,6 +492,12 @@ pub struct DecoderDatasetArtifacts {
     pub observables: usize,
 }
 
+struct DecoderDatasetChunk {
+    public_shots: BitTable,
+    answers: BitTable,
+    masks: Option<BitTable>,
+}
+
 struct DatasetRngs {
     physical: rand::rngs::StdRng,
     mask: rand::rngs::StdRng,
@@ -529,53 +536,39 @@ fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usiz
     }
 }
 
-#[doc(hidden)]
-pub fn generate_decoder_dataset_artifacts(
-    config: &ExportDecoderDatasetConfig,
-) -> Result<DecoderDatasetArtifacts, String> {
-    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
-    generate_decoder_dataset_artifacts_with_logical_flip(&config)
-}
-
-#[doc(hidden)]
-pub fn generate_decoder_dataset_artifacts_with_logical_flip(
-    config: &ExportDecoderDatasetLogicalFlipConfig,
-) -> Result<DecoderDatasetArtifacts, String> {
-    let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
-    let mut rngs = make_dataset_rngs(config.seed);
-    match config.mode {
+fn generate_decoder_dataset_chunk(
+    validated: &ValidatedDecoderDatasetInput,
+    mode: DecoderDatasetMode,
+    shots: usize,
+    rngs: &mut DatasetRngs,
+) -> Result<DecoderDatasetChunk, String> {
+    match mode {
         DecoderDatasetMode::Detectors => {
             let result = crate::sampler::sample_batch_with_options(
                 &validated.public_instrs,
-                config.shots,
+                shots,
                 &mut rngs.physical,
                 crate::sampler::SampleOptions {
                     output_mode: crate::sampler::SampleOutputMode::Full,
                     ..crate::sampler::SampleOptions::default()
                 },
             )?;
-            Ok(DecoderDatasetArtifacts {
-                public_circuit_text: validated.public_circuit_text,
-                public_instrs: validated.public_instrs,
-                public_row_kind: "detectors",
+            Ok(DecoderDatasetChunk {
                 public_shots: result.detections,
                 answers: result.observable_flips,
                 masks: None,
-                measurements: validated.measurements,
-                detectors: validated.detectors,
-                observables: validated.observables,
             })
         }
         DecoderDatasetMode::MeasurementsBlinded => {
             let mut source_labels: Vec<bool> =
-                (0..config.shots).map(|_| rngs.mask.r#gen()).collect();
+                (0..shots).map(|_| rngs.mask.r#gen()).collect();
             for index in (1..source_labels.len()).rev() {
                 let replacement = rngs.permutation.gen_range(0..=index);
                 source_labels.swap(index, replacement);
             }
 
             let zero_count = source_labels.iter().filter(|&&label| !label).count();
-            let one_count = config.shots - zero_count;
+            let one_count = shots - zero_count;
             let zero_samples = crate::sampler::sample_batch_with_options(
                 &validated.public_instrs,
                 zero_count,
@@ -599,9 +592,9 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
                 },
             )?;
 
-            let mut measurements = BitTable::try_new(validated.measurements, config.shots)
+            let mut measurements = BitTable::try_new(validated.measurements, shots)
                 .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-            let mut masks = BitTable::try_new(1, config.shots)
+            let mut masks = BitTable::try_new(1, shots)
                 .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
             let mut next_zero = 0;
             let mut next_one = 0;
@@ -623,27 +616,52 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
 
             let public_interpretation =
                 crate::m2d::measurements_to_detections(&validated.public_instrs, &measurements)?;
-            let mut answers = BitTable::try_new(1, config.shots)
+            let mut answers = BitTable::try_new(1, shots)
                 .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-            for shot in 0..config.shots {
+            for shot in 0..shots {
                 let public_observable = public_interpretation.observable_flips.get(0, shot);
                 let mask_bit = masks.get(0, shot);
                 answers.set(0, shot, public_observable ^ mask_bit);
             }
 
-            Ok(DecoderDatasetArtifacts {
-                public_circuit_text: validated.public_circuit_text,
-                public_instrs: validated.public_instrs,
-                public_row_kind: "measurements",
+            Ok(DecoderDatasetChunk {
                 public_shots: measurements,
                 answers,
                 masks: Some(masks),
-                measurements: validated.measurements,
-                detectors: validated.detectors,
-                observables: validated.observables,
             })
         }
     }
+}
+
+#[doc(hidden)]
+pub fn generate_decoder_dataset_artifacts(
+    config: &ExportDecoderDatasetConfig,
+) -> Result<DecoderDatasetArtifacts, String> {
+    let config = ExportDecoderDatasetLogicalFlipConfig::from(config);
+    generate_decoder_dataset_artifacts_with_logical_flip(&config)
+}
+
+#[doc(hidden)]
+pub fn generate_decoder_dataset_artifacts_with_logical_flip(
+    config: &ExportDecoderDatasetLogicalFlipConfig,
+) -> Result<DecoderDatasetArtifacts, String> {
+    let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
+    let mut rngs = make_dataset_rngs(config.seed);
+    let chunk = generate_decoder_dataset_chunk(&validated, config.mode, config.shots, &mut rngs)?;
+    Ok(DecoderDatasetArtifacts {
+        public_circuit_text: validated.public_circuit_text,
+        public_instrs: validated.public_instrs,
+        public_row_kind: match config.mode {
+            DecoderDatasetMode::Detectors => "detectors",
+            DecoderDatasetMode::MeasurementsBlinded => "measurements",
+        },
+        public_shots: chunk.public_shots,
+        answers: chunk.answers,
+        masks: chunk.masks,
+        measurements: validated.measurements,
+        detectors: validated.detectors,
+        observables: validated.observables,
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -701,6 +719,7 @@ struct FileManifest {
 #[derive(Debug, Serialize)]
 struct PrivateGenerationManifest {
     rstim_version: &'static str,
+    batch_shots: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     seed: Option<u64>,
 }
@@ -885,6 +904,51 @@ fn bytes_per_shot(bits: usize) -> Result<usize, String> {
         .map(|bits| bits / 8)
 }
 
+struct Sha256Writer<W> {
+    inner: W,
+    digest: Sha256,
+}
+
+impl<W: Write> Sha256Writer<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            digest: Sha256::new(),
+        }
+    }
+
+    fn finish(mut self) -> Result<String, String> {
+        self.inner
+            .flush()
+            .map_err(|error| format!("failed to flush dataset artifact: {error}"))?;
+        let digest = self.digest.finalize();
+        let mut output = String::with_capacity(64);
+        for byte in digest {
+            use std::fmt::Write as _;
+            write!(&mut output, "{byte:02x}").expect("write hex into String");
+        }
+        Ok(output)
+    }
+}
+
+impl<W: Write> Write for Sha256Writer<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        self.digest.update(&bytes[..written]);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn create_hashed_file(path: &Path) -> Result<Sha256Writer<BufWriter<File>>, String> {
+    let file = File::create(path)
+        .map_err(|error| format!("failed to create {}: {error}", path.display()))?;
+    Ok(Sha256Writer::new(BufWriter::new(file)))
+}
+
 fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let file = File::create(path)
         .map_err(|error| format!("failed to create {}: {error}", path.display()))?;
@@ -904,31 +968,6 @@ fn write_manifest(path: &Path, manifest: &impl Serialize) -> Result<(), String> 
     write_file(path, &bytes)
 }
 
-fn write_private_bundle(
-    path: &Path,
-    manifest: &PrivateManifest,
-    answers: &[u8],
-    masks: Option<&[u8]>,
-) -> Result<(), String> {
-    write_manifest(&path.join("manifest.json"), manifest)?;
-    write_file(&path.join("answers.b8"), answers)?;
-    if let Some(masks) = masks {
-        write_file(&path.join("masks.b8"), masks)?;
-    }
-    Ok(())
-}
-
-fn write_public_bundle(
-    path: &Path,
-    manifest: &PublicManifest,
-    circuit: &[u8],
-    shots: &[u8],
-) -> Result<(), String> {
-    write_manifest(&path.join("manifest.json"), manifest)?;
-    write_file(&path.join("circuit.stim"), circuit)?;
-    write_file(&path.join("shots.b8"), shots)
-}
-
 /// Exports using the backward-compatible X-only configuration.
 pub fn export_decoder_dataset(
     config: ExportDecoderDatasetConfig,
@@ -945,6 +984,19 @@ pub fn export_decoder_dataset_with_logical_flip(
     export_decoder_dataset_with_logical_flip_and_publisher(config, &mut publisher)
 }
 
+/// Exports in bounded batches so peak memory does not scale with total shots.
+pub fn export_decoder_dataset_with_logical_flip_in_batches(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+    batch_shots: usize,
+) -> Result<DecoderDatasetSummary, String> {
+    let mut publisher = FsDirectoryPublisher::from_env();
+    export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
+        config,
+        &mut publisher,
+        batch_shots,
+    )
+}
+
 #[doc(hidden)]
 pub fn export_decoder_dataset_with_publisher(
     config: ExportDecoderDatasetConfig,
@@ -958,32 +1010,75 @@ pub fn export_decoder_dataset_with_logical_flip_and_publisher(
     config: ExportDecoderDatasetLogicalFlipConfig,
     publisher: &mut impl DirectoryPublisher,
 ) -> Result<DecoderDatasetSummary, String> {
+    export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
+        config,
+        publisher,
+        DEFAULT_DECODER_DATASET_BATCH_SHOTS,
+    )
+}
+
+fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
+    config: ExportDecoderDatasetLogicalFlipConfig,
+    publisher: &mut impl DirectoryPublisher,
+    batch_shots: usize,
+) -> Result<DecoderDatasetSummary, String> {
+    if batch_shots == 0 {
+        return Err("--batch_shots must be positive".to_string());
+    }
     let validated_paths = validate_output_directories(&config.public_out, &config.private_out)?;
-    let artifacts = generate_decoder_dataset_artifacts_with_logical_flip(&config)?;
-    let public_shots_bytes = bit_table_to_b8_bytes(&artifacts.public_shots)?;
-    let answers_bytes = bit_table_to_b8_bytes(&artifacts.answers)?;
-    let masks_bytes = artifacts
-        .masks
-        .as_ref()
-        .map(bit_table_to_b8_bytes)
+    let validated = validate_decoder_dataset_logical_flip_inputs(&config)?;
+    let public_row_kind = match config.mode {
+        DecoderDatasetMode::Detectors => "detectors",
+        DecoderDatasetMode::MeasurementsBlinded => "measurements",
+    };
+    let public_row_bits = match config.mode {
+        DecoderDatasetMode::Detectors => validated.detectors,
+        DecoderDatasetMode::MeasurementsBlinded => validated.measurements,
+    };
+    let answers_bits = validated.observables;
+    let masks_bits = (config.mode == DecoderDatasetMode::MeasurementsBlinded).then_some(1);
+    let circuit_sha256 = sha256_hex(validated.public_circuit_text.as_bytes());
+
+    let mut private_stage = StagedBundle::create(&validated_paths.private, true)?;
+    let mut public_stage = StagedBundle::create(&validated_paths.public, false)?;
+    let mut shots_writer = create_hashed_file(&public_stage.temp_path.join("shots.b8"))?;
+    let mut answers_writer = create_hashed_file(&private_stage.temp_path.join("answers.b8"))?;
+    let mut masks_writer = masks_bits
+        .map(|_| create_hashed_file(&private_stage.temp_path.join("masks.b8")))
         .transpose()?;
-    let circuit_sha256 = sha256_hex(artifacts.public_circuit_text.as_bytes());
-    let shots_sha256 = sha256_hex(&public_shots_bytes);
+    let mut rngs = make_dataset_rngs(config.seed);
+    let mut remaining = config.shots;
+    while remaining > 0 {
+        let current_shots = remaining.min(batch_shots);
+        let chunk =
+            generate_decoder_dataset_chunk(&validated, config.mode, current_shots, &mut rngs)?;
+        crate::output::write_shots_b8(&chunk.public_shots, &mut shots_writer)
+            .map_err(|error| format!("failed to write public shots: {error}"))?;
+        crate::output::write_shots_b8(&chunk.answers, &mut answers_writer)
+            .map_err(|error| format!("failed to write private answers: {error}"))?;
+        match (&chunk.masks, masks_writer.as_mut()) {
+            (Some(masks), Some(writer)) => crate::output::write_shots_b8(masks, writer)
+                .map_err(|error| format!("failed to write private masks: {error}"))?,
+            (None, None) => {}
+            _ => return Err("inconsistent blinded mask artifacts".to_string()),
+        }
+        remaining -= current_shots;
+    }
+    let shots_sha256 = shots_writer.finish()?;
+    let answers_sha256 = answers_writer.finish()?;
+    let masks_sha256 = masks_writer.map(Sha256Writer::finish).transpose()?;
     let dataset_id = sha256_hex(&dataset_id_material(
         PUBLIC_SCHEMA_VERSION,
         config.mode,
         &circuit_sha256,
         config.shots,
-        artifacts.public_shots.num_major(),
+        public_row_bits,
         &shots_sha256,
     ));
-    let public_row_bits = artifacts.public_shots.num_major();
-    let answers_bits = artifacts.answers.num_major();
-    let masks_bits = artifacts.masks.as_ref().map(BitTable::num_major);
-    let masks_file = match (&masks_bytes, masks_bits) {
-        (Some(bytes), Some(bits)) => Some(FileManifest {
+    let masks_file = match (masks_sha256, masks_bits) {
+        (Some(sha256), Some(bits)) => Some(FileManifest {
             file: "masks.b8",
-            sha256: sha256_hex(bytes),
+            sha256,
             bits,
             bytes_per_shot: bytes_per_shot(bits)?,
         }),
@@ -997,7 +1092,7 @@ pub fn export_decoder_dataset_with_logical_flip_and_publisher(
         mode: config.mode,
         shots: config.shots,
         row: PublicRowManifest {
-            kind: artifacts.public_row_kind,
+            kind: public_row_kind,
             bits: public_row_bits,
             encoding: "b8",
             bit_order: "lsb_first",
@@ -1006,9 +1101,9 @@ pub fn export_decoder_dataset_with_logical_flip_and_publisher(
         circuit: CircuitManifest {
             file: "circuit.stim",
             sha256: circuit_sha256,
-            measurements: artifacts.measurements,
-            detectors: artifacts.detectors,
-            observables: artifacts.observables,
+            measurements: validated.measurements,
+            detectors: validated.detectors,
+            observables: validated.observables,
             sweep_bits: 0,
         },
         shots_file: FileManifest {
@@ -1026,30 +1121,23 @@ pub fn export_decoder_dataset_with_logical_flip_and_publisher(
         shots: config.shots,
         answers_file: FileManifest {
             file: "answers.b8",
-            sha256: sha256_hex(&answers_bytes),
+            sha256: answers_sha256,
             bits: answers_bits,
             bytes_per_shot: bytes_per_shot(answers_bits)?,
         },
         masks_file,
         generation: PrivateGenerationManifest {
             rstim_version: crate::version(),
+            batch_shots,
             seed: config.seed,
         },
     };
 
-    let mut private_stage = StagedBundle::create(&validated_paths.private, true)?;
-    let mut public_stage = StagedBundle::create(&validated_paths.public, false)?;
-    write_private_bundle(
-        &private_stage.temp_path,
-        &private_manifest,
-        &answers_bytes,
-        masks_bytes.as_deref(),
-    )?;
-    write_public_bundle(
-        &public_stage.temp_path,
-        &public_manifest,
-        artifacts.public_circuit_text.as_bytes(),
-        &public_shots_bytes,
+    write_manifest(&private_stage.temp_path.join("manifest.json"), &private_manifest)?;
+    write_manifest(&public_stage.temp_path.join("manifest.json"), &public_manifest)?;
+    write_file(
+        &public_stage.temp_path.join("circuit.stim"),
+        validated.public_circuit_text.as_bytes(),
     )?;
     private_stage.publish_with(publisher)?;
     match public_stage.publish_with(publisher) {
@@ -1480,6 +1568,63 @@ mod tests {
         assert!(std::fs::read_to_string(public_out.join("circuit.stim"))
             .unwrap()
             .contains(LOGICAL_FLIP_MARKER));
+    }
+
+    #[test]
+    fn batched_export_streams_cross_batch_files_and_hashes() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let circuit =
+            "R 0\nX_ERROR(0.5) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let mut config = test_config(circuit, DecoderDatasetMode::Detectors, None);
+        config.shots = 5;
+        config.seed = Some(19);
+        config.public_out = public_out.clone();
+        config.private_out = private_out.clone();
+
+        export_decoder_dataset_with_logical_flip_in_batches(config, 2).unwrap();
+
+        let shots = std::fs::read(public_out.join("shots.b8")).unwrap();
+        let answers = std::fs::read(private_out.join("answers.b8")).unwrap();
+        assert_eq!(shots.len(), 5);
+        assert_eq!(answers.len(), 5);
+
+        let public_manifest: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(public_out.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+        let private_manifest: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(private_out.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(public_manifest["shots"], 5);
+        assert_eq!(private_manifest["generation"]["batch_shots"], 2);
+        assert_eq!(public_manifest["shots_file"]["sha256"], sha256_hex(&shots));
+        assert_eq!(
+            private_manifest["answers_file"]["sha256"],
+            sha256_hex(&answers)
+        );
+    }
+
+    #[test]
+    fn batched_export_rejects_zero_batch_before_creating_outputs() {
+        let root = tempfile::tempdir().unwrap();
+        let public_out = root.path().join("public");
+        let private_out = root.path().join("private");
+        let mut config = test_config(
+            "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            DecoderDatasetMode::Detectors,
+            None,
+        );
+        config.public_out = public_out.clone();
+        config.private_out = private_out.clone();
+
+        let error = export_decoder_dataset_with_logical_flip_in_batches(config, 0).unwrap_err();
+
+        assert_eq!(error, "--batch_shots must be positive");
+        assert!(!public_out.exists());
+        assert!(!private_out.exists());
     }
 
     #[test]
