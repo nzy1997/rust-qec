@@ -8,6 +8,82 @@ use sha2::{Digest, Sha256};
 
 use super::DecodeFailure;
 
+/// Writes a complete public dataset bundle (`manifest.json`, `circuit.stim`,
+/// `shots.b8`) into an existing directory, computing counts, SHA-256 hashes,
+/// and the derived `dataset_id`. Shared by `dataset export`-style producers
+/// and the `dataset import` verb so the wire format has exactly one writer.
+pub(super) fn write_public_bundle(
+    dir: &Path,
+    circuit_text: &str,
+    shots_b8: &[u8],
+    shots: usize,
+) -> Result<(), DecodeFailure> {
+    let instrs = rstim::validation::parse_and_validate(circuit_text)
+        .map_err(|message| DecodeFailure::new("invalid_dataset", message))?;
+    let stats = rstim::stats::summarize(&instrs);
+    let row_bits = stats.num_measurements;
+    let row_bytes = row_bits.div_ceil(8);
+    if shots_b8.len() != shots * row_bytes {
+        return Err(DecodeFailure::new(
+            "invalid_dataset",
+            format!(
+                "shots payload has {} bytes, expected {shots} shots x {row_bytes} bytes",
+                shots_b8.len()
+            ),
+        ));
+    }
+    let circuit_sha = sha256_hex(circuit_text.as_bytes());
+    let shots_sha = sha256_hex(shots_b8);
+    let manifest = serde_json::json!({
+        "format": RSTIM_DATASET_FORMAT,
+        "schema_version": RSTIM_DATASET_SCHEMA_VERSION,
+        "dataset_id": sha256_hex(&dataset_id_material(
+            RSTIM_DATASET_SCHEMA_VERSION,
+            "measurements_blinded",
+            &circuit_sha,
+            shots,
+            row_bits,
+            &shots_sha,
+        )),
+        "mode": "measurements_blinded",
+        "shots": shots,
+        "row": {
+            "kind": "measurements",
+            "bits": row_bits,
+            "encoding": "b8",
+            "bit_order": "lsb_first",
+            "bytes_per_shot": row_bytes,
+        },
+        "circuit": {
+            "file": "circuit.stim",
+            "sha256": circuit_sha,
+            "measurements": stats.num_measurements,
+            "detectors": stats.num_detectors,
+            "observables": stats.num_observables,
+            "sweep_bits": stats.num_sweep_bits,
+        },
+        "shots_file": {
+            "file": "shots.b8",
+            "sha256": shots_sha,
+            "bits": row_bits,
+            "bytes_per_shot": row_bytes,
+        },
+    });
+    let write = |name: &str, bytes: &[u8]| -> Result<(), DecodeFailure> {
+        fs::write(dir.join(name), bytes)
+            .map_err(|error| DecodeFailure::new("missing_dataset_file", format!("{error}")))
+    };
+    write("circuit.stim", circuit_text.as_bytes())?;
+    write("shots.b8", shots_b8)?;
+    write(
+        "manifest.json",
+        serde_json::to_vec_pretty(&manifest)
+            .map_err(|error| DecodeFailure::new("invalid_dataset", error.to_string()))?
+            .as_slice(),
+    )?;
+    Ok(())
+}
+
 const RSTIM_DATASET_FORMAT: &str = "rstim_decoder_dataset";
 const RSTIM_DATASET_SCHEMA_VERSION: u32 = 1;
 const QUDE_DATASET_FORMAT: &str = "qude_decoder_dataset";

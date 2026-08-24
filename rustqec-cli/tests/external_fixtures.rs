@@ -137,7 +137,11 @@ fn error_signature(dem_text: &str) -> Vec<(i128, Vec<Vec<String>>)> {
     let dem = rstim::dem::DetectorErrorModel::parse(dem_text).unwrap();
     let mut signature = Vec::new();
     for instruction in dem.instructions() {
-        let DemInstruction::Error { probability, targets } = instruction else {
+        let DemInstruction::Error {
+            probability,
+            targets,
+        } = instruction
+        else {
             continue;
         };
         let mut components: Vec<Vec<String>> = Vec::new();

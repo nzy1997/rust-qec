@@ -95,6 +95,27 @@ enum DatasetCommand {
         #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
         format: pipeline::PipelineFormat,
     },
+    /// Package a third-party circuit and shot payload into a public dataset
+    Import {
+        /// Loss-visible circuit file (must satisfy subset v1)
+        #[arg(long)]
+        circuit: PathBuf,
+        /// Shot payload file produced by an external sampler
+        #[arg(long)]
+        shots: PathBuf,
+        /// Shot payload encoding: 01 (text rows) or b8 (packed binary)
+        #[arg(long = "shots-format", default_value = "01")]
+        shots_format: String,
+        /// Destination directory for the public dataset bundle
+        #[arg(long)]
+        out: PathBuf,
+        /// Optional rustqec.loss-log.v1 sidecar to cross-check flag bits
+        #[arg(long = "loss-log")]
+        loss_log: Option<PathBuf>,
+        /// Select human-readable or versioned JSON output
+        #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
+        format: pipeline::PipelineFormat,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -542,6 +563,39 @@ where
                 .and_then(|result| {
                     write_pipeline_success(
                         pipeline::DATASET_EXPORT_COMMAND,
+                        &result,
+                        artifacts,
+                        format,
+                        error_format,
+                        stdout,
+                    )
+                })
+                .map_err(RunError::Command)
+        }
+        Command::Dataset {
+            command:
+                DatasetCommand::Import {
+                    circuit,
+                    shots,
+                    shots_format,
+                    out,
+                    loss_log,
+                    format,
+                },
+        } => {
+            let artifacts = vec![out.display().to_string()];
+            let options = pipeline::DatasetImportOptions {
+                circuit,
+                shots,
+                shots_format,
+                out,
+                loss_log,
+                format,
+            };
+            pipeline::run_dataset_import(&options, error_format)
+                .and_then(|result| {
+                    write_pipeline_success(
+                        pipeline::DATASET_IMPORT_COMMAND,
                         &result,
                         artifacts,
                         format,
@@ -1271,6 +1325,101 @@ fn write_capabilities(
                             format: "directory",
                         },
                     ],
+                },
+                Capability {
+                    name: pipeline::DATASET_IMPORT_COMMAND,
+                    argv: vec!["dataset", "import"],
+                    input_sources: vec!["file"],
+                    formats: vec!["human", "json"],
+                    output_schema: SCHEMA_VERSION,
+                    arguments: vec![
+                        ArgumentCapability {
+                            name: "circuit",
+                            flag: "--circuit",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "shots",
+                            flag: "--shots",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "shots_format",
+                            flag: "--shots-format",
+                            required: false,
+                            values: vec!["01", "b8"],
+                            default: Some("01"),
+                        },
+                        ArgumentCapability {
+                            name: "out",
+                            flag: "--out",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "loss_log",
+                            flag: "--loss-log",
+                            required: false,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "format",
+                            flag: "--format",
+                            required: false,
+                            values: vec!["human", "json"],
+                            default: Some("json"),
+                        },
+                    ],
+                    success_exit_code: 0,
+                    errors: vec![
+                        ErrorCapability {
+                            code: "invalid_arguments",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_circuit",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "input_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_dataset",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "unsupported_circuit",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "loss_log_mismatch",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "output_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                    ],
+                    decoders: Vec::new(),
+                    artifacts: vec![ArtifactCapability {
+                        name: "public_dataset",
+                        flag: "--out",
+                        format: "directory",
+                    }],
                 },
                 Capability {
                     name: decode::COMMAND,

@@ -379,6 +379,27 @@ fn parent_dir(path: &Path) -> &Path {
         .unwrap_or(Path::new("."))
 }
 
+/// Re-validates a staged public bundle exactly as `decode` would: manifest
+/// structure, hashes, row widths, and the full loss-visible circuit subset
+/// compilation. Returns the flag-record measurement indices on success so
+/// callers (for example `dataset import`) can cross-check loss sidecars.
+pub(crate) fn validate_public_bundle(dir: &Path) -> Result<Vec<usize>, DecodeFailure> {
+    let dataset = read_dataset(dir)?;
+    let compiled = compile_circuit(&dataset)?;
+    Ok(compiled.loss_flags)
+}
+
+/// Writes a public dataset bundle into `dir`; see
+/// [`dataset::write_public_bundle`].
+pub(crate) fn write_public_bundle(
+    dir: &Path,
+    circuit_text: &str,
+    shots_b8: &[u8],
+    shots: usize,
+) -> Result<(), DecodeFailure> {
+    dataset::write_public_bundle(dir, circuit_text, shots_b8, shots)
+}
+
 #[cfg(test)]
 mod tests {
     use renvelope::{
