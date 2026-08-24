@@ -404,6 +404,66 @@ fn dataset_export_rejects_unknown_mode_and_missing_circuit() {
 }
 
 #[test]
+fn dataset_export_error_trace_writes_private_trace_jsonl() {
+    let dir = tempfile::tempdir().unwrap();
+    let circuit = dir.path().join("circuit.stim");
+    std::fs::write(
+        &circuit,
+        "R 0\nX_ERROR(0.5) 0\nLOSS(0.5) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    let public = dir.path().join("public");
+    let private = dir.path().join("private");
+
+    let output = rustqec_cmd()
+        .args([
+            "dataset",
+            "export",
+            "--circuit",
+            circuit.to_str().unwrap(),
+            "--shots",
+            "8",
+            "--mode",
+            "detectors",
+            "--public-out",
+            public.to_str().unwrap(),
+            "--private-out",
+            private.to_str().unwrap(),
+            "--seed",
+            "7",
+            "--error-trace",
+        ])
+        .output()
+        .unwrap();
+    let value = stdout_json(&output);
+    assert_eq!(value["command"], "dataset.export");
+
+    let trace = std::fs::read_to_string(private.join("trace.jsonl")).unwrap();
+    let lines: Vec<serde_json::Value> = trace
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(lines.len(), 8, "one trace line per shot");
+    for (shot, line) in lines.iter().enumerate() {
+        assert_eq!(line["schema_version"], "rstim.error-trace.v1");
+        assert_eq!(line["shot"], shot);
+    }
+    assert!(
+        lines.iter().any(|line| line["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["branch"] == "L")),
+        "expected at least one heralding loss event"
+    );
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(private.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["trace_file"]["file"], "trace.jsonl");
+    assert_eq!(manifest["trace_file"]["schema"], "rstim.error-trace.v1");
+    assert!(!public.join("trace.jsonl").exists());
+}
+
+#[test]
 fn pipeline_commands_default_to_json_and_support_human() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("circuit.stim");
@@ -524,6 +584,15 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         mode["values"],
         serde_json::json!(["detectors", "measurements_blinded"])
     );
+    let trace_argument = export["arguments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|argument| argument["name"] == "error_trace")
+        .expect("dataset.export must declare --error-trace");
+    assert_eq!(trace_argument["flag"], "--error-trace");
+    assert_eq!(trace_argument["required"], false);
+    assert_eq!(trace_argument["default"], "false");
 }
 
 #[test]

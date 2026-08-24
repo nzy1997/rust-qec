@@ -451,6 +451,7 @@ fn native_d3_and_d5_exports_decode_via_cli_against_private_answers() {
             public_out: public.clone(),
             private_out: private.clone(),
             seed: Some(0x630 + distance as u64),
+            error_trace: false,
         })
         .unwrap();
         let answers = fs::read(private.join("answers.b8")).unwrap();

@@ -274,6 +274,9 @@ pub enum Commands {
         private_out: String,
         #[arg(long = "seed")]
         seed: Option<u64>,
+        /// Also write a per-shot rstim.error-trace.v1 trace.jsonl into the private bundle
+        #[arg(long = "error_trace")]
+        error_trace: bool,
     },
     /// Pack measurement samples into an RSMP archive
     #[command(name = "pack_samples")]
@@ -751,6 +754,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             public_out,
             private_out,
             seed,
+            error_trace,
         }) => {
             let logical_flip = parse_cli_logical_flip(
                 logical_x_qubits.as_deref(),
@@ -765,6 +769,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 &public_out,
                 &private_out,
                 seed,
+                error_trace,
             )
         }
         Some(Commands::PackSamples {
@@ -1367,6 +1372,7 @@ pub fn run_export_decoder_dataset(
         public_out,
         private_out,
         seed,
+        false,
     )
 }
 
@@ -1379,6 +1385,7 @@ pub fn run_export_decoder_dataset_with_logical_flip(
     public_out: &str,
     private_out: &str,
     seed: Option<u64>,
+    error_trace: bool,
 ) -> Result<(), String> {
     run_export_decoder_dataset_with_logical_flip_in_batches(
         circuit,
@@ -1389,6 +1396,7 @@ pub fn run_export_decoder_dataset_with_logical_flip(
         public_out,
         private_out,
         seed,
+        error_trace,
     )
 }
 
@@ -1403,6 +1411,7 @@ pub fn run_export_decoder_dataset_with_logical_flip_in_batches(
     public_out: &str,
     private_out: &str,
     seed: Option<u64>,
+    error_trace: bool,
 ) -> Result<(), String> {
     let circuit_text = std::fs::read_to_string(circuit)
         .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
@@ -1418,6 +1427,7 @@ pub fn run_export_decoder_dataset_with_logical_flip_in_batches(
             public_out: std::path::PathBuf::from(public_out),
             private_out: std::path::PathBuf::from(private_out),
             seed,
+            error_trace,
         },
         batch_shots,
     )

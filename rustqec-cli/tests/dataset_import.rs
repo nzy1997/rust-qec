@@ -258,6 +258,7 @@ fn imported_bundle_decodes_identically_to_exported_bundle() {
         public_out: exported.clone(),
         private_out: private,
         seed: Some(99),
+        error_trace: false,
     })
     .unwrap();
 

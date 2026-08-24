@@ -97,6 +97,7 @@ fn generalized_rust_api_accepts_a_logical_z_flip() {
         public_out: PathBuf::from("public-unused"),
         private_out: PathBuf::from("private-unused"),
         seed: Some(1),
+        error_trace: false,
     };
 
     let _: fn(ExportDecoderDatasetLogicalFlipConfig) -> Result<DecoderDatasetSummary, String> =
@@ -115,6 +116,7 @@ fn generalized_rust_api_accepts_a_logical_z_flip() {
         &str,
         &str,
         Option<u64>,
+        bool,
     ) -> Result<(), String> = run_export_decoder_dataset_with_logical_flip_in_batches;
     assert_eq!(config.logical_flip.unwrap().pauli, LogicalPauli::Z);
 }

@@ -424,6 +424,7 @@ pub struct DatasetExportOptions {
     pub seed: Option<u64>,
     pub logical_x_qubits: Option<String>,
     pub logical_z_qubits: Option<String>,
+    pub error_trace: bool,
     pub format: PipelineFormat,
 }
 
@@ -788,6 +789,7 @@ pub fn run_dataset_export(
         &public_out,
         &private_out,
         options.seed,
+        options.error_trace,
     )
     .map_err(|message| {
         let code = if message.contains("unknown decoder dataset mode") {

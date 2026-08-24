@@ -96,6 +96,11 @@ pub struct ExportDecoderDatasetLogicalFlipConfig {
     pub public_out: PathBuf,
     pub private_out: PathBuf,
     pub seed: Option<u64>,
+    /// Also write a per-shot `trace.jsonl` sidecar (schema `rstim.error-trace.v1`)
+    /// into the private bundle, recording every noise realization (Pauli branch
+    /// or loss onset) behind each shot. Traced sampling is per-shot and slower,
+    /// and produces a different batch than untraced sampling for the same seed.
+    pub error_trace: bool,
 }
 
 impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
@@ -116,6 +121,7 @@ impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig 
             public_out: config.public_out,
             private_out: config.private_out,
             seed: config.seed,
+            error_trace: false,
         }
     }
 }
@@ -493,6 +499,7 @@ pub struct DecoderDatasetArtifacts {
     pub public_shots: BitTable,
     pub answers: BitTable,
     pub masks: Option<BitTable>,
+    pub error_trace: Option<Vec<u8>>,
     pub measurements: usize,
     pub detectors: usize,
     pub observables: usize,
@@ -502,6 +509,7 @@ struct DecoderDatasetChunk {
     public_shots: BitTable,
     answers: BitTable,
     masks: Option<BitTable>,
+    error_trace: Option<Vec<u8>>,
 }
 
 struct DatasetRngs {
@@ -542,12 +550,177 @@ fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usiz
     }
 }
 
+const ERROR_TRACE_SCHEMA: &str = "rstim.error-trace.v1";
+
+fn append_error_trace_line(
+    buffer: &mut Vec<u8>,
+    shot: usize,
+    trace: &crate::sample_trace::SampleTrace,
+) -> Result<(), String> {
+    #[derive(Serialize)]
+    struct TraceEvent<'a> {
+        op: &'a str,
+        targets: &'a [u32],
+        branch: Option<&'a str>,
+        path: &'a [usize],
+        iterations: &'a [u64],
+    }
+    #[derive(Serialize)]
+    struct TraceLine<'a> {
+        schema_version: &'static str,
+        shot: usize,
+        events: Vec<TraceEvent<'a>>,
+    }
+    let line = TraceLine {
+        schema_version: ERROR_TRACE_SCHEMA,
+        shot,
+        events: trace
+            .noise_events
+            .iter()
+            .map(|event| TraceEvent {
+                op: &event.instr_name,
+                targets: &event.target_qubits,
+                branch: event.branch_label.as_deref(),
+                path: &event.op_path,
+                iterations: &event.repeat_iterations,
+            })
+            .collect(),
+    };
+    serde_json::to_writer(&mut *buffer, &line)
+        .map_err(|error| format!("failed to serialize error trace line: {error}"))?;
+    buffer.push(b'\n');
+    Ok(())
+}
+
+fn observable_flip(output: &crate::executor::ExecOutput, context: &str) -> Result<bool, String> {
+    output
+        .observables
+        .iter()
+        .find(|(index, _)| *index == 0)
+        .map(|(_, bit)| *bit)
+        .ok_or_else(|| format!("traced {context} shot produced no observable 0"))
+}
+
+/// Samples a chunk shot-by-shot with tracing enabled so every shot carries the
+/// noise realization (Pauli branch or loss onset) that produced it. `shot_offset`
+/// is the global index of the chunk's first shot, so trace lines stay aligned
+/// with `shots.b8` across chunk boundaries.
+fn generate_traced_decoder_dataset_chunk(
+    validated: &ValidatedDecoderDatasetInput,
+    mode: DecoderDatasetMode,
+    shots: usize,
+    shot_offset: usize,
+    rngs: &mut DatasetRngs,
+) -> Result<DecoderDatasetChunk, String> {
+    match mode {
+        DecoderDatasetMode::Detectors => {
+            let mut executor =
+                crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
+            let mut detections = BitTable::try_new(validated.detectors, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut answers = BitTable::try_new(1, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut trace_bytes = Vec::new();
+            for shot in 0..shots {
+                let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
+                if output.detectors.len() != validated.detectors {
+                    return Err(format!(
+                        "traced shot produced {} detectors, expected {}",
+                        output.detectors.len(),
+                        validated.detectors
+                    ));
+                }
+                for (detector, bit) in output.detectors.iter().copied().enumerate() {
+                    if bit {
+                        detections.set(detector, shot, true);
+                    }
+                }
+                if observable_flip(&output, "detectors")? {
+                    answers.set(0, shot, true);
+                }
+                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+            }
+            Ok(DecoderDatasetChunk {
+                public_shots: detections,
+                answers,
+                masks: None,
+                error_trace: Some(trace_bytes),
+            })
+        }
+        DecoderDatasetMode::MeasurementsBlinded => {
+            let private_one_instrs = validated
+                .private_one_instrs
+                .as_ref()
+                .ok_or_else(|| "missing blinded logical-one circuit".to_string())?;
+            let mut zero_executor =
+                crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
+            let mut one_executor =
+                crate::executor::Executor::from_instrs(private_one_instrs.clone())?;
+
+            let mut source_labels: Vec<bool> = (0..shots).map(|_| rngs.mask.r#gen()).collect();
+            for index in (1..source_labels.len()).rev() {
+                let replacement = rngs.permutation.gen_range(0..=index);
+                source_labels.swap(index, replacement);
+            }
+
+            let mut measurements = BitTable::try_new(validated.measurements, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut masks = BitTable::try_new(1, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut answers = BitTable::try_new(1, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut trace_bytes = Vec::new();
+            for (shot, label) in source_labels.iter().copied().enumerate() {
+                let executor = if label {
+                    &mut one_executor
+                } else {
+                    &mut zero_executor
+                };
+                let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
+                if output.measurements.len() != validated.measurements {
+                    return Err(format!(
+                        "traced shot produced {} measurements, expected {}",
+                        output.measurements.len(),
+                        validated.measurements
+                    ));
+                }
+                for (row, bit) in output.measurements.iter().copied().enumerate() {
+                    if bit {
+                        measurements.set(row, shot, true);
+                    }
+                }
+                if label {
+                    masks.set(0, shot, true);
+                }
+                // The injected logical flip only changes measurement values, not
+                // the observable's record-bit structure, so the executed
+                // observable equals the public interpretation; unmask it here.
+                if observable_flip(&output, "blinded")? ^ label {
+                    answers.set(0, shot, true);
+                }
+                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+            }
+            Ok(DecoderDatasetChunk {
+                public_shots: measurements,
+                answers,
+                masks: Some(masks),
+                error_trace: Some(trace_bytes),
+            })
+        }
+    }
+}
+
 fn generate_decoder_dataset_chunk(
     validated: &ValidatedDecoderDatasetInput,
     mode: DecoderDatasetMode,
     shots: usize,
+    shot_offset: usize,
+    error_trace: bool,
     rngs: &mut DatasetRngs,
 ) -> Result<DecoderDatasetChunk, String> {
+    if error_trace {
+        return generate_traced_decoder_dataset_chunk(validated, mode, shots, shot_offset, rngs);
+    }
     match mode {
         DecoderDatasetMode::Detectors => {
             let result = crate::sampler::sample_batch_with_options(
@@ -563,11 +736,11 @@ fn generate_decoder_dataset_chunk(
                 public_shots: result.detections,
                 answers: result.observable_flips,
                 masks: None,
+                error_trace: None,
             })
         }
         DecoderDatasetMode::MeasurementsBlinded => {
-            let mut source_labels: Vec<bool> =
-                (0..shots).map(|_| rngs.mask.r#gen()).collect();
+            let mut source_labels: Vec<bool> = (0..shots).map(|_| rngs.mask.r#gen()).collect();
             for index in (1..source_labels.len()).rev() {
                 let replacement = rngs.permutation.gen_range(0..=index);
                 source_labels.swap(index, replacement);
@@ -634,6 +807,7 @@ fn generate_decoder_dataset_chunk(
                 public_shots: measurements,
                 answers,
                 masks: Some(masks),
+                error_trace: None,
             })
         }
     }
@@ -653,7 +827,14 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
 ) -> Result<DecoderDatasetArtifacts, String> {
     let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
     let mut rngs = make_dataset_rngs(config.seed);
-    let chunk = generate_decoder_dataset_chunk(&validated, config.mode, config.shots, &mut rngs)?;
+    let chunk = generate_decoder_dataset_chunk(
+        &validated,
+        config.mode,
+        config.shots,
+        0,
+        config.error_trace,
+        &mut rngs,
+    )?;
     Ok(DecoderDatasetArtifacts {
         public_circuit_text: validated.public_circuit_text,
         public_instrs: validated.public_instrs,
@@ -664,6 +845,7 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
         public_shots: chunk.public_shots,
         answers: chunk.answers,
         masks: chunk.masks,
+        error_trace: chunk.error_trace,
         measurements: validated.measurements,
         detectors: validated.detectors,
         observables: validated.observables,
@@ -692,7 +874,17 @@ struct PrivateManifest {
     answers_file: FileManifest,
     #[serde(skip_serializing_if = "Option::is_none")]
     masks_file: Option<FileManifest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trace_file: Option<TraceFileManifest>,
     generation: PrivateGenerationManifest,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceFileManifest {
+    file: &'static str,
+    sha256: String,
+    schema: &'static str,
+    lines: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -1052,12 +1244,23 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
     let mut masks_writer = masks_bits
         .map(|_| create_hashed_file(&private_stage.temp_path.join("masks.b8")))
         .transpose()?;
+    let mut trace_writer = config
+        .error_trace
+        .then(|| create_hashed_file(&private_stage.temp_path.join("trace.jsonl")))
+        .transpose()?;
     let mut rngs = make_dataset_rngs(config.seed);
     let mut remaining = config.shots;
+    let mut shot_offset = 0;
     while remaining > 0 {
         let current_shots = remaining.min(batch_shots);
-        let chunk =
-            generate_decoder_dataset_chunk(&validated, config.mode, current_shots, &mut rngs)?;
+        let chunk = generate_decoder_dataset_chunk(
+            &validated,
+            config.mode,
+            current_shots,
+            shot_offset,
+            config.error_trace,
+            &mut rngs,
+        )?;
         crate::output::write_shots_b8(&chunk.public_shots, &mut shots_writer)
             .map_err(|error| format!("failed to write public shots: {error}"))?;
         crate::output::write_shots_b8(&chunk.answers, &mut answers_writer)
@@ -1068,11 +1271,20 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             (None, None) => {}
             _ => return Err("inconsistent blinded mask artifacts".to_string()),
         }
+        match (&chunk.error_trace, trace_writer.as_mut()) {
+            (Some(trace), Some(writer)) => writer
+                .write_all(trace)
+                .map_err(|error| format!("failed to write private error trace: {error}"))?,
+            (None, None) => {}
+            _ => return Err("inconsistent error trace artifacts".to_string()),
+        }
         remaining -= current_shots;
+        shot_offset += current_shots;
     }
     let shots_sha256 = shots_writer.finish()?;
     let answers_sha256 = answers_writer.finish()?;
     let masks_sha256 = masks_writer.map(Sha256Writer::finish).transpose()?;
+    let trace_sha256 = trace_writer.map(Sha256Writer::finish).transpose()?;
     let dataset_id = sha256_hex(&dataset_id_material(
         PUBLIC_SCHEMA_VERSION,
         config.mode,
@@ -1091,6 +1303,12 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
         (None, None) => None,
         _ => return Err("inconsistent blinded mask artifacts".to_string()),
     };
+    let trace_file = trace_sha256.map(|sha256| TraceFileManifest {
+        file: "trace.jsonl",
+        sha256,
+        schema: ERROR_TRACE_SCHEMA,
+        lines: config.shots,
+    });
     let public_manifest = PublicManifest {
         format: DATASET_FORMAT,
         schema_version: PUBLIC_SCHEMA_VERSION,
@@ -1132,6 +1350,7 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             bytes_per_shot: bytes_per_shot(answers_bits)?,
         },
         masks_file,
+        trace_file,
         generation: PrivateGenerationManifest {
             rstim_version: crate::version(),
             batch_shots,
@@ -1139,8 +1358,14 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
         },
     };
 
-    write_manifest(&private_stage.temp_path.join("manifest.json"), &private_manifest)?;
-    write_manifest(&public_stage.temp_path.join("manifest.json"), &public_manifest)?;
+    write_manifest(
+        &private_stage.temp_path.join("manifest.json"),
+        &private_manifest,
+    )?;
+    write_manifest(
+        &public_stage.temp_path.join("manifest.json"),
+        &public_manifest,
+    )?;
     write_file(
         &public_stage.temp_path.join("circuit.stim"),
         validated.public_circuit_text.as_bytes(),
@@ -1180,6 +1405,7 @@ mod tests {
             public_out: std::path::PathBuf::from("public-unused"),
             private_out: std::path::PathBuf::from("private-unused"),
             seed: Some(1),
+            error_trace: false,
         }
     }
 

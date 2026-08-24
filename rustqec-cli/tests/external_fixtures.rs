@@ -74,6 +74,7 @@ fn stim_generated_memory_z_decodes_end_to_end() {
         public_out: public.clone(),
         private_out: private.clone(),
         seed: Some(42),
+        error_trace: false,
     })
     .unwrap();
     let answers = fs::read(private.join("answers.b8")).unwrap();

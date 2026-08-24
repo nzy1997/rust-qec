@@ -31,6 +31,18 @@ in the private manifest so seeded exports remain reproducible.
 Output files and their SHA-256 digests are written incrementally. Peak dataset
 memory therefore scales with `--batch_shots`, not the total value of `--shots`.
 
+## Optional per-shot error trace
+
+`--error_trace` additionally writes `trace.jsonl` into the private bundle and
+a `trace_file` entry into the private manifest. Each line records the complete
+noise realization behind one shot — every Pauli branch that fired and every
+`LOSS` onset — in the versioned `rstim.error-trace.v1` schema (see
+`docs/specs/error-trace-v1.md`). Traced export samples shot by shot, so it is
+slower than batch sampling and produces a different batch than an untraced
+export with the same seed; within one traced export the trace, shots, answers,
+and masks always describe the same executions, and a fixed seed remains
+byte-for-byte reproducible.
+
 ## Blinded Measurement Mode
 
 Place the marker exactly once as a standalone, top-level comment at the point where an ideal logical Pauli may be inserted. It must not be inside a `REPEAT` block or appended to another instruction.
@@ -75,6 +87,6 @@ Here `O_public(m)` is the observable computed from the published measurement row
 
 ## Files
 
-Public files are exactly `manifest.json`, `circuit.stim`, and `shots.b8`. Private files are exactly `manifest.json`, `answers.b8`, and, in blinded measurement mode, `masks.b8`.
+Public files are exactly `manifest.json`, `circuit.stim`, and `shots.b8`. Private files are exactly `manifest.json`, `answers.b8`, and, in blinded measurement mode, `masks.b8`, plus `trace.jsonl` when `--error_trace` is on.
 
 The manifests describe their respective bundle files and associate the public and private bundles with the same dataset. Publish only the public directory; retain the private directory for the scoring authority.

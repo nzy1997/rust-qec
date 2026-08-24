@@ -91,6 +91,9 @@ enum DatasetCommand {
         /// Apply a logical-Z flip on the given data qubits before export
         #[arg(long = "logical-z-qubits")]
         logical_z_qubits: Option<String>,
+        /// Also write a per-shot rstim.error-trace.v1 trace.jsonl into the private bundle
+        #[arg(long = "error-trace")]
+        error_trace: bool,
         /// Select human-readable or versioned JSON output
         #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
         format: pipeline::PipelineFormat,
@@ -541,6 +544,7 @@ where
                     seed,
                     logical_x_qubits,
                     logical_z_qubits,
+                    error_trace,
                     format,
                 },
         } => {
@@ -557,6 +561,7 @@ where
                 seed,
                 logical_x_qubits,
                 logical_z_qubits,
+                error_trace,
                 format,
             };
             pipeline::run_dataset_export(&options, error_format)
@@ -1280,6 +1285,13 @@ fn write_capabilities(
                             required: false,
                             values: vec!["qubit_index_list"],
                             default: None,
+                        },
+                        ArgumentCapability {
+                            name: "error_trace",
+                            flag: "--error-trace",
+                            required: false,
+                            values: vec!["boolean"],
+                            default: Some("false"),
                         },
                         ArgumentCapability {
                             name: "format",
