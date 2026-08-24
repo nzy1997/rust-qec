@@ -8,6 +8,7 @@
 rstim export_decoder_dataset \
   --circuit memory.stim \
   --shots 100000 \
+  --batch_shots 10000 \
   --mode detectors \
   --public_out public-data \
   --private_out private-truth
@@ -18,6 +19,17 @@ The public bundle contains detector-event rows in `shots.b8` and the logical-zer
 Contestants decode each public row to one predicted observable bit. Scoring compares each prediction with the corresponding private answer bit.
 
 Detector mode rejects both `--logical_x_qubits` and `--logical_z_qubits`.
+
+## Bounded-memory export
+
+The exporter generates and writes shots in bounded batches instead of keeping
+the full dataset in memory. `--batch_shots` controls the maximum number of
+shots held by one generation batch and defaults to `10000`; lowering it reduces
+peak memory at the cost of more sampling calls. The selected value is recorded
+in the private manifest so seeded exports remain reproducible.
+
+Output files and their SHA-256 digests are written incrementally. Peak dataset
+memory therefore scales with `--batch_shots`, not the total value of `--shots`.
 
 ## Blinded Measurement Mode
 

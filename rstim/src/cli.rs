@@ -257,6 +257,11 @@ pub enum Commands {
         circuit: String,
         #[arg(long = "shots")]
         shots: u64,
+        #[arg(
+            long = "batch_shots",
+            default_value_t = crate::decoder_dataset::DEFAULT_DECODER_DATASET_BATCH_SHOTS
+        )]
+        batch_shots: usize,
         #[arg(long = "mode")]
         mode: String,
         #[arg(long = "logical_x_qubits")]
@@ -739,6 +744,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
         Some(Commands::ExportDecoderDataset {
             circuit,
             shots,
+            batch_shots,
             mode,
             logical_x_qubits,
             logical_z_qubits,
@@ -750,9 +756,10 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 logical_x_qubits.as_deref(),
                 logical_z_qubits.as_deref(),
             )?;
-            run_export_decoder_dataset_with_logical_flip(
+            run_export_decoder_dataset_with_logical_flip_in_batches(
                 &circuit,
                 shots,
+                batch_shots,
                 &mode,
                 logical_flip,
                 &public_out,
@@ -1373,12 +1380,36 @@ pub fn run_export_decoder_dataset_with_logical_flip(
     private_out: &str,
     seed: Option<u64>,
 ) -> Result<(), String> {
+    run_export_decoder_dataset_with_logical_flip_in_batches(
+        circuit,
+        shots,
+        crate::decoder_dataset::DEFAULT_DECODER_DATASET_BATCH_SHOTS,
+        mode,
+        logical_flip,
+        public_out,
+        private_out,
+        seed,
+    )
+}
+
+/// Runs decoder-dataset export with bounded batches and an X-or-Z logical flip.
+#[allow(clippy::too_many_arguments)]
+pub fn run_export_decoder_dataset_with_logical_flip_in_batches(
+    circuit: &str,
+    shots: u64,
+    batch_shots: usize,
+    mode: &str,
+    logical_flip: Option<crate::decoder_dataset::LogicalFlip>,
+    public_out: &str,
+    private_out: &str,
+    seed: Option<u64>,
+) -> Result<(), String> {
     let circuit_text = std::fs::read_to_string(circuit)
         .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
     let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
     let shots =
         usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
-    crate::decoder_dataset::export_decoder_dataset_with_logical_flip(
+    crate::decoder_dataset::export_decoder_dataset_with_logical_flip_in_batches(
         crate::decoder_dataset::ExportDecoderDatasetLogicalFlipConfig {
             circuit_text,
             shots,
@@ -1388,6 +1419,7 @@ pub fn run_export_decoder_dataset_with_logical_flip(
             private_out: std::path::PathBuf::from(private_out),
             seed,
         },
+        batch_shots,
     )
     .map(drop)
 }

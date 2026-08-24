@@ -1,8 +1,11 @@
-use rstim::cli::run_export_decoder_dataset;
+use rstim::cli::{
+    run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip_in_batches,
+};
 use rstim::decoder_dataset::{
     DecoderDatasetArtifacts, DecoderDatasetMode, DecoderDatasetSummary,
     ExportDecoderDatasetConfig, ExportDecoderDatasetLogicalFlipConfig, LogicalFlip, LogicalPauli,
     export_decoder_dataset, export_decoder_dataset_with_logical_flip,
+    export_decoder_dataset_with_logical_flip_in_batches,
     generate_decoder_dataset_artifacts,
 };
 use std::fs;
@@ -98,6 +101,21 @@ fn generalized_rust_api_accepts_a_logical_z_flip() {
 
     let _: fn(ExportDecoderDatasetLogicalFlipConfig) -> Result<DecoderDatasetSummary, String> =
         export_decoder_dataset_with_logical_flip;
+    let _: fn(
+        ExportDecoderDatasetLogicalFlipConfig,
+        usize,
+    ) -> Result<DecoderDatasetSummary, String> =
+        export_decoder_dataset_with_logical_flip_in_batches;
+    let _: fn(
+        &str,
+        u64,
+        usize,
+        &str,
+        Option<LogicalFlip>,
+        &str,
+        &str,
+        Option<u64>,
+    ) -> Result<(), String> = run_export_decoder_dataset_with_logical_flip_in_batches;
     assert_eq!(config.logical_flip.unwrap().pauli, LogicalPauli::Z);
 }
 
