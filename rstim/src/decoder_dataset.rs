@@ -407,9 +407,15 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
     }
     let public_instrs = crate::parser::parse_lines(&config.circuit_text)?;
     let stats = crate::stats::summarize(&public_instrs);
-    if stats.num_observables != 1 {
+    if stats.num_observables == 0 {
         return Err(format!(
-            "export_decoder_dataset requires exactly one observable, found {}",
+            "export_decoder_dataset requires at least one observable, found {}",
+            stats.num_observables
+        ));
+    }
+    if config.mode == DecoderDatasetMode::MeasurementsBlinded && stats.num_observables != 1 {
+        return Err(format!(
+            "measurements_blinded mode requires exactly one observable, found {}",
             stats.num_observables
         ));
     }
@@ -1282,14 +1288,21 @@ mod tests {
         let config = test_config(no_observable, DecoderDatasetMode::Detectors, None);
         assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
-            .contains("exactly one observable, found 0"));
+            .contains("at least one observable, found 0"));
 
         let multiple_observables =
             "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
         let config = test_config(multiple_observables, DecoderDatasetMode::Detectors, None);
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
+
+        let config = test_config(
+            multiple_observables,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
         assert!(validate_decoder_dataset_logical_flip_inputs(&config)
             .unwrap_err()
-            .contains("exactly one observable, found 2"));
+            .contains("measurements_blinded mode requires exactly one observable, found 2"));
 
         let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, None);
@@ -1575,8 +1588,11 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
-        let circuit =
-            "R 0\nX_ERROR(0.5) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let circuit = concat!(
+            "R 0\nX_ERROR(0.5) 0\nM 0\nDETECTOR rec[-1]\n",
+            "OBSERVABLE_INCLUDE(0) rec[-1]\n",
+            "OBSERVABLE_INCLUDE(1) rec[-1]\n",
+        );
         let mut config = test_config(circuit, DecoderDatasetMode::Detectors, None);
         config.shots = 5;
         config.seed = Some(19);
@@ -1599,6 +1615,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(public_manifest["shots"], 5);
+        assert_eq!(private_manifest["answers_file"]["bits"], 2);
         assert_eq!(private_manifest["generation"]["batch_shots"], 2);
         assert_eq!(public_manifest["shots_file"]["sha256"], sha256_hex(&shots));
         assert_eq!(
