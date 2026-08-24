@@ -1187,8 +1187,20 @@ fn execute_op(
                         }
                     });
                 if outcome == NoiseOutcome::Lost {
-                    exec.lost[q] = true;
-                    exec.record_noise_event(context, name, vec![target_slot], vec![q as u32], "L");
+                    if exec.lost[q] {
+                        // Already lost: no present→lost transition, so this
+                        // sampled loss is a no-op, not a new loss onset.
+                        exec.record_inapplicable_noise_event(context, &target_slots);
+                    } else {
+                        exec.lost[q] = true;
+                        exec.record_noise_event(
+                            context,
+                            name,
+                            vec![target_slot],
+                            vec![q as u32],
+                            "L",
+                        );
+                    }
                 } else if outcome != NoiseOutcome::Identity {
                     return Err(format!("invalid override {} for LOSS", outcome.label()));
                 }

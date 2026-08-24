@@ -212,6 +212,85 @@ fn blinded_trace_unmasks_answers_and_stays_private() {
 }
 
 #[test]
+fn traced_export_xors_all_observable_include_contributions() {
+    // Two OBSERVABLE_INCLUDE(0) lines define observable 0 as m0 XOR m1 = 1;
+    // a third line defines observable 1 = m1 = 1. Reading only the first
+    // contribution would silently mislabel every answer.
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join("circuit.stim");
+    fs::write(
+        &circuit,
+        "R 0 1\nX 1\nM 0 1\nDETECTOR rec[-2]\n\
+         OBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+    )
+    .unwrap();
+    let public_out = root.path().join("public");
+    let private_out = root.path().join("private");
+    assert_success(
+        &run_cli(&export_args(
+            &circuit,
+            "detectors",
+            4,
+            &public_out,
+            &private_out,
+            &["--seed", "5", "--error_trace"],
+        )),
+        "multi-include traced export",
+    );
+
+    // 2 observable rows * 1 bit -> 1 byte per shot, LSB = observable 0.
+    let answers = fs::read(private_out.join("answers.b8")).unwrap();
+    assert_eq!(answers.len(), 4);
+    for (shot, byte) in answers.iter().enumerate() {
+        assert_eq!(byte & 1, 1, "shot {shot} observable 0 must XOR to 1");
+        assert_eq!(byte >> 1 & 1, 1, "shot {shot} observable 1 must be 1");
+    }
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(private_out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["answers_file"]["bits"], 2);
+    trace_lines(&private_out, 4);
+}
+
+#[test]
+fn traced_export_records_single_loss_onset_for_double_loss() {
+    let root = tempfile::tempdir().unwrap();
+    let circuit = root.path().join("circuit.stim");
+    fs::write(
+        &circuit,
+        "R 0\nLOSS(1) 0\nLOSS(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    let public_out = root.path().join("public");
+    let private_out = root.path().join("private");
+    assert_success(
+        &run_cli(&export_args(
+            &circuit,
+            "detectors",
+            2,
+            &public_out,
+            &private_out,
+            &["--seed", "1", "--error_trace"],
+        )),
+        "double-loss traced export",
+    );
+
+    for line in trace_lines(&private_out, 2) {
+        let loss_events: Vec<_> = line["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| event["op"] == "LOSS")
+            .collect();
+        assert_eq!(
+            loss_events.len(),
+            1,
+            "a LOSS sampled on an already-lost qubit is not a new onset: {line}"
+        );
+        assert_eq!(loss_events[0]["branch"], "L");
+    }
+}
+
+#[test]
 fn seeded_trace_export_is_deterministic_and_opt_in() {
     let root = tempfile::tempdir().unwrap();
     let circuit = root.path().join("circuit.stim");

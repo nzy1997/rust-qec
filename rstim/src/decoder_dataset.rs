@@ -592,13 +592,32 @@ fn append_error_trace_line(
     Ok(())
 }
 
-fn observable_flip(output: &crate::executor::ExecOutput, context: &str) -> Result<bool, String> {
-    output
-        .observables
-        .iter()
-        .find(|(index, _)| *index == 0)
-        .map(|(_, bit)| *bit)
-        .ok_or_else(|| format!("traced {context} shot produced no observable 0"))
+/// Aggregates an observable bit per observable index. Stim allows several
+/// `OBSERVABLE_INCLUDE(k)` instructions whose contributions XOR into the same
+/// observable, so every entry with the same index must be combined.
+fn observable_flips(
+    output: &crate::executor::ExecOutput,
+    num_observables: usize,
+    context: &str,
+) -> Result<Vec<bool>, String> {
+    let mut seen = vec![false; num_observables];
+    let mut flips = vec![false; num_observables];
+    for (index, bit) in &output.observables {
+        let observable = *index as usize;
+        if observable >= num_observables {
+            return Err(format!(
+                "traced {context} shot produced observable {observable}, expected {num_observables}"
+            ));
+        }
+        seen[observable] = true;
+        flips[observable] ^= bit;
+    }
+    if let Some(missing) = seen.iter().position(|present| !present) {
+        return Err(format!(
+            "traced {context} shot produced no observable {missing}"
+        ));
+    }
+    Ok(flips)
 }
 
 /// Samples a chunk shot-by-shot with tracing enabled so every shot carries the
@@ -618,7 +637,7 @@ fn generate_traced_decoder_dataset_chunk(
                 crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
             let mut detections = BitTable::try_new(validated.detectors, shots)
                 .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-            let mut answers = BitTable::try_new(1, shots)
+            let mut answers = BitTable::try_new(validated.observables, shots)
                 .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
             let mut trace_bytes = Vec::new();
             for shot in 0..shots {
@@ -635,8 +654,15 @@ fn generate_traced_decoder_dataset_chunk(
                         detections.set(detector, shot, true);
                     }
                 }
-                if observable_flip(&output, "detectors")? {
-                    answers.set(0, shot, true);
+                for (observable, bit) in
+                    observable_flips(&output, validated.observables, "detectors")?
+                        .iter()
+                        .copied()
+                        .enumerate()
+                {
+                    if bit {
+                        answers.set(observable, shot, true);
+                    }
                 }
                 append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
             }
@@ -695,7 +721,8 @@ fn generate_traced_decoder_dataset_chunk(
                 // The injected logical flip only changes measurement values, not
                 // the observable's record-bit structure, so the executed
                 // observable equals the public interpretation; unmask it here.
-                if observable_flip(&output, "blinded")? ^ label {
+                let flips = observable_flips(&output, validated.observables, "blinded")?;
+                if flips[0] ^ label {
                     answers.set(0, shot, true);
                 }
                 append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
@@ -1425,15 +1452,21 @@ mod tests {
                 qubits: vec![0, 2, 4],
             }
         );
-        assert!(LogicalFlip::parse(LogicalPauli::Z, "")
-            .unwrap_err()
-            .contains("--logical_z_qubits must be non-empty"));
-        assert!(LogicalFlip::parse(LogicalPauli::X, "0,2,2")
-            .unwrap_err()
-            .contains("--logical_x_qubits contains duplicate"));
-        assert!(LogicalFlip::parse(LogicalPauli::Z, "0,nope")
-            .unwrap_err()
-            .contains("--logical_z_qubits contains invalid"));
+        assert!(
+            LogicalFlip::parse(LogicalPauli::Z, "")
+                .unwrap_err()
+                .contains("--logical_z_qubits must be non-empty")
+        );
+        assert!(
+            LogicalFlip::parse(LogicalPauli::X, "0,2,2")
+                .unwrap_err()
+                .contains("--logical_x_qubits contains duplicate")
+        );
+        assert!(
+            LogicalFlip::parse(LogicalPauli::Z, "0,nope")
+                .unwrap_err()
+                .contains("--logical_z_qubits contains invalid")
+        );
         assert_eq!(parse_logical_x_qubits("1,3").unwrap(), vec![1, 3]);
     }
 
@@ -1444,9 +1477,11 @@ mod tests {
             pauli: LogicalPauli::Z,
             qubits: vec![0],
         };
-        assert!(circuit_with_injected_logical_flip(good, &logical_z)
-            .unwrap()
-            .contains("\nZ 0\n"));
+        assert!(
+            circuit_with_injected_logical_flip(good, &logical_z)
+                .unwrap()
+                .contains("\nZ 0\n")
+        );
 
         let marker_without_trailing_newline = "R 0\n# RSTIM_LOGICAL_FLIP_POINT";
         assert_eq!(
@@ -1456,25 +1491,33 @@ mod tests {
         );
 
         let missing = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(missing, &[0])
-            .unwrap_err()
-            .contains("marker"));
+        assert!(
+            circuit_with_injected_logical_x(missing, &[0])
+                .unwrap_err()
+                .contains("marker")
+        );
 
         let duplicate = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(duplicate, &[0])
-            .unwrap_err()
-            .contains("exactly once"));
+        assert!(
+            circuit_with_injected_logical_x(duplicate, &[0])
+                .unwrap_err()
+                .contains("exactly once")
+        );
 
         let nested =
             "R 0\nREPEAT 2 {\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(nested, &[0])
-            .unwrap_err()
-            .contains("top-level"));
+        assert!(
+            circuit_with_injected_logical_x(nested, &[0])
+                .unwrap_err()
+                .contains("top-level")
+        );
 
         let inline = "R 0 # RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(inline, &[0])
-            .unwrap_err()
-            .contains("standalone"));
+        assert!(
+            circuit_with_injected_logical_x(inline, &[0])
+                .unwrap_err()
+                .contains("standalone")
+        );
     }
 
     #[test]
@@ -1493,9 +1536,11 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("injected logical X does not flip observable 0"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("injected logical X does not flip observable 0")
+        );
 
         let changes_detector = "R 0 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
@@ -1503,18 +1548,22 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("changes detector"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("changes detector")
+        );
     }
 
     #[test]
     fn input_validation_rejects_observable_sweep_and_qubit_contract_violations() {
         let no_observable = "R 0\nM 0\n";
         let config = test_config(no_observable, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("at least one observable, found 0"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("at least one observable, found 0")
+        );
 
         let multiple_observables =
             "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
@@ -1526,15 +1575,19 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("measurements_blinded mode requires exactly one observable, found 2"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("measurements_blinded mode requires exactly one observable, found 2")
+        );
 
         let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("does not support sweep-bit circuits"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("does not support sweep-bit circuits")
+        );
 
         let one_qubit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
@@ -1542,9 +1595,11 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![1]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("contains qubit 1, but circuit has 1 qubits"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("contains qubit 1, but circuit has 1 qubits")
+        );
 
         let config = test_config(
             one_qubit,
@@ -1804,9 +1859,11 @@ mod tests {
         let public_manifest = std::fs::read_to_string(public_out.join("manifest.json")).unwrap();
         assert_no_public_secret_words(&public_manifest);
         assert!(public_manifest.contains("\"mode\": \"measurements_blinded\""));
-        assert!(std::fs::read_to_string(public_out.join("circuit.stim"))
-            .unwrap()
-            .contains(LOGICAL_FLIP_MARKER));
+        assert!(
+            std::fs::read_to_string(public_out.join("circuit.stim"))
+                .unwrap()
+                .contains(LOGICAL_FLIP_MARKER)
+        );
     }
 
     #[test]
@@ -1832,14 +1889,12 @@ mod tests {
         assert_eq!(shots.len(), 5);
         assert_eq!(answers.len(), 5);
 
-        let public_manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(public_out.join("manifest.json")).unwrap(),
-        )
-        .unwrap();
-        let private_manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(private_out.join("manifest.json")).unwrap(),
-        )
-        .unwrap();
+        let public_manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(public_out.join("manifest.json")).unwrap())
+                .unwrap();
+        let private_manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(private_out.join("manifest.json")).unwrap())
+                .unwrap();
         assert_eq!(public_manifest["shots"], 5);
         assert_eq!(private_manifest["answers_file"]["bits"], 2);
         assert_eq!(private_manifest["generation"]["batch_shots"], 2);

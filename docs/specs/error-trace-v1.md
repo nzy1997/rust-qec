@@ -41,7 +41,10 @@ Each event:
 - `branch` — the sampled branch label. For Pauli channels this is the Pauli
   string that was applied (`"X"`, `"Y"`, `"Z"`, `"IX"`, ...). For `LOSS`
   this is exactly `"L"` and marks the **loss onset**: the qubit in
-  `targets` is lost from this point until its next reset.
+  `targets` transitions from present to lost at this point and stays lost
+  until its next reset. A `LOSS` instruction that samples "lost" on an
+  already-lost qubit is a physical no-op and is **not** recorded, so each
+  loss episode produces exactly one `"L"` event.
 - `path` — instruction path: the index of the instruction within its
   enclosing block, descending through `REPEAT` bodies.
 - `iterations` — the `REPEAT` iteration indices, one per enclosing
