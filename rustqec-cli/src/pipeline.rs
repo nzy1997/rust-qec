@@ -18,6 +18,7 @@ pub const CIRCUIT_SAMPLE_COMMAND: &str = "circuit.sample";
 pub const CIRCUIT_DETECT_COMMAND: &str = "circuit.detect";
 pub const CIRCUIT_DEM_COMMAND: &str = "circuit.dem";
 pub const DATASET_EXPORT_COMMAND: &str = "dataset.export";
+pub const DATASET_IMPORT_COMMAND: &str = "dataset.import";
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum PipelineFormat {
@@ -114,6 +115,303 @@ pub struct DemResult {
     pub num_detectors: usize,
     pub num_observables: usize,
     pub out: String,
+}
+
+#[derive(Debug)]
+pub struct DatasetImportOptions {
+    pub circuit: PathBuf,
+    pub shots: PathBuf,
+    pub shots_format: String,
+    pub out: PathBuf,
+    pub loss_log: Option<PathBuf>,
+    pub format: PipelineFormat,
+}
+
+#[derive(Serialize)]
+pub struct DatasetImportResult {
+    pub shots: usize,
+    pub measurements: usize,
+    pub loss_flags: usize,
+    pub out: String,
+}
+
+/// Packages a third-party-produced circuit and shot payload into a public
+/// decoder dataset bundle. The staged bundle is validated with exactly the
+/// checks `decode` performs (manifest structure, hashes, row widths, and the
+/// full loss-visible circuit subset compilation) before it is published
+/// atomically; a failed import leaves no output behind.
+pub fn run_dataset_import(
+    options: &DatasetImportOptions,
+    error_format: Option<ErrorFormat>,
+) -> Result<DatasetImportResult, CommandError> {
+    let json = options.format.is_json(error_format);
+    let text = fs::read_to_string(&options.circuit).map_err(|error| {
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "input_error",
+            format!("failed to read {}: {error}", options.circuit.display()),
+            json,
+        )
+    })?;
+    validate_circuit(DATASET_IMPORT_COMMAND, &text, json)?;
+    let summary = rstim::stats::summarize_text(&text).map_err(|message| {
+        command_error(DATASET_IMPORT_COMMAND, "invalid_circuit", message, json)
+    })?;
+    let row_bits = summary.num_measurements;
+    if row_bits == 0 {
+        return Err(command_error(
+            DATASET_IMPORT_COMMAND,
+            "invalid_arguments",
+            "circuit has no measurement records to import".to_string(),
+            json,
+        ));
+    }
+    let shots_b8 = read_shots_payload(options, row_bits, json)?;
+    let row_bytes = row_bits.div_ceil(8);
+    let shots = shots_b8.len() / row_bytes;
+    if shots == 0 {
+        return Err(command_error(
+            DATASET_IMPORT_COMMAND,
+            "invalid_arguments",
+            "shots payload is empty".to_string(),
+            json,
+        ));
+    }
+    if options.out.exists() {
+        return Err(command_error(
+            DATASET_IMPORT_COMMAND,
+            "output_error",
+            format!("{} already exists", options.out.display()),
+            json,
+        ));
+    }
+    let staging = options.out.with_file_name(format!(
+        ".{}.import-staging-{}",
+        options
+            .out
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "dataset".to_string()),
+        std::process::id()
+    ));
+    fs::create_dir(&staging).map_err(|error| {
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "output_error",
+            format!("failed to create {}: {error}", staging.display()),
+            json,
+        )
+    })?;
+    let staged = (|| -> Result<Vec<usize>, CommandError> {
+        crate::decode::write_public_bundle(&staging, &text, &shots_b8, shots).map_err(
+            |failure| command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json),
+        )?;
+        let loss_flags = crate::decode::validate_public_bundle(&staging).map_err(|failure| {
+            command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json)
+        })?;
+        if let Some(loss_log) = &options.loss_log {
+            check_loss_log(loss_log, &loss_flags, &shots_b8, row_bits, shots, json)?;
+        }
+        Ok(loss_flags)
+    })();
+    let loss_flags = match staged {
+        Ok(loss_flags) => loss_flags,
+        Err(error) => {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(error);
+        }
+    };
+    fs::rename(&staging, &options.out).map_err(|error| {
+        let _ = fs::remove_dir_all(&staging);
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "output_error",
+            format!("failed to publish {}: {error}", options.out.display()),
+            json,
+        )
+    })?;
+    Ok(DatasetImportResult {
+        shots,
+        measurements: row_bits,
+        loss_flags: loss_flags.len(),
+        out: options.out.display().to_string(),
+    })
+}
+
+fn read_shots_payload(
+    options: &DatasetImportOptions,
+    row_bits: usize,
+    json: bool,
+) -> Result<Vec<u8>, CommandError> {
+    let invalid =
+        |message: String| command_error(DATASET_IMPORT_COMMAND, "invalid_arguments", message, json);
+    match options.shots_format.as_str() {
+        "01" => {
+            let text = fs::read_to_string(&options.shots).map_err(|error| {
+                command_error(
+                    DATASET_IMPORT_COMMAND,
+                    "input_error",
+                    format!("failed to read {}: {error}", options.shots.display()),
+                    json,
+                )
+            })?;
+            let row_bytes = row_bits.div_ceil(8);
+            let mut packed = Vec::new();
+            for (line_number, line) in text.lines().enumerate() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                if line.len() != row_bits || !line.chars().all(|c| c == '0' || c == '1') {
+                    return Err(invalid(format!(
+                        "01 row {} must contain exactly {row_bits} bits",
+                        line_number + 1
+                    )));
+                }
+                let mut row = vec![0u8; row_bytes];
+                for (bit, c) in line.chars().enumerate() {
+                    if c == '1' {
+                        row[bit / 8] |= 1 << (bit % 8);
+                    }
+                }
+                packed.extend_from_slice(&row);
+            }
+            Ok(packed)
+        }
+        "b8" => {
+            let bytes = fs::read(&options.shots).map_err(|error| {
+                command_error(
+                    DATASET_IMPORT_COMMAND,
+                    "input_error",
+                    format!("failed to read {}: {error}", options.shots.display()),
+                    json,
+                )
+            })?;
+            let row_bytes = row_bits.div_ceil(8);
+            if bytes.len() % row_bytes != 0 {
+                return Err(invalid(format!(
+                    "b8 payload has {} bytes, not a multiple of the {row_bytes}-byte row",
+                    bytes.len()
+                )));
+            }
+            let padding = row_bits % 8;
+            if padding != 0 {
+                let mask = 0xffu8 << padding;
+                for (shot, row) in bytes.chunks_exact(row_bytes).enumerate() {
+                    if row[row_bytes - 1] & mask != 0 {
+                        return Err(invalid(format!("b8 row {shot} has nonzero padding bits")));
+                    }
+                }
+            }
+            Ok(bytes)
+        }
+        other => Err(invalid(format!(
+            "unknown shots format {other:?}; expected 01 or b8"
+        ))),
+    }
+}
+
+/// Cross-checks a loss sidecar (`rustqec.loss-log.v1`: per-shot lists of
+/// loss-visible readout ordinals) against the flag bits actually present in
+/// the packed shots payload.
+fn check_loss_log(
+    path: &Path,
+    loss_flags: &[usize],
+    shots_b8: &[u8],
+    row_bits: usize,
+    shots: usize,
+    json: bool,
+) -> Result<(), CommandError> {
+    let text = fs::read_to_string(path).map_err(|error| {
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "input_error",
+            format!("failed to read {}: {error}", path.display()),
+            json,
+        )
+    })?;
+    let log: serde_json::Value = serde_json::from_str(&text).map_err(|error| {
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "invalid_arguments",
+            format!("invalid loss log: {error}"),
+            json,
+        )
+    })?;
+    if log["schema_version"] != "rustqec.loss-log.v1" {
+        return Err(command_error(
+            DATASET_IMPORT_COMMAND,
+            "invalid_arguments",
+            "loss log must declare schema_version rustqec.loss-log.v1".to_string(),
+            json,
+        ));
+    }
+    let entries = log["shots"].as_array().ok_or_else(|| {
+        command_error(
+            DATASET_IMPORT_COMMAND,
+            "invalid_arguments",
+            "loss log must contain a shots array".to_string(),
+            json,
+        )
+    })?;
+    if entries.len() != shots {
+        return Err(command_error(
+            DATASET_IMPORT_COMMAND,
+            "loss_log_mismatch",
+            format!(
+                "loss log lists {} shots, payload carries {shots}",
+                entries.len()
+            ),
+            json,
+        ));
+    }
+    let row_bytes = row_bits.div_ceil(8);
+    for (shot, entry) in entries.iter().enumerate() {
+        let declared = entry.as_array().ok_or_else(|| {
+            command_error(
+                DATASET_IMPORT_COMMAND,
+                "invalid_arguments",
+                format!("loss log shot {shot} must be an array of readout ordinals"),
+                json,
+            )
+        })?;
+        let mut declared: Vec<usize> = declared
+            .iter()
+            .map(|value| {
+                value
+                    .as_u64()
+                    .map(|ordinal| ordinal as usize)
+                    .ok_or_else(|| {
+                        command_error(
+                            DATASET_IMPORT_COMMAND,
+                            "invalid_arguments",
+                            format!("loss log shot {shot} contains a non-integer ordinal"),
+                            json,
+                        )
+                    })
+            })
+            .collect::<Result<_, _>>()?;
+        declared.sort_unstable();
+        let row = &shots_b8[shot * row_bytes..(shot + 1) * row_bytes];
+        let actual: Vec<usize> = loss_flags
+            .iter()
+            .enumerate()
+            .filter_map(|(ordinal, &flag)| {
+                ((row[flag / 8] >> (flag % 8)) & 1 == 1).then_some(ordinal)
+            })
+            .collect();
+        if declared != actual {
+            return Err(command_error(
+                DATASET_IMPORT_COMMAND,
+                "loss_log_mismatch",
+                format!(
+                    "loss log shot {shot} declares readouts {declared:?} but flag bits mark {actual:?}"
+                ),
+                json,
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug)]

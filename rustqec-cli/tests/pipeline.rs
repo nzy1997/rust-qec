@@ -472,6 +472,7 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         ("circuit.detect", serde_json::json!(["circuit", "detect"])),
         ("circuit.dem", serde_json::json!(["circuit", "dem"])),
         ("dataset.export", serde_json::json!(["dataset", "export"])),
+        ("dataset.import", serde_json::json!(["dataset", "import"])),
     ] {
         let entry = commands
             .iter()

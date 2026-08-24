@@ -379,6 +379,27 @@ fn parent_dir(path: &Path) -> &Path {
         .unwrap_or(Path::new("."))
 }
 
+/// Re-validates a staged public bundle exactly as `decode` would: manifest
+/// structure, hashes, row widths, and the full loss-visible circuit subset
+/// compilation. Returns the flag-record measurement indices on success so
+/// callers (for example `dataset import`) can cross-check loss sidecars.
+pub(crate) fn validate_public_bundle(dir: &Path) -> Result<Vec<usize>, DecodeFailure> {
+    let dataset = read_dataset(dir)?;
+    let compiled = compile_circuit(&dataset)?;
+    Ok(compiled.loss_flags)
+}
+
+/// Writes a public dataset bundle into `dir`; see
+/// [`dataset::write_public_bundle`].
+pub(crate) fn write_public_bundle(
+    dir: &Path,
+    circuit_text: &str,
+    shots_b8: &[u8],
+    shots: usize,
+) -> Result<(), DecodeFailure> {
+    dataset::write_public_bundle(dir, circuit_text, shots_b8, shots)
+}
+
 #[cfg(test)]
 mod tests {
     use renvelope::{
@@ -838,6 +859,58 @@ mod tests {
         let error = validate_output_paths(&options).unwrap_err();
         assert_eq!(error.code, "output_error");
         assert!(error.message.contains("already exists"));
+    }
+
+    #[test]
+    fn stim_generated_fixture_compiles_and_matches_reference_kernels() {
+        // The annotated Stim-generated conformance fixture (see
+        // rustqec-cli/tests/external_fixtures.rs) must compile through the
+        // same code path as built-in-generator circuits and agree with the
+        // explicit renvelope reference kernels shot by shot.
+        const FIXTURE: &str =
+            include_str!("../tests/fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
+        let circuit = compiled(FIXTURE);
+        assert_eq!(circuit.envelopes.len(), 25);
+        assert!(
+            circuit
+                .envelopes
+                .iter()
+                .all(|envelope| !envelope.candidates.is_empty())
+        );
+        assert!(circuit.envelopes.iter().any(|envelope| {
+            envelope
+                .candidates
+                .iter()
+                .any(|candidate| !candidate.detectors.is_empty())
+        }));
+        CompiledMatching::new(&circuit).unwrap();
+
+        let zero_syndrome = vec![0u8; circuit.num_detectors];
+        let shots: Vec<(&[u8], Vec<usize>)> = vec![
+            (&zero_syndrome, vec![]),
+            (&zero_syndrome, vec![0]),
+            (&zero_syndrome, vec![7]),
+            (&zero_syndrome, vec![15]),
+            (&zero_syndrome, vec![24]),
+            (&zero_syndrome, vec![0, 12, 24]),
+        ];
+
+        let mut mle = CompiledMle::new(&circuit, None).unwrap();
+        for (syndrome, losses) in &shots {
+            let actual = mask(&mle.decode(syndrome, losses).unwrap());
+            assert_eq!(actual, reference_mle(&circuit, syndrome, losses));
+        }
+
+        let shot_refs: Vec<(&[u8], &[usize])> = shots
+            .iter()
+            .map(|(syndrome, losses)| (*syndrome, losses.as_slice()))
+            .collect();
+        let mut matching = CompiledMatching::new(&circuit).unwrap();
+        let actual: Vec<_> = shot_refs
+            .iter()
+            .map(|(syndrome, losses)| mask(&matching.decode(syndrome, losses).unwrap()))
+            .collect();
+        assert_eq!(actual, reference_matching(&circuit, &shot_refs));
     }
 
     #[test]
