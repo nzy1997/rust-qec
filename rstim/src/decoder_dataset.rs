@@ -642,13 +642,11 @@ fn generate_traced_decoder_dataset_chunk(
             let mut trace_bytes = Vec::new();
             for shot in 0..shots {
                 let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
-                if output.detectors.len() != validated.detectors {
-                    return Err(format!(
-                        "traced shot produced {} detectors, expected {}",
-                        output.detectors.len(),
-                        validated.detectors
-                    ));
-                }
+                debug_assert_eq!(
+                    output.detectors.len(),
+                    validated.detectors,
+                    "traced shot detector count matches the validated circuit"
+                );
                 for (detector, bit) in output.detectors.iter().copied().enumerate() {
                     if bit {
                         detections.set(detector, shot, true);
@@ -703,13 +701,11 @@ fn generate_traced_decoder_dataset_chunk(
                     &mut zero_executor
                 };
                 let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
-                if output.measurements.len() != validated.measurements {
-                    return Err(format!(
-                        "traced shot produced {} measurements, expected {}",
-                        output.measurements.len(),
-                        validated.measurements
-                    ));
-                }
+                debug_assert_eq!(
+                    output.measurements.len(),
+                    validated.measurements,
+                    "traced shot measurement count matches the validated circuit"
+                );
                 for (row, bit) in output.measurements.iter().copied().enumerate() {
                     if bit {
                         measurements.set(row, shot, true);
@@ -860,8 +856,7 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
         config.shots,
         0,
         config.error_trace,
-        &mut rngs,
-    )?;
+        &mut rngs)?;
     Ok(DecoderDatasetArtifacts {
         public_circuit_text: validated.public_circuit_text,
         public_instrs: validated.public_instrs,
@@ -1286,8 +1281,7 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             current_shots,
             shot_offset,
             config.error_trace,
-            &mut rngs,
-        )?;
+            &mut rngs)?;
         crate::output::write_shots_b8(&chunk.public_shots, &mut shots_writer)
             .map_err(|error| format!("failed to write public shots: {error}"))?;
         crate::output::write_shots_b8(&chunk.answers, &mut answers_writer)
@@ -1298,12 +1292,14 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             (None, None) => {}
             _ => return Err("inconsistent blinded mask artifacts".to_string()),
         }
-        match (&chunk.error_trace, trace_writer.as_mut()) {
-            (Some(trace), Some(writer)) => writer
+        if let Some(writer) = trace_writer.as_mut() {
+            let trace = chunk
+                .error_trace
+                .as_ref()
+                .expect("traced chunk carries trace bytes");
+            writer
                 .write_all(trace)
-                .map_err(|error| format!("failed to write private error trace: {error}"))?,
-            (None, None) => {}
-            _ => return Err("inconsistent error trace artifacts".to_string()),
+                .map_err(|error| format!("failed to write private error trace: {error}"))?;
         }
         remaining -= current_shots;
         shot_offset += current_shots;
@@ -1387,12 +1383,10 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
 
     write_manifest(
         &private_stage.temp_path.join("manifest.json"),
-        &private_manifest,
-    )?;
+        &private_manifest)?;
     write_manifest(
         &public_stage.temp_path.join("manifest.json"),
-        &public_manifest,
-    )?;
+        &public_manifest)?;
     write_file(
         &public_stage.temp_path.join("circuit.stim"),
         validated.public_circuit_text.as_bytes(),
@@ -1441,6 +1435,38 @@ mod tests {
             pauli: LogicalPauli::X,
             qubits,
         })
+    }
+
+    fn exec_output_with_observables(observables: Vec<(u32, bool)>) -> crate::executor::ExecOutput {
+        crate::executor::ExecOutput {
+            measurements: Vec::new(),
+            detectors: Vec::new(),
+            detector_coords: Vec::new(),
+            observables,
+            observable_events: Vec::new(),
+            inapplicable_noise_events: Vec::new(),
+            qubit_coords: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn observable_flips_rejects_out_of_range_index() {
+        let output = exec_output_with_observables(vec![(1, false)]);
+        let error = observable_flips(&output, 1, "detectors").unwrap_err();
+        assert!(
+            error.contains("produced observable 1"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn observable_flips_rejects_missing_observable() {
+        let output = exec_output_with_observables(vec![(0, true)]);
+        let error = observable_flips(&output, 2, "detectors").unwrap_err();
+        assert!(
+            error.contains("no observable 1"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
