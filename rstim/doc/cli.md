@@ -233,9 +233,44 @@ Current generator controls:
 - `--task`
 - `--distance`
 - `--rounds`
+- `--before_round_data_depolarization`
 - `--after_clifford_depolarization`
-- `--operation_loss_probability` (Mid-SWAP only)
-- `--measurement_loss_probability` (Mid-SWAP only)
+- `--before_measure_flip_probability`
+- `--after_reset_flip_probability`
+- `--after_clifford_loss_probability`
+- `--operation_loss_probability` (`rotated_memory_z` loss-visible mode and Mid-SWAP only)
+- `--measurement_loss_probability` (`rotated_memory_z` loss-visible mode and Mid-SWAP only)
+
+Each Pauli-noise flag drives exactly the channel it is named after: there is
+no "uniform" shortcut, and omitted channels default to zero. In particular
+`--after_clifford_depolarization` only inserts `DEPOLARIZE1`/`DEPOLARIZE2`
+after Clifford gates; it no longer broadcasts into the other channels.
+
+For `--code surface_code --task rotated_memory_z`, setting
+`--operation_loss_probability` or `--measurement_loss_probability` selects the
+loss-visible conventional form: the circuit keeps the fixed CNOT layer order
+in every round (no alternating A/B schedule, no shuttles), uses the native
+Mid-SWAP generator's loss semantics (full rate after resets and single-qubit
+gates, half rate on each qubit of a two-qubit gate, measurement-stage `LOSS`
+immediately before each readout), emits loss-visible `MRL`/`ML` records in
+`loss_flag,value_bit` order, and places exactly one
+`# RSTIM_LOGICAL_FLIP_POINT` immediately after the data reset so the circuit
+can drive `export_decoder_dataset --mode measurements_blinded`:
+
+```sh
+rstim gen \
+  --code surface_code \
+  --task rotated_memory_z \
+  --distance 3 \
+  --rounds 2 \
+  --before_round_data_depolarization 0.011 \
+  --after_clifford_depolarization 0.022 \
+  --before_measure_flip_probability 0.033 \
+  --after_reset_flip_probability 0.044 \
+  --operation_loss_probability 0.055 \
+  --measurement_loss_probability 0.066 \
+  --out conventional-loss.stim
+```
 
 The native Mid-SWAP rotated-memory generator is selected by its dedicated
 surface-code task. It requires an odd distance of at least 3 and emits

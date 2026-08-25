@@ -595,3 +595,502 @@ fn gen_css_memory_rejects_non_logical_observable_and_preserves_out() {
     );
     assert_eq!(std::fs::read_to_string(out).unwrap(), "keep me");
 }
+
+#[test]
+fn gen_rotated_memory_z_explicit_noise_and_loss() {
+    use rstim::ir::StimTarget;
+    use rstim::parser::parse_lines;
+
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("conventional-loss.stim");
+
+    // Positive command: every Pauli-noise channel and both loss channels set
+    // to distinct values.
+    let generated = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--before_round_data_depolarization",
+            "0.011",
+            "--after_clifford_depolarization",
+            "0.022",
+            "--before_measure_flip_probability",
+            "0.033",
+            "--after_reset_flip_probability",
+            "0.044",
+            "--operation_loss_probability",
+            "0.055",
+            "--measurement_loss_probability",
+            "0.066",
+            "--out",
+            circuit_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        generated.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&generated.stderr)
+    );
+    let text = std::fs::read_to_string(&circuit_path).unwrap();
+    let circuit = parse_lines(&text).expect("generated circuit must parse");
+
+    let name_at = |index: usize| circuit[index].name().unwrap_or("<none>");
+    let args_at = |index: usize| circuit[index].args().unwrap_or(&[]).to_vec();
+    let targets_at = |index: usize| circuit[index].targets().unwrap_or(&[]).to_vec();
+    let qubits_at = |index: usize| -> Vec<u32> {
+        targets_at(index)
+            .iter()
+            .map(|target| match target {
+                StimTarget::Qubit(q) => *q,
+                other => panic!("expected qubit target, got {other:?}"),
+            })
+            .collect()
+    };
+
+    // 1. Each Pauli rate occurs only in its named channel, verified by
+    //    instruction position.
+    let data_qubits = vec![1, 2, 3, 7, 8, 9, 13, 14, 15];
+    let x_ancilla = vec![4, 6, 10, 12];
+    for index in 0..circuit.len() {
+        let name = name_at(index);
+        let args = args_at(index);
+        if name == "DEPOLARIZE1" && args == [0.011] {
+            assert_eq!(
+                name_at(index.wrapping_sub(1)),
+                "TICK",
+                "before-round data depolarization must open a round"
+            );
+            assert_eq!(
+                qubits_at(index),
+                data_qubits,
+                "0.011 may only depolarize data qubits before the round"
+            );
+        }
+        if name == "DEPOLARIZE1" && args == [0.022] {
+            assert_eq!(
+                name_at(index - 1),
+                "H",
+                "after-Clifford DEPOLARIZE1 must follow H"
+            );
+            assert_eq!(
+                qubits_at(index),
+                x_ancilla,
+                "0.022 DEPOLARIZE1 may only target X ancilla after H"
+            );
+        }
+        if name == "DEPOLARIZE2" {
+            assert_eq!(
+                args,
+                [0.022],
+                "DEPOLARIZE2 only carries the after-Clifford rate"
+            );
+            assert_eq!(name_at(index - 1), "CX");
+            assert_eq!(
+                qubits_at(index),
+                qubits_at(index - 1),
+                "DEPOLARIZE2 targets must match its CX layer"
+            );
+        }
+        if name == "X_ERROR" && args == [0.033] {
+            assert!(
+                matches!(name_at(index + 1), "MRL" | "ML"),
+                "before-measure flips must immediately precede a readout, found {}",
+                name_at(index + 1)
+            );
+        }
+        if name == "X_ERROR" && args == [0.044] {
+            assert!(
+                matches!(name_at(index - 1), "R" | "MRL"),
+                "after-reset flips must immediately follow a reset, found {}",
+                name_at(index - 1)
+            );
+        }
+        if name == "X_ERROR" {
+            assert!(
+                args == [0.033] || args == [0.044],
+                "X_ERROR may only carry 0.033 or 0.044, found {args:?}"
+            );
+        }
+        if name == "DEPOLARIZE1" {
+            assert!(
+                args == [0.011] || args == [0.022],
+                "DEPOLARIZE1 may only carry 0.011 or 0.022, found {args:?}"
+            );
+        }
+        if name == "LOSS" {
+            assert!(
+                args == [0.055] || args == [0.0275] || args == [0.066],
+                "LOSS may only carry the loss rates, found {args:?}"
+            );
+        }
+    }
+    assert_eq!(
+        circuit
+            .iter()
+            .filter(|instr| instr.name() == Some("DEPOLARIZE1") && instr.args() == Some(&[0.011][..]))
+            .count(),
+        2,
+        "one before-round data depolarization layer per round"
+    );
+
+    // 2. Operation and measurement loss follow the conventional loss
+    //    contract: Mid-SWAP reset/H/two-qubit semantics plus measurement-stage
+    //    LOSS before every loss-visible readout.
+    for index in 0..circuit.len() {
+        match name_at(index) {
+            "H" => {
+                assert_eq!(name_at(index + 1), "DEPOLARIZE1");
+                assert_eq!(name_at(index + 2), "LOSS");
+                assert_eq!(args_at(index + 2), [0.055]);
+                assert_eq!(qubits_at(index + 2), qubits_at(index));
+            }
+            "CX" => {
+                assert_eq!(name_at(index + 1), "DEPOLARIZE2");
+                assert_eq!(name_at(index + 2), "LOSS");
+                assert_eq!(
+                    args_at(index + 2),
+                    [0.0275],
+                    "two-qubit operation loss is split across the pair"
+                );
+                assert_eq!(qubits_at(index + 2), qubits_at(index));
+            }
+            "MRL" | "ML" => {
+                assert_eq!(name_at(index - 2), "LOSS");
+                assert_eq!(args_at(index - 2), [0.066]);
+                assert_eq!(qubits_at(index - 2), qubits_at(index));
+                assert_eq!(name_at(index - 1), "X_ERROR");
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(
+        text.lines().filter(|line| line.starts_with("MRL ")).count(),
+        2
+    );
+    assert_eq!(
+        text.lines().filter(|line| line.starts_with("ML ")).count(),
+        1
+    );
+
+    // 3. Measurements are loss-visible: every DETECTOR/OBSERVABLE_INCLUDE
+    //    record reference lands on a value bit (odd distance back from an
+    //    even-sized record block boundary) and stays in range.
+    let mut record_count = 0_i64;
+    for instruction in &circuit {
+        let name = instruction.name().unwrap();
+        let targets = instruction.targets().unwrap();
+        if matches!(name, "DETECTOR" | "OBSERVABLE_INCLUDE") {
+            for target in targets {
+                let StimTarget::Rec(offset) = target else {
+                    panic!("{name} contained a non-record target: {target:?}");
+                };
+                assert!(
+                    offset % 2 == -1,
+                    "{name} referenced a loss-flag record via rec[{offset}]"
+                );
+                let referenced = record_count + i64::from(*offset);
+                assert!(
+                    (0..record_count).contains(&referenced),
+                    "{name} used invalid rec[{offset}] after {record_count} records"
+                );
+            }
+        }
+        if matches!(name, "MRL" | "ML") {
+            record_count += 2 * targets.len() as i64;
+        }
+    }
+    assert_eq!(record_count, 50);
+
+    // Record counts must remain valid for blinded dataset export.
+    let public_out = directory.path().join("public");
+    let private_out = directory.path().join("private");
+    let exported = rstim_cmd()
+        .args([
+            "export_decoder_dataset",
+            "--circuit",
+            circuit_path.to_str().unwrap(),
+            "--shots",
+            "8",
+            "--mode",
+            "measurements_blinded",
+            "--logical_x_qubits",
+            "1,2,3",
+            "--public_out",
+            public_out.to_str().unwrap(),
+            "--private_out",
+            private_out.to_str().unwrap(),
+            "--seed",
+            "7",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        exported.status.success(),
+        "measurements_blinded export failed\nstderr: {}",
+        String::from_utf8_lossy(&exported.stderr)
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(public_out.join("manifest.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(manifest["circuit"]["measurements"], 50);
+    assert_eq!(manifest["row"]["bits"], 50);
+
+    // 4. Round 0 and round 1 use the same fixed CNOT layer order.
+    let cx_layers: Vec<Vec<u32>> = circuit
+        .iter()
+        .enumerate()
+        .filter(|(_, instr)| instr.name() == Some("CX"))
+        .map(|(index, _)| qubits_at(index))
+        .collect();
+    assert_eq!(cx_layers.len(), 8, "two rounds of four CX layers");
+    assert_eq!(
+        &cx_layers[..4],
+        &cx_layers[4..],
+        "conventional control must keep the fixed CNOT layer order in every round"
+    );
+
+    // 5. Exactly one logical-flip marker and zero shuttle/remapping events.
+    assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
+    assert!(!text.contains("MIDSWAP_SHUTTLE"));
+    assert!(!text.contains("SHUTTLE"));
+    let lines: Vec<&str> = text.lines().collect();
+    let data_reset = lines
+        .iter()
+        .position(|line| line.starts_with("R "))
+        .unwrap();
+    assert_eq!(lines[data_reset + 1], "# RSTIM_LOGICAL_FLIP_POINT");
+
+    // The circuit must also be sampleable.
+    let shots_path = directory.path().join("shots.b8");
+    let sampled = rstim_cmd()
+        .args([
+            "sample",
+            "--in",
+            circuit_path.to_str().unwrap(),
+            "--shots",
+            "8",
+            "--seed",
+            "7",
+            "--out_format",
+            "b8",
+            "--out",
+            shots_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        sampled.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&sampled.stderr)
+    );
+    assert_eq!(std::fs::metadata(&shots_path).unwrap().len(), 8 * 7);
+
+    // Negative control 1: only --after_clifford_depolarization touches the
+    // after-Clifford channel; nothing is broadcast and no LOSS appears.
+    let depol_only_path = directory.path().join("depol-only.stim");
+    let depol_only = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.022",
+            "--out",
+            depol_only_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        depol_only.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&depol_only.stderr)
+    );
+    let depol_text = std::fs::read_to_string(&depol_only_path).unwrap();
+    assert!(depol_text.contains("DEPOLARIZE1(0.022)"));
+    assert!(depol_text.contains("DEPOLARIZE2(0.022)"));
+    assert!(
+        !depol_text.contains("X_ERROR(0.022)"),
+        "after_clifford_depolarization must not broadcast into flip channels"
+    );
+    assert!(
+        !depol_text.contains("LOSS"),
+        "no loss may appear without explicit loss flags"
+    );
+    let depol_circuit = parse_lines(&depol_text).unwrap();
+    for (index, instruction) in depol_circuit.iter().enumerate() {
+        if instruction.name() == Some("DEPOLARIZE1") {
+            let targets: Vec<u32> = instruction
+                .targets()
+                .unwrap()
+                .iter()
+                .map(|target| match target {
+                    StimTarget::Qubit(q) => *q,
+                    other => panic!("expected qubit target, got {other:?}"),
+                })
+                .collect();
+            assert!(
+                targets.iter().all(|q| x_ancilla.contains(q)),
+                "DEPOLARIZE1(0.022) at instruction {index} targeted data qubits: {targets:?}"
+            );
+        }
+    }
+
+    // Negative control 2: there is no uniform CLI shortcut.
+    let uniform = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--uniform_noise",
+            "0.022",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        !uniform.status.success(),
+        "--uniform_noise must be rejected"
+    );
+    assert!(
+        String::from_utf8_lossy(&uniform.stderr).contains("unexpected argument"),
+        "stderr: {}",
+        String::from_utf8_lossy(&uniform.stderr)
+    );
+}
+
+#[test]
+fn gen_css_uses_explicit_noise_channels() {
+    let dir = tempfile::tempdir().unwrap();
+    let hx = dir.path().join("hx.json");
+    let hz = dir.path().join("hz.json");
+    std::fs::write(
+        &hx,
+        r#"{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}"#,
+    )
+    .unwrap();
+    std::fs::write(&hz, r#"{"format":"sparse_rows","num_cols":7,"rows":[]}"#).unwrap();
+
+    // Only the after-Clifford channel set: nothing may broadcast into the
+    // reset or measurement flip channels.
+    let depol_only = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "css",
+            "--task",
+            "memory",
+            "--hx",
+            hx.to_str().unwrap(),
+            "--hz",
+            hz.to_str().unwrap(),
+            "--basis",
+            "x",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.123",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        depol_only.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&depol_only.stderr)
+    );
+    let depol_text = String::from_utf8(depol_only.stdout).unwrap();
+    assert!(depol_text.contains("DEPOLARIZE"));
+    assert!(
+        !depol_text.contains("X_ERROR(0.123)"),
+        "after_clifford_depolarization must not broadcast into CSS flip channels:\n{depol_text}"
+    );
+
+    // Explicitly named channels land in their own slots.
+    let explicit = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "css",
+            "--task",
+            "memory",
+            "--hx",
+            hx.to_str().unwrap(),
+            "--hz",
+            hz.to_str().unwrap(),
+            "--basis",
+            "x",
+            "--rounds",
+            "2",
+            "--before_measure_flip_probability",
+            "0.05",
+            "--after_reset_flip_probability",
+            "0.06",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        explicit.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&explicit.stderr)
+    );
+    let explicit_text = String::from_utf8(explicit.stdout).unwrap();
+    assert!(explicit_text.contains("X_ERROR(0.05)"));
+    assert!(explicit_text.contains("X_ERROR(0.06)"));
+    assert!(!explicit_text.contains("DEPOLARIZE"));
+}
+
+#[test]
+fn gen_rejects_out_of_range_probabilities() {
+    for (flag, value) in [
+        ("--before_round_data_depolarization", "2"),
+        ("--after_clifford_depolarization", "NaN"),
+        ("--before_measure_flip_probability", "-0.1"),
+        ("--after_reset_flip_probability", "1.5"),
+        ("--after_clifford_loss_probability", "2"),
+        ("--before_measure_flip_probability", "inf"),
+    ] {
+        let output = rstim_cmd()
+            .args([
+                "gen",
+                "--code",
+                "repetition_code",
+                "--task",
+                "memory",
+                "--distance",
+                "3",
+                "--rounds",
+                "1",
+                &format!("{flag}={value}"),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "{flag} {value} unexpectedly succeeded"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("finite and in [0, 1]"),
+            "{flag} {value}: stderr: {stderr}"
+        );
+    }
+}
