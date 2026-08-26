@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -170,9 +171,16 @@ def test_checked_in_full_results_paired_decoders_agree() -> None:
         shots_used = int(rust["shots_used"])
         rust_errors = int(rust["logical_errors"])
         python_errors = int(python["logical_errors"])
-        # Both decoders decode the same exported trials; allow only binomial
-        # sampling noise between the two decoders' failure counts.
-        tolerance = max(2, int(0.02 * shots_used))
+        # Both decoders replay the *same* exported trials, so their failure
+        # counts can only differ through BP+OSD tie-breaking, not through
+        # sampling noise (there is no independent sampling between the two
+        # rows). Observed drift on the checked-in CSV is 0-1 shot per pair.
+        # Scale the tolerance with sqrt(errors) — a few tie-break flips per
+        # batch — instead of with shots_used: a shot-proportional tolerance
+        # (e.g. 2% of 56000 shots = 1120) would wave through even the original
+        # #303 anomaly (200 vs 138 = 62) or a decoder reporting zero errors.
+        max_errors = max(rust_errors, python_errors)
+        tolerance = max(4, math.ceil(4 * math.sqrt(max_errors)))
         assert abs(rust_errors - python_errors) <= tolerance, (
             f"{case_id}: rbposd {rust_errors} vs ldpc_bposd {python_errors} "
             f"logical errors over {shots_used} shared shots"
