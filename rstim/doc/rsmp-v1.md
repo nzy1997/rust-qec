@@ -217,6 +217,19 @@ python3 -m benchmarks.rstim_vs_stim_simulator.run_rsmp_compression \
   --results-dir benchmarks/rstim_vs_stim_simulator/results/rsmp-v1
 ```
 
+The benchmark row also carries Stim-format baselines for exactly `b8`, `r8`,
+and `ptb64`. All three serialize the same canonical 1024-shot, seed-7
+measurement batch; `r8` is produced with the pinned `stim convert` command and
+`ptb64` with the pinned stim Python API (the Stim CLI streams single records
+and cannot write `ptb64`). Each baseline records its raw byte count, its
+direct level-3 Zstandard byte count under the same recorded contract, the
+conversion argv, the artifact SHA-256, and a round-trip `b8` SHA-256 that must
+equal the canonical measurement SHA-256. The summary and report state byte
+counts and ratios relative to the RSMP archive only; no universal
+cross-format compression superiority is claimed. The pinned Stim binary
+identity, version, and every conversion command are recorded in
+`environment.json`.
+
 The recorded environment includes producer identity, Git state, Rust target,
 Cargo.lock hash, zstd crate versions, native zstd version, full command argv,
 and artifact SHA-256 values. These gates prove only the pinned `rsmp v1`

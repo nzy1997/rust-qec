@@ -122,6 +122,14 @@ The checked gates are `benchmark_raw_lt_20pct`, `benchmark_zstd_lt_75pct`, and
 `high_entropy_raw_le_102pct`. They are claims about the pinned evidence cases
 and recorded environment only, not a wall-clock performance threshold.
 
+The benchmark evidence also includes Stim-format baselines for `b8`, `r8`, and
+`ptb64`, all serialized from the same canonical 1024-shot, seed-7 measurement
+batch and all proven to round-trip to the canonical `b8` SHA-256. Each
+baseline records raw bytes, direct level-3 Zstandard bytes, conversion argv,
+and artifact SHA-256; the report shows ratios relative to the RSMP archive
+without claiming universal cross-format superiority. The pinned Stim binary
+identity and all conversion commands are recorded in `environment.json`.
+
 ## Documented CLI Surface
 
 ```json
