@@ -219,6 +219,12 @@ rstim sample_dem --shots 1000 --out_format dets --in model.dem
 As with `detect`, you can split observables into a separate stream using
 `--obs_out` and `--obs_out_format`.
 
+Add `--trace_out <PATH>` to stream a versioned manifest and one detailed JSON
+record per shot. Trace mode stages all outputs, requires named `--out` files,
+and is intentionally slower than ordinary detector sampling. See the complete
+[local training-data tutorial](training-data.md) for the schema, aligned `b8`
+files, Python loading example, reproducibility guidance, and loss caveats.
+
 ## Generate Circuits with `gen`
 
 `gen` produces common QEC benchmark circuits:

@@ -102,6 +102,8 @@ cargo test --workspace
   Rust API orientation.
 - [`rstim` CLI reference](rstim/doc/cli.md): `stats`, `sample`, `detect`,
   `analyze_errors`, `render_svg`, `export_json`, and related commands.
+- [Local neural-decoder training data](rstim/doc/training-data.md): aligned
+  detector/observable `b8` streams plus versioned per-shot simulator traces.
 - [`rmatching` decoder docs](rmatching/README.md): MWPM decoder entry point for
   detector-error-model workflows.
 - [`rsinter replay`](docs/rsinter-replay.md): decode frozen `.dem` plus b8

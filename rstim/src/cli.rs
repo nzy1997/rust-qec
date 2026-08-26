@@ -85,6 +85,9 @@ pub enum Commands {
         obs_out: Option<String>,
         #[arg(long = "obs_out_format", default_value = "01")]
         obs_out_format: String,
+        /// Write a versioned manifest and one detailed JSON record per shot
+        #[arg(long = "trace_out")]
+        trace_out: Option<String>,
     },
     /// Convert a circuit into a detector error model
     #[command(name = "analyze_errors")]
@@ -478,8 +481,23 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             append_observables,
             obs_out,
             obs_out_format,
+            trace_out,
         }) => {
             let text = read_input(r#in.as_deref())?;
+            if let Some(trace_path) = trace_out.as_deref() {
+                return run_detect_with_trace_files(
+                    &text,
+                    shots.unwrap_or(1) as usize,
+                    &out_format,
+                    seed,
+                    append_observables,
+                    out.as_deref(),
+                    obs_out.as_deref(),
+                    &obs_out_format,
+                    trace_path,
+                    r#in.as_deref(),
+                );
+            }
             let mut w = open_output(out.as_deref())?;
             if let Some(obs_path) = obs_out.as_deref() {
                 let mut obs_w = open_output(Some(obs_path))?;
@@ -983,6 +1001,150 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn run_detect_with_trace_files(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    append_observables: bool,
+    out_path: Option<&str>,
+    obs_out_path: Option<&str>,
+    obs_out_format: &str,
+    trace_path: &str,
+    input_path: Option<&str>,
+) -> Result<(), String> {
+    let out_path = out_path.filter(|path| *path != "-").ok_or_else(|| {
+        "detect --trace_out requires --out to name a file so all outputs can be staged".to_string()
+    })?;
+    if trace_path == "-" {
+        return Err("detect --trace_out must name a file".to_string());
+    }
+    if obs_out_path == Some("-") {
+        return Err(
+            "detect --trace_out requires --obs_out to name a file so all outputs can be staged"
+                .to_string(),
+        );
+    }
+
+    let output_format = traced_detect_format(out_format, "--out_format", true)?;
+    let obs_format = obs_out_path
+        .map(|_| traced_detect_format(obs_out_format, "--obs_out_format", false))
+        .transpose()?;
+    let instrs = parse_lines(circuit_text)?;
+    crate::validation::validate_circuit(&instrs)?;
+    let stats = crate::stats::summarize(&instrs);
+
+    let cwd = std::env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
+    let mut reserved_paths = BTreeSet::new();
+    for path in [Some(out_path), obs_out_path, Some(trace_path)]
+        .into_iter()
+        .flatten()
+    {
+        let normalized = canonical_parent_path_identity_with_cwd(Path::new(path), &cwd)?;
+        if !reserved_paths.insert(normalized) {
+            return Err("detect output paths must be distinct".to_string());
+        }
+    }
+    if let Some(input_path) = input_path.filter(|path| *path != "-") {
+        let normalized_input =
+            canonical_parent_path_identity_with_cwd(Path::new(input_path), &cwd)?;
+        if reserved_paths.contains(&normalized_input) {
+            return Err("detect output paths must differ from --in".to_string());
+        }
+    }
+
+    let mut out = PendingOutput::create(out_path, &reserved_paths)?;
+    let mut obs_out = obs_out_path
+        .map(|path| PendingOutput::create(path, &reserved_paths))
+        .transpose()?;
+    let mut trace_out = PendingOutput::create(trace_path, &reserved_paths)?;
+    let mut executor = Executor::from_instrs(instrs)?;
+    let mut rng = make_rng(seed);
+
+    crate::detect_trace::write_manifest(
+        trace_out.writer(),
+        circuit_text,
+        seed,
+        shots,
+        stats.num_measurements,
+        stats.num_detectors,
+        stats.num_observables,
+    )?;
+
+    for shot_index in 0..shots {
+        let (output, trace) = executor.run_with_trace(&mut rng)?;
+        let observables =
+            crate::detect_trace::aggregate_observables(&output, stats.num_observables)?;
+        let detections = one_shot_bit_table(&output.detectors)?;
+        let observable_flips = one_shot_bit_table(&observables)?;
+        write_detection_outputs(
+            &detections,
+            &observable_flips,
+            output_format,
+            append_observables,
+            out.writer(),
+            obs_out
+                .as_mut()
+                .zip(obs_format)
+                .map(|(writer, format)| (writer.writer(), format)),
+        )?;
+        crate::detect_trace::write_shot(
+            trace_out.writer(),
+            shot_index,
+            &output,
+            &trace,
+            stats.num_observables,
+        )?;
+    }
+
+    out.finish_staging()?;
+    if let Some(obs_out) = obs_out.as_mut() {
+        obs_out.finish_staging()?;
+    }
+    trace_out.finish_staging()?;
+
+    let mut outputs = vec![&mut out];
+    if let Some(obs_out) = obs_out.as_mut() {
+        outputs.push(obs_out);
+    }
+    outputs.push(&mut trace_out);
+    let mut publisher = FsPublisher::from_env();
+    publish_pending_outputs_atomically(&mut outputs, &mut publisher)?;
+    Ok(())
+}
+
+fn traced_detect_format(
+    value: &str,
+    option: &str,
+    allow_detector_labels: bool,
+) -> Result<OutputFormat, String> {
+    let format = OutputFormat::from_str(value)?;
+    if format == OutputFormat::Ptb64 || (!allow_detector_labels && format == OutputFormat::Dets) {
+        return Err(format!(
+            "detect --trace_out does not support {option}={value}; use 01, b8, r8, or hits{}",
+            if allow_detector_labels {
+                ", or dets"
+            } else {
+                ""
+            }
+        ));
+    }
+    Ok(format)
+}
+
+fn one_shot_bit_table(bits: &[bool]) -> Result<BitTable, String> {
+    let mut table = BitTable::try_new(bits.len(), 1)
+        .map_err(|error| format!("BitTable allocation failed: {error:?}"))?;
+    for (index, &bit) in bits.iter().enumerate() {
+        if bit {
+            table.set(index, 0, true);
+        }
+    }
+    Ok(table)
+}
+
 fn finish_benchmark_telemetry(
     path: Option<&str>,
     result: Result<(), String>,
@@ -1262,7 +1424,13 @@ impl PendingOutput {
 
         for retry in 0..1024 {
             let temp_path = parent.join(format!(".{name}.rstim-{process_id}-{retry}.tmp"));
-            if reserved_final_paths.contains(&lexical_absolute_path_from_path(&temp_path)?) {
+            let lexical_temp_path = lexical_absolute_path_from_path(&temp_path)?;
+            let canonical_temp_path = canonical_parent_path_identity_from_path(&temp_path).ok();
+            if reserved_final_paths.contains(&lexical_temp_path)
+                || canonical_temp_path
+                    .as_ref()
+                    .is_some_and(|path| reserved_final_paths.contains(path))
+            {
                 continue;
             }
             match OpenOptions::new()
@@ -1340,6 +1508,139 @@ impl PendingOutput {
 
     fn final_path(&self) -> &Path {
         &self.final_path
+    }
+}
+
+fn publish_pending_outputs_atomically(
+    outputs: &mut [&mut PendingOutput],
+    publisher: &mut impl FilePublisher,
+) -> Result<(), String> {
+    for output in outputs.iter_mut() {
+        output.finish_staging()?;
+    }
+
+    let mut reserved_paths = BTreeSet::new();
+    for output in outputs.iter() {
+        reserved_paths.insert(canonical_parent_path_identity_from_path(
+            output.final_path(),
+        )?);
+        reserved_paths.insert(canonical_parent_path_identity_from_path(&output.temp_path)?);
+        if std::fs::symlink_metadata(output.final_path())
+            .map(|metadata| metadata.file_type().is_dir())
+            .unwrap_or(false)
+        {
+            return Err(format!(
+                "cannot publish output over directory {}",
+                output.final_path().display()
+            ));
+        }
+    }
+
+    let mut backups = vec![None; outputs.len()];
+    for index in 0..outputs.len() {
+        if std::fs::symlink_metadata(outputs[index].final_path()).is_err() {
+            continue;
+        }
+        let backup_path =
+            allocate_output_backup_path(outputs[index].final_path(), &reserved_paths)?;
+        reserved_paths.insert(canonical_parent_path_identity_from_path(&backup_path)?);
+        if let Err(error) = publisher.rename(outputs[index].final_path(), &backup_path) {
+            let rollback = restore_output_backups(outputs, &backups, publisher);
+            return Err(format_transaction_error(
+                format!(
+                    "failed to stage existing output {}: {error}",
+                    outputs[index].final_path().display()
+                ),
+                rollback,
+            ));
+        }
+        backups[index] = Some(backup_path);
+    }
+
+    let mut published_count = 0;
+    for index in 0..outputs.len() {
+        if let Err(error) = publisher.rename(&outputs[index].temp_path, outputs[index].final_path())
+        {
+            let mut rollback_errors = Vec::new();
+            for published_index in (0..published_count).rev() {
+                if let Err(remove_error) =
+                    std::fs::remove_file(outputs[published_index].final_path())
+                {
+                    rollback_errors.push(format!(
+                        "failed to remove partially published {}: {remove_error}",
+                        outputs[published_index].final_path().display()
+                    ));
+                }
+                outputs[published_index].published = false;
+            }
+            rollback_errors.extend(restore_output_backups(outputs, &backups, publisher));
+            return Err(format_transaction_error(
+                format!(
+                    "failed to publish {}: {error}",
+                    outputs[index].final_path().display()
+                ),
+                rollback_errors,
+            ));
+        }
+        outputs[index].published = true;
+        published_count += 1;
+    }
+
+    for backup in backups.into_iter().flatten() {
+        let _ = std::fs::remove_file(backup);
+    }
+    Ok(())
+}
+
+fn allocate_output_backup_path(
+    final_path: &Path,
+    reserved_paths: &BTreeSet<PathBuf>,
+) -> Result<PathBuf, String> {
+    let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
+    let name = final_path
+        .file_name()
+        .ok_or_else(|| "output path must name a file".to_string())?
+        .to_string_lossy();
+    let process_id = std::process::id();
+    for retry in 0..1024 {
+        let candidate = parent.join(format!(".{name}.rstim-{process_id}-{retry}.bak"));
+        let identity = canonical_parent_path_identity_from_path(&candidate)?;
+        if !reserved_paths.contains(&identity) && std::fs::symlink_metadata(&candidate).is_err() {
+            return Ok(candidate);
+        }
+    }
+    Err(format!(
+        "failed to allocate a backup beside {}",
+        final_path.display()
+    ))
+}
+
+fn restore_output_backups(
+    outputs: &mut [&mut PendingOutput],
+    backups: &[Option<PathBuf>],
+    publisher: &mut impl FilePublisher,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    for index in (0..outputs.len()).rev() {
+        let Some(backup) = backups[index].as_ref() else {
+            continue;
+        };
+        if let Err(error) = publisher.rename(backup, outputs[index].final_path()) {
+            errors.push(format!(
+                "failed to restore {} from {}: {error}",
+                outputs[index].final_path().display(),
+                backup.display()
+            ));
+        }
+    }
+    errors
+}
+
+fn format_transaction_error(primary: String, rollback_errors: Vec<String>) -> String {
+    if rollback_errors.is_empty() {
+        primary
+    } else {
+        format!("{primary}; rollback errors: {}", rollback_errors.join("; "))
     }
 }
 
@@ -1880,6 +2181,31 @@ fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
 fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
     let cwd = std::env::current_dir().map_err(|error| format!("failed to resolve current directory: {error}"))?;
     lexical_absolute_path_with_cwd(path, &cwd)
+}
+
+fn canonical_parent_path_identity_from_path(path: &Path) -> Result<PathBuf, String> {
+    let cwd = std::env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
+    canonical_parent_path_identity_with_cwd(path, &cwd)
+}
+
+fn canonical_parent_path_identity_with_cwd(path: &Path, cwd: &Path) -> Result<PathBuf, String> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        cwd.join(path)
+    };
+    let file_name = absolute
+        .file_name()
+        .ok_or_else(|| format!("path must name a file: {}", path.display()))?;
+    let parent = absolute.parent().unwrap_or_else(|| Path::new("."));
+    let canonical_parent = std::fs::canonicalize(parent).map_err(|error| {
+        format!(
+            "failed to resolve parent directory {}: {error}",
+            parent.display()
+        )
+    })?;
+    Ok(canonical_parent.join(file_name))
 }
 
 fn lexical_absolute_path_with_cwd(path: &Path, cwd: &Path) -> Result<PathBuf, String> {
@@ -3208,6 +3534,27 @@ mod tests {
             .err()
             .unwrap();
         assert!(exhausted_err.contains("failed to allocate a staged output"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_backup_allocation_skips_dangling_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let final_path = dir.path().join("detections.b8");
+        let first_candidate = dir
+            .path()
+            .join(format!(".detections.b8.rstim-{}-0.bak", std::process::id()));
+        symlink(dir.path().join("missing-target"), &first_candidate).unwrap();
+
+        let allocated = allocate_output_backup_path(&final_path, &BTreeSet::new()).unwrap();
+        assert_eq!(
+            allocated,
+            dir.path()
+                .join(format!(".detections.b8.rstim-{}-1.bak", std::process::id()))
+        );
+        assert!(std::fs::symlink_metadata(first_candidate).is_ok());
     }
 
     #[test]

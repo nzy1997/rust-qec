@@ -30,6 +30,7 @@ pub mod measurement_transform;
 pub mod qp101;
 pub mod qp101_svg;
 pub mod sample_trace;
+mod detect_trace;
 pub mod perf;
 pub mod compiled;
 pub mod sample_archive;
