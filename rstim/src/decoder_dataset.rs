@@ -96,6 +96,11 @@ pub struct ExportDecoderDatasetLogicalFlipConfig {
     pub public_out: PathBuf,
     pub private_out: PathBuf,
     pub seed: Option<u64>,
+    /// Also write a per-shot `trace.jsonl` sidecar (schema `rstim.error-trace.v1`)
+    /// into the private bundle, recording every noise realization (Pauli branch
+    /// or loss onset) behind each shot. Traced sampling is per-shot and slower,
+    /// and produces a different batch than untraced sampling for the same seed.
+    pub error_trace: bool,
 }
 
 impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig {
@@ -116,6 +121,7 @@ impl From<ExportDecoderDatasetConfig> for ExportDecoderDatasetLogicalFlipConfig 
             public_out: config.public_out,
             private_out: config.private_out,
             seed: config.seed,
+            error_trace: false,
         }
     }
 }
@@ -493,6 +499,7 @@ pub struct DecoderDatasetArtifacts {
     pub public_shots: BitTable,
     pub answers: BitTable,
     pub masks: Option<BitTable>,
+    pub error_trace: Option<Vec<u8>>,
     pub measurements: usize,
     pub detectors: usize,
     pub observables: usize,
@@ -502,6 +509,7 @@ struct DecoderDatasetChunk {
     public_shots: BitTable,
     answers: BitTable,
     masks: Option<BitTable>,
+    error_trace: Option<Vec<u8>>,
 }
 
 struct DatasetRngs {
@@ -542,12 +550,200 @@ fn copy_shot(src: &BitTable, src_shot: usize, dst: &mut BitTable, dst_shot: usiz
     }
 }
 
+const ERROR_TRACE_SCHEMA: &str = "rstim.error-trace.v1";
+
+fn append_error_trace_line(
+    buffer: &mut Vec<u8>,
+    shot: usize,
+    trace: &crate::sample_trace::SampleTrace,
+) -> Result<(), String> {
+    #[derive(Serialize)]
+    struct TraceEvent<'a> {
+        op: &'a str,
+        targets: &'a [u32],
+        branch: Option<&'a str>,
+        path: &'a [usize],
+        iterations: &'a [u64],
+    }
+    #[derive(Serialize)]
+    struct TraceLine<'a> {
+        schema_version: &'static str,
+        shot: usize,
+        events: Vec<TraceEvent<'a>>,
+    }
+    let line = TraceLine {
+        schema_version: ERROR_TRACE_SCHEMA,
+        shot,
+        events: trace
+            .noise_events
+            .iter()
+            .map(|event| TraceEvent {
+                op: &event.instr_name,
+                targets: &event.target_qubits,
+                branch: event.branch_label.as_deref(),
+                path: &event.op_path,
+                iterations: &event.repeat_iterations,
+            })
+            .collect(),
+    };
+    serde_json::to_writer(&mut *buffer, &line)
+        .map_err(|error| format!("failed to serialize error trace line: {error}"))?;
+    buffer.push(b'\n');
+    Ok(())
+}
+
+/// Aggregates an observable bit per observable index. Stim allows several
+/// `OBSERVABLE_INCLUDE(k)` instructions whose contributions XOR into the same
+/// observable, so every entry with the same index must be combined.
+fn observable_flips(
+    output: &crate::executor::ExecOutput,
+    num_observables: usize,
+    context: &str,
+) -> Result<Vec<bool>, String> {
+    let mut seen = vec![false; num_observables];
+    let mut flips = vec![false; num_observables];
+    for (index, bit) in &output.observables {
+        let observable = *index as usize;
+        if observable >= num_observables {
+            return Err(format!(
+                "traced {context} shot produced observable {observable}, expected {num_observables}"
+            ));
+        }
+        seen[observable] = true;
+        flips[observable] ^= bit;
+    }
+    if let Some(missing) = seen.iter().position(|present| !present) {
+        return Err(format!(
+            "traced {context} shot produced no observable {missing}"
+        ));
+    }
+    Ok(flips)
+}
+
+/// Samples a chunk shot-by-shot with tracing enabled so every shot carries the
+/// noise realization (Pauli branch or loss onset) that produced it. `shot_offset`
+/// is the global index of the chunk's first shot, so trace lines stay aligned
+/// with `shots.b8` across chunk boundaries.
+fn generate_traced_decoder_dataset_chunk(
+    validated: &ValidatedDecoderDatasetInput,
+    mode: DecoderDatasetMode,
+    shots: usize,
+    shot_offset: usize,
+    rngs: &mut DatasetRngs,
+) -> Result<DecoderDatasetChunk, String> {
+    match mode {
+        DecoderDatasetMode::Detectors => {
+            let mut executor =
+                crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
+            let mut detections = BitTable::try_new(validated.detectors, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut answers = BitTable::try_new(validated.observables, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut trace_bytes = Vec::new();
+            for shot in 0..shots {
+                let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
+                debug_assert_eq!(
+                    output.detectors.len(),
+                    validated.detectors,
+                    "traced shot detector count matches the validated circuit"
+                );
+                for (detector, bit) in output.detectors.iter().copied().enumerate() {
+                    if bit {
+                        detections.set(detector, shot, true);
+                    }
+                }
+                for (observable, bit) in
+                    observable_flips(&output, validated.observables, "detectors")?
+                        .iter()
+                        .copied()
+                        .enumerate()
+                {
+                    if bit {
+                        answers.set(observable, shot, true);
+                    }
+                }
+                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+            }
+            Ok(DecoderDatasetChunk {
+                public_shots: detections,
+                answers,
+                masks: None,
+                error_trace: Some(trace_bytes),
+            })
+        }
+        DecoderDatasetMode::MeasurementsBlinded => {
+            let private_one_instrs = validated
+                .private_one_instrs
+                .as_ref()
+                .ok_or_else(|| "missing blinded logical-one circuit".to_string())?;
+            let mut zero_executor =
+                crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
+            let mut one_executor =
+                crate::executor::Executor::from_instrs(private_one_instrs.clone())?;
+
+            let mut source_labels: Vec<bool> = (0..shots).map(|_| rngs.mask.r#gen()).collect();
+            for index in (1..source_labels.len()).rev() {
+                let replacement = rngs.permutation.gen_range(0..=index);
+                source_labels.swap(index, replacement);
+            }
+
+            let mut measurements = BitTable::try_new(validated.measurements, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut masks = BitTable::try_new(1, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut answers = BitTable::try_new(1, shots)
+                .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+            let mut trace_bytes = Vec::new();
+            for (shot, label) in source_labels.iter().copied().enumerate() {
+                let executor = if label {
+                    &mut one_executor
+                } else {
+                    &mut zero_executor
+                };
+                let (output, trace) = executor.run_with_trace(&mut rngs.physical)?;
+                debug_assert_eq!(
+                    output.measurements.len(),
+                    validated.measurements,
+                    "traced shot measurement count matches the validated circuit"
+                );
+                for (row, bit) in output.measurements.iter().copied().enumerate() {
+                    if bit {
+                        measurements.set(row, shot, true);
+                    }
+                }
+                if label {
+                    masks.set(0, shot, true);
+                }
+                // The injected logical flip only changes measurement values, not
+                // the observable's record-bit structure, so the executed
+                // observable equals the public interpretation; unmask it here.
+                let flips = observable_flips(&output, validated.observables, "blinded")?;
+                if flips[0] ^ label {
+                    answers.set(0, shot, true);
+                }
+                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+            }
+            Ok(DecoderDatasetChunk {
+                public_shots: measurements,
+                answers,
+                masks: Some(masks),
+                error_trace: Some(trace_bytes),
+            })
+        }
+    }
+}
+
 fn generate_decoder_dataset_chunk(
     validated: &ValidatedDecoderDatasetInput,
     mode: DecoderDatasetMode,
     shots: usize,
+    shot_offset: usize,
+    error_trace: bool,
     rngs: &mut DatasetRngs,
 ) -> Result<DecoderDatasetChunk, String> {
+    if error_trace {
+        return generate_traced_decoder_dataset_chunk(validated, mode, shots, shot_offset, rngs);
+    }
     match mode {
         DecoderDatasetMode::Detectors => {
             let result = crate::sampler::sample_batch_with_options(
@@ -563,11 +759,11 @@ fn generate_decoder_dataset_chunk(
                 public_shots: result.detections,
                 answers: result.observable_flips,
                 masks: None,
+                error_trace: None,
             })
         }
         DecoderDatasetMode::MeasurementsBlinded => {
-            let mut source_labels: Vec<bool> =
-                (0..shots).map(|_| rngs.mask.r#gen()).collect();
+            let mut source_labels: Vec<bool> = (0..shots).map(|_| rngs.mask.r#gen()).collect();
             for index in (1..source_labels.len()).rev() {
                 let replacement = rngs.permutation.gen_range(0..=index);
                 source_labels.swap(index, replacement);
@@ -634,6 +830,7 @@ fn generate_decoder_dataset_chunk(
                 public_shots: measurements,
                 answers,
                 masks: Some(masks),
+                error_trace: None,
             })
         }
     }
@@ -653,7 +850,13 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
 ) -> Result<DecoderDatasetArtifacts, String> {
     let validated = validate_decoder_dataset_logical_flip_inputs(config)?;
     let mut rngs = make_dataset_rngs(config.seed);
-    let chunk = generate_decoder_dataset_chunk(&validated, config.mode, config.shots, &mut rngs)?;
+    let chunk = generate_decoder_dataset_chunk(
+        &validated,
+        config.mode,
+        config.shots,
+        0,
+        config.error_trace,
+        &mut rngs)?;
     Ok(DecoderDatasetArtifacts {
         public_circuit_text: validated.public_circuit_text,
         public_instrs: validated.public_instrs,
@@ -664,6 +867,7 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
         public_shots: chunk.public_shots,
         answers: chunk.answers,
         masks: chunk.masks,
+        error_trace: chunk.error_trace,
         measurements: validated.measurements,
         detectors: validated.detectors,
         observables: validated.observables,
@@ -692,7 +896,17 @@ struct PrivateManifest {
     answers_file: FileManifest,
     #[serde(skip_serializing_if = "Option::is_none")]
     masks_file: Option<FileManifest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trace_file: Option<TraceFileManifest>,
     generation: PrivateGenerationManifest,
+}
+
+#[derive(Debug, Serialize)]
+struct TraceFileManifest {
+    file: &'static str,
+    sha256: String,
+    schema: &'static str,
+    lines: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -1052,12 +1266,22 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
     let mut masks_writer = masks_bits
         .map(|_| create_hashed_file(&private_stage.temp_path.join("masks.b8")))
         .transpose()?;
+    let mut trace_writer = config
+        .error_trace
+        .then(|| create_hashed_file(&private_stage.temp_path.join("trace.jsonl")))
+        .transpose()?;
     let mut rngs = make_dataset_rngs(config.seed);
     let mut remaining = config.shots;
+    let mut shot_offset = 0;
     while remaining > 0 {
         let current_shots = remaining.min(batch_shots);
-        let chunk =
-            generate_decoder_dataset_chunk(&validated, config.mode, current_shots, &mut rngs)?;
+        let chunk = generate_decoder_dataset_chunk(
+            &validated,
+            config.mode,
+            current_shots,
+            shot_offset,
+            config.error_trace,
+            &mut rngs)?;
         crate::output::write_shots_b8(&chunk.public_shots, &mut shots_writer)
             .map_err(|error| format!("failed to write public shots: {error}"))?;
         crate::output::write_shots_b8(&chunk.answers, &mut answers_writer)
@@ -1068,11 +1292,22 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             (None, None) => {}
             _ => return Err("inconsistent blinded mask artifacts".to_string()),
         }
+        if let Some(writer) = trace_writer.as_mut() {
+            let trace = chunk
+                .error_trace
+                .as_ref()
+                .expect("traced chunk carries trace bytes");
+            writer
+                .write_all(trace)
+                .map_err(|error| format!("failed to write private error trace: {error}"))?;
+        }
         remaining -= current_shots;
+        shot_offset += current_shots;
     }
     let shots_sha256 = shots_writer.finish()?;
     let answers_sha256 = answers_writer.finish()?;
     let masks_sha256 = masks_writer.map(Sha256Writer::finish).transpose()?;
+    let trace_sha256 = trace_writer.map(Sha256Writer::finish).transpose()?;
     let dataset_id = sha256_hex(&dataset_id_material(
         PUBLIC_SCHEMA_VERSION,
         config.mode,
@@ -1091,6 +1326,12 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
         (None, None) => None,
         _ => return Err("inconsistent blinded mask artifacts".to_string()),
     };
+    let trace_file = trace_sha256.map(|sha256| TraceFileManifest {
+        file: "trace.jsonl",
+        sha256,
+        schema: ERROR_TRACE_SCHEMA,
+        lines: config.shots,
+    });
     let public_manifest = PublicManifest {
         format: DATASET_FORMAT,
         schema_version: PUBLIC_SCHEMA_VERSION,
@@ -1132,6 +1373,7 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             bytes_per_shot: bytes_per_shot(answers_bits)?,
         },
         masks_file,
+        trace_file,
         generation: PrivateGenerationManifest {
             rstim_version: crate::version(),
             batch_shots,
@@ -1139,8 +1381,12 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
         },
     };
 
-    write_manifest(&private_stage.temp_path.join("manifest.json"), &private_manifest)?;
-    write_manifest(&public_stage.temp_path.join("manifest.json"), &public_manifest)?;
+    write_manifest(
+        &private_stage.temp_path.join("manifest.json"),
+        &private_manifest)?;
+    write_manifest(
+        &public_stage.temp_path.join("manifest.json"),
+        &public_manifest)?;
     write_file(
         &public_stage.temp_path.join("circuit.stim"),
         validated.public_circuit_text.as_bytes(),
@@ -1180,6 +1426,7 @@ mod tests {
             public_out: std::path::PathBuf::from("public-unused"),
             private_out: std::path::PathBuf::from("private-unused"),
             seed: Some(1),
+            error_trace: false,
         }
     }
 
@@ -1188,6 +1435,38 @@ mod tests {
             pauli: LogicalPauli::X,
             qubits,
         })
+    }
+
+    fn exec_output_with_observables(observables: Vec<(u32, bool)>) -> crate::executor::ExecOutput {
+        crate::executor::ExecOutput {
+            measurements: Vec::new(),
+            detectors: Vec::new(),
+            detector_coords: Vec::new(),
+            observables,
+            observable_events: Vec::new(),
+            inapplicable_noise_events: Vec::new(),
+            qubit_coords: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn observable_flips_rejects_out_of_range_index() {
+        let output = exec_output_with_observables(vec![(1, false)]);
+        let error = observable_flips(&output, 1, "detectors").unwrap_err();
+        assert!(
+            error.contains("produced observable 1"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn observable_flips_rejects_missing_observable() {
+        let output = exec_output_with_observables(vec![(0, true)]);
+        let error = observable_flips(&output, 2, "detectors").unwrap_err();
+        assert!(
+            error.contains("no observable 1"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -1199,15 +1478,21 @@ mod tests {
                 qubits: vec![0, 2, 4],
             }
         );
-        assert!(LogicalFlip::parse(LogicalPauli::Z, "")
-            .unwrap_err()
-            .contains("--logical_z_qubits must be non-empty"));
-        assert!(LogicalFlip::parse(LogicalPauli::X, "0,2,2")
-            .unwrap_err()
-            .contains("--logical_x_qubits contains duplicate"));
-        assert!(LogicalFlip::parse(LogicalPauli::Z, "0,nope")
-            .unwrap_err()
-            .contains("--logical_z_qubits contains invalid"));
+        assert!(
+            LogicalFlip::parse(LogicalPauli::Z, "")
+                .unwrap_err()
+                .contains("--logical_z_qubits must be non-empty")
+        );
+        assert!(
+            LogicalFlip::parse(LogicalPauli::X, "0,2,2")
+                .unwrap_err()
+                .contains("--logical_x_qubits contains duplicate")
+        );
+        assert!(
+            LogicalFlip::parse(LogicalPauli::Z, "0,nope")
+                .unwrap_err()
+                .contains("--logical_z_qubits contains invalid")
+        );
         assert_eq!(parse_logical_x_qubits("1,3").unwrap(), vec![1, 3]);
     }
 
@@ -1218,9 +1503,11 @@ mod tests {
             pauli: LogicalPauli::Z,
             qubits: vec![0],
         };
-        assert!(circuit_with_injected_logical_flip(good, &logical_z)
-            .unwrap()
-            .contains("\nZ 0\n"));
+        assert!(
+            circuit_with_injected_logical_flip(good, &logical_z)
+                .unwrap()
+                .contains("\nZ 0\n")
+        );
 
         let marker_without_trailing_newline = "R 0\n# RSTIM_LOGICAL_FLIP_POINT";
         assert_eq!(
@@ -1230,25 +1517,33 @@ mod tests {
         );
 
         let missing = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(missing, &[0])
-            .unwrap_err()
-            .contains("marker"));
+        assert!(
+            circuit_with_injected_logical_x(missing, &[0])
+                .unwrap_err()
+                .contains("marker")
+        );
 
         let duplicate = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(duplicate, &[0])
-            .unwrap_err()
-            .contains("exactly once"));
+        assert!(
+            circuit_with_injected_logical_x(duplicate, &[0])
+                .unwrap_err()
+                .contains("exactly once")
+        );
 
         let nested =
             "R 0\nREPEAT 2 {\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(nested, &[0])
-            .unwrap_err()
-            .contains("top-level"));
+        assert!(
+            circuit_with_injected_logical_x(nested, &[0])
+                .unwrap_err()
+                .contains("top-level")
+        );
 
         let inline = "R 0 # RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-        assert!(circuit_with_injected_logical_x(inline, &[0])
-            .unwrap_err()
-            .contains("standalone"));
+        assert!(
+            circuit_with_injected_logical_x(inline, &[0])
+                .unwrap_err()
+                .contains("standalone")
+        );
     }
 
     #[test]
@@ -1267,9 +1562,11 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("injected logical X does not flip observable 0"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("injected logical X does not flip observable 0")
+        );
 
         let changes_detector = "R 0 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
@@ -1277,18 +1574,22 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("changes detector"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("changes detector")
+        );
     }
 
     #[test]
     fn input_validation_rejects_observable_sweep_and_qubit_contract_violations() {
         let no_observable = "R 0\nM 0\n";
         let config = test_config(no_observable, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("at least one observable, found 0"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("at least one observable, found 0")
+        );
 
         let multiple_observables =
             "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n";
@@ -1300,15 +1601,19 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("measurements_blinded mode requires exactly one observable, found 2"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("measurements_blinded mode requires exactly one observable, found 2")
+        );
 
         let sweep_bit = "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(sweep_bit, DecoderDatasetMode::Detectors, None);
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("does not support sweep-bit circuits"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("does not support sweep-bit circuits")
+        );
 
         let one_qubit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
@@ -1316,9 +1621,11 @@ mod tests {
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![1]),
         );
-        assert!(validate_decoder_dataset_logical_flip_inputs(&config)
-            .unwrap_err()
-            .contains("contains qubit 1, but circuit has 1 qubits"));
+        assert!(
+            validate_decoder_dataset_logical_flip_inputs(&config)
+                .unwrap_err()
+                .contains("contains qubit 1, but circuit has 1 qubits")
+        );
 
         let config = test_config(
             one_qubit,
@@ -1578,9 +1885,11 @@ mod tests {
         let public_manifest = std::fs::read_to_string(public_out.join("manifest.json")).unwrap();
         assert_no_public_secret_words(&public_manifest);
         assert!(public_manifest.contains("\"mode\": \"measurements_blinded\""));
-        assert!(std::fs::read_to_string(public_out.join("circuit.stim"))
-            .unwrap()
-            .contains(LOGICAL_FLIP_MARKER));
+        assert!(
+            std::fs::read_to_string(public_out.join("circuit.stim"))
+                .unwrap()
+                .contains(LOGICAL_FLIP_MARKER)
+        );
     }
 
     #[test]
@@ -1606,14 +1915,12 @@ mod tests {
         assert_eq!(shots.len(), 5);
         assert_eq!(answers.len(), 5);
 
-        let public_manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(public_out.join("manifest.json")).unwrap(),
-        )
-        .unwrap();
-        let private_manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(private_out.join("manifest.json")).unwrap(),
-        )
-        .unwrap();
+        let public_manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(public_out.join("manifest.json")).unwrap())
+                .unwrap();
+        let private_manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(private_out.join("manifest.json")).unwrap())
+                .unwrap();
         assert_eq!(public_manifest["shots"], 5);
         assert_eq!(private_manifest["answers_file"]["bits"], 2);
         assert_eq!(private_manifest["generation"]["batch_shots"], 2);
