@@ -183,9 +183,106 @@ def sample_measurements(rstim: str, circuit_path: str, shots: int, seed: int, ca
     return result.stdout, argv
 
 
+def stim_convert_cli_argv(stim: str, in_path: Path, in_format: str, out_path: Path, out_format: str, bits_per_shot: int) -> list[str]:
+    return [
+        stim,
+        "convert",
+        "--in",
+        str(in_path),
+        "--in_format",
+        in_format,
+        "--out",
+        str(out_path),
+        "--out_format",
+        out_format,
+        "--bits_per_shot",
+        str(bits_per_shot),
+    ]
+
+
+def stim_convert_api_argv(in_path: Path, in_format: str, out_path: Path, out_format: str, bits_per_shot: int) -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "benchmarks.rstim_vs_stim_simulator.stim_convert",
+        "--in",
+        str(in_path),
+        "--in_format",
+        in_format,
+        "--out",
+        str(out_path),
+        "--out_format",
+        out_format,
+        "--bits_per_shot",
+        str(bits_per_shot),
+    ]
+
+
+def build_stim_baselines(
+    *,
+    rstim: str,
+    stim: str,
+    case_work: Path,
+    case_id: str,
+    measurement_path: Path,
+    measurement_sha256: str,
+    measurement_argv: list[str],
+    bits_per_shot: int,
+) -> dict[str, Any]:
+    baselines: dict[str, Any] = {}
+    for fmt in checker.REQUIRED_STIM_BASELINE_FORMATS:
+        artifact_path = case_work / f"stim_baseline.{fmt}"
+        if fmt == "b8":
+            # The canonical b8 measurement bytes are the source of truth.
+            artifact_path.write_bytes(measurement_path.read_bytes())
+            serialize_argv = list(measurement_argv)
+        elif fmt == "ptb64":
+            # The pinned Stim CLI streams single records and cannot write
+            # ptb64, so use the pinned stim Python API helper instead.
+            serialize_argv = stim_convert_api_argv(measurement_path, "b8", artifact_path, "ptb64", bits_per_shot)
+            run_command(serialize_argv, stdout=None)
+        else:
+            serialize_argv = stim_convert_cli_argv(stim, measurement_path, "b8", artifact_path, fmt, bits_per_shot)
+            run_command(serialize_argv, stdout=None)
+        artifact = artifact_path.read_bytes()
+        artifact_sha256 = sha256_bytes(artifact)
+
+        direct_path = case_work / f"stim_baseline.{fmt}.zst"
+        direct_argv = [rstim, "rsmp_zstd_frame", "--level", "3", "--in", str(artifact_path), "--out", str(direct_path)]
+        run_command(direct_argv, stdout=None)
+        direct_bytes = direct_path.read_bytes()
+
+        roundtrip_path = case_work / f"stim_baseline.{fmt}.roundtrip.b8"
+        roundtrip_argv = stim_convert_cli_argv(stim, artifact_path, fmt, roundtrip_path, "b8", bits_per_shot)
+        run_command(roundtrip_argv, stdout=None)
+        roundtrip_sha256 = sha256_file(roundtrip_path)
+        if roundtrip_sha256 != measurement_sha256:
+            raise RuntimeError(f"{case_id} {fmt} round-trip measurement SHA-256 mismatch")
+
+        baselines[fmt] = {
+            "artifact": {
+                "argv": serialize_argv,
+                "bytes": len(artifact),
+                "sha256": artifact_sha256,
+            },
+            "direct_zstd": {
+                "argv": direct_argv,
+                "input_sha256": artifact_sha256,
+                "bytes": len(direct_bytes),
+                "sha256": sha256_bytes(direct_bytes),
+            },
+            "roundtrip_b8": {
+                "argv": roundtrip_argv,
+                "sha256": roundtrip_sha256,
+            },
+        }
+    return baselines
+
+
 def build_row(
     *,
     rstim: str,
+    stim: str,
     work_dir: Path,
     case_id: str,
     semantic_role: str,
@@ -273,6 +370,18 @@ def build_row(
     raw_b8_bytes = len(measurements_b8)
     if raw_b8_bytes != checker.expected_b8_bytes(m, shots):
         raise RuntimeError(f"{case_id} raw b8 byte count does not match dimensions")
+    stim_baselines: dict[str, Any] | None = None
+    if case_id == checker.BENCHMARK_CASE_ID:
+        stim_baselines = build_stim_baselines(
+            rstim=rstim,
+            stim=stim,
+            case_work=case_work,
+            case_id=case_id,
+            measurement_path=measurement_path,
+            measurement_sha256=measurement_sha256,
+            measurement_argv=measurement_argv,
+            bits_per_shot=m,
+        )
     detectors = detections_path.read_bytes()
     detector_one_count = count_b8_ones(detectors, d, shots)
     detector_total_bits = d * shots
@@ -344,6 +453,8 @@ def build_row(
         },
         "zstd_contract": dict(checker.ZSTD_CONTRACT),
     }
+    if stim_baselines is not None:
+        row["stim_baselines"] = stim_baselines
     row["rsmp_archive"]["peak_logical_block_working_set_bytes"] = checker.peak_working_set(row)
     return row
 
@@ -402,6 +513,7 @@ def publish_temp_result(temp_dir: Path, out_dir: Path) -> None:
 
 def generate(args: argparse.Namespace) -> Path:
     rstim = args.rstim
+    stim = args.stim
     if WORK_ROOT.exists():
         shutil.rmtree(WORK_ROOT)
     WORK_ROOT.mkdir(parents=True)
@@ -417,6 +529,7 @@ def generate(args: argparse.Namespace) -> Path:
             records.append(
                 build_row(
                     rstim=rstim,
+                    stim=stim,
                     work_dir=WORK_ROOT,
                     case_id=checker.HIGH_ENTROPY_CASE_ID,
                     semantic_role="high_entropy_control",
@@ -441,6 +554,7 @@ def generate(args: argparse.Namespace) -> Path:
         records.append(
             build_row(
                 rstim=rstim,
+                stim=stim,
                 work_dir=WORK_ROOT,
                 case_id=requirement.case_id,
                 semantic_role=requirement.semantic_role,
@@ -468,6 +582,11 @@ def generate(args: argparse.Namespace) -> Path:
     locked_versions = checker.load_locked_package_versions()
     rstim_binary = Path(rstim)
     rstim_binary_for_hash = rstim_binary if rstim_binary.is_absolute() else REPO_ROOT / rstim_binary
+    stim_resolved = shutil.which(stim)
+    if stim_resolved is None:
+        raise RuntimeError(f"could not resolve pinned stim executable: {stim}")
+    stim_binary_path = Path(stim_resolved).resolve()
+    stim_version = command_stdout_text([sys.executable, "-c", "import stim; print(stim.__version__)"])
     environment = {
         "schema_version": checker.ENVIRONMENT_SCHEMA_VERSION,
         "evidence_format": checker.EVIDENCE_FORMAT,
@@ -502,8 +621,24 @@ def generate(args: argparse.Namespace) -> Path:
         },
         "zstd_info": zstd_info,
         "zstd_contract": dict(checker.ZSTD_CONTRACT),
+        "stim": {
+            "binary": {
+                "path": str(stim_binary_path),
+                "sha256": sha256_file(stim_binary_path),
+            },
+            "version": stim_version,
+            "version_source": "stim-python-module",
+        },
         "commands": {
             "benchmark_sample": checker.PINNED_BENCHMARK_SAMPLE_ARGV,
+            "stim_baselines": {
+                fmt: {
+                    "serialize": baseline["artifact"]["argv"],
+                    "direct_zstd": baseline["direct_zstd"]["argv"],
+                    "roundtrip": baseline["roundtrip_b8"]["argv"],
+                }
+                for fmt, baseline in benchmark["stim_baselines"].items()
+            },
             "rows": {row["case_id"]: {
                 "measurement": row["measurement_input"]["argv"],
                 "direct_zstd": row["direct_zstd"]["argv"],
@@ -540,6 +675,7 @@ def parse_high_entropy_args(argv: list[str]) -> argparse.Namespace:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate rsmp v1 compression evidence")
     parser.add_argument("--rstim", required=True)
+    parser.add_argument("--stim", default="stim")
     parser.add_argument("--catalog", required=True, type=Path)
     parser.add_argument("--case", required=True)
     parser.add_argument("--shots", required=True, type=int)
