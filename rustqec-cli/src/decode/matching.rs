@@ -100,7 +100,12 @@ impl CompiledMatching {
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
-            let artifact_work = conditioned_matching_work(&self.edges, &syndrome.checks)?;
+            let artifact_work = conditioned_matching_work(
+                &self.edges,
+                &self.loss_edges,
+                &syndrome.checks,
+                losses,
+            )?;
             let cached_work = conditioned_cache_total(
                 "matching",
                 self.cache.len(),
@@ -187,11 +192,21 @@ fn build_matching(
     checks: &[LossAwareDetectorCheck],
     losses: &[usize],
 ) -> Result<ConditionedMatching, ShotFailure> {
-    conditioned_matching_work(edges, checks)?;
-    let active: HashSet<usize> = losses
-        .iter()
-        .flat_map(|&loss| loss_edges[loss].iter().copied())
-        .collect();
+    conditioned_matching_work(edges, loss_edges, checks, losses)?;
+    let mut active = HashSet::new();
+    for &loss in losses {
+        let mapped_edges = loss_edges.get(loss).ok_or_else(|| {
+            ShotFailure::Other(format!("loss pattern references unknown envelope {loss}"))
+        })?;
+        for &edge in mapped_edges {
+            if edge >= edges.len() {
+                return Err(ShotFailure::Other(format!(
+                    "loss envelope {loss} references unknown matching edge {edge}"
+                )));
+            }
+            active.insert(edge);
+        }
+    }
     let scale = edges.iter().map(|edge| edge.weight).fold(1.0f64, f64::max);
     let mut matching = Matching::new();
     let mut reachable_checks = vec![false; checks.len()];
@@ -247,7 +262,9 @@ fn build_matching(
 
 fn conditioned_matching_work(
     edges: &[GraphEdge],
+    loss_edges: &[Vec<usize>],
     checks: &[LossAwareDetectorCheck],
+    losses: &[usize],
 ) -> Result<usize, ShotFailure> {
     let edge_terms = edges
         .iter()
@@ -263,7 +280,23 @@ fn conditioned_matching_work(
             total.checked_add(check.source_detectors.len())
         })
         .ok_or_else(conditioned_matching_limit_error)?;
-    conditioned_matching_work_from_counts(edges.len(), checks.len(), edge_terms, check_terms)
+    let loss_terms = losses
+        .iter()
+        .try_fold(0usize, |total, &loss| {
+            let mapped = loss_edges.get(loss)?;
+            total.checked_add(mapped.len())
+        })
+        .ok_or_else(|| {
+            ShotFailure::Other("loss pattern references an unknown envelope or exceeds the conditioned matching work limit".to_string())
+        })?;
+    conditioned_matching_work_from_counts(
+        edges.len(),
+        checks.len(),
+        edge_terms,
+        check_terms,
+        losses.len(),
+        loss_terms,
+    )
 }
 
 fn conditioned_matching_work_from_counts(
@@ -271,9 +304,12 @@ fn conditioned_matching_work_from_counts(
     check_count: usize,
     edge_terms: usize,
     check_terms: usize,
+    loss_count: usize,
+    loss_terms: usize,
 ) -> Result<usize, ShotFailure> {
     if edge_count > MAX_CONDITIONED_DECODER_ITEMS
         || check_count > MAX_CONDITIONED_DECODER_ITEMS
+        || loss_count > MAX_CONDITIONED_DECODER_ITEMS
     {
         return Err(conditioned_matching_limit_error());
     }
@@ -281,6 +317,8 @@ fn conditioned_matching_work_from_counts(
         .checked_add(check_count)
         .and_then(|value| value.checked_add(edge_terms))
         .and_then(|value| value.checked_add(check_terms))
+        .and_then(|value| value.checked_add(loss_count))
+        .and_then(|value| value.checked_add(loss_terms))
         .and_then(|value| value.checked_add(edge_count.checked_mul(check_count)?))
         .and_then(|value| value.checked_add(edge_terms.checked_mul(check_terms)?))
         .ok_or_else(conditioned_matching_limit_error)?;
@@ -363,12 +401,38 @@ mod tests {
 
     #[test]
     fn conditioned_matching_preflights_incidence_work() {
-        let error = conditioned_matching_work_from_counts(10_001, 1_000, 0, 0).unwrap_err();
+        let error =
+            conditioned_matching_work_from_counts(10_001, 1_000, 0, 0, 0, 0).unwrap_err();
         assert!(
             matches!(error, ShotFailure::Other(message) if message.contains("work limit"))
         );
-        assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0).is_err());
-        assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX).is_err());
+        assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0, 0, 0).is_err());
+        assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX, 0, 0).is_err());
+    }
+
+    #[test]
+    fn conditioned_matching_preflights_active_loss_edge_work_and_indices() {
+        assert!(conditioned_matching_work_from_counts(
+            1,
+            0,
+            1,
+            0,
+            10_000,
+            MAX_CONDITIONED_DECODER_WORK,
+        )
+        .is_err());
+        let error = conditioned_matching_work(&[boundary_edge()], &[], &[], &[0]).unwrap_err();
+        assert!(matches!(
+            error,
+            ShotFailure::Other(message) if message.contains("unknown envelope")
+        ));
+        let error = build_matching(&[boundary_edge()], &[vec![1]], 1.0, &[], &[0])
+            .err()
+            .unwrap();
+        assert!(matches!(
+            error,
+            ShotFailure::Other(message) if message.contains("unknown matching edge")
+        ));
     }
 
     #[test]
