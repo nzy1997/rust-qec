@@ -22,6 +22,7 @@
         <div class="nav-links">
           <a class="nav-link{% if current_nav == "home" %} current{% endif %}" href="{{ root }}/"{% if current_nav == "home" %} aria-current="page"{% endif %}>Home</a>
           <a class="nav-link{% if current_nav == "simulate" %} current{% endif %}" href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate</a>
+          <a class="nav-link{% if current_nav == "data" %} current{% endif %}" href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Data</a>
           <a class="nav-link{% if current_nav == "dems" %} current{% endif %}" href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>DEMs</a>
           <a class="nav-link{% if current_nav == "decode" %} current{% endif %}" href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decode</a>
           <a class="nav-link{% if current_nav == "css" %} current{% endif %}" href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS Codes</a>

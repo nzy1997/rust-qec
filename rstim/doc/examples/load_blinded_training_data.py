@@ -52,7 +52,10 @@ def load_blinded_training_rows(
 
     trace_entry = private.get("trace_file")
     if trace_entry is None:
-        raise ValueError("private manifest has no trace_file; export with --error_trace")
+        raise ValueError(
+            "private manifest has no trace_file; export with rustqec --error-trace "
+            "(or rstim --error_trace)"
+        )
     trace_lines = [
         json.loads(line)
         for line in (private_dir / trace_entry["file"]).read_text().splitlines()

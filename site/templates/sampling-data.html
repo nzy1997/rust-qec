@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Sampling and training data — RustQEC{% endblock title %}
+{% block description %}Generate RustQEC shots, save public and private decoder datasets, and load loss-visible records into neural-network tensors.{% endblock description %}
+
+{% block hero %}
+<div class="hero compact-hero data-hero">
+  <p class="eyebrow">Sampling and data</p>
+  <h1>Sample once. Save every meaning.</h1>
+  <p class="hero-copy">
+    Start with a Stim circuit, choose a shot format, and keep measurement
+    values, loss information, and private labels aligned from simulation to
+    decoder training.
+  </p>
+  <div class="data-pipeline" aria-label="Sampling data flow">
+    <span><small>1</small><strong>circuit.stim</strong><em>experiment</em></span>
+    <span><small>2</small><strong>sample</strong><em>seeded shots</em></span>
+    <span><small>3</small><strong>public inputs</strong><em>publishable</em></span>
+    <span><small>4</small><strong>private labels</strong><em>training only</em></span>
+  </div>
+</div>
+{% endblock hero %}
+
+{% block main %}
+<section id="choose-path" class="task-section" aria-labelledby="choose-path-title">
+  <div class="section-heading">
+    <p class="eyebrow">Choose the output</p>
+    <h2 id="choose-path-title">Three paths, depending on what comes next</h2>
+  </div>
+  <div class="data-choice-grid">
+    <article class="compact-card">
+      <span class="badge">Inspect</span>
+      <h3>Raw measurement shots</h3>
+      <p>Use <code>circuit sample</code>. Start with readable <code>01</code>; switch to compact <code>b8</code> for volume.</p>
+    </article>
+    <article class="compact-card">
+      <span class="badge">Decode</span>
+      <h3>Detector rows</h3>
+      <p>Use <code>dataset export --mode detectors</code>. Publish detector inputs and keep observable answers private.</p>
+    </article>
+    <article class="compact-card primary-data-card">
+      <span class="badge measured">Train</span>
+      <h3>Fully labeled simulator data</h3>
+      <p>Use blinded measurements; add <code>--error-trace</code> only when training or debugging also needs realized physical error events.</p>
+    </article>
+  </div>
+</section>
+
+<section id="sample" class="task-section" aria-labelledby="sample-title">
+  <div class="section-heading">
+    <p class="eyebrow">Quick sampling</p>
+    <h2 id="sample-title">Generate a loss-visible circuit and inspect four shots</h2>
+    <p class="section-copy">Run from the repository root. The first command creates a d=3 Mid-SWAP Z-memory circuit whose loss-visible measurements are stored as interleaved <code>flag,value</code> records.</p>
+  </div>
+  <pre class="quick-command"><code>cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+  circuit gen \
+  --code surface_code \
+  --task rotated_memory_z_midswap \
+  --distance 3 --rounds 2 \
+  --noise 0.002 \
+  --operation-loss-probability 0.002 \
+  --measurement-loss-probability 0.003 \
+  --out circuit.stim
+
+cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+  circuit sample \
+  --in circuit.stim --shots 4 --seed 7 \
+  --out raw-shots.01 --out-format 01</code></pre>
+  <div class="data-note">
+    <strong>What gets saved?</strong>
+    <p><code>raw-shots.01</code> contains one ASCII bit row per shot. It is easy to inspect, but it has no manifest, answer labels, or separate sidecar. Use it for debugging—not as the long-term training contract.</p>
+  </div>
+</section>
+
+<section id="export" class="task-section" aria-labelledby="export-title">
+  <div class="section-heading">
+    <p class="eyebrow">Recommended training layout</p>
+    <h2 id="export-title">Export aligned public inputs and private truth</h2>
+    <p class="section-copy">Use <code>detectors</code> for ordinary detector-input benchmarks without erased records. For atom loss, prefer <code>measurements_blinded</code>: it retains loss flags and avoids declaring an arbitrary lost-value parity to be valid syndrome.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Mode</th><th>Public row</th><th>Private truth</th><th>Use when</th></tr></thead>
+      <tbody>
+        <tr><td><code>detectors</code></td><td>Detector bits</td><td>Observable flips</td><td>No referenced measurement is lost, or the result is explicitly a legacy baseline</td></tr>
+        <tr><td><code>measurements_blinded</code></td><td>Measurement records</td><td>Unmasked logical-error target + source mask</td><td>Training, blind evaluation, and loss-aware decoding</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="section-copy">For the generated d=3 Mid-SWAP example, <code>1,8,15</code> is a verified logical-X representative. Do not copy that support to a different circuit: the exporter checks that the requested Pauli preserves detector references and flips observable 0.</p>
+  <pre class="quick-command"><code>mkdir -p data
+
+cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+  dataset export \
+  --circuit circuit.stim --shots 100000 --seed 7 \
+  --mode measurements_blinded \
+  --logical-x-qubits 1,8,15 \
+  --public-out data/public \
+  --private-out data/private \
+  --error-trace</code></pre>
+  <div class="bundle-grid">
+    <article class="bundle-card public-bundle">
+      <span class="badge measured">Safe to publish</span>
+      <h3><code>data/public/</code></h3>
+      <pre class="file-tree"><code>manifest.json  # shape, hashes, dataset id
+circuit.stim  # public logical-zero circuit
+shots.b8      # one measurement row per shot</code></pre>
+    </article>
+    <article class="bundle-card private-bundle">
+      <span class="badge caveat">Keep private</span>
+      <h3><code>data/private/</code></h3>
+      <pre class="file-tree"><code>manifest.json  # seed and private hashes
+answers.b8    # physical logical-error target
+masks.b8      # injected logical input bit
+trace.jsonl   # realized errors, one shot/line</code></pre>
+    </article>
+  </div>
+  <p class="section-copy">The public manifest deliberately contains no seed, answers, masks, private path, or producer-circuit choice. Pair the two bundles by their shared <code>dataset_id</code>, and never publish the private directory for a blind evaluation.</p>
+  <div class="data-note">
+    <strong>Trace is optional</strong>
+    <p>Omit <code>--error-trace</code> for faster, smaller exports when <code>answers.b8</code>, <code>masks.b8</code>, and public loss flags are enough. The checked loader below intentionally verifies trace alignment and therefore requires the flag. Traced sampling is shot-by-shot; enabling it changes RNG consumption, so the same seed produces a different batch than an untraced export.</p>
+  </div>
+</section>
+
+<section id="b8-format" class="task-section" aria-labelledby="b8-title">
+  <div class="section-heading">
+    <p class="eyebrow">Binary layout</p>
+    <h2 id="b8-title">How <code>b8</code> stores each row</h2>
+    <p class="section-copy"><code>b8</code> packs bits least-significant-bit first inside each byte (<code>bit_order: lsb_first</code>), concatenates fixed-width rows in shot order, and requires unused padding bits to be zero.</p>
+  </div>
+  <div class="b8-explainer">
+    <article class="compact-card">
+      <h3>Row size</h3>
+      <p><code>bytes_per_shot = ceil(bits_per_shot / 8)</code></p>
+      <p>The manifest records both values; use them instead of guessing from the file size.</p>
+    </article>
+    <article class="compact-card">
+      <h3>Verified example</h3>
+      <p>50 measurement bits become 7 bytes per shot. Eight shots therefore produce a 56-byte <code>shots.b8</code>.</p>
+    </article>
+  </div>
+  <pre class="quick-command"><code># Decode bit k of shot s
+row_bytes = (bits_per_shot + 7) // 8
+bit = (raw[s * row_bytes + k // 8] >> (k % 8)) &amp; 1</code></pre>
+</section>
+
+<section id="loss-tensors" class="task-section" aria-labelledby="loss-tensors-title">
+  <div class="section-heading">
+    <p class="eyebrow">Neural-network input</p>
+    <h2 id="loss-tensors-title">Keep loss separate from the stored value</h2>
+    <p class="section-copy">For <code>ML</code> and <code>MRL</code>, records appear as <code>loss_flag,value_bit</code>. Preserve the complete packed row, then deinterleave each pair into value and mask channels. A lost value may be stored as <code>1</code>, but that is only a placeholder—not a physical eigenvalue and not valid syndrome evidence.</p>
+  </div>
+  <div class="table-wrap tensor-table">
+    <table>
+      <thead><tr><th>Tensor</th><th>Shape</th><th>Source and role</th></tr></thead>
+      <tbody>
+        <tr><td><code>record_bits</code></td><td><code>[shots, row.bits]</code></td><td>Directly unpacked public <code>shots.b8</code></td></tr>
+        <tr><td><code>measurement_bits</code></td><td><code>[shots, values]</code></td><td>The <code>value_bit</code> from each loss-visible pair</td></tr>
+        <tr><td><code>measurement_loss_mask</code></td><td><code>[shots, values]</code></td><td>The paired <code>loss_flag</code>; a separate model input channel</td></tr>
+        <tr><td><code>raw_detector_bits</code></td><td><code>[shots, detectors]</code></td><td>Optional derived feature, never sufficient by itself under loss</td></tr>
+        <tr><td><code>detector_valid</code></td><td><code>[shots, detectors]</code></td><td>Derived loss-aware mask for detectors untouched by lost records</td></tr>
+        <tr><td><code>answer_targets</code></td><td><code>[shots, 1]</code></td><td>Private <code>answers.b8</code>: supervised physical logical-error label</td></tr>
+        <tr><td><code>logical_masks</code></td><td><code>[shots, 1]</code></td><td>Private <code>masks.b8</code>: training metadata, never decoder input in blind evaluation</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="data-note warning-note">
+    <strong>Decoder rule</strong>
+    <p>Do not feed matching a detector parity computed by replacing every lost measurement with 0 or 1. Invalidate affected checks or combine them into loss-aware superchecks; changing the placeholder under a set loss mask must not change the decoder answer.</p>
+  </div>
+</section>
+
+<section id="marker-contract" class="task-section" aria-labelledby="marker-title">
+  <div class="section-heading">
+    <p class="eyebrow">Blinding contract</p>
+    <h2 id="marker-title">Put the hidden logical flip before the first noise</h2>
+  </div>
+  <pre class="quick-command"><code>R 1 3 5 8 10 12 15 17 19
+TICK[rstim:logical_flip_point]
+X_ERROR(0.002) 1 3 5 8 10 12 15 17 19</code></pre>
+  <p class="section-copy">The circuit must contain exactly one top-level <code>TICK[rstim:logical_flip_point]</code>, after ideal state preparation and before every positive-probability noise instruction, including noise inside completed <code>REPEAT</code> blocks. The old comment marker is intentionally unsupported.</p>
+</section>
+
+<section id="load-and-check" class="task-section" aria-labelledby="load-title">
+  <div class="section-heading">
+    <p class="eyebrow">Load and verify</p>
+    <h2 id="load-title">Turn rows into tensors without losing alignment</h2>
+    <p class="section-copy">The checked standard-library loader validates manifests, dataset identity, row sizes, trace indices, logical masks, and the private answer relation before returning fixed-width Python lists ready for NumPy, PyTorch, or JAX. Because it verifies <code>logical_input</code> metadata, this command requires a dataset exported with <code>--error-trace</code>.</p>
+  </div>
+  <pre class="quick-command"><code>python3 rstim/doc/examples/load_blinded_training_data.py \
+  --public-dir data/public \
+  --private-dir data/private \
+  --observable-rec -17 \
+  --observable-rec -15 \
+  --observable-rec -13</code></pre>
+  <p class="section-copy">Those three record offsets belong to the generated d=3 Mid-SWAP example. Read <code>OBSERVABLE_INCLUDE(0)</code> from your own circuit when using a different layout.</p>
+  <p class="section-copy"><code>trace.jsonl</code> is ragged by design. Keep it as an auditable sidecar, or encode events by operation path into fixed-width features only when auxiliary physical-error supervision is useful.</p>
+  <div class="docs-card-links">
+    <a href="https://github.com/nzy1997/rust-qec/blob/master/rstim/doc/training-data.md">Training-data guide</a>
+    <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/specs/error-trace-v1.md">Error-trace v1</a>
+    <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/specs/loss-aware-detectors-v1.md">Loss-aware detectors v1</a>
+    <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/specs/delayed-erasure-conditioned-decoding-v1.md">Conditioned decoding v1</a>
+  </div>
+</section>
+{% endblock main %}

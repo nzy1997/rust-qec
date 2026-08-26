@@ -42,6 +42,7 @@ class SiteFixture:
 PAGE_FILES = (
     "index.html",
     "simulator/index.html",
+    "sampling-data/index.html",
     "detector-models/index.html",
     "decoding/index.html",
     "css-codes/index.html",
@@ -54,6 +55,15 @@ JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
 PAGE_REQUIRED_ANCHORS = {
     "index.html": ("capabilities",),
     "simulator/index.html": ("circuit-simulation",),
+    "sampling-data/index.html": (
+        "choose-path",
+        "sample",
+        "export",
+        "b8-format",
+        "loss-tensors",
+        "marker-contract",
+        "load-and-check",
+    ),
     "detector-models/index.html": ("dem-extraction",),
     "decoding/index.html": ("decoder-families", "benchmark-campaigns"),
     "css-codes/index.html": ("css-construction", "distance-search"),
@@ -1006,6 +1016,22 @@ def make_fixture_site() -> SiteFixture:
     <div data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></div>
   </section>
   <script src="../js/benchmarks.js"></script>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "sampling-data/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="choose-path"></section>
+  <section id="sample"></section>
+  <section id="export"></section>
+  <section id="b8-format"></section>
+  <section id="loss-tensors"></section>
+  <section id="marker-contract"></section>
+  <section id="load-and-check"></section>
 </body>
 </html>
 """,

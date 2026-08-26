@@ -412,6 +412,67 @@ fn task_oriented_content_pages_are_linked() {
 }
 
 #[test]
+fn sampling_data_page_preserves_training_and_loss_contracts() {
+    let page = read_repo_file("site/templates/sampling-data.html");
+    let base = read_repo_file("site/templates/base.html");
+    let index = read_repo_file("site/templates/index.html");
+    let styles = read_repo_file("site/static/styles.css");
+
+    assert_contains_all(
+        &page,
+        &[
+            "id=\"choose-path\"",
+            "id=\"sample\"",
+            "id=\"export\"",
+            "id=\"b8-format\"",
+            "id=\"loss-tensors\"",
+            "id=\"marker-contract\"",
+            "id=\"load-and-check\"",
+            "rustqec -- \\",
+            "circuit sample",
+            "dataset export",
+            "mkdir -p data",
+            "--mode measurements_blinded",
+            "--logical-x-qubits 1,8,15",
+            "--error-trace",
+            "shots.b8",
+            "answers.b8",
+            "masks.b8",
+            "trace.jsonl",
+            "lsb_first",
+            "measurement_loss_mask",
+            "detector_valid",
+            "TICK[rstim:logical_flip_point]",
+            "before every positive-probability noise instruction",
+            "load_blinded_training_data.py",
+            "this command requires a dataset exported with",
+        ],
+        "sampling and training-data page",
+    );
+    assert_contains_all(
+        &base,
+        &["href=\"{{ root }}/sampling-data/\"", ">Data</a>"],
+        "sampling-data navigation",
+    );
+    assert_contains_all(
+        &index,
+        &["href=\"sampling-data/\"", "Save decoder and training data"],
+        "sampling-data home card",
+    );
+    assert_contains_all(
+        &styles,
+        &[
+            ".data-pipeline",
+            ".data-choice-grid",
+            ".bundle-grid",
+            ".data-note",
+        ],
+        "sampling-data styles",
+    );
+    assert_repo_file_exists("site/content/sampling-data/_index.md");
+}
+
+#[test]
 fn decode_campaigns_and_active_navigation_are_unified() {
     let index = read_repo_file("site/templates/index.html");
     let base = read_repo_file("site/templates/base.html");
