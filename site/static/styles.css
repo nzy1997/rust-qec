@@ -1003,6 +1003,112 @@ pre code {
   height: auto;
 }
 
+.data-hero {
+  max-width: 1120px;
+}
+
+.data-pipeline,
+.data-choice-grid,
+.bundle-grid,
+.b8-explainer {
+  display: grid;
+  gap: 1rem;
+}
+
+.data-pipeline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 2rem;
+}
+
+.data-pipeline span {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.data-pipeline small,
+.data-pipeline strong,
+.data-pipeline em {
+  display: block;
+}
+
+.data-pipeline small {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.data-pipeline strong {
+  margin-top: 0.35rem;
+}
+
+.data-pipeline em {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-style: normal;
+}
+
+.data-choice-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.data-choice-grid h3,
+.bundle-card h3 {
+  margin-top: 0.8rem;
+}
+
+.primary-data-card,
+.public-bundle {
+  border-color: rgba(27, 111, 122, 0.42);
+}
+
+.bundle-grid,
+.b8-explainer {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.bundle-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.15rem;
+}
+
+.file-tree {
+  margin-top: 1rem;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.data-note {
+  margin-top: 1rem;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.15rem;
+}
+
+.data-note p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.warning-note {
+  border-left-color: #b56a2b;
+}
+
+.tensor-table td:nth-child(2) {
+  white-space: nowrap;
+}
+
 .site-footer {
   display: flex;
   justify-content: space-between;
@@ -1050,6 +1156,13 @@ pre code {
   .checked-results-grid,
   .provenance-panel,
   .schema-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .data-pipeline,
+  .data-choice-grid,
+  .bundle-grid,
+  .b8-explainer {
     grid-template-columns: 1fr;
   }
 
