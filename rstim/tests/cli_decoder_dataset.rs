@@ -105,7 +105,7 @@ fn blinded_measurements_masks_recomputed_public_observable() {
     let circuit = root.path().join("producer-input.stim");
     fs::write(
         &circuit,
-        "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
     )
     .unwrap();
     let public_out = root.path().join("public");
@@ -297,7 +297,7 @@ fn insert_marker_before_first_tick(circuit: &mut String) {
     let index = circuit
         .find(needle)
         .expect("generated memory circuit has first TICK");
-    circuit.insert_str(index, "# RSTIM_LOGICAL_FLIP_POINT\n");
+    circuit.insert_str(index, "TICK[rstim:logical_flip_point]\n");
 }
 
 #[test]

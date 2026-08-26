@@ -10,7 +10,7 @@ codebase: Google's Stim 1.16.0 (`stim.Circuit.generated`).
 |---|---|---|
 | `stim_rotated_memory_z_d3_r2.stim` | Flattened distance-3 rotated-surface memory-Z circuit, 2 rounds, `after_clifford_depolarization=0.001`. Pure Stim dialect, unmodified. | Stim 1.16.0 |
 | `stim_rotated_memory_z_d3_r2.dem` | Detector error model computed by Stim itself (`detector_error_model(decompose_errors=False)`) for the circuit above. | Stim 1.16.0 |
-| `stim_rotated_memory_z_d3_r2_loss_visible.stim` | The same circuit annotated into subset v1: `MR`→`MRL`, terminal `M`→`ML`, `LOSS(0.01)` after each CX layer, `LOSS(0.02)` before each readout, `rec[-k]`→`rec[-(2k-1)]` for the inserted flag records, plus the `# RSTIM_LOGICAL_FLIP_POINT` marker after the initial reset. | `tools/annotate_loss_visible.py` |
+| `stim_rotated_memory_z_d3_r2_loss_visible.stim` | The same circuit annotated into subset v1: `MR`→`MRL`, terminal `M`→`ML`, `LOSS(0.01)` after each CX layer, `LOSS(0.02)` before each readout, `rec[-k]`→`rec[-(2k-1)]` for the inserted flag records, plus the `TICK[rstim:logical_flip_point]` marker after the initial reset. | `tools/annotate_loss_visible.py` |
 
 Consumed by `rustqec-cli/tests/external_fixtures.rs`:
 

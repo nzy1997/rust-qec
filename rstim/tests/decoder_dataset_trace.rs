@@ -118,6 +118,10 @@ fn detectors_trace_records_pauli_and_loss_events_per_shot() {
     let mut saw_x = false;
     let mut saw_loss = false;
     for (shot, line) in lines.iter().enumerate() {
+        assert!(
+            line.get("logical_input").is_none(),
+            "detector traces must omit blinded logical-input metadata"
+        );
         let ops = event_ops(line);
         saw_x |= ops.contains(&"X_ERROR");
         saw_loss |= ops.contains(&"LOSS");
@@ -159,7 +163,7 @@ fn blinded_trace_unmasks_answers_and_stays_private() {
     let circuit = root.path().join("circuit.stim");
     fs::write(
         &circuit,
-        "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
     )
     .unwrap();
     let public_out = root.path().join("public");
@@ -185,6 +189,19 @@ fn blinded_trace_unmasks_answers_and_stays_private() {
     for (shot, line) in lines.iter().enumerate() {
         let x_fired = event_ops(line).contains(&"X_ERROR");
         let mask = b8_bit(&masks_bytes, shot);
+        let logical_input = &line["logical_input"];
+        assert_eq!(logical_input["bit"], u8::from(mask));
+        assert_eq!(logical_input["applied"], mask);
+        assert_eq!(logical_input["pauli"], "X");
+        assert_eq!(logical_input["support"], serde_json::json!([0]));
+        assert!(
+            line["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|event| event["op"] != "X" && event["op"] != "Z"),
+            "intentional logical gates must not be noise events"
+        );
         saw_flip |= mask;
         // The executed measurement reads x_fired ^ mask; the answer is the
         // unmasked public observable, i.e. exactly whether the X error fired.

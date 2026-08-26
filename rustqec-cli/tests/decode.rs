@@ -13,7 +13,7 @@ const CIRCUIT: &str = concat!(
     "QUBIT_COORDS(0,0) 0\n",
     "QUBIT_COORDS(1,0) 1\n",
     "R 0 1\n",
-    "# RSTIM_LOGICAL_FLIP_POINT\n",
+    "TICK[rstim:logical_flip_point]\n",
     "X_ERROR(0.1) 0\n",
     "X_ERROR(0.01) 1\n",
     "LOSS(0.1) 0\n",

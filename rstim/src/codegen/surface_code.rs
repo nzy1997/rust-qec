@@ -1,4 +1,3 @@
-use crate::decoder_dataset::LOGICAL_FLIP_MARKER;
 use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 use super::NoiseParams;
 
@@ -407,7 +406,7 @@ pub struct RotatedMemoryZLossConfig {
 /// The circuit keeps the fixed `rotated_memory_z` CNOT layer order in every
 /// round (no alternating A/B schedule and no shuttles), emits loss-visible
 /// `MRL`/`ML` readouts whose records interleave `loss_flag,value_bit`, and
-/// places exactly one `# RSTIM_LOGICAL_FLIP_POINT` immediately after the data
+/// places exactly one `TICK[rstim:logical_flip_point]` immediately after the data
 /// reset so the circuit can drive `export_decoder_dataset --mode
 /// measurements_blinded`.
 pub fn rotated_memory_z_loss_visible(
@@ -460,16 +459,11 @@ pub fn rotated_memory_z_loss_visible(
     Ok(LossVisibleMemoryZ::new(distance, rounds, config).build())
 }
 
-enum LossVisibleItem {
-    Instruction(StimInstr),
-    Comment(&'static str),
-}
-
 struct LossVisibleMemoryZ {
     config: RotatedMemoryZLossConfig,
     layout: RotatedLayout,
     rounds: usize,
-    items: Vec<LossVisibleItem>,
+    items: Vec<StimInstr>,
 }
 
 impl LossVisibleMemoryZ {
@@ -492,17 +486,21 @@ impl LossVisibleMemoryZ {
             self.emit("QUBIT_COORDS", &[cx as f64, cy as f64], &[q]);
         }
 
-        // Data reset, then the logical-flip marker before any data noise or
-        // loss so the blinded-dataset boundary stays ahead of the first LOSS
-        // on the logical support.
+        // Data reset, then the logical-flip marker before every
+        // positive-probability noise instruction.
         let data = self.layout.data_qubits.clone();
         let measure = self.layout.measure_qubits.clone();
         self.emit("R", &[], &data);
-        self.comment(LOGICAL_FLIP_MARKER.trim_start_matches("# "));
+        self.items
+            .push(crate::decoder_dataset::logical_flip_marker_instruction());
         self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &data);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &data);
         self.emit("R", &[], &measure);
-        self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &measure);
+        self.emit_noise(
+            "X_ERROR",
+            self.config.after_reset_flip_probability,
+            &measure,
+        );
         self.emit_noise("LOSS", self.config.operation_loss_probability, &measure);
 
         for round in 0..self.rounds {
@@ -566,17 +564,8 @@ impl LossVisibleMemoryZ {
         self.emit_rec("OBSERVABLE_INCLUDE", &[0.0], &observable);
 
         let mut output = String::new();
-        for item in &self.items {
-            match item {
-                LossVisibleItem::Instruction(instruction) => {
-                    output.push_str(&circuit_to_string(std::slice::from_ref(instruction)));
-                }
-                LossVisibleItem::Comment(text) => {
-                    output.push_str("# ");
-                    output.push_str(text);
-                    output.push('\n');
-                }
-            }
+        for instruction in &self.items {
+            output.push_str(&circuit_to_string(std::slice::from_ref(instruction)));
         }
         output
     }
@@ -597,7 +586,11 @@ impl LossVisibleMemoryZ {
 
         self.emit("H", &[], &x_measure);
         self.emit_noise("LOSS", config.after_clifford_loss_probability, &x_measure);
-        self.emit_noise("DEPOLARIZE1", config.after_clifford_depolarization, &x_measure);
+        self.emit_noise(
+            "DEPOLARIZE1",
+            config.after_clifford_depolarization,
+            &x_measure,
+        );
         self.emit_noise("LOSS", config.operation_loss_probability, &x_measure);
 
         for layer in &layers {
@@ -614,37 +607,33 @@ impl LossVisibleMemoryZ {
         self.emit("TICK", &[], &[]);
         self.emit("H", &[], &x_measure);
         self.emit_noise("LOSS", config.after_clifford_loss_probability, &x_measure);
-        self.emit_noise("DEPOLARIZE1", config.after_clifford_depolarization, &x_measure);
+        self.emit_noise(
+            "DEPOLARIZE1",
+            config.after_clifford_depolarization,
+            &x_measure,
+        );
         self.emit_noise("LOSS", config.operation_loss_probability, &x_measure);
 
         self.emit("TICK", &[], &[]);
         self.emit_noise("LOSS", config.measurement_loss_probability, &measure);
-        self.emit_noise(
-            "X_ERROR",
-            config.before_measure_flip_probability,
-            &measure,
-        );
+        self.emit_noise("X_ERROR", config.before_measure_flip_probability, &measure);
         self.emit("MRL", &[], &measure);
         self.emit_noise("X_ERROR", config.after_reset_flip_probability, &measure);
         self.emit_noise("LOSS", config.operation_loss_probability, &measure);
     }
 
     fn emit_detector(&mut self, coord: (i32, i32), time: f64, offsets: &[i32]) {
-        self.emit_rec(
-            "DETECTOR",
-            &[coord.0 as f64, coord.1 as f64, time],
-            offsets,
-        );
+        self.emit_rec("DETECTOR", &[coord.0 as f64, coord.1 as f64, time], offsets);
     }
 
     fn emit(&mut self, name: &str, args: &[f64], wires: &[u32]) {
         let targets: Vec<StimTarget> = wires.iter().copied().map(StimTarget::Qubit).collect();
-        self.items.push(LossVisibleItem::Instruction(op(name, args, &targets)));
+        self.items.push(op(name, args, &targets));
     }
 
     fn emit_rec(&mut self, name: &str, args: &[f64], offsets: &[i32]) {
         let targets: Vec<StimTarget> = offsets.iter().copied().map(StimTarget::Rec).collect();
-        self.items.push(LossVisibleItem::Instruction(op(name, args, &targets)));
+        self.items.push(op(name, args, &targets));
     }
 
     fn emit_noise(&mut self, name: &str, probability: f64, wires: &[u32]) {
@@ -652,12 +641,7 @@ impl LossVisibleMemoryZ {
             self.emit(name, &[probability], wires);
         }
     }
-
-    fn comment(&mut self, text: &'static str) {
-        self.items.push(LossVisibleItem::Comment(text));
-    }
 }
-
 
 /// Generate an unrotated surface code memory-X experiment circuit.
 pub fn unrotated_memory_x(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {

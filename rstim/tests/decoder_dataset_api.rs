@@ -49,7 +49,7 @@ fn released_x_only_cli_wrapper_delegates_for_present_and_absent_flips() {
     let circuit = root.path().join("circuit.stim");
     fs::write(
         &circuit,
-        "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
     )
     .unwrap();
     let circuit = circuit.to_str().unwrap();
@@ -86,7 +86,7 @@ fn released_x_only_cli_wrapper_delegates_for_present_and_absent_flips() {
 #[test]
 fn generalized_rust_api_accepts_a_logical_z_flip() {
     let config = ExportDecoderDatasetLogicalFlipConfig {
-        circuit_text: "RX 0\n# RSTIM_LOGICAL_FLIP_POINT\nMX 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+        circuit_text: "RX 0\nTICK[rstim:logical_flip_point]\nMX 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
             .to_string(),
         shots: 1,
         mode: DecoderDatasetMode::MeasurementsBlinded,

@@ -78,9 +78,9 @@ def annotate(circuit_text: str) -> str:
             converted += len(targets.split())
         elif name in ("DETECTOR", "OBSERVABLE_INCLUDE"):
             out.append(shift_rec_refs(line))
-        elif name == "R" and converted == 0 and not any("RSTIM_LOGICAL_FLIP_POINT" in entry for entry in out):
+        elif name == "R" and converted == 0 and not any("rstim:logical_flip_point" in entry for entry in out):
             out.append(line)
-            out.append("# RSTIM_LOGICAL_FLIP_POINT")
+            out.append("TICK[rstim:logical_flip_point]")
         else:
             out.append(line)
     if converted == 0:

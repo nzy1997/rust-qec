@@ -71,7 +71,7 @@ fn circuit_gen_midswap_writes_a_loss_visible_circuit() {
 
     let circuit = std::fs::read_to_string(&out).unwrap();
     assert!(circuit.contains("MRL"));
-    assert!(circuit.contains("# RSTIM_LOGICAL_FLIP_POINT"));
+    assert!(circuit.contains("TICK[rstim:logical_flip_point]"));
 }
 
 #[test]

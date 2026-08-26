@@ -8,7 +8,8 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-pub const LOGICAL_FLIP_MARKER: &str = "# RSTIM_LOGICAL_FLIP_POINT";
+pub const LOGICAL_FLIP_MARKER_TAG: &str = "rstim:logical_flip_point";
+pub const LOGICAL_FLIP_MARKER: &str = "TICK[rstim:logical_flip_point]";
 pub const DEFAULT_DECODER_DATASET_BATCH_SHOTS: usize = 10_000;
 const PUBLIC_SCHEMA_VERSION: u32 = 1;
 const DATASET_FORMAT: &str = "rstim_decoder_dataset";
@@ -56,6 +57,10 @@ impl LogicalPauli {
             Self::X => "--logical_x_qubits",
             Self::Z => "--logical_z_qubits",
         }
+    }
+
+    fn as_str(self) -> &'static str {
+        self.gate_name()
     }
 }
 
@@ -212,24 +217,112 @@ pub fn parse_logical_x_qubits(value: &str) -> Result<Vec<u32>, String> {
     LogicalFlip::parse(LogicalPauli::X, value).map(|flip| flip.qubits)
 }
 
-fn marker_depth_before_line(line: &str, current_depth: usize) -> usize {
-    let code = line.split('#').next().unwrap_or("").trim();
-    if code == "}" {
-        current_depth.saturating_sub(1)
-    } else {
-        current_depth
+pub(crate) fn logical_flip_marker_instruction() -> crate::ir::StimInstr {
+    crate::ir::StimInstr::Op {
+        name: "TICK".to_string(),
+        tag: Some(LOGICAL_FLIP_MARKER_TAG.to_string()),
+        args: Vec::new(),
+        targets: Vec::new(),
     }
 }
 
-fn marker_depth_after_line(line: &str, current_depth: usize) -> usize {
-    let code = line.split('#').next().unwrap_or("").trim();
-    if code.ends_with('{') {
-        current_depth + 1
-    } else if code == "}" {
-        current_depth.saturating_sub(1)
-    } else {
-        current_depth
+fn logical_flip_marker_index(instrs: &[crate::ir::StimInstr]) -> Result<usize, String> {
+    fn scan(
+        instrs: &[crate::ir::StimInstr],
+        depth: usize,
+        marker_count: &mut usize,
+        top_level_index: &mut Option<usize>,
+    ) -> Result<(), String> {
+        for (index, instr) in instrs.iter().enumerate() {
+            match instr {
+                crate::ir::StimInstr::Op { name, tag, .. }
+                    if tag.as_deref() == Some(LOGICAL_FLIP_MARKER_TAG) =>
+                {
+                    if name != "TICK" {
+                        return Err(format!(
+                            "logical flip tag [{LOGICAL_FLIP_MARKER_TAG}] must annotate TICK"
+                        ));
+                    }
+                    *marker_count += 1;
+                    if depth == 0 {
+                        *top_level_index = Some(index);
+                    }
+                }
+                crate::ir::StimInstr::Repeat { body, .. } => {
+                    scan(body, depth + 1, marker_count, top_level_index)?;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
+
+    let mut marker_count = 0;
+    let mut top_level_index = None;
+    scan(instrs, 0, &mut marker_count, &mut top_level_index)?;
+    if marker_count != 1 {
+        return Err(format!(
+            "logical flip marker {LOGICAL_FLIP_MARKER} must appear exactly once"
+        ));
+    }
+    top_level_index.ok_or_else(|| "logical flip marker must be top-level".to_string())
+}
+
+fn positive_probability_noise_name(instrs: &[crate::ir::StimInstr]) -> Option<&str> {
+    for instr in instrs {
+        match instr {
+            crate::ir::StimInstr::Op { name, args, .. }
+                if matches!(
+                    name.as_str(),
+                    "I_ERROR"
+                        | "II_ERROR"
+                        | "LOSS"
+                        | "X_ERROR"
+                        | "Y_ERROR"
+                        | "Z_ERROR"
+                        | "DEPOLARIZE1"
+                        | "DEPOLARIZE2"
+                        | "PAULI_CHANNEL_1"
+                        | "PAULI_CHANNEL_2"
+                        | "HERALDED_ERASE"
+                        | "HERALDED_PAULI_CHANNEL_1"
+                        | "CORRELATED_ERROR"
+                        | "E"
+                        | "ELSE_CORRELATED_ERROR"
+                        | "M"
+                        | "MZ"
+                        | "MX"
+                        | "MY"
+                        | "MR"
+                        | "MRZ"
+                        | "MRX"
+                        | "MRY"
+                        | "ML"
+                        | "MZL"
+                        | "MXL"
+                        | "MYL"
+                        | "MRL"
+                        | "MRZL"
+                        | "MRXL"
+                        | "MRYL"
+                        | "MPAD"
+                        | "MPP"
+                        | "MXX"
+                        | "MYY"
+                        | "MZZ"
+                ) && args.iter().any(|probability| *probability > 0.0) =>
+            {
+                return Some(name);
+            }
+            crate::ir::StimInstr::Repeat { count, body } if *count > 0 => {
+                if let Some(name) = positive_probability_noise_name(body) {
+                    return Some(name);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[doc(hidden)]
@@ -237,26 +330,12 @@ pub fn circuit_with_injected_logical_flip(
     circuit_text: &str,
     logical_flip: &LogicalFlip,
 ) -> Result<String, String> {
-    let mut marker_count = 0;
-    let mut marker_at_top_level = false;
-    let mut depth = 0;
-    for line in circuit_text.lines() {
-        let depth_before = marker_depth_before_line(line, depth);
-        if line.contains(LOGICAL_FLIP_MARKER) {
-            if line.trim() != LOGICAL_FLIP_MARKER {
-                return Err("logical flip marker must be standalone".to_string());
-            }
-            marker_count += 1;
-            marker_at_top_level = depth_before == 0;
-        }
-        depth = marker_depth_after_line(line, depth);
-    }
-
-    if marker_count != 1 {
-        return Err("logical flip marker must appear exactly once".to_string());
-    }
-    if !marker_at_top_level {
-        return Err("logical flip marker must be top-level".to_string());
+    let instrs = crate::validation::parse_and_validate(circuit_text)?;
+    let marker_index = logical_flip_marker_index(&instrs)?;
+    if let Some(noise_name) = positive_probability_noise_name(&instrs[..marker_index]) {
+        return Err(format!(
+            "logical flip marker {LOGICAL_FLIP_MARKER} must appear before the first positive-probability noise instruction; found {noise_name} before the marker"
+        ));
     }
 
     let injected = format!(
@@ -270,14 +349,22 @@ pub fn circuit_with_injected_logical_flip(
             .join(" ")
     );
     let mut output = String::with_capacity(circuit_text.len() + injected.len());
+    let mut inserted = false;
     for line in circuit_text.split_inclusive('\n') {
         output.push_str(line);
-        if line.trim() == LOGICAL_FLIP_MARKER {
+        let code = line.split('#').next().unwrap_or("").trim();
+        if code == LOGICAL_FLIP_MARKER {
             if !line.ends_with('\n') {
                 output.push('\n');
             }
             output.push_str(&injected);
+            inserted = true;
         }
+    }
+    if !inserted {
+        return Err(format!(
+            "logical flip marker must use the canonical source spelling {LOGICAL_FLIP_MARKER}"
+        ));
     }
     Ok(output)
 }
@@ -301,6 +388,7 @@ struct ValidatedDecoderDatasetInput {
     public_circuit_text: String,
     public_instrs: Vec<crate::ir::StimInstr>,
     private_one_instrs: Option<Vec<crate::ir::StimInstr>>,
+    logical_flip: Option<LogicalFlip>,
     measurements: usize,
     detectors: usize,
     observables: usize,
@@ -350,48 +438,6 @@ fn validate_logical_flip_effect(
         ));
     }
     Ok(())
-}
-
-fn first_logical_support_loss_before_marker(
-    circuit_text: &str,
-    logical_flip: &LogicalFlip,
-) -> Result<Option<u32>, String> {
-    fn find_loss(instrs: &[crate::ir::StimInstr], logical_support: &BTreeSet<u32>) -> Option<u32> {
-        for instruction in instrs {
-            match instruction {
-                crate::ir::StimInstr::Op {
-                    name,
-                    args,
-                    targets,
-                    ..
-                } if name == "LOSS"
-                    && args.first().is_some_and(|probability| *probability > 0.0) =>
-                {
-                    if let Some(qubit) = targets
-                        .iter()
-                        .filter_map(crate::ir::StimTarget::qubit_index)
-                        .find(|qubit| logical_support.contains(qubit))
-                    {
-                        return Some(qubit);
-                    }
-                }
-                crate::ir::StimInstr::Repeat { count, body } if *count > 0 => {
-                    if let Some(qubit) = find_loss(body, logical_support) {
-                        return Some(qubit);
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-
-    let marker_offset = circuit_text
-        .find(LOGICAL_FLIP_MARKER)
-        .ok_or_else(|| "logical flip marker must appear exactly once".to_string())?;
-    let prefix = crate::parser::parse_lines(&circuit_text[..marker_offset])?;
-    let logical_support = logical_flip.qubits.iter().copied().collect();
-    Ok(find_loss(&prefix, &logical_support))
 }
 
 #[doc(hidden)]
@@ -457,7 +503,14 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
                     logical_flip.pauli.option_name()
                 ));
             }
+            let mut unique_qubits = BTreeSet::new();
             for &qubit in &logical_flip.qubits {
+                if !unique_qubits.insert(qubit) {
+                    return Err(format!(
+                        "{} contains duplicate qubit index {qubit}",
+                        logical_flip.pauli.option_name()
+                    ));
+                }
                 if qubit as usize >= stats.num_qubits {
                     return Err(format!(
                         "{} contains qubit {qubit}, but circuit has {} qubits",
@@ -468,13 +521,6 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
             }
             let circuit_text =
                 circuit_with_injected_logical_flip(&config.circuit_text, logical_flip)?;
-            if let Some(qubit) =
-                first_logical_support_loss_before_marker(&config.circuit_text, logical_flip)?
-            {
-                return Err(format!(
-                    "logical-support qubit {qubit} can be lost before {LOGICAL_FLIP_MARKER}; move the marker before the first LOSS on the logical support"
-                ));
-            }
             let instrs = crate::parser::parse_lines(&circuit_text)?;
             validate_logical_flip_effect(&public_instrs, &instrs, logical_flip.pauli)?;
             Some(instrs)
@@ -485,6 +531,7 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
         public_circuit_text: config.circuit_text.clone(),
         public_instrs,
         private_one_instrs,
+        logical_flip: config.logical_flip.clone(),
         measurements: stats.num_measurements,
         detectors: stats.num_detectors,
         observables: stats.num_observables,
@@ -556,6 +603,7 @@ fn append_error_trace_line(
     buffer: &mut Vec<u8>,
     shot: usize,
     trace: &crate::sample_trace::SampleTrace,
+    logical_input: Option<(&LogicalFlip, bool)>,
 ) -> Result<(), String> {
     #[derive(Serialize)]
     struct TraceEvent<'a> {
@@ -569,11 +617,26 @@ fn append_error_trace_line(
     struct TraceLine<'a> {
         schema_version: &'static str,
         shot: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        logical_input: Option<LogicalInputTrace<'a>>,
         events: Vec<TraceEvent<'a>>,
+    }
+    #[derive(Serialize)]
+    struct LogicalInputTrace<'a> {
+        bit: u8,
+        applied: bool,
+        pauli: &'static str,
+        support: &'a [u32],
     }
     let line = TraceLine {
         schema_version: ERROR_TRACE_SCHEMA,
         shot,
+        logical_input: logical_input.map(|(logical_flip, bit)| LogicalInputTrace {
+            bit: u8::from(bit),
+            applied: bit,
+            pauli: logical_flip.pauli.as_str(),
+            support: &logical_flip.qubits,
+        }),
         events: trace
             .noise_events
             .iter()
@@ -662,7 +725,7 @@ fn generate_traced_decoder_dataset_chunk(
                         answers.set(observable, shot, true);
                     }
                 }
-                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace, None)?;
             }
             Ok(DecoderDatasetChunk {
                 public_shots: detections,
@@ -676,6 +739,10 @@ fn generate_traced_decoder_dataset_chunk(
                 .private_one_instrs
                 .as_ref()
                 .ok_or_else(|| "missing blinded logical-one circuit".to_string())?;
+            let logical_flip = validated
+                .logical_flip
+                .as_ref()
+                .ok_or_else(|| "missing blinded logical-input metadata".to_string())?;
             let mut zero_executor =
                 crate::executor::Executor::from_instrs(validated.public_instrs.clone())?;
             let mut one_executor =
@@ -721,7 +788,12 @@ fn generate_traced_decoder_dataset_chunk(
                 if flips[0] ^ label {
                     answers.set(0, shot, true);
                 }
-                append_error_trace_line(&mut trace_bytes, shot_offset + shot, &trace)?;
+                append_error_trace_line(
+                    &mut trace_bytes,
+                    shot_offset + shot,
+                    &trace,
+                    Some((logical_flip, label)),
+                )?;
             }
             Ok(DecoderDatasetChunk {
                 public_shots: measurements,
@@ -1497,8 +1569,8 @@ mod tests {
     }
 
     #[test]
-    fn marker_must_be_unique_standalone_and_top_level() {
-        let good = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    fn marker_must_be_a_unique_top_level_tagged_tick() {
+        let good = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let logical_z = LogicalFlip {
             pauli: LogicalPauli::Z,
             qubits: vec![0],
@@ -1509,11 +1581,11 @@ mod tests {
                 .contains("\nZ 0\n")
         );
 
-        let marker_without_trailing_newline = "R 0\n# RSTIM_LOGICAL_FLIP_POINT";
+        let marker_without_trailing_newline = "R 0\nTICK[rstim:logical_flip_point]";
         assert_eq!(
             circuit_with_injected_logical_flip(marker_without_trailing_newline, &logical_z)
                 .unwrap(),
-            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nZ 0\n"
+            "R 0\nTICK[rstim:logical_flip_point]\nZ 0\n"
         );
 
         let missing = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
@@ -1523,7 +1595,7 @@ mod tests {
                 .contains("marker")
         );
 
-        let duplicate = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let duplicate = "R 0\nTICK[rstim:logical_flip_point]\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         assert!(
             circuit_with_injected_logical_x(duplicate, &[0])
                 .unwrap_err()
@@ -1531,24 +1603,33 @@ mod tests {
         );
 
         let nested =
-            "R 0\nREPEAT 2 {\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+            "R 0\nREPEAT 2 {\nTICK[rstim:logical_flip_point]\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         assert!(
             circuit_with_injected_logical_x(nested, &[0])
                 .unwrap_err()
                 .contains("top-level")
         );
 
-        let inline = "R 0 # RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let legacy_comment =
+            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         assert!(
-            circuit_with_injected_logical_x(inline, &[0])
+            circuit_with_injected_logical_x(legacy_comment, &[0])
                 .unwrap_err()
-                .contains("standalone")
+                .contains("exactly once")
+        );
+
+        let wrong_instruction =
+            "R 0\nH[rstim:logical_flip_point] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        assert!(
+            circuit_with_injected_logical_x(wrong_instruction, &[0])
+                .unwrap_err()
+                .contains("must annotate TICK")
         );
     }
 
     #[test]
     fn logical_validation_requires_observable_flip_without_detector_change() {
-        let valid = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let valid = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
             valid,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1556,7 +1637,7 @@ mod tests {
         );
         assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
 
-        let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let no_flip = "R 0\nTICK[rstim:logical_flip_point]\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
             no_flip,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1568,7 +1649,7 @@ mod tests {
                 .contains("injected logical X does not flip observable 0")
         );
 
-        let changes_detector = "R 0 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let changes_detector = "R 0 1\nTICK[rstim:logical_flip_point]\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             changes_detector,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1615,7 +1696,7 @@ mod tests {
                 .contains("does not support sweep-bit circuits")
         );
 
-        let one_qubit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let one_qubit = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
             one_qubit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1639,35 +1720,45 @@ mod tests {
             validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err(),
             "--logical_z_qubits must be non-empty"
         );
+
+        let config = test_config(
+            one_qubit,
+            DecoderDatasetMode::MeasurementsBlinded,
+            Some(LogicalFlip {
+                pauli: LogicalPauli::X,
+                qubits: vec![0, 0],
+            }),
+        );
+        assert_eq!(
+            validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err(),
+            "--logical_x_qubits contains duplicate qubit index 0"
+        );
     }
 
     #[test]
-    fn blinded_validation_rejects_loss_on_logical_support_before_marker() {
-        let unsafe_circuit = "R 0 1\nLOSS(0.1) 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+    fn blinded_validation_requires_marker_before_first_positive_probability_noise() {
+        let unsafe_circuit = "R 0 1\nLOSS(0.1) 0\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             unsafe_circuit,
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
         let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
-        assert!(error.contains("qubit 0 can be lost before"), "{error}");
+        assert!(error.contains("positive-probability noise"), "{error}");
+        assert!(error.contains("LOSS"), "{error}");
         assert!(error.contains(LOGICAL_FLIP_MARKER), "{error}");
-        assert!(
-            error.contains("move the marker before the first LOSS"),
-            "{error}"
-        );
 
-        let loss_in_repeat = "R 0 1\nREPEAT 2 {\n  LOSS(0.1) 0\n}\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let loss_in_repeat = "R 0 1\nREPEAT 2 {\n  LOSS(0.1) 0\n}\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             loss_in_repeat,
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
         let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
-        assert!(error.contains("qubit 0 can be lost before"), "{error}");
+        assert!(error.contains("LOSS"), "{error}");
 
         let zero_probability_loss =
-            "R 0 1\nLOSS(0) 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+            "R 0 1\nLOSS(0) 0\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             zero_probability_loss,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1675,9 +1766,45 @@ mod tests {
         );
         assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
 
-        let loss_off_support = "R 0 1\nLOSS(0.1) 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let loss_off_support = "R 0 1\nLOSS(0.1) 1\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             loss_off_support,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
+        assert!(error.contains("LOSS"), "{error}");
+
+        for (name, circuit) in [
+            (
+                "Pauli error",
+                "R 0\nX_ERROR(0.1) 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            ),
+            (
+                "noisy measurement",
+                "R 0\nM(0.1) 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            ),
+        ] {
+            let config = test_config(
+                circuit,
+                DecoderDatasetMode::MeasurementsBlinded,
+                logical_x(vec![0]),
+            );
+            let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
+            assert!(error.contains("positive-probability noise"), "{name}: {error}");
+        }
+
+        let zero_probability_error = "R 0\nX_ERROR(0) 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(
+            zero_probability_error,
+            DecoderDatasetMode::MeasurementsBlinded,
+            logical_x(vec![0]),
+        );
+        assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
+
+        let noise_after_marker = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.1) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let config = test_config(
+            noise_after_marker,
             DecoderDatasetMode::MeasurementsBlinded,
             logical_x(vec![0]),
         );
@@ -1796,7 +1923,7 @@ mod tests {
     #[test]
     fn blinded_measurement_answers_are_public_observable_xor_mask() {
         let circuit =
-            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1829,7 +1956,7 @@ mod tests {
     #[test]
     fn fixed_seed_reproduces_artifacts_byte_for_byte() {
         let circuit =
-            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1860,7 +1987,7 @@ mod tests {
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
         let circuit =
-            "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1978,7 +2105,7 @@ mod tests {
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
         let config = ExportDecoderDatasetConfig {
-            circuit_text: "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+            circuit_text: "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
                 .to_string(),
             shots: 1,
             mode: DecoderDatasetMode::MeasurementsBlinded,

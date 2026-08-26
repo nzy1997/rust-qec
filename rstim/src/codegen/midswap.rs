@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+#[cfg(test)]
 use crate::decoder_dataset::LOGICAL_FLIP_MARKER;
 use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 
@@ -195,7 +196,9 @@ impl MidSwapBuilder {
         let data = self.mapped_sites(&self.data.clone());
         let checks = self.mapped_sites(&self.checks.clone());
         self.emit("R", vec![], qubit_targets(&data));
-        self.comment(LOGICAL_FLIP_MARKER.trim_start_matches("# "));
+        self.items.push(CircuitItem::Instruction(
+            crate::decoder_dataset::logical_flip_marker_instruction(),
+        ));
         self.emit_noise("X_ERROR", self.config.pauli_probability, &data);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &data);
         self.emit("R", vec![], qubit_targets(&checks));
@@ -558,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn initialization_places_one_flip_marker_before_first_loss() {
+    fn initialization_places_one_flip_marker_before_first_noise() {
         let mut config = noiseless_config(1);
         config.pauli_probability = 0.01;
         config.operation_loss_probability = 0.02;
@@ -569,8 +572,8 @@ mod tests {
             .position(|line| line.starts_with("R "))
             .unwrap();
 
-        assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
-        assert_eq!(lines[data_reset + 1], "# RSTIM_LOGICAL_FLIP_POINT");
+        assert_eq!(text.matches(LOGICAL_FLIP_MARKER).count(), 1);
+        assert_eq!(lines[data_reset + 1], LOGICAL_FLIP_MARKER);
         assert!(lines[data_reset + 2].starts_with("X_ERROR(0.01) "));
         assert!(lines[data_reset + 3].starts_with("LOSS(0.02) "));
     }
@@ -586,7 +589,21 @@ mod tests {
 
         for (index, instruction) in circuit.iter().enumerate() {
             match instruction.name().unwrap() {
-                "R" => assert_eq!(circuit[index + 1].name(), Some("X_ERROR")),
+                "R" => {
+                    let next = &circuit[index + 1];
+                    let noise_index = if matches!(
+                        next,
+                        StimInstr::Op { name, tag, .. }
+                            if name == "TICK"
+                                && tag.as_deref()
+                                    == Some(crate::decoder_dataset::LOGICAL_FLIP_MARKER_TAG)
+                    ) {
+                        index + 2
+                    } else {
+                        index + 1
+                    };
+                    assert_eq!(circuit[noise_index].name(), Some("X_ERROR"));
+                }
                 "MRL" => {
                     assert_eq!(circuit[index - 1].name(), Some("X_ERROR"));
                     assert_eq!(circuit[index + 1].name(), Some("X_ERROR"));

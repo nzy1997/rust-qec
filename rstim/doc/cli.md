@@ -260,7 +260,7 @@ Mid-SWAP generator's loss semantics (full rate after resets and single-qubit
 gates, half rate on each qubit of a two-qubit gate, measurement-stage `LOSS`
 immediately before each readout), emits loss-visible `MRL`/`ML` records in
 `loss_flag,value_bit` order, and places exactly one
-`# RSTIM_LOGICAL_FLIP_POINT` immediately after the data reset so the circuit
+`TICK[rstim:logical_flip_point]` immediately after the data reset so the circuit
 can drive `export_decoder_dataset --mode measurements_blinded`:
 
 ```sh
@@ -304,7 +304,7 @@ state-selective readout confusion.
 `--after_clifford_loss_probability` is intentionally rejected to keep the two
 loss channels unambiguous. The generated `# MIDSWAP_SHUTTLE` comments expose
 each persistent logical-to-physical remapping without changing circuit
-semantics. The generator emits exactly one `# RSTIM_LOGICAL_FLIP_POINT`
+semantics. The generator emits exactly one `TICK[rstim:logical_flip_point]`
 immediately after the data reset and before data reset noise or loss, so the
 circuit can be validated for blinded measurement export.
 

@@ -20,7 +20,7 @@ One JSON object per line, one line per shot, in shot order. The number of
 lines equals the `shots` count in both manifests.
 
 ```json
-{"schema_version":"rstim.error-trace.v1","shot":1,"events":[{"op":"X_ERROR","targets":[0],"branch":"X","path":[1],"iterations":[]},{"op":"LOSS","targets":[0],"branch":"L","path":[2],"iterations":[]}]}
+{"schema_version":"rstim.error-trace.v1","shot":1,"logical_input":{"bit":1,"applied":true,"pauli":"X","support":[0,2,4]},"events":[{"op":"X_ERROR","targets":[0],"branch":"X","path":[2],"iterations":[]},{"op":"LOSS","targets":[0],"branch":"L","path":[3],"iterations":[]}]}
 ```
 
 - `schema_version` — exactly `"rstim.error-trace.v1"`, repeated on every
@@ -31,6 +31,11 @@ lines equals the `shots` count in both manifests.
 - `events` — the noise events that **occurred** in this shot, in execution
   order. Events that did not occur are implicit (absent). An empty array
   means a noiseless shot.
+- `logical_input` — present only for `measurements_blinded` traces. `bit` is
+  exactly the aligned `masks.b8` bit; `applied` states whether the ideal
+  logical gate was inserted and is equal to `bit`; `pauli` is `"X"` or
+  `"Z"`; and `support` is the configured physical representative. Detector
+  traces omit this field.
 
 Each event:
 
@@ -52,9 +57,9 @@ Each event:
   its round.
 
 The injected logical flip of `measurements_blinded` mode is a gate, not a
-noise event: it never appears in `events`. Its per-shot presence is exactly
-the `masks.b8` bit, so the hidden flip remains recoverable without
-polluting the physical noise record.
+noise event: it never appears in `events`. Its per-shot presence is recorded
+by both `logical_input.bit` and the aligned `masks.b8` bit, without polluting
+the physical noise record.
 
 ## Manifest entry
 
@@ -95,3 +100,5 @@ For every shot, in both modes:
   hidden logical flip (if any) removed;
 - in `measurements_blinded` mode the executed measurement record equals
   `answer XOR mask` up to the physical noise recorded in the trace.
+- in `measurements_blinded` mode `logical_input.bit == logical_input.applied ==
+  masks.b8[shot]`, while detector traces contain no `logical_input` field.

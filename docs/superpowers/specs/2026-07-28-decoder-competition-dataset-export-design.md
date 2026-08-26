@@ -127,7 +127,7 @@ marker after logical initialization and before the first measurement:
 
 ```stim
 R 0 1 2
-# RSTIM_LOGICAL_FLIP_POINT
+TICK[rstim:logical_flip_point]
 ```
 
 The organizer invokes:
@@ -174,8 +174,8 @@ correlation is the signal a decoder is supposed to use.
 
 ## Logical-operator validation
 
-`measurements_blinded` is rejected unless the marker appears exactly once as a
-standalone top-level comment. A marker inside a `REPEAT` block is invalid. The
+`measurements_blinded` is rejected unless the tagged `TICK` marker appears
+exactly once at top level. A marker inside a `REPEAT` block is invalid. The
 injected ideal `X_L` must execute once and must not be erased by later logical
 initialization.
 

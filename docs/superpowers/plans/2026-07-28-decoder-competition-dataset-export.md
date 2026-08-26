@@ -21,7 +21,7 @@
 - Private output directory contains exactly `manifest.json`, `answers.b8`, and only for `measurements_blinded`, `masks.b8`.
 - The first version supports exactly one observable.
 - Circuits with zero observables, multiple observables, or sweep bits are rejected.
-- `measurements_blinded` requires exactly one standalone top-level marker line: `# RSTIM_LOGICAL_FLIP_POINT`.
+- `measurements_blinded` requires exactly one top-level tagged instruction: `TICK[rstim:logical_flip_point]`.
 - The injected private producer operation is one ideal `X` instruction immediately after the marker.
 - The public circuit is the unmodified logical-zero circuit text supplied by the organizer.
 - Logical validation requires `D_public(m_ref_0) = D_public(m_ref_1)` and `O_public(m_ref_0) XOR O_public(m_ref_1) = 1`.
@@ -140,7 +140,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
-pub const LOGICAL_FLIP_MARKER: &str = "# RSTIM_LOGICAL_FLIP_POINT";
+pub const LOGICAL_FLIP_MARKER: &str = "TICK[rstim:logical_flip_point]";
 const PUBLIC_SCHEMA_VERSION: u32 = 1;
 const DATASET_FORMAT: &str = "rstim_decoder_dataset";
 
@@ -362,33 +362,33 @@ fn parse_logical_x_qubits_rejects_empty_duplicate_and_bad_tokens() {
 
 #[test]
 fn marker_must_be_unique_standalone_and_top_level() {
-    let good = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let good = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     assert!(circuit_with_injected_logical_x(good, &[0]).unwrap().contains("\nX 0\n"));
 
     let missing = "R 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     assert!(circuit_with_injected_logical_x(missing, &[0]).unwrap_err().contains("marker"));
 
-    let duplicate = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let duplicate = "R 0\nTICK[rstim:logical_flip_point]\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     assert!(circuit_with_injected_logical_x(duplicate, &[0]).unwrap_err().contains("exactly once"));
 
-    let nested = "R 0\nREPEAT 2 {\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let nested = "R 0\nREPEAT 2 {\nTICK[rstim:logical_flip_point]\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     assert!(circuit_with_injected_logical_x(nested, &[0]).unwrap_err().contains("top-level"));
 
-    let inline = "R 0 # RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let inline = "R 0 TICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     assert!(circuit_with_injected_logical_x(inline, &[0]).unwrap_err().contains("standalone"));
 }
 
 #[test]
 fn logical_validation_requires_observable_flip_without_detector_change() {
-    let valid = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let valid = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let config = test_config(valid, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
     assert!(validate_decoder_dataset_inputs(&config).is_ok());
 
-    let no_flip = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let no_flip = "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let config = test_config(no_flip, DecoderDatasetMode::MeasurementsBlinded, vec![]);
     assert!(validate_decoder_dataset_inputs(&config).unwrap_err().contains("--logical_x_qubits"));
 
-    let changes_detector = "R 0 1\n# RSTIM_LOGICAL_FLIP_POINT\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+    let changes_detector = "R 0 1\nTICK[rstim:logical_flip_point]\nM 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
     let config = test_config(changes_detector, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
     assert!(validate_decoder_dataset_inputs(&config).unwrap_err().contains("changes detector"));
 }
@@ -600,7 +600,7 @@ fn detector_artifacts_publish_detections_and_private_answers() {
 
 #[test]
 fn blinded_measurement_answers_are_public_observable_xor_mask() {
-    let circuit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
     config.shots = 16;
     config.seed = Some(0xdec0_de01);
@@ -627,7 +627,7 @@ fn blinded_measurement_answers_are_public_observable_xor_mask() {
 
 #[test]
 fn fixed_seed_reproduces_artifacts_byte_for_byte() {
-    let circuit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
     config.shots = 32;
     config.seed = Some(123);
@@ -785,7 +785,7 @@ fn export_writes_exact_public_and_private_files() {
     let root = tempfile::tempdir().unwrap();
     let public_out = root.path().join("public");
     let private_out = root.path().join("private");
-    let circuit = "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let mut config = test_config(circuit, DecoderDatasetMode::MeasurementsBlinded, vec![0]);
     config.shots = 8;
     config.seed = Some(7);
@@ -1115,7 +1115,7 @@ fn detectors_mode_writes_public_circuit_and_detector_rows() {
 fn blinded_measurements_masks_recomputed_public_observable() {
     let root = tempfile::tempdir().unwrap();
     let circuit = root.path().join("circuit.stim");
-    fs::write(&circuit, "R 0\n# RSTIM_LOGICAL_FLIP_POINT\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    fs::write(&circuit, "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let public_out = root.path().join("public");
     let private_out = root.path().join("private");
     let output = run_cli(&export_args(&circuit, "measurements_blinded", &public_out, &private_out, &["--logical_x_qubits", "0", "--seed", "9"]));
@@ -1289,7 +1289,7 @@ fn generated_surface_z_memory_with_marker() -> (String, &'static str) {
 fn insert_marker_before_first_tick(circuit: &mut String) {
     let needle = "TICK\n";
     let index = circuit.find(needle).expect("generated memory circuit has first TICK");
-    circuit.insert_str(index, "# RSTIM_LOGICAL_FLIP_POINT\n");
+    circuit.insert_str(index, "TICK[rstim:logical_flip_point]\n");
 }
 ```
 
@@ -1389,7 +1389,7 @@ The public bundle contains detector-event rows in `shots.b8` and the logical-zer
 
 ```stim
 R 0 1 2
-# RSTIM_LOGICAL_FLIP_POINT
+TICK[rstim:logical_flip_point]
 ```
 
 ```console
@@ -1500,7 +1500,7 @@ python3 - "$RSTIM_DATASET_TMP/memory.stim" <<'PY'
 from pathlib import Path
 path = Path(__import__("sys").argv[1])
 text = path.read_text()
-path.write_text(text.replace("TICK\n", "# RSTIM_LOGICAL_FLIP_POINT\nTICK\n", 1))
+path.write_text(text.replace("TICK\n", "TICK[rstim:logical_flip_point]\nTICK\n", 1))
 PY
 cargo run --locked --quiet -p rstim --bin rstim -- export_decoder_dataset --circuit "$RSTIM_DATASET_TMP/memory.stim" --shots 16 --mode measurements_blinded --logical_x_qubits 0,1,2 --public_out "$RSTIM_DATASET_TMP/public" --private_out "$RSTIM_DATASET_TMP/private" --seed 5
 find "$RSTIM_DATASET_TMP/public" -maxdepth 1 -type f -print | sort

@@ -121,3 +121,42 @@ binary detector calculation. If a detector references a loss-caused measurement,
 the fixed measurement bit is a storage placeholder, not a trustworthy matching
 syndrome. A loss-aware decoder must first invalidate or combine affected checks
 into superchecks using the separate loss information.
+
+## Blinded logical-input training rows
+
+`rstim export_decoder_dataset --mode measurements_blinded --error_trace`
+produces a second tensor-friendly layout: public measurement rows, private
+answers, private logical masks, and private physical-error traces. Every trace
+line includes `logical_input`, whose `bit` and `applied` fields equal the aligned
+mask bit and whose `pauli` / `support` fields identify the ideal representative.
+The ideal logical gate is deliberately absent from the physical `events` list.
+
+The canonical top-level `TICK[rstim:logical_flip_point]` marks where that ideal
+source-state `X` or `Z` is inserted. It must follow ideal logical-state
+initialization and precede every positive-probability noise instruction. For a
+published measurement row `m`, `O_public(m)` contains both the chosen source bit
+and any logical flip accumulated from physical errors. Therefore the supervised
+decoder target removes the known training-time source choice:
+
+```text
+answer = O_public(measurement) XOR logical_input.bit
+```
+
+The logical-input object and physical-error trace are simulator ground truth:
+keep both private in a blinded benchmark even though local training may consume
+them.
+
+The checked standard-library loader verifies all four streams and returns
+fixed-width `measurement_inputs`, `answer_targets`, and `logical_masks`, plus
+ragged `trace_records` for auxiliary supervision:
+
+```sh
+python3 rstim/doc/examples/load_blinded_training_data.py \
+  --public-dir public-data \
+  --private-dir private-truth \
+  --observable-rec -1
+```
+
+Repeat `--observable-rec` for every `rec[-k]` term contributing to observable
+0. Convert the three integer matrices directly to tensors; encode the ragged
+event records only if the training objective uses simulator-only supervision.

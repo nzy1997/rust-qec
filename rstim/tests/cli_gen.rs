@@ -192,7 +192,7 @@ fn gen_midswap_is_parseable_and_sampleable_from_cli() {
     );
     let text = std::fs::read_to_string(&circuit_path).unwrap();
     assert_eq!(text.matches("# MIDSWAP_SHUTTLE").count(), 2);
-    assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
+    assert_eq!(text.matches("TICK[rstim:logical_flip_point]").count(), 1);
     assert_eq!(
         text.lines().filter(|line| line.starts_with("MRL ")).count(),
         2
@@ -707,9 +707,18 @@ fn gen_rotated_memory_z_explicit_noise_and_loss() {
             );
         }
         if name == "X_ERROR" && args == [0.044] {
+            let follows_reset = matches!(name_at(index - 1), "R" | "MRL");
+            let follows_initial_marker = index >= 2
+                && name_at(index - 2) == "R"
+                && matches!(
+                    &circuit[index - 1],
+                    rstim::ir::StimInstr::Op { name, tag, .. }
+                        if name == "TICK"
+                            && tag.as_deref() == Some("rstim:logical_flip_point")
+                );
             assert!(
-                matches!(name_at(index - 1), "R" | "MRL"),
-                "after-reset flips must immediately follow a reset, found {}",
+                follows_reset || follows_initial_marker,
+                "after-reset flips must follow a reset or the logical marker, found {}",
                 name_at(index - 1)
             );
         }
@@ -859,7 +868,7 @@ fn gen_rotated_memory_z_explicit_noise_and_loss() {
     );
 
     // 5. Exactly one logical-flip marker and zero shuttle/remapping events.
-    assert_eq!(text.matches("# RSTIM_LOGICAL_FLIP_POINT").count(), 1);
+    assert_eq!(text.matches("TICK[rstim:logical_flip_point]").count(), 1);
     assert!(!text.contains("MIDSWAP_SHUTTLE"));
     assert!(!text.contains("SHUTTLE"));
     let lines: Vec<&str> = text.lines().collect();
@@ -867,7 +876,7 @@ fn gen_rotated_memory_z_explicit_noise_and_loss() {
         .iter()
         .position(|line| line.starts_with("R "))
         .unwrap();
-    assert_eq!(lines[data_reset + 1], "# RSTIM_LOGICAL_FLIP_POINT");
+    assert_eq!(lines[data_reset + 1], "TICK[rstim:logical_flip_point]");
 
     // The circuit must also be sampleable.
     let shots_path = directory.path().join("shots.b8");
