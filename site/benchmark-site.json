@@ -35,12 +35,20 @@
           "provenance": {
             "schema_version": 1,
             "artifact_date": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "results_csv_commit_time": "2026-06-11T12:58:04+08:00",
+                "plot_commit_time": "2026-06-26T11:35:11+08:00",
+                "date_kind": "git commit times of the checked bytes; the original benchmark run wall-clock time was not captured"
+              }
             },
             "source_commit": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "results_csv": "5b70d92c4b3a5fb427fd6cfdd0d61ac41a5a4bbd",
+                "plot": "70aaa20c6bbc5fdbe3821200eb6ab925dcfdcf2c",
+                "commit_kind": "last commits that modified the checked artifacts; the working-tree commit that produced the original run was not captured"
+              }
             },
             "commands": {
               "status": "recorded",
@@ -74,16 +82,23 @@
               "reason": "historical checked artifact predates canonical provenance capture"
             },
             "seed_policy": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "sampler_seed": 12345,
+                "recorded_in": "seed column of benchmarks/surface_decoder_compare/results/full/results.csv"
+              }
             },
             "build_profile": {
               "status": "not_recorded",
               "reason": "historical checked artifact predates canonical provenance capture"
             },
             "shots_or_error_budget": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "shots_budget": 10000,
+                "errors_budget": 200,
+                "recorded_in": "shots_budget and errors_budget columns of benchmarks/surface_decoder_compare/results/full/results.csv and benchmarks/surface_decoder_compare/README.md"
+              }
             },
             "artifact_hashes": {
               "status": "recorded",
@@ -112,7 +127,8 @@
           ],
           "provenance_sources": [
             "docs/showcases/benchmark-evidence.md",
-            "benchmarks/surface_decoder_compare/README.md"
+            "benchmarks/surface_decoder_compare/README.md",
+            "benchmarks/surface_decoder_compare/results/full/results.csv"
           ],
           "claims_limit": "Checked full-tier artifacts are committed-run evidence, not a general decoder ordering claim.",
           "caveats": [
@@ -194,12 +210,20 @@
           "provenance": {
             "schema_version": 1,
             "artifact_date": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "artifacts_commit_time": "2026-06-28T22:18:17+08:00",
+                "date_kind": "git commit time of the checked bytes; the original benchmark run wall-clock time was not captured"
+              }
             },
             "source_commit": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "rust_source_commit": "cc6ee302523c0810bef71ee891eca77fb9396508",
+                "rust_source_commit_recorded_in": "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md regeneration evidence",
+                "artifacts_commit": "dc784ed6ac4889f733fa5bbac437c921341b2105",
+                "commit_kind": "artifacts_commit is the last commit that modified the checked artifacts"
+              }
             },
             "commands": {
               "status": "recorded",
@@ -224,24 +248,47 @@
               "reason": "historical checked artifact predates canonical provenance capture"
             },
             "dependency_versions": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "ldpc": "2.4.1",
+                "bposd": "2.1",
+                "numpy": "2.5.0",
+                "recorded_in": "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md regeneration evidence"
+              }
             },
             "external_repository_commits": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": [
+                {
+                  "repository": "sbravyi/BivariateBicycleCodes",
+                  "commit": "fa77e3333d3ec44c79d8f914dd24c040d1da471b",
+                  "role": "pinned Bravyi reference contract recorded in reference_gap_report.md"
+                }
+              ]
             },
             "seed_policy": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "sampler_seed": 12345,
+                "recorded_in": "case ids of benchmarks/bb_circuit_bposd_compare/results/full/results.csv (t1000000-seed12345)"
+              }
             },
             "build_profile": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "profile": "release",
+                "rust_binary": "target/release/rsinter",
+                "recorded_in": "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md regeneration evidence"
+              }
             },
             "shots_or_error_budget": {
-              "status": "not_recorded",
-              "reason": "historical checked artifact predates canonical provenance capture"
+              "status": "recorded",
+              "value": {
+                "max_shots_per_point": 1000000,
+                "max_errors_per_point": 200,
+                "stop_policy": "the batched compare checks the error budget between batches and stops each point with stop_reason=errors_budget_reached",
+                "recorded_in": "benchmarks/bb_circuit_bposd_compare/README.md BB72/BB144 batched compare budget table"
+              }
             },
             "artifact_hashes": {
               "status": "recorded",
@@ -276,7 +323,8 @@
           ],
           "provenance_sources": [
             "docs/showcases/benchmark-evidence.md",
-            "benchmarks/bb_circuit_bposd_compare/README.md"
+            "benchmarks/bb_circuit_bposd_compare/README.md",
+            "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md"
           ],
           "claims_limit": "Checked full-tier artifacts document the committed BB72/BB144 paired comparison and reference-gap report only.",
           "caveats": [

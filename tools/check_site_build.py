@@ -1081,6 +1081,40 @@ def make_fixture_site() -> SiteFixture:
 """,
     )
     write_text(
+        site_root / "interactive/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="shot-viewer">
+    <script src="app.js"></script>
+  </section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "interactive/local/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="../..">
+  <section id="shot-viewer">
+    <script src="../app.js"></script>
+  </section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "interactive/app.js",
+        """const viewer = document.getElementById("shot-viewer");
+fetch("fixed-circuit.stim");
+const wasmPath = "pkg/rstim_shot_web_bg.wasm";
+""",
+    )
+    write_text(site_root / "interactive/shot-viewer.css", ".shot-viewer { display: block; }\n")
+    write_text(site_root / "interactive/fixed-circuit.stim", "M 0\n")
+    write_text(site_root / "interactive/pkg/rstim_shot_web_bg.wasm", "wasm\n")
+    write_text(
         site_root / "js/benchmarks.js",
         """const evidenceContainers = document.querySelectorAll("[data-evidence-items]");
 function renderEvidenceContainers(manifest) {

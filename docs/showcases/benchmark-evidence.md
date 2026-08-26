@@ -98,6 +98,11 @@ Primary evidence docs and commands:
 - [`benchmarks/bb_circuit_bposd_compare/README.md`](benchmarks/bb_circuit_bposd_compare/README.md)
 - [`Makefile`](Makefile)
 
+Site benchmark manifest and canonical provenance schema:
+
+- [`site/benchmark-site.json`](site/benchmark-site.json)
+- [`docs/specs/benchmark-site-provenance-v1.md`](docs/specs/benchmark-site-provenance-v1.md)
+
 Tracked surface-decoder comparison artifacts:
 
 - [`benchmarks/surface_decoder_compare/results/full/results.csv`](benchmarks/surface_decoder_compare/results/full/results.csv)
