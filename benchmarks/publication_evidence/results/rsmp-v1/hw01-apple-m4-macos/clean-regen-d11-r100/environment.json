@@ -1,0 +1,71 @@
+{
+ "argv": [
+  "python3",
+  "-m",
+  "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
+  "--rstim",
+  "target/release/rstim",
+  "--catalog",
+  "rstim/tests/fixtures/rsmp/catalog.json",
+  "--case",
+  "stim_surface_d11_r100",
+  "--shots",
+  "1024",
+  "--seed",
+  "7",
+  "--zstd-level",
+  "3",
+  "--out-dir",
+  "/tmp/rstim-rsmp-v1-evidence"
+ ],
+ "family": "rsmp-v1",
+ "git": {
+  "commit": "8080c5806b090f0b9417ddf8f6c5187b649d8a9e",
+  "dirty": false
+ },
+ "hardware": {
+  "cpu_class": "aarch64-apple-darwin",
+  "cpu_model": "Apple M4",
+  "identified": true,
+  "logical_cores": 10,
+  "os": "macOS (Darwin 25.6.0)",
+  "physical_cores": 10,
+  "ram_gb": 32
+ },
+ "hardware_id": "hw01-apple-m4-macos",
+ "production_provenance": {
+  "commit": "b0869db93ca81254e680743230418b6a1089f0c0",
+  "note": "regenerated from a clean tree with git.dirty=false (issue #601 RSMP provenance fix)",
+  "recorded": true
+ },
+ "run_id": "clean-regen-d11-r100",
+ "schema": "publication-environment-v1",
+ "source_artifacts": [
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/raw.jsonl",
+   "sha256": "1feba9f732e515c1627735785d634e092ea88c04914fcf03ad2169a6776b1832"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/summary.json",
+   "sha256": "f9ecd1953a2e61f6b8800ee8a2716bba1a01191914f0c570cfe63fec9d1be36b"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/report.md",
+   "sha256": "748bc21935e2871a0aed10ab1f0f0364e74349b7dcf71b23872e4eaa5cba50ce"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/environment.json",
+   "sha256": "34886a75aeec9eea589dce799ad314d098b3fcf7406ce4bc9f17027e6a96e029"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/artifact-sha256.json",
+   "sha256": "d5d451ca1dbe04f97d6430ed9ef40808e4674f4b0083dcc26cc2571efd7b2369"
+  }
+ ],
+ "toolchain": {
+  "build_profile": "release",
+  "rust_target": "aarch64-apple-darwin",
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "threads": "1 (zstd single_threaded contract)"
+ }
+}

@@ -1,4 +1,4 @@
-.PHONY: help test check build-shot-viewer build-site release rsmp-v1-readiness bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test check build-shot-viewer build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -25,6 +25,7 @@ help:
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
 	@echo "  build-shot-viewer    - Rebuild the version-matched interactive-shot web bundle"
 	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
+	@echo "  publication-evidence-check - Validate the publication benchmark evidence bundle (issue #601)"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
@@ -48,6 +49,16 @@ check:
 
 rsmp-v1-readiness:
 	@python3 tools/check_rsmp_v1_readiness.py --repo-root . --out-dir benchmarks/out/rsmp-v1
+
+publication-evidence-check:
+	@python3 tools/check_publication_benchmark_evidence.py --self-test
+	@python3 tools/check_publication_benchmark_evidence.py \
+		--manifest benchmarks/publication_evidence/manifest.toml \
+		--results-dir benchmarks/publication_evidence/results \
+		--report-out /tmp/rstim-publication-evidence-report.md \
+		--readiness-out /tmp/rstim-publication-evidence-readiness.json
+	@cmp /tmp/rstim-publication-evidence-report.md benchmarks/publication_evidence/report.md
+	@cmp /tmp/rstim-publication-evidence-readiness.json benchmarks/publication_evidence/readiness.json
 
 build-shot-viewer:
 	tools/build_shot_viewer.sh

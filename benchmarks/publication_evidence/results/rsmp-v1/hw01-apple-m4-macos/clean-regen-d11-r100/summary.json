@@ -1,0 +1,416 @@
+{
+ "estimates": [
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0003-b8"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0008-b8"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0006-b8"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0001-b8"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0005-b8"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0002-b8"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0004-b8"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-0007-b8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0003-zstd"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 1.000038146973,
+   "ci_low": 1.000038146973,
+   "group": "bytes|direct_zstd_frame|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.000038146973,
+   "raw_records": [
+    "rsmp-0008-zstd"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0006-zstd"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0001-zstd"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0005-zstd"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0002-zstd"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|direct_zstd_frame|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-0004-zstd"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 0.209719373557,
+   "ci_low": 0.209719373557,
+   "group": "bytes|direct_zstd_frame|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 0.209719373557,
+   "raw_records": [
+    "rsmp-0007-zstd"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "direct_zstd_frame"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0003-rsmp"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 1.000465393066,
+   "ci_low": 1.000465393066,
+   "group": "bytes|rsmp_v1_adaptive|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.000465393066,
+   "raw_records": [
+    "rsmp-0008-rsmp"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0006-rsmp"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0001-rsmp"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0005-rsmp"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0002-rsmp"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-0004-rsmp"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 0.119833752474,
+   "ci_low": 0.119833752474,
+   "group": "bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 0.119833752474,
+   "raw_records": [
+    "rsmp-0007-rsmp"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "rsmp_v1_adaptive"
+  }
+ ],
+ "family": "rsmp-v1",
+ "hardware_id": "hw01-apple-m4-macos",
+ "run_id": "clean-regen-d11-r100",
+ "schema": "publication-summary-v1"
+}

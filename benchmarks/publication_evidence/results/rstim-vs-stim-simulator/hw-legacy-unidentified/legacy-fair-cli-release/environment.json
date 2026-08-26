@@ -1,0 +1,46 @@
+{
+ "argv": [
+  "import://tools/import_publication_evidence.py",
+  "--family",
+  "rstim-vs-stim-simulator",
+  "--source",
+  "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/raw.jsonl"
+ ],
+ "family": "rstim-vs-stim-simulator",
+ "git": {
+  "commit": "8080c5806b090f0b9417ddf8f6c5187b649d8a9e",
+  "dirty": false
+ },
+ "hardware": {
+  "cpu_class": "unidentified",
+  "cpu_model": "not recorded in source artifact",
+  "identified": false,
+  "logical_cores": 0,
+  "os": "not recorded in source artifact",
+  "physical_cores": 0,
+  "ram_gb": 0
+ },
+ "hardware_id": "hw-legacy-unidentified",
+ "production_provenance": {
+  "note": "portable fair-cli bundle pins executable hashes and argv but does not record the source commit or an identified hardware profile; 2 warmup + 7 measured rounds fall below the publication repetition protocol",
+  "recorded": false
+ },
+ "run_id": "legacy-fair-cli-release",
+ "schema": "publication-environment-v1",
+ "source_artifacts": [
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/raw.jsonl",
+   "sha256": "715634316bb0c35dbc60edcae2b39609f6e7707243c2c9b32007f00ab2e89328"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/environment.json",
+   "sha256": "e01fa8211fd049690fd5d45bd64cce24927586e0ad301d6fde159b71b43a3ff7"
+  }
+ ],
+ "toolchain": {
+  "build_profile": "not recorded",
+  "rust_target": "not recorded in source artifact",
+  "rustc": "not recorded in source artifact",
+  "threads": "not recorded"
+ }
+}

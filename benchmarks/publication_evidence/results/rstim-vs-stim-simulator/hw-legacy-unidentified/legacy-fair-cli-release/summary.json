@@ -1,0 +1,54 @@
+{
+ "estimates": [
+  {
+   "ci_high": 18208292.0,
+   "ci_low": 17919584.0,
+   "group": "timing|rstim_cli|workload=stim_surface_d11_r100",
+   "kind": "timing",
+   "method": "bootstrap_percentile_95",
+   "n": 7,
+   "point": 18073833.0,
+   "raw_records": [
+    "fair-cli-0012",
+    "fair-cli-0013",
+    "fair-cli-0014",
+    "fair-cli-0015",
+    "fair-cli-0016",
+    "fair-cli-0017",
+    "fair-cli-0018"
+   ],
+   "scale": {
+    "workload": "stim_surface_d11_r100"
+   },
+   "variant": "rstim_cli",
+   "warmups": 2
+  },
+  {
+   "ci_high": 26760000.0,
+   "ci_low": 26370042.0,
+   "group": "timing|stim_cli|workload=stim_surface_d11_r100",
+   "kind": "timing",
+   "method": "bootstrap_percentile_95",
+   "n": 7,
+   "point": 26704292.0,
+   "raw_records": [
+    "fair-cli-0003",
+    "fair-cli-0004",
+    "fair-cli-0005",
+    "fair-cli-0006",
+    "fair-cli-0007",
+    "fair-cli-0008",
+    "fair-cli-0009"
+   ],
+   "scale": {
+    "workload": "stim_surface_d11_r100"
+   },
+   "variant": "stim_cli",
+   "warmups": 2
+  }
+ ],
+ "family": "rstim-vs-stim-simulator",
+ "hardware_id": "hw-legacy-unidentified",
+ "run_id": "legacy-fair-cli-release",
+ "schema": "publication-summary-v1"
+}
