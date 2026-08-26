@@ -321,40 +321,74 @@ def rsmp_row_records(row: dict, record_prefix: str, seed: int | None) -> list[di
 def run_rsmp_matrix(repo_root: Path) -> tuple[list[dict], list[list[str]]]:
     """Run the declared RSMP shots x seed matrix with the merged #600 runner.
 
-    Each cell regenerates the full rsmp-v1 evidence bundle (including the
-    b8/r8/ptb64 Stim baselines) for the pinned d11/r100 benchmark case and
-    contributes its benchmark row to the publication records.
+    Each cell samples the pinned d11/r100 benchmark circuit with the declared
+    (shots, seed) pair and builds its evidence row through the runner's own
+    ``build_row`` pipeline, so matrix cells get exactly the same pack/unpack,
+    level-3 Zstandard, and b8/r8/ptb64 Stim-baseline treatment as the pinned
+    canonical bundle. The runner's command-line entry point stays pinned to
+    (1024, 7); matrix cells reuse its implementation, not a loosened CLI.
     """
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from benchmarks.rstim_vs_stim_simulator import run_rsmp_compression as rsmp_runner
+    from tools import check_rsmp_v1_compression_evidence as rsmp_checker
+
+    catalog = rsmp_checker.load_catalog_cases_from_path(
+        repo_root / "rstim/tests/fixtures/rsmp/catalog.json"
+    )
+    catalog_case = catalog["surface_d11_r100"]
+    circuit_path = str(catalog_case["circuit_path"])
+    circuit_bytes = (repo_root / circuit_path).read_bytes()
+    circuit_sha256 = str(catalog_case["circuit_sha256"])
+    committed_benchmark_sha = None
+    with (repo_root / RSMP_DIR / "raw.jsonl").open(encoding="utf-8") as handle:
+        for line in handle:
+            row = json.loads(line)
+            if row.get("is_benchmark"):
+                committed_benchmark_sha = row["measurement_input"]["sha256"]
+                break
+
     records: list[dict] = []
     commands: list[list[str]] = []
     with tempfile.TemporaryDirectory(prefix="rstim-publication-rsmp-") as tmp:
         for shots in RSMP_MATRIX_SHOTS:
             for seed in RSMP_MATRIX_SEEDS:
-                out_dir = Path(tmp) / f"s{shots}-seed{seed}"
-                argv = [
-                    "python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
-                    "--rstim", "target/release/rstim",
-                    "--catalog", "rstim/tests/fixtures/rsmp/catalog.json",
-                    "--case", "stim_surface_d11_r100",
+                sample_argv = [
+                    "target/release/rstim", "sample",
                     "--shots", str(shots),
                     "--seed", str(seed),
-                    "--zstd-level", "3",
-                    "--out-dir", f"/tmp/rstim-publication-rsmp-matrix/s{shots}-seed{seed}",
+                    "--out_format", "b8",
+                    "--in", circuit_path,
                 ]
-                run_argv = [sys.executable, *argv[1:]]
-                subprocess.run(run_argv, cwd=repo_root, check=True)
-                commands.append(argv)
-                with (out_dir / "raw.jsonl").open(encoding="utf-8") as handle:
-                    rows = [json.loads(line) for line in handle]
-                benchmark_rows = [row for row in rows if row.get("is_benchmark")]
-                if len(benchmark_rows) != 1:
-                    raise RuntimeError(
-                        f"rsmp matrix cell shots={shots} seed={seed} produced "
-                        f"{len(benchmark_rows)} benchmark rows, expected 1"
-                    )
-                records.extend(
-                    rsmp_row_records(benchmark_rows[0], f"rsmp-s{shots}-seed{seed}", seed)
+                result = subprocess.run(
+                    sample_argv, cwd=repo_root, check=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 )
+                row = rsmp_runner.build_row(
+                    rstim="target/release/rstim",
+                    stim="stim",
+                    work_dir=Path(tmp),
+                    case_id="stim_surface_d11_r100",
+                    semantic_role="surface_d11_r100",
+                    catalog_case_id="surface_d11_r100",
+                    circuit_path=circuit_path,
+                    circuit_bytes=circuit_bytes,
+                    canonical_circuit_sha256=circuit_sha256,
+                    shots=shots,
+                    measurements_b8=result.stdout,
+                    measurement_argv=sample_argv,
+                    generator="rstim_sample",
+                    generator_sha256=None,
+                )
+                commands.append(sample_argv)
+                if (shots, seed) == (1024, 7) and committed_benchmark_sha is not None:
+                    produced = row["measurement_input"]["sha256"]
+                    if produced != committed_benchmark_sha:
+                        raise RuntimeError(
+                            "matrix cell (1024, 7) disagrees with the committed canonical "
+                            f"bundle: measurement sha256 {produced} != {committed_benchmark_sha}"
+                        )
+                records.extend(rsmp_row_records(row, f"rsmp-s{shots}-seed{seed}", seed))
     return records, commands
 
 
