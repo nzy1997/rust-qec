@@ -8,7 +8,7 @@ the checker hashes and regenerates this file.
 
 ## Readiness
 
-Publication readiness: **not ready** (25 of 31 gates report gaps).
+Publication readiness: **not ready** (21 of 31 gates report gaps).
 
 | Gate | Status | Detail |
 |---|---|---|
@@ -34,10 +34,10 @@ Publication readiness: **not ready** (25 of 31 gates report gaps).
 | provenance:rstim-vs-stim-simulator | gap | runs without original production provenance (legacy imports): hw-legacy-unidentified/legacy-fair-cli-release |
 | hardware:rstim-vs-stim-simulator | gap | only 0 identified timing host(s); need >= 2 physical hosts spanning x86_64-linux and aarch64 |
 | timing-protocol:rstim-vs-stim-simulator | gap | cells below protocol: legacy-fair-cli-release:timing|rstim_cli|workload=stim_surface_d11_r100 (warmups=2, measured=7); legacy-fair-cli-release:timing|stim_cli|workload=stim_surface_d11_r100 (warmups=2, measured=7) |
-| seeds:rsmp-v1 | gap | missing declared seeds: [11, 17, 23, 31] |
-| scale:rsmp-v1:shots | gap | missing scale levels: [256.0, 4096.0] |
-| baselines:rsmp-v1 | gap | missing required baselines: ['ptb64', 'r8'] |
-| ablations:rsmp-v1 | gap | missing required ablations: ['fixed_codec'] |
+| seeds:rsmp-v1 | ready | all declared seeds present |
+| scale:rsmp-v1:shots | ready | measured levels cover the contract |
+| baselines:rsmp-v1 | ready | all required baselines present |
+| ablations:rsmp-v1 | ready | all required ablations present |
 | provenance:rsmp-v1 | ready | all runs record original production commit, hardware, and argv |
 | seeds:qec-code-random-window | gap | missing declared seeds: [7, 11, 17, 23, 31] |
 | scale:qec-code-random-window:case_id | gap | missing scale levels: ['bb144_full', 'bb72_full', 'steane_full', 'surface_rotated_d5_full', 'toric_d5_full'] |
@@ -47,7 +47,7 @@ Publication readiness: **not ready** (25 of 31 gates report gaps).
 ## Runs
 
 - `bb-circuit-bposd-compare/hw-legacy-unidentified/legacy-full-2025`: 16 raw records, 16 derived estimates.
-- `rsmp-v1/hw01-apple-m4-macos/clean-regen-d11-r100`: 24 raw records, 24 derived estimates.
+- `rsmp-v1/hw01-apple-m4-macos/d11-r100-matrix`: 126 raw records, 42 derived estimates.
 - `rstim-vs-stim-simulator/hw-legacy-unidentified/legacy-fair-cli-release`: 18 raw records, 2 derived estimates.
 - `surface-decoder-compare/hw-legacy-unidentified/legacy-full-2025`: 36 raw records, 36 derived estimates.
 
@@ -74,7 +74,7 @@ Publication readiness: **not ready** (25 of 31 gates report gaps).
 | logical_error|rbposd|code_id=bb72,p=0.005 | 0.2 | [0.180535259652, 0.22099739878] | 1500 | wilson_score_95 |
 | logical_error|rbposd|code_id=bb72,p=0.006 | 0.384 | [0.35435414144, 0.414533666528] | 1000 | wilson_score_95 |
 
-### rsmp-v1 / hw01-apple-m4-macos / clean-regen-d11-r100
+### rsmp-v1 / hw01-apple-m4-macos / d11-r100-matrix
 
 | Group | Point | 95% CI | n | Method |
 |---|---|---|---|---|
@@ -85,15 +85,31 @@ Publication readiness: **not ready** (25 of 31 gates report gaps).
 | bytes|b8|case_id=observable_recovery,shots=4 | 1.0 | [1.0, 1.0] | 1 | deterministic_ratio |
 | bytes|b8|case_id=rank_zero,shots=4 | 1.0 | [1.0, 1.0] | 1 | deterministic_ratio |
 | bytes|b8|case_id=repeat_records,shots=4 | 1.0 | [1.0, 1.0] | 1 | deterministic_ratio |
-| bytes|b8|case_id=stim_surface_d11_r100,shots=1024 | 1.0 | [1.0, 1.0] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=dependent_detectors,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=high_entropy_control,shots=8192 | 1.000038146973 | [1.000038146973, 1.000038146973] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=loss_visible_measurements,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=nonzero_reference,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=observable_recovery,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=rank_zero,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=repeat_records,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
-| bytes|direct_zstd_frame|case_id=stim_surface_d11_r100,shots=1024 | 0.209719373557 | [0.209719373557, 0.209719373557] | 1 | deterministic_ratio |
+| bytes|b8|case_id=stim_surface_d11_r100,shots=1024 | 1.0 | [1.0, 1.0] | 5 | deterministic_ratio |
+| bytes|b8|case_id=stim_surface_d11_r100,shots=256 | 1.0 | [1.0, 1.0] | 5 | deterministic_ratio |
+| bytes|b8|case_id=stim_surface_d11_r100,shots=4096 | 1.0 | [1.0, 1.0] | 5 | deterministic_ratio |
+| bytes|fixed_codec|case_id=dependent_detectors,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=high_entropy_control,shots=8192 | 1.000038146973 | [1.000038146973, 1.000038146973] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=loss_visible_measurements,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=nonzero_reference,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=observable_recovery,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=rank_zero,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=repeat_records,shots=4 | 4.25 | [4.25, 4.25] | 1 | deterministic_ratio |
+| bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=1024 | 0.20932037434 | [0.20932037434, 0.20932037434] | 5 | deterministic_ratio |
+| bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=256 | 0.208979736972 | [0.208979736972, 0.208979736972] | 5 | deterministic_ratio |
+| bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=4096 | 0.208955226284 | [0.208955226284, 0.208955226284] | 5 | deterministic_ratio |
+| bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=1024 | 0.247782765089 | [0.247782765089, 0.247782765089] | 5 | deterministic_ratio |
+| bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=256 | 0.246637945251 | [0.246637945251, 0.246637945251] | 5 | deterministic_ratio |
+| bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=4096 | 0.247755130174 | [0.247755130174, 0.247755130174] | 5 | deterministic_ratio |
+| bytes|ptb64|case_id=stim_surface_d11_r100,shots=1024 | 0.999422823219 | [0.999422823219, 0.999422823219] | 5 | deterministic_ratio |
+| bytes|ptb64|case_id=stim_surface_d11_r100,shots=256 | 0.999422823219 | [0.999422823219, 0.999422823219] | 5 | deterministic_ratio |
+| bytes|ptb64|case_id=stim_surface_d11_r100,shots=4096 | 0.999422823219 | [0.999422823219, 0.999422823219] | 5 | deterministic_ratio |
+| bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=1024 | 0.390620748475 | [0.390620748475, 0.390620748475] | 5 | deterministic_ratio |
+| bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=256 | 0.376123948714 | [0.376123948714, 0.376123948714] | 5 | deterministic_ratio |
+| bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=4096 | 0.395343291351 | [0.395343291351, 0.395343291351] | 5 | deterministic_ratio |
+| bytes|r8|case_id=stim_surface_d11_r100,shots=1024 | 3.014863976954 | [3.014863976954, 3.014863976954] | 5 | deterministic_ratio |
+| bytes|r8|case_id=stim_surface_d11_r100,shots=256 | 3.005862467018 | [3.005862467018, 3.005862467018] | 5 | deterministic_ratio |
+| bytes|r8|case_id=stim_surface_d11_r100,shots=4096 | 3.011718460123 | [3.011718460123, 3.011718460123] | 5 | deterministic_ratio |
 | bytes|rsmp_v1_adaptive|case_id=dependent_detectors,shots=4 | 84.5 | [84.5, 84.5] | 1 | deterministic_ratio |
 | bytes|rsmp_v1_adaptive|case_id=high_entropy_control,shots=8192 | 1.000465393066 | [1.000465393066, 1.000465393066] | 1 | deterministic_ratio |
 | bytes|rsmp_v1_adaptive|case_id=loss_visible_measurements,shots=4 | 84.5 | [84.5, 84.5] | 1 | deterministic_ratio |
@@ -101,7 +117,9 @@ Publication readiness: **not ready** (25 of 31 gates report gaps).
 | bytes|rsmp_v1_adaptive|case_id=observable_recovery,shots=4 | 84.5 | [84.5, 84.5] | 1 | deterministic_ratio |
 | bytes|rsmp_v1_adaptive|case_id=rank_zero,shots=4 | 84.5 | [84.5, 84.5] | 1 | deterministic_ratio |
 | bytes|rsmp_v1_adaptive|case_id=repeat_records,shots=4 | 84.5 | [84.5, 84.5] | 1 | deterministic_ratio |
-| bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=1024 | 0.119833752474 | [0.119833752474, 0.119833752474] | 1 | deterministic_ratio |
+| bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=1024 | 0.119508575198 | [0.119508575198, 0.119508575198] | 5 | deterministic_ratio |
+| bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=256 | 0.120072868569 | [0.120072868569, 0.120072868569] | 5 | deterministic_ratio |
+| bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=4096 | 0.118963800194 | [0.118963800194, 0.118963800194] | 5 | deterministic_ratio |
 
 ### rstim-vs-stim-simulator / hw-legacy-unidentified / legacy-fair-cli-release
 

@@ -1,7 +1,7 @@
 {
  "bundle": "rstim-publication-evidence",
  "external_dependencies": [],
- "gap_count": 25,
+ "gap_count": 21,
  "gate_count": 31,
  "gates": [
   {
@@ -138,27 +138,27 @@
   },
   {
    "description": "family rsmp-v1 covers the declared seed set [7, 11, 17, 23, 31]",
-   "detail": "missing declared seeds: [11, 17, 23, 31]",
+   "detail": "all declared seeds present",
    "id": "seeds:rsmp-v1",
-   "status": "gap"
+   "status": "ready"
   },
   {
    "description": "family rsmp-v1 measures required levels of scale axis shots",
-   "detail": "missing scale levels: [256.0, 4096.0]",
+   "detail": "measured levels cover the contract",
    "id": "scale:rsmp-v1:shots",
-   "status": "gap"
+   "status": "ready"
   },
   {
    "description": "family rsmp-v1 includes all required baselines",
-   "detail": "missing required baselines: ['ptb64', 'r8']",
+   "detail": "all required baselines present",
    "id": "baselines:rsmp-v1",
-   "status": "gap"
+   "status": "ready"
   },
   {
    "description": "family rsmp-v1 includes all required ablations",
-   "detail": "missing required ablations: ['fixed_codec']",
+   "detail": "all required ablations present",
    "id": "ablations:rsmp-v1",
-   "status": "gap"
+   "status": "ready"
   },
   {
    "description": "family rsmp-v1 runs record complete original production provenance",
@@ -201,11 +201,11 @@
    "run_id": "legacy-full-2025"
   },
   {
-   "estimate_count": 24,
+   "estimate_count": 42,
    "family": "rsmp-v1",
    "hardware_id": "hw01-apple-m4-macos",
-   "record_count": 24,
-   "run_id": "clean-regen-d11-r100"
+   "record_count": 126,
+   "run_id": "d11-r100-matrix"
   },
   {
    "estimate_count": 2,
