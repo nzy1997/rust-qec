@@ -110,6 +110,25 @@ the current point is written with `status=ok` and
 manually and expires, the current aggregate rows are written with
 `status=partial` and `stop_reason=wall_budget_exhausted`.
 
+### Logical Error Rate Unit
+
+The CSV `logical_error_rate` is **per Monte Carlo trial (per shot)**:
+`logical_errors / shots_used`. A trial fails under the upstream Bravyi
+predicate — decode Z first; the trial fails if the predicted Z logicals
+differ from the sampled logicals (any of the k=12 observables), and X is
+decoded only when Z succeeds. The rate is *not* divided by `num_cycles` and
+*not* divided by the number of logical observables. Rust `rbposd` and Python
+`ldpc_bposd` count failures on the same exported trial batches with the same
+predicate, and both rows of a pair share `shots_used` even when the
+error budget stops the point early, so early stopping shortens the run
+without biasing either decoder's rate.
+
+The plot converts this per-shot rate to the paper-style per-syndrome-cycle
+rate: `plot.toml` sets `logical_rate_unit = "per_round"`, which divides by
+`num_cycles` at render time. Do not compare the per-shot CSV numbers against
+per-cycle reference curves directly. See `LER_INVESTIGATION.md` for the
+full #303 investigation.
+
 ## BB72/BB144 Reference-Gap Report
 
 The full BB72/BB144 CSV may be preserved when a full paired rerun is too

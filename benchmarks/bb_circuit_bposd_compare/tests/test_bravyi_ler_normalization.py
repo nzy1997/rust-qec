@@ -135,10 +135,48 @@ def test_checked_in_full_results_are_trial_level_normalized() -> None:
     assert verified_rows
     bb144_rows = [row for row in verified_rows if "bb144" in row.case_id]
     assert bb144_rows
+    # Post-#307 regenerated full CSV: bb144 p=0.003 stopped at 56000 shots
+    # with 204 logical errors (identical for rbposd and ldpc_bposd).
     assert any(
-        row.bravyi_tuple == ("0.003", 12, 40000, 200)
+        row.bravyi_tuple == ("0.003", 12, 56000, 204)
         for row in bb144_rows
     )
+
+
+def test_checked_in_full_results_paired_decoders_agree() -> None:
+    """Regression guard for the #303 anomaly / #307 fix.
+
+    The original #303 observation was rbposd LER visibly above ldpc_bposd on
+    the same exported batches (e.g. bb144 p=0.003: 200/40000 vs 138/40000).
+    After the #307 hard-replay fix, both decoders replay identical trials, so
+    the checked-in full CSV must show paired rows with identical shot counts
+    and near-identical logical error counts.
+    """
+    rows = [
+        row
+        for row in verify_bravyi_ler.load_rows(FULL_RESULTS)
+        if row.get("runner") == "batched_compare" and row.get("status") == "ok"
+    ]
+
+    pairs: dict[str, dict[str, dict[str, str]]] = {}
+    for row in rows:
+        pairs.setdefault(row["case_id"], {})[row["decoder_impl"]] = row
+
+    assert len(pairs) == 8
+    for case_id, pair in sorted(pairs.items()):
+        rust = pair["rbposd"]
+        python = pair["ldpc_bposd"]
+        assert rust["shots_used"] == python["shots_used"], case_id
+        shots_used = int(rust["shots_used"])
+        rust_errors = int(rust["logical_errors"])
+        python_errors = int(python["logical_errors"])
+        # Both decoders decode the same exported trials; allow only binomial
+        # sampling noise between the two decoders' failure counts.
+        tolerance = max(2, int(0.02 * shots_used))
+        assert abs(rust_errors - python_errors) <= tolerance, (
+            f"{case_id}: rbposd {rust_errors} vs ldpc_bposd {python_errors} "
+            f"logical errors over {shots_used} shared shots"
+        )
 
 
 def test_verify_rows_returns_partitionable_items() -> None:
