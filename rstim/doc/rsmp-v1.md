@@ -214,7 +214,13 @@ readiness:
 
 ```console
 python3 -m benchmarks.rstim_vs_stim_simulator.run_rsmp_compression \
-  --results-dir benchmarks/rstim_vs_stim_simulator/results/rsmp-v1
+  --rstim target/release/rstim \
+  --catalog rstim/tests/fixtures/rsmp/catalog.json \
+  --case stim_surface_d11_r100 \
+  --shots 1024 \
+  --seed 7 \
+  --zstd-level 3 \
+  --out-dir /tmp/rstim-rsmp-v1-evidence
 ```
 
 The benchmark row also carries Stim-format baselines for exactly `b8`, `r8`,
@@ -229,6 +235,18 @@ counts and ratios relative to the RSMP archive only; no universal
 cross-format compression superiority is claimed. The pinned Stim binary
 identity, version, and every conversion command are recorded in
 `environment.json`.
+
+The runner writes the bundle to a temporary output directory so the evidence
+check above stays separate from regeneration. To publish a regenerated bundle
+over the committed location, copy the five generated files:
+
+```console
+cp /tmp/rstim-rsmp-v1-evidence/{raw.jsonl,summary.json,report.md,environment.json,artifact-sha256.json} \
+  benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/
+```
+
+Regeneration must run from a clean Git tree so the recorded environment has
+`git.dirty=false`.
 
 The recorded environment includes producer identity, Git state, Rust target,
 Cargo.lock hash, zstd crate versions, native zstd version, full command argv,
