@@ -25,20 +25,29 @@ Verdict: PASS
 | stim_surface_d11_r100 | surface_d11_r100 | 1024 | 12121 | 12000 | 1 | 12000 | 121 | 1552384 | 325565 | 186028 | syndrome_sparse_leb128_v1 |
 | high_entropy_control | high_entropy_control | 8192 | 1024 | 0 | 0 | 0 | 1024 | 1048576 | 1048616 | 1049064 | empty,empty |
 
+## Stim Format Baselines
+Each row serializes the same canonical 1024-shot, seed-7 measurement batch in one Stim result format. Every format round-trips to the canonical b8 SHA-256; ratios are relative to the RSMP archive byte count.
+| format | raw bytes | direct zstd | archive/raw | archive/zstd | round-trip b8 SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| b8 | 1552384 | 325565 | 11.98% | 57.14% | a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b |
+| r8 | 4676542 | 606433 | 3.97% | 30.67% | a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b |
+| ptb64 | 1551488 | 386789 | 11.99% | 48.09% | a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b |
+
 ## Environment
 The exact producer, Git state, Rust target, Cargo.lock hash, zstd package versions, and complete command argv values are recorded in environment.json. This report is rendered from raw.jsonl-derived counts and gate arithmetic.
 
 ## Throughput Observations
-- nonzero_reference: encode 518 B/s, decode 545 B/s, peak logical block working set 8388639 bytes.
-- rank_zero: encode 1253 B/s, decode 986 B/s, peak logical block working set 8388639 bytes.
-- dependent_detectors: encode 1095 B/s, decode 885 B/s, peak logical block working set 8388639 bytes.
-- repeat_records: encode 1121 B/s, decode 1098 B/s, peak logical block working set 8388655 bytes.
-- observable_recovery: encode 1410 B/s, decode 1248 B/s, peak logical block working set 8388639 bytes.
-- loss_visible_measurements: encode 1387 B/s, decode 1315 B/s, peak logical block working set 8388655 bytes.
-- stim_surface_d11_r100: encode 15443821 B/s, decode 37218025 B/s, peak logical block working set 11900649 bytes.
-- high_entropy_control: encode 11398829 B/s, decode 24977742 B/s, peak logical block working set 10485788 bytes.
+- nonzero_reference: encode 642 B/s, decode 335 B/s, peak logical block working set 8388639 bytes.
+- rank_zero: encode 476 B/s, decode 417 B/s, peak logical block working set 8388639 bytes.
+- dependent_detectors: encode 512 B/s, decode 430 B/s, peak logical block working set 8388639 bytes.
+- repeat_records: encode 472 B/s, decode 437 B/s, peak logical block working set 8388655 bytes.
+- observable_recovery: encode 420 B/s, decode 498 B/s, peak logical block working set 8388639 bytes.
+- loss_visible_measurements: encode 542 B/s, decode 494 B/s, peak logical block working set 8388655 bytes.
+- stim_surface_d11_r100: encode 5821005 B/s, decode 22195265 B/s, peak logical block working set 11900649 bytes.
+- high_entropy_control: encode 7755060 B/s, decode 18970596 B/s, peak logical block working set 10485788 bytes.
 
 ## Claim Limitations
 - These gates prove the pinned `rsmp v1` evidence cases under the recorded producer and zstd settings.
 - Direct Zstandard for the high-entropy control is reported only as a diagnostic; the acceptance denominator is raw b8 bytes.
+- The Stim `b8`/`r8`/`ptb64` baselines report byte counts and ratios only; no universal cross-format compression superiority is claimed.
 - No fixed wall-clock performance gate or cross-version byte-for-byte writer determinism is claimed.

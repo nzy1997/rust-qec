@@ -1,6 +1,6 @@
 {
   "cargo": {
-    "lock_sha256": "c686b75aa69a970dd77e4ec39f8cb8d070064cc111863f5964a34d27ff2b9a4a",
+    "lock_sha256": "7c2f259f0c5511260cebbabc62da2bedd4c060201ed3d61bf6d4c39bdd1a07d3",
     "zstd": "0.13.3",
     "zstd-safe": "7.2.4",
     "zstd-sys": "2.0.16+zstd.1.5.7"
@@ -478,14 +478,137 @@
           "b8"
         ]
       }
+    },
+    "stim_baselines": {
+      "b8": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.b8.zst"
+        ],
+        "roundtrip": [
+          "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
+          "convert",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.b8.roundtrip.b8",
+          "--out_format",
+          "b8",
+          "--bits_per_shot",
+          "12121"
+        ],
+        "serialize": [
+          "target/release/rstim",
+          "sample",
+          "--shots",
+          "1024",
+          "--seed",
+          "7",
+          "--out_format",
+          "b8",
+          "--in",
+          "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+        ]
+      },
+      "ptb64": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.ptb64",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.ptb64.zst"
+        ],
+        "roundtrip": [
+          "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
+          "convert",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.ptb64",
+          "--in_format",
+          "ptb64",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.ptb64.roundtrip.b8",
+          "--out_format",
+          "b8",
+          "--bits_per_shot",
+          "12121"
+        ],
+        "serialize": [
+          "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/python3",
+          "-m",
+          "benchmarks.rstim_vs_stim_simulator.stim_convert",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.ptb64",
+          "--out_format",
+          "ptb64",
+          "--bits_per_shot",
+          "12121"
+        ]
+      },
+      "r8": {
+        "direct_zstd": [
+          "target/release/rstim",
+          "rsmp_zstd_frame",
+          "--level",
+          "3",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.r8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.r8.zst"
+        ],
+        "roundtrip": [
+          "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
+          "convert",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.r8",
+          "--in_format",
+          "r8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.r8.roundtrip.b8",
+          "--out_format",
+          "b8",
+          "--bits_per_shot",
+          "12121"
+        ],
+        "serialize": [
+          "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
+          "convert",
+          "--in",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/measurements.b8",
+          "--in_format",
+          "b8",
+          "--out",
+          "/tmp/rstim-rsmp-v1-evidence-work/stim_surface_d11_r100/stim_baseline.r8",
+          "--out_format",
+          "r8",
+          "--bits_per_shot",
+          "12121"
+        ]
+      }
     }
   },
   "evidence_format": "rsmp-v1-compression-evidence",
   "generator": {
     "argv": [
-      "/Users/nzy/pycode/agent-desk/config/.agent-desk/worktrees/nzy1997-rstim/issue-528-run-1-agent-issue-528-publish-checked-rsmp-compression-evidence-run-1/benchmarks/rstim_vs_stim_simulator/run_rsmp_compression.py",
+      "/Users/nzy/rcode/rstim/.worktrees/issue-600/benchmarks/rstim_vs_stim_simulator/run_rsmp_compression.py",
       "--rstim",
       "target/release/rstim",
+      "--stim",
+      "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
       "--catalog",
       "rstim/tests/fixtures/rsmp/catalog.json",
       "--case",
@@ -497,19 +620,19 @@
       "--zstd-level",
       "3",
       "--out-dir",
-      "/tmp/rstim-rsmp-v1-evidence"
+      "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1"
     ],
     "module": "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
-    "module_sha256": "fca80e3b3385c0948caf470ad47bbf87f980cfc7c0e68829b108432d10f9172a"
+    "module_sha256": "c8071503b5baf4d6bcb5babb24ad20bc2bafe381d1a223e10a6c0a4031f2f6fd"
   },
   "git": {
-    "commit": "73f3d43c4599c9010756f3fc0d75abf6dabd8dfc",
-    "dirty": true
+    "commit": "421087750d76d0b310ee2f4f77e7c095526a8775",
+    "dirty": false
   },
   "inputs": {
     "benchmark_case": "stim_surface_d11_r100",
     "catalog_path": "rstim/tests/fixtures/rsmp/catalog.json",
-    "catalog_sha256": "5555911dc735e079470fcb123afccb4b852428288cc74413869e89f75a98135d",
+    "catalog_sha256": "aac5e5eeaf3b57f6669cad80e3a4e164703a2c86f90cd7a32d04cae510bfebd2",
     "high_entropy_generator": {
       "id": "rstim-rsmp-v1-high-entropy-v1",
       "raw_sha256": "258c8b47bf6e074c19f90bc0e9b0dbdea38030ec7583804980eedce99b99ccf3",
@@ -518,7 +641,7 @@
   },
   "platform": {
     "machine": "arm64",
-    "os": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
     "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
     "target": "aarch64-apple-darwin"
   },
@@ -526,11 +649,19 @@
     "name": "rstim",
     "rstim_binary": {
       "path": "target/release/rstim",
-      "sha256": "1c15d11b589ef31ff57398370425890647cec15b7ffef7e0e6da19983546e5aa"
+      "sha256": "5eef299ce4b9897228c8a860475e6dc4ff6202f429645b37f60c6ac0a82eaa3c"
     },
-    "version": "rstim 0.1.1"
+    "version": "rstim 0.2.0"
   },
   "schema_version": 1,
+  "stim": {
+    "binary": {
+      "path": "/Users/nzy/rcode/rstim/.venv-surface-decoder/bin/stim",
+      "sha256": "095e4438e7206b36e26e6c3eef732410dfea095b0e06dfb28e00b156626d6991"
+    },
+    "version": "1.16.0",
+    "version_source": "stim-python-module"
+  },
   "zstd_contract": {
     "dictionary": "none",
     "frame_checksum": true,

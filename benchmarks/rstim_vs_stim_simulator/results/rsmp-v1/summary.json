@@ -12,7 +12,7 @@
       "numerator": 186028
     },
     "case_id": "stim_surface_d11_r100",
-    "decode_throughput_bytes_per_second": 37218025,
+    "decode_throughput_bytes_per_second": 22195265,
     "detector_density": {
       "one_count": 186951,
       "ppm": 15214,
@@ -28,7 +28,7 @@
       "shots": 1024
     },
     "direct_zstd_bytes": 325565,
-    "encode_throughput_bytes_per_second": 15443821,
+    "encode_throughput_bytes_per_second": 5821005,
     "free_codecs": [
       "free_dense_v1"
     ],
@@ -54,7 +54,7 @@
         "numerator": 338
       },
       "case_id": "nonzero_reference",
-      "decode_throughput_bytes_per_second": 545,
+      "decode_throughput_bytes_per_second": 335,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -70,7 +70,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 518,
+      "encode_throughput_bytes_per_second": 642,
       "free_codecs": [
         "empty"
       ],
@@ -94,7 +94,7 @@
         "numerator": 338
       },
       "case_id": "rank_zero",
-      "decode_throughput_bytes_per_second": 986,
+      "decode_throughput_bytes_per_second": 417,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -110,7 +110,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 1253,
+      "encode_throughput_bytes_per_second": 476,
       "free_codecs": [
         "free_dense_v1"
       ],
@@ -134,7 +134,7 @@
         "numerator": 338
       },
       "case_id": "dependent_detectors",
-      "decode_throughput_bytes_per_second": 885,
+      "decode_throughput_bytes_per_second": 430,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -150,7 +150,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 1095,
+      "encode_throughput_bytes_per_second": 512,
       "free_codecs": [
         "empty"
       ],
@@ -174,7 +174,7 @@
         "numerator": 338
       },
       "case_id": "repeat_records",
-      "decode_throughput_bytes_per_second": 1098,
+      "decode_throughput_bytes_per_second": 437,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -190,7 +190,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 1121,
+      "encode_throughput_bytes_per_second": 472,
       "free_codecs": [
         "empty"
       ],
@@ -214,7 +214,7 @@
         "numerator": 338
       },
       "case_id": "observable_recovery",
-      "decode_throughput_bytes_per_second": 1248,
+      "decode_throughput_bytes_per_second": 498,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -230,7 +230,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 1410,
+      "encode_throughput_bytes_per_second": 420,
       "free_codecs": [
         "free_dense_v1"
       ],
@@ -254,7 +254,7 @@
         "numerator": 338
       },
       "case_id": "loss_visible_measurements",
-      "decode_throughput_bytes_per_second": 1315,
+      "decode_throughput_bytes_per_second": 494,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -270,7 +270,7 @@
         "shots": 4
       },
       "direct_zstd_bytes": 17,
-      "encode_throughput_bytes_per_second": 1387,
+      "encode_throughput_bytes_per_second": 542,
       "free_codecs": [
         "empty"
       ],
@@ -294,7 +294,7 @@
         "numerator": 186028
       },
       "case_id": "stim_surface_d11_r100",
-      "decode_throughput_bytes_per_second": 37218025,
+      "decode_throughput_bytes_per_second": 22195265,
       "detector_density": {
         "one_count": 186951,
         "ppm": 15214,
@@ -310,7 +310,7 @@
         "shots": 1024
       },
       "direct_zstd_bytes": 325565,
-      "encode_throughput_bytes_per_second": 15443821,
+      "encode_throughput_bytes_per_second": 5821005,
       "free_codecs": [
         "free_dense_v1"
       ],
@@ -334,7 +334,7 @@
         "numerator": 1049064
       },
       "case_id": "high_entropy_control",
-      "decode_throughput_bytes_per_second": 24977742,
+      "decode_throughput_bytes_per_second": 18970596,
       "detector_density": {
         "one_count": 0,
         "ppm": 0,
@@ -350,7 +350,7 @@
         "shots": 8192
       },
       "direct_zstd_bytes": 1048616,
-      "encode_throughput_bytes_per_second": 11398829,
+      "encode_throughput_bytes_per_second": 7755060,
       "free_codecs": [
         "free_dense_v1",
         "free_dense_v1"
@@ -407,7 +407,7 @@
       "numerator": 1049064
     },
     "case_id": "high_entropy_control",
-    "decode_throughput_bytes_per_second": 24977742,
+    "decode_throughput_bytes_per_second": 18970596,
     "detector_density": {
       "one_count": 0,
       "ppm": 0,
@@ -424,7 +424,7 @@
     },
     "direct_zstd_bytes": 1048616,
     "direct_zstd_is_diagnostic_only": true,
-    "encode_throughput_bytes_per_second": 11398829,
+    "encode_throughput_bytes_per_second": 7755060,
     "free_codecs": [
       "free_dense_v1",
       "free_dense_v1"
@@ -448,5 +448,55 @@
     "loss_visible_measurements",
     "surface_d11_r100"
   ],
-  "schema_version": 1
+  "schema_version": 1,
+  "stim_baselines": {
+    "b8": {
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 5714,
+        "denominator": 325565,
+        "numerator": 186028
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 1198,
+        "denominator": 1552384,
+        "numerator": 186028
+      },
+      "artifact_sha256": "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b",
+      "direct_zstd_bytes": 325565,
+      "raw_bytes": 1552384,
+      "roundtrip_b8_sha256": "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b"
+    },
+    "ptb64": {
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 4809,
+        "denominator": 386789,
+        "numerator": 186028
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 1199,
+        "denominator": 1551488,
+        "numerator": 186028
+      },
+      "artifact_sha256": "e9adce7dec4e37fb9311259b65320a521254cf99485ec7263e9bf9da6f184823",
+      "direct_zstd_bytes": 386789,
+      "raw_bytes": 1551488,
+      "roundtrip_b8_sha256": "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b"
+    },
+    "r8": {
+      "archive_to_direct_zstd": {
+        "basis_points_floor": 3067,
+        "denominator": 606433,
+        "numerator": 186028
+      },
+      "archive_to_raw": {
+        "basis_points_floor": 397,
+        "denominator": 4676542,
+        "numerator": 186028
+      },
+      "artifact_sha256": "44d9a648662f136db71a7520836afdc6434a472b35f3c2135b4a81fc49ea4c19",
+      "direct_zstd_bytes": 606433,
+      "raw_bytes": 4676542,
+      "roundtrip_b8_sha256": "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b"
+    }
+  }
 }
