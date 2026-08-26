@@ -46,3 +46,10 @@ whose original production provenance (commit, identified hardware, declared-seed
 protocol) was not captured are marked `production_provenance.recorded = false`
 and appear as readiness gaps; they are secondary diagnostics, not
 publication-grade claims.
+
+For `rsmp-v1` the importer additionally regenerates the declared shots x seed
+matrix (`{256, 1024, 4096}` x `{7, 11, 17, 23, 31}`) for the pinned d11/r100
+case with the merged #600 runner, so the family carries the b8/r8/ptb64 Stim
+baselines per cell. The `fixed_codec` variant is the direct level-3 Zstandard
+frame over the same b8 bytes; it is the fixed-codec ablation that isolates the
+contribution of RSMP v1 adaptive syndrome encoding.

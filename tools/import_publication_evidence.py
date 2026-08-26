@@ -18,8 +18,10 @@ import argparse
 import csv
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -91,6 +93,7 @@ def write_run(
     production_provenance: dict,
     commit: str,
     dirty: bool,
+    extra_environment: dict | None = None,
 ) -> Path:
     run_dir = repo_root / RESULTS_ROOT / family / hardware_id / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +107,7 @@ def write_run(
         "run_id": run_id,
         "estimates": pub.derive_estimates(records),
     })
-    pub.write_json(run_dir / "environment.json", {
+    environment = {
         "schema": "publication-environment-v1",
         "family": family,
         "hardware_id": hardware_id,
@@ -118,7 +121,10 @@ def write_run(
             for source in sources
         ],
         "production_provenance": production_provenance,
-    })
+    }
+    if extra_environment:
+        environment.update(extra_environment)
+    pub.write_json(run_dir / "environment.json", environment)
     pub.write_json(run_dir / "artifact-sha256.json", {
         name: pub.sha256_file(run_dir / name) for name in pub.RUN_FILES if name != "artifact-sha256.json"
     })
@@ -235,44 +241,143 @@ def import_simulator(repo_root: Path, commit: str, dirty: bool) -> Path:
     )
 
 
-def import_rsmp(repo_root: Path, commit: str, dirty: bool) -> Path:
-    environment = json.loads((repo_root / RSMP_DIR / "environment.json").read_text(encoding="utf-8"))
-    records = []
-    with (repo_root / RSMP_DIR / "raw.jsonl").open(encoding="utf-8") as handle:
-        rows = [json.loads(line) for line in handle]
-    for index, row in enumerate(rows, start=1):
-        case_id = row["case_id"]
-        shots = str(row["dimensions"]["shots"])
-        seed = 7 if row.get("is_benchmark") else None
-        raw_b8 = row["measurement_input"]["raw_b8_bytes"]
-        scale = {"case_id": case_id, "shots": shots}
-        records.append({
-            "record_id": f"rsmp-{index:04d}-b8",
+RSMP_MATRIX_SHOTS = (256, 1024, 4096)
+RSMP_MATRIX_SEEDS = (7, 11, 17, 23, 31)
+RSMP_OLD_RUN_DIR = (
+    RESULTS_ROOT / "rsmp-v1" / "hw01-apple-m4-macos" / "clean-regen-d11-r100"
+)
+
+
+def rsmp_row_records(row: dict, record_prefix: str, seed: int | None) -> list[dict]:
+    """Emit the publication records for one rsmp-v1 bundle row.
+
+    Every row contributes the core codec comparison:
+
+    - ``b8``: the canonical measurement bytes (identity baseline);
+    - ``fixed_codec``: a direct level-3 Zstandard frame over the same b8
+      bytes. This is the issue #601 fixed-codec ablation: it isolates the
+      contribution of RSMP v1 adaptive syndrome encoding, because the only
+      difference from ``rsmp_v1_adaptive`` is the codec, not the input;
+    - ``rsmp_v1_adaptive``: the RSMP v1 archive.
+
+    Rows that carry Stim-format baselines (issue #600) additionally contribute
+    ``r8``/``ptb64`` and their own direct-Zstandard frames so every required
+    baseline can be compared against the archive on the same input basis.
+    """
+    case_id = row["case_id"]
+    shots = str(row["dimensions"]["shots"])
+    raw_b8 = row["measurement_input"]["raw_b8_bytes"]
+    scale = {"case_id": case_id, "shots": shots}
+    records = [
+        {
+            "record_id": f"{record_prefix}-b8",
             "kind": "bytes",
             "variant": "b8",
             "scale": scale,
             "seed": seed,
             "values": {"input_bytes": raw_b8, "output_bytes": raw_b8},
-        })
-        records.append({
-            "record_id": f"rsmp-{index:04d}-zstd",
+        },
+        {
+            "record_id": f"{record_prefix}-fixed-codec",
             "kind": "bytes",
-            "variant": "direct_zstd_frame",
+            "variant": "fixed_codec",
             "scale": scale,
             "seed": seed,
             "values": {"input_bytes": raw_b8, "output_bytes": row["direct_zstd"]["bytes"]},
-        })
-        records.append({
-            "record_id": f"rsmp-{index:04d}-rsmp",
+        },
+        {
+            "record_id": f"{record_prefix}-rsmp",
             "kind": "bytes",
             "variant": "rsmp_v1_adaptive",
             "scale": scale,
             "seed": seed,
             "values": {"input_bytes": raw_b8, "output_bytes": row["rsmp_archive"]["bytes"]},
+        },
+    ]
+    baselines = row.get("stim_baselines") or {}
+    for fmt in ("r8", "ptb64"):
+        entry = baselines.get(fmt)
+        if entry is None:
+            continue
+        records.append({
+            "record_id": f"{record_prefix}-{fmt}",
+            "kind": "bytes",
+            "variant": fmt,
+            "scale": scale,
+            "seed": seed,
+            "values": {"input_bytes": raw_b8, "output_bytes": entry["artifact"]["bytes"]},
         })
+        records.append({
+            "record_id": f"{record_prefix}-{fmt}-fixed-codec",
+            "kind": "bytes",
+            "variant": f"{fmt}_fixed_codec",
+            "scale": scale,
+            "seed": seed,
+            "values": {"input_bytes": raw_b8, "output_bytes": entry["direct_zstd"]["bytes"]},
+        })
+    return records
+
+
+def run_rsmp_matrix(repo_root: Path) -> tuple[list[dict], list[list[str]]]:
+    """Run the declared RSMP shots x seed matrix with the merged #600 runner.
+
+    Each cell regenerates the full rsmp-v1 evidence bundle (including the
+    b8/r8/ptb64 Stim baselines) for the pinned d11/r100 benchmark case and
+    contributes its benchmark row to the publication records.
+    """
+    records: list[dict] = []
+    commands: list[list[str]] = []
+    with tempfile.TemporaryDirectory(prefix="rstim-publication-rsmp-") as tmp:
+        for shots in RSMP_MATRIX_SHOTS:
+            for seed in RSMP_MATRIX_SEEDS:
+                out_dir = Path(tmp) / f"s{shots}-seed{seed}"
+                argv = [
+                    "python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
+                    "--rstim", "target/release/rstim",
+                    "--catalog", "rstim/tests/fixtures/rsmp/catalog.json",
+                    "--case", "stim_surface_d11_r100",
+                    "--shots", str(shots),
+                    "--seed", str(seed),
+                    "--zstd-level", "3",
+                    "--out-dir", f"/tmp/rstim-publication-rsmp-matrix/s{shots}-seed{seed}",
+                ]
+                run_argv = [sys.executable, *argv[1:]]
+                subprocess.run(run_argv, cwd=repo_root, check=True)
+                commands.append(argv)
+                with (out_dir / "raw.jsonl").open(encoding="utf-8") as handle:
+                    rows = [json.loads(line) for line in handle]
+                benchmark_rows = [row for row in rows if row.get("is_benchmark")]
+                if len(benchmark_rows) != 1:
+                    raise RuntimeError(
+                        f"rsmp matrix cell shots={shots} seed={seed} produced "
+                        f"{len(benchmark_rows)} benchmark rows, expected 1"
+                    )
+                records.extend(
+                    rsmp_row_records(benchmark_rows[0], f"rsmp-s{shots}-seed{seed}", seed)
+                )
+    return records, commands
+
+
+def import_rsmp(repo_root: Path, commit: str, dirty: bool) -> Path:
+    environment = json.loads((repo_root / RSMP_DIR / "environment.json").read_text(encoding="utf-8"))
+    records = []
+    with (repo_root / RSMP_DIR / "raw.jsonl").open(encoding="utf-8") as handle:
+        rows = [json.loads(line) for line in handle]
+    # Semantic fixtures and the high-entropy control are seed-independent and
+    # imported once from the committed canonical bundle; the declared
+    # shots x seed matrix for the benchmark case is regenerated below.
+    for index, row in enumerate(rows, start=1):
+        if row.get("is_benchmark"):
+            continue
+        records.extend(rsmp_row_records(row, f"rsmp-fix-{index:04d}", None))
+    matrix_records, matrix_commands = run_rsmp_matrix(repo_root)
+    records.extend(matrix_records)
     production_clean = environment.get("git", {}).get("dirty") is False
+    stale_run_dir = repo_root / RSMP_OLD_RUN_DIR
+    if stale_run_dir.is_dir():
+        shutil.rmtree(stale_run_dir)
     return write_run(
-        repo_root, "rsmp-v1", "hw01-apple-m4-macos", "clean-regen-d11-r100",
+        repo_root, "rsmp-v1", "hw01-apple-m4-macos", "d11-r100-matrix",
         records, HW01_HARDWARE,
         {
             "rust_target": environment.get("platform", {}).get("target", "aarch64-apple-darwin"),
@@ -280,14 +385,7 @@ def import_rsmp(repo_root: Path, commit: str, dirty: bool) -> Path:
             "build_profile": "release",
             "threads": "1 (zstd single_threaded contract)",
         },
-        [
-            "python3", "-m", "benchmarks.rstim_vs_stim_simulator.run_rsmp_compression",
-            "--rstim", "target/release/rstim",
-            "--catalog", "rstim/tests/fixtures/rsmp/catalog.json",
-            "--case", "stim_surface_d11_r100",
-            "--shots", "1024", "--seed", "7", "--zstd-level", "3",
-            "--out-dir", "/tmp/rstim-rsmp-v1-evidence",
-        ],
+        ["python3", "tools/import_publication_evidence.py", "--repo-root", "."],
         [
             RSMP_DIR / "raw.jsonl",
             RSMP_DIR / "summary.json",
@@ -298,10 +396,25 @@ def import_rsmp(repo_root: Path, commit: str, dirty: bool) -> Path:
         {
             "recorded": production_clean,
             "commit": environment.get("git", {}).get("commit"),
-            "note": "regenerated from a clean tree with git.dirty=false (issue #601 RSMP provenance fix)"
+            "note": "benchmark-case rows regenerated from a clean tree for the declared "
+            "shots x seed matrix with the merged #600 runner (issue #601 RSMP provenance fix)"
             if production_clean else "legacy bundle recorded git.dirty=true; regenerate from a clean tree",
         },
         commit, dirty,
+        extra_environment={
+            "matrix": {
+                "case": "stim_surface_d11_r100",
+                "shots": [str(shots) for shots in RSMP_MATRIX_SHOTS],
+                "seeds": list(RSMP_MATRIX_SEEDS),
+            },
+            "matrix_commands": matrix_commands,
+            "variant_notes": {
+                "fixed_codec": "direct level-3 Zstandard frame over the same b8 bytes; "
+                "the fixed-codec ablation isolating RSMP v1 adaptive syndrome encoding",
+                "r8_fixed_codec": "direct level-3 Zstandard frame over the Stim r8 baseline bytes",
+                "ptb64_fixed_codec": "direct level-3 Zstandard frame over the Stim ptb64 baseline bytes",
+            },
+        },
     )
 
 

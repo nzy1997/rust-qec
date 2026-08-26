@@ -27,7 +27,7 @@ claim_limits = [
 
 external_dependencies = [
   "Issue #379 (site provenance schema): this bundle reuses the portable repository-relative path + sha256 conventions; the site-facing schema integration lands with #379.",
-  "Issue #600 (RSMP b8/r8/ptb64 Stim result-format baselines): the rsmp-v1 family reserves required_baselines b8/r8/ptb64; the b8 row is derived from the pinned measurement stream, r8 and ptb64 rows are filled once #600 merges.",
+  "Issue #600 (RSMP b8/r8/ptb64 Stim result-format baselines, merged as PR #660): the rsmp-v1 family requires baselines b8/r8/ptb64; all three are imported from the regenerated shots x seed matrix bundles produced by the merged #600 runner.",
 ]
 
 # Hardware profiles referenced by run environments. hw01 is the identified
