@@ -103,10 +103,17 @@ pub struct DecodedSampleBlock {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LossVisibleMeasurementPair {
+    pub flag: usize,
+    pub value: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedMeasurementLayout {
     num_measurements: usize,
     detector_rows: Vec<Vec<usize>>,
     observable_rows: Vec<Vec<usize>>,
+    loss_visible_measurements: Vec<LossVisibleMeasurementPair>,
     expanded_instructions: u64,
     parity_terms: u64,
     max_repeat_depth: u64,
@@ -124,6 +131,7 @@ impl CheckedMeasurementLayout {
             num_measurements,
             detector_rows: builder.detector_rows,
             observable_rows: builder.observable_rows,
+            loss_visible_measurements: builder.loss_visible_measurements,
             expanded_instructions: builder.expanded_instructions,
             parity_terms: builder.parity_terms,
             max_repeat_depth: builder.max_repeat_depth,
@@ -148,6 +156,11 @@ impl CheckedMeasurementLayout {
 
     pub fn observable_rows(&self) -> &[Vec<usize>] {
         &self.observable_rows
+    }
+
+    /// Interleaved `flag,value` record pairs produced by loss-visible measurements.
+    pub fn loss_visible_measurements(&self) -> &[LossVisibleMeasurementPair] {
+        &self.loss_visible_measurements
     }
 
     pub fn expanded_instructions(&self) -> u64 {
@@ -601,6 +614,7 @@ struct LayoutBuilder {
     measurement_count: u64,
     detector_rows: Vec<Vec<usize>>,
     observable_rows: Vec<Vec<usize>>,
+    loss_visible_measurements: Vec<LossVisibleMeasurementPair>,
     expanded_instructions: u64,
     parity_terms: u64,
     max_repeat_depth: u64,
@@ -614,6 +628,7 @@ impl LayoutBuilder {
             measurement_count: 0,
             detector_rows: Vec::new(),
             observable_rows: Vec::new(),
+            loss_visible_measurements: Vec::new(),
             expanded_instructions: 0,
             parity_terms: 0,
             max_repeat_depth: 0,
@@ -710,6 +725,40 @@ impl LayoutBuilder {
                 xor_terms_into(&mut self.observable_rows[index], &row);
             }
             _ => {
+                if is_loss_visible_measurement(name) {
+                    let pair_count = count_qubit_like_targets(targets);
+                    let base = usize::try_from(self.measurement_count).map_err(|_| {
+                        MeasurementTransformError::LimitExceeded {
+                            limit: "max_measurements",
+                        }
+                    })?;
+                    let pair_bytes = pair_count
+                        .checked_mul(std::mem::size_of::<LossVisibleMeasurementPair>())
+                        .and_then(|value| u64::try_from(value).ok())
+                        .ok_or(MeasurementTransformError::LimitExceeded {
+                            limit: "max_transform_working_bytes",
+                        })?;
+                    self.reserve_layout_bytes(pair_bytes)?;
+                    for pair in 0..pair_count {
+                        let offset = pair.checked_mul(2).ok_or(
+                            MeasurementTransformError::LimitExceeded {
+                                limit: "max_measurements",
+                            },
+                        )?;
+                        let flag = base.checked_add(offset).ok_or(
+                            MeasurementTransformError::LimitExceeded {
+                                limit: "max_measurements",
+                            },
+                        )?;
+                        let value = flag.checked_add(1).ok_or(
+                            MeasurementTransformError::LimitExceeded {
+                                limit: "max_measurements",
+                            },
+                        )?;
+                        self.loss_visible_measurements
+                            .push(LossVisibleMeasurementPair { flag, value });
+                    }
+                }
                 let produced = count_measurements_op_u64(name, targets)?;
                 self.measurement_count = self.measurement_count.checked_add(produced).ok_or(
                     MeasurementTransformError::LimitExceeded {
@@ -885,6 +934,13 @@ impl LayoutBuilder {
             Ok(())
         }
     }
+}
+
+fn is_loss_visible_measurement(name: &str) -> bool {
+    matches!(
+        name,
+        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
+    )
 }
 
 pub(crate) fn num_measurements_unchecked(instrs: &[StimInstr]) -> usize {
