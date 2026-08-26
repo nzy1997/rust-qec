@@ -8,8 +8,8 @@ use qec_ilp_core::{
 use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
 
 use super::{
-    CompiledCircuit, DecodeFailure, Effect, LossEnvelope, MAX_CONDITIONED_DECODER_INCIDENCES,
-    ShotFailure,
+    CompiledCircuit, DecodeFailure, Effect, LossEnvelope, MAX_CONDITIONED_DECODER_ITEMS,
+    MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_total,
 };
 
 #[derive(Clone, Copy)]
@@ -25,6 +25,7 @@ pub(super) struct CompiledMle {
     num_observables: usize,
     timeout_ms: Option<u64>,
     force_timeout: bool,
+    cached_work: usize,
 }
 
 struct ConditionedMleModel {
@@ -47,6 +48,7 @@ impl CompiledMle {
             num_observables: circuit.num_observables,
             timeout_ms,
             force_timeout: timeout_ms == Some(0),
+            cached_work: 0,
         })
     }
 
@@ -60,14 +62,29 @@ impl CompiledMle {
         }
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
+            let (source_count, artifact_work) = preflight_conditioned_mle(
+                &self.independent,
+                &self.envelopes,
+                &syndrome.checks,
+            )
+            .map_err(|error| ShotFailure::Other(error.message))?;
+            let cached_work = conditioned_cache_total(
+                "MLE",
+                self.cache.len(),
+                self.cached_work,
+                artifact_work,
+            )
+            .map_err(ShotFailure::Other)?;
             let model = build_pattern_model(
                 &self.independent,
                 &self.envelopes,
                 &syndrome.checks,
                 self.timeout_ms,
+                source_count,
             )
             .map_err(|error| ShotFailure::Other(error.message))?;
             self.cache.insert(key.clone(), model);
+            self.cached_work = cached_work;
         }
         let model = self.cache.get_mut(&key).unwrap();
         if model.check_sources.len() != syndrome.checks.len()
@@ -135,15 +152,8 @@ fn build_pattern_model(
     envelopes: &[LossEnvelope],
     checks: &[LossAwareDetectorCheck],
     timeout_ms: Option<u64>,
+    source_count: usize,
 ) -> Result<ConditionedMleModel, DecodeFailure> {
-    let source_count = envelopes
-        .iter()
-        .try_fold(independent.len(), |total, envelope| {
-            total.checked_add(envelope.candidates.len())
-        });
-    let source_count = source_count.ok_or_else(conditioned_mle_limit_error)?;
-    preflight_conditioned_mle(source_count, checks.len())?;
-
     let mut binary_vars = Vec::with_capacity(source_count);
     let mut sources = Vec::with_capacity(source_count);
     for (index, effect) in independent.iter().enumerate() {
@@ -236,18 +246,66 @@ fn build_pattern_model(
     })
 }
 
-fn preflight_conditioned_mle(source_count: usize, check_count: usize) -> Result<(), DecodeFailure> {
-    let incidences = source_count
-        .checked_mul(check_count)
+fn preflight_conditioned_mle(
+    independent: &[Effect],
+    envelopes: &[LossEnvelope],
+    checks: &[LossAwareDetectorCheck],
+) -> Result<(usize, usize), DecodeFailure> {
+    let source_count = envelopes
+        .iter()
+        .try_fold(independent.len(), |total, envelope| {
+            total.checked_add(envelope.candidates.len())
+        })
         .ok_or_else(conditioned_mle_limit_error)?;
-    if incidences > MAX_CONDITIONED_DECODER_INCIDENCES {
+    let effect_terms = independent
+        .iter()
+        .chain(envelopes.iter().flat_map(|envelope| &envelope.candidates))
+        .try_fold(0usize, |total, effect| {
+            total.checked_add(effect.detectors.len())
+        })
+        .ok_or_else(conditioned_mle_limit_error)?;
+    let check_terms = checks
+        .iter()
+        .try_fold(0usize, |total, check| {
+            total.checked_add(check.source_detectors.len())
+        })
+        .ok_or_else(conditioned_mle_limit_error)?;
+    let work = conditioned_mle_work_from_counts(
+        source_count,
+        checks.len(),
+        effect_terms,
+        check_terms,
+    )?;
+    Ok((source_count, work))
+}
+
+fn conditioned_mle_work_from_counts(
+    source_count: usize,
+    check_count: usize,
+    effect_terms: usize,
+    check_terms: usize,
+) -> Result<usize, DecodeFailure> {
+    if source_count > MAX_CONDITIONED_DECODER_ITEMS
+        || check_count > MAX_CONDITIONED_DECODER_ITEMS
+    {
         return Err(conditioned_mle_limit_error());
     }
-    Ok(())
+    let work = source_count
+        .checked_add(check_count)
+        .and_then(|value| value.checked_add(effect_terms))
+        .and_then(|value| value.checked_add(check_terms))
+        .and_then(|value| value.checked_add(source_count.checked_mul(check_count)?))
+        .and_then(|value| value.checked_add(source_count.checked_mul(check_terms)?))
+        .and_then(|value| value.checked_add(check_count.checked_mul(effect_terms)?))
+        .ok_or_else(conditioned_mle_limit_error)?;
+    if work > MAX_CONDITIONED_DECODER_WORK {
+        return Err(conditioned_mle_limit_error());
+    }
+    Ok(work)
 }
 
 fn conditioned_mle_limit_error() -> DecodeFailure {
-    DecodeFailure::new("decode_error", "conditioned MLE incidence limit exceeded")
+    DecodeFailure::new("decode_error", "conditioned MLE work limit exceeded")
 }
 
 fn odd_sorted_intersection(left: &[usize], right: &[usize]) -> bool {
@@ -295,10 +353,24 @@ mod tests {
 
     #[test]
     fn conditioned_mle_preflights_incidence_work() {
-        assert!(preflight_conditioned_mle(10_000, 1_000).is_ok());
-        let error = preflight_conditioned_mle(10_001, 1_000).unwrap_err();
+        assert!(conditioned_mle_work_from_counts(1_000, 1_000, 0, 0).is_ok());
+        let error = conditioned_mle_work_from_counts(10_001, 1_000, 0, 0).unwrap_err();
         assert_eq!(error.code, "decode_error");
-        assert!(error.message.contains("incidence limit"));
-        assert!(preflight_conditioned_mle(usize::MAX, 2).is_err());
+        assert!(error.message.contains("work limit"));
+        assert!(conditioned_mle_work_from_counts(usize::MAX, 0, 0, 0).is_err());
+        assert!(conditioned_mle_work_from_counts(1, 1, 0, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn conditioned_mle_caps_many_cached_patterns() {
+        assert!(conditioned_cache_total("MLE", 0, 0, 1).is_ok());
+        assert!(conditioned_cache_total(
+            "MLE",
+            super::super::MAX_CONDITIONED_DECODER_ARTIFACTS,
+            0,
+            1,
+        )
+        .is_err());
+        assert!(conditioned_cache_total("MLE", 1, MAX_CONDITIONED_DECODER_WORK, 1).is_err());
     }
 }

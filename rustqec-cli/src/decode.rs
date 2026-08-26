@@ -35,7 +35,9 @@ pub const STATS_SCHEMA_VERSION: &str = "rustqec.decode-stats.v1";
 const BATCH_SIZE: usize = 1024;
 const MAX_ENVELOPE_CANDIDATES: usize = 100_000;
 const MAX_PRIMITIVE_PROBES: usize = 10_000;
-const MAX_CONDITIONED_DECODER_INCIDENCES: usize = 10_000_000;
+const MAX_CONDITIONED_DECODER_ARTIFACTS: usize = 1_024;
+const MAX_CONDITIONED_DECODER_ITEMS: usize = 100_000;
+const MAX_CONDITIONED_DECODER_WORK: usize = 10_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderKind {
@@ -74,6 +76,28 @@ impl DecodeFailure {
             message: message.into(),
         }
     }
+}
+
+fn conditioned_cache_total(
+    kind: &str,
+    existing_artifacts: usize,
+    cached_work: usize,
+    artifact_work: usize,
+) -> Result<usize, String> {
+    if existing_artifacts >= MAX_CONDITIONED_DECODER_ARTIFACTS {
+        return Err(format!(
+            "conditioned {kind} cache artifact limit exceeded"
+        ));
+    }
+    let total = cached_work
+        .checked_add(artifact_work)
+        .ok_or_else(|| format!("conditioned {kind} cumulative work limit exceeded"))?;
+    if total > MAX_CONDITIONED_DECODER_WORK {
+        return Err(format!(
+            "conditioned {kind} cumulative work limit exceeded"
+        ));
+    }
+    Ok(total)
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -706,12 +730,14 @@ mod tests {
         let mut mle = CompiledMle::new(&circuit, None).unwrap();
         let mle_zero = mle.decode(&syndromes[0], &losses[0]).unwrap();
         let mle_one = mle.decode(&syndromes[1], &losses[1]).unwrap();
+        assert_eq!(mle_zero, [0]);
         assert_eq!(mle_zero, mle_one);
         assert_eq!(mle.model_builds(), 1);
 
         let mut matching = CompiledMatching::new(&circuit).unwrap();
         let matching_zero = matching.decode(&syndromes[0], &losses[0]).unwrap();
         let matching_one = matching.decode(&syndromes[1], &losses[1]).unwrap();
+        assert_eq!(matching_zero, [0]);
         assert_eq!(matching_zero, matching_one);
         assert_eq!(matching.cache.len(), 1);
 
@@ -769,6 +795,7 @@ mod tests {
             mean_weight: 1.0,
             num_observables: 2,
             cache: HashMap::new(),
+            cached_work: 0,
         };
         assert_eq!(
             matching.decode(&singleton_syndrome(&[1]), &[]).unwrap(),
@@ -902,6 +929,7 @@ mod tests {
             mean_weight: 2.0,
             num_observables: 1,
             cache: HashMap::new(),
+            cached_work: 0,
         };
         assert_eq!(
             time_like

@@ -92,8 +92,10 @@ lost value bit.
 
 The loss-aware transform retains its detector, batch-table, pivot,
 elimination-step, and materialized-term limits. Conditioned matching and MLE
-also cap the product of mechanisms and surviving checks before constructing a
-shot-specific graph/model.
+also cap mechanism/check counts, support-scanning work, cached artifact count,
+and cumulative cached work before constructing a shot-specific graph/model.
+These limits remain effective for zero-check patterns and for streams with
+many distinct loss patterns.
 
 `matching_graph_builds` and `mle_model_builds` report the number of distinct
 conditioned artifacts actually built. `distinct_loss_patterns` and cache-hit

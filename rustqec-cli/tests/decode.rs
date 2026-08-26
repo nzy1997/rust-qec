@@ -230,7 +230,7 @@ fn real_cli_predictions_are_invariant_to_lost_measurement_placeholders() {
             String::from_utf8_lossy(&output.stderr)
         );
         let predictions = fs::read(root.path().join(format!("{decoder}.b8"))).unwrap();
-        assert_eq!(predictions.len(), 2);
+        assert_eq!(predictions, [1, 1], "{decoder}");
         assert_eq!(predictions[0], predictions[1], "{decoder}");
         let stats: Value =
             serde_json::from_slice(&fs::read(root.path().join(format!("{decoder}.json"))).unwrap())

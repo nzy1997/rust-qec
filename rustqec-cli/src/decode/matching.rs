@@ -4,7 +4,8 @@ use rmatching::Matching;
 use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
 
 use super::{
-    CompiledCircuit, DecodeFailure, Effect, MAX_CONDITIONED_DECODER_INCIDENCES, ShotFailure,
+    CompiledCircuit, DecodeFailure, Effect, MAX_CONDITIONED_DECODER_ITEMS,
+    MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_total,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -29,11 +30,13 @@ pub(super) struct CompiledMatching {
     pub(super) mean_weight: f64,
     pub(super) num_observables: usize,
     pub(super) cache: HashMap<Vec<usize>, ConditionedMatching>,
+    pub(super) cached_work: usize,
 }
 
 pub(super) struct ConditionedMatching {
     matching: Matching,
     check_sources: Vec<Vec<usize>>,
+    reachable_checks: Vec<bool>,
 }
 
 impl CompiledMatching {
@@ -86,6 +89,7 @@ impl CompiledMatching {
             mean_weight,
             num_observables: circuit.num_observables,
             cache: HashMap::new(),
+            cached_work: 0,
         })
     }
 
@@ -96,6 +100,14 @@ impl CompiledMatching {
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
+            let artifact_work = conditioned_matching_work(&self.edges, &syndrome.checks)?;
+            let cached_work = conditioned_cache_total(
+                "matching",
+                self.cache.len(),
+                self.cached_work,
+                artifact_work,
+            )
+            .map_err(ShotFailure::Other)?;
             let matching = build_matching(
                 &self.edges,
                 &self.loss_edges,
@@ -104,6 +116,7 @@ impl CompiledMatching {
                 losses,
             )?;
             self.cache.insert(key.clone(), matching);
+            self.cached_work = cached_work;
         }
         let conditioned = self.cache.get_mut(&key).unwrap();
         if conditioned.check_sources.len() != syndrome.checks.len()
@@ -117,6 +130,7 @@ impl CompiledMatching {
                 "loss pattern produced inconsistent detector-check basis".to_string(),
             ));
         }
+        validate_reachable_checks(conditioned, &syndrome.checks)?;
         let check_values: Vec<u8> = syndrome
             .checks
             .iter()
@@ -173,20 +187,14 @@ fn build_matching(
     checks: &[LossAwareDetectorCheck],
     losses: &[usize],
 ) -> Result<ConditionedMatching, ShotFailure> {
-    let incidences = edges.len().checked_mul(checks.len()).ok_or_else(|| {
-        ShotFailure::Other("conditioned matching incidence limit exceeded".to_string())
-    })?;
-    if incidences > MAX_CONDITIONED_DECODER_INCIDENCES {
-        return Err(ShotFailure::Other(
-            "conditioned matching incidence limit exceeded".to_string(),
-        ));
-    }
+    conditioned_matching_work(edges, checks)?;
     let active: HashSet<usize> = losses
         .iter()
         .flat_map(|&loss| loss_edges[loss].iter().copied())
         .collect();
     let scale = edges.iter().map(|edge| edge.weight).fold(1.0f64, f64::max);
     let mut matching = Matching::new();
+    let mut reachable_checks = vec![false; checks.len()];
     for (index, edge) in edges.iter().enumerate() {
         let weight = if active.contains(&index) {
             match edge.kind {
@@ -210,6 +218,9 @@ fn build_matching(
             // inventing a detector or splitting its logical label.
             continue;
         }
+        for &check in &transformed {
+            reachable_checks[check] = true;
+        }
         let probability = 1.0 / (1.0 + weight.exp());
         if transformed.len() == 2 {
             matching.add_edge(
@@ -230,7 +241,72 @@ fn build_matching(
             .iter()
             .map(|check| check.source_detectors.clone())
             .collect(),
+        reachable_checks,
     })
+}
+
+fn conditioned_matching_work(
+    edges: &[GraphEdge],
+    checks: &[LossAwareDetectorCheck],
+) -> Result<usize, ShotFailure> {
+    let edge_terms = edges
+        .iter()
+        .try_fold(0usize, |total, edge| {
+            total
+                .checked_add(1 + usize::from(edge.node2.is_some()))?
+                .checked_add(edge.observables.len())
+        })
+        .ok_or_else(conditioned_matching_limit_error)?;
+    let check_terms = checks
+        .iter()
+        .try_fold(0usize, |total, check| {
+            total.checked_add(check.source_detectors.len())
+        })
+        .ok_or_else(conditioned_matching_limit_error)?;
+    conditioned_matching_work_from_counts(edges.len(), checks.len(), edge_terms, check_terms)
+}
+
+fn conditioned_matching_work_from_counts(
+    edge_count: usize,
+    check_count: usize,
+    edge_terms: usize,
+    check_terms: usize,
+) -> Result<usize, ShotFailure> {
+    if edge_count > MAX_CONDITIONED_DECODER_ITEMS
+        || check_count > MAX_CONDITIONED_DECODER_ITEMS
+    {
+        return Err(conditioned_matching_limit_error());
+    }
+    let work = edge_count
+        .checked_add(check_count)
+        .and_then(|value| value.checked_add(edge_terms))
+        .and_then(|value| value.checked_add(check_terms))
+        .and_then(|value| value.checked_add(edge_count.checked_mul(check_count)?))
+        .and_then(|value| value.checked_add(edge_terms.checked_mul(check_terms)?))
+        .ok_or_else(conditioned_matching_limit_error)?;
+    if work > MAX_CONDITIONED_DECODER_WORK {
+        return Err(conditioned_matching_limit_error());
+    }
+    Ok(work)
+}
+
+fn conditioned_matching_limit_error() -> ShotFailure {
+    ShotFailure::Other("conditioned matching work limit exceeded".to_string())
+}
+
+fn validate_reachable_checks(
+    conditioned: &ConditionedMatching,
+    checks: &[LossAwareDetectorCheck],
+) -> Result<(), ShotFailure> {
+    if conditioned
+        .reachable_checks
+        .iter()
+        .zip(checks)
+        .any(|(&reachable, check)| check.value && !reachable)
+    {
+        return Err(ShotFailure::Infeasible);
+    }
+    Ok(())
 }
 
 fn transformed_check_nodes(edge: &GraphEdge, checks: &[LossAwareDetectorCheck]) -> Vec<usize> {
@@ -263,12 +339,20 @@ mod tests {
 
     #[test]
     fn conditioned_matching_rejects_hyperedges_without_splitting_them() {
-        let checks: Vec<_> = (0..3)
-            .map(|_| LossAwareDetectorCheck {
+        let checks = vec![
+            LossAwareDetectorCheck {
                 source_detectors: vec![0],
                 value: false,
-            })
-            .collect();
+            },
+            LossAwareDetectorCheck {
+                source_detectors: vec![0, 1],
+                value: false,
+            },
+            LossAwareDetectorCheck {
+                source_detectors: vec![0, 2],
+                value: false,
+            },
+        ];
         let error = build_matching(&[boundary_edge()], &[], 1.0, &checks, &[])
             .err()
             .unwrap();
@@ -279,19 +363,36 @@ mod tests {
 
     #[test]
     fn conditioned_matching_preflights_incidence_work() {
-        let edges = vec![boundary_edge(); 10_001];
-        let checks = vec![
-            LossAwareDetectorCheck {
-                source_detectors: Vec::new(),
-                value: false,
-            };
-            1_000
-        ];
-        let error = build_matching(&edges, &[], 1.0, &checks, &[])
-            .err()
-            .unwrap();
+        let error = conditioned_matching_work_from_counts(10_001, 1_000, 0, 0).unwrap_err();
         assert!(
-            matches!(error, ShotFailure::Other(message) if message.contains("incidence limit"))
+            matches!(error, ShotFailure::Other(message) if message.contains("work limit"))
         );
+        assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0).is_err());
+        assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn conditioned_matching_marks_fired_unreachable_checks_infeasible() {
+        let checks = vec![LossAwareDetectorCheck {
+            source_detectors: vec![1],
+            value: true,
+        }];
+        let mut decoder = CompiledMatching {
+            edges: vec![boundary_edge()],
+            loss_edges: Vec::new(),
+            mean_weight: 1.0,
+            num_observables: 0,
+            cache: HashMap::new(),
+            cached_work: 0,
+        };
+        let shot = LossAwareDetectorShot {
+            lost_measurements: Vec::new(),
+            detector_valid: vec![true, true],
+            checks,
+        };
+        assert!(matches!(
+            decoder.decode(&shot, &[]),
+            Err(ShotFailure::Infeasible)
+        ));
     }
 }
