@@ -127,17 +127,17 @@ native Mid-SWAP families), seeded measurement and detection-event sampling,
 detector-error-model extraction, circuit statistics, public dataset export and
 import, and loss-aware batch decoding. The full
 loop from circuit generation to decoded predictions therefore runs behind one
-machine-facing interface, while crate boundaries separate circuit execution,
-code construction, decoding, and evidence generation. This keeps the
-user-facing interface cohesive without forcing unrelated algorithms into one
-library API.
+machine-facing interface; crate boundaries separate circuit execution,
+code construction, decoding, and evidence generation.
 
 The simulation layer samples Stim-style circuits and exports structured or
 bit-packed data. Native Mid-SWAP generation adds an alternating syndrome-
 extraction schedule and a persistent logical-site-to-wire permutation. Loss-
 visible `MRL` and `ML` instructions emit an adjacent flag and value for each
 target. Detectors and logical observables reference value records, while the
-flags retain the information required by a loss-aware decoder.
+flags retain the information required by a loss-aware decoder. An optional
+per-shot trace records the exact noise realization — every Pauli branch and
+loss onset — behind each exported shot.
 
 The unified decoder reads a public dataset containing `manifest.json`,
 `circuit.stim`, and `shots.b8`. It validates hashes, dimensions, row widths,
@@ -146,12 +146,12 @@ is compiled once into measurement-to-detector relations, independent Pauli
 effects, loss envelopes, and a matching graph. Each shot then supplies only its
 syndrome and observed loss set. One backend uses an ILP model as an exact
 small-scale correctness reference; the other updates and caches matching graphs
-for repeated loss patterns. The `renvelope` crate holds the reference decoders
-for explicit, versioned envelope cases, and the production backends
+for repeated loss patterns. The `renvelope` crate holds reference decoders
+for explicit, versioned envelope cases; the production backends
 cross-validate against it in the test suite, so correctness claims trace to
-checked reference cases rather than to the optimized implementation alone.
-Both backends are implementation choices behind the same workflow, not
-separate user-facing research products.
+checked reference cases rather than the optimized implementation alone.
+Both backends are implementation choices behind one workflow, not
+separate research products.
 
 The command-line contract is the enforcement layer of this scientific
 contract, and each of its properties exists to prevent a specific
@@ -159,12 +159,12 @@ reproducibility failure mode. Successful commands write stable JSON or packed
 binary artifacts, while failures use documented error codes and nonzero
 exits, so an infeasible decode or a timeout can never read as an all-zero
 prediction. The `capabilities` command reports every verb's
-argument list, input sources, output formats, artifacts, and error behavior in
+arguments, input sources, output formats, artifacts, and error behavior in
 JSON, and the test suite pins this document against the implementation so the
-advertised contract cannot drift from behavior. Decode statistics record
+advertised contract cannot drift. Decode statistics record
 the circuit hash, shot count, compile and decode time, distinct loss patterns,
 cache reuse, timeouts, and infeasible shots. Prediction and statistics files
-are published atomically so that a partial run cannot resemble a completed
+are published atomically so a partial run cannot resemble a completed
 experiment.
 
 The loss-aware compiler accepts a published, versioned circuit subset rather
@@ -191,13 +191,15 @@ the stable detector-error-model decoder interface.
 RustQEC is used to build reproducible QEC experiments within this repository.
 Tracked workflows compare multiple decoder implementations on shared surface-
 code and bivariate-bicycle-code workloads. They publish fixed inputs, result
-tables, figures, methodology notes, and claim limits. The loss-aware path is
-also used to generate and decode native distance-3 and distance-5 Mid-SWAP
+tables, figures, methodology notes, and claim limits. The loss-aware path
+generates and decodes native distance-3 and distance-5 Mid-SWAP
 datasets through the public CLI, and datasets produced outside the built-in
 generators — including a Stim-generated surface-code circuit annotated by
 independent tooling — enter through `dataset import` and decode through the
-same validated contract. A companion study will report scientific
-results produced with this workflow; its citation must be added before JOSS
+same validated contract. The blinded split and the private error trace give
+learned decoders ground-truth training labels while keeping the public
+evaluation fair. A companion study will report scientific
+results from this workflow; its citation must be added before JOSS
 submission.
 
 Correctness evidence is layered rather than represented by a single benchmark.
@@ -207,7 +209,7 @@ missing files, timeouts, and infeasible models. Regression tests verify Mid-
 SWAP schedule and record semantics, compare batched predictions with explicit
 decoder kernels, and check that circuits compile once while repeated loss
 patterns reuse state. The documentation site exposes runnable showcases and
-checked artifacts so a reader can distinguish implementation smoke tests from
+checked artifacts, distinguishing implementation smoke tests from
 publication-scale evidence.
 
 A public issue and pull-request history, continuous integration,
