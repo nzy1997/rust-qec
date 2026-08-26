@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use rstim::ir::{StimInstr, StimTarget};
-use rstim::measurement_transform::{CheckedMeasurementLayout, MeasurementTransformLimits};
+use rstim::m2d::CompiledLossAwareM2d;
 use rstim::sim::bit_table::BitTable;
 
 use super::dataset::Dataset;
@@ -44,16 +44,9 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
         ));
     }
     let normalized = normalize_supported_circuit(&instrs)?;
-    let layout = CheckedMeasurementLayout::from_circuit_with_limits(
-        &instrs,
-        MeasurementTransformLimits::default(),
-    )
-    .map_err(|error| DecodeFailure::new("unsupported_circuit", error.to_string()))?;
-    let reference = rstim::data_path::build_reference_sample(
-        &instrs,
-        rstim::data_path::ReferenceSampleMode::SimulateNoiseless,
-    )
-    .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
+    let loss_aware_m2d = CompiledLossAwareM2d::new(&instrs)
+        .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
+    let layout = loss_aware_m2d.layout();
     let flag_set: HashSet<usize> = normalized.loss_flags.iter().copied().collect();
     if layout
         .detector_rows()
@@ -89,15 +82,13 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
         unmapped_loss_primitives.push(compiled.unmapped_primitives);
     }
     Ok(CompiledCircuit {
-        layout,
-        reference,
+        loss_aware_m2d,
         loss_flags: normalized.loss_flags,
         independent_effects,
         envelopes,
         graph_edges,
         loss_edges,
         unmapped_loss_primitives,
-        num_detectors: stats.num_detectors,
         num_observables: stats.num_observables,
     })
 }
@@ -627,25 +618,20 @@ fn split_components(targets: &[DemTarget]) -> Vec<&[DemTarget]> {
 }
 
 impl CompiledCircuit {
-    pub(super) fn syndromes(&self, measurements: &BitTable) -> Result<Vec<Vec<u8>>, DecodeFailure> {
-        if measurements.num_major() != self.layout.num_measurements() {
+    pub(super) fn loss_aware_syndromes(
+        &self,
+        measurements: &BitTable,
+    ) -> Result<Vec<rstim::m2d::LossAwareDetectorShot>, DecodeFailure> {
+        if measurements.num_major() != self.loss_aware_m2d.layout().num_measurements() {
             return Err(DecodeFailure::new(
                 "invalid_dataset",
                 "measurement block width does not match compiled circuit",
             ));
         }
-        let mut output = vec![vec![0; self.num_detectors]; measurements.num_minor()];
-        for (detector, terms) in self.layout.detector_rows().iter().enumerate() {
-            for (shot, row) in output.iter_mut().enumerate() {
-                row[detector] = terms.iter().fold(0u8, |parity, &measurement| {
-                    parity
-                        ^ u8::from(
-                            measurements.get(measurement, shot) ^ self.reference[measurement],
-                        )
-                });
-            }
-        }
-        Ok(output)
+        self.loss_aware_m2d
+            .convert(measurements)
+            .map(|output| output.shots)
+            .map_err(|error| DecodeFailure::new("invalid_dataset", error))
     }
 
     pub(super) fn loss_patterns(&self, measurements: &BitTable) -> Vec<Vec<usize>> {

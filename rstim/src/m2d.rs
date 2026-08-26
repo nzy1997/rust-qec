@@ -67,6 +67,60 @@ impl Default for LossAwareM2dLimits {
     }
 }
 
+/// Reusable loss-aware measurement-to-detector transform.
+///
+/// Construction validates the circuit and computes its noiseless reference
+/// sample once. [`Self::convert`] can then process many measurement batches
+/// without recompiling either artifact.
+pub struct CompiledLossAwareM2d {
+    layout: CheckedMeasurementLayout,
+    reference_sample: Vec<bool>,
+    limits: LossAwareM2dLimits,
+}
+
+impl CompiledLossAwareM2d {
+    pub fn new(instrs: &[StimInstr]) -> Result<Self, String> {
+        Self::with_limits(instrs, LossAwareM2dLimits::default())
+    }
+
+    pub fn with_limits(instrs: &[StimInstr], limits: LossAwareM2dLimits) -> Result<Self, String> {
+        let layout = CheckedMeasurementLayout::from_circuit_with_limits(
+            instrs,
+            MeasurementTransformLimits::default(),
+        )
+        .map_err(|err| err.to_string())?;
+        validate_loss_flag_references(&layout)?;
+        let reference_sample =
+            build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?;
+        Ok(Self {
+            layout,
+            reference_sample,
+            limits,
+        })
+    }
+
+    pub fn layout(&self) -> &CheckedMeasurementLayout {
+        &self.layout
+    }
+
+    pub fn convert(&self, meas_table: &BitTable) -> Result<LossAwareM2dOutput, String> {
+        preflight_loss_aware_tables(&self.layout, meas_table, self.limits)?;
+        let loss_mask = loss_mask_from_loss_visible_measurements(&self.layout, meas_table)?;
+        let raw = measurements_to_detections_with_layout_and_reference(
+            &self.layout,
+            meas_table,
+            &self.reference_sample,
+        )?;
+        build_loss_aware_output(
+            &self.layout,
+            &raw,
+            &loss_mask,
+            meas_table.num_minor(),
+            self.limits,
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct M2dOptions {
     pub reference_sample_mode: ReferenceSampleMode,
@@ -210,16 +264,32 @@ fn measurements_to_loss_aware_detections_with_layout(
     let merged_loss_mask = merge_embedded_loss_flags(layout, meas_table, measurement_loss_mask)?;
 
     let raw = measurements_to_detections(instrs, meas_table)?;
+    build_loss_aware_output(
+        layout,
+        &raw,
+        &merged_loss_mask,
+        meas_table.num_minor(),
+        limits,
+    )
+}
+
+fn build_loss_aware_output(
+    layout: &CheckedMeasurementLayout,
+    raw: &M2dOutput,
+    loss_mask: &BitTable,
+    num_shots: usize,
+    limits: LossAwareM2dLimits,
+) -> Result<LossAwareM2dOutput, String> {
     let mut shots = Vec::new();
     shots
-        .try_reserve_exact(meas_table.num_minor())
+        .try_reserve_exact(num_shots)
         .map_err(|_| "loss-aware output allocation failed".to_string())?;
     let mut budget = LossAwareWorkBudget::new(limits);
-    for shot in 0..meas_table.num_minor() {
+    for shot in 0..num_shots {
         shots.push(build_loss_aware_shot(
             layout.detector_rows(),
             &raw.detections,
-            &merged_loss_mask,
+            loss_mask,
             shot,
             &mut budget,
         )?);
@@ -566,6 +636,24 @@ fn measurements_to_detections_impl(
         MeasurementTransformLimits::default(),
     )
     .map_err(|err| err.to_string())?;
+    measurements_to_detections_with_layout(
+        work_instrs,
+        &layout,
+        meas_table,
+        sweep_table,
+        shared_reference,
+        measurement_corrections,
+    )
+}
+
+fn measurements_to_detections_with_layout(
+    work_instrs: &[StimInstr],
+    layout: &CheckedMeasurementLayout,
+    meas_table: &BitTable,
+    sweep_table: Option<&BitTable>,
+    shared_reference: Option<&[bool]>,
+    measurement_corrections: &[Vec<usize>],
+) -> Result<M2dOutput, String> {
     let n_meas = layout.num_measurements();
     if let Some(reference) = shared_reference {
         if reference.len() != n_meas {
@@ -644,6 +732,21 @@ fn measurements_to_detections_impl(
         detections: dets,
         observable_flips: obs,
     })
+}
+
+fn measurements_to_detections_with_layout_and_reference(
+    layout: &CheckedMeasurementLayout,
+    meas_table: &BitTable,
+    reference_sample: &[bool],
+) -> Result<M2dOutput, String> {
+    measurements_to_detections_with_layout(
+        &[],
+        layout,
+        meas_table,
+        None,
+        Some(reference_sample),
+        &[],
+    )
 }
 
 fn reference_measurement_count_mismatch(reference_len: usize, n_meas: usize) -> String {

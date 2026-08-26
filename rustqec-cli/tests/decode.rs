@@ -29,6 +29,19 @@ const CIRCUIT: &str = concat!(
 );
 const SHOTS: &[u8] = &[0x02, 0x01, 0x01, 0x00];
 const EXPECTED_PREDICTIONS: &[u8] = &[1, 0, 0, 0];
+const PLACEHOLDER_INVARIANCE_CIRCUIT: &str = concat!(
+    "QUBIT_COORDS(0,0) 0\n",
+    "R 0\n",
+    "X_ERROR(0.1) 0\n",
+    "LOSS(0.1) 0\n",
+    "MRL 0\n",
+    "X_ERROR(0.02) 0\n",
+    "LOSS(0.1) 0\n",
+    "ML 0\n",
+    "DETECTOR(0,0,0) rec[-3]\n",
+    "DETECTOR(0,0,1) rec[-3] rec[-1]\n",
+    "OBSERVABLE_INCLUDE(0) rec[-1]\n",
+);
 
 fn rustqec() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rustqec"))
@@ -197,6 +210,34 @@ fn both_loss_decoders_run_public_only_and_reuse_compiled_state() {
         if decoder == "envelope-matching" {
             assert_eq!(stats["matching_graph_builds"], 2);
             assert_eq!(stats["cache_hits"], 2);
+        } else {
+            assert_eq!(stats["mle_model_builds"], 2);
+        }
+    }
+}
+
+#[test]
+fn real_cli_predictions_are_invariant_to_lost_measurement_placeholders() {
+    let root = tempfile::tempdir().unwrap();
+    // Both shots herald loss at record 0 and have the same known final value.
+    // They differ only at lost value record 1 (0x09 versus 0x0b).
+    let dataset = write_dataset(root.path(), PLACEHOLDER_INVARIANCE_CIRCUIT, &[0x09, 0x0b]);
+    for decoder in ["envelope-matching", "envelope-mle"] {
+        let output = run_decode(&dataset, decoder, root.path());
+        assert!(
+            output.status.success(),
+            "{decoder}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let predictions = fs::read(root.path().join(format!("{decoder}.b8"))).unwrap();
+        assert_eq!(predictions, [1, 1], "{decoder}");
+        assert_eq!(predictions[0], predictions[1], "{decoder}");
+        let stats: Value =
+            serde_json::from_slice(&fs::read(root.path().join(format!("{decoder}.json"))).unwrap())
+                .unwrap();
+        assert_eq!(stats["distinct_loss_patterns"], 1);
+        if decoder == "envelope-matching" {
+            assert_eq!(stats["matching_graph_builds"], 1);
         } else {
             assert_eq!(stats["mle_model_builds"], 1);
         }
