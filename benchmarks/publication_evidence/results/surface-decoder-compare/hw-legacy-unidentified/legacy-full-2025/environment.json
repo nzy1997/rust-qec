@@ -1,0 +1,42 @@
+{
+ "argv": [
+  "import://tools/import_publication_evidence.py",
+  "--family",
+  "surface-decoder-compare",
+  "--source",
+  "benchmarks/surface_decoder_compare/results/full/results.csv"
+ ],
+ "family": "surface-decoder-compare",
+ "git": {
+  "commit": "a92f687af6cb4a2e06ffbf4451891be2bbc52782",
+  "dirty": false
+ },
+ "hardware": {
+  "cpu_class": "unidentified",
+  "cpu_model": "not recorded in source artifact",
+  "identified": false,
+  "logical_cores": 0,
+  "os": "not recorded in source artifact",
+  "physical_cores": 0,
+  "ram_gb": 0
+ },
+ "hardware_id": "hw-legacy-unidentified",
+ "production_provenance": {
+  "note": "historical error-budget-stopped full comparison; original commit, hardware, and declared-seed fixed-shot protocol were not recorded in the source artifact",
+  "recorded": false
+ },
+ "run_id": "legacy-full-2025",
+ "schema": "publication-environment-v1",
+ "source_artifacts": [
+  {
+   "path": "benchmarks/surface_decoder_compare/results/full/results.csv",
+   "sha256": "e74ff135e130fc127f7dbfd41d2d431cc800bdb3ab0f038ce512bcf9ab06ccc9"
+  }
+ ],
+ "toolchain": {
+  "build_profile": "not recorded",
+  "rust_target": "not recorded in source artifact",
+  "rustc": "not recorded in source artifact",
+  "threads": "not recorded"
+ }
+}

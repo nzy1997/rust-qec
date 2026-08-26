@@ -1,0 +1,806 @@
+{
+ "estimates": [
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0003-b8"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0008-b8"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0006-b8"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0001-b8"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0005-b8"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0002-b8"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-fix-0004-b8"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-s1024-seed11-b8",
+    "rsmp-s1024-seed17-b8",
+    "rsmp-s1024-seed23-b8",
+    "rsmp-s1024-seed31-b8",
+    "rsmp-s1024-seed7-b8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-s256-seed11-b8",
+    "rsmp-s256-seed17-b8",
+    "rsmp-s256-seed23-b8",
+    "rsmp-s256-seed31-b8",
+    "rsmp-s256-seed7-b8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 1.0,
+   "ci_low": 1.0,
+   "group": "bytes|b8|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 1.0,
+   "raw_records": [
+    "rsmp-s4096-seed11-b8",
+    "rsmp-s4096-seed17-b8",
+    "rsmp-s4096-seed23-b8",
+    "rsmp-s4096-seed31-b8",
+    "rsmp-s4096-seed7-b8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "b8"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0003-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 1.000038146973,
+   "ci_low": 1.000038146973,
+   "group": "bytes|fixed_codec|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.000038146973,
+   "raw_records": [
+    "rsmp-fix-0008-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0006-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0001-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0005-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0002-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 4.25,
+   "ci_low": 4.25,
+   "group": "bytes|fixed_codec|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 4.25,
+   "raw_records": [
+    "rsmp-fix-0004-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 0.20932037434,
+   "ci_low": 0.20932037434,
+   "group": "bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.20932037434,
+   "raw_records": [
+    "rsmp-s1024-seed11-fixed-codec",
+    "rsmp-s1024-seed17-fixed-codec",
+    "rsmp-s1024-seed23-fixed-codec",
+    "rsmp-s1024-seed31-fixed-codec",
+    "rsmp-s1024-seed7-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 0.208979736972,
+   "ci_low": 0.208979736972,
+   "group": "bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.208979736972,
+   "raw_records": [
+    "rsmp-s256-seed11-fixed-codec",
+    "rsmp-s256-seed17-fixed-codec",
+    "rsmp-s256-seed23-fixed-codec",
+    "rsmp-s256-seed31-fixed-codec",
+    "rsmp-s256-seed7-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 0.208955226284,
+   "ci_low": 0.208955226284,
+   "group": "bytes|fixed_codec|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.208955226284,
+   "raw_records": [
+    "rsmp-s4096-seed11-fixed-codec",
+    "rsmp-s4096-seed17-fixed-codec",
+    "rsmp-s4096-seed23-fixed-codec",
+    "rsmp-s4096-seed31-fixed-codec",
+    "rsmp-s4096-seed7-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "fixed_codec"
+  },
+  {
+   "ci_high": 0.247782765089,
+   "ci_low": 0.247782765089,
+   "group": "bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.247782765089,
+   "raw_records": [
+    "rsmp-s1024-seed11-ptb64-fixed-codec",
+    "rsmp-s1024-seed17-ptb64-fixed-codec",
+    "rsmp-s1024-seed23-ptb64-fixed-codec",
+    "rsmp-s1024-seed31-ptb64-fixed-codec",
+    "rsmp-s1024-seed7-ptb64-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "ptb64_fixed_codec"
+  },
+  {
+   "ci_high": 0.246637945251,
+   "ci_low": 0.246637945251,
+   "group": "bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.246637945251,
+   "raw_records": [
+    "rsmp-s256-seed11-ptb64-fixed-codec",
+    "rsmp-s256-seed17-ptb64-fixed-codec",
+    "rsmp-s256-seed23-ptb64-fixed-codec",
+    "rsmp-s256-seed31-ptb64-fixed-codec",
+    "rsmp-s256-seed7-ptb64-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "ptb64_fixed_codec"
+  },
+  {
+   "ci_high": 0.247755130174,
+   "ci_low": 0.247755130174,
+   "group": "bytes|ptb64_fixed_codec|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.247755130174,
+   "raw_records": [
+    "rsmp-s4096-seed11-ptb64-fixed-codec",
+    "rsmp-s4096-seed17-ptb64-fixed-codec",
+    "rsmp-s4096-seed23-ptb64-fixed-codec",
+    "rsmp-s4096-seed31-ptb64-fixed-codec",
+    "rsmp-s4096-seed7-ptb64-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "ptb64_fixed_codec"
+  },
+  {
+   "ci_high": 0.999422823219,
+   "ci_low": 0.999422823219,
+   "group": "bytes|ptb64|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.999422823219,
+   "raw_records": [
+    "rsmp-s1024-seed11-ptb64",
+    "rsmp-s1024-seed17-ptb64",
+    "rsmp-s1024-seed23-ptb64",
+    "rsmp-s1024-seed31-ptb64",
+    "rsmp-s1024-seed7-ptb64"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "ptb64"
+  },
+  {
+   "ci_high": 0.999422823219,
+   "ci_low": 0.999422823219,
+   "group": "bytes|ptb64|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.999422823219,
+   "raw_records": [
+    "rsmp-s256-seed11-ptb64",
+    "rsmp-s256-seed17-ptb64",
+    "rsmp-s256-seed23-ptb64",
+    "rsmp-s256-seed31-ptb64",
+    "rsmp-s256-seed7-ptb64"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "ptb64"
+  },
+  {
+   "ci_high": 0.999422823219,
+   "ci_low": 0.999422823219,
+   "group": "bytes|ptb64|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.999422823219,
+   "raw_records": [
+    "rsmp-s4096-seed11-ptb64",
+    "rsmp-s4096-seed17-ptb64",
+    "rsmp-s4096-seed23-ptb64",
+    "rsmp-s4096-seed31-ptb64",
+    "rsmp-s4096-seed7-ptb64"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "ptb64"
+  },
+  {
+   "ci_high": 0.390620748475,
+   "ci_low": 0.390620748475,
+   "group": "bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.390620748475,
+   "raw_records": [
+    "rsmp-s1024-seed11-r8-fixed-codec",
+    "rsmp-s1024-seed17-r8-fixed-codec",
+    "rsmp-s1024-seed23-r8-fixed-codec",
+    "rsmp-s1024-seed31-r8-fixed-codec",
+    "rsmp-s1024-seed7-r8-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "r8_fixed_codec"
+  },
+  {
+   "ci_high": 0.376123948714,
+   "ci_low": 0.376123948714,
+   "group": "bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.376123948714,
+   "raw_records": [
+    "rsmp-s256-seed11-r8-fixed-codec",
+    "rsmp-s256-seed17-r8-fixed-codec",
+    "rsmp-s256-seed23-r8-fixed-codec",
+    "rsmp-s256-seed31-r8-fixed-codec",
+    "rsmp-s256-seed7-r8-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "r8_fixed_codec"
+  },
+  {
+   "ci_high": 0.395343291351,
+   "ci_low": 0.395343291351,
+   "group": "bytes|r8_fixed_codec|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.395343291351,
+   "raw_records": [
+    "rsmp-s4096-seed11-r8-fixed-codec",
+    "rsmp-s4096-seed17-r8-fixed-codec",
+    "rsmp-s4096-seed23-r8-fixed-codec",
+    "rsmp-s4096-seed31-r8-fixed-codec",
+    "rsmp-s4096-seed7-r8-fixed-codec"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "r8_fixed_codec"
+  },
+  {
+   "ci_high": 3.014863976954,
+   "ci_low": 3.014863976954,
+   "group": "bytes|r8|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 3.014863976954,
+   "raw_records": [
+    "rsmp-s1024-seed11-r8",
+    "rsmp-s1024-seed17-r8",
+    "rsmp-s1024-seed23-r8",
+    "rsmp-s1024-seed31-r8",
+    "rsmp-s1024-seed7-r8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "r8"
+  },
+  {
+   "ci_high": 3.005862467018,
+   "ci_low": 3.005862467018,
+   "group": "bytes|r8|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 3.005862467018,
+   "raw_records": [
+    "rsmp-s256-seed11-r8",
+    "rsmp-s256-seed17-r8",
+    "rsmp-s256-seed23-r8",
+    "rsmp-s256-seed31-r8",
+    "rsmp-s256-seed7-r8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "r8"
+  },
+  {
+   "ci_high": 3.011718460123,
+   "ci_low": 3.011718460123,
+   "group": "bytes|r8|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 3.011718460123,
+   "raw_records": [
+    "rsmp-s4096-seed11-r8",
+    "rsmp-s4096-seed17-r8",
+    "rsmp-s4096-seed23-r8",
+    "rsmp-s4096-seed31-r8",
+    "rsmp-s4096-seed7-r8"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "r8"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=dependent_detectors,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0003-rsmp"
+   ],
+   "scale": {
+    "case_id": "dependent_detectors",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 1.000465393066,
+   "ci_low": 1.000465393066,
+   "group": "bytes|rsmp_v1_adaptive|case_id=high_entropy_control,shots=8192",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 1.000465393066,
+   "raw_records": [
+    "rsmp-fix-0008-rsmp"
+   ],
+   "scale": {
+    "case_id": "high_entropy_control",
+    "shots": "8192"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=loss_visible_measurements,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0006-rsmp"
+   ],
+   "scale": {
+    "case_id": "loss_visible_measurements",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=nonzero_reference,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0001-rsmp"
+   ],
+   "scale": {
+    "case_id": "nonzero_reference",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=observable_recovery,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0005-rsmp"
+   ],
+   "scale": {
+    "case_id": "observable_recovery",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=rank_zero,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0002-rsmp"
+   ],
+   "scale": {
+    "case_id": "rank_zero",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 84.5,
+   "ci_low": 84.5,
+   "group": "bytes|rsmp_v1_adaptive|case_id=repeat_records,shots=4",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 1,
+   "point": 84.5,
+   "raw_records": [
+    "rsmp-fix-0004-rsmp"
+   ],
+   "scale": {
+    "case_id": "repeat_records",
+    "shots": "4"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 0.119508575198,
+   "ci_low": 0.119508575198,
+   "group": "bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=1024",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.119508575198,
+   "raw_records": [
+    "rsmp-s1024-seed11-rsmp",
+    "rsmp-s1024-seed17-rsmp",
+    "rsmp-s1024-seed23-rsmp",
+    "rsmp-s1024-seed31-rsmp",
+    "rsmp-s1024-seed7-rsmp"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "1024"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 0.120072868569,
+   "ci_low": 0.120072868569,
+   "group": "bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=256",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.120072868569,
+   "raw_records": [
+    "rsmp-s256-seed11-rsmp",
+    "rsmp-s256-seed17-rsmp",
+    "rsmp-s256-seed23-rsmp",
+    "rsmp-s256-seed31-rsmp",
+    "rsmp-s256-seed7-rsmp"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "256"
+   },
+   "variant": "rsmp_v1_adaptive"
+  },
+  {
+   "ci_high": 0.118963800194,
+   "ci_low": 0.118963800194,
+   "group": "bytes|rsmp_v1_adaptive|case_id=stim_surface_d11_r100,shots=4096",
+   "kind": "bytes",
+   "method": "deterministic_ratio",
+   "n": 5,
+   "point": 0.118963800194,
+   "raw_records": [
+    "rsmp-s4096-seed11-rsmp",
+    "rsmp-s4096-seed17-rsmp",
+    "rsmp-s4096-seed23-rsmp",
+    "rsmp-s4096-seed31-rsmp",
+    "rsmp-s4096-seed7-rsmp"
+   ],
+   "scale": {
+    "case_id": "stim_surface_d11_r100",
+    "shots": "4096"
+   },
+   "variant": "rsmp_v1_adaptive"
+  }
+ ],
+ "family": "rsmp-v1",
+ "hardware_id": "hw01-apple-m4-macos",
+ "run_id": "d11-r100-matrix",
+ "schema": "publication-summary-v1"
+}

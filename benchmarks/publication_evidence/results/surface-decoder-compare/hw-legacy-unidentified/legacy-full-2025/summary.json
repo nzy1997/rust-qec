@@ -1,0 +1,620 @@
+{
+ "estimates": [
+  {
+   "ci_high": 0.001839944387,
+   "ci_low": 0.000543285986,
+   "group": "logical_error|ilpqec|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.001,
+   "raw_records": [
+    "surface-full-0002"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.005556994928,
+   "ci_low": 0.003023854656,
+   "group": "logical_error|ilpqec|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0041,
+   "raw_records": [
+    "surface-full-0008"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.016820482754,
+   "ci_low": 0.012152533263,
+   "group": "logical_error|ilpqec|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0143,
+   "raw_records": [
+    "surface-full-0014"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.000728995844,
+   "ci_low": 5.4848927e-05,
+   "group": "logical_error|ilpqec|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0002,
+   "raw_records": [
+    "surface-full-0020"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.002720985415,
+   "ci_low": 0.001061707361,
+   "group": "logical_error|ilpqec|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0017,
+   "raw_records": [
+    "surface-full-0026"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.019939908259,
+   "ci_low": 0.014830880568,
+   "group": "logical_error|ilpqec|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0172,
+   "raw_records": [
+    "surface-full-0032"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "ilpqec"
+  },
+  {
+   "ci_high": 0.004630640572,
+   "ci_low": 0.00235082341,
+   "group": "logical_error|ldpc_bposd|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0033,
+   "raw_records": [
+    "surface-full-0003"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.013676372155,
+   "ci_low": 0.009498871053,
+   "group": "logical_error|ldpc_bposd|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0114,
+   "raw_records": [
+    "surface-full-0009"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.034748313621,
+   "ci_low": 0.026490600449,
+   "group": "logical_error|ldpc_bposd|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 6656,
+   "point": 0.030348557692,
+   "raw_records": [
+    "surface-full-0015"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.002965795017,
+   "ci_low": 0.00121674416,
+   "group": "logical_error|ldpc_bposd|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0019,
+   "raw_records": [
+    "surface-full-0021"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.013349365912,
+   "ci_low": 0.009226107695,
+   "group": "logical_error|ldpc_bposd|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0111,
+   "raw_records": [
+    "surface-full-0027"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.064397699269,
+   "ci_low": 0.04927551163,
+   "group": "logical_error|ldpc_bposd|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 3584,
+   "point": 0.056361607143,
+   "raw_records": [
+    "surface-full-0033"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "ldpc_bposd"
+  },
+  {
+   "ci_high": 0.002223088102,
+   "ci_low": 0.000759911873,
+   "group": "logical_error|pymatching|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0013,
+   "raw_records": [
+    "surface-full-0001"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.00737720496,
+   "ci_low": 0.00440241583,
+   "group": "logical_error|pymatching|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0057,
+   "raw_records": [
+    "surface-full-0007"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.022507133551,
+   "ci_low": 0.017061812083,
+   "group": "logical_error|pymatching|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0196,
+   "raw_records": [
+    "surface-full-0013"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.000881735772,
+   "ci_low": 0.000102032199,
+   "group": "logical_error|pymatching|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0003,
+   "raw_records": [
+    "surface-full-0019"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.005441912646,
+   "ci_low": 0.002939013738,
+   "group": "logical_error|pymatching|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.004,
+   "raw_records": [
+    "surface-full-0025"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.038156121193,
+   "ci_low": 0.02915879927,
+   "group": "logical_error|pymatching|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 6144,
+   "point": 0.033365885417,
+   "raw_records": [
+    "surface-full-0031"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "pymatching"
+  },
+  {
+   "ci_high": 0.004630640572,
+   "ci_low": 0.00235082341,
+   "group": "logical_error|rbposd|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0033,
+   "raw_records": [
+    "surface-full-0005"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.013676372155,
+   "ci_low": 0.009498871053,
+   "group": "logical_error|rbposd|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0114,
+   "raw_records": [
+    "surface-full-0011"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.035068271546,
+   "ci_low": 0.026771257423,
+   "group": "logical_error|rbposd|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 6656,
+   "point": 0.030649038462,
+   "raw_records": [
+    "surface-full-0017"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.002965795017,
+   "ci_low": 0.00121674416,
+   "group": "logical_error|rbposd|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0019,
+   "raw_records": [
+    "surface-full-0023"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.013131152377,
+   "ci_low": 0.00904447483,
+   "group": "logical_error|rbposd|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0109,
+   "raw_records": [
+    "surface-full-0029"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.064266659432,
+   "ci_low": 0.049640603267,
+   "group": "logical_error|rbposd|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 3840,
+   "point": 0.056510416667,
+   "raw_records": [
+    "surface-full-0035"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "rbposd"
+  },
+  {
+   "ci_high": 0.00196880292,
+   "ci_low": 0.000614350654,
+   "group": "logical_error|rilpqec|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0011,
+   "raw_records": [
+    "surface-full-0006"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.006015571094,
+   "ci_low": 0.003364971292,
+   "group": "logical_error|rilpqec|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0045,
+   "raw_records": [
+    "surface-full-0012"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.017683176127,
+   "ci_low": 0.012889225493,
+   "group": "logical_error|rilpqec|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0151,
+   "raw_records": [
+    "surface-full-0018"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.000566268897,
+   "ci_low": 1.7652674e-05,
+   "group": "logical_error|rilpqec|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0001,
+   "raw_records": [
+    "surface-full-0024"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.00247358455,
+   "ci_low": 0.000909261826,
+   "group": "logical_error|rilpqec|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0015,
+   "raw_records": [
+    "surface-full-0030"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.019939908259,
+   "ci_low": 0.014830880568,
+   "group": "logical_error|rilpqec|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0172,
+   "raw_records": [
+    "surface-full-0036"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "rilpqec"
+  },
+  {
+   "ci_high": 0.002348761146,
+   "ci_low": 0.000834162029,
+   "group": "logical_error|rmatching|distance=3,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0014,
+   "raw_records": [
+    "surface-full-0004"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.002"
+   },
+   "variant": "rmatching"
+  },
+  {
+   "ci_high": 0.00748986741,
+   "ci_low": 0.00448967658,
+   "group": "logical_error|rmatching|distance=3,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0058,
+   "raw_records": [
+    "surface-full-0010"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.005"
+   },
+   "variant": "rmatching"
+  },
+  {
+   "ci_high": 0.021973230146,
+   "ci_low": 0.016596099487,
+   "group": "logical_error|rmatching|distance=3,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0191,
+   "raw_records": [
+    "surface-full-0016"
+   ],
+   "scale": {
+    "distance": "3",
+    "p": "0.01"
+   },
+   "variant": "rmatching"
+  },
+  {
+   "ci_high": 0.001170025946,
+   "ci_low": 0.000213588426,
+   "group": "logical_error|rmatching|distance=5,p=0.002",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0005,
+   "raw_records": [
+    "surface-full-0022"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.002"
+   },
+   "variant": "rmatching"
+  },
+  {
+   "ci_high": 0.004979629944,
+   "ci_low": 0.002601603639,
+   "group": "logical_error|rmatching|distance=5,p=0.005",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 10000,
+   "point": 0.0036,
+   "raw_records": [
+    "surface-full-0028"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.005"
+   },
+   "variant": "rmatching"
+  },
+  {
+   "ci_high": 0.03746308706,
+   "ci_low": 0.028550563672,
+   "group": "logical_error|rmatching|distance=5,p=0.01",
+   "kind": "logical_error",
+   "method": "wilson_score_95",
+   "n": 6144,
+   "point": 0.03271484375,
+   "raw_records": [
+    "surface-full-0034"
+   ],
+   "scale": {
+    "distance": "5",
+    "p": "0.01"
+   },
+   "variant": "rmatching"
+  }
+ ],
+ "family": "surface-decoder-compare",
+ "hardware_id": "hw-legacy-unidentified",
+ "run_id": "legacy-full-2025",
+ "schema": "publication-summary-v1"
+}

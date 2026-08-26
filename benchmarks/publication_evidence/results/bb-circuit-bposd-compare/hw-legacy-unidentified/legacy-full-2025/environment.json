@@ -1,0 +1,46 @@
+{
+ "argv": [
+  "import://tools/import_publication_evidence.py",
+  "--family",
+  "bb-circuit-bposd-compare",
+  "--source",
+  "benchmarks/bb_circuit_bposd_compare/results/full/results.csv"
+ ],
+ "family": "bb-circuit-bposd-compare",
+ "git": {
+  "commit": "a92f687af6cb4a2e06ffbf4451891be2bbc52782",
+  "dirty": false
+ },
+ "hardware": {
+  "cpu_class": "unidentified",
+  "cpu_model": "not recorded in source artifact",
+  "identified": false,
+  "logical_cores": 0,
+  "os": "not recorded in source artifact",
+  "physical_cores": 0,
+  "ram_gb": 0
+ },
+ "hardware_id": "hw-legacy-unidentified",
+ "production_provenance": {
+  "note": "historical error-budget-stopped bb72/bb144 comparison; the Bravyi reference curve and fixed-shot protocol rows are not part of the committed artifact",
+  "recorded": false
+ },
+ "run_id": "legacy-full-2025",
+ "schema": "publication-environment-v1",
+ "source_artifacts": [
+  {
+   "path": "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+   "sha256": "523ff316fa20ee21fca7f0b6ad38daec30898428d15e0385a98aa03c73530e25"
+  },
+  {
+   "path": "benchmarks/bb_circuit_bposd_compare/reference/bravyi_contract.json",
+   "sha256": "e6a08d0b76a5d858ca114b710f2d586aa7c612d6f757cc11e7cf9e5256832b29"
+  }
+ ],
+ "toolchain": {
+  "build_profile": "not recorded",
+  "rust_target": "not recorded in source artifact",
+  "rustc": "not recorded in source artifact",
+  "threads": "not recorded"
+ }
+}

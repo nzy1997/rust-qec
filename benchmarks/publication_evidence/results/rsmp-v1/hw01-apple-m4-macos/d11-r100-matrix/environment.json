@@ -1,0 +1,260 @@
+{
+ "argv": [
+  "python3",
+  "tools/import_publication_evidence.py",
+  "--repo-root",
+  "."
+ ],
+ "family": "rsmp-v1",
+ "git": {
+  "commit": "a92f687af6cb4a2e06ffbf4451891be2bbc52782",
+  "dirty": false
+ },
+ "hardware": {
+  "cpu_class": "aarch64-apple-darwin",
+  "cpu_model": "Apple M4",
+  "identified": true,
+  "logical_cores": 10,
+  "os": "macOS (Darwin 25.6.0)",
+  "physical_cores": 10,
+  "ram_gb": 32
+ },
+ "hardware_id": "hw01-apple-m4-macos",
+ "matrix": {
+  "case": "stim_surface_d11_r100",
+  "seeds": [
+   7,
+   11,
+   17,
+   23,
+   31
+  ],
+  "shots": [
+   "256",
+   "1024",
+   "4096"
+  ]
+ },
+ "matrix_commands": [
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "256",
+   "--seed",
+   "7",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "256",
+   "--seed",
+   "11",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "256",
+   "--seed",
+   "17",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "256",
+   "--seed",
+   "23",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "256",
+   "--seed",
+   "31",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "1024",
+   "--seed",
+   "7",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "1024",
+   "--seed",
+   "11",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "1024",
+   "--seed",
+   "17",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "1024",
+   "--seed",
+   "23",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "1024",
+   "--seed",
+   "31",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "4096",
+   "--seed",
+   "7",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "4096",
+   "--seed",
+   "11",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "4096",
+   "--seed",
+   "17",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "4096",
+   "--seed",
+   "23",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ],
+  [
+   "target/release/rstim",
+   "sample",
+   "--shots",
+   "4096",
+   "--seed",
+   "31",
+   "--out_format",
+   "b8",
+   "--in",
+   "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
+  ]
+ ],
+ "production_provenance": {
+  "commit": "421087750d76d0b310ee2f4f77e7c095526a8775",
+  "note": "benchmark-case rows regenerated from a clean tree for the declared shots x seed matrix with the merged #600 runner (issue #601 RSMP provenance fix)",
+  "recorded": true
+ },
+ "run_id": "d11-r100-matrix",
+ "schema": "publication-environment-v1",
+ "source_artifacts": [
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/raw.jsonl",
+   "sha256": "494d3de13e79e8d3d23eb1515e3801b3daa89ea036f09b757acef1adbb70fca8"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/summary.json",
+   "sha256": "1d989cc0acc09eb4aa2b3529bc3219e5a00892fcf6e7608f05d5e48db04d86a4"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/report.md",
+   "sha256": "964648a26fb6f654cbc111d758fa87972d741119d560c2e52057d7bba381021a"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/environment.json",
+   "sha256": "638e9fc982873b5d527425afb3d8a8ec1cf0eb305e61d33001eb6946a69ad6ca"
+  },
+  {
+   "path": "benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/artifact-sha256.json",
+   "sha256": "4a42f94f88643e5d61e81fd14e25f35c9fcabbe9e6f7389ca790d772ad8fa98d"
+  }
+ ],
+ "toolchain": {
+  "build_profile": "release",
+  "rust_target": "aarch64-apple-darwin",
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "threads": "1 (zstd single_threaded contract)"
+ },
+ "variant_notes": {
+  "fixed_codec": "direct level-3 Zstandard frame over the same b8 bytes; the fixed-codec ablation isolating RSMP v1 adaptive syndrome encoding",
+  "ptb64_fixed_codec": "direct level-3 Zstandard frame over the Stim ptb64 baseline bytes",
+  "r8_fixed_codec": "direct level-3 Zstandard frame over the Stim r8 baseline bytes"
+ }
+}
