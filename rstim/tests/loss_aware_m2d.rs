@@ -1,7 +1,7 @@
 use rstim::m2d::{
     measurements_to_loss_aware_detections, measurements_to_loss_aware_detections_with_loss_mask,
-    measurements_to_loss_aware_detections_with_loss_mask_and_limits, LossAwareDetectorCheck,
-    LossAwareM2dLimits,
+    measurements_to_loss_aware_detections_with_loss_mask_and_limits, CompiledLossAwareM2d,
+    LossAwareDetectorCheck, LossAwareM2dLimits,
 };
 use rstim::measurement_transform::{CheckedMeasurementLayout, MeasurementTransformLimits};
 use rstim::parser::parse_lines;
@@ -113,6 +113,22 @@ fn embedded_loss_flags_derive_a_distinct_mask_for_each_shot() {
     assert_eq!(output.shots[1].detector_valid, [false]);
     assert_eq!(output.shots[2].lost_measurements, [1]);
     assert_eq!(output.shots[1].checks, output.shots[2].checks);
+}
+
+#[test]
+fn compiled_transform_reuses_the_validated_layout_and_reference() {
+    let circuit = parse_lines("ML 0\nDETECTOR rec[-1]\n").unwrap();
+    let mut measurements = BitTable::new(2, 2);
+    measurements.set(0, 0, true);
+    measurements.set(1, 0, true);
+    measurements.set(1, 1, true);
+
+    let compiled = CompiledLossAwareM2d::new(&circuit).unwrap();
+    assert_eq!(compiled.layout().num_measurements(), 2);
+    let reused = compiled.convert(&measurements).unwrap();
+    let convenience = measurements_to_loss_aware_detections(&circuit, &measurements).unwrap();
+
+    assert_eq!(reused, convenience);
 }
 
 #[test]

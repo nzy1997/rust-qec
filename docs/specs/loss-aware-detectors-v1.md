@@ -2,8 +2,9 @@
 
 Status: **experimental public API contract**. This document defines how
 `rstim` turns known missing measurement records into detector information. It
-does not yet define the shot-conditioned detector error model or matching
-graph; those are a separate follow-up contract.
+is consumed by the follow-up
+[`delayed-erasure-conditioned-decoding-v1.md`](delayed-erasure-conditioned-decoding-v1.md)
+contract for shot-conditioned MLE and matching.
 
 The reference implementation is [`rstim/src/m2d.rs`](../../rstim/src/m2d.rs):
 
@@ -27,8 +28,8 @@ For every shot, keep the two channels separate:
 2. `measurement_loss_mask[m]` says whether that payload is unknown.
 
 Changing `measurement_bits[m]` at every masked position must not change any
-loss-aware check value. The v1 tests enforce this API-level invariant;
-decoder-answer invariance belongs to the follow-up integration.
+loss-aware check value. The v1 tests enforce this API-level invariant; the
+conditioned-decoding tests also enforce decoder-answer invariance.
 
 For an `ML`/`MRL`-family instruction, records are interleaved as
 `flag,value`. A set flag marks the paired value as lost. Flags are metadata and
@@ -149,8 +150,9 @@ loss, while the loss-aware MLE updated the error model per shot.
 ## 5. Boundary with shot-conditioned decoding
 
 This v1 transform states which parity checks survive a known measurement-loss
-pattern. It does not assign probabilities to possible loss onset times or to
-Pauli errors caused by skipped gates.
+pattern. The conditioned-decoding follow-up now combines that basis with the
+native delayed-erasure onset envelopes; the separation remains useful because
+the detector transform itself is decoder-neutral.
 
 The follow-up delayed-erasure integration must:
 

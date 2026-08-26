@@ -6,7 +6,7 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use rstim::measurement_transform::CheckedMeasurementLayout;
+use rstim::m2d::{CompiledLossAwareM2d, LossAwareDetectorShot};
 use rstim::output::{OutputFormat, write_shots_b8};
 use rstim::result_stream::ResultBlockReader;
 use rstim::sim::bit_table::BitTable;
@@ -35,6 +35,7 @@ pub const STATS_SCHEMA_VERSION: &str = "rustqec.decode-stats.v1";
 const BATCH_SIZE: usize = 1024;
 const MAX_ENVELOPE_CANDIDATES: usize = 100_000;
 const MAX_PRIMITIVE_PROBES: usize = 10_000;
+const MAX_CONDITIONED_DECODER_INCIDENCES: usize = 10_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderKind {
@@ -108,15 +109,13 @@ struct LossEnvelope {
 }
 
 struct CompiledCircuit {
-    layout: CheckedMeasurementLayout,
-    reference: Vec<bool>,
+    loss_aware_m2d: CompiledLossAwareM2d,
     loss_flags: Vec<usize>,
     independent_effects: Vec<Effect>,
     envelopes: Vec<LossEnvelope>,
     graph_edges: Vec<GraphEdge>,
     loss_edges: Vec<Vec<usize>>,
     unmapped_loss_primitives: Vec<Vec<String>>,
-    num_detectors: usize,
     num_observables: usize,
 }
 
@@ -171,13 +170,13 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
         .next_block()
         .map_err(|error| DecodeFailure::new("invalid_dataset", error.to_string()))?
     {
-        let syndromes = circuit.syndromes(&measurements)?;
+        let loss_aware = circuit.loss_aware_syndromes(&measurements)?;
         let losses = circuit.loss_patterns(&measurements);
         let mut predictions = BitTable::try_new(circuit.num_observables, measurements.num_minor())
             .map_err(|error| DecodeFailure::new("decode_error", format!("{error:?}")))?;
         for shot in 0..measurements.num_minor() {
             patterns.insert(losses[shot].clone());
-            match decoder.decode(&syndromes[shot], &losses[shot]) {
+            match decoder.decode(&loss_aware[shot], &losses[shot]) {
                 Ok(bits) => {
                     for observable in bits {
                         predictions.set(observable, shot, true);
@@ -297,7 +296,7 @@ fn build_stats(
         infeasible_shot_count,
         circuit_compilations: 1,
         matching_graph_builds: decoder.graph_builds(),
-        mle_model_builds: usize::from(matches!(decoder, DecoderState::Mle(_))),
+        mle_model_builds: decoder.model_builds(),
     }
 }
 
@@ -358,7 +357,11 @@ enum DecoderState {
 }
 
 impl DecoderState {
-    fn decode(&mut self, syndrome: &[u8], losses: &[usize]) -> Result<Vec<usize>, ShotFailure> {
+    fn decode(
+        &mut self,
+        syndrome: &LossAwareDetectorShot,
+        losses: &[usize],
+    ) -> Result<Vec<usize>, ShotFailure> {
         match self {
             Self::Matching(decoder) => decoder.decode(syndrome, losses),
             Self::Mle(decoder) => decoder.decode(syndrome, losses),
@@ -369,6 +372,13 @@ impl DecoderState {
         match self {
             Self::Matching(decoder) => decoder.cache.len(),
             Self::Mle(_) => 0,
+        }
+    }
+
+    fn model_builds(&self) -> usize {
+        match self {
+            Self::Matching(_) => 0,
+            Self::Mle(decoder) => decoder.model_builds(),
         }
     }
 }
@@ -480,6 +490,21 @@ mod tests {
         indices.iter().fold(0, |value, &index| value | (1 << index))
     }
 
+    fn singleton_syndrome(bits: &[u8]) -> LossAwareDetectorShot {
+        LossAwareDetectorShot {
+            lost_measurements: Vec::new(),
+            detector_valid: vec![true; bits.len()],
+            checks: bits
+                .iter()
+                .enumerate()
+                .map(|(detector, &bit)| rstim::m2d::LossAwareDetectorCheck {
+                    source_detectors: vec![detector],
+                    value: bit != 0,
+                })
+                .collect(),
+        }
+    }
+
     fn reference_effect(effect: &Effect) -> ReferenceEffect {
         ReferenceEffect {
             id: effect.id.clone(),
@@ -492,7 +517,7 @@ mod tests {
     fn reference_mle(circuit: &CompiledCircuit, syndrome: &[u8], losses: &[usize]) -> u64 {
         let case = AtomLossCase {
             schema_version: "atom-loss-envelope.v0".to_string(),
-            num_detectors: circuit.num_detectors,
+            num_detectors: circuit.loss_aware_m2d.layout().num_detectors(),
             num_observables: circuit.num_observables,
             observed_detectors: observed(syndrome),
             independent_effects: circuit
@@ -524,7 +549,7 @@ mod tests {
             .collect();
         let case = EnvelopeMatchingCase {
             schema_version: "atom-loss-envelope-matching.v0".to_string(),
-            num_detectors: circuit.num_detectors,
+            num_detectors: circuit.loss_aware_m2d.layout().num_detectors(),
             num_observables: circuit.num_observables,
             edges: circuit
                 .graph_edges
@@ -579,7 +604,9 @@ mod tests {
         let mut mle = CompiledMle::new(&circuit, None).unwrap();
         let mle_predictions: Vec<_> = shots
             .iter()
-            .map(|(syndrome, losses)| mask(&mle.decode(syndrome, losses).unwrap()))
+            .map(|(syndrome, losses)| {
+                mask(&mle.decode(&singleton_syndrome(syndrome), losses).unwrap())
+            })
             .collect();
         let expected_mle: Vec<_> = shots
             .iter()
@@ -591,7 +618,13 @@ mod tests {
         let mut matching = CompiledMatching::new(&circuit).unwrap();
         let matching_predictions: Vec<_> = shots
             .iter()
-            .map(|(syndrome, losses)| mask(&matching.decode(syndrome, losses).unwrap()))
+            .map(|(syndrome, losses)| {
+                mask(
+                    &matching
+                        .decode(&singleton_syndrome(syndrome), losses)
+                        .unwrap(),
+                )
+            })
             .collect();
         assert_eq!(matching_predictions, reference_matching(&circuit, &shots));
         assert_eq!(matching_predictions, [1, 0, 0, 0]);
@@ -612,7 +645,9 @@ mod tests {
         let mut mle = CompiledMle::new(&circuit, None).unwrap();
         let actual_mle: Vec<_> = shots
             .iter()
-            .map(|(syndrome, losses)| mask(&mle.decode(syndrome, losses).unwrap()))
+            .map(|(syndrome, losses)| {
+                mask(&mle.decode(&singleton_syndrome(syndrome), losses).unwrap())
+            })
             .collect();
         assert_eq!(actual_mle, expected);
         assert_eq!(
@@ -626,11 +661,66 @@ mod tests {
         let mut matching = CompiledMatching::new(&circuit).unwrap();
         let actual_matching: Vec<_> = shots
             .iter()
-            .map(|(syndrome, losses)| mask(&matching.decode(syndrome, losses).unwrap()))
+            .map(|(syndrome, losses)| {
+                mask(
+                    &matching
+                        .decode(&singleton_syndrome(syndrome), losses)
+                        .unwrap(),
+                )
+            })
             .collect();
         assert_eq!(actual_matching, expected);
         assert_eq!(actual_matching, reference_matching(&circuit, &shots));
         assert_eq!(matching.cache.len(), 1);
+    }
+
+    #[test]
+    fn delayed_erasure_decoders_ignore_the_lost_measurement_placeholder() {
+        let circuit = compiled(concat!(
+            "QUBIT_COORDS(0,0) 0\n",
+            "R 0\n",
+            "X_ERROR(0.1) 0\n",
+            "LOSS(0.1) 0\n",
+            "MRL 0\n",
+            "X_ERROR(0.02) 0\n",
+            "LOSS(0.1) 0\n",
+            "ML 0\n",
+            "DETECTOR(0,0,0) rec[-3]\n",
+            "DETECTOR(0,0,1) rec[-3] rec[-1]\n",
+            "OBSERVABLE_INCLUDE(0) rec[-1]\n",
+        ));
+        let mut measurements = BitTable::new(4, 2);
+        measurements.set(0, 0, true);
+        measurements.set(0, 1, true);
+        measurements.set(1, 1, true);
+        measurements.set(3, 0, true);
+        measurements.set(3, 1, true);
+
+        let syndromes = circuit.loss_aware_syndromes(&measurements).unwrap();
+        let losses = circuit.loss_patterns(&measurements);
+        assert_eq!(losses, [vec![0], vec![0]]);
+        assert_eq!(syndromes[0].checks, syndromes[1].checks);
+        assert_eq!(syndromes[0].checks.len(), 1);
+        assert_eq!(syndromes[0].checks[0].source_detectors, [0, 1]);
+
+        let mut mle = CompiledMle::new(&circuit, None).unwrap();
+        let mle_zero = mle.decode(&syndromes[0], &losses[0]).unwrap();
+        let mle_one = mle.decode(&syndromes[1], &losses[1]).unwrap();
+        assert_eq!(mle_zero, mle_one);
+        assert_eq!(mle.model_builds(), 1);
+
+        let mut matching = CompiledMatching::new(&circuit).unwrap();
+        let matching_zero = matching.decode(&syndromes[0], &losses[0]).unwrap();
+        let matching_one = matching.decode(&syndromes[1], &losses[1]).unwrap();
+        assert_eq!(matching_zero, matching_one);
+        assert_eq!(matching.cache.len(), 1);
+
+        let mut inconsistent = syndromes[0].clone();
+        inconsistent.checks[0].source_detectors = vec![0];
+        let error = mle.decode(&inconsistent, &losses[0]).unwrap_err();
+        assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
+        let error = matching.decode(&inconsistent, &losses[0]).unwrap_err();
+        assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
     }
 
     #[test]
@@ -680,7 +770,10 @@ mod tests {
             num_observables: 2,
             cache: HashMap::new(),
         };
-        assert_eq!(matching.decode(&[1], &[]).unwrap(), Vec::<usize>::new());
+        assert_eq!(
+            matching.decode(&singleton_syndrome(&[1]), &[]).unwrap(),
+            Vec::<usize>::new()
+        );
     }
 
     #[test]
@@ -810,7 +903,12 @@ mod tests {
             num_observables: 1,
             cache: HashMap::new(),
         };
-        assert_eq!(time_like.decode(&[1, 1], &[0]).unwrap(), [0]);
+        assert_eq!(
+            time_like
+                .decode(&singleton_syndrome(&[1, 1]), &[0])
+                .unwrap(),
+            [0]
+        );
     }
 
     #[test]
@@ -834,7 +932,7 @@ mod tests {
 
         let circuit = compiled(PERSISTENT_CIRCUIT);
         let wrong_width = BitTable::try_new(1, 1).unwrap();
-        let error = circuit.syndromes(&wrong_width).unwrap_err();
+        let error = circuit.loss_aware_syndromes(&wrong_width).unwrap_err();
         assert_eq!(error.code, "invalid_dataset");
         assert!(error.message.contains("width"));
     }
@@ -885,7 +983,7 @@ mod tests {
         }));
         CompiledMatching::new(&circuit).unwrap();
 
-        let zero_syndrome = vec![0u8; circuit.num_detectors];
+        let zero_syndrome = vec![0u8; circuit.loss_aware_m2d.layout().num_detectors()];
         let shots: Vec<(&[u8], Vec<usize>)> = vec![
             (&zero_syndrome, vec![]),
             (&zero_syndrome, vec![0]),
@@ -897,7 +995,7 @@ mod tests {
 
         let mut mle = CompiledMle::new(&circuit, None).unwrap();
         for (syndrome, losses) in &shots {
-            let actual = mask(&mle.decode(syndrome, losses).unwrap());
+            let actual = mask(&mle.decode(&singleton_syndrome(syndrome), losses).unwrap());
             assert_eq!(actual, reference_mle(&circuit, syndrome, losses));
         }
 
@@ -908,7 +1006,13 @@ mod tests {
         let mut matching = CompiledMatching::new(&circuit).unwrap();
         let actual: Vec<_> = shot_refs
             .iter()
-            .map(|(syndrome, losses)| mask(&matching.decode(syndrome, losses).unwrap()))
+            .map(|(syndrome, losses)| {
+                mask(
+                    &matching
+                        .decode(&singleton_syndrome(syndrome), losses)
+                        .unwrap(),
+                )
+            })
             .collect();
         assert_eq!(actual, reference_matching(&circuit, &shot_refs));
     }

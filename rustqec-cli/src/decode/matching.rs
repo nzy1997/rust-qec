@@ -1,8 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
 use rmatching::Matching;
+use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
 
-use super::{CompiledCircuit, DecodeFailure, Effect, ShotFailure};
+use super::{
+    CompiledCircuit, DecodeFailure, Effect, MAX_CONDITIONED_DECODER_INCIDENCES, ShotFailure,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum EdgeKind {
@@ -25,7 +28,12 @@ pub(super) struct CompiledMatching {
     pub(super) loss_edges: Vec<Vec<usize>>,
     pub(super) mean_weight: f64,
     pub(super) num_observables: usize,
-    pub(super) cache: HashMap<Vec<usize>, Matching>,
+    pub(super) cache: HashMap<Vec<usize>, ConditionedMatching>,
+}
+
+pub(super) struct ConditionedMatching {
+    matching: Matching,
+    check_sources: Vec<Vec<usize>>,
 }
 
 impl CompiledMatching {
@@ -83,15 +91,38 @@ impl CompiledMatching {
 
     pub(super) fn decode(
         &mut self,
-        syndrome: &[u8],
+        syndrome: &LossAwareDetectorShot,
         losses: &[usize],
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
-            let matching = build_matching(&self.edges, &self.loss_edges, self.mean_weight, losses);
+            let matching = build_matching(
+                &self.edges,
+                &self.loss_edges,
+                self.mean_weight,
+                &syndrome.checks,
+                losses,
+            )?;
             self.cache.insert(key.clone(), matching);
         }
-        let bits = self.cache.get_mut(&key).unwrap().decode(syndrome);
+        let conditioned = self.cache.get_mut(&key).unwrap();
+        if conditioned.check_sources.len() != syndrome.checks.len()
+            || conditioned
+                .check_sources
+                .iter()
+                .zip(&syndrome.checks)
+                .any(|(expected, actual)| expected != &actual.source_detectors)
+        {
+            return Err(ShotFailure::Other(
+                "loss pattern produced inconsistent detector-check basis".to_string(),
+            ));
+        }
+        let check_values: Vec<u8> = syndrome
+            .checks
+            .iter()
+            .map(|check| u8::from(check.value))
+            .collect();
+        let bits = conditioned.matching.decode(&check_values);
         Ok(bits
             .iter()
             .chain(std::iter::repeat(&0))
@@ -139,8 +170,17 @@ fn build_matching(
     edges: &[GraphEdge],
     loss_edges: &[Vec<usize>],
     mean_weight: f64,
+    checks: &[LossAwareDetectorCheck],
     losses: &[usize],
-) -> Matching {
+) -> Result<ConditionedMatching, ShotFailure> {
+    let incidences = edges.len().checked_mul(checks.len()).ok_or_else(|| {
+        ShotFailure::Other("conditioned matching incidence limit exceeded".to_string())
+    })?;
+    if incidences > MAX_CONDITIONED_DECODER_INCIDENCES {
+        return Err(ShotFailure::Other(
+            "conditioned matching incidence limit exceeded".to_string(),
+        ));
+    }
     let active: HashSet<usize> = losses
         .iter()
         .flat_map(|&loss| loss_edges[loss].iter().copied())
@@ -156,13 +196,102 @@ fn build_matching(
         } else {
             edge.weight
         } / scale;
+        let transformed = transformed_check_nodes(edge, checks);
+        if transformed.len() > 2 {
+            return Err(ShotFailure::Other(format!(
+                "loss pattern turns a graphlike mechanism into a {}-detector hyperedge",
+                transformed.len()
+            )));
+        }
+        if transformed.is_empty() {
+            // A positive-weight mechanism with no surviving detector symptom
+            // has maximum-likelihood representative "not selected". Matching
+            // cannot express an observable-only edge, so omit it instead of
+            // inventing a detector or splitting its logical label.
+            continue;
+        }
         let probability = 1.0 / (1.0 + weight.exp());
-        if let Some(node2) = edge.node2 {
-            matching.add_edge(edge.node1, node2, weight, &edge.observables, probability);
+        if transformed.len() == 2 {
+            matching.add_edge(
+                transformed[0],
+                transformed[1],
+                weight,
+                &edge.observables,
+                probability,
+            );
         } else {
-            matching.add_boundary_edge(edge.node1, weight, &edge.observables, probability);
+            matching.add_boundary_edge(transformed[0], weight, &edge.observables, probability);
         }
     }
     matching.prepare();
-    matching
+    Ok(ConditionedMatching {
+        matching,
+        check_sources: checks
+            .iter()
+            .map(|check| check.source_detectors.clone())
+            .collect(),
+    })
+}
+
+fn transformed_check_nodes(edge: &GraphEdge, checks: &[LossAwareDetectorCheck]) -> Vec<usize> {
+    checks
+        .iter()
+        .enumerate()
+        .filter_map(|(check_index, check)| {
+            let mut parity = check.source_detectors.contains(&edge.node1);
+            if let Some(node2) = edge.node2 {
+                parity ^= check.source_detectors.contains(&node2);
+            }
+            parity.then_some(check_index)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn boundary_edge() -> GraphEdge {
+        GraphEdge {
+            node1: 0,
+            node2: None,
+            observables: Vec::new(),
+            weight: 1.0,
+            kind: EdgeKind::Boundary,
+        }
+    }
+
+    #[test]
+    fn conditioned_matching_rejects_hyperedges_without_splitting_them() {
+        let checks: Vec<_> = (0..3)
+            .map(|_| LossAwareDetectorCheck {
+                source_detectors: vec![0],
+                value: false,
+            })
+            .collect();
+        let error = build_matching(&[boundary_edge()], &[], 1.0, &checks, &[])
+            .err()
+            .unwrap();
+        assert!(
+            matches!(error, ShotFailure::Other(message) if message.contains("3-detector hyperedge"))
+        );
+    }
+
+    #[test]
+    fn conditioned_matching_preflights_incidence_work() {
+        let edges = vec![boundary_edge(); 10_001];
+        let checks = vec![
+            LossAwareDetectorCheck {
+                source_detectors: Vec::new(),
+                value: false,
+            };
+            1_000
+        ];
+        let error = build_matching(&edges, &[], 1.0, &checks, &[])
+            .err()
+            .unwrap();
+        assert!(
+            matches!(error, ShotFailure::Other(message) if message.contains("incidence limit"))
+        );
+    }
 }
