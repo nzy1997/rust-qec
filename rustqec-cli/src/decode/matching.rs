@@ -39,6 +39,11 @@ pub(super) struct ConditionedMatching {
     reachable_checks: Vec<bool>,
 }
 
+struct ConditionedMatchingPreflight {
+    work: usize,
+    detector_checks: HashMap<usize, Vec<usize>>,
+}
+
 impl CompiledMatching {
     pub(super) fn new(circuit: &CompiledCircuit) -> Result<Self, DecodeFailure> {
         validate_unambiguous_parallel_edges(&circuit.graph_edges)?;
@@ -100,21 +105,26 @@ impl CompiledMatching {
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
-            let artifact_work =
-                conditioned_matching_work(&self.edges, &self.loss_edges, &syndrome.checks, losses)?;
+            let preflight = conditioned_matching_preflight(
+                &self.edges,
+                &self.loss_edges,
+                &syndrome.checks,
+                losses,
+            )?;
             let cached_work = conditioned_cache_total(
                 "matching",
                 self.cache.len(),
                 self.cached_work,
-                artifact_work,
+                preflight.work,
             )
             .map_err(ShotFailure::Other)?;
-            let matching = build_matching(
+            let matching = build_matching_preflighted(
                 &self.edges,
                 &self.loss_edges,
                 self.mean_weight,
                 &syndrome.checks,
                 losses,
+                &preflight.detector_checks,
             )?;
             self.cache.insert(key.clone(), matching);
             self.cached_work = cached_work;
@@ -174,6 +184,7 @@ pub(super) fn validate_unambiguous_parallel_edges(
     Ok(())
 }
 
+#[cfg(test)]
 fn build_matching(
     edges: &[GraphEdge],
     loss_edges: &[Vec<usize>],
@@ -181,8 +192,25 @@ fn build_matching(
     checks: &[LossAwareDetectorCheck],
     losses: &[usize],
 ) -> Result<ConditionedMatching, ShotFailure> {
-    conditioned_matching_work(edges, loss_edges, checks, losses)?;
-    let detector_checks = detector_check_incidence(checks);
+    let preflight = conditioned_matching_preflight(edges, loss_edges, checks, losses)?;
+    build_matching_preflighted(
+        edges,
+        loss_edges,
+        mean_weight,
+        checks,
+        losses,
+        &preflight.detector_checks,
+    )
+}
+
+fn build_matching_preflighted(
+    edges: &[GraphEdge],
+    loss_edges: &[Vec<usize>],
+    mean_weight: f64,
+    checks: &[LossAwareDetectorCheck],
+    losses: &[usize],
+    detector_checks: &HashMap<usize, Vec<usize>>,
+) -> Result<ConditionedMatching, ShotFailure> {
     let mut active = HashSet::new();
     for &loss in losses {
         let mapped_edges = loss_edges.get(loss).ok_or_else(|| {
@@ -209,7 +237,7 @@ fn build_matching(
         } else {
             edge.weight
         } / scale;
-        let transformed = transformed_check_nodes(edge, &detector_checks);
+        let transformed = transformed_check_nodes(edge, detector_checks);
         if transformed.len() > 2 {
             return Err(ShotFailure::Other(format!(
                 "loss pattern turns a graphlike mechanism into a {}-detector hyperedge",
@@ -250,12 +278,29 @@ fn build_matching(
     })
 }
 
+#[cfg(test)]
 fn conditioned_matching_work(
     edges: &[GraphEdge],
     loss_edges: &[Vec<usize>],
     checks: &[LossAwareDetectorCheck],
     losses: &[usize],
 ) -> Result<usize, ShotFailure> {
+    conditioned_matching_preflight(edges, loss_edges, checks, losses)
+        .map(|preflight| preflight.work)
+}
+
+fn conditioned_matching_preflight(
+    edges: &[GraphEdge],
+    loss_edges: &[Vec<usize>],
+    checks: &[LossAwareDetectorCheck],
+    losses: &[usize],
+) -> Result<ConditionedMatchingPreflight, ShotFailure> {
+    if edges.len() > MAX_CONDITIONED_DECODER_ITEMS
+        || checks.len() > MAX_CONDITIONED_DECODER_ITEMS
+        || losses.len() > MAX_CONDITIONED_DECODER_ITEMS
+    {
+        return Err(conditioned_matching_limit_error());
+    }
     let edge_terms = edges
         .iter()
         .try_fold(0usize, |total, edge| {
@@ -284,9 +329,38 @@ fn conditioned_matching_work(
         checks.len(),
         edge_terms,
         check_terms,
+        0,
         losses.len(),
         loss_terms,
-    )
+    )?;
+    let detector_checks = detector_check_incidence(checks);
+    // `transformed_check_nodes` merges both endpoint incidence vectors for
+    // every edge, so their lengths are the tight checked upper bound on that
+    // phase's iterations and temporary output capacity.
+    let edge_incidence_terms = edges
+        .iter()
+        .try_fold(0usize, |total, edge| {
+            let left = detector_checks.get(&edge.node1).map_or(0, Vec::len);
+            let right = edge
+                .node2
+                .and_then(|node| detector_checks.get(&node))
+                .map_or(0, Vec::len);
+            total.checked_add(left)?.checked_add(right)
+        })
+        .ok_or_else(conditioned_matching_limit_error)?;
+    let work = conditioned_matching_work_from_counts(
+        edges.len(),
+        checks.len(),
+        edge_terms,
+        check_terms,
+        edge_incidence_terms,
+        losses.len(),
+        loss_terms,
+    )?;
+    Ok(ConditionedMatchingPreflight {
+        work,
+        detector_checks,
+    })
 }
 
 fn conditioned_matching_work_from_counts(
@@ -294,6 +368,7 @@ fn conditioned_matching_work_from_counts(
     check_count: usize,
     edge_terms: usize,
     check_terms: usize,
+    edge_incidence_terms: usize,
     loss_count: usize,
     loss_terms: usize,
 ) -> Result<usize, ShotFailure> {
@@ -307,6 +382,7 @@ fn conditioned_matching_work_from_counts(
         .checked_add(check_count)
         .and_then(|value| value.checked_add(edge_terms))
         .and_then(|value| value.checked_add(check_terms))
+        .and_then(|value| value.checked_add(edge_incidence_terms))
         .and_then(|value| value.checked_add(loss_count))
         .and_then(|value| value.checked_add(loss_terms))
         .ok_or_else(conditioned_matching_limit_error)?;
@@ -431,24 +507,72 @@ mod tests {
     #[test]
     fn conditioned_matching_preflights_incidence_work() {
         let error =
-            conditioned_matching_work_from_counts(1, 1, MAX_CONDITIONED_DECODER_WORK, 0, 0, 0)
+            conditioned_matching_work_from_counts(1, 1, MAX_CONDITIONED_DECODER_WORK, 0, 0, 0, 0)
                 .unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("work limit")));
-        assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0, 0, 0).is_err());
-        assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX, 0, 0).is_err());
+        assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0, 0, 0, 0).is_err());
+        assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX, 0, 0, 0).is_err());
+        assert!(conditioned_matching_work_from_counts(1, 1, 0, 0, usize::MAX, 0, 0).is_err());
+    }
+
+    #[test]
+    fn conditioned_matching_preflights_each_edge_endpoint_incidence_scan() {
+        let small_edges = [GraphEdge {
+            node1: 0,
+            node2: Some(1),
+            observables: Vec::new(),
+            weight: 1.0,
+            kind: EdgeKind::SpaceLike,
+        }];
+        let small_checks = [
+            LossAwareDetectorCheck {
+                source_detectors: vec![0, 1],
+                value: false,
+            },
+            LossAwareDetectorCheck {
+                source_detectors: vec![0, 1],
+                value: false,
+            },
+        ];
+        assert_eq!(
+            conditioned_matching_work(&small_edges, &[], &small_checks, &[]).unwrap(),
+            13
+        );
+
+        let edges = (0..501)
+            .map(|_| GraphEdge {
+                node1: 0,
+                node2: Some(1),
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::SpaceLike,
+            })
+            .collect::<Vec<_>>();
+        let checks = (0..10_000)
+            .map(|_| LossAwareDetectorCheck {
+                source_detectors: vec![0, 1],
+                value: false,
+            })
+            .collect::<Vec<_>>();
+
+        let error = conditioned_matching_work(&edges, &[], &checks, &[]).unwrap_err();
+        assert!(matches!(error, ShotFailure::Other(message) if message.contains("work limit")));
     }
 
     #[test]
     fn conditioned_matching_preflights_active_loss_edge_work_and_indices() {
-        assert!(conditioned_matching_work_from_counts(
-            1,
-            0,
-            1,
-            0,
-            10_000,
-            MAX_CONDITIONED_DECODER_WORK,
-        )
-        .is_err());
+        assert!(
+            conditioned_matching_work_from_counts(
+                1,
+                0,
+                1,
+                0,
+                0,
+                10_000,
+                MAX_CONDITIONED_DECODER_WORK,
+            )
+            .is_err()
+        );
         let error = conditioned_matching_work(&[boundary_edge()], &[], &[], &[0]).unwrap_err();
         assert!(matches!(
             error,

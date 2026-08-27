@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
-use rstim::error_analyzer::{ErrorAnalyzer, PauliEffectProbe};
+use rstim::error_analyzer::{ErrorAnalyzer, PauliEffectAnalysisError, PauliEffectProbe};
 use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::m2d::CompiledLossAwareM2d;
 use rstim::sim::bit_table::BitTable;
@@ -535,8 +535,19 @@ fn compile_primitive_effects(
             },
         })
         .collect();
-    let analyzed = ErrorAnalyzer::circuit_pauli_effects(noiseless, &queries)
-        .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
+    let analyzed = ErrorAnalyzer::circuit_pauli_effects_with_target_limit(
+        noiseless,
+        &queries,
+        MAX_PRIMITIVE_SYMPTOM_TERMS,
+    )
+    .map_err(|error| match error {
+        PauliEffectAnalysisError::Circuit(message) => {
+            DecodeFailure::new("unsupported_circuit", message)
+        }
+        PauliEffectAnalysisError::TargetTermLimitExceeded { .. } => primitive_symptom_limit_error(),
+    })?;
+    // The analyzer capped target-vector allocation incrementally. Compute the
+    // exact detector/observable count here for stats and as a defensive check.
     let mut symptom_terms = 0usize;
     let mut effects = HashMap::with_capacity(keys.len());
     for (key, analyzed) in keys.into_iter().zip(analyzed) {
