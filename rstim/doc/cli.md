@@ -240,6 +240,7 @@ Current generator controls:
 - `--distance`
 - `--rounds`
 - `--before_round_data_depolarization`
+- `--before_round_data_loss_probability` (Mid-SWAP only; alias `--before_round_data_loss`)
 - `--after_clifford_depolarization`
 - `--before_measure_flip_probability`
 - `--after_reset_flip_probability`
@@ -288,17 +289,23 @@ rstim gen \
   --task rotated_memory_z_midswap \
   --distance 3 \
   --rounds 2 \
-  --after_clifford_depolarization 0.001 \
-  --operation_loss_probability 0.002 \
-  --measurement_loss_probability 0.003 \
+  --before_round_data_depolarization 0.001 \
+  --before_round_data_loss_probability 0.007 \
+  --after_clifford_depolarization 0.002 \
+  --before_measure_flip_probability 0.003 \
+  --after_reset_flip_probability 0.004 \
+  --operation_loss_probability 0.005 \
+  --measurement_loss_probability 0.006 \
   --out midswap.stim
 ```
 
-For this task, `--after_clifford_depolarization` is the Pauli-noise parameter,
+For this task, the four Pauli-noise flags remain independent. Before-round
+depolarization and atom loss follow the persistent logical-to-physical mapping
+and target the physical wires carrying logical data in that round. Reset and
+measurement bit noise use `X_ERROR`; the single-qubit `H` and two-qubit `CX`
+channels use `DEPOLARIZE1` and `DEPOLARIZE2`, respectively.
 `--operation_loss_probability` controls gate/reset loss, and
 `--measurement_loss_probability` controls loss immediately before measurement.
-Reset and measurement bit noise use `X_ERROR`; the single-qubit `H` and
-two-qubit `CX` channels remain `DEPOLARIZE1` and `DEPOLARIZE2`, respectively.
 Measurement-stage loss is physical atom loss reported by the loss flag, not
 state-selective readout confusion.
 `--after_clifford_loss_probability` is intentionally rejected to keep the two

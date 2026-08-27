@@ -1816,7 +1816,11 @@ mod tests {
         let circuit = crate::codegen::rotated_memory_z_midswap(crate::codegen::MidSwapConfig {
             distance: 3,
             rounds: 1,
-            pauli_probability: 0.0,
+            before_round_data_depolarization: 0.0,
+            before_round_data_loss_probability: 0.0,
+            after_clifford_depolarization: 0.0,
+            before_measure_flip_probability: 0.0,
+            after_reset_flip_probability: 0.0,
             operation_loss_probability: 0.0,
             measurement_loss_probability: 0.0,
         })

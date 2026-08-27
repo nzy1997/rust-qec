@@ -105,6 +105,20 @@ fn circuit_gen_rejects_unknown_code_and_misplaced_loss_flags() {
             "--operation-loss-probability",
             "0.1",
         ],
+        vec![
+            "circuit",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--before-round-data-loss",
+            "0.1",
+        ],
     ] {
         let mut full = args.clone();
         full.extend(["--out", out.to_str().unwrap()]);
@@ -207,6 +221,7 @@ fn circuit_gen_rejects_out_of_range_probabilities() {
     let out = dir.path().join("x.stim");
     for (flag, value) in [
         ("--before-measure-flip-probability", "2"),
+        ("--before-round-data-loss-probability", "2"),
         ("--noise", "nan"),
         ("--after-reset-flip-probability", "1.5"),
     ] {
@@ -238,7 +253,7 @@ fn circuit_gen_rejects_out_of_range_probabilities() {
 }
 
 #[test]
-fn circuit_gen_midswap_rejects_the_explicit_pauli_channel_flags() {
+fn circuit_gen_midswap_applies_the_explicit_noise_channel_flags() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("x.stim");
     let output = rustqec_cmd()
@@ -253,17 +268,34 @@ fn circuit_gen_midswap_rejects_the_explicit_pauli_channel_flags() {
             "3",
             "--rounds",
             "2",
+            "--before-round-data-depolarization",
+            "0.01",
+            "--before-round-data-loss",
+            "0.05",
+            "--noise",
+            "0.02",
             "--before-measure-flip-probability",
-            "0.1",
+            "0.03",
+            "--after-reset-flip-probability",
+            "0.04",
             "--out",
             out.to_str().unwrap(),
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    let value = stderr_json(&output);
-    assert_eq!(value["error"]["code"], "invalid_arguments");
-    assert!(!out.exists());
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let circuit = std::fs::read_to_string(out).unwrap();
+    assert!(circuit.contains("DEPOLARIZE1(0.01)"));
+    assert!(circuit.contains("DEPOLARIZE1(0.02)"));
+    assert!(circuit.contains("DEPOLARIZE2(0.02)"));
+    assert!(circuit.contains("X_ERROR(0.03)"));
+    assert!(circuit.contains("X_ERROR(0.04)"));
+    assert!(!circuit.contains("X_ERROR(0.02)"));
+    assert!(circuit.contains("LOSS(0.05)"));
 }
 
 #[test]

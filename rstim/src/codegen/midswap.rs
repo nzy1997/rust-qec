@@ -11,7 +11,11 @@ const CNOT_SCHEDULE: &str = "paper_alternating_ab";
 pub struct MidSwapConfig {
     pub distance: usize,
     pub rounds: usize,
-    pub pauli_probability: f64,
+    pub before_round_data_depolarization: f64,
+    pub before_round_data_loss_probability: f64,
+    pub after_clifford_depolarization: f64,
+    pub before_measure_flip_probability: f64,
+    pub after_reset_flip_probability: f64,
     pub operation_loss_probability: f64,
     pub measurement_loss_probability: f64,
 }
@@ -88,7 +92,26 @@ fn validate_config(config: MidSwapConfig) -> Result<(), MidSwapError> {
         return Err(MidSwapError::InvalidRounds);
     }
     for (name, value) in [
-        ("pauli_probability", config.pauli_probability),
+        (
+            "before_round_data_depolarization",
+            config.before_round_data_depolarization,
+        ),
+        (
+            "before_round_data_loss_probability",
+            config.before_round_data_loss_probability,
+        ),
+        (
+            "after_clifford_depolarization",
+            config.after_clifford_depolarization,
+        ),
+        (
+            "before_measure_flip_probability",
+            config.before_measure_flip_probability,
+        ),
+        (
+            "after_reset_flip_probability",
+            config.after_reset_flip_probability,
+        ),
         (
             "operation_loss_probability",
             config.operation_loss_probability,
@@ -199,15 +222,27 @@ impl MidSwapBuilder {
         self.items.push(CircuitItem::Instruction(
             crate::decoder_dataset::logical_flip_marker_instruction(),
         ));
-        self.emit_noise("X_ERROR", self.config.pauli_probability, &data);
+        self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &data);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &data);
         self.emit("R", vec![], qubit_targets(&checks));
-        self.emit_noise("X_ERROR", self.config.pauli_probability, &checks);
+        self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &checks);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &checks);
         self.emit("TICK", vec![], vec![]);
     }
 
     fn emit_round(&mut self, round: usize) -> Result<(), MidSwapError> {
+        let data_wires = self.mapped_sites(&self.data.clone());
+        self.emit_noise(
+            "DEPOLARIZE1",
+            self.config.before_round_data_depolarization,
+            &data_wires,
+        );
+        self.emit_noise(
+            "LOSS",
+            self.config.before_round_data_loss_probability,
+            &data_wires,
+        );
+
         let x_checks: Vec<Site> = self
             .checks
             .iter()
@@ -216,7 +251,11 @@ impl MidSwapBuilder {
             .collect();
         let mut x_wires = self.mapped_sites(&x_checks);
         self.emit("H", vec![], qubit_targets(&x_wires));
-        self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &x_wires);
+        self.emit_noise(
+            "DEPOLARIZE1",
+            self.config.after_clifford_depolarization,
+            &x_wires,
+        );
         self.emit_noise("LOSS", self.config.operation_loss_probability, &x_wires);
         self.emit("TICK", vec![], vec![]);
 
@@ -237,7 +276,11 @@ impl MidSwapBuilder {
                 cnot_wires.push(self.mapped(target));
             }
             self.emit("CX", vec![], qubit_targets(&cnot_wires));
-            self.emit_noise("DEPOLARIZE2", self.config.pauli_probability, &cnot_wires);
+            self.emit_noise(
+                "DEPOLARIZE2",
+                self.config.after_clifford_depolarization,
+                &cnot_wires,
+            );
             self.emit_noise(
                 "LOSS",
                 self.config.operation_loss_probability / 2.0,
@@ -251,7 +294,11 @@ impl MidSwapBuilder {
 
         x_wires = self.mapped_sites(&x_checks);
         self.emit("H", vec![], qubit_targets(&x_wires));
-        self.emit_noise("DEPOLARIZE1", self.config.pauli_probability, &x_wires);
+        self.emit_noise(
+            "DEPOLARIZE1",
+            self.config.after_clifford_depolarization,
+            &x_wires,
+        );
         self.emit_noise("LOSS", self.config.operation_loss_probability, &x_wires);
         self.emit("TICK", vec![], vec![]);
 
@@ -365,14 +412,18 @@ impl MidSwapBuilder {
     ) -> Vec<i32> {
         let wires = self.mapped_sites(sites);
         self.emit_noise("LOSS", self.config.measurement_loss_probability, &wires);
-        self.emit_noise("X_ERROR", self.config.pauli_probability, &wires);
+        self.emit_noise(
+            "X_ERROR",
+            self.config.before_measure_flip_probability,
+            &wires,
+        );
         self.emit(instruction, vec![], qubit_targets(&wires));
         let values: Vec<i32> = (0..sites.len())
             .map(|index| self.measurement_count + 2 * index as i32 + 1)
             .collect();
         self.measurement_count += 2 * sites.len() as i32;
         if resets {
-            self.emit_noise("X_ERROR", self.config.pauli_probability, &wires);
+            self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &wires);
             self.emit_noise("LOSS", self.config.operation_loss_probability, &wires);
         }
         values
@@ -513,7 +564,11 @@ mod tests {
         MidSwapConfig {
             distance: 3,
             rounds,
-            pauli_probability: 0.0,
+            before_round_data_depolarization: 0.0,
+            before_round_data_loss_probability: 0.0,
+            after_clifford_depolarization: 0.0,
+            before_measure_flip_probability: 0.0,
+            after_reset_flip_probability: 0.0,
             operation_loss_probability: 0.0,
             measurement_loss_probability: 0.0,
         }
@@ -563,7 +618,7 @@ mod tests {
     #[test]
     fn initialization_places_one_flip_marker_before_first_noise() {
         let mut config = noiseless_config(1);
-        config.pauli_probability = 0.01;
+        config.after_reset_flip_probability = 0.01;
         config.operation_loss_probability = 0.02;
         let text = rotated_memory_z_midswap(config).unwrap();
         let lines: Vec<&str> = text.lines().collect();
@@ -579,11 +634,13 @@ mod tests {
     }
 
     #[test]
-    fn reset_and_measurement_bit_noise_use_x_error_channels() {
-        let mut config = noiseless_config(1);
-        config.pauli_probability = 0.01;
-        config.operation_loss_probability = 0.02;
-        config.measurement_loss_probability = 0.03;
+    fn noise_channels_are_independent_and_follow_logical_data_mapping() {
+        let mut config = noiseless_config(2);
+        config.before_round_data_depolarization = 0.01;
+        config.after_clifford_depolarization = 0.02;
+        config.before_measure_flip_probability = 0.03;
+        config.after_reset_flip_probability = 0.04;
+        config.before_round_data_loss_probability = 0.05;
         let text = rotated_memory_z_midswap(config).unwrap();
         let circuit = parse_lines(&text).unwrap();
 
@@ -603,27 +660,73 @@ mod tests {
                         index + 1
                     };
                     assert_eq!(circuit[noise_index].name(), Some("X_ERROR"));
+                    assert_eq!(circuit[noise_index].args(), Some(&[0.04][..]));
                 }
                 "MRL" => {
                     assert_eq!(circuit[index - 1].name(), Some("X_ERROR"));
+                    assert_eq!(circuit[index - 1].args(), Some(&[0.03][..]));
                     assert_eq!(circuit[index + 1].name(), Some("X_ERROR"));
+                    assert_eq!(circuit[index + 1].args(), Some(&[0.04][..]));
                 }
-                "ML" => assert_eq!(circuit[index - 1].name(), Some("X_ERROR")),
-                "H" => assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE1")),
-                "CX" => assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE2")),
+                "ML" => {
+                    assert_eq!(circuit[index - 1].name(), Some("X_ERROR"));
+                    assert_eq!(circuit[index - 1].args(), Some(&[0.03][..]));
+                }
+                "H" => {
+                    assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE1"));
+                    assert_eq!(circuit[index + 1].args(), Some(&[0.02][..]));
+                }
+                "CX" => {
+                    assert_eq!(circuit[index + 1].name(), Some("DEPOLARIZE2"));
+                    assert_eq!(circuit[index + 1].args(), Some(&[0.02][..]));
+                }
                 _ => {}
             }
         }
 
-        let depolarize1_count = circuit
+        let before_round_targets: Vec<Vec<u32>> = circuit
             .iter()
-            .filter(|instruction| instruction.name() == Some("DEPOLARIZE1"))
-            .count();
-        let h_count = circuit
+            .filter(|instruction| {
+                instruction.name() == Some("DEPOLARIZE1") && instruction.args() == Some(&[0.01][..])
+            })
+            .map(|instruction| {
+                instruction
+                    .targets()
+                    .unwrap()
+                    .iter()
+                    .map(|target| match target {
+                        StimTarget::Qubit(wire) => *wire,
+                        other => panic!("expected qubit target, got {other:?}"),
+                    })
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            before_round_targets,
+            vec![
+                vec![1, 3, 5, 8, 10, 12, 15, 17, 19],
+                vec![2, 3, 5, 9, 11, 13, 16, 18, 19],
+            ]
+        );
+
+        let before_round_loss_targets: Vec<Vec<u32>> = circuit
             .iter()
-            .filter(|instruction| instruction.name() == Some("H"))
-            .count();
-        assert_eq!(depolarize1_count, h_count);
+            .filter(|instruction| {
+                instruction.name() == Some("LOSS") && instruction.args() == Some(&[0.05][..])
+            })
+            .map(|instruction| {
+                instruction
+                    .targets()
+                    .unwrap()
+                    .iter()
+                    .map(|target| match target {
+                        StimTarget::Qubit(wire) => *wire,
+                        other => panic!("expected qubit target, got {other:?}"),
+                    })
+                    .collect()
+            })
+            .collect();
+        assert_eq!(before_round_loss_targets, before_round_targets);
     }
 
     #[test]
@@ -681,6 +784,18 @@ mod tests {
             Err(MidSwapError::InvalidRounds)
         );
         config.rounds = 1;
+        config.before_round_data_depolarization = -0.01;
+        assert!(matches!(
+            rotated_memory_z_midswap(config),
+            Err(MidSwapError::InvalidProbability { .. })
+        ));
+        config.before_round_data_depolarization = 0.0;
+        config.before_round_data_loss_probability = 1.01;
+        assert!(matches!(
+            rotated_memory_z_midswap(config),
+            Err(MidSwapError::InvalidProbability { .. })
+        ));
+        config.before_round_data_loss_probability = 0.0;
         config.operation_loss_probability = f64::NAN;
         assert!(matches!(
             rotated_memory_z_midswap(config),

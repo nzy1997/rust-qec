@@ -152,6 +152,13 @@ enum CircuitCommand {
         /// Depolarization applied to data qubits at the start of each round
         #[arg(long, default_value = "0")]
         before_round_data_depolarization: f64,
+        /// Atom loss applied to data qubits at the start of each Mid-SWAP round
+        #[arg(
+            long = "before-round-data-loss-probability",
+            visible_alias = "before-round-data-loss",
+            default_value = "0"
+        )]
+        before_round_data_loss_probability: f64,
         /// Bit-flip probability applied immediately before each measurement
         #[arg(long, default_value = "0")]
         before_measure_flip_probability: f64,
@@ -400,6 +407,7 @@ where
                     rounds,
                     noise,
                     before_round_data_depolarization,
+                    before_round_data_loss_probability,
                     before_measure_flip_probability,
                     after_reset_flip_probability,
                     after_clifford_loss_probability,
@@ -416,6 +424,7 @@ where
                 rounds,
                 noise,
                 before_round_data_depolarization,
+                before_round_data_loss_probability,
                 before_measure_flip_probability,
                 after_reset_flip_probability,
                 after_clifford_loss_probability,
@@ -895,6 +904,13 @@ fn write_capabilities(
                         ArgumentCapability {
                             name: "before_round_data_depolarization",
                             flag: "--before-round-data-depolarization",
+                            required: false,
+                            values: vec!["probability"],
+                            default: Some("0"),
+                        },
+                        ArgumentCapability {
+                            name: "before_round_data_loss_probability",
+                            flag: "--before-round-data-loss-probability",
                             required: false,
                             values: vec!["probability"],
                             default: Some("0"),

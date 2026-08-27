@@ -119,6 +119,13 @@ pub enum Commands {
         /// Depolarization applied to data qubits at the start of each round.
         #[arg(long = "before_round_data_depolarization", default_value = "0")]
         before_round_data_depolarization: f64,
+        /// Atom loss applied to data qubits at the start of each Mid-SWAP round.
+        #[arg(
+            long = "before_round_data_loss_probability",
+            visible_alias = "before_round_data_loss",
+            default_value = "0"
+        )]
+        before_round_data_loss_probability: f64,
         /// Bit-flip probability applied immediately before each measurement.
         #[arg(long = "before_measure_flip_probability", default_value = "0")]
         before_measure_flip_probability: f64,
@@ -546,6 +553,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             rounds,
             noise,
             before_round_data_depolarization,
+            before_round_data_loss_probability,
             before_measure_flip_probability,
             after_reset_flip_probability,
             after_clifford_loss_probability,
@@ -563,6 +571,10 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 (
                     "before_round_data_depolarization",
                     before_round_data_depolarization,
+                ),
+                (
+                    "before_round_data_loss_probability",
+                    before_round_data_loss_probability,
                 ),
                 (
                     "before_measure_flip_probability",
@@ -596,19 +608,16 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 after_clifford_loss_probability,
             };
             let is_midswap = code == "surface_code" && task == "rotated_memory_z_midswap";
+            if !is_midswap && before_round_data_loss_probability != 0.0 {
+                return Err(
+                    "before_round_data_loss_probability is only valid for surface_code/rotated_memory_z_midswap"
+                        .to_string(),
+                );
+            }
             if is_midswap {
                 if after_clifford_loss_probability != 0.0 {
                     return Err(
                         "after_clifford_loss_probability is not used by the Mid-SWAP task; use operation_loss_probability"
-                            .to_string(),
-                    );
-                }
-                if before_round_data_depolarization != 0.0
-                    || before_measure_flip_probability != 0.0
-                    || after_reset_flip_probability != 0.0
-                {
-                    return Err(
-                        "before_round_data_depolarization, before_measure_flip_probability and after_reset_flip_probability are not used by the Mid-SWAP task; --after_clifford_depolarization sets its Pauli-noise rate"
                             .to_string(),
                     );
                 }
@@ -618,7 +627,11 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                     crate::codegen::MidSwapConfig {
                         distance,
                         rounds,
-                        pauli_probability: noise,
+                        before_round_data_depolarization,
+                        before_round_data_loss_probability,
+                        after_clifford_depolarization: noise,
+                        before_measure_flip_probability,
+                        after_reset_flip_probability,
                         operation_loss_probability,
                         measurement_loss_probability,
                     },
@@ -4263,6 +4276,7 @@ mod tests {
                 rounds: 2,
                 noise: 0.0,
                 before_round_data_depolarization: 0.0,
+                before_round_data_loss_probability: 0.0,
                 before_measure_flip_probability: 0.0,
                 after_reset_flip_probability: 0.0,
                 after_clifford_loss_probability: 0.0,
@@ -4469,6 +4483,7 @@ mod tests {
                 rounds: 1,
                 noise: 0.0,
                 before_round_data_depolarization: 0.0,
+                before_round_data_loss_probability: 0.0,
                 before_measure_flip_probability: 0.0,
                 after_reset_flip_probability: 0.0,
                 after_clifford_loss_probability: 0.0,

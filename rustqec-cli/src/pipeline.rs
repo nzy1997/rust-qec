@@ -44,6 +44,7 @@ pub struct GenOptions {
     pub rounds: usize,
     pub noise: f64,
     pub before_round_data_depolarization: f64,
+    pub before_round_data_loss_probability: f64,
     pub before_measure_flip_probability: f64,
     pub after_reset_flip_probability: f64,
     pub after_clifford_loss_probability: f64,
@@ -534,6 +535,10 @@ pub fn run_gen(
             options.before_round_data_depolarization,
         ),
         (
+            "before_round_data_loss_probability",
+            options.before_round_data_loss_probability,
+        ),
+        (
             "before_measure_flip_probability",
             options.before_measure_flip_probability,
         ),
@@ -565,6 +570,15 @@ pub fn run_gen(
     }
     let is_midswap = options.code == "surface_code" && options.task == "rotated_memory_z_midswap";
     let is_conventional = options.code == "surface_code" && options.task == "rotated_memory_z";
+    if !is_midswap && options.before_round_data_loss_probability != 0.0 {
+        return Err(command_error(
+            CIRCUIT_GEN_COMMAND,
+            "invalid_arguments",
+            "before_round_data_loss_probability is only valid for surface_code/rotated_memory_z_midswap"
+                .to_string(),
+            json,
+        ));
+    }
     let mut buffer = Vec::new();
     if is_midswap {
         if options.after_clifford_loss_probability != 0.0 {
@@ -576,35 +590,14 @@ pub fn run_gen(
                 json,
             ));
         }
-        for (name, value) in [
-            (
-                "before_round_data_depolarization",
-                options.before_round_data_depolarization,
-            ),
-            (
-                "before_measure_flip_probability",
-                options.before_measure_flip_probability,
-            ),
-            (
-                "after_reset_flip_probability",
-                options.after_reset_flip_probability,
-            ),
-        ] {
-            if value != 0.0 {
-                return Err(command_error(
-                    CIRCUIT_GEN_COMMAND,
-                    "invalid_arguments",
-                    format!(
-                        "{name} is not used by the Mid-SWAP task; --noise sets its Pauli-noise rate"
-                    ),
-                    json,
-                ));
-            }
-        }
         let circuit = rstim::codegen::rotated_memory_z_midswap(rstim::codegen::MidSwapConfig {
             distance: options.distance,
             rounds: options.rounds,
-            pauli_probability: options.noise,
+            before_round_data_depolarization: options.before_round_data_depolarization,
+            before_round_data_loss_probability: options.before_round_data_loss_probability,
+            after_clifford_depolarization: options.noise,
+            before_measure_flip_probability: options.before_measure_flip_probability,
+            after_reset_flip_probability: options.after_reset_flip_probability,
             operation_loss_probability: options.operation_loss_probability,
             measurement_loss_probability: options.measurement_loss_probability,
         })

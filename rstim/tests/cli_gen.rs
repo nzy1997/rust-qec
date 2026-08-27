@@ -174,8 +174,16 @@ fn gen_midswap_is_parseable_and_sampleable_from_cli() {
             "3",
             "--rounds",
             "2",
+            "--before_round_data_depolarization",
+            "0.004",
+            "--before_round_data_loss",
+            "0.007",
             "--after_clifford_depolarization",
             "0.002",
+            "--before_measure_flip_probability",
+            "0.005",
+            "--after_reset_flip_probability",
+            "0.006",
             "--operation_loss_probability",
             "0.002",
             "--measurement_loss_probability",
@@ -203,7 +211,11 @@ fn gen_midswap_is_parseable_and_sampleable_from_cli() {
     );
     assert!(text.contains("DEPOLARIZE1(0.002)"));
     assert!(text.contains("DEPOLARIZE2(0.002)"));
-    assert!(text.contains("X_ERROR(0.002)"));
+    assert!(text.contains("DEPOLARIZE1(0.004)"));
+    assert!(text.contains("X_ERROR(0.005)"));
+    assert!(text.contains("X_ERROR(0.006)"));
+    assert!(!text.contains("X_ERROR(0.002)"));
+    assert!(text.contains("LOSS(0.007)"));
     assert!(text.contains("LOSS(0.001)"));
     assert!(text.contains("LOSS(0.003)"));
 
@@ -274,6 +286,37 @@ fn gen_midswap_rejects_invalid_input_without_touching_output() {
         );
         assert_eq!(std::fs::read_to_string(&circuit_path).unwrap(), "keep me");
     }
+}
+
+#[test]
+fn gen_before_round_data_loss_rejects_non_midswap_without_touching_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let circuit_path = directory.path().join("conventional.stim");
+    std::fs::write(&circuit_path, "keep me").unwrap();
+    let output = rstim_cmd()
+        .args([
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--before_round_data_loss",
+            "0.1",
+            "--out",
+            circuit_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("only valid for surface_code/rotated_memory_z_midswap")
+    );
+    assert_eq!(std::fs::read_to_string(circuit_path).unwrap(), "keep me");
 }
 
 #[test]
@@ -1075,6 +1118,7 @@ fn gen_css_uses_explicit_noise_channels() {
 fn gen_rejects_out_of_range_probabilities() {
     for (flag, value) in [
         ("--before_round_data_depolarization", "2"),
+        ("--before_round_data_loss_probability", "2"),
         ("--after_clifford_depolarization", "NaN"),
         ("--before_measure_flip_probability", "-0.1"),
         ("--after_reset_flip_probability", "1.5"),
