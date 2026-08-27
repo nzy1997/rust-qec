@@ -472,7 +472,11 @@ fn native_d3_and_d5_exports_decode_via_cli_against_private_answers() {
         let circuit = rstim::codegen::rotated_memory_z_midswap(rstim::codegen::MidSwapConfig {
             distance,
             rounds: 1,
-            pauli_probability: 1e-9,
+            before_round_data_depolarization: 1e-9,
+            before_round_data_loss_probability: 0.0,
+            after_clifford_depolarization: 1e-9,
+            before_measure_flip_probability: 1e-9,
+            after_reset_flip_probability: 1e-9,
             operation_loss_probability: 1e-9,
             measurement_loss_probability: 1e-9,
         })
