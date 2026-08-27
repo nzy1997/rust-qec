@@ -472,11 +472,9 @@ impl GraphEdgeIndex {
             let mut pending = vec![detector];
             detector_components.insert(detector, component);
             while let Some(current) = pending.pop() {
-                if let Some(neighbors) = adjacency.get(&current) {
-                    for &neighbor in neighbors {
-                        if detector_components.insert(neighbor, component).is_none() {
-                            pending.push(neighbor);
-                        }
+                for &neighbor in &adjacency[&current] {
+                    if detector_components.insert(neighbor, component).is_none() {
+                        pending.push(neighbor);
                     }
                 }
             }
@@ -515,9 +513,7 @@ impl GraphEdgeIndex {
             let Some(edges) = edges else {
                 return Vec::new();
             };
-            let Some((&first, rest)) = edges.split_first() else {
-                return Vec::new();
-            };
+            let (first, rest) = (edges[0], &edges[1..]);
             let label = &self.observables[first];
             if rest.iter().any(|&edge| self.observables[edge] != *label) {
                 return Vec::new();
@@ -957,11 +953,32 @@ mod tests {
                 kind: EdgeKind::Boundary,
             },
             GraphEdge {
-                node1: 0,
-                node2: Some(1),
+                node1: 1,
+                node2: Some(0),
                 observables: Vec::new(),
                 weight: 1.0,
                 kind: EdgeKind::SpaceLike,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: Some(2),
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::SpaceLike,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: None,
+                observables: vec![1],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 3,
+                node2: None,
+                observables: vec![1],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
             },
         ];
         let index = GraphEdgeIndex::new(&edges);
@@ -994,6 +1011,32 @@ mod tests {
             }),
             [0]
         );
+        for (id, detectors, observables) in [
+            ("unknown-detector", vec![99], Vec::new()),
+            ("three-detector-component", vec![0, 1, 2], Vec::new()),
+            ("missing-boundary", vec![2], Vec::new()),
+            ("ambiguous-parallel-label", vec![1], Vec::new()),
+        ] {
+            assert!(
+                index
+                    .compatible_edges(&Effect {
+                        id: id.to_string(),
+                        detectors,
+                        observables,
+                        weight: 0.0,
+                    })
+                    .is_empty(),
+                "{id} must not map approximately"
+            );
+        }
+        let mut disconnected = index.compatible_edges(&Effect {
+            id: "disconnected-xor".to_string(),
+            detectors: vec![0, 3],
+            observables: vec![0, 1],
+            weight: 0.0,
+        });
+        disconnected.sort_unstable();
+        assert_eq!(disconnected, [0, 5]);
     }
 
     #[test]

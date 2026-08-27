@@ -371,6 +371,31 @@ fn effect_for_source<'a>(
 mod tests {
     use super::*;
 
+    fn empty_decoder() -> CompiledMle {
+        CompiledMle {
+            cache: HashMap::new(),
+            independent: Vec::new(),
+            envelopes: Vec::new(),
+            num_observables: 0,
+            timeout_ms: None,
+            force_timeout: false,
+            cached_work: 0,
+            cache_order: VecDeque::new(),
+            model_builds: 0,
+            cache_hits: 0,
+        }
+    }
+
+    fn cached_model(work: usize) -> ConditionedMleModel {
+        let independent = [Effect {
+            id: "cache-test".to_string(),
+            detectors: Vec::new(),
+            observables: Vec::new(),
+            weight: 1.0,
+        }];
+        build_pattern_model(&independent, &[], &[], None, 1, work).unwrap()
+    }
+
     #[test]
     fn conditioned_mle_preflights_incidence_work() {
         assert!(conditioned_mle_work_from_counts(1_000, 1_000, 0, 0).is_ok());
@@ -379,5 +404,42 @@ mod tests {
         assert!(error.message.contains("work limit"));
         assert!(conditioned_mle_work_from_counts(usize::MAX, 0, 0, 0).is_err());
         assert!(conditioned_mle_work_from_counts(1, 1, 0, usize::MAX).is_err());
+    }
+
+    #[test]
+    fn conditioned_mle_evicts_fifo_and_reports_accounting_drift() {
+        let mut decoder = empty_decoder();
+        decoder
+            .cache
+            .insert(vec![0], cached_model(MAX_CONDITIONED_DECODER_WORK));
+        decoder.cache_order.push_back(vec![0]);
+        decoder.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        decoder.evict_until_fits(1).unwrap();
+        assert!(decoder.cache.is_empty());
+        assert_eq!(decoder.cached_work, 0);
+
+        let mut missing_order = empty_decoder();
+        missing_order.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        assert!(matches!(
+            missing_order.evict_until_fits(1),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
+
+        let mut missing_entry = empty_decoder();
+        missing_entry.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        missing_entry.cache_order.push_back(vec![0]);
+        assert!(matches!(
+            missing_entry.evict_until_fits(1),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
+
+        let mut underflow = empty_decoder();
+        underflow.cache.insert(vec![0], cached_model(2));
+        underflow.cache_order.push_back(vec![0]);
+        underflow.cached_work = 1;
+        assert!(matches!(
+            underflow.evict_until_fits(MAX_CONDITIONED_DECODER_WORK),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
     }
 }
