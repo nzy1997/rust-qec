@@ -97,7 +97,7 @@ fn circuit_gen_rejects_unknown_code_and_misplaced_loss_flags() {
             "--code",
             "surface_code",
             "--task",
-            "rotated_memory_z",
+            "rotated_memory_x",
             "--distance",
             "3",
             "--rounds",
@@ -118,6 +118,152 @@ fn circuit_gen_rejects_unknown_code_and_misplaced_loss_flags() {
         );
         assert!(!out.exists(), "args: {args:?}");
     }
+}
+
+#[test]
+fn circuit_gen_rotated_memory_z_with_loss_routes_to_loss_visible_builder() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("loss.stim");
+    let output = rustqec_cmd()
+        .args([
+            "circuit",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--before-round-data-depolarization",
+            "0.001",
+            "--noise",
+            "0.002",
+            "--before-measure-flip-probability",
+            "0.003",
+            "--after-reset-flip-probability",
+            "0.004",
+            "--after-clifford-loss-probability",
+            "0.005",
+            "--operation-loss-probability",
+            "0.006",
+            "--measurement-loss-probability",
+            "0.007",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let value = stdout_json(&output);
+    assert_eq!(value["command"], "circuit.gen");
+    assert_eq!(value["result"]["task"], "rotated_memory_z");
+
+    let circuit = std::fs::read_to_string(&out).unwrap();
+    assert!(circuit.contains("MRL"));
+    assert!(circuit.contains("ML"));
+    assert!(circuit.contains("LOSS(0.005)"));
+    assert!(circuit.contains("TICK[rstim:logical_flip_point]"));
+    // The subset-v1 decoder compiler rejects SHIFT_COORDS; detectors must
+    // carry explicit time coordinates instead.
+    assert!(!circuit.contains("SHIFT_COORDS"));
+}
+
+#[test]
+fn circuit_gen_noise_flag_only_drives_the_after_clifford_channel() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("noise.stim");
+    let output = rustqec_cmd()
+        .args([
+            "circuit",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_x",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--noise",
+            "0.1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    stdout_json(&output);
+
+    let circuit = std::fs::read_to_string(&out).unwrap();
+    assert!(circuit.contains("DEPOLARIZE1(0.1)"));
+    assert!(circuit.contains("DEPOLARIZE2(0.1)"));
+    // --noise must not broadcast into the reset/measurement flip channels.
+    assert!(!circuit.contains("X_ERROR(0.1)"));
+}
+
+#[test]
+fn circuit_gen_rejects_out_of_range_probabilities() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("x.stim");
+    for (flag, value) in [
+        ("--before-measure-flip-probability", "2"),
+        ("--noise", "nan"),
+        ("--after-reset-flip-probability", "1.5"),
+    ] {
+        let output = rustqec_cmd()
+            .args([
+                "circuit",
+                "gen",
+                "--code",
+                "surface_code",
+                "--task",
+                "rotated_memory_z",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+                flag,
+                value,
+                "--out",
+                out.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{flag} {value}");
+        let json = stderr_json(&output);
+        assert_eq!(json["command"], "circuit.gen", "{flag} {value}");
+        assert_eq!(json["error"]["code"], "invalid_arguments", "{flag} {value}");
+        assert!(!out.exists(), "{flag} {value}");
+    }
+}
+
+#[test]
+fn circuit_gen_midswap_rejects_the_explicit_pauli_channel_flags() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("x.stim");
+    let output = rustqec_cmd()
+        .args([
+            "circuit",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z_midswap",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--before-measure-flip-probability",
+            "0.1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let value = stderr_json(&output);
+    assert_eq!(value["error"]["code"], "invalid_arguments");
+    assert!(!out.exists());
 }
 
 #[test]
@@ -568,12 +714,17 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         .find(|entry| entry["name"] == "circuit.gen")
         .unwrap();
     let gen_arguments = gen_entry["arguments"].as_array().unwrap();
-    assert!(
-        gen_arguments
-            .iter()
-            .any(|argument| argument["flag"] == "--after-clifford-loss-probability"),
-        "circuit.gen must declare --after-clifford-loss-probability"
-    );
+    for flag in [
+        "--after-clifford-loss-probability",
+        "--before-round-data-depolarization",
+        "--before-measure-flip-probability",
+        "--after-reset-flip-probability",
+    ] {
+        assert!(
+            gen_arguments.iter().any(|argument| argument["flag"] == flag),
+            "circuit.gen must declare {flag}"
+        );
+    }
     let mode = export["arguments"]
         .as_array()
         .unwrap()
