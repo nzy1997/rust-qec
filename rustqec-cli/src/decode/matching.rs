@@ -4,8 +4,8 @@ use rmatching::Matching;
 use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
 
 use super::{
-    CompiledCircuit, DecodeFailure, Effect, MAX_CONDITIONED_DECODER_ITEMS,
-    MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_total,
+    CompiledCircuit, DecodeFailure, MAX_CONDITIONED_DECODER_ITEMS, MAX_CONDITIONED_DECODER_WORK,
+    ShotFailure, conditioned_cache_total,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -100,12 +100,8 @@ impl CompiledMatching {
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
         if !self.cache.contains_key(&key) {
-            let artifact_work = conditioned_matching_work(
-                &self.edges,
-                &self.loss_edges,
-                &syndrome.checks,
-                losses,
-            )?;
+            let artifact_work =
+                conditioned_matching_work(&self.edges, &self.loss_edges, &syndrome.checks, losses)?;
             let cached_work = conditioned_cache_total(
                 "matching",
                 self.cache.len(),
@@ -152,13 +148,6 @@ impl CompiledMatching {
     }
 }
 
-pub(super) fn candidate_affects_edge(effect: &Effect, edge: &GraphEdge) -> bool {
-    effect.detectors.contains(&edge.node1)
-        && edge
-            .node2
-            .is_none_or(|node2| effect.detectors.contains(&node2))
-}
-
 pub(super) fn validate_unambiguous_parallel_edges(
     edges: &[GraphEdge],
 ) -> Result<(), DecodeFailure> {
@@ -193,6 +182,7 @@ fn build_matching(
     losses: &[usize],
 ) -> Result<ConditionedMatching, ShotFailure> {
     conditioned_matching_work(edges, loss_edges, checks, losses)?;
+    let detector_checks = detector_check_incidence(checks);
     let mut active = HashSet::new();
     for &loss in losses {
         let mapped_edges = loss_edges.get(loss).ok_or_else(|| {
@@ -219,7 +209,7 @@ fn build_matching(
         } else {
             edge.weight
         } / scale;
-        let transformed = transformed_check_nodes(edge, checks);
+        let transformed = transformed_check_nodes(edge, &detector_checks);
         if transformed.len() > 2 {
             return Err(ShotFailure::Other(format!(
                 "loss pattern turns a graphlike mechanism into a {}-detector hyperedge",
@@ -319,8 +309,6 @@ fn conditioned_matching_work_from_counts(
         .and_then(|value| value.checked_add(check_terms))
         .and_then(|value| value.checked_add(loss_count))
         .and_then(|value| value.checked_add(loss_terms))
-        .and_then(|value| value.checked_add(edge_count.checked_mul(check_count)?))
-        .and_then(|value| value.checked_add(edge_terms.checked_mul(check_terms)?))
         .ok_or_else(conditioned_matching_limit_error)?;
     if work > MAX_CONDITIONED_DECODER_WORK {
         return Err(conditioned_matching_limit_error());
@@ -347,18 +335,59 @@ fn validate_reachable_checks(
     Ok(())
 }
 
-fn transformed_check_nodes(edge: &GraphEdge, checks: &[LossAwareDetectorCheck]) -> Vec<usize> {
-    checks
-        .iter()
-        .enumerate()
-        .filter_map(|(check_index, check)| {
-            let mut parity = check.source_detectors.contains(&edge.node1);
-            if let Some(node2) = edge.node2 {
-                parity ^= check.source_detectors.contains(&node2);
+fn detector_check_incidence(checks: &[LossAwareDetectorCheck]) -> HashMap<usize, Vec<usize>> {
+    let mut incidence = HashMap::<usize, Vec<usize>>::new();
+    for (check_index, check) in checks.iter().enumerate() {
+        for &detector in &check.source_detectors {
+            incidence.entry(detector).or_default().push(check_index);
+        }
+    }
+    incidence
+}
+
+fn transformed_check_nodes(
+    edge: &GraphEdge,
+    detector_checks: &HashMap<usize, Vec<usize>>,
+) -> Vec<usize> {
+    let left = detector_checks
+        .get(&edge.node1)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let Some(node2) = edge.node2 else {
+        return left.to_vec();
+    };
+    let right = detector_checks
+        .get(&node2)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let mut transformed = Vec::with_capacity(left.len() + right.len());
+    let (mut a, mut b) = (0, 0);
+    while a < left.len() || b < right.len() {
+        match (left.get(a), right.get(b)) {
+            (Some(&left_value), Some(&right_value)) if left_value == right_value => {
+                a += 1;
+                b += 1;
             }
-            parity.then_some(check_index)
-        })
-        .collect()
+            (Some(&left_value), Some(&right_value)) if left_value < right_value => {
+                transformed.push(left_value);
+                a += 1;
+            }
+            (Some(_), Some(&right_value)) => {
+                transformed.push(right_value);
+                b += 1;
+            }
+            (Some(&left_value), None) => {
+                transformed.push(left_value);
+                a += 1;
+            }
+            (None, Some(&right_value)) => {
+                transformed.push(right_value);
+                b += 1;
+            }
+            (None, None) => break,
+        }
+    }
+    transformed
 }
 
 #[cfg(test)]
@@ -402,10 +431,9 @@ mod tests {
     #[test]
     fn conditioned_matching_preflights_incidence_work() {
         let error =
-            conditioned_matching_work_from_counts(10_001, 1_000, 0, 0, 0, 0).unwrap_err();
-        assert!(
-            matches!(error, ShotFailure::Other(message) if message.contains("work limit"))
-        );
+            conditioned_matching_work_from_counts(1, 1, MAX_CONDITIONED_DECODER_WORK, 0, 0, 0)
+                .unwrap_err();
+        assert!(matches!(error, ShotFailure::Other(message) if message.contains("work limit")));
         assert!(conditioned_matching_work_from_counts(usize::MAX, 0, 0, 0, 0, 0).is_err());
         assert!(conditioned_matching_work_from_counts(1, 1, 0, usize::MAX, 0, 0).is_err());
     }

@@ -22,6 +22,22 @@ pub struct AnalyzeOptions {
     pub allow_gauge_detectors: bool,
 }
 
+/// A Pauli error queried at an instruction boundary of a flat circuit.
+///
+/// `insertion` has the same meaning as `Vec::insert`: zero is before the first
+/// instruction and `instrs.len()` is after the last instruction.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PauliEffectProbe {
+    pub insertion: usize,
+    pub qubit: u32,
+    pub basis: PauliBasis,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PauliEffect {
+    pub targets: Vec<DemTarget>,
+}
+
 #[derive(Debug, Clone, Default)]
 struct SparseXorVec {
     targets: Vec<DemTarget>,
@@ -157,6 +173,93 @@ impl ErrorAnalyzer {
         options: AnalyzeOptions,
     ) -> Result<DetectorErrorModel, String> {
         Self::circuit_to_dem_backend(instrs, options, false)
+    }
+
+    /// Evaluates many single-Pauli error effects in one reverse sensitivity
+    /// traversal of a flat circuit.
+    ///
+    /// This is equivalent to inserting one `X_ERROR`, `Y_ERROR`, or `Z_ERROR`
+    /// at a time and extracting its detector/observable symptoms, but avoids
+    /// cloning and re-analyzing the complete circuit for every probe.
+    pub fn circuit_pauli_effects(
+        instrs: &[StimInstr],
+        probes: &[PauliEffectProbe],
+    ) -> Result<Vec<PauliEffect>, String> {
+        if instrs
+            .iter()
+            .any(|instruction| matches!(instruction, StimInstr::Repeat { .. }))
+        {
+            return Err("batched Pauli-effect probes require a flat circuit".to_string());
+        }
+
+        let num_qubits = count_qubits(instrs);
+        let num_measurements = count_measurements(instrs);
+        let num_detectors = count_annotations(instrs, "DETECTOR");
+        let mut probes_at = vec![Vec::<usize>::new(); instrs.len() + 1];
+        for (index, probe) in probes.iter().enumerate() {
+            if probe.insertion > instrs.len() {
+                return Err(format!(
+                    "Pauli-effect probe position {} is outside circuit of length {}",
+                    probe.insertion,
+                    instrs.len()
+                ));
+            }
+            if probe.qubit as usize >= num_qubits {
+                return Err(format!(
+                    "Pauli-effect probe qubit {} is outside circuit width {}",
+                    probe.qubit, num_qubits
+                ));
+            }
+            probes_at[probe.insertion].push(index);
+        }
+
+        let mut analyzer = ErrorAnalyzer {
+            x_sens: vec![SparseXorVec::default(); num_qubits],
+            z_sens: vec![SparseXorVec::default(); num_qubits],
+            measurement_sens: vec![SparseXorVec::default(); num_measurements],
+            num_measurements,
+            det_index: num_detectors,
+            errors: Vec::new(),
+            tracked_sources: Vec::new(),
+            tracked_terms: Vec::new(),
+            decompose_channel_errors: false,
+            options: AnalyzeOptions::default(),
+        };
+        let mut effects = vec![None; probes.len()];
+
+        for insertion in (0..=instrs.len()).rev() {
+            for &probe_index in &probes_at[insertion] {
+                let probe = probes[probe_index];
+                let qubit = probe.qubit as usize;
+                let targets = match probe.basis {
+                    PauliBasis::X => analyzer.x_sens[qubit].targets.clone(),
+                    PauliBasis::Y => ErrorAnalyzer::xor_sorted_targets(
+                        &analyzer.x_sens[qubit].targets,
+                        &analyzer.z_sens[qubit].targets,
+                    ),
+                    PauliBasis::Z => analyzer.z_sens[qubit].targets.clone(),
+                };
+                effects[probe_index] = Some(PauliEffect { targets });
+            }
+            if insertion > 0 {
+                let StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } = &instrs[insertion - 1]
+                else {
+                    unreachable!("repeat blocks were rejected above")
+                };
+                analyzer.undo_op(name, args, targets)?;
+            }
+        }
+        analyzer.ensure_no_pending_gauge()?;
+
+        Ok(effects
+            .into_iter()
+            .map(|effect| effect.expect("every validated Pauli-effect probe is evaluated"))
+            .collect())
     }
 
     pub fn circuit_to_tracked_dem(instrs: &[StimInstr]) -> Result<TrackedDemResult, String> {
@@ -2483,6 +2586,98 @@ mod internal_branch_tests {
             decompose_channel_errors: false,
             options: AnalyzeOptions::default(),
         }
+    }
+
+    #[test]
+    fn batched_pauli_effects_match_individually_inserted_errors() {
+        let circuit = crate::validation::parse_and_validate(concat!(
+            "R 0 1\n",
+            "H 0\n",
+            "H 0\n",
+            "CX 0 1\n",
+            "M 0 1\n",
+            "DETECTOR rec[-2]\n",
+            "DETECTOR rec[-1]\n",
+            "OBSERVABLE_INCLUDE(0) rec[-2]\n",
+        ))
+        .unwrap();
+        let probes = [
+            PauliEffectProbe {
+                insertion: 1,
+                qubit: 0,
+                basis: PauliBasis::X,
+            },
+            PauliEffectProbe {
+                insertion: 2,
+                qubit: 0,
+                basis: PauliBasis::Y,
+            },
+            PauliEffectProbe {
+                insertion: 3,
+                qubit: 1,
+                basis: PauliBasis::Z,
+            },
+            PauliEffectProbe {
+                insertion: circuit.len(),
+                qubit: 1,
+                basis: PauliBasis::X,
+            },
+        ];
+
+        let actual = ErrorAnalyzer::circuit_pauli_effects(&circuit, &probes).unwrap();
+        for (probe, effect) in probes.iter().zip(actual) {
+            let mut individually_probed = circuit.clone();
+            let name = match probe.basis {
+                PauliBasis::X => "X_ERROR",
+                PauliBasis::Y => "Y_ERROR",
+                PauliBasis::Z => "Z_ERROR",
+            };
+            individually_probed.insert(
+                probe.insertion,
+                StimInstr::new(name, vec![0.125], vec![StimTarget::Qubit(probe.qubit)]),
+            );
+            let dem = ErrorAnalyzer::circuit_to_dem(&individually_probed).unwrap();
+            let expected = dem
+                .instructions()
+                .iter()
+                .find_map(|instruction| match instruction {
+                    DemInstruction::Error { targets, .. } => Some(targets.clone()),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            assert_eq!(effect.targets, expected, "probe={probe:?}");
+        }
+    }
+
+    #[test]
+    fn batched_pauli_effects_reject_invalid_query_layouts() {
+        let flat = crate::validation::parse_and_validate("R 0\nM 0\n").unwrap();
+        let invalid_position = [PauliEffectProbe {
+            insertion: flat.len() + 1,
+            qubit: 0,
+            basis: PauliBasis::X,
+        }];
+        assert!(
+            ErrorAnalyzer::circuit_pauli_effects(&flat, &invalid_position)
+                .unwrap_err()
+                .contains("outside circuit")
+        );
+        let invalid_qubit = [PauliEffectProbe {
+            insertion: 0,
+            qubit: 1,
+            basis: PauliBasis::X,
+        }];
+        assert!(
+            ErrorAnalyzer::circuit_pauli_effects(&flat, &invalid_qubit)
+                .unwrap_err()
+                .contains("outside circuit width")
+        );
+        let repeated = crate::validation::parse_and_validate("REPEAT 2 {\nM 0\n}\n").unwrap();
+        assert!(
+            ErrorAnalyzer::circuit_pauli_effects(&repeated, &[])
+                .unwrap_err()
+                .contains("flat circuit")
+        );
     }
 
     #[test]

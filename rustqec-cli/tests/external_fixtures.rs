@@ -10,7 +10,7 @@
 //! `pip install stim==1.16.0`).
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rstim::decoder_dataset::{
@@ -51,6 +51,143 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+fn current_rstim_fixture(family: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/current_rstim_atom_loss")
+        .join(family)
+}
+
+fn assert_current_rstim_atom_loss_decodes(family: &str) {
+    let dataset = current_rstim_fixture(family);
+    let circuit = fs::read_to_string(dataset.join("circuit.stim")).unwrap();
+    assert!(circuit.contains("QUBIT_COORDS"), "{family}");
+    if family == "conventional" {
+        assert!(circuit.contains("SHIFT_COORDS"), "{family}");
+    }
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(dataset.join("manifest.json")).unwrap()).unwrap();
+
+    let root = tempfile::tempdir().unwrap();
+    let output = run_decode(&dataset, "envelope-matching", root.path());
+    assert!(
+        output.status.success(),
+        "{family}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let predictions = fs::read(root.path().join("envelope-matching.b8")).unwrap();
+    let shots = manifest["shots"].as_u64().unwrap() as usize;
+    let observables = manifest["circuit"]["observables"].as_u64().unwrap() as usize;
+    assert_eq!(
+        predictions.len(),
+        shots * observables.div_ceil(8),
+        "{family}"
+    );
+    if observables % 8 != 0 {
+        let padding_mask = !((1u8 << (observables % 8)) - 1);
+        assert!(
+            predictions
+                .chunks_exact(observables.div_ceil(8))
+                .all(|row| row.last().unwrap() & padding_mask == 0),
+            "{family}: prediction padding bits must be zero"
+        );
+    }
+    let stats: Value =
+        serde_json::from_slice(&fs::read(root.path().join("envelope-matching.json")).unwrap())
+            .unwrap();
+    assert_eq!(stats["shot_count"], manifest["shots"], "{family}");
+    assert_eq!(
+        stats["circuit_sha256"], manifest["circuit"]["sha256"],
+        "{family}"
+    );
+    assert_eq!(stats["primitive_probe_count"], 15_345, "{family}");
+    assert_eq!(
+        stats["primitive_symptom_terms"],
+        if family == "conventional" {
+            29_360
+        } else {
+            29_128
+        },
+        "{family}"
+    );
+    assert_eq!(stats["loss_envelope_candidate_count"], 0, "{family}");
+}
+
+#[test]
+fn current_rstim_atom_loss_conventional_decodes_unmodified() {
+    assert_current_rstim_atom_loss_decodes("conventional");
+}
+
+#[test]
+fn current_rstim_atom_loss_midswap_decodes_unmodified() {
+    assert_current_rstim_atom_loss_decodes("midswap");
+}
+
+#[test]
+fn current_rstim_atom_loss_rejects_non_metadata_without_outputs() {
+    let root = tempfile::tempdir().unwrap();
+    let dataset = root.path().join("unsupported-dataset");
+    fs::create_dir(&dataset).unwrap();
+    let circuit = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/current_rstim_atom_loss/unsupported_non_metadata.stim"),
+    )
+    .unwrap();
+    let stats = rstim::stats::summarize_text(&circuit).unwrap();
+    let shots = vec![0u8; stats.num_measurements.div_ceil(8)];
+    fs::write(dataset.join("circuit.stim"), &circuit).unwrap();
+    fs::write(dataset.join("shots.b8"), &shots).unwrap();
+    let circuit_sha = sha256_hex(circuit.as_bytes());
+    let shots_sha = sha256_hex(&shots);
+    let dataset_id = sha256_hex(
+        format!(
+            "format=rstim_decoder_dataset\nschema_version=1\nmode=measurements_blinded\ncircuit_sha256={circuit_sha}\nshots=1\nrow_bits={}\nshots_b8_sha256={shots_sha}\n",
+            stats.num_measurements
+        )
+        .as_bytes(),
+    );
+    let manifest = serde_json::json!({
+        "format": "rstim_decoder_dataset",
+        "schema_version": 1,
+        "dataset_id": dataset_id,
+        "mode": "measurements_blinded",
+        "shots": 1,
+        "row": {
+            "kind": "measurements",
+            "bits": stats.num_measurements,
+            "encoding": "b8",
+            "bit_order": "lsb_first",
+            "bytes_per_shot": shots.len()
+        },
+        "circuit": {
+            "file": "circuit.stim",
+            "sha256": circuit_sha,
+            "measurements": stats.num_measurements,
+            "detectors": stats.num_detectors,
+            "observables": stats.num_observables,
+            "sweep_bits": stats.num_sweep_bits
+        },
+        "shots_file": {
+            "file": "shots.b8",
+            "sha256": shots_sha,
+            "bits": stats.num_measurements,
+            "bytes_per_shot": shots.len()
+        }
+    });
+    fs::write(
+        dataset.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let output = run_decode(&dataset, "envelope-matching", root.path());
+    assert!(!output.status.success());
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(error["error"]["code"], "unsupported_circuit");
+    assert!(error["error"]["message"].as_str().unwrap().contains("S"));
+    assert!(!root.path().join("envelope-matching.b8").exists());
+    assert!(!root.path().join("envelope-matching.json").exists());
 }
 
 /// A distance-3 rotated-surface memory-Z circuit generated by Stim and

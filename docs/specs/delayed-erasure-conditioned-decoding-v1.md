@@ -99,7 +99,10 @@ many distinct loss patterns.
 
 `matching_graph_builds` and `mle_model_builds` report the number of distinct
 conditioned artifacts actually built. `distinct_loss_patterns` and cache-hit
-statistics make accidental per-shot recompilation visible.
+statistics make accidental per-shot recompilation visible. Compile-time
+growth is reported by `primitive_probe_count`, `primitive_symptom_terms`, and
+`loss_envelope_candidate_count`; the last value is zero for Envelope-Matching
+because that backend consumes primitive-to-edge unions directly.
 
 The private `logical_input` label introduced for blinded datasets remains the
 evaluation answer source. It is independent of the arbitrary lost-value

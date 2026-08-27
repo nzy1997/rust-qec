@@ -178,8 +178,8 @@ fn circuit_gen_rotated_memory_z_with_loss_routes_to_loss_visible_builder() {
     assert!(circuit.contains("ML"));
     assert!(circuit.contains("LOSS(0.005)"));
     assert!(circuit.contains("TICK[rstim:logical_flip_point]"));
-    // The subset-v1 decoder compiler rejects SHIFT_COORDS; detectors must
-    // carry explicit time coordinates instead.
+    // This generator path emits explicit detector time coordinates. The
+    // decoder also accepts SHIFT_COORDS from earlier RStim revisions.
     assert!(!circuit.contains("SHIFT_COORDS"));
 }
 

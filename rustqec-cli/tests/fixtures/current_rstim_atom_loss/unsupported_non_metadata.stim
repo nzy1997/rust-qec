@@ -1,0 +1,9 @@
+QUBIT_COORDS(0,0) 0
+R 0
+TICK[rstim:logical_flip_point]
+LOSS(0.1) 0
+S 0
+X_ERROR(0.1) 0
+ML 0
+DETECTOR(0,0,0) rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]

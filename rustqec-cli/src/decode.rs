@@ -34,7 +34,8 @@ pub const COMMAND: &str = "decode";
 pub const STATS_SCHEMA_VERSION: &str = "rustqec.decode-stats.v1";
 const BATCH_SIZE: usize = 1024;
 const MAX_ENVELOPE_CANDIDATES: usize = 100_000;
-const MAX_PRIMITIVE_PROBES: usize = 10_000;
+const MAX_PRIMITIVE_PROBES: usize = 100_000;
+const MAX_PRIMITIVE_SYMPTOM_TERMS: usize = 10_000_000;
 const MAX_CONDITIONED_DECODER_ARTIFACTS: usize = 1_024;
 const MAX_CONDITIONED_DECODER_ITEMS: usize = 100_000;
 const MAX_CONDITIONED_DECODER_WORK: usize = 10_000_000;
@@ -114,6 +115,9 @@ pub struct DecodeStats {
     pub timeout_count: usize,
     pub infeasible_shot_count: usize,
     pub circuit_compilations: usize,
+    pub primitive_probe_count: usize,
+    pub primitive_symptom_terms: usize,
+    pub loss_envelope_candidate_count: usize,
     pub matching_graph_builds: usize,
     pub mle_model_builds: usize,
 }
@@ -141,13 +145,15 @@ struct CompiledCircuit {
     loss_edges: Vec<Vec<usize>>,
     unmapped_loss_primitives: Vec<Vec<String>>,
     num_observables: usize,
+    primitive_probe_count: usize,
+    primitive_symptom_terms: usize,
 }
 
 pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
     validate_output_paths(options)?;
     let dataset = read_dataset(&options.dataset)?;
     let compile_started = Instant::now();
-    let circuit = compile_circuit(&dataset)?;
+    let circuit = compile_circuit(&dataset, options.decoder)?;
     let mut decoder = match options.decoder {
         DecoderKind::EnvelopeMatching => DecoderState::Matching(CompiledMatching::new(&circuit)?),
         DecoderKind::EnvelopeMle => {
@@ -214,6 +220,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
                         decode_started.elapsed().as_secs_f64(),
                         &patterns,
                         &decoder,
+                        &circuit,
                         shot_offset + shot + 1,
                         1,
                         0,
@@ -232,6 +239,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
                         decode_started.elapsed().as_secs_f64(),
                         &patterns,
                         &decoder,
+                        &circuit,
                         shot_offset + shot + 1,
                         0,
                         1,
@@ -263,6 +271,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
         decode_seconds,
         &patterns,
         &decoder,
+        &circuit,
         dataset.manifest.shots,
         0,
         0,
@@ -298,6 +307,7 @@ fn build_stats(
     decode_seconds: f64,
     patterns: &HashSet<Vec<usize>>,
     decoder: &DecoderState,
+    circuit: &CompiledCircuit,
     attempted_shots: usize,
     timeout_count: usize,
     infeasible_shot_count: usize,
@@ -319,6 +329,13 @@ fn build_stats(
         timeout_count,
         infeasible_shot_count,
         circuit_compilations: 1,
+        primitive_probe_count: circuit.primitive_probe_count,
+        primitive_symptom_terms: circuit.primitive_symptom_terms,
+        loss_envelope_candidate_count: circuit
+            .envelopes
+            .iter()
+            .map(|envelope| envelope.candidates.len())
+            .sum(),
         matching_graph_builds: decoder.graph_builds(),
         mle_model_builds: decoder.model_builds(),
     }
@@ -419,7 +436,7 @@ fn parent_dir(path: &Path) -> &Path {
 /// callers (for example `dataset import`) can cross-check loss sidecars.
 pub(crate) fn validate_public_bundle(dir: &Path) -> Result<Vec<usize>, DecodeFailure> {
     let dataset = read_dataset(dir)?;
-    let compiled = compile_circuit(&dataset)?;
+    let compiled = compile_circuit(&dataset, DecoderKind::EnvelopeMatching)?;
     Ok(compiled.loss_flags)
 }
 
@@ -500,7 +517,7 @@ mod tests {
     }
 
     fn compiled(circuit_text: &str) -> CompiledCircuit {
-        compile_circuit(&dataset_for(circuit_text)).unwrap()
+        compile_circuit(&dataset_for(circuit_text), DecoderKind::EnvelopeMle).unwrap()
     }
 
     fn observed(bits: &[u8]) -> Vec<usize> {
@@ -943,7 +960,9 @@ mod tests {
     fn compile_and_decode_boundaries_report_structured_errors() {
         let mut mismatched = dataset_for(PERSISTENT_CIRCUIT);
         mismatched.manifest.circuit.detectors += 1;
-        let error = compile_circuit(&mismatched).err().unwrap();
+        let error = compile_circuit(&mismatched, DecoderKind::EnvelopeMatching)
+            .err()
+            .unwrap();
         assert_eq!(error.code, "invalid_dataset");
         assert!(error.message.contains("circuit counts"));
 
@@ -954,7 +973,9 @@ mod tests {
             "ML 0\n",
             "DETECTOR(0,0,0) rec[-1]\n",
         ));
-        let error = compile_circuit(&no_observable).err().unwrap();
+        let error = compile_circuit(&no_observable, DecoderKind::EnvelopeMatching)
+            .err()
+            .unwrap();
         assert_eq!(error.code, "unsupported_circuit");
         assert!(error.message.contains("1..=64 observables"));
 
