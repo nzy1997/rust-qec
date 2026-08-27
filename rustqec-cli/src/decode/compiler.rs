@@ -438,14 +438,21 @@ struct CompiledLossEnvelope {
 struct GraphEdgeIndex {
     boundary: HashMap<usize, Vec<usize>>,
     internal: HashMap<(usize, usize), Vec<usize>>,
+    detector_components: HashMap<usize, usize>,
+    observables: Vec<Vec<usize>>,
 }
 
 impl GraphEdgeIndex {
     fn new(edges: &[GraphEdge]) -> Self {
         let mut boundary = HashMap::<usize, Vec<usize>>::new();
         let mut internal = HashMap::<(usize, usize), Vec<usize>>::new();
+        let mut adjacency = HashMap::<usize, Vec<usize>>::new();
         for (index, edge) in edges.iter().enumerate() {
+            adjacency.entry(edge.node1).or_default();
             if let Some(node2) = edge.node2 {
+                adjacency.entry(node2).or_default();
+                adjacency.entry(edge.node1).or_default().push(node2);
+                adjacency.entry(node2).or_default().push(edge.node1);
                 let endpoints = if edge.node1 <= node2 {
                     (edge.node1, node2)
                 } else {
@@ -456,23 +463,70 @@ impl GraphEdgeIndex {
                 boundary.entry(edge.node1).or_default().push(index);
             }
         }
-        Self { boundary, internal }
+        let mut detector_components = HashMap::new();
+        let mut component = 0usize;
+        for &detector in adjacency.keys() {
+            if detector_components.contains_key(&detector) {
+                continue;
+            }
+            let mut pending = vec![detector];
+            detector_components.insert(detector, component);
+            while let Some(current) = pending.pop() {
+                if let Some(neighbors) = adjacency.get(&current) {
+                    for &neighbor in neighbors {
+                        if detector_components.insert(neighbor, component).is_none() {
+                            pending.push(neighbor);
+                        }
+                    }
+                }
+            }
+            component += 1;
+        }
+        Self {
+            boundary,
+            internal,
+            detector_components,
+            observables: edges.iter().map(|edge| edge.observables.clone()).collect(),
+        }
     }
 
     fn compatible_edges(&self, effect: &Effect) -> Vec<usize> {
-        let mut compatible = Vec::new();
+        // A primitive Pauli effect must be represented by one exact graph edge
+        // in each disconnected detector subgraph. Merely mentioning a detector
+        // does not make every boundary edge incident on it part of the
+        // envelope, and a multi-detector symptom must not be expanded into a
+        // clique of cheap matching edges.
+        let mut by_component = HashMap::<usize, Vec<usize>>::new();
         for &detector in &effect.detectors {
-            if let Some(edges) = self.boundary.get(&detector) {
-                compatible.extend(edges);
-            }
+            let Some(&component) = self.detector_components.get(&detector) else {
+                return Vec::new();
+            };
+            by_component.entry(component).or_default().push(detector);
         }
-        for left in 0..effect.detectors.len() {
-            for right in left + 1..effect.detectors.len() {
-                let endpoints = (effect.detectors[left], effect.detectors[right]);
-                if let Some(edges) = self.internal.get(&endpoints) {
-                    compatible.extend(edges);
-                }
+        let mut compatible = Vec::new();
+        let mut represented_observables = Vec::new();
+        for detectors in by_component.values_mut() {
+            detectors.sort_unstable();
+            let edges = match detectors.as_slice() {
+                [detector] => self.boundary.get(detector),
+                [left, right] => self.internal.get(&(*left, *right)),
+                _ => return Vec::new(),
+            };
+            let Some(edges) = edges else {
+                return Vec::new();
+            };
+            let Some((&first, rest)) = edges.split_first() else {
+                return Vec::new();
+            };
+            let label = &self.observables[first];
+            if rest.iter().any(|&edge| self.observables[edge] != *label) {
+                return Vec::new();
             }
+            represented_observables = xor_indices(&represented_observables, label);
+            compatible.extend(edges);
+        }
+        if represented_observables != effect.observables {
+            return Vec::new();
         }
         compatible
     }
@@ -883,6 +937,63 @@ mod tests {
         assert_eq!(edges[1].kind, EdgeKind::SpaceLike);
         assert_eq!(edges[2].kind, EdgeKind::Boundary);
         assert_eq!(edges[2].observables, [0]);
+    }
+
+    #[test]
+    fn primitive_edge_mapping_requires_exact_components_and_observables() {
+        let edges = vec![
+            GraphEdge {
+                node1: 0,
+                node2: None,
+                observables: vec![0],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: None,
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 0,
+                node2: Some(1),
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::SpaceLike,
+            },
+        ];
+        let index = GraphEdgeIndex::new(&edges);
+
+        assert_eq!(
+            index.compatible_edges(&Effect {
+                id: "pair".to_string(),
+                detectors: vec![0, 1],
+                observables: Vec::new(),
+                weight: 0.0,
+            }),
+            [2]
+        );
+        assert!(
+            index
+                .compatible_edges(&Effect {
+                    id: "wrong-boundary-label".to_string(),
+                    detectors: vec![0],
+                    observables: Vec::new(),
+                    weight: 0.0,
+                })
+                .is_empty()
+        );
+        assert_eq!(
+            index.compatible_edges(&Effect {
+                id: "logical-boundary".to_string(),
+                detectors: vec![0],
+                observables: vec![0],
+                weight: 0.0,
+            }),
+            [0]
+        );
     }
 
     #[test]

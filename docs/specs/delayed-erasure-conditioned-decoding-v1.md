@@ -58,30 +58,30 @@ loss onset and skipped-gate history consistent with the herald.
 
 ## Envelope matching
 
-`envelope-matching` also caches one graph per distinct loss pattern. Before the
-graph is prepared, each baseline edge is projected through the surviving
-check basis. A projected one-detector effect becomes a boundary edge, a
-two-detector effect becomes an ordinary edge, and an effect that cancels from
-all checks is omitted.
+`envelope-matching` caches one reweighted copy of the ordinary detector graph
+per loss pattern. Its syndrome is the original detector pattern after every
+flagged measurement placeholder is canonicalized to `1`; loss flags affect
+the graph only through the delayed-erasure edge reweighting. Canonicalization
+makes the result independent of the stored placeholder while retaining the
+spatial constraints expected by the Pauli-envelope matching algorithm.
 
-Matching remains an approximation to the full categorical envelope model: it
-uses the existing loss-conditioned edge weights. A positive-weight mechanism
-with no surviving detector symptom is omitted using its maximum-likelihood
-zero representative. If projection creates a hyperedge with more than two
-conditioned detectors, matching returns a structured `decode_error` instead
-of silently splitting the correlated mechanism. `envelope-mle` is the exact
-fallback for such patterns.
+Matching remains an approximation to the full categorical envelope model.
+In particular, the v1 measurement-record elimination basis cannot substitute
+for the spatial code deformation around a physical data-atom loss: projecting
+the graph through that incomplete basis deletes valid spatial constraints and
+causes a logical-error-rate regression. `envelope-mle` continues to use the
+conditioned check basis and is the exact categorical fallback within the
+documented flat Mid-SWAP subset.
 
 ## Required invariants
 
 For fixed circuit, loss flags, and all known measurement values:
 
 - changing any flagged value placeholder from 0 to 1 must not change the
-  surviving checks;
+  surviving checks or the canonical detector pattern;
 - it must not change the prediction from either supported decoder;
-- shots with the same loss pattern must reuse the same conditioned check
-  basis and cached graph/model;
-- a mismatched basis for an existing cache key is rejected;
+- shots with the same loss pattern must reuse the same cached graph/model;
+- a mismatched detector or check basis for an existing cache key is rejected;
 - no-loss predictions remain equal to the preconditioned decoder behavior.
 
 Both a Rust-level known-answer test and a real-CLI two-shot test exercise the
@@ -92,14 +92,16 @@ lost value bit.
 
 The loss-aware transform retains its detector, batch-table, pivot,
 elimination-step, and materialized-term limits. Conditioned matching and MLE
-also cap mechanism/check counts, support-scanning work, cached artifact count,
-and cumulative cached work before constructing a shot-specific graph/model.
-These limits remain effective for zero-check patterns and for streams with
-many distinct loss patterns.
+also cap mechanism/check counts, support-scanning work, resident artifact
+count, and resident cached work before constructing a shot-specific
+graph/model. Deterministic FIFO eviction keeps these limits effective for
+zero-check patterns and for streams with many distinct loss patterns without
+rejecting an otherwise valid shot merely because earlier patterns filled the
+cache.
 
-`matching_graph_builds` and `mle_model_builds` report the number of distinct
-conditioned artifacts actually built. `distinct_loss_patterns` and cache-hit
-statistics make accidental per-shot recompilation visible. Compile-time
+`matching_graph_builds` and `mle_model_builds` report cumulative artifact
+builds, including rebuilds after eviction. `distinct_loss_patterns` and
+cache-hit statistics make accidental per-shot recompilation visible. Compile-time
 growth is reported by `primitive_probe_count`, `primitive_symptom_terms`, and
 `loss_envelope_candidate_count`; the last value is zero for Envelope-Matching
 because that backend consumes primitive-to-edge unions directly.

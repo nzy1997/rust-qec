@@ -1,4 +1,4 @@
-use crate::data_path::{build_reference_sample, ReferenceSampleMode};
+use crate::data_path::{ReferenceSampleMode, build_reference_sample};
 use crate::ir::StimInstr;
 use crate::measurement_transform::{CheckedMeasurementLayout, MeasurementTransformLimits};
 use crate::sim::bit_table::BitTable;
@@ -36,6 +36,10 @@ pub struct LossAwareDetectorShot {
     pub detector_valid: Vec<bool>,
     /// A maximal independent basis of loss-independent detector checks.
     pub checks: Vec<LossAwareDetectorCheck>,
+    /// Original detector values after every lost measurement placeholder is
+    /// canonicalized to one. This is the fixed gauge used by Pauli-envelope
+    /// decoders that consume the paper's ordinary detector pattern directly.
+    pub canonical_detector_values: Vec<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,6 +114,7 @@ impl CompiledLossAwareM2d {
             &self.layout,
             meas_table,
             &self.reference_sample,
+            Some(&loss_mask),
         )?;
         build_loss_aware_output(
             &self.layout,
@@ -263,7 +268,13 @@ fn measurements_to_loss_aware_detections_with_layout(
     preflight_loss_aware_tables(layout, meas_table, limits)?;
     let merged_loss_mask = merge_embedded_loss_flags(layout, meas_table, measurement_loss_mask)?;
 
-    let raw = measurements_to_detections(instrs, meas_table)?;
+    let reference_sample = build_reference_sample(instrs, ReferenceSampleMode::SimulateNoiseless)?;
+    let raw = measurements_to_detections_with_layout_and_reference(
+        layout,
+        meas_table,
+        &reference_sample,
+        Some(&merged_loss_mask),
+    )?;
     build_loss_aware_output(
         layout,
         &raw,
@@ -570,6 +581,9 @@ fn build_loss_aware_shot(
         lost_measurements,
         detector_valid,
         checks,
+        canonical_detector_values: (0..detector_rows.len())
+            .map(|detector| raw_detections.get(detector, shot))
+            .collect(),
     })
 }
 
@@ -643,6 +657,7 @@ fn measurements_to_detections_impl(
         sweep_table,
         shared_reference,
         measurement_corrections,
+        None,
     )
 }
 
@@ -653,6 +668,7 @@ fn measurements_to_detections_with_layout(
     sweep_table: Option<&BitTable>,
     shared_reference: Option<&[bool]>,
     measurement_corrections: &[Vec<usize>],
+    canonical_one_mask: Option<&BitTable>,
 ) -> Result<M2dOutput, String> {
     let n_meas = layout.num_measurements();
     if let Some(reference) = shared_reference {
@@ -705,7 +721,12 @@ fn measurements_to_detections_with_layout(
         };
         let mut flips = Vec::with_capacity(n_meas);
         for i in 0..n_meas {
-            let mut flip = meas_table.get(i, shot) ^ reference[i];
+            let measurement = if canonical_one_mask.is_some_and(|mask| mask.get(i, shot)) {
+                true
+            } else {
+                meas_table.get(i, shot)
+            };
+            let mut flip = measurement ^ reference[i];
             if let Some(extra_terms) = measurement_corrections.get(i) {
                 for &j in extra_terms {
                     flip ^= flips[j];
@@ -738,6 +759,7 @@ fn measurements_to_detections_with_layout_and_reference(
     layout: &CheckedMeasurementLayout,
     meas_table: &BitTable,
     reference_sample: &[bool],
+    canonical_one_mask: Option<&BitTable>,
 ) -> Result<M2dOutput, String> {
     measurements_to_detections_with_layout(
         &[],
@@ -746,6 +768,7 @@ fn measurements_to_detections_with_layout_and_reference(
         None,
         Some(reference_sample),
         &[],
+        canonical_one_mask,
     )
 }
 
@@ -791,6 +814,46 @@ mod tests {
         assert_eq!(
             reference_measurement_count_mismatch(2, 3),
             "reference has 2 bits but circuit has 3 measurements"
+        );
+    }
+
+    #[test]
+    fn canonical_detector_values_ignore_lost_measurement_placeholders() {
+        let instrs = crate::parser::parse_lines("M 0 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
+        let mut loss_mask = BitTable::new(2, 1);
+        loss_mask.set(0, 0, true);
+        let zero_placeholder = BitTable::new(2, 1);
+        let mut one_placeholder = BitTable::new(2, 1);
+        one_placeholder.set(0, 0, true);
+
+        let zero = measurements_to_loss_aware_detections_with_loss_mask(
+            &instrs,
+            &zero_placeholder,
+            &loss_mask,
+        )
+        .unwrap();
+        let one = measurements_to_loss_aware_detections_with_loss_mask(
+            &instrs,
+            &one_placeholder,
+            &loss_mask,
+        )
+        .unwrap();
+
+        assert_eq!(
+            zero.shots[0].canonical_detector_values,
+            one.shots[0].canonical_detector_values
+        );
+        assert_eq!(zero.shots[0].canonical_detector_values, vec![true]);
+
+        let loss_visible = crate::parser::parse_lines("ML 0\nDETECTOR rec[-1]\n").unwrap();
+        let compiled = CompiledLossAwareM2d::new(&loss_visible).unwrap();
+        let mut embedded_zero = BitTable::new(2, 1);
+        embedded_zero.set(0, 0, true);
+        let mut embedded_one = embedded_zero.clone();
+        embedded_one.set(1, 0, true);
+        assert_eq!(
+            compiled.convert(&embedded_zero).unwrap().shots[0].canonical_detector_values,
+            compiled.convert(&embedded_one).unwrap().shots[0].canonical_detector_values
         );
     }
 

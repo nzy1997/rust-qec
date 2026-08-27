@@ -79,26 +79,19 @@ impl DecodeFailure {
     }
 }
 
-fn conditioned_cache_total(
-    kind: &str,
+fn conditioned_cache_needs_eviction(
     existing_artifacts: usize,
     cached_work: usize,
     artifact_work: usize,
-) -> Result<usize, String> {
-    if existing_artifacts >= MAX_CONDITIONED_DECODER_ARTIFACTS {
-        return Err(format!(
-            "conditioned {kind} cache artifact limit exceeded"
-        ));
+) -> Result<bool, String> {
+    if artifact_work > MAX_CONDITIONED_DECODER_WORK {
+        return Err("conditioned decoder artifact work limit exceeded".to_string());
     }
     let total = cached_work
         .checked_add(artifact_work)
-        .ok_or_else(|| format!("conditioned {kind} cumulative work limit exceeded"))?;
-    if total > MAX_CONDITIONED_DECODER_WORK {
-        return Err(format!(
-            "conditioned {kind} cumulative work limit exceeded"
-        ));
-    }
-    Ok(total)
+        .ok_or_else(|| "conditioned decoder cache work overflow".to_string())?;
+    Ok(existing_artifacts >= MAX_CONDITIONED_DECODER_ARTIFACTS
+        || total > MAX_CONDITIONED_DECODER_WORK)
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -321,11 +314,7 @@ fn build_stats(
         compile_seconds,
         decode_seconds,
         distinct_loss_patterns: patterns.len(),
-        cache_hits: if matches!(decoder, DecoderState::Matching(_)) {
-            attempted_shots.saturating_sub(patterns.len())
-        } else {
-            0
-        },
+        cache_hits: decoder.cache_hits(),
         timeout_count,
         infeasible_shot_count,
         circuit_compilations: 1,
@@ -411,7 +400,7 @@ impl DecoderState {
 
     fn graph_builds(&self) -> usize {
         match self {
-            Self::Matching(decoder) => decoder.cache.len(),
+            Self::Matching(decoder) => decoder.graph_builds(),
             Self::Mle(_) => 0,
         }
     }
@@ -420,6 +409,13 @@ impl DecoderState {
         match self {
             Self::Matching(_) => 0,
             Self::Mle(decoder) => decoder.model_builds(),
+        }
+    }
+
+    fn cache_hits(&self) -> usize {
+        match self {
+            Self::Matching(decoder) => decoder.cache_hits(),
+            Self::Mle(decoder) => decoder.cache_hits(),
         }
     }
 }
@@ -479,6 +475,14 @@ mod tests {
         "DETECTOR(1,0,0) rec[-1]\n",
         "OBSERVABLE_INCLUDE(0) rec[-3]\n",
     );
+
+    #[test]
+    fn conditioned_cache_requests_eviction_instead_of_rejecting_valid_artifacts() {
+        assert!(!conditioned_cache_needs_eviction(0, 0, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(MAX_CONDITIONED_DECODER_ARTIFACTS, 0, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(1, MAX_CONDITIONED_DECODER_WORK, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(0, 0, MAX_CONDITIONED_DECODER_WORK + 1).is_err());
+    }
 
     fn dataset_for(circuit_text: &str) -> Dataset {
         let instrs = rstim::validation::parse_and_validate(circuit_text).unwrap();
@@ -543,6 +547,7 @@ mod tests {
                     value: bit != 0,
                 })
                 .collect(),
+            canonical_detector_values: bits.iter().map(|&bit| bit != 0).collect(),
         }
     }
 
@@ -762,6 +767,11 @@ mod tests {
         inconsistent.checks[0].source_detectors = vec![0];
         let error = mle.decode(&inconsistent, &losses[0]).unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
+        assert_eq!(
+            matching.decode(&inconsistent, &losses[0]).unwrap(),
+            matching_zero
+        );
+        inconsistent.canonical_detector_values.pop();
         let error = matching.decode(&inconsistent, &losses[0]).unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
     }
@@ -812,7 +822,10 @@ mod tests {
             mean_weight: 1.0,
             num_observables: 2,
             cache: HashMap::new(),
+            cache_order: std::collections::VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         };
         assert_eq!(
             matching.decode(&singleton_syndrome(&[1]), &[]).unwrap(),
@@ -946,7 +959,10 @@ mod tests {
             mean_weight: 2.0,
             num_observables: 1,
             cache: HashMap::new(),
+            cache_order: std::collections::VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         };
         assert_eq!(
             time_like

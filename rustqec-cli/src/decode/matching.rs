@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use rmatching::Matching;
-use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
+#[cfg(test)]
+use rstim::m2d::LossAwareDetectorCheck;
+use rstim::m2d::LossAwareDetectorShot;
 
 use super::{
     CompiledCircuit, DecodeFailure, MAX_CONDITIONED_DECODER_ITEMS, MAX_CONDITIONED_DECODER_WORK,
-    ShotFailure, conditioned_cache_total,
+    ShotFailure, conditioned_cache_needs_eviction,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -30,15 +32,20 @@ pub(super) struct CompiledMatching {
     pub(super) mean_weight: f64,
     pub(super) num_observables: usize,
     pub(super) cache: HashMap<Vec<usize>, ConditionedMatching>,
+    pub(super) cache_order: VecDeque<Vec<usize>>,
     pub(super) cached_work: usize,
+    pub(super) graph_builds: usize,
+    pub(super) cache_hits: usize,
 }
 
 pub(super) struct ConditionedMatching {
     matching: Matching,
-    check_sources: Vec<Vec<usize>>,
-    reachable_checks: Vec<bool>,
+    detector_count: usize,
+    reachable_detectors: Vec<bool>,
+    work: usize,
 }
 
+#[cfg(test)]
 struct ConditionedMatchingPreflight {
     work: usize,
     detector_checks: HashMap<usize, Vec<usize>>,
@@ -94,7 +101,10 @@ impl CompiledMatching {
             mean_weight,
             num_observables: circuit.num_observables,
             cache: HashMap::new(),
+            cache_order: VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         })
     }
 
@@ -104,50 +114,42 @@ impl CompiledMatching {
         losses: &[usize],
     ) -> Result<Vec<usize>, ShotFailure> {
         let key = losses.to_vec();
-        if !self.cache.contains_key(&key) {
-            let preflight = conditioned_matching_preflight(
+        if self.cache.contains_key(&key) {
+            self.cache_hits += 1;
+        } else {
+            let work = canonical_matching_preflight(
                 &self.edges,
                 &self.loss_edges,
-                &syndrome.checks,
+                syndrome.canonical_detector_values.len(),
                 losses,
             )?;
-            let cached_work = conditioned_cache_total(
-                "matching",
-                self.cache.len(),
-                self.cached_work,
-                preflight.work,
-            )
-            .map_err(ShotFailure::Other)?;
-            let matching = build_matching_preflighted(
+            self.evict_until_fits(work)?;
+            let matching = build_canonical_matching(
                 &self.edges,
                 &self.loss_edges,
                 self.mean_weight,
-                &syndrome.checks,
+                syndrome.canonical_detector_values.len(),
                 losses,
-                &preflight.detector_checks,
+                work,
             )?;
             self.cache.insert(key.clone(), matching);
-            self.cached_work = cached_work;
+            self.cache_order.push_back(key.clone());
+            self.cached_work += work;
+            self.graph_builds += 1;
         }
         let conditioned = self.cache.get_mut(&key).unwrap();
-        if conditioned.check_sources.len() != syndrome.checks.len()
-            || conditioned
-                .check_sources
-                .iter()
-                .zip(&syndrome.checks)
-                .any(|(expected, actual)| expected != &actual.source_detectors)
-        {
+        if conditioned.detector_count != syndrome.canonical_detector_values.len() {
             return Err(ShotFailure::Other(
-                "loss pattern produced inconsistent detector-check basis".to_string(),
+                "loss pattern produced an inconsistent detector basis".to_string(),
             ));
         }
-        validate_reachable_checks(conditioned, &syndrome.checks)?;
-        let check_values: Vec<u8> = syndrome
-            .checks
+        validate_reachable_detectors(conditioned, &syndrome.canonical_detector_values)?;
+        let detector_values: Vec<u8> = syndrome
+            .canonical_detector_values
             .iter()
-            .map(|check| u8::from(check.value))
+            .map(|&value| u8::from(value))
             .collect();
-        let bits = conditioned.matching.decode(&check_values);
+        let bits = conditioned.matching.decode(&detector_values);
         Ok(bits
             .iter()
             .chain(std::iter::repeat(&0))
@@ -156,6 +158,132 @@ impl CompiledMatching {
             .filter_map(|(index, &bit)| (bit != 0).then_some(index))
             .collect())
     }
+
+    fn evict_until_fits(&mut self, artifact_work: usize) -> Result<(), ShotFailure> {
+        while conditioned_cache_needs_eviction(self.cache.len(), self.cached_work, artifact_work)
+            .map_err(ShotFailure::Other)?
+        {
+            let oldest = self.cache_order.pop_front().ok_or_else(|| {
+                ShotFailure::Other("conditioned matching cache accounting drift".to_string())
+            })?;
+            let removed = self.cache.remove(&oldest).ok_or_else(|| {
+                ShotFailure::Other("conditioned matching cache accounting drift".to_string())
+            })?;
+            self.cached_work = self.cached_work.checked_sub(removed.work).ok_or_else(|| {
+                ShotFailure::Other("conditioned matching cache accounting drift".to_string())
+            })?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn graph_builds(&self) -> usize {
+        self.graph_builds
+    }
+
+    pub(super) fn cache_hits(&self) -> usize {
+        self.cache_hits
+    }
+}
+
+fn canonical_matching_preflight(
+    edges: &[GraphEdge],
+    loss_edges: &[Vec<usize>],
+    detector_count: usize,
+    losses: &[usize],
+) -> Result<usize, ShotFailure> {
+    if edges.len() > MAX_CONDITIONED_DECODER_ITEMS
+        || detector_count > MAX_CONDITIONED_DECODER_ITEMS
+        || losses.len() > MAX_CONDITIONED_DECODER_ITEMS
+    {
+        return Err(conditioned_matching_limit_error());
+    }
+    let edge_terms = edges
+        .iter()
+        .try_fold(0usize, |total, edge| {
+            total
+                .checked_add(1 + usize::from(edge.node2.is_some()))?
+                .checked_add(edge.observables.len())
+        })
+        .ok_or_else(conditioned_matching_limit_error)?;
+    let loss_terms = losses
+        .iter()
+        .try_fold(0usize, |total, &loss| {
+            let mapped = loss_edges.get(loss)?;
+            total.checked_add(mapped.len())
+        })
+        .ok_or_else(|| {
+            ShotFailure::Other(
+                "loss pattern references an unknown envelope or exceeds the matching work limit"
+                    .to_string(),
+            )
+        })?;
+    conditioned_matching_work_from_counts(
+        edges.len(),
+        detector_count,
+        edge_terms,
+        0,
+        0,
+        losses.len(),
+        loss_terms,
+    )
+}
+
+fn build_canonical_matching(
+    edges: &[GraphEdge],
+    loss_edges: &[Vec<usize>],
+    mean_weight: f64,
+    detector_count: usize,
+    losses: &[usize],
+    artifact_work: usize,
+) -> Result<ConditionedMatching, ShotFailure> {
+    let mut active = HashSet::new();
+    for &loss in losses {
+        let mapped_edges = loss_edges.get(loss).ok_or_else(|| {
+            ShotFailure::Other(format!("loss pattern references unknown envelope {loss}"))
+        })?;
+        for &edge in mapped_edges {
+            if edge >= edges.len() {
+                return Err(ShotFailure::Other(format!(
+                    "loss envelope {loss} references unknown matching edge {edge}"
+                )));
+            }
+            active.insert(edge);
+        }
+    }
+
+    let scale = edges.iter().map(|edge| edge.weight).fold(1.0f64, f64::max);
+    let mut matching = Matching::new();
+    let mut reachable_detectors = vec![false; detector_count];
+    for (index, edge) in edges.iter().enumerate() {
+        if edge.node1 >= detector_count || edge.node2.is_some_and(|node| node >= detector_count) {
+            return Err(ShotFailure::Other(format!(
+                "matching edge {index} references a detector outside the canonical detector basis"
+            )));
+        }
+        let weight = if active.contains(&index) {
+            match edge.kind {
+                EdgeKind::TimeLike => 0.25 * mean_weight,
+                EdgeKind::SpaceLike | EdgeKind::Boundary => 0.5 * mean_weight,
+            }
+        } else {
+            edge.weight
+        } / scale;
+        let probability = 1.0 / (1.0 + weight.exp());
+        reachable_detectors[edge.node1] = true;
+        if let Some(node2) = edge.node2 {
+            reachable_detectors[node2] = true;
+            matching.add_edge(edge.node1, node2, weight, &edge.observables, probability);
+        } else {
+            matching.add_boundary_edge(edge.node1, weight, &edge.observables, probability);
+        }
+    }
+    matching.prepare();
+    Ok(ConditionedMatching {
+        matching,
+        detector_count,
+        reachable_detectors,
+        work: artifact_work,
+    })
 }
 
 pub(super) fn validate_unambiguous_parallel_edges(
@@ -200,9 +328,11 @@ fn build_matching(
         checks,
         losses,
         &preflight.detector_checks,
+        preflight.work,
     )
 }
 
+#[cfg(test)]
 fn build_matching_preflighted(
     edges: &[GraphEdge],
     loss_edges: &[Vec<usize>],
@@ -210,6 +340,7 @@ fn build_matching_preflighted(
     checks: &[LossAwareDetectorCheck],
     losses: &[usize],
     detector_checks: &HashMap<usize, Vec<usize>>,
+    artifact_work: usize,
 ) -> Result<ConditionedMatching, ShotFailure> {
     let mut active = HashSet::new();
     for &loss in losses {
@@ -270,11 +401,9 @@ fn build_matching_preflighted(
     matching.prepare();
     Ok(ConditionedMatching {
         matching,
-        check_sources: checks
-            .iter()
-            .map(|check| check.source_detectors.clone())
-            .collect(),
-        reachable_checks,
+        detector_count: checks.len(),
+        reachable_detectors: reachable_checks,
+        work: artifact_work,
     })
 }
 
@@ -289,6 +418,7 @@ fn conditioned_matching_work(
         .map(|preflight| preflight.work)
 }
 
+#[cfg(test)]
 fn conditioned_matching_preflight(
     edges: &[GraphEdge],
     loss_edges: &[Vec<usize>],
@@ -396,21 +526,22 @@ fn conditioned_matching_limit_error() -> ShotFailure {
     ShotFailure::Other("conditioned matching work limit exceeded".to_string())
 }
 
-fn validate_reachable_checks(
+fn validate_reachable_detectors(
     conditioned: &ConditionedMatching,
-    checks: &[LossAwareDetectorCheck],
+    detector_values: &[bool],
 ) -> Result<(), ShotFailure> {
     if conditioned
-        .reachable_checks
+        .reachable_detectors
         .iter()
-        .zip(checks)
-        .any(|(&reachable, check)| check.value && !reachable)
+        .zip(detector_values)
+        .any(|(&reachable, &value)| value && !reachable)
     {
         return Err(ShotFailure::Infeasible);
     }
     Ok(())
 }
 
+#[cfg(test)]
 fn detector_check_incidence(checks: &[LossAwareDetectorCheck]) -> HashMap<usize, Vec<usize>> {
     let mut incidence = HashMap::<usize, Vec<usize>>::new();
     for (check_index, check) in checks.iter().enumerate() {
@@ -421,6 +552,7 @@ fn detector_check_incidence(checks: &[LossAwareDetectorCheck]) -> HashMap<usize,
     incidence
 }
 
+#[cfg(test)]
 fn transformed_check_nodes(
     edge: &GraphEdge,
     detector_checks: &HashMap<usize, Vec<usize>>,
@@ -599,12 +731,16 @@ mod tests {
             mean_weight: 1.0,
             num_observables: 0,
             cache: HashMap::new(),
+            cache_order: VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         };
         let shot = LossAwareDetectorShot {
             lost_measurements: Vec::new(),
             detector_valid: vec![true, true],
             checks,
+            canonical_detector_values: vec![false, true],
         };
         assert!(matches!(
             decoder.decode(&shot, &[]),

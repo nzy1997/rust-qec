@@ -29,6 +29,7 @@ const CIRCUIT: &str = concat!(
 );
 const SHOTS: &[u8] = &[0x02, 0x01, 0x01, 0x00];
 const EXPECTED_PREDICTIONS: &[u8] = &[1, 0, 0, 0];
+const EXPECTED_MATCHING_PREDICTIONS: &[u8] = &[1, 1, 1, 0];
 const PLACEHOLDER_INVARIANCE_CIRCUIT: &str = concat!(
     "QUBIT_COORDS(0,0) 0\n",
     "R 0\n",
@@ -197,7 +198,12 @@ fn both_loss_decoders_run_public_only_and_reuse_compiled_state() {
         assert!(output.stdout.is_empty());
         assert!(output.stderr.is_empty());
         let predictions = fs::read(root.path().join(format!("{decoder}.b8"))).unwrap();
-        assert_eq!(predictions, EXPECTED_PREDICTIONS, "{decoder}");
+        let expected = if decoder == "envelope-matching" {
+            EXPECTED_MATCHING_PREDICTIONS
+        } else {
+            EXPECTED_PREDICTIONS
+        };
+        assert_eq!(predictions, expected, "{decoder}");
         assert!(predictions.iter().all(|byte| byte & 0xfe == 0));
         let stats: Value =
             serde_json::from_slice(&fs::read(root.path().join(format!("{decoder}.json"))).unwrap())
@@ -255,9 +261,14 @@ fn decoder_server_v3_public_bundle_decodes_without_translation() {
             "{decoder}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
+        let expected = if decoder == "envelope-matching" {
+            EXPECTED_MATCHING_PREDICTIONS
+        } else {
+            EXPECTED_PREDICTIONS
+        };
         assert_eq!(
             fs::read(root.path().join(format!("{decoder}.b8"))).unwrap(),
-            EXPECTED_PREDICTIONS,
+            expected,
         );
     }
 }
