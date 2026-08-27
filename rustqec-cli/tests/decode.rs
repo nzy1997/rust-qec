@@ -518,6 +518,61 @@ fn native_d3_and_d5_exports_decode_via_cli_against_private_answers() {
 }
 
 #[test]
+fn conventional_loss_visible_rotated_memory_z_decodes_via_cli_against_private_answers() {
+    let circuit = rstim::codegen::surface_code::rotated_memory_z_loss_visible(
+        3,
+        1,
+        rstim::codegen::surface_code::RotatedMemoryZLossConfig {
+            before_round_data_depolarization: 1e-9,
+            after_clifford_depolarization: 1e-9,
+            before_measure_flip_probability: 1e-9,
+            after_reset_flip_probability: 1e-9,
+            operation_loss_probability: 1e-9,
+            measurement_loss_probability: 1e-9,
+            after_clifford_loss_probability: 1e-9,
+        },
+    )
+    .unwrap();
+    assert!(!circuit.contains("SHIFT_COORDS"));
+    let root = tempfile::tempdir().unwrap();
+    let public = root.path().join("public");
+    let private = root.path().join("private");
+    export_decoder_dataset_with_logical_flip(ExportDecoderDatasetLogicalFlipConfig {
+        circuit_text: circuit,
+        shots: 4,
+        mode: DecoderDatasetMode::MeasurementsBlinded,
+        logical_flip: Some(LogicalFlip {
+            pauli: LogicalPauli::X,
+            qubits: vec![1, 2, 3],
+        }),
+        public_out: public.clone(),
+        private_out: private.clone(),
+        seed: Some(0x631),
+        error_trace: false,
+    })
+    .unwrap();
+    let answers = fs::read(private.join("answers.b8")).unwrap();
+
+    for decoder in ["envelope-matching", "envelope-mle"] {
+        let output = run_decode(&public, decoder, root.path());
+        assert!(
+            output.status.success(),
+            "{decoder}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let predictions = fs::read(root.path().join(format!("{decoder}.b8"))).unwrap();
+        assert_eq!(predictions.len(), answers.len());
+        for shot in 0..answers.len() {
+            assert_eq!(
+                predictions[shot] & 1,
+                answers[shot] & 1,
+                "{decoder} shot={shot}"
+            );
+        }
+    }
+}
+
+#[test]
 fn capabilities_advertises_decode_contract() {
     let output = rustqec()
         .args(["capabilities", "--format", "json"])

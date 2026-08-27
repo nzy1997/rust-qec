@@ -504,9 +504,6 @@ impl LossVisibleMemoryZ {
         self.emit_noise("LOSS", self.config.operation_loss_probability, &measure);
 
         for round in 0..self.rounds {
-            if round > 0 {
-                self.emit("SHIFT_COORDS", &[0.0, 0.0, 1.0], &[]);
-            }
             self.emit_round();
             if round == 0 {
                 let z_measure_coords = self.layout.z_measure_coords.clone();
@@ -521,7 +518,7 @@ impl LossVisibleMemoryZ {
                     let order = coord_order(&self.layout.measure_coords, mc) as i32;
                     let current = 2 * order + 1 - 2 * n_measure as i32;
                     let previous = current - 2 * n_measure as i32;
-                    self.emit_detector(mc, 0.0, &[current, previous]);
+                    self.emit_detector(mc, round as f64, &[current, previous]);
                 }
             }
         }
@@ -548,7 +545,7 @@ impl LossVisibleMemoryZ {
             let morder = coord_order(&self.layout.measure_coords, mc) as i32;
             offsets.push(2 * morder + 1 - 2 * (n_data + n_measure) as i32);
             offsets.sort_unstable();
-            self.emit_detector(mc, 1.0, &offsets);
+            self.emit_detector(mc, self.rounds as f64, &offsets);
         }
 
         let mut observable: Vec<i32> = self

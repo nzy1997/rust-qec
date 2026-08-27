@@ -871,6 +871,10 @@ fn gen_rotated_memory_z_explicit_noise_and_loss() {
     assert_eq!(text.matches("TICK[rstim:logical_flip_point]").count(), 1);
     assert!(!text.contains("MIDSWAP_SHUTTLE"));
     assert!(!text.contains("SHUTTLE"));
+    assert!(
+        !text.contains("SHIFT_COORDS"),
+        "loss-visible circuits use explicit detector time coordinates so they stay inside the rustqec decode subset"
+    );
     let lines: Vec<&str> = text.lines().collect();
     let data_reset = lines
         .iter()
