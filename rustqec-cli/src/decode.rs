@@ -2,6 +2,7 @@ use std::collections::HashSet;
 #[cfg(test)]
 use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -34,10 +35,15 @@ pub const COMMAND: &str = "decode";
 pub const STATS_SCHEMA_VERSION: &str = "rustqec.decode-stats.v1";
 const BATCH_SIZE: usize = 1024;
 const MAX_ENVELOPE_CANDIDATES: usize = 100_000;
-const MAX_PRIMITIVE_PROBES: usize = 10_000;
+const MAX_PRIMITIVE_PROBES: usize = 100_000;
+const MAX_PRIMITIVE_SYMPTOM_TERMS: usize = 10_000_000;
 const MAX_CONDITIONED_DECODER_ARTIFACTS: usize = 1_024;
 const MAX_CONDITIONED_DECODER_ITEMS: usize = 100_000;
 const MAX_CONDITIONED_DECODER_WORK: usize = 10_000_000;
+const MAX_EXACT_LOSS_PATTERNS: usize = 4_096;
+const MAX_EXACT_LOSS_PATTERN_TERMS: usize = 65_536;
+const LOSS_PATTERN_HLL_PRECISION: u32 = 14;
+const LOSS_PATTERN_HLL_REGISTERS: usize = 1 << LOSS_PATTERN_HLL_PRECISION;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderKind {
@@ -78,26 +84,19 @@ impl DecodeFailure {
     }
 }
 
-fn conditioned_cache_total(
-    kind: &str,
+fn conditioned_cache_needs_eviction(
     existing_artifacts: usize,
     cached_work: usize,
     artifact_work: usize,
-) -> Result<usize, String> {
-    if existing_artifacts >= MAX_CONDITIONED_DECODER_ARTIFACTS {
-        return Err(format!(
-            "conditioned {kind} cache artifact limit exceeded"
-        ));
+) -> Result<bool, String> {
+    if artifact_work > MAX_CONDITIONED_DECODER_WORK {
+        return Err("conditioned decoder artifact work limit exceeded".to_string());
     }
     let total = cached_work
         .checked_add(artifact_work)
-        .ok_or_else(|| format!("conditioned {kind} cumulative work limit exceeded"))?;
-    if total > MAX_CONDITIONED_DECODER_WORK {
-        return Err(format!(
-            "conditioned {kind} cumulative work limit exceeded"
-        ));
-    }
-    Ok(total)
+        .ok_or_else(|| "conditioned decoder cache work overflow".to_string())?;
+    Ok(existing_artifacts >= MAX_CONDITIONED_DECODER_ARTIFACTS
+        || total > MAX_CONDITIONED_DECODER_WORK)
 }
 
 #[derive(Debug, Serialize, PartialEq)]
@@ -110,12 +109,145 @@ pub struct DecodeStats {
     pub compile_seconds: f64,
     pub decode_seconds: f64,
     pub distinct_loss_patterns: usize,
+    pub distinct_loss_patterns_exact: bool,
     pub cache_hits: usize,
     pub timeout_count: usize,
     pub infeasible_shot_count: usize,
     pub circuit_compilations: usize,
+    pub primitive_probe_count: usize,
+    pub primitive_symptom_terms: usize,
+    pub loss_envelope_candidate_count: usize,
     pub matching_graph_builds: usize,
     pub mle_model_builds: usize,
+}
+
+#[derive(Debug)]
+enum DistinctLossPatternState {
+    Exact {
+        patterns: HashSet<Vec<usize>>,
+        retained_terms: usize,
+    },
+    Approximate {
+        registers: Box<[u8]>,
+    },
+}
+
+#[derive(Debug)]
+struct DistinctLossPatternCounter {
+    state: DistinctLossPatternState,
+    observations: usize,
+}
+
+impl Default for DistinctLossPatternCounter {
+    fn default() -> Self {
+        Self {
+            state: DistinctLossPatternState::Exact {
+                patterns: HashSet::new(),
+                retained_terms: 0,
+            },
+            observations: 0,
+        }
+    }
+}
+
+impl DistinctLossPatternCounter {
+    fn observe(&mut self, pattern: &[usize]) {
+        self.observations = self.observations.saturating_add(1);
+        let should_promote = match &mut self.state {
+            DistinctLossPatternState::Exact {
+                patterns,
+                retained_terms,
+            } => {
+                if patterns.contains(pattern) {
+                    return;
+                }
+                match retained_terms.checked_add(pattern.len()) {
+                    Some(total)
+                        if patterns.len() < MAX_EXACT_LOSS_PATTERNS
+                            && total <= MAX_EXACT_LOSS_PATTERN_TERMS =>
+                    {
+                        patterns.insert(pattern.to_vec());
+                        *retained_terms = total;
+                        return;
+                    }
+                    _ => true,
+                }
+            }
+            DistinctLossPatternState::Approximate { registers } => {
+                hll_insert(registers, loss_pattern_fingerprint(pattern));
+                return;
+            }
+        };
+
+        if should_promote {
+            self.promote_to_approximate();
+            let DistinctLossPatternState::Approximate { registers } = &mut self.state else {
+                unreachable!("promotion must install the approximate counter")
+            };
+            hll_insert(registers, loss_pattern_fingerprint(pattern));
+        }
+    }
+
+    fn promote_to_approximate(&mut self) {
+        let previous = std::mem::replace(
+            &mut self.state,
+            DistinctLossPatternState::Approximate {
+                registers: vec![0; LOSS_PATTERN_HLL_REGISTERS].into_boxed_slice(),
+            },
+        );
+        let DistinctLossPatternState::Exact { patterns, .. } = previous else {
+            return;
+        };
+        let DistinctLossPatternState::Approximate { registers } = &mut self.state else {
+            unreachable!("promotion must install the approximate counter")
+        };
+        for pattern in patterns {
+            hll_insert(registers, loss_pattern_fingerprint(&pattern));
+        }
+    }
+
+    fn count(&self) -> usize {
+        match &self.state {
+            DistinctLossPatternState::Exact { patterns, .. } => patterns.len(),
+            DistinctLossPatternState::Approximate { registers } => {
+                hll_estimate(registers).min(self.observations)
+            }
+        }
+    }
+
+    fn is_exact(&self) -> bool {
+        matches!(self.state, DistinctLossPatternState::Exact { .. })
+    }
+}
+
+fn loss_pattern_fingerprint(pattern: &[usize]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    pattern.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn hll_insert(registers: &mut [u8], fingerprint: u64) {
+    let index = (fingerprint >> (64 - LOSS_PATTERN_HLL_PRECISION)) as usize;
+    let remaining = fingerprint << LOSS_PATTERN_HLL_PRECISION;
+    let rank = (remaining.leading_zeros() + 1).min(64 - LOSS_PATTERN_HLL_PRECISION + 1) as u8;
+    registers[index] = registers[index].max(rank);
+}
+
+fn hll_estimate(registers: &[u8]) -> usize {
+    let register_count = registers.len() as f64;
+    let alpha = 0.7213 / (1.0 + 1.079 / register_count);
+    let harmonic_sum: f64 = registers
+        .iter()
+        .map(|&rank| 2.0_f64.powi(-i32::from(rank)))
+        .sum();
+    let raw = alpha * register_count * register_count / harmonic_sum;
+    let zero_registers = registers.iter().filter(|&&rank| rank == 0).count();
+    let estimate = if raw <= 2.5 * register_count && zero_registers > 0 {
+        register_count * (register_count / zero_registers as f64).ln()
+    } else {
+        raw
+    };
+    estimate.round().min(usize::MAX as f64) as usize
 }
 
 #[derive(Clone, Debug)]
@@ -141,13 +273,15 @@ struct CompiledCircuit {
     loss_edges: Vec<Vec<usize>>,
     unmapped_loss_primitives: Vec<Vec<String>>,
     num_observables: usize,
+    primitive_probe_count: usize,
+    primitive_symptom_terms: usize,
 }
 
 pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
     validate_output_paths(options)?;
     let dataset = read_dataset(&options.dataset)?;
     let compile_started = Instant::now();
-    let circuit = compile_circuit(&dataset)?;
+    let circuit = compile_circuit(&dataset, options.decoder)?;
     let mut decoder = match options.decoder {
         DecoderKind::EnvelopeMatching => DecoderState::Matching(CompiledMatching::new(&circuit)?),
         DecoderKind::EnvelopeMle => {
@@ -188,7 +322,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
     )
     .map_err(|error| DecodeFailure::new("invalid_dataset", error.to_string()))?;
     let decode_started = Instant::now();
-    let mut patterns = HashSet::new();
+    let mut patterns = DistinctLossPatternCounter::default();
     let mut shot_offset = 0usize;
     while let Some(measurements) = reader
         .next_block()
@@ -199,7 +333,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
         let mut predictions = BitTable::try_new(circuit.num_observables, measurements.num_minor())
             .map_err(|error| DecodeFailure::new("decode_error", format!("{error:?}")))?;
         for shot in 0..measurements.num_minor() {
-            patterns.insert(losses[shot].clone());
+            patterns.observe(&losses[shot]);
             match decoder.decode(&loss_aware[shot], &losses[shot]) {
                 Ok(bits) => {
                     for observable in bits {
@@ -214,6 +348,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
                         decode_started.elapsed().as_secs_f64(),
                         &patterns,
                         &decoder,
+                        &circuit,
                         shot_offset + shot + 1,
                         1,
                         0,
@@ -232,6 +367,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
                         decode_started.elapsed().as_secs_f64(),
                         &patterns,
                         &decoder,
+                        &circuit,
                         shot_offset + shot + 1,
                         0,
                         1,
@@ -263,6 +399,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
         decode_seconds,
         &patterns,
         &decoder,
+        &circuit,
         dataset.manifest.shots,
         0,
         0,
@@ -296,8 +433,9 @@ fn build_stats(
     dataset: &Dataset,
     compile_seconds: f64,
     decode_seconds: f64,
-    patterns: &HashSet<Vec<usize>>,
+    patterns: &DistinctLossPatternCounter,
     decoder: &DecoderState,
+    circuit: &CompiledCircuit,
     attempted_shots: usize,
     timeout_count: usize,
     infeasible_shot_count: usize,
@@ -310,15 +448,19 @@ fn build_stats(
         attempted_shot_count: attempted_shots,
         compile_seconds,
         decode_seconds,
-        distinct_loss_patterns: patterns.len(),
-        cache_hits: if matches!(decoder, DecoderState::Matching(_)) {
-            attempted_shots.saturating_sub(patterns.len())
-        } else {
-            0
-        },
+        distinct_loss_patterns: patterns.count(),
+        distinct_loss_patterns_exact: patterns.is_exact(),
+        cache_hits: decoder.cache_hits(),
         timeout_count,
         infeasible_shot_count,
         circuit_compilations: 1,
+        primitive_probe_count: circuit.primitive_probe_count,
+        primitive_symptom_terms: circuit.primitive_symptom_terms,
+        loss_envelope_candidate_count: circuit
+            .envelopes
+            .iter()
+            .map(|envelope| envelope.candidates.len())
+            .sum(),
         matching_graph_builds: decoder.graph_builds(),
         mle_model_builds: decoder.model_builds(),
     }
@@ -394,7 +536,7 @@ impl DecoderState {
 
     fn graph_builds(&self) -> usize {
         match self {
-            Self::Matching(decoder) => decoder.cache.len(),
+            Self::Matching(decoder) => decoder.graph_builds(),
             Self::Mle(_) => 0,
         }
     }
@@ -403,6 +545,13 @@ impl DecoderState {
         match self {
             Self::Matching(_) => 0,
             Self::Mle(decoder) => decoder.model_builds(),
+        }
+    }
+
+    fn cache_hits(&self) -> usize {
+        match self {
+            Self::Matching(decoder) => decoder.cache_hits(),
+            Self::Mle(decoder) => decoder.cache_hits(),
         }
     }
 }
@@ -419,7 +568,7 @@ fn parent_dir(path: &Path) -> &Path {
 /// callers (for example `dataset import`) can cross-check loss sidecars.
 pub(crate) fn validate_public_bundle(dir: &Path) -> Result<Vec<usize>, DecodeFailure> {
     let dataset = read_dataset(dir)?;
-    let compiled = compile_circuit(&dataset)?;
+    let compiled = compile_circuit(&dataset, DecoderKind::EnvelopeMatching)?;
     Ok(compiled.loss_flags)
 }
 
@@ -463,6 +612,56 @@ mod tests {
         "OBSERVABLE_INCLUDE(0) rec[-3]\n",
     );
 
+    #[test]
+    fn conditioned_cache_requests_eviction_instead_of_rejecting_valid_artifacts() {
+        assert!(!conditioned_cache_needs_eviction(0, 0, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(MAX_CONDITIONED_DECODER_ARTIFACTS, 0, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(1, MAX_CONDITIONED_DECODER_WORK, 1).unwrap());
+        assert!(conditioned_cache_needs_eviction(0, 0, MAX_CONDITIONED_DECODER_WORK + 1).is_err());
+    }
+
+    #[test]
+    fn distinct_loss_pattern_counter_is_exact_within_its_budgets() {
+        let mut counter = DistinctLossPatternCounter::default();
+        counter.observe(&[1, 3]);
+        counter.observe(&[1, 3]);
+        counter.observe(&[2]);
+
+        assert_eq!(counter.count(), 2);
+        assert!(counter.is_exact());
+    }
+
+    #[test]
+    fn distinct_loss_pattern_counter_does_not_retain_an_oversized_pattern() {
+        let mut counter = DistinctLossPatternCounter::default();
+        let pattern = vec![0; MAX_EXACT_LOSS_PATTERN_TERMS + 1];
+
+        counter.observe(&pattern);
+
+        assert_eq!(counter.count(), 1);
+        assert!(!counter.is_exact());
+        let DistinctLossPatternState::Approximate { registers } = &counter.state else {
+            panic!("oversized pattern must switch to fixed-memory counting")
+        };
+        assert_eq!(registers.len(), LOSS_PATTERN_HLL_REGISTERS);
+    }
+
+    #[test]
+    fn distinct_loss_pattern_counter_bounds_many_unique_patterns() {
+        let mut counter = DistinctLossPatternCounter::default();
+        let pattern_count = MAX_EXACT_LOSS_PATTERNS * 4;
+        for pattern in 0..pattern_count {
+            counter.observe(&[pattern]);
+        }
+
+        assert!(!counter.is_exact());
+        assert!(counter.count().abs_diff(pattern_count) < pattern_count / 10);
+        let DistinctLossPatternState::Approximate { registers } = &counter.state else {
+            panic!("unique-pattern stream must switch to fixed-memory counting")
+        };
+        assert_eq!(registers.len(), LOSS_PATTERN_HLL_REGISTERS);
+    }
+
     fn dataset_for(circuit_text: &str) -> Dataset {
         let instrs = rstim::validation::parse_and_validate(circuit_text).unwrap();
         let stats = rstim::stats::summarize(&instrs);
@@ -500,7 +699,7 @@ mod tests {
     }
 
     fn compiled(circuit_text: &str) -> CompiledCircuit {
-        compile_circuit(&dataset_for(circuit_text)).unwrap()
+        compile_circuit(&dataset_for(circuit_text), DecoderKind::EnvelopeMle).unwrap()
     }
 
     fn observed(bits: &[u8]) -> Vec<usize> {
@@ -526,6 +725,7 @@ mod tests {
                     value: bit != 0,
                 })
                 .collect(),
+            canonical_detector_values: bits.iter().map(|&bit| bit != 0).collect(),
         }
     }
 
@@ -745,6 +945,11 @@ mod tests {
         inconsistent.checks[0].source_detectors = vec![0];
         let error = mle.decode(&inconsistent, &losses[0]).unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
+        assert_eq!(
+            matching.decode(&inconsistent, &losses[0]).unwrap(),
+            matching_zero
+        );
+        inconsistent.canonical_detector_values.pop();
         let error = matching.decode(&inconsistent, &losses[0]).unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
     }
@@ -795,7 +1000,10 @@ mod tests {
             mean_weight: 1.0,
             num_observables: 2,
             cache: HashMap::new(),
+            cache_order: std::collections::VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         };
         assert_eq!(
             matching.decode(&singleton_syndrome(&[1]), &[]).unwrap(),
@@ -929,7 +1137,10 @@ mod tests {
             mean_weight: 2.0,
             num_observables: 1,
             cache: HashMap::new(),
+            cache_order: std::collections::VecDeque::new(),
             cached_work: 0,
+            graph_builds: 0,
+            cache_hits: 0,
         };
         assert_eq!(
             time_like
@@ -943,7 +1154,9 @@ mod tests {
     fn compile_and_decode_boundaries_report_structured_errors() {
         let mut mismatched = dataset_for(PERSISTENT_CIRCUIT);
         mismatched.manifest.circuit.detectors += 1;
-        let error = compile_circuit(&mismatched).err().unwrap();
+        let error = compile_circuit(&mismatched, DecoderKind::EnvelopeMatching)
+            .err()
+            .unwrap();
         assert_eq!(error.code, "invalid_dataset");
         assert!(error.message.contains("circuit counts"));
 
@@ -954,7 +1167,9 @@ mod tests {
             "ML 0\n",
             "DETECTOR(0,0,0) rec[-1]\n",
         ));
-        let error = compile_circuit(&no_observable).err().unwrap();
+        let error = compile_circuit(&no_observable, DecoderKind::EnvelopeMatching)
+            .err()
+            .unwrap();
         assert_eq!(error.code, "unsupported_circuit");
         assert!(error.message.contains("1..=64 observables"));
 

@@ -49,7 +49,7 @@ extraction circuit), **structural** (consumed by the loss compiler itself), or
 | `CX`, `CNOT`, `ZCX` | kept (decomposed to `H`–`CZ`–`H`) | Targets must form complete, pairwise-disjoint qubit pairs within one instruction. |
 | `R`, `RZ` | kept | Closes any open loss window for the targeted wires. |
 | `X_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2` | kept | The only noise channels in v1. All probabilities must be finite and `< 0.5` at DEM level. |
-| `QUBIT_COORDS`, `TICK`, `DETECTOR`, `OBSERVABLE_INCLUDE` | kept | Annotations; see §5. |
+| `QUBIT_COORDS`, `SHIFT_COORDS`, `TICK`, `DETECTOR`, `OBSERVABLE_INCLUDE` | kept | Semantically inert annotations for loss-envelope construction; they remain in the analysis circuit so detector coordinates are preserved. |
 | anything else (incl. `Y_ERROR`, `Z_ERROR`, `PAULI_CHANNEL_*`, `CORRELATED_ERROR`, `MPP`, `S`, `SWAP`, …) | rejected | `unsupported_circuit` naming the instruction. |
 
 Loss-visible readouts with inline noise arguments (`ML(p) ...`) are rejected.
@@ -96,15 +96,20 @@ space-like, single-detector → boundary.
 
 | Limit | Value | Error on exceed |
 |---|---|---|
-| Envelope candidates per loss measurement | 100 000 | `unsupported_circuit` ("exceeds candidate limit") |
-| Primitive loss probes | 10 000 | `unsupported_circuit` ("exceeds primitive probe limit") |
+| Envelope-MLE candidates per loss measurement | 100 000 | `unsupported_circuit` ("exceeds candidate limit") |
+| Unique primitive loss probes | 100 000 | `unsupported_circuit` ("exceeds primitive probe limit") |
+| Primitive detector/observable symptom terms | 10 000 000 | `unsupported_circuit` ("exceeds primitive symptom-term limit") |
 | Measurements / detectors | 10 000 000 each | layout error |
 | Observables | min(64, 1 000 000) | `unsupported_circuit` |
 | Parity terms in measurement transforms | 100 000 000 | layout error |
 | Transform working memory | 512 MiB transform / 256 MiB block | layout error |
 
-A primitive loss probe that fans out into more than one DEM mechanism is
-rejected ("a primitive loss probe produced multiple DEM mechanisms").
+Primitive effects are deduplicated by `(instruction boundary, qubit, Pauli)`
+and evaluated in one reverse detector-sensitivity traversal. Envelope-Matching
+uses the primitive-to-edge union directly and therefore does not enumerate the
+composite Envelope-MLE candidate set. Successful decode stats expose
+`primitive_probe_count`, `primitive_symptom_terms`, and
+`loss_envelope_candidate_count` so generator growth remains observable.
 
 ## 7. Dataset bundle contract (consumer side)
 

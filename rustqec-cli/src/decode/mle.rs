@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use qec_ilp_core::backend::{BinaryBackend, build_binary_backend};
 use qec_ilp_core::{
@@ -9,7 +9,7 @@ use rstim::m2d::{LossAwareDetectorCheck, LossAwareDetectorShot};
 
 use super::{
     CompiledCircuit, DecodeFailure, Effect, LossEnvelope, MAX_CONDITIONED_DECODER_ITEMS,
-    MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_total,
+    MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_needs_eviction,
 };
 
 #[derive(Clone, Copy)]
@@ -26,6 +26,9 @@ pub(super) struct CompiledMle {
     timeout_ms: Option<u64>,
     force_timeout: bool,
     cached_work: usize,
+    cache_order: VecDeque<Vec<usize>>,
+    model_builds: usize,
+    cache_hits: usize,
 }
 
 struct ConditionedMleModel {
@@ -34,6 +37,7 @@ struct ConditionedMleModel {
     check_rows: Vec<usize>,
     envelope_rows: Vec<usize>,
     check_sources: Vec<Vec<usize>>,
+    work: usize,
 }
 
 impl CompiledMle {
@@ -49,6 +53,9 @@ impl CompiledMle {
             timeout_ms,
             force_timeout: timeout_ms == Some(0),
             cached_work: 0,
+            cache_order: VecDeque::new(),
+            model_builds: 0,
+            cache_hits: 0,
         })
     }
 
@@ -61,30 +68,26 @@ impl CompiledMle {
             return Err(ShotFailure::Timeout);
         }
         let key = losses.to_vec();
-        if !self.cache.contains_key(&key) {
-            let (source_count, artifact_work) = preflight_conditioned_mle(
-                &self.independent,
-                &self.envelopes,
-                &syndrome.checks,
-            )
-            .map_err(|error| ShotFailure::Other(error.message))?;
-            let cached_work = conditioned_cache_total(
-                "MLE",
-                self.cache.len(),
-                self.cached_work,
-                artifact_work,
-            )
-            .map_err(ShotFailure::Other)?;
+        if self.cache.contains_key(&key) {
+            self.cache_hits += 1;
+        } else {
+            let (source_count, artifact_work) =
+                preflight_conditioned_mle(&self.independent, &self.envelopes, &syndrome.checks)
+                    .map_err(|error| ShotFailure::Other(error.message))?;
+            self.evict_until_fits(artifact_work)?;
             let model = build_pattern_model(
                 &self.independent,
                 &self.envelopes,
                 &syndrome.checks,
                 self.timeout_ms,
                 source_count,
+                artifact_work,
             )
             .map_err(|error| ShotFailure::Other(error.message))?;
             self.cache.insert(key.clone(), model);
-            self.cached_work = cached_work;
+            self.cache_order.push_back(key.clone());
+            self.cached_work += artifact_work;
+            self.model_builds += 1;
         }
         let model = self.cache.get_mut(&key).unwrap();
         if model.check_sources.len() != syndrome.checks.len()
@@ -143,7 +146,28 @@ impl CompiledMle {
     }
 
     pub(super) fn model_builds(&self) -> usize {
-        self.cache.len()
+        self.model_builds
+    }
+
+    pub(super) fn cache_hits(&self) -> usize {
+        self.cache_hits
+    }
+
+    fn evict_until_fits(&mut self, artifact_work: usize) -> Result<(), ShotFailure> {
+        while conditioned_cache_needs_eviction(self.cache.len(), self.cached_work, artifact_work)
+            .map_err(ShotFailure::Other)?
+        {
+            let oldest = self.cache_order.pop_front().ok_or_else(|| {
+                ShotFailure::Other("conditioned MLE cache accounting drift".to_string())
+            })?;
+            let removed = self.cache.remove(&oldest).ok_or_else(|| {
+                ShotFailure::Other("conditioned MLE cache accounting drift".to_string())
+            })?;
+            self.cached_work = self.cached_work.checked_sub(removed.work).ok_or_else(|| {
+                ShotFailure::Other("conditioned MLE cache accounting drift".to_string())
+            })?;
+        }
+        Ok(())
     }
 }
 
@@ -153,6 +177,7 @@ fn build_pattern_model(
     checks: &[LossAwareDetectorCheck],
     timeout_ms: Option<u64>,
     source_count: usize,
+    artifact_work: usize,
 ) -> Result<ConditionedMleModel, DecodeFailure> {
     let mut binary_vars = Vec::with_capacity(source_count);
     let mut sources = Vec::with_capacity(source_count);
@@ -243,6 +268,7 @@ fn build_pattern_model(
             .iter()
             .map(|check| check.source_detectors.clone())
             .collect(),
+        work: artifact_work,
     })
 }
 
@@ -270,12 +296,8 @@ fn preflight_conditioned_mle(
             total.checked_add(check.source_detectors.len())
         })
         .ok_or_else(conditioned_mle_limit_error)?;
-    let work = conditioned_mle_work_from_counts(
-        source_count,
-        checks.len(),
-        effect_terms,
-        check_terms,
-    )?;
+    let work =
+        conditioned_mle_work_from_counts(source_count, checks.len(), effect_terms, check_terms)?;
     Ok((source_count, work))
 }
 
@@ -285,9 +307,7 @@ fn conditioned_mle_work_from_counts(
     effect_terms: usize,
     check_terms: usize,
 ) -> Result<usize, DecodeFailure> {
-    if source_count > MAX_CONDITIONED_DECODER_ITEMS
-        || check_count > MAX_CONDITIONED_DECODER_ITEMS
-    {
+    if source_count > MAX_CONDITIONED_DECODER_ITEMS || check_count > MAX_CONDITIONED_DECODER_ITEMS {
         return Err(conditioned_mle_limit_error());
     }
     let work = source_count
@@ -351,6 +371,31 @@ fn effect_for_source<'a>(
 mod tests {
     use super::*;
 
+    fn empty_decoder() -> CompiledMle {
+        CompiledMle {
+            cache: HashMap::new(),
+            independent: Vec::new(),
+            envelopes: Vec::new(),
+            num_observables: 0,
+            timeout_ms: None,
+            force_timeout: false,
+            cached_work: 0,
+            cache_order: VecDeque::new(),
+            model_builds: 0,
+            cache_hits: 0,
+        }
+    }
+
+    fn cached_model(work: usize) -> ConditionedMleModel {
+        let independent = [Effect {
+            id: "cache-test".to_string(),
+            detectors: Vec::new(),
+            observables: Vec::new(),
+            weight: 1.0,
+        }];
+        build_pattern_model(&independent, &[], &[], None, 1, work).unwrap()
+    }
+
     #[test]
     fn conditioned_mle_preflights_incidence_work() {
         assert!(conditioned_mle_work_from_counts(1_000, 1_000, 0, 0).is_ok());
@@ -362,15 +407,39 @@ mod tests {
     }
 
     #[test]
-    fn conditioned_mle_caps_many_cached_patterns() {
-        assert!(conditioned_cache_total("MLE", 0, 0, 1).is_ok());
-        assert!(conditioned_cache_total(
-            "MLE",
-            super::super::MAX_CONDITIONED_DECODER_ARTIFACTS,
-            0,
-            1,
-        )
-        .is_err());
-        assert!(conditioned_cache_total("MLE", 1, MAX_CONDITIONED_DECODER_WORK, 1).is_err());
+    fn conditioned_mle_evicts_fifo_and_reports_accounting_drift() {
+        let mut decoder = empty_decoder();
+        decoder
+            .cache
+            .insert(vec![0], cached_model(MAX_CONDITIONED_DECODER_WORK));
+        decoder.cache_order.push_back(vec![0]);
+        decoder.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        decoder.evict_until_fits(1).unwrap();
+        assert!(decoder.cache.is_empty());
+        assert_eq!(decoder.cached_work, 0);
+
+        let mut missing_order = empty_decoder();
+        missing_order.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        assert!(matches!(
+            missing_order.evict_until_fits(1),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
+
+        let mut missing_entry = empty_decoder();
+        missing_entry.cached_work = MAX_CONDITIONED_DECODER_WORK;
+        missing_entry.cache_order.push_back(vec![0]);
+        assert!(matches!(
+            missing_entry.evict_until_fits(1),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
+
+        let mut underflow = empty_decoder();
+        underflow.cache.insert(vec![0], cached_model(2));
+        underflow.cache_order.push_back(vec![0]);
+        underflow.cached_work = 1;
+        assert!(matches!(
+            underflow.evict_until_fits(MAX_CONDITIONED_DECODER_WORK),
+            Err(ShotFailure::Other(message)) if message.contains("accounting drift")
+        ));
     }
 }

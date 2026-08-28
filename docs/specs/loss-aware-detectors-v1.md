@@ -101,7 +101,11 @@ Each `LossAwareDetectorShot` contains:
 - `lost_measurements`: sorted measurement-record indices marked unknown;
 - `detector_valid`: a fixed-width mask over original circuit detectors;
 - `checks`: a maximal independent basis. Each entry contains sorted
-  `source_detectors` and its binary `value`.
+  `source_detectors` and its binary `value`;
+- `canonical_detector_values`: the fixed-width original detector pattern after
+  masked measurement payloads are canonicalized to `1`. This compatibility
+  channel is intended for Pauli-envelope matching; it is placeholder-invariant
+  but does not claim that a masked measurement became physically known.
 
 The loss-aware API intentionally does not return an observable parity. A
 logical operator crossing lost support can be undefined for the same reason as
@@ -150,9 +154,10 @@ loss, while the loss-aware MLE updated the error model per shot.
 ## 5. Boundary with shot-conditioned decoding
 
 This v1 transform states which parity checks survive a known measurement-loss
-pattern. The conditioned-decoding follow-up now combines that basis with the
-native delayed-erasure onset envelopes; the separation remains useful because
-the detector transform itself is decoder-neutral.
+pattern and also supplies the explicit fixed-gauge compatibility channel used
+by Pauli-envelope matching. The conditioned-decoding follow-up combines these
+outputs with native delayed-erasure onset envelopes; the separation remains
+useful because the detector transform itself is decoder-neutral.
 
 The follow-up delayed-erasure integration must:
 

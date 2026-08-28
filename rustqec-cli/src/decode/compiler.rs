@@ -1,18 +1,24 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
-use rstim::ir::{StimInstr, StimTarget};
+use rstim::error_analyzer::{ErrorAnalyzer, PauliEffectAnalysisError, PauliEffectProbe};
+use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::m2d::CompiledLossAwareM2d;
 use rstim::sim::bit_table::BitTable;
 
 use super::dataset::Dataset;
-use super::matching::{EdgeKind, GraphEdge, candidate_affects_edge};
+use super::matching::{EdgeKind, GraphEdge};
 use super::{
-    CompiledCircuit, DecodeFailure, Effect, LossEnvelope, MAX_ENVELOPE_CANDIDATES,
-    MAX_PRIMITIVE_PROBES,
+    CompiledCircuit, DecodeFailure, DecoderKind, Effect, LossEnvelope, MAX_ENVELOPE_CANDIDATES,
+    MAX_PRIMITIVE_PROBES, MAX_PRIMITIVE_SYMPTOM_TERMS,
 };
 
-pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, DecodeFailure> {
+type PrimitiveKey = (usize, u32, &'static str);
+
+pub(super) fn compile_circuit(
+    dataset: &Dataset,
+    decoder: DecoderKind,
+) -> Result<CompiledCircuit, DecodeFailure> {
     let instrs = rstim::validation::parse_and_validate(&dataset.circuit_text)
         .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
     if instrs
@@ -63,17 +69,20 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
     let dem = rstim::error_analyzer::ErrorAnalyzer::circuit_to_dem_decomposed(&normalized.analysis)
         .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
     let (independent_effects, graph_edges) = effects_and_edges_from_dem(&dem)?;
+    let graph_edge_index = GraphEdgeIndex::new(&graph_edges);
     let mut envelopes = Vec::new();
     let mut loss_edges = Vec::new();
     let mut unmapped_loss_primitives = Vec::new();
-    let mut primitive_cache = HashMap::new();
-    for probe in normalized.probes {
-        let compiled = compile_loss_candidates(
-            &normalized.noiseless,
-            &probe,
-            &graph_edges,
-            &mut primitive_cache,
-        )?;
+    let primitive_analysis = compile_primitive_effects(&normalized.noiseless, &normalized.probes)?;
+    for probe in &normalized.probes {
+        let compiled = match decoder {
+            DecoderKind::EnvelopeMatching => {
+                compile_loss_primitives(probe, &graph_edge_index, &primitive_analysis.effects)?
+            }
+            DecoderKind::EnvelopeMle => {
+                compile_loss_candidates(probe, &graph_edge_index, &primitive_analysis.effects)?
+            }
+        };
         envelopes.push(LossEnvelope {
             id: format!("loss-m{}-q{}", probe.flag_measurement, probe.qubit),
             candidates: compiled.candidates,
@@ -90,6 +99,8 @@ pub(super) fn compile_circuit(dataset: &Dataset) -> Result<CompiledCircuit, Deco
         loss_edges,
         unmapped_loss_primitives,
         num_observables: stats.num_observables,
+        primitive_probe_count: primitive_analysis.effects.len(),
+        primitive_symptom_terms: primitive_analysis.symptom_terms,
     })
 }
 
@@ -256,8 +267,8 @@ pub(super) fn normalize_supported_circuit(
                     basis_sites.remove(&qubit);
                 }
             }
-            "QUBIT_COORDS" | "TICK" | "DETECTOR" | "OBSERVABLE_INCLUDE" | "X_ERROR"
-            | "DEPOLARIZE1" | "DEPOLARIZE2" => {
+            "QUBIT_COORDS" | "SHIFT_COORDS" | "TICK" | "DETECTOR" | "OBSERVABLE_INCLUDE"
+            | "X_ERROR" | "DEPOLARIZE1" | "DEPOLARIZE2" => {
                 normalized.push(instruction.clone());
                 if !is_noise_instruction(name) {
                     noiseless.push(instruction.clone());
@@ -424,11 +435,286 @@ struct CompiledLossEnvelope {
     unmapped_primitives: Vec<String>,
 }
 
-fn compile_loss_candidates(
+struct GraphEdgeIndex {
+    boundary: HashMap<usize, Vec<usize>>,
+    internal: HashMap<(usize, usize), Vec<usize>>,
+    detector_components: HashMap<usize, usize>,
+    observables: Vec<Vec<usize>>,
+}
+
+impl GraphEdgeIndex {
+    fn new(edges: &[GraphEdge]) -> Self {
+        let mut boundary = HashMap::<usize, Vec<usize>>::new();
+        let mut internal = HashMap::<(usize, usize), Vec<usize>>::new();
+        let mut adjacency = HashMap::<usize, Vec<usize>>::new();
+        for (index, edge) in edges.iter().enumerate() {
+            adjacency.entry(edge.node1).or_default();
+            if let Some(node2) = edge.node2 {
+                adjacency.entry(node2).or_default();
+                adjacency.entry(edge.node1).or_default().push(node2);
+                adjacency.entry(node2).or_default().push(edge.node1);
+                let endpoints = if edge.node1 <= node2 {
+                    (edge.node1, node2)
+                } else {
+                    (node2, edge.node1)
+                };
+                internal.entry(endpoints).or_default().push(index);
+            } else {
+                boundary.entry(edge.node1).or_default().push(index);
+            }
+        }
+        let mut detector_components = HashMap::new();
+        let mut component = 0usize;
+        for &detector in adjacency.keys() {
+            if detector_components.contains_key(&detector) {
+                continue;
+            }
+            let mut pending = vec![detector];
+            detector_components.insert(detector, component);
+            while let Some(current) = pending.pop() {
+                for &neighbor in &adjacency[&current] {
+                    if detector_components.insert(neighbor, component).is_none() {
+                        pending.push(neighbor);
+                    }
+                }
+            }
+            component += 1;
+        }
+        Self {
+            boundary,
+            internal,
+            detector_components,
+            observables: edges.iter().map(|edge| edge.observables.clone()).collect(),
+        }
+    }
+
+    fn compatible_edges(&self, effect: &Effect) -> Vec<usize> {
+        // A primitive Pauli effect must be represented by one exact graph edge
+        // in each disconnected detector subgraph. Merely mentioning a detector
+        // does not make every boundary edge incident on it part of the
+        // envelope, and a multi-detector symptom must not be expanded into a
+        // clique of cheap matching edges.
+        let mut by_component = HashMap::<usize, Vec<usize>>::new();
+        for &detector in &effect.detectors {
+            let Some(&component) = self.detector_components.get(&detector) else {
+                return Vec::new();
+            };
+            by_component.entry(component).or_default().push(detector);
+        }
+        let mut compatible = Vec::new();
+        let mut represented_observables = Vec::new();
+        for detectors in by_component.values_mut() {
+            detectors.sort_unstable();
+            let edges = match detectors.as_slice() {
+                [detector] => self.boundary.get(detector),
+                [left, right] => self.internal.get(&(*left, *right)),
+                _ => return Vec::new(),
+            };
+            let Some(edges) = edges else {
+                return Vec::new();
+            };
+            let (first, rest) = (edges[0], &edges[1..]);
+            let label = &self.observables[first];
+            if rest.iter().any(|&edge| self.observables[edge] != *label) {
+                return Vec::new();
+            }
+            represented_observables = xor_indices(&represented_observables, label);
+            compatible.extend(edges);
+        }
+        if represented_observables != effect.observables {
+            return Vec::new();
+        }
+        compatible
+    }
+}
+
+struct PrimitiveKeyCollector {
+    keys: BTreeSet<PrimitiveKey>,
+    limit: usize,
+    #[cfg(test)]
+    inspected_candidates: usize,
+}
+
+impl PrimitiveKeyCollector {
+    fn new(limit: usize) -> Self {
+        Self {
+            keys: BTreeSet::new(),
+            limit,
+            #[cfg(test)]
+            inspected_candidates: 0,
+        }
+    }
+
+    fn add_probe(&mut self, probe: &LossProbe) -> Result<(), DecodeFailure> {
+        let Some(earliest_onset) = probe.onset_sites.iter().copied().min() else {
+            return Ok(());
+        };
+        for site in probe
+            .onset_sites
+            .iter()
+            .copied()
+            .chain(
+                probe
+                    .basis_sites
+                    .iter()
+                    .copied()
+                    .filter(|&site| site >= earliest_onset && site <= probe.readout_site),
+            )
+            .chain(std::iter::once(probe.readout_site))
+        {
+            for name in ["X_ERROR", "Y_ERROR", "Z_ERROR"] {
+                #[cfg(test)]
+                {
+                    self.inspected_candidates += 1;
+                }
+                let key = (site, probe.qubit, name);
+                if !self.keys.contains(&key) {
+                    if self.keys.len() >= self.limit {
+                        return Err(primitive_probe_limit_error());
+                    }
+                    self.keys.insert(key);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn into_keys(self) -> BTreeSet<PrimitiveKey> {
+        self.keys
+    }
+}
+
+struct PrimitiveEffectAnalysis {
+    effects: HashMap<PrimitiveKey, Effect>,
+    symptom_terms: usize,
+}
+
+fn compile_primitive_effects(
     noiseless: &[StimInstr],
+    probes: &[LossProbe],
+) -> Result<PrimitiveEffectAnalysis, DecodeFailure> {
+    let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
+    for probe in probes {
+        collector.add_probe(probe)?;
+    }
+    let keys = collector.into_keys();
+    let queries: Vec<_> = keys
+        .iter()
+        .map(|&(insertion, qubit, name)| PauliEffectProbe {
+            insertion,
+            qubit,
+            basis: match name {
+                "X_ERROR" => PauliBasis::X,
+                "Y_ERROR" => PauliBasis::Y,
+                "Z_ERROR" => PauliBasis::Z,
+                _ => unreachable!("primitive keys use Pauli error instructions"),
+            },
+        })
+        .collect();
+    let analyzed = ErrorAnalyzer::circuit_pauli_effects_with_target_limit(
+        noiseless,
+        &queries,
+        MAX_PRIMITIVE_SYMPTOM_TERMS,
+    )
+    .map_err(|error| match error {
+        PauliEffectAnalysisError::Circuit(message) => {
+            DecodeFailure::new("unsupported_circuit", message)
+        }
+        PauliEffectAnalysisError::TargetTermLimitExceeded { .. } => primitive_symptom_limit_error(),
+    })?;
+    // The analyzer capped target-vector allocation incrementally. Compute the
+    // exact detector/observable count here for stats and as a defensive check.
+    let mut symptom_terms = 0usize;
+    let mut effects = HashMap::with_capacity(keys.len());
+    for (key, analyzed) in keys.into_iter().zip(analyzed) {
+        let (detectors, observables) = symptoms(&analyzed.targets);
+        symptom_terms = symptom_terms
+            .checked_add(detectors.len())
+            .and_then(|total| total.checked_add(observables.len()))
+            .ok_or_else(primitive_symptom_limit_error)?;
+        if symptom_terms > MAX_PRIMITIVE_SYMPTOM_TERMS {
+            return Err(primitive_symptom_limit_error());
+        }
+        effects.insert(
+            key,
+            Effect {
+                id: key.2.to_ascii_lowercase(),
+                detectors,
+                observables,
+                weight: 0.0,
+            },
+        );
+    }
+    Ok(PrimitiveEffectAnalysis {
+        effects,
+        symptom_terms,
+    })
+}
+
+fn primitive_probe_limit_error() -> DecodeFailure {
+    DecodeFailure::new(
+        "unsupported_circuit",
+        format!("persistent-loss circuit exceeds primitive probe limit of {MAX_PRIMITIVE_PROBES}"),
+    )
+}
+
+fn primitive_symptom_limit_error() -> DecodeFailure {
+    DecodeFailure::new(
+        "unsupported_circuit",
+        format!(
+            "persistent-loss circuit exceeds primitive symptom-term limit of {MAX_PRIMITIVE_SYMPTOM_TERMS}"
+        ),
+    )
+}
+
+fn map_primitive_effect(
+    key: PrimitiveKey,
+    effect: &Effect,
+    graph_edges: &GraphEdgeIndex,
+    mapped: &mut BTreeSet<usize>,
+    unmapped: &mut BTreeSet<String>,
+) {
+    if effect.detectors.is_empty() && effect.observables.is_empty() {
+        return;
+    }
+    let compatible = graph_edges.compatible_edges(effect);
+    for edge_index in &compatible {
+        mapped.insert(*edge_index);
+    }
+    if compatible.is_empty() {
+        unmapped.insert(format!("{} at site {} for qubit {}", key.2, key.0, key.1));
+    }
+}
+
+fn compile_loss_primitives(
     probe: &LossProbe,
-    graph_edges: &[GraphEdge],
-    primitive_cache: &mut HashMap<(usize, u32, &'static str), Effect>,
+    graph_edges: &GraphEdgeIndex,
+    primitive_effects: &HashMap<PrimitiveKey, Effect>,
+) -> Result<CompiledLossEnvelope, DecodeFailure> {
+    let mut mapped = BTreeSet::new();
+    let mut unmapped = BTreeSet::new();
+    let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
+    collector.add_probe(probe)?;
+    for key in collector.into_keys() {
+        let effect = primitive_effects.get(&key).ok_or_else(|| {
+            DecodeFailure::new(
+                "unsupported_circuit",
+                "primitive loss effect is missing from batched analysis",
+            )
+        })?;
+        map_primitive_effect(key, effect, graph_edges, &mut mapped, &mut unmapped);
+    }
+    Ok(CompiledLossEnvelope {
+        candidates: Vec::new(),
+        mapped_edges: mapped.into_iter().collect(),
+        unmapped_primitives: unmapped.into_iter().collect(),
+    })
+}
+
+fn compile_loss_candidates(
+    probe: &LossProbe,
+    graph_edges: &GraphEdgeIndex,
+    primitive_effects: &HashMap<PrimitiveKey, Effect>,
 ) -> Result<CompiledLossEnvelope, DecodeFailure> {
     let mut union = BTreeSet::<(Vec<usize>, Vec<usize>)>::new();
     let mut mapped = BTreeSet::new();
@@ -449,32 +735,15 @@ fn compile_loss_candidates(
         for site in sites {
             let mut choices = vec![(Vec::new(), Vec::new())];
             for name in ["X_ERROR", "Y_ERROR", "Z_ERROR"] {
-                let effect = if let Some(effect) = primitive_cache.get(&(site, probe.qubit, name)) {
-                    effect.clone()
-                } else {
-                    if primitive_cache.len() >= MAX_PRIMITIVE_PROBES {
-                        return Err(DecodeFailure::new(
-                            "unsupported_circuit",
-                            "persistent-loss circuit exceeds primitive probe limit",
-                        ));
-                    }
-                    let effect = probe_effect(noiseless, site, probe.qubit, name)?;
-                    primitive_cache.insert((site, probe.qubit, name), effect.clone());
-                    effect
-                };
-                if !effect.detectors.is_empty() || !effect.observables.is_empty() {
-                    let mut primitive_mapped = false;
-                    for (edge_index, edge) in graph_edges.iter().enumerate() {
-                        if candidate_affects_edge(&effect, edge) {
-                            mapped.insert(edge_index);
-                            primitive_mapped = true;
-                        }
-                    }
-                    if !primitive_mapped {
-                        unmapped.insert(format!("{name} at site {site} for qubit {}", probe.qubit));
-                    }
-                }
-                choices.push((effect.detectors, effect.observables));
+                let key = (site, probe.qubit, name);
+                let effect = primitive_effects.get(&key).ok_or_else(|| {
+                    DecodeFailure::new(
+                        "unsupported_circuit",
+                        "primitive loss effect is missing from batched analysis",
+                    )
+                })?;
+                map_primitive_effect(key, effect, graph_edges, &mut mapped, &mut unmapped);
+                choices.push((effect.detectors.clone(), effect.observables.clone()));
             }
             let mut next = BTreeSet::new();
             for state in &states {
@@ -533,53 +802,6 @@ fn xor_indices(left: &[usize], right: &[usize]) -> Vec<usize> {
         toggle(&mut values, value);
     }
     values.into_iter().collect()
-}
-
-fn probe_effect(
-    noiseless: &[StimInstr],
-    insertion: usize,
-    qubit: u32,
-    name: &'static str,
-) -> Result<Effect, DecodeFailure> {
-    let mut circuit = noiseless.to_vec();
-    if insertion > circuit.len() {
-        return Err(DecodeFailure::new(
-            "unsupported_circuit",
-            "loss probe position is outside normalized circuit",
-        ));
-    }
-    circuit.insert(
-        insertion,
-        StimInstr::new(name, vec![0.125], vec![StimTarget::Qubit(qubit)]),
-    );
-    let dem = rstim::error_analyzer::ErrorAnalyzer::circuit_to_dem(&circuit)
-        .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
-    let mut found = None;
-    for instruction in dem.instructions() {
-        if let DemInstruction::Error {
-            probability,
-            targets,
-        } = instruction
-        {
-            if *probability <= 0.0 {
-                continue;
-            }
-            if found.is_some() {
-                return Err(DecodeFailure::new(
-                    "unsupported_circuit",
-                    "a primitive loss probe produced multiple DEM mechanisms",
-                ));
-            }
-            found = Some(symptoms(targets));
-        }
-    }
-    let (detectors, observables) = found.unwrap_or_default();
-    Ok(Effect {
-        id: name.to_ascii_lowercase(),
-        detectors,
-        observables,
-        weight: 0.0,
-    })
 }
 
 fn symptoms(targets: &[DemTarget]) -> (Vec<usize>, Vec<usize>) {
@@ -749,7 +971,126 @@ mod tests {
     }
 
     #[test]
-    fn primitive_probe_limits_and_invalid_timelines_fail_explicitly() {
+    fn primitive_edge_mapping_requires_exact_components_and_observables() {
+        let edges = vec![
+            GraphEdge {
+                node1: 0,
+                node2: None,
+                observables: vec![0],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: None,
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: Some(0),
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::SpaceLike,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: Some(2),
+                observables: Vec::new(),
+                weight: 1.0,
+                kind: EdgeKind::SpaceLike,
+            },
+            GraphEdge {
+                node1: 1,
+                node2: None,
+                observables: vec![1],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+            GraphEdge {
+                node1: 3,
+                node2: None,
+                observables: vec![1],
+                weight: 1.0,
+                kind: EdgeKind::Boundary,
+            },
+        ];
+        let index = GraphEdgeIndex::new(&edges);
+
+        assert_eq!(
+            index.compatible_edges(&Effect {
+                id: "pair".to_string(),
+                detectors: vec![0, 1],
+                observables: Vec::new(),
+                weight: 0.0,
+            }),
+            [2]
+        );
+        assert!(
+            index
+                .compatible_edges(&Effect {
+                    id: "wrong-boundary-label".to_string(),
+                    detectors: vec![0],
+                    observables: Vec::new(),
+                    weight: 0.0,
+                })
+                .is_empty()
+        );
+        assert_eq!(
+            index.compatible_edges(&Effect {
+                id: "logical-boundary".to_string(),
+                detectors: vec![0],
+                observables: vec![0],
+                weight: 0.0,
+            }),
+            [0]
+        );
+        for (id, detectors, observables) in [
+            ("unknown-detector", vec![99], Vec::new()),
+            ("three-detector-component", vec![0, 1, 2], Vec::new()),
+            ("missing-boundary", vec![2], Vec::new()),
+            ("ambiguous-parallel-label", vec![1], Vec::new()),
+        ] {
+            assert!(
+                index
+                    .compatible_edges(&Effect {
+                        id: id.to_string(),
+                        detectors,
+                        observables,
+                        weight: 0.0,
+                    })
+                    .is_empty(),
+                "{id} must not map approximately"
+            );
+        }
+        let mut disconnected = index.compatible_edges(&Effect {
+            id: "disconnected-xor".to_string(),
+            detectors: vec![0, 3],
+            observables: vec![0, 1],
+            weight: 0.0,
+        });
+        disconnected.sort_unstable();
+        assert_eq!(disconnected, [0, 5]);
+    }
+
+    #[test]
+    fn current_rstim_atom_loss_resource_bound_and_unmapped_effects_fail_explicitly() {
+        let oversized_probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 0,
+            onset_sites: (0..=(MAX_PRIMITIVE_PROBES / 3 + 1)).collect(),
+            basis_sites: Vec::new(),
+            readout_site: 0,
+        };
+        let message = error_message(compile_primitive_effects(&[], &[oversized_probe]));
+        assert_eq!(
+            message,
+            format!(
+                "persistent-loss circuit exceeds primitive probe limit of {MAX_PRIMITIVE_PROBES}"
+            )
+        );
+
         let probe = LossProbe {
             flag_measurement: 7,
             qubit: 0,
@@ -757,58 +1098,62 @@ mod tests {
             basis_sites: Vec::new(),
             readout_site: 0,
         };
-        let filler = Effect {
-            id: "cached".to_string(),
-            detectors: Vec::new(),
-            observables: Vec::new(),
-            weight: 0.0,
-        };
-        let mut cache: HashMap<_, _> = (0..MAX_PRIMITIVE_PROBES)
-            .map(|site| ((site, 0, "X_ERROR"), filler.clone()))
-            .collect();
-        assert!(
-            error_message(compile_loss_candidates(&[], &probe, &[], &mut cache))
-                .contains("primitive probe limit")
-        );
-
         let unmapped = Effect {
             id: "unmapped".to_string(),
             detectors: vec![0],
             observables: Vec::new(),
             weight: 0.0,
         };
-        let mut cache = ["X_ERROR", "Y_ERROR", "Z_ERROR"]
+        let cache = ["X_ERROR", "Y_ERROR", "Z_ERROR"]
             .into_iter()
             .map(|name| ((0, 0, name), unmapped.clone()))
             .collect();
-        let compiled = compile_loss_candidates(&[], &probe, &[], &mut cache).unwrap();
+        let compiled = compile_loss_candidates(&probe, &GraphEdgeIndex::new(&[]), &cache).unwrap();
         assert_eq!(compiled.unmapped_primitives.len(), 3);
-
         assert!(
-            error_message(probe_effect(&[], 1, 0, "X_ERROR"))
-                .contains("outside normalized circuit")
+            primitive_symptom_limit_error()
+                .message
+                .contains("symptom-term limit")
         );
-        let unsupported = [StimInstr::new(
-            "LOSS",
-            vec![0.1],
-            vec![StimTarget::Qubit(0)],
-        )];
-        assert!(error_message(probe_effect(&unsupported, 0, 0, "X_ERROR")).contains("LOSS"));
     }
 
     #[test]
-    fn primitive_probe_rejects_multiple_independent_mechanisms() {
-        let circuit = rstim::validation::parse_and_validate(concat!(
-            "R 0 1\n",
-            "X_ERROR(0.1) 1\n",
-            "M 0 1\n",
-            "DETECTOR rec[-2]\n",
-            "DETECTOR rec[-1]\n",
-        ))
-        .unwrap();
-        assert!(
-            error_message(probe_effect(&circuit, 1, 0, "X_ERROR"))
-                .contains("multiple DEM mechanisms")
-        );
+    fn primitive_key_collection_is_linear_and_stops_at_its_budget() {
+        const SIDE: usize = 50_000;
+        let probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 0,
+            onset_sites: (0..SIDE).collect(),
+            basis_sites: (SIDE..2 * SIDE).collect(),
+            readout_site: 2 * SIDE,
+        };
+        let mut collector = PrimitiveKeyCollector::new(9);
+
+        let message = error_message(collector.add_probe(&probe));
+
+        assert_eq!(message, primitive_probe_limit_error().message);
+        assert_eq!(collector.keys.len(), 9);
+        assert_eq!(collector.inspected_candidates, 10);
+    }
+
+    #[test]
+    fn primitive_key_collection_keeps_the_union_of_all_loss_windows() {
+        let probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 4,
+            onset_sites: vec![2, 5],
+            basis_sites: vec![1, 3, 5, 7, 11],
+            readout_site: 10,
+        };
+        let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
+
+        collector.add_probe(&probe).unwrap();
+
+        let sites: BTreeSet<_> = collector
+            .into_keys()
+            .into_iter()
+            .map(|(site, _, _)| site)
+            .collect();
+        assert_eq!(sites, BTreeSet::from([2, 3, 5, 7, 10]));
     }
 }
