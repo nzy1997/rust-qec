@@ -289,9 +289,10 @@ impl ErrorAnalyzer {
                 target_terms += effect_target_terms;
                 let targets = match probe.basis {
                     PauliBasis::X => analyzer.x_sens[qubit].targets.clone(),
-                    PauliBasis::Y => ErrorAnalyzer::xor_sorted_targets(
+                    PauliBasis::Y => ErrorAnalyzer::xor_sorted_targets_with_capacity(
                         &analyzer.x_sens[qubit].targets,
                         &analyzer.z_sens[qubit].targets,
+                        effect_target_terms,
                     ),
                     PauliBasis::Z => analyzer.z_sens[qubit].targets.clone(),
                 };
@@ -1372,9 +1373,17 @@ impl ErrorAnalyzer {
     }
 
     fn xor_sorted_targets(a: &[DemTarget], b: &[DemTarget]) -> Vec<DemTarget> {
+        Self::xor_sorted_targets_with_capacity(a, b, a.len().saturating_add(b.len()))
+    }
+
+    fn xor_sorted_targets_with_capacity(
+        a: &[DemTarget],
+        b: &[DemTarget],
+        capacity: usize,
+    ) -> Vec<DemTarget> {
         let mut i = 0;
         let mut j = 0;
-        let mut out = Vec::with_capacity(a.len() + b.len());
+        let mut out = Vec::with_capacity(capacity);
         while i < a.len() || j < b.len() {
             if i == a.len() {
                 out.push(b[j].clone());
@@ -2807,6 +2816,27 @@ mod internal_branch_tests {
             ErrorAnalyzer::circuit_pauli_effects_with_target_limit(&circuit, &probes[..1], 2)
                 .unwrap();
         assert_eq!(effects[0].targets.len(), 2);
+    }
+
+    #[test]
+    fn cancellation_heavy_y_probe_does_not_retain_cancelled_capacity() {
+        const DETECTORS: usize = 4_096;
+        let mut circuit_text = String::from("RY 0\nMY 0\n");
+        for _ in 0..DETECTORS {
+            circuit_text.push_str("DETECTOR rec[-1]\n");
+        }
+        let circuit = crate::validation::parse_and_validate(&circuit_text).unwrap();
+        let probes = [PauliEffectProbe {
+            insertion: 1,
+            qubit: 0,
+            basis: PauliBasis::Y,
+        }];
+
+        let effects =
+            ErrorAnalyzer::circuit_pauli_effects_with_target_limit(&circuit, &probes, 0).unwrap();
+
+        assert!(effects[0].targets.is_empty());
+        assert_eq!(effects[0].targets.capacity(), 0);
     }
 
     #[test]

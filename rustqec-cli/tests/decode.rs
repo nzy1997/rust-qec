@@ -213,6 +213,7 @@ fn both_loss_decoders_run_public_only_and_reuse_compiled_state() {
         assert_eq!(stats["attempted_shot_count"], SHOTS.len());
         assert_eq!(stats["circuit_compilations"], 1);
         assert_eq!(stats["distinct_loss_patterns"], 2);
+        assert_eq!(stats["distinct_loss_patterns_exact"], true);
         if decoder == "envelope-matching" {
             assert_eq!(stats["matching_graph_builds"], 2);
             assert_eq!(stats["cache_hits"], 2);
@@ -242,6 +243,7 @@ fn real_cli_predictions_are_invariant_to_lost_measurement_placeholders() {
             serde_json::from_slice(&fs::read(root.path().join(format!("{decoder}.json"))).unwrap())
                 .unwrap();
         assert_eq!(stats["distinct_loss_patterns"], 1);
+        assert_eq!(stats["distinct_loss_patterns_exact"], true);
         if decoder == "envelope-matching" {
             assert_eq!(stats["matching_graph_builds"], 1);
         } else {

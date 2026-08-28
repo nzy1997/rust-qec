@@ -100,11 +100,17 @@ rejecting an otherwise valid shot merely because earlier patterns filled the
 cache.
 
 `matching_graph_builds` and `mle_model_builds` report cumulative artifact
-builds, including rebuilds after eviction. `distinct_loss_patterns` and
-cache-hit statistics make accidental per-shot recompilation visible. Compile-time
-growth is reported by `primitive_probe_count`, `primitive_symptom_terms`, and
-`loss_envelope_candidate_count`; the last value is zero for Envelope-Matching
-because that backend consumes primitive-to-edge unions directly.
+builds, including rebuilds after eviction. `distinct_loss_patterns` is exact
+while a bounded small-pattern budget is sufficient, then switches to a
+fixed-memory cardinality estimate; `distinct_loss_patterns_exact` distinguishes
+the two modes. Together with cache-hit statistics, this makes accidental
+per-shot recompilation visible without retaining every pattern in memory.
+Compile-time growth is reported by `primitive_probe_count`,
+`primitive_symptom_terms`, and `loss_envelope_candidate_count`; the last value
+is zero for Envelope-Matching because that backend consumes primitive-to-edge
+unions directly. Primitive-key discovery forms the union of onset and basis
+sites in linear time and charges each new key while collecting it, before the
+batched Pauli-effect analysis begins.
 
 The private `logical_input` label introduced for blinded datasets remains the
 evaluation answer source. It is independent of the arbitrary lost-value

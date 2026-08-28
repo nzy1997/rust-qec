@@ -528,25 +528,60 @@ impl GraphEdgeIndex {
     }
 }
 
-fn probe_primitive_keys(probe: &LossProbe) -> Vec<PrimitiveKey> {
-    let mut keys = BTreeSet::new();
-    for &onset in &probe.onset_sites {
-        let mut sites = vec![onset];
-        sites.extend(
-            probe
-                .basis_sites
-                .iter()
-                .copied()
-                .filter(|&site| site >= onset && site <= probe.readout_site),
-        );
-        sites.push(probe.readout_site);
-        for site in sites {
-            for name in ["X_ERROR", "Y_ERROR", "Z_ERROR"] {
-                keys.insert((site, probe.qubit, name));
-            }
+struct PrimitiveKeyCollector {
+    keys: BTreeSet<PrimitiveKey>,
+    limit: usize,
+    #[cfg(test)]
+    inspected_candidates: usize,
+}
+
+impl PrimitiveKeyCollector {
+    fn new(limit: usize) -> Self {
+        Self {
+            keys: BTreeSet::new(),
+            limit,
+            #[cfg(test)]
+            inspected_candidates: 0,
         }
     }
-    keys.into_iter().collect()
+
+    fn add_probe(&mut self, probe: &LossProbe) -> Result<(), DecodeFailure> {
+        let Some(earliest_onset) = probe.onset_sites.iter().copied().min() else {
+            return Ok(());
+        };
+        for site in probe
+            .onset_sites
+            .iter()
+            .copied()
+            .chain(
+                probe
+                    .basis_sites
+                    .iter()
+                    .copied()
+                    .filter(|&site| site >= earliest_onset && site <= probe.readout_site),
+            )
+            .chain(std::iter::once(probe.readout_site))
+        {
+            for name in ["X_ERROR", "Y_ERROR", "Z_ERROR"] {
+                #[cfg(test)]
+                {
+                    self.inspected_candidates += 1;
+                }
+                let key = (site, probe.qubit, name);
+                if !self.keys.contains(&key) {
+                    if self.keys.len() >= self.limit {
+                        return Err(primitive_probe_limit_error());
+                    }
+                    self.keys.insert(key);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn into_keys(self) -> BTreeSet<PrimitiveKey> {
+        self.keys
+    }
 }
 
 struct PrimitiveEffectAnalysis {
@@ -558,20 +593,11 @@ fn compile_primitive_effects(
     noiseless: &[StimInstr],
     probes: &[LossProbe],
 ) -> Result<PrimitiveEffectAnalysis, DecodeFailure> {
-    let mut keys = BTreeSet::new();
+    let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
     for probe in probes {
-        for key in probe_primitive_keys(probe) {
-            keys.insert(key);
-            if keys.len() > MAX_PRIMITIVE_PROBES {
-                return Err(DecodeFailure::new(
-                    "unsupported_circuit",
-                    format!(
-                        "persistent-loss circuit exceeds primitive probe limit of {MAX_PRIMITIVE_PROBES}"
-                    ),
-                ));
-            }
-        }
+        collector.add_probe(probe)?;
     }
+    let keys = collector.into_keys();
     let queries: Vec<_> = keys
         .iter()
         .map(|&(insertion, qubit, name)| PauliEffectProbe {
@@ -625,6 +651,13 @@ fn compile_primitive_effects(
     })
 }
 
+fn primitive_probe_limit_error() -> DecodeFailure {
+    DecodeFailure::new(
+        "unsupported_circuit",
+        format!("persistent-loss circuit exceeds primitive probe limit of {MAX_PRIMITIVE_PROBES}"),
+    )
+}
+
 fn primitive_symptom_limit_error() -> DecodeFailure {
     DecodeFailure::new(
         "unsupported_circuit",
@@ -660,7 +693,9 @@ fn compile_loss_primitives(
 ) -> Result<CompiledLossEnvelope, DecodeFailure> {
     let mut mapped = BTreeSet::new();
     let mut unmapped = BTreeSet::new();
-    for key in probe_primitive_keys(probe) {
+    let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
+    collector.add_probe(probe)?;
+    for key in collector.into_keys() {
         let effect = primitive_effects.get(&key).ok_or_else(|| {
             DecodeFailure::new(
                 "unsupported_circuit",
@@ -1080,5 +1115,45 @@ mod tests {
                 .message
                 .contains("symptom-term limit")
         );
+    }
+
+    #[test]
+    fn primitive_key_collection_is_linear_and_stops_at_its_budget() {
+        const SIDE: usize = 50_000;
+        let probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 0,
+            onset_sites: (0..SIDE).collect(),
+            basis_sites: (SIDE..2 * SIDE).collect(),
+            readout_site: 2 * SIDE,
+        };
+        let mut collector = PrimitiveKeyCollector::new(9);
+
+        let message = error_message(collector.add_probe(&probe));
+
+        assert_eq!(message, primitive_probe_limit_error().message);
+        assert_eq!(collector.keys.len(), 9);
+        assert_eq!(collector.inspected_candidates, 10);
+    }
+
+    #[test]
+    fn primitive_key_collection_keeps_the_union_of_all_loss_windows() {
+        let probe = LossProbe {
+            flag_measurement: 7,
+            qubit: 4,
+            onset_sites: vec![2, 5],
+            basis_sites: vec![1, 3, 5, 7, 11],
+            readout_site: 10,
+        };
+        let mut collector = PrimitiveKeyCollector::new(MAX_PRIMITIVE_PROBES);
+
+        collector.add_probe(&probe).unwrap();
+
+        let sites: BTreeSet<_> = collector
+            .into_keys()
+            .into_iter()
+            .map(|(site, _, _)| site)
+            .collect();
+        assert_eq!(sites, BTreeSet::from([2, 3, 5, 7, 10]));
     }
 }
