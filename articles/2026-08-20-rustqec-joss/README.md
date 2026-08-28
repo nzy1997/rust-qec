@@ -3,6 +3,8 @@
 This directory contains the working JOSS software-paper draft.
 
 - `paper.md`: manuscript and JOSS metadata.
+- `abstract.md`: standalone abstract for the submission form (JOSS renders
+  the Summary section in the paper itself).
 - `paper.bib`: references resolved from DOI/arXiv metadata.
 - `template/README.md`: official format source and current constraints.
 
