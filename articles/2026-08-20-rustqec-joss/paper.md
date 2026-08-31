@@ -19,17 +19,17 @@ bibliography: paper.bib
 
 # Summary
 
-Neutral-atom quantum computers lose atoms during operation, and a heralded
+Neutral-atom quantum computers lose atoms during operation. A heralded
 loss — one the experiment detects and localizes — is valuable side
 information: the Pauli Envelope framework [@Liu_2026] turns each observed
 per-shot loss pattern into a well-defined maximum-likelihood decoding
-problem through Mid-SWAP syndrome extraction and envelope-aware decoders.
-Turning this framework into a reproducible study places unusual demands on
-the software stack: the simulator must carry a persistent per-shot loss
-state that suppresses gates on lost atoms and re-randomizes them on reset,
-the measurement record must preserve each `(loss flag, value bit)` pair, and
-the circuit, seed, noise model, and decoder configuration behind a result
-must remain auditable.
+problem through Mid-SWAP syndrome extraction, an atom-replenishing
+extraction schedule, and envelope-aware decoders. Turning this framework
+into a reproducible study places unusual demands on the software stack: the
+simulator must carry a persistent per-shot loss state that suppresses gates
+on lost atoms and re-randomizes them on reset, the measurement record must
+preserve each `(loss flag, value bit)` pair, and the circuit, seed, noise
+model, and decoder configuration behind a result must remain auditable.
 
 RustQEC is an open-source Rust workspace that implements this complete loop
 as a reference pipeline. It generates native Mid-SWAP syndrome-extraction
@@ -47,9 +47,9 @@ Stim-generated circuit while reproducing its private answers shot for shot.
 
 The full loop runs behind one `rustqec` command with machine-readable
 capability metadata, structured error codes, and atomically published
-artifacts; externally produced datasets enter through the same validated
-contract, serving interactive use, scripting, workflow engines, and
-automated agents alike.
+artifacts; external datasets enter through the same validated contract,
+serving interactive use, scripting, workflow engines, and automated agents
+alike.
 
 # Statement of need
 
@@ -58,10 +58,10 @@ and detector error models [@Gidney_2021], while specialized decoders provide
 efficient inference from detector events [@Higgott_2022]. A reproducible
 study, however, needs more than fast components: contracts across circuit
 generation, sampling, the packed layout of shot records, decoder compilation,
-and per-shot evidence of which physical errors produced each shot. Ad hoc
-wrappers silently violate these contracts — disagreeing about record
-ordering, observable conventions, or record encoding, and blurring the line
-between an infeasible decode and an all-zero prediction.
+and per-shot evidence of which errors produced each shot. Ad hoc wrappers
+silently violate these contracts — disagreeing about record ordering,
+observable conventions, or record encoding, and blurring the line between an
+infeasible decode and an all-zero prediction.
 
 Heralded atom loss makes this interface problem scientifically important.
 Because the onset of a loss is not itself heralded, a realized loss is
@@ -71,7 +71,7 @@ Envelope framework formalizes this relationship and introduces Mid-SWAP
 syndrome extraction together with exact and matching-based decoders
 [@Liu_2026]. Yet general-purpose tools do not close this simulate-to-decode
 loop: the simulator must export loss-visible records in a layout the decoder
-trusts, and the decoder must learn which loss pattern each shot realized
+trusts, and the decoder must learn which loss pattern each shot realized,
 under shared semantics. To our knowledge, no existing stack couples a
 persistent-loss simulator to a loss-aware decoder under one auditable
 contract.
@@ -80,8 +80,8 @@ RustQEC targets QEC researchers who need inspectable command-line experiments,
 Rust developers embedding QEC components, and automated systems that require a
 stable machine-facing contract. Its purpose is not to replace every simulator
 or decoder, but to provide one integrated path in which circuits, datasets,
-predictions, and statistics validate and replay together, and failure states
-— timeouts, infeasible decodes — surface as explicit recorded errors rather
+predictions, and statistics validate and replay together, and failures —
+timeouts, infeasible decodes — surface as explicit recorded errors rather
 than silent predictions.
 
 # State of the field
@@ -101,13 +101,13 @@ loss-aware decoder consumes directly.
 Stim's companion tool sinter orchestrates large sampling campaigns but
 inherits the same record model and offers no per-shot loss-driven decoding.
 Nor is performance the differentiator: on the checked measurement-sampling
-workloads (a distance-11 surface code and a distance-13 repetition code),
-RustQEC's compiled sampling recorded 27–50x lower wall time than the Stim
-command line, detection-event sampling showed a smaller 7.75x advantage, and
+workloads (distance-11 surface code, distance-13 repetition code), RustQEC's
+compiled sampling recorded 27–50x lower wall time than the Stim command
+line, detection-event sampling showed a smaller 7.75x advantage, and
 detector-error-model sampling ran about 8x slower. These report-only CLI
 comparisons include process startup; a more conservative 3.60x
-precompiled-to-precompiled figure, with methodology, environments, and claim
-limits, is published on the [documentation
+precompiled-to-precompiled figure, with methodology and claim limits, is
+published on the [documentation
 site](https://nzy1997.github.io/rust-qec/simulator/).
 
 PyMatching supplies a mature minimum-weight perfect-matching decoder
@@ -158,34 +158,34 @@ record and observed loss flags. One backend solves each shot as an integer
 linear program for exact maximum-likelihood predictions at small scale; the
 other conditions and caches a matching graph per observed loss pattern. Both
 backends cross-validate against the `renvelope` reference decoders in the
-test suite, so correctness claims trace to checked reference cases rather
-than optimized implementations alone.
+test suite, so correctness claims trace to checked reference cases, not
+optimized implementations alone.
 
-The command-line contract enforces these contracts.
-Successful commands write stable JSON reports alongside versioned artifact
-files (packed binary or Stim-format text), while failures use documented
-error codes and nonzero exits, so an infeasible decode or a timeout can never
-read as an all-zero prediction. The `capabilities` command reports every
-verb's arguments, inputs, outputs, artifacts, and error behavior in JSON,
-pinned by the test suite so the advertised contract cannot drift. Decode
-statistics record circuit hash, shot count, compile and decode time, distinct
-loss patterns, cache reuse, timeouts, and infeasible shots; all artifacts are
-published atomically, so a partial run cannot resemble a completed
-experiment.
+The command-line contract enforces these contracts. Successful commands
+write stable JSON reports alongside versioned artifact files (packed binary
+or Stim-format text), while failures use documented error codes and nonzero
+exits, so an infeasible decode or a timeout can never read as an all-zero
+prediction. The `capabilities` command reports every verb's arguments,
+inputs, outputs, artifacts, and error behavior in JSON, pinned by the test
+suite so the advertised contract cannot drift. Decode statistics record
+circuit hash, shot count, compile and decode time, distinct loss patterns,
+cache reuse, timeouts, and infeasible shots; all artifacts are published
+atomically, so a partial run cannot resemble a completed experiment.
 
 The loss-aware compiler accepts a published, versioned circuit subset rather
 than a fixed code family. Any flat circuit built from the documented
 instruction set — loss-opportunity markers, Z-basis loss-visible readouts,
 Hadamard and CNOT gates, resets, `X_ERROR`, and one- and two-qubit
 depolarizing channels — is admitted provided it passes the published
-capability checks: graphlike detector-error-model decomposition, detector
-coordinates, value-record references, and envelope resource limits.
-Acceptance is therefore a capability check, not generator recognition. The
-conformance suite decodes a distance-3 rotated surface-code circuit generated
-by Stim and annotated into the loss-visible subset by a dedicated
-in-repository tool: the exact backend reproduces the private logical answers
-shot by shot, and RustQEC's detector error model for the shared circuit
-matches Stim's own extraction. Extensions — further readout bases, repeat
+capability checks: graphlike detector-error-model decomposition (each error
+mechanism triggers at most two detectors), detector coordinates,
+value-record references, and envelope resource limits. Acceptance is
+therefore a capability check, not generator recognition. The conformance
+suite decodes a distance-3 rotated surface-code circuit generated by Stim
+and annotated into the loss-visible subset by a dedicated in-repository
+tool: the exact backend reproduces the private logical answers shot by
+shot, and RustQEC's detector error model for the shared circuit matches
+Stim's own extraction. Extensions — further readout bases, repeat
 constructs, additional gates — are future work versioned through the
 specification, without widening the stable decoder interface.
 
@@ -193,12 +193,12 @@ specification, without widening the stable decoder interface.
 
 RustQEC is used to build reproducible QEC experiments within this repository.
 Tracked workflows compare multiple decoder implementations on the same
-surface-code and bivariate-bicycle-code workloads, publishing fixed inputs,
-result tables, figures, methodology notes, and claim limits. The loss-aware
-path decodes native distance-3 and distance-5 Mid-SWAP datasets through the
-public CLI; external datasets — including a Stim-generated surface-code
-circuit annotated into the loss-visible subset by a dedicated in-repository
-tool — enter through `dataset import` and decode through the same contract.
+surface-code and bivariate-bicycle-code [@Bravyi_2024] workloads, publishing
+fixed inputs, result tables, figures, methodology notes, and claim limits.
+The loss-aware path decodes native distance-3 and distance-5 Mid-SWAP
+datasets through the public CLI; external datasets — including the
+Stim-generated conformance circuit described in the software-design section
+— enter through `dataset import` and decode through the same contract.
 
 The blinded split gives learned decoders ground-truth training labels while
 keeping the public evaluation fair: a canonical circuit marker, placed before
@@ -217,9 +217,9 @@ check that repeated loss patterns reuse compiled state. The documentation
 site exposes runnable showcases and checked artifacts, distinguishing
 implementation smoke tests from publication-scale evidence.
 
-A public issue and pull-request history, continuous integration,
+Public issue and pull-request history, continuous integration,
 an Apache-2.0 license, and reproducible build and test commands keep the
-software inspectable by researchers who did not participate in its
+software inspectable to researchers who did not participate in its
 development.
 
 # AI usage disclosure
