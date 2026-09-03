@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
+use std::ops::Range;
 
 use qec_ilp_core::backend::{BinaryBackend, build_binary_backend};
 use qec_ilp_core::{
@@ -12,7 +13,7 @@ use super::{
     MAX_CONDITIONED_DECODER_WORK, ShotFailure, conditioned_cache_needs_eviction,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum VariableSource {
     Independent(usize),
     Candidate { envelope: usize, candidate: usize },
@@ -35,8 +36,14 @@ struct ConditionedMleModel {
     backend: Box<dyn BinaryBackend>,
     sources: Vec<VariableSource>,
     check_rows: Vec<usize>,
-    envelope_rows: Vec<usize>,
     check_sources: Vec<Vec<usize>>,
+    work: usize,
+}
+
+struct ConditionedMlePlan {
+    sources: Vec<VariableSource>,
+    active_envelope_ranges: Vec<(usize, Range<usize>)>,
+    check_binary_variables: Vec<Vec<usize>>,
     work: usize,
 }
 
@@ -71,17 +78,21 @@ impl CompiledMle {
         if self.cache.contains_key(&key) {
             self.cache_hits += 1;
         } else {
-            let (source_count, artifact_work) =
-                preflight_conditioned_mle(&self.independent, &self.envelopes, &syndrome.checks)
-                    .map_err(|error| ShotFailure::Other(error.message))?;
+            let plan = preflight_conditioned_mle(
+                &self.independent,
+                &self.envelopes,
+                &syndrome.checks,
+                losses,
+            )
+            .map_err(|error| ShotFailure::Other(error.message))?;
+            let artifact_work = plan.work;
             self.evict_until_fits(artifact_work)?;
             let model = build_pattern_model(
                 &self.independent,
                 &self.envelopes,
                 &syndrome.checks,
                 self.timeout_ms,
-                source_count,
-                artifact_work,
+                plan,
             )
             .map_err(|error| ShotFailure::Other(error.message))?;
             self.cache.insert(key.clone(), model);
@@ -105,13 +116,6 @@ impl CompiledMle {
             model
                 .backend
                 .set_rhs(row, f64::from(check.value))
-                .map_err(|error| ShotFailure::Other(error.to_string()))?;
-        }
-        let active: HashSet<usize> = losses.iter().copied().collect();
-        for (envelope, &row) in model.envelope_rows.iter().enumerate() {
-            model
-                .backend
-                .set_rhs(row, f64::from(active.contains(&envelope)))
                 .map_err(|error| ShotFailure::Other(error.to_string()))?;
         }
         let solution = model.backend.solve().map_err(|error| match error {
@@ -176,42 +180,38 @@ fn build_pattern_model(
     envelopes: &[LossEnvelope],
     checks: &[LossAwareDetectorCheck],
     timeout_ms: Option<u64>,
-    source_count: usize,
-    artifact_work: usize,
+    plan: ConditionedMlePlan,
 ) -> Result<ConditionedMleModel, DecodeFailure> {
-    let mut binary_vars = Vec::with_capacity(source_count);
-    let mut sources = Vec::with_capacity(source_count);
-    for (index, effect) in independent.iter().enumerate() {
-        binary_vars.push(model_var(
-            format!("independent:{}", effect.id),
-            effect.weight,
-        ));
-        sources.push(VariableSource::Independent(index));
-    }
-    let mut envelope_ranges = Vec::new();
-    for (envelope, value) in envelopes.iter().enumerate() {
-        let start = binary_vars.len();
-        for (candidate, effect) in value.candidates.iter().enumerate() {
-            binary_vars.push(model_var(format!("loss:{}:{}", value.id, effect.id), 0.0));
-            sources.push(VariableSource::Candidate {
+    let ConditionedMlePlan {
+        sources,
+        active_envelope_ranges,
+        check_binary_variables,
+        work,
+    } = plan;
+    let binary_vars: Vec<_> = sources
+        .iter()
+        .map(|&source| match source {
+            VariableSource::Independent(index) => {
+                let effect = &independent[index];
+                model_var(format!("independent:{}", effect.id), effect.weight)
+            }
+            VariableSource::Candidate {
                 envelope,
                 candidate,
-            });
-        }
-        envelope_ranges.push(start..binary_vars.len());
-    }
+            } => {
+                let value = &envelopes[envelope];
+                let effect = &value.candidates[candidate];
+                model_var(format!("loss:{}:{}", value.id, effect.id), 0.0)
+            }
+        })
+        .collect();
     let mut integer_vars = Vec::new();
     let mut constraints = Vec::new();
     let mut check_rows = Vec::new();
-    for (check_index, check) in checks.iter().enumerate() {
-        let binary_terms: Vec<_> = sources
-            .iter()
-            .enumerate()
-            .filter_map(|(variable, source)| {
-                let effect = effect_for_source(independent, envelopes, *source);
-                odd_sorted_intersection(&check.source_detectors, &effect.detectors)
-                    .then_some((variable, 1.0))
-            })
+    for (check_index, variables) in check_binary_variables.into_iter().enumerate() {
+        let binary_terms: Vec<_> = variables
+            .into_iter()
+            .map(|variable| (variable, 1.0))
             .collect();
         let slack = integer_vars.len();
         integer_vars.push(ModelVar {
@@ -229,15 +229,14 @@ fn build_pattern_model(
             rhs: 0.0,
         });
     }
-    let mut envelope_rows = Vec::new();
-    for (envelope, range) in envelopes.iter().zip(envelope_ranges) {
-        envelope_rows.push(constraints.len());
+    for (envelope_index, range) in active_envelope_ranges {
+        let envelope = &envelopes[envelope_index];
         constraints.push(LinearConstraint {
             name: format!("loss-active:{}", envelope.id),
             sense: ConstraintSense::Eq,
             binary_terms: range.map(|variable| (variable, 1.0)).collect(),
             integer_terms: Vec::new(),
-            rhs: 0.0,
+            rhs: 1.0,
         });
     }
     let model = BinaryIlpModel {
@@ -263,12 +262,11 @@ fn build_pattern_model(
         backend,
         sources,
         check_rows,
-        envelope_rows,
         check_sources: checks
             .iter()
             .map(|check| check.source_detectors.clone())
             .collect(),
-        work: artifact_work,
+        work,
     })
 }
 
@@ -276,72 +274,164 @@ fn preflight_conditioned_mle(
     independent: &[Effect],
     envelopes: &[LossEnvelope],
     checks: &[LossAwareDetectorCheck],
-) -> Result<(usize, usize), DecodeFailure> {
-    let source_count = envelopes
+    losses: &[usize],
+) -> Result<ConditionedMlePlan, DecodeFailure> {
+    preflight_conditioned_mle_with_work_limit(
+        independent,
+        envelopes,
+        checks,
+        losses,
+        MAX_CONDITIONED_DECODER_WORK,
+    )
+}
+
+fn preflight_conditioned_mle_with_work_limit(
+    independent: &[Effect],
+    envelopes: &[LossEnvelope],
+    checks: &[LossAwareDetectorCheck],
+    losses: &[usize],
+    max_work: usize,
+) -> Result<ConditionedMlePlan, DecodeFailure> {
+    if independent.len() > MAX_CONDITIONED_DECODER_ITEMS
+        || checks.len() > MAX_CONDITIONED_DECODER_ITEMS
+        || losses.len() > MAX_CONDITIONED_DECODER_ITEMS
+    {
+        return Err(conditioned_mle_limit_error());
+    }
+    if losses.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(DecodeFailure::new(
+            "decode_error",
+            "conditioned MLE loss pattern must contain strictly increasing envelope indices",
+        ));
+    }
+
+    let mut source_count = independent.len();
+    let mut effect_terms = independent
         .iter()
-        .try_fold(independent.len(), |total, envelope| {
-            total.checked_add(envelope.candidates.len())
-        })
-        .ok_or_else(conditioned_mle_limit_error)?;
-    let effect_terms = independent
-        .iter()
-        .chain(envelopes.iter().flat_map(|envelope| &envelope.candidates))
         .try_fold(0usize, |total, effect| {
             total.checked_add(effect.detectors.len())
         })
         .ok_or_else(conditioned_mle_limit_error)?;
+    let mut active_candidate_count = 0usize;
+    for &envelope_index in losses {
+        let envelope = envelopes.get(envelope_index).ok_or_else(|| {
+            DecodeFailure::new(
+                "decode_error",
+                format!("loss pattern references unknown envelope {envelope_index}"),
+            )
+        })?;
+        source_count = source_count
+            .checked_add(envelope.candidates.len())
+            .ok_or_else(conditioned_mle_limit_error)?;
+        active_candidate_count = active_candidate_count
+            .checked_add(envelope.candidates.len())
+            .ok_or_else(conditioned_mle_limit_error)?;
+        effect_terms = envelope
+            .candidates
+            .iter()
+            .try_fold(effect_terms, |total, effect| {
+                total.checked_add(effect.detectors.len())
+            })
+            .ok_or_else(conditioned_mle_limit_error)?;
+    }
+    if source_count > MAX_CONDITIONED_DECODER_ITEMS {
+        return Err(conditioned_mle_limit_error());
+    }
     let check_terms = checks
         .iter()
         .try_fold(0usize, |total, check| {
             total.checked_add(check.source_detectors.len())
         })
         .ok_or_else(conditioned_mle_limit_error)?;
-    let work =
-        conditioned_mle_work_from_counts(source_count, checks.len(), effect_terms, check_terms)?;
-    Ok((source_count, work))
+
+    let mut work = 0usize;
+    for count in [
+        source_count,
+        checks.len(),
+        effect_terms,
+        check_terms,
+        active_candidate_count,
+    ] {
+        charge_conditioned_mle_work(&mut work, count, max_work)?;
+    }
+
+    let mut detector_checks = HashMap::<usize, Vec<usize>>::new();
+    for (check_index, check) in checks.iter().enumerate() {
+        for &detector in &check.source_detectors {
+            detector_checks
+                .entry(detector)
+                .or_default()
+                .push(check_index);
+        }
+    }
+
+    let mut sources = Vec::with_capacity(source_count);
+    sources.extend((0..independent.len()).map(VariableSource::Independent));
+    let mut active_envelope_ranges = Vec::with_capacity(losses.len());
+    for &envelope in losses {
+        let start = sources.len();
+        sources.extend((0..envelopes[envelope].candidates.len()).map(|candidate| {
+            VariableSource::Candidate {
+                envelope,
+                candidate,
+            }
+        }));
+        active_envelope_ranges.push((envelope, start..sources.len()));
+    }
+
+    let mut check_binary_variables = vec![Vec::new(); checks.len()];
+    let mut parity = vec![false; checks.len()];
+    let mut touched = vec![false; checks.len()];
+    let mut touched_rows = Vec::new();
+    for (variable, &source) in sources.iter().enumerate() {
+        let effect = effect_for_source(independent, envelopes, source);
+        for detector in &effect.detectors {
+            let Some(rows) = detector_checks.get(detector) else {
+                continue;
+            };
+            charge_conditioned_mle_work(&mut work, rows.len(), max_work)?;
+            for &row in rows {
+                if !touched[row] {
+                    touched[row] = true;
+                    touched_rows.push(row);
+                }
+                parity[row] ^= true;
+            }
+        }
+        for row in touched_rows.drain(..) {
+            if parity[row] {
+                charge_conditioned_mle_work(&mut work, 1, max_work)?;
+                check_binary_variables[row].push(variable);
+            }
+            parity[row] = false;
+            touched[row] = false;
+        }
+    }
+
+    Ok(ConditionedMlePlan {
+        sources,
+        active_envelope_ranges,
+        check_binary_variables,
+        work,
+    })
 }
 
-fn conditioned_mle_work_from_counts(
-    source_count: usize,
-    check_count: usize,
-    effect_terms: usize,
-    check_terms: usize,
-) -> Result<usize, DecodeFailure> {
-    if source_count > MAX_CONDITIONED_DECODER_ITEMS || check_count > MAX_CONDITIONED_DECODER_ITEMS {
-        return Err(conditioned_mle_limit_error());
-    }
-    let work = source_count
-        .checked_add(check_count)
-        .and_then(|value| value.checked_add(effect_terms))
-        .and_then(|value| value.checked_add(check_terms))
-        .and_then(|value| value.checked_add(source_count.checked_mul(check_count)?))
-        .and_then(|value| value.checked_add(source_count.checked_mul(check_terms)?))
-        .and_then(|value| value.checked_add(check_count.checked_mul(effect_terms)?))
+fn charge_conditioned_mle_work(
+    work: &mut usize,
+    amount: usize,
+    max_work: usize,
+) -> Result<(), DecodeFailure> {
+    *work = work
+        .checked_add(amount)
         .ok_or_else(conditioned_mle_limit_error)?;
-    if work > MAX_CONDITIONED_DECODER_WORK {
+    if *work > max_work {
         return Err(conditioned_mle_limit_error());
     }
-    Ok(work)
+    Ok(())
 }
 
 fn conditioned_mle_limit_error() -> DecodeFailure {
     DecodeFailure::new("decode_error", "conditioned MLE work limit exceeded")
-}
-
-fn odd_sorted_intersection(left: &[usize], right: &[usize]) -> bool {
-    let (mut a, mut b, mut parity) = (0, 0, false);
-    while a < left.len() && b < right.len() {
-        match left[a].cmp(&right[b]) {
-            std::cmp::Ordering::Less => a += 1,
-            std::cmp::Ordering::Greater => b += 1,
-            std::cmp::Ordering::Equal => {
-                parity ^= true;
-                a += 1;
-                b += 1;
-            }
-        }
-    }
-    parity
 }
 
 fn model_var(name: String, objective: f64) -> ModelVar {
@@ -393,17 +483,136 @@ mod tests {
             observables: Vec::new(),
             weight: 1.0,
         }];
-        build_pattern_model(&independent, &[], &[], None, 1, work).unwrap()
+        let mut plan = preflight_conditioned_mle(&independent, &[], &[], &[]).unwrap();
+        plan.work = work;
+        build_pattern_model(&independent, &[], &[], None, plan).unwrap()
     }
 
     #[test]
     fn conditioned_mle_preflights_incidence_work() {
-        assert!(conditioned_mle_work_from_counts(1_000, 1_000, 0, 0).is_ok());
-        let error = conditioned_mle_work_from_counts(10_001, 1_000, 0, 0).unwrap_err();
+        let mut work = 0;
+        charge_conditioned_mle_work(
+            &mut work,
+            MAX_CONDITIONED_DECODER_WORK,
+            MAX_CONDITIONED_DECODER_WORK,
+        )
+        .unwrap();
+        let error =
+            charge_conditioned_mle_work(&mut work, 1, MAX_CONDITIONED_DECODER_WORK).unwrap_err();
         assert_eq!(error.code, "decode_error");
         assert!(error.message.contains("work limit"));
-        assert!(conditioned_mle_work_from_counts(usize::MAX, 0, 0, 0).is_err());
-        assert!(conditioned_mle_work_from_counts(1, 1, 0, usize::MAX).is_err());
+        let mut overflow = 1;
+        assert!(
+            charge_conditioned_mle_work(&mut overflow, usize::MAX, MAX_CONDITIONED_DECODER_WORK,)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn conditioned_mle_preflight_charges_sparse_incidence_and_materialized_terms() {
+        let effect = |detectors| Effect {
+            id: "effect".to_string(),
+            detectors,
+            observables: Vec::new(),
+            weight: 1.0,
+        };
+        let checks = [LossAwareDetectorCheck {
+            source_detectors: vec![0],
+            value: false,
+        }];
+
+        let cancelling = [effect(vec![0, 0])];
+        assert!(
+            preflight_conditioned_mle_with_work_limit(&cancelling, &[], &checks, &[], 7).is_ok()
+        );
+        assert!(
+            preflight_conditioned_mle_with_work_limit(&cancelling, &[], &checks, &[], 6).is_err(),
+            "two sparse incidence visits must be charged even when their parity cancels"
+        );
+
+        let materialized = [effect(vec![0])];
+        assert!(
+            preflight_conditioned_mle_with_work_limit(&materialized, &[], &checks, &[], 6).is_ok()
+        );
+        assert!(
+            preflight_conditioned_mle_with_work_limit(&materialized, &[], &checks, &[], 5).is_err(),
+            "the projected binary term must be charged after its incidence visit"
+        );
+    }
+
+    #[test]
+    fn conditioned_mle_plan_keeps_only_active_envelopes_and_projects_sparsely() {
+        let independent = [Effect {
+            id: "independent".to_string(),
+            detectors: vec![0],
+            observables: Vec::new(),
+            weight: 1.0,
+        }];
+        let envelopes = [
+            LossEnvelope {
+                id: "inactive".to_string(),
+                candidates: vec![Effect {
+                    id: "inactive-candidate".to_string(),
+                    detectors: vec![1],
+                    observables: Vec::new(),
+                    weight: 0.0,
+                }],
+            },
+            LossEnvelope {
+                id: "active".to_string(),
+                candidates: vec![
+                    Effect {
+                        id: "active-candidate".to_string(),
+                        detectors: vec![0, 1],
+                        observables: Vec::new(),
+                        weight: 0.0,
+                    },
+                    Effect {
+                        id: "identity".to_string(),
+                        detectors: Vec::new(),
+                        observables: Vec::new(),
+                        weight: 0.0,
+                    },
+                ],
+            },
+        ];
+        let checks = [
+            LossAwareDetectorCheck {
+                source_detectors: vec![0],
+                value: false,
+            },
+            LossAwareDetectorCheck {
+                source_detectors: vec![0, 1],
+                value: false,
+            },
+        ];
+
+        let plan = preflight_conditioned_mle(&independent, &envelopes, &checks, &[1]).unwrap();
+        assert_eq!(
+            plan.sources,
+            [
+                VariableSource::Independent(0),
+                VariableSource::Candidate {
+                    envelope: 1,
+                    candidate: 0,
+                },
+                VariableSource::Candidate {
+                    envelope: 1,
+                    candidate: 1,
+                },
+            ]
+        );
+        assert_eq!(plan.active_envelope_ranges, [(1, 1..3)]);
+        assert_eq!(plan.check_binary_variables, [vec![0, 1], vec![0]]);
+
+        let duplicate = preflight_conditioned_mle(&independent, &envelopes, &checks, &[1, 1])
+            .err()
+            .unwrap();
+        assert!(duplicate.message.contains("strictly increasing"));
+        let unknown = preflight_conditioned_mle(&independent, &envelopes, &checks, &[2])
+            .err()
+            .unwrap();
+        assert!(unknown.message.contains("unknown envelope"));
     }
 
     #[test]

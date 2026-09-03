@@ -45,6 +45,30 @@ fn run_decode(dataset: &Path, decoder: &str, root: &Path) -> std::process::Outpu
         .unwrap()
 }
 
+fn run_decode_with_timeout(
+    dataset: &Path,
+    decoder: &str,
+    root: &Path,
+    shot_timeout_ms: u64,
+) -> std::process::Output {
+    rustqec()
+        .args([
+            "decode",
+            "--decoder",
+            decoder,
+            "--dataset",
+            dataset.to_str().unwrap(),
+            "--out",
+            root.join(format!("{decoder}.b8")).to_str().unwrap(),
+            "--stats-out",
+            root.join(format!("{decoder}.json")).to_str().unwrap(),
+            "--shot-timeout-ms",
+            &shot_timeout_ms.to_string(),
+        ])
+        .output()
+        .unwrap()
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(bytes)
@@ -122,6 +146,97 @@ fn current_rstim_atom_loss_conventional_decodes_unmodified() {
 #[test]
 fn current_rstim_atom_loss_midswap_decodes_unmodified() {
     assert_current_rstim_atom_loss_decodes("midswap");
+}
+
+#[test]
+fn current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified() {
+    let dataset = current_rstim_fixture("midswap");
+    let root = tempfile::tempdir().unwrap();
+    let original_out = root.path().join("original");
+    let output = run_decode_with_timeout(&dataset, "envelope-mle", &original_out, 2_000);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let predictions = fs::read(original_out.join("envelope-mle.b8")).unwrap();
+    assert_eq!(predictions.len(), 2);
+    let stats: Value =
+        serde_json::from_slice(&fs::read(original_out.join("envelope-mle.json")).unwrap()).unwrap();
+    assert_eq!(stats["decoder"], "envelope-mle");
+    assert_eq!(stats["shot_count"], 2);
+    assert_eq!(stats["timeout_count"], 0);
+    assert_eq!(stats["mle_model_builds"], 2);
+
+    let circuit = fs::read_to_string(dataset.join("circuit.stim")).unwrap();
+    let instrs = rstim::validation::parse_and_validate(&circuit).unwrap();
+    let transform = rstim::m2d::CompiledLossAwareM2d::new(&instrs).unwrap();
+    let mut shots = fs::read(dataset.join("shots.b8")).unwrap();
+    let row_bytes = shots.len() / 2;
+    let pair = transform
+        .layout()
+        .loss_visible_measurements()
+        .iter()
+        .find(|pair| shots[pair.flag / 8] & (1 << (pair.flag % 8)) != 0)
+        .expect("fixture must contain a flagged measurement in its first shot");
+    assert!(pair.value < row_bytes * 8);
+    shots[pair.value / 8] ^= 1 << (pair.value % 8);
+
+    let mutated_dataset = root.path().join("mutated-dataset");
+    fs::create_dir(&mutated_dataset).unwrap();
+    fs::write(mutated_dataset.join("circuit.stim"), &circuit).unwrap();
+    fs::write(mutated_dataset.join("shots.b8"), &shots).unwrap();
+    let mut manifest: Value =
+        serde_json::from_slice(&fs::read(dataset.join("manifest.json")).unwrap()).unwrap();
+    let shots_sha = sha256_hex(&shots);
+    manifest["shots_file"]["sha256"] = Value::String(shots_sha.clone());
+    let dataset_id_material = format!(
+        "format=rstim_decoder_dataset\nschema_version={}\nmode={}\ncircuit_sha256={}\nshots={}\nrow_bits={}\nshots_b8_sha256={}\n",
+        manifest["schema_version"].as_u64().unwrap(),
+        manifest["mode"].as_str().unwrap(),
+        manifest["circuit"]["sha256"].as_str().unwrap(),
+        manifest["shots"].as_u64().unwrap(),
+        manifest["row"]["bits"].as_u64().unwrap(),
+        shots_sha,
+    );
+    manifest["dataset_id"] = Value::String(sha256_hex(dataset_id_material.as_bytes()));
+    fs::write(
+        mutated_dataset.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let mutated_out = root.path().join("mutated");
+    let output = run_decode_with_timeout(&mutated_dataset, "envelope-mle", &mutated_out, 2_000);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(mutated_out.join("envelope-mle.b8")).unwrap(),
+        predictions,
+        "a flagged measurement's paired value is an arbitrary placeholder"
+    );
+}
+
+#[test]
+fn current_rstim_atom_loss_conventional_envelope_mle_rejects_candidate_explosion() {
+    let dataset = current_rstim_fixture("conventional");
+    let root = tempfile::tempdir().unwrap();
+    let output = run_decode_with_timeout(&dataset, "envelope-mle", root.path(), 2_000);
+    assert!(!output.status.success());
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(error["error"]["code"], "unsupported_circuit");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("exceeds candidate limit")
+    );
+    assert!(!root.path().join("envelope-mle.b8").exists());
+    assert!(!root.path().join("envelope-mle.json").exists());
 }
 
 #[test]

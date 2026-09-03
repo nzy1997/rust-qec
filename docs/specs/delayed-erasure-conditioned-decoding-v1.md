@@ -47,8 +47,10 @@ identical to ordinary detector decoding.
 
 `envelope-mle` builds and caches one ILP model per distinct loss pattern. Its
 parity constraints are the shot's surviving checks, not the original detector
-rows. Independent Pauli effects and every joint delayed-erasure candidate are
-projected through the same check basis.
+rows. Independent Pauli effects and the joint delayed-erasure candidates from
+active loss envelopes are projected through the same check basis. Inactive
+envelopes are omitted: their exclusivity right-hand side is zero, which would
+otherwise force every binary candidate variable in those envelopes to zero.
 
 An active loss envelope selects exactly one joint candidate. The candidate may
 flip several detectors and logical observables together. This preserves the
@@ -92,12 +94,12 @@ lost value bit.
 
 The loss-aware transform retains its detector, batch-table, pivot,
 elimination-step, and materialized-term limits. Conditioned matching and MLE
-also cap mechanism/check counts, support-scanning work, resident artifact
-count, and resident cached work before constructing a shot-specific
-graph/model. Deterministic FIFO eviction keeps these limits effective for
-zero-check patterns and for streams with many distinct loss patterns without
-rejecting an otherwise valid shot merely because earlier patterns filled the
-cache.
+also cap mechanism/check counts, sparse detector-to-check incidence work,
+materialized model terms, resident artifact count, and resident cached work
+before constructing a shot-specific graph/model. Deterministic FIFO eviction
+keeps these limits effective for zero-check patterns and for streams with many
+distinct loss patterns without rejecting an otherwise valid shot merely
+because earlier patterns filled the cache.
 
 `matching_graph_builds` and `mle_model_builds` report cumulative artifact
 builds, including rebuilds after eviction. `distinct_loss_patterns` is exact
