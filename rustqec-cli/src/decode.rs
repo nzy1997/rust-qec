@@ -119,6 +119,7 @@ pub struct DecodeStats {
     pub loss_envelope_candidate_count: usize,
     pub matching_graph_builds: usize,
     pub mle_model_builds: usize,
+    pub mle_detector_rows: usize,
 }
 
 #[derive(Debug)]
@@ -463,6 +464,7 @@ fn build_stats(
             .sum(),
         matching_graph_builds: decoder.graph_builds(),
         mle_model_builds: decoder.model_builds(),
+        mle_detector_rows: decoder.mle_detector_rows(),
     }
 }
 
@@ -552,6 +554,13 @@ impl DecoderState {
         match self {
             Self::Matching(decoder) => decoder.cache_hits(),
             Self::Mle(decoder) => decoder.cache_hits(),
+        }
+    }
+
+    fn mle_detector_rows(&self) -> usize {
+        match self {
+            Self::Matching(_) => 0,
+            Self::Mle(decoder) => decoder.detector_rows(),
         }
     }
 }
@@ -738,12 +747,16 @@ mod tests {
         }
     }
 
-    fn reference_mle(circuit: &CompiledCircuit, syndrome: &[u8], losses: &[usize]) -> u64 {
-        let case = AtomLossCase {
+    fn reference_case(
+        circuit: &CompiledCircuit,
+        observed_detectors: Vec<usize>,
+        losses: &[usize],
+    ) -> AtomLossCase {
+        AtomLossCase {
             schema_version: "atom-loss-envelope.v0".to_string(),
             num_detectors: circuit.loss_aware_m2d.layout().num_detectors(),
             num_observables: circuit.num_observables,
-            observed_detectors: observed(syndrome),
+            observed_detectors,
             independent_effects: circuit
                 .independent_effects
                 .iter()
@@ -760,11 +773,126 @@ mod tests {
                         .collect(),
                 })
                 .collect(),
-        };
+        }
+    }
+
+    fn reference_mle(circuit: &CompiledCircuit, syndrome: &[u8], losses: &[usize]) -> u64 {
+        let case = reference_case(circuit, observed(syndrome), losses);
         match decode_reference_mle(&case).unwrap() {
             DecodeOutcome::Optimal(result) => mask(&result.predicted_observables),
             DecodeOutcome::Infeasible(_) => panic!("reference MLE unexpectedly infeasible"),
         }
+    }
+
+    fn project_reference_effect(
+        effect: &ReferenceEffect,
+        checks: &[rstim::m2d::LossAwareDetectorCheck],
+    ) -> ReferenceEffect {
+        ReferenceEffect {
+            id: effect.id.clone(),
+            detectors: checks
+                .iter()
+                .enumerate()
+                .filter_map(|(row, check)| {
+                    (check
+                        .source_detectors
+                        .iter()
+                        .filter(|detector| effect.detectors.contains(detector))
+                        .count()
+                        % 2
+                        == 1)
+                        .then_some(row)
+                })
+                .collect(),
+            observables: effect.observables.clone(),
+            weight: effect.weight,
+        }
+    }
+
+    fn project_reference_case(
+        canonical: &AtomLossCase,
+        checks: &[rstim::m2d::LossAwareDetectorCheck],
+    ) -> AtomLossCase {
+        AtomLossCase {
+            schema_version: canonical.schema_version.clone(),
+            num_detectors: checks.len(),
+            num_observables: canonical.num_observables,
+            observed_detectors: checks
+                .iter()
+                .enumerate()
+                .filter_map(|(row, check)| check.value.then_some(row))
+                .collect(),
+            independent_effects: canonical
+                .independent_effects
+                .iter()
+                .map(|effect| project_reference_effect(effect, checks))
+                .collect(),
+            loss_envelopes: canonical
+                .loss_envelopes
+                .iter()
+                .map(|envelope| ReferenceLossEnvelope {
+                    loss_id: envelope.loss_id.clone(),
+                    candidates: envelope
+                        .candidates
+                        .iter()
+                        .map(|effect| project_reference_effect(effect, checks))
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+
+    fn issue_679_native_reference_cases() -> (AtomLossCase, AtomLossCase, Vec<usize>, usize, usize)
+    {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle");
+        let dataset = read_dataset(&fixture).unwrap();
+        let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMle).unwrap();
+        let shots = File::open(&dataset.shots_path).unwrap();
+        let mut reader = ResultBlockReader::new(
+            BufReader::new(shots),
+            dataset.manifest.row.bits,
+            dataset.manifest.shots as u64,
+            OutputFormat::B8,
+            BATCH_SIZE,
+        )
+        .unwrap();
+        let measurements = reader.next_block().unwrap().unwrap();
+        let mut syndromes = circuit.loss_aware_syndromes(&measurements).unwrap();
+        let losses = circuit.loss_patterns(&measurements).pop().unwrap();
+        let syndrome = syndromes.pop().unwrap();
+        let canonical = reference_case(
+            &circuit,
+            syndrome
+                .canonical_detector_values
+                .iter()
+                .enumerate()
+                .filter_map(|(detector, &value)| value.then_some(detector))
+                .collect(),
+            &losses,
+        );
+        let projected = project_reference_case(&canonical, &syndrome.checks);
+        (
+            canonical,
+            projected,
+            losses,
+            syndrome.canonical_detector_values.len(),
+            syndrome.checks.len(),
+        )
+    }
+
+    fn issue_679_reference_fixture() -> serde_json::Value {
+        let (canonical, projected, losses, detector_count, check_count) =
+            issue_679_native_reference_cases();
+        serde_json::json!({
+            "source_shot_index": 134,
+            "expected_observables": [0],
+            "active_loss_indices": losses,
+            "original_detector_count": detector_count,
+            "surviving_check_count": check_count,
+            "canonical_case": canonical,
+            "surviving_check_case": projected,
+        })
     }
 
     fn reference_matching(circuit: &CompiledCircuit, shots: &[(&[u8], &[usize])]) -> Vec<u64> {
@@ -856,6 +984,74 @@ mod tests {
     }
 
     #[test]
+    fn imported_measurement_rows_match_the_canonical_reference_mle() {
+        let circuit = compiled(PERSISTENT_CIRCUIT);
+        let rows = ["0100", "1000", "1000", "0000"];
+        let mut measurements = BitTable::new(4, rows.len());
+        for (shot, row) in rows.iter().enumerate() {
+            for (measurement, value) in row.bytes().enumerate() {
+                measurements.set(measurement, shot, value == b'1');
+            }
+        }
+        let syndromes = circuit.loss_aware_syndromes(&measurements).unwrap();
+        let losses = circuit.loss_patterns(&measurements);
+        let mut mle = CompiledMle::new(&circuit, None).unwrap();
+        let actual: Vec<_> = syndromes
+            .iter()
+            .zip(&losses)
+            .map(|(syndrome, losses)| mask(&mle.decode(syndrome, losses).unwrap()))
+            .collect();
+        let expected: Vec<_> = syndromes
+            .iter()
+            .zip(&losses)
+            .map(|(syndrome, losses)| {
+                let canonical: Vec<_> = syndrome
+                    .canonical_detector_values
+                    .iter()
+                    .map(|&value| u8::from(value))
+                    .collect();
+                reference_mle(&circuit, &canonical, losses)
+            })
+            .collect();
+        assert_eq!(actual, expected);
+        assert_eq!(actual, [1, 1, 1, 0]);
+    }
+
+    #[test]
+    fn issue_679_reference_fixture_matches_the_native_compiler() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle");
+        let pinned =
+            zstd::decode_all(File::open(fixture.join("reference_cases.json.zst")).unwrap())
+                .unwrap();
+        let reference: serde_json::Value = serde_json::from_slice(&pinned).unwrap();
+        let _: AtomLossCase = serde_json::from_value(reference["canonical_case"].clone()).unwrap();
+        let _: AtomLossCase =
+            serde_json::from_value(reference["surviving_check_case"].clone()).unwrap();
+        let current = serde_json::to_vec_pretty(&issue_679_reference_fixture()).unwrap();
+        assert_eq!(
+            sha256_hex(&current),
+            sha256_hex(&pinned),
+            "the pinned canonical reference and negative control are stale; run the ignored regenerator"
+        );
+    }
+
+    #[test]
+    #[ignore = "regenerates /tmp/issue679-reference_cases.json.zst"]
+    fn regenerate_issue_679_reference_cases() {
+        let fixture = issue_679_reference_fixture();
+        let json = serde_json::to_vec_pretty(&fixture).unwrap();
+        let compressed = zstd::encode_all(json.as_slice(), 19).unwrap();
+        let output = Path::new("/tmp/issue679-reference_cases.json.zst");
+        fs::write(output, &compressed).unwrap();
+        eprintln!(
+            "wrote {} sha256={}",
+            output.display(),
+            sha256_hex(&compressed)
+        );
+    }
+
+    #[test]
     fn all_no_loss_reduces_to_ordinary_pauli_decoding() {
         let circuit = compiled(PERSISTENT_CIRCUIT);
         let shots: Vec<(&[u8], &[usize])> = vec![
@@ -943,13 +1139,14 @@ mod tests {
 
         let mut inconsistent = syndromes[0].clone();
         inconsistent.checks[0].source_detectors = vec![0];
-        let error = mle.decode(&inconsistent, &losses[0]).unwrap_err();
-        assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
+        assert_eq!(mle.decode(&inconsistent, &losses[0]).unwrap(), mle_zero);
         assert_eq!(
             matching.decode(&inconsistent, &losses[0]).unwrap(),
             matching_zero
         );
         inconsistent.canonical_detector_values.pop();
+        let error = mle.decode(&inconsistent, &losses[0]).unwrap_err();
+        assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
         let error = matching.decode(&inconsistent, &losses[0]).unwrap_err();
         assert!(matches!(error, ShotFailure::Other(message) if message.contains("inconsistent")));
     }

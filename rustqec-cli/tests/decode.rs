@@ -28,7 +28,7 @@ const CIRCUIT: &str = concat!(
     "OBSERVABLE_INCLUDE(0) rec[-3]\n",
 );
 const SHOTS: &[u8] = &[0x02, 0x01, 0x01, 0x00];
-const EXPECTED_PREDICTIONS: &[u8] = &[1, 0, 0, 0];
+const EXPECTED_PREDICTIONS: &[u8] = &[1, 1, 1, 0];
 const EXPECTED_MATCHING_PREDICTIONS: &[u8] = &[1, 1, 1, 0];
 const PLACEHOLDER_INVARIANCE_CIRCUIT: &str = concat!(
     "QUBIT_COORDS(0,0) 0\n",

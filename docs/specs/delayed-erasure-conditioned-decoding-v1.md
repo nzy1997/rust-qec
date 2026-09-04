@@ -25,7 +25,7 @@ Circuit compilation is performed once:
 The compiled measurement transform is reused for every input batch. It does
 not rebuild the reference sample or measurement layout per batch.
 
-## Shot-conditioned detector model
+## Loss-aware syndrome views
 
 For one shot, let `B` contain the surviving detector checks returned by the
 loss-aware transform. Each row of `B` lists original detector indices; its
@@ -38,19 +38,24 @@ e_conditioned = B e  (mod 2).
 
 This is the direct, in-memory equivalent of rewriting every DEM mechanism for
 the shot. Duplicate lost-record contributions cancel inside a supercheck.
-The decoder never receives an invalid original detector bit.
+The transform also returns the complete original detector vector after every
+flagged value placeholder has been canonicalized to `1`. This canonical vector
+is valid and placeholder-invariant even where the surviving-check view combines
+or removes original detector rows.
 
 The no-loss basis consists only of singleton rows, so the conditioned model is
 identical to ordinary detector decoding.
 
 ## Envelope MLE
 
-`envelope-mle` builds and caches one ILP model per distinct loss pattern. Its
-parity constraints are the shot's surviving checks, not the original detector
-rows. Independent Pauli effects and the joint delayed-erasure candidates from
-active loss envelopes are projected through the same check basis. Inactive
-envelopes are omitted: their exclusivity right-hand side is zero, which would
-otherwise force every binary candidate variable in those envelopes to zero.
+`envelope-mle` builds and caches one ILP model per distinct loss pattern. It
+implements Section V, Algorithm 1 of the Pauli-envelope paper directly: every
+original detector contributes one parity constraint whose right-hand side is
+the corresponding canonical detector value. Independent Pauli effects and the
+joint delayed-erasure candidates from active loss envelopes remain in the
+original detector index space. Inactive envelopes are omitted: their
+exclusivity right-hand side is zero, which would otherwise force every binary
+candidate variable in those envelopes to zero.
 
 An active loss envelope selects exactly one joint candidate. The candidate may
 flip several detectors and logical observables together. This preserves the
@@ -71,9 +76,9 @@ Matching remains an approximation to the full categorical envelope model.
 In particular, the v1 measurement-record elimination basis cannot substitute
 for the spatial code deformation around a physical data-atom loss: projecting
 the graph through that incomplete basis deletes valid spatial constraints and
-causes a logical-error-rate regression. `envelope-mle` continues to use the
-conditioned check basis and is the exact categorical fallback within the
-documented flat Mid-SWAP subset.
+causes a logical-error-rate regression. The same projection is not used for
+`envelope-mle`; it keeps the full original detector constraints and is the
+exact categorical fallback within the documented flat Mid-SWAP subset.
 
 ## Required invariants
 
@@ -83,7 +88,7 @@ For fixed circuit, loss flags, and all known measurement values:
   surviving checks or the canonical detector pattern;
 - it must not change the prediction from either supported decoder;
 - shots with the same loss pattern must reuse the same cached graph/model;
-- a mismatched detector or check basis for an existing cache key is rejected;
+- a mismatched canonical detector count for an existing cache key is rejected;
 - no-loss predictions remain equal to the preconditioned decoder behavior.
 
 Both a Rust-level known-answer test and a real-CLI two-shot test exercise the
@@ -94,15 +99,17 @@ lost value bit.
 
 The loss-aware transform retains its detector, batch-table, pivot,
 elimination-step, and materialized-term limits. Conditioned matching and MLE
-also cap mechanism/check counts, sparse detector-to-check incidence work,
-materialized model terms, resident artifact count, and resident cached work
+also cap mechanism/detector counts, sparse detector-incidence work, materialized
+model terms, resident artifact count, and resident cached work
 before constructing a shot-specific graph/model. Deterministic FIFO eviction
 keeps these limits effective for zero-check patterns and for streams with many
 distinct loss patterns without rejecting an otherwise valid shot merely
 because earlier patterns filled the cache.
 
 `matching_graph_builds` and `mle_model_builds` report cumulative artifact
-builds, including rebuilds after eviction. `distinct_loss_patterns` is exact
+builds, including rebuilds after eviction. `mle_detector_rows` reports the
+number of original-detector parity rows in a resident MLE model (zero for
+matching). `distinct_loss_patterns` is exact
 while a bounded small-pattern budget is sufficient, then switches to a
 fixed-memory cardinality estimate; `distinct_loss_patterns_exact` distinguishes
 the two modes. Together with cache-hit statistics, this makes accidental

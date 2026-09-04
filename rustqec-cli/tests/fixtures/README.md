@@ -44,3 +44,23 @@ does not accept a real unsupported gate.
 
 The regeneration is deterministic; a diff after regeneration means either the
 fixture drifted or the installed Stim version changed.
+
+`current_rstim_atom_loss/midswap_canonical_mle/` is the focused issue #679
+regression. It contains the complete current d=5/r=15 Mid-SWAP circuit and shot
+134 (zero-based) from a 512-shot, seed-679 export. On that row the canonical
+detector formulation and private logical answer predict observable 0, while
+the old surviving-check formulation does not. `provenance.json` records the
+exact circuit/export commands, detector counts, loss indices, expected answer,
+and the checksum of the compressed independent-reference cases. Regenerate the
+reference oracle at `/tmp/issue679-reference_cases.json.zst` with:
+
+```sh
+cargo test -p rustqec-cli --lib \
+  decode::tests::regenerate_issue_679_reference_cases -- \
+  --ignored --exact --nocapture
+```
+
+After replacing the checked file, update its SHA-256 in `provenance.json`. The
+non-ignored `issue_679_reference_fixture_matches_the_native_compiler` test
+compares every independent effect and active-envelope candidate against a fresh
+native compilation, so stale reference data fails the ordinary test suite.
