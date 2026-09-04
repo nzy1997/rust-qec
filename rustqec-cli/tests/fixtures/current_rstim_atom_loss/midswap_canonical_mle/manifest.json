@@ -1,0 +1,28 @@
+{
+  "format": "rstim_decoder_dataset",
+  "schema_version": 1,
+  "dataset_id": "cb1463ff8596499682f37f52b3507b6772cb44fdf4d9f5f2ba2d4f699867e24c",
+  "mode": "measurements_blinded",
+  "shots": 1,
+  "row": {
+    "kind": "measurements",
+    "bits": 770,
+    "encoding": "b8",
+    "bit_order": "lsb_first",
+    "bytes_per_shot": 97
+  },
+  "circuit": {
+    "file": "circuit.stim",
+    "sha256": "6bc55332b66830b90f968c1aea702eda7db9a82c04a230e434f2c005c69b79e6",
+    "measurements": 770,
+    "detectors": 360,
+    "observables": 1,
+    "sweep_bits": 0
+  },
+  "shots_file": {
+    "file": "shots.b8",
+    "sha256": "fa6cd01cbdcd2440ec9652fccdd58b507765079c6d80f62dd3f2b77c0a04bd9c",
+    "bits": 770,
+    "bytes_per_shot": 97
+  }
+}

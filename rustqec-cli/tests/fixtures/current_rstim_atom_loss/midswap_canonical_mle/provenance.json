@@ -1,0 +1,16 @@
+{
+  "purpose": "Issue #679 canonical-detector Envelope-MLE regression",
+  "source_commit": "eeadbb19c9725277527893a077ba5cc4db1069d4",
+  "circuit_command": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap --distance 5 --rounds 15 --noise 0.002 --operation-loss-probability 0.001 --measurement-loss-probability 0.001 --out circuit.stim",
+  "dataset_command": "rustqec dataset export --circuit circuit.stim --shots 512 --mode measurements_blinded --public-out public --private-out private --seed 679 --logical-x-qubits 1,12,23,34,45",
+  "reference_cases_command": "cargo test -p rustqec-cli --lib decode::tests::regenerate_issue_679_reference_cases -- --ignored --exact --nocapture",
+  "source_shot_index_zero_based": 134,
+  "expected_observables": [0],
+  "active_loss_indices": [149, 364],
+  "original_detector_count": 360,
+  "surviving_check_count": 358,
+  "canonical_prediction": [0],
+  "surviving_check_prediction": [],
+  "reference_cases_file": "reference_cases.json.zst",
+  "reference_cases_sha256": "80d39123d29836059acf45575031b07d29ed919a46f63426bbc96ce7af9cd1a4"
+}

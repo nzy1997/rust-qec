@@ -97,10 +97,11 @@ fn import_packages_third_party_payloads_and_decode_reads_them() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // Same circuit and shots as the decode test suite: known answer.
+    // The decode unit suite independently checks these canonical detector
+    // predictions against renvelope's exact MLE.
     assert_eq!(
         fs::read(root.path().join("preds.b8")).unwrap(),
-        [1, 0, 0, 0]
+        [1, 1, 1, 0]
     );
 }
 

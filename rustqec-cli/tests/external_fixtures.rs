@@ -13,6 +13,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use renvelope::{
+    AtomLossCase, DecodeOutcome, Effect as ReferenceEffect, LossEnvelope as ReferenceLossEnvelope,
+    decode as decode_reference_mle,
+};
 use rstim::decoder_dataset::{
     DecoderDatasetMode, ExportDecoderDatasetLogicalFlipConfig, LogicalFlip, LogicalPauli,
     export_decoder_dataset_with_logical_flip,
@@ -81,6 +85,81 @@ fn current_rstim_fixture(family: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/current_rstim_atom_loss")
         .join(family)
+}
+
+fn measurement_table(bytes: &[u8], bit_count: usize) -> rstim::sim::bit_table::BitTable {
+    let mut table = rstim::sim::bit_table::BitTable::try_new(bit_count, 1).unwrap();
+    for bit in 0..bit_count {
+        if bytes[bit / 8] & (1 << (bit % 8)) != 0 {
+            table.set(bit, 0, true);
+        }
+    }
+    table
+}
+
+fn project_reference_effect(
+    effect: &ReferenceEffect,
+    checks: &[rstim::m2d::LossAwareDetectorCheck],
+) -> ReferenceEffect {
+    ReferenceEffect {
+        id: effect.id.clone(),
+        detectors: checks
+            .iter()
+            .enumerate()
+            .filter_map(|(row, check)| {
+                (check
+                    .source_detectors
+                    .iter()
+                    .filter(|detector| effect.detectors.contains(detector))
+                    .count()
+                    % 2
+                    == 1)
+                    .then_some(row)
+            })
+            .collect(),
+        observables: effect.observables.clone(),
+        weight: effect.weight,
+    }
+}
+
+fn project_reference_case(
+    canonical: &AtomLossCase,
+    checks: &[rstim::m2d::LossAwareDetectorCheck],
+) -> AtomLossCase {
+    AtomLossCase {
+        schema_version: canonical.schema_version.clone(),
+        num_detectors: checks.len(),
+        num_observables: canonical.num_observables,
+        observed_detectors: checks
+            .iter()
+            .enumerate()
+            .filter_map(|(row, check)| check.value.then_some(row))
+            .collect(),
+        independent_effects: canonical
+            .independent_effects
+            .iter()
+            .map(|effect| project_reference_effect(effect, checks))
+            .collect(),
+        loss_envelopes: canonical
+            .loss_envelopes
+            .iter()
+            .map(|envelope| ReferenceLossEnvelope {
+                loss_id: envelope.loss_id.clone(),
+                candidates: envelope
+                    .candidates
+                    .iter()
+                    .map(|effect| project_reference_effect(effect, checks))
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+fn reference_prediction(case: &AtomLossCase) -> Vec<usize> {
+    match decode_reference_mle(case).unwrap() {
+        DecodeOutcome::Optimal(result) => result.predicted_observables,
+        DecodeOutcome::Infeasible(_) => panic!("reference MLE unexpectedly infeasible"),
+    }
 }
 
 fn assert_current_rstim_atom_loss_decodes(family: &str) {
@@ -218,6 +297,179 @@ fn current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified() {
         fs::read(mutated_out.join("envelope-mle.b8")).unwrap(),
         predictions,
         "a flagged measurement's paired value is an arbitrary placeholder"
+    );
+}
+
+#[test]
+fn current_rstim_atom_loss_midswap_envelope_mle_uses_canonical_detectors() {
+    let dataset = current_rstim_fixture("midswap_canonical_mle");
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(dataset.join("manifest.json")).unwrap()).unwrap();
+    let provenance: Value =
+        serde_json::from_slice(&fs::read(dataset.join("provenance.json")).unwrap()).unwrap();
+    let circuit = fs::read_to_string(dataset.join("circuit.stim")).unwrap();
+    let measurements = fs::read(dataset.join("shots.b8")).unwrap();
+    let bit_count = manifest["row"]["bits"].as_u64().unwrap() as usize;
+    let instrs = rstim::validation::parse_and_validate(&circuit).unwrap();
+    let transform = rstim::m2d::CompiledLossAwareM2d::new(&instrs).unwrap();
+    let original = transform
+        .convert(&measurement_table(&measurements, bit_count))
+        .unwrap()
+        .shots
+        .pop()
+        .unwrap();
+
+    let original_detector_count = provenance["original_detector_count"].as_u64().unwrap() as usize;
+    let surviving_check_count = provenance["surviving_check_count"].as_u64().unwrap() as usize;
+    assert_eq!(
+        original.canonical_detector_values.len(),
+        original_detector_count
+    );
+    assert_eq!(original.checks.len(), surviving_check_count);
+    assert_eq!(original_detector_count, manifest["circuit"]["detectors"]);
+    assert!(surviving_check_count < original_detector_count);
+    let active_loss_indices: Vec<_> = transform
+        .layout()
+        .loss_visible_measurements()
+        .iter()
+        .enumerate()
+        .filter_map(|(loss, pair)| {
+            (measurements[pair.flag / 8] & (1 << (pair.flag % 8)) != 0).then_some(loss)
+        })
+        .collect();
+    assert_eq!(
+        active_loss_indices,
+        provenance["active_loss_indices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_u64().unwrap() as usize)
+            .collect::<Vec<_>>()
+    );
+
+    let reference_bytes =
+        zstd::decode_all(fs::File::open(dataset.join("reference_cases.json.zst")).unwrap())
+            .unwrap();
+    assert_eq!(
+        sha256_hex(&fs::read(dataset.join("reference_cases.json.zst")).unwrap()),
+        provenance["reference_cases_sha256"]
+    );
+    let reference: Value = serde_json::from_slice(&reference_bytes).unwrap();
+    assert_eq!(
+        reference["source_shot_index"],
+        provenance["source_shot_index_zero_based"]
+    );
+    assert_eq!(
+        reference["active_loss_indices"],
+        provenance["active_loss_indices"]
+    );
+    assert_eq!(
+        reference["original_detector_count"],
+        provenance["original_detector_count"]
+    );
+    assert_eq!(
+        reference["surviving_check_count"],
+        provenance["surviving_check_count"]
+    );
+
+    let canonical_case: AtomLossCase =
+        serde_json::from_value(reference["canonical_case"].clone()).unwrap();
+    let surviving_case: AtomLossCase =
+        serde_json::from_value(reference["surviving_check_case"].clone()).unwrap();
+    assert_eq!(canonical_case.num_detectors, original_detector_count);
+    assert_eq!(
+        canonical_case.observed_detectors,
+        original
+            .canonical_detector_values
+            .iter()
+            .enumerate()
+            .filter_map(|(detector, &value)| value.then_some(detector))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        project_reference_case(&canonical_case, &original.checks),
+        surviving_case,
+        "the negative control must be the old projection of the same effects"
+    );
+    let expected = provenance["expected_observables"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_u64().unwrap() as usize)
+        .collect::<Vec<_>>();
+    assert_eq!(reference_prediction(&canonical_case), expected);
+    assert_ne!(
+        reference_prediction(&surviving_case),
+        expected,
+        "the pinned row must distinguish the old surviving-check formulation"
+    );
+
+    let root = tempfile::tempdir().unwrap();
+    let native_out = root.path().join("native");
+    let output = run_decode(&dataset, "envelope-mle", &native_out);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(native_out.join("envelope-mle.b8")).unwrap(), [1]);
+    let stats: Value =
+        serde_json::from_slice(&fs::read(native_out.join("envelope-mle.json")).unwrap()).unwrap();
+    assert_eq!(stats["mle_detector_rows"], manifest["circuit"]["detectors"]);
+
+    let mut flipped_measurements = measurements.clone();
+    let mut flipped_count = 0usize;
+    for pair in transform.layout().loss_visible_measurements() {
+        if measurements[pair.flag / 8] & (1 << (pair.flag % 8)) != 0 {
+            flipped_measurements[pair.value / 8] ^= 1 << (pair.value % 8);
+            flipped_count += 1;
+        }
+    }
+    assert_eq!(
+        flipped_count, 2,
+        "the fixture must retain both observed losses"
+    );
+    let flipped = transform
+        .convert(&measurement_table(&flipped_measurements, bit_count))
+        .unwrap()
+        .shots
+        .pop()
+        .unwrap();
+    assert_eq!(
+        flipped.canonical_detector_values, original.canonical_detector_values,
+        "canonical detectors must ignore every flagged value placeholder"
+    );
+
+    let mutated_dataset = root.path().join("mutated-dataset");
+    fs::create_dir(&mutated_dataset).unwrap();
+    fs::write(mutated_dataset.join("circuit.stim"), &circuit).unwrap();
+    fs::write(mutated_dataset.join("shots.b8"), &flipped_measurements).unwrap();
+    let mut mutated_manifest = manifest.clone();
+    let shots_sha = sha256_hex(&flipped_measurements);
+    mutated_manifest["shots_file"]["sha256"] = Value::String(shots_sha.clone());
+    let dataset_id_material = format!(
+        "format=rstim_decoder_dataset\nschema_version=1\nmode=measurements_blinded\ncircuit_sha256={}\nshots=1\nrow_bits={}\nshots_b8_sha256={}\n",
+        manifest["circuit"]["sha256"].as_str().unwrap(),
+        bit_count,
+        shots_sha,
+    );
+    mutated_manifest["dataset_id"] = Value::String(sha256_hex(dataset_id_material.as_bytes()));
+    fs::write(
+        mutated_dataset.join("manifest.json"),
+        serde_json::to_vec_pretty(&mutated_manifest).unwrap(),
+    )
+    .unwrap();
+    let mutated_out = root.path().join("mutated");
+    let output = run_decode(&mutated_dataset, "envelope-mle", &mutated_out);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(mutated_out.join("envelope-mle.b8")).unwrap(),
+        [1],
+        "flipping every flagged placeholder must preserve the native prediction"
     );
 }
 
