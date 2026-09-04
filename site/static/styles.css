@@ -11,6 +11,8 @@
   --code-bg: #111820;
   --code-text: #edf4f7;
   --shadow: 0 16px 42px rgba(23, 32, 38, 0.08);
+  --page-width: 1120px;
+  --reading-width: 760px;
 }
 
 * {
@@ -51,7 +53,7 @@ code {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
-  max-width: 1120px;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 1rem 1.25rem 0;
 }
@@ -119,7 +121,7 @@ code {
 }
 
 .hero {
-  max-width: 1120px;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 5rem 1.25rem 4.5rem;
 }
@@ -166,14 +168,15 @@ h3 {
 }
 
 .hero-copy {
-  max-width: 760px;
+  max-width: var(--reading-width);
   margin: 1.25rem 0 0;
   color: var(--muted);
   font-size: 1.15rem;
 }
 
 .section-copy {
-  max-width: 760px;
+  width: 100%;
+  max-width: none;
   margin: 0.9rem 0 0;
   color: var(--muted);
 }
@@ -207,7 +210,7 @@ h3 {
 }
 
 main {
-  max-width: 1120px;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
 }
@@ -857,7 +860,7 @@ pre code {
 }
 
 .rsmp-hero {
-  max-width: 1120px;
+  max-width: var(--page-width);
 }
 
 .rsmp-hero-grid,
@@ -1004,7 +1007,7 @@ pre code {
 }
 
 .data-hero {
-  max-width: 1120px;
+  max-width: var(--page-width);
 }
 
 .data-pipeline,
@@ -1113,7 +1116,7 @@ pre code {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  max-width: 1120px;
+  max-width: var(--page-width);
   margin: 0 auto;
   padding: 2rem 1.25rem;
   border-top: 1px solid var(--border);
