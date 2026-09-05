@@ -90,6 +90,12 @@ Run the Rust test suite:
 cargo test --workspace
 ```
 
+## Support And Compatibility
+
+The [support and compatibility contract](docs/support-compatibility.md) states
+the current supported boundaries, pre-1.0 compatibility policy, and known
+exclusions for this release line.
+
 ## Primary Next Steps
 
 - [Showcase index](docs/showcases/README.md): runnable workflow categories and

@@ -8,6 +8,25 @@ use crate::ir::{circuit_to_string, StimInstr, StimTarget};
 const CNOT_SCHEDULE: &str = "paper_alternating_ab";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// Configuration for the flat Mid-SWAP rotated-memory-Z generator.
+///
+/// ```
+/// use rstim::codegen::{MidSwapConfig, rotated_memory_z_midswap};
+///
+/// let config = MidSwapConfig {
+///     distance: 3,
+///     rounds: 2,
+///     before_round_data_depolarization: 0.0,
+///     before_round_data_loss_probability: 0.0,
+///     after_clifford_depolarization: 0.0,
+///     before_measure_flip_probability: 0.0,
+///     after_reset_flip_probability: 0.0,
+///     operation_loss_probability: 0.0,
+///     measurement_loss_probability: 0.0,
+/// };
+///
+/// assert!(rotated_memory_z_midswap(config).is_ok());
+/// ```
 pub struct MidSwapConfig {
     pub distance: usize,
     pub rounds: usize,
