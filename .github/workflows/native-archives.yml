@@ -1,0 +1,466 @@
+name: Native release archives
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable release tag to build
+        required: true
+        default: v0.2.1
+        type: string
+      publish:
+        description: Upload verified assets to the existing GitHub Release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: native-archives-${{ github.event.pull_request.number || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      source_sha: ${{ steps.identity.outputs.source_sha }}
+      staging: ${{ steps.identity.outputs.staging }}
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Checkout immutable build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || inputs.tag }}
+          fetch-depth: 0
+          path: source
+      - name: Resolve source identity
+        id: identity
+        working-directory: source
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          source_sha="$(git rev-parse HEAD)"
+          if [ -n "$PR_HEAD_SHA" ]; then
+            tag="staging-${source_sha}"
+            git tag "$tag" "$source_sha"
+            staging=true
+          else
+            tag="$REQUESTED_TAG"
+            test "$(git cat-file -t "refs/tags/$tag")" = tag
+            test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$source_sha"
+            staging=false
+          fi
+          {
+            echo "tag=$tag"
+            echo "source_sha=$source_sha"
+            echo "staging=$staging"
+          } >> "$GITHUB_OUTPUT"
+      - name: Apply the release gate to a production tag
+        if: github.event_name == 'workflow_dispatch'
+        id: release_gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          python3 tooling/tools/check_release_gate.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --dry-run \
+            --wait-seconds 2700 \
+            --poll-seconds 20 \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Confirm the release gate resolved the build source
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          test "${{ steps.identity.outputs.source_sha }}" = "${{ steps.release_gate.outputs.commit }}"
+
+  checker-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest tools.test_verify_release_archive
+
+  shot-assets:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Checkout immutable build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          path: source
+      - name: Restore the ephemeral staging tag
+        if: needs.prepare.outputs.staging == 'true'
+        working-directory: source
+        run: git tag "${{ needs.prepare.outputs.tag }}" "${{ needs.prepare.outputs.source_sha }}"
+      - name: Install the WebAssembly compiler prerequisite
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Select stable Rust exactly
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add --toolchain stable wasm32-unknown-unknown
+          {
+            echo "RUSTC=$(rustup which --toolchain stable rustc)"
+            echo "RUSTDOC=$(rustup which --toolchain stable rustdoc)"
+            echo "CARGO=$(rustup which --toolchain stable cargo)"
+            echo "CARGO_TARGET_DIR=$GITHUB_WORKSPACE/source/target"
+            echo "SOURCE_DATE_EPOCH=$(git -C source show -s --format=%ct HEAD)"
+          } >> "$GITHUB_ENV"
+      - name: Install the pinned WebAssembly binding tool
+        run: |
+          "$(rustup which --toolchain stable cargo)" install wasm-bindgen-cli --version 0.2.126 --locked
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: source
+      - name: Rebuild the shared embedded Shot Lab assets from the tag
+        env:
+          SHOT_VIEWER_REPO_ROOT: ${{ github.workspace }}/source
+        run: |
+          WASM_BINDGEN="$HOME/.cargo/bin/wasm-bindgen" tooling/tools/build_shot_viewer.sh
+          python3 source/tools/shot_viewer_assets.py
+          tar -czf rebuilt-shot-lab-assets.tar.gz -C source \
+            site/static/interactive/app.js \
+            site/static/interactive/pkg/rstim_shot_web.d.ts \
+            site/static/interactive/pkg/rstim_shot_web.js \
+            site/static/interactive/pkg/rstim_shot_web_bg.wasm \
+            site/static/interactive/pkg/rstim_shot_web_bg.wasm.d.ts \
+            site/static/interactive/shot-viewer.css \
+            rstim/assets/shot-viewer/app.js \
+            rstim/assets/shot-viewer/asset-manifest.json \
+            rstim/assets/shot-viewer/pkg/rstim_shot_web_bg.wasm \
+            rstim/assets/shot-viewer/shot-viewer.css
+      - name: Upload one shared rebuilt asset set
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-shot-lab-assets
+          path: rebuilt-shot-lab-assets.tar.gz
+          if-no-files-found: error
+
+  build:
+    needs: [prepare, shot-assets]
+    name: Build archive / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+      RELEASE_TARGET: ${{ matrix.target }}
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Checkout immutable build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          path: source
+      - name: Restore the ephemeral staging tag
+        if: needs.prepare.outputs.staging == 'true'
+        working-directory: source
+        run: git tag "$RELEASE_TAG" "$SOURCE_SHA"
+      - name: Verify the production tag is present
+        if: needs.prepare.outputs.staging != 'true'
+        working-directory: source
+        run: test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$SOURCE_SHA"
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake libclang-dev pkg-config libfontconfig1-dev
+      - name: Install macOS build prerequisites
+        if: runner.os == 'macOS'
+        run: brew install cmake fontconfig pkg-config
+      - name: Select stable Rust exactly
+        run: |
+          rustup toolchain install stable --profile minimal
+          {
+            echo "RUSTC=$(rustup which --toolchain stable rustc)"
+            echo "RUSTDOC=$(rustup which --toolchain stable rustdoc)"
+            echo "CARGO=$(rustup which --toolchain stable cargo)"
+            echo "CARGO_TARGET_DIR=$GITHUB_WORKSPACE/source/target"
+            echo "SOURCE_DATE_EPOCH=$(git -C source show -s --format=%ct HEAD)"
+          } >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: source
+      - name: Download the shared assets rebuilt from the tag
+        uses: actions/download-artifact@v4
+        with:
+          name: rebuilt-shot-lab-assets
+          path: rebuilt-shot-assets
+      - name: Apply and verify the rebuilt Shot Lab assets
+        run: |
+          tar -xzf rebuilt-shot-assets/rebuilt-shot-lab-assets.tar.gz -C source
+          python3 source/tools/shot_viewer_assets.py
+      - name: Build the two native CLIs from the locked source
+        run: |
+          "$CARGO" build --locked --release \
+            --manifest-path source/Cargo.toml \
+            -p rustqec-cli --bin rustqec \
+            -p rstim --bin rstim
+      - name: Record native runtime linkage
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            {
+              echo "rustqec:"
+              ldd source/target/release/rustqec | sed -E 's/ \(0x[0-9a-f]+\)//g'
+              echo "rstim:"
+              ldd source/target/release/rstim | sed -E 's/ \(0x[0-9a-f]+\)//g'
+            } > runtime-linkage.txt
+          else
+            {
+              echo "rustqec:"
+              otool -L source/target/release/rustqec
+              echo "rstim:"
+              otool -L source/target/release/rstim
+            } > runtime-linkage.txt
+          fi
+          cat runtime-linkage.txt
+      - name: Package the target archive
+        run: |
+          mkdir -p staged-target
+          python3 tooling/tools/build_release_archive.py package \
+            --repo-root source \
+            --out-dir staged-target \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$SOURCE_SHA" \
+            --target "$RELEASE_TARGET" \
+            --cargo "$CARGO" \
+            --rustc "$RUSTC" \
+            --rustqec source/target/release/rustqec \
+            --rstim source/target/release/rstim \
+            --runtime-linkage runtime-linkage.txt
+      - name: Upload the target staging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-archive-fragment-${{ matrix.target }}
+          path: staged-target/
+          if-no-files-found: error
+
+  aggregate:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Checkout the frozen installed-quickstart contract
+        uses: actions/checkout@v4
+        with:
+          ref: f5dc754f73d2eb54459c1dffc282e717fd02d610
+          path: quickstart-tooling
+          sparse-checkout: tools/check_installed_quickstart.py
+          sparse-checkout-cone-mode: false
+      - name: Download target staging artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-archive-fragment-*
+          path: staged-targets
+          merge-multiple: true
+      - name: Assemble checksums and release manifest
+        run: |
+          python3 tooling/tools/build_release_archive.py assemble \
+            --fragments staged-targets \
+            --out-dir staged-release \
+            --tag "${{ needs.prepare.outputs.tag }}" \
+            --source-sha "${{ needs.prepare.outputs.source_sha }}"
+          cp tooling/tools/verify_release_archive.py staged-release/
+          cp quickstart-tooling/tools/check_installed_quickstart.py staged-release/
+      - name: Upload the complete staging bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release/
+          if-no-files-found: error
+
+  verify-linux-runtime:
+    needs: [prepare, aggregate]
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    steps:
+      - name: Install runtime verifier only
+        run: apt-get update && apt-get install -y python3
+      - name: Download staged release bundle without a source checkout
+        uses: actions/download-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release
+      - name: Verify and execute the Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e source
+          test ! -e quickstart-tooling
+          test ! -e Cargo.toml
+          test ! -e target
+          archive="staged-release/rustqec-${{ needs.prepare.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz"
+          python3 staged-release/verify_release_archive.py \
+            --archive "$archive" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag "${{ needs.prepare.outputs.tag }}" > linux-positive.log
+          cat linux-positive.log
+          root="$(basename "$archive" .tar.gz)"
+          PYTHONPATH=staged-release python3 - "$archive" "$root" <<'PY'
+          import sys
+          from pathlib import Path
+          from verify_release_archive import safe_extract
+          safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
+          PY
+          PATH='' /usr/bin/python3 staged-release/check_installed_quickstart.py \
+            --bin-dir "$PWD/extracted/$root/bin" | tee linux-quickstart.log
+          mkdir tampered
+          cp "$archive" "tampered/$(basename "$archive")"
+          printf tampered >> "tampered/$(basename "$archive")"
+          if python3 staged-release/verify_release_archive.py \
+            --archive "tampered/$(basename "$archive")" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag "${{ needs.prepare.outputs.tag }}" > linux-tamper.log 2>&1; then
+            echo "tampered archive unexpectedly passed" >&2
+            exit 1
+          fi
+          grep 'archive SHA-256 mismatch' linux-tamper.log
+          if python3 staged-release/verify_release_archive.py \
+            --archive "$archive" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag wrong-tag > linux-wrong-tag.log 2>&1; then
+            echo "wrong tag unexpectedly passed" >&2
+            exit 1
+          fi
+          grep 'release tag mismatch' linux-wrong-tag.log
+          uname -a > linux-runtime-identity.txt
+          cat /etc/os-release >> linux-runtime-identity.txt
+      - name: Upload Linux clean-runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-runtime-evidence-x86_64-unknown-linux-gnu
+          path: linux-*
+
+  verify-macos-runtime:
+    needs: [prepare, aggregate]
+    runs-on: macos-15
+    steps:
+      - name: Download staged release bundle without a source checkout
+        uses: actions/download-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release
+      - name: Verify and execute the macOS archive with a system-only binary PATH
+        run: |
+          set -euo pipefail
+          test ! -e source
+          test ! -e quickstart-tooling
+          test ! -e Cargo.toml
+          test ! -e target
+          python_bin="$(command -v python3)"
+          developer_stub="$RUNNER_TEMP/no-developer-tools"
+          mkdir "$developer_stub"
+          archive="staged-release/rustqec-${{ needs.prepare.outputs.tag }}-aarch64-apple-darwin.tar.gz"
+          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
+            --archive "$archive" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag "${{ needs.prepare.outputs.tag }}" > macos-positive.log
+          cat macos-positive.log
+          root="$(basename "$archive" .tar.gz)"
+          DEVELOPER_DIR="$developer_stub" PATH='' PYTHONPATH=staged-release "$python_bin" - "$archive" "$root" <<'PY'
+          import sys
+          from pathlib import Path
+          from verify_release_archive import safe_extract
+          safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
+          PY
+          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/check_installed_quickstart.py \
+            --bin-dir "$PWD/extracted/$root/bin" | tee macos-quickstart.log
+          mkdir tampered
+          cp "$archive" "tampered/$(basename "$archive")"
+          printf tampered >> "tampered/$(basename "$archive")"
+          if DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
+            --archive "tampered/$(basename "$archive")" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag "${{ needs.prepare.outputs.tag }}" > macos-tamper.log 2>&1; then
+            echo "tampered archive unexpectedly passed" >&2
+            exit 1
+          fi
+          grep 'archive SHA-256 mismatch' macos-tamper.log
+          if DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
+            --archive "$archive" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag wrong-tag > macos-wrong-tag.log 2>&1; then
+            echo "wrong tag unexpectedly passed" >&2
+            exit 1
+          fi
+          grep 'release tag mismatch' macos-wrong-tag.log
+          { uname -a; sw_vers; echo "clean PATH="; echo "empty DEVELOPER_DIR=$developer_stub"; } > macos-runtime-identity.txt
+      - name: Upload macOS clean-runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-runtime-evidence-aarch64-apple-darwin
+          path: macos-*
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: [prepare, checker-tests, verify-linux-runtime, verify-macos-runtime]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download the release-gated verified bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release
+      - name: Attach new assets to the existing release without overwriting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY"; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
+          fi
+          existing_assets="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for asset in staged-release/rustqec-*.tar.gz staged-release/SHA256SUMS staged-release/release-manifest.json staged-release/verify_release_archive.py; do
+            if grep -Fxq "$(basename "$asset")" <<< "$existing_assets"; then
+              echo "release asset already exists; refusing to overwrite: $(basename "$asset")" >&2
+              exit 1
+            fi
+          done
+          gh release upload "$TAG" \
+            staged-release/rustqec-*.tar.gz \
+            staged-release/SHA256SUMS \
+            staged-release/release-manifest.json \
+            staged-release/verify_release_archive.py \
+            --repo "$GITHUB_REPOSITORY"
