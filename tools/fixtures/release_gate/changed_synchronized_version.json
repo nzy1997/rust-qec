@@ -1,0 +1,16 @@
+{
+  "$base": "valid.json",
+  "packages": {
+    "qec-ilp-core": {"name": "qec-ilp-core", "version": "0.1.0"},
+    "qec-code": {"name": "qec-code", "version": "0.1.0"},
+    "renvelope": {"name": "renvelope", "version": "0.1.0"},
+    "rustqec-cli": {"name": "rustqec-cli", "version": "0.1.0"},
+    "rstim": {"name": "rstim", "version": "0.2.0"},
+    "rstim-shot-web": {"name": "rstim-shot-web", "version": "0.1.0"},
+    "rsinter": {"name": "rsinter", "version": "0.2.1"},
+    "rbposd": {"name": "rbposd", "version": "0.2.1"},
+    "rmatching": {"name": "rmatching", "version": "0.2.1"},
+    "rilpqec": {"name": "rilpqec", "version": "0.1.0"},
+    "benchmarks/surface_decoder_compare/rust_bridge": {"name": "surface_decoder_compare_bridge", "version": "0.1.0"}
+  }
+}

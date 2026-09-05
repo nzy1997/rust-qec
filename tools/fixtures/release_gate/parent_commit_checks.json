@@ -1,0 +1,10 @@
+{
+  "$base": "valid.json",
+  "checks": [
+    {"id": 101, "name": "test", "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 1, "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 102, "name": "rsmp-v1-readiness", "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 1, "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 103, "name": "checked-evidence-portability", "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 1, "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 104, "name": "publication-evidence-check", "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 1, "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 105, "name": "coverage", "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 1, "head_sha": "7f50dca253c6a697d497f5b7514f797988b77591", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}}
+  ]
+}
