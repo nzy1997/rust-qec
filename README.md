@@ -54,6 +54,67 @@ With RustQEC you can:
 
 ## Quick Start
 
+When v0.2.1 native assets are attached to its existing
+[release](https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1), install an
+archive for your platform before running the three steps below. On Ubuntu
+x86_64 use `x86_64-unknown-linux-gnu`; on Apple-silicon macOS use
+`aarch64-apple-darwin`.
+
+```sh
+set -eu
+target=x86_64-unknown-linux-gnu
+base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
+archive="rustqec-v0.2.1-${target}.tar.gz"
+curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
+awk -v archive="$archive" '$2 == archive { count++; record = $0 } END { if (count != 1) exit 1; print record }' SHA256SUMS > "$archive.sha256"
+if command -v sha256sum >/dev/null; then
+  sha256sum -c "$archive.sha256"
+else
+  shasum -a 256 -c "$archive.sha256"
+fi
+tar -xzf "$archive"
+bin_dir="$(pwd)/${archive%.tar.gz}/bin"
+```
+
+1. Discover the installed CLI contract:
+
+   ```sh
+   "$bin_dir/rustqec" capabilities --format json
+   ```
+
+2. Inspect the deterministic showcase circuit:
+
+   ```sh
+   cat > pipeline.stim <<'STIM'
+   R 0
+   X_ERROR(1) 0
+   M 0
+   DETECTOR rec[-1]
+   OBSERVABLE_INCLUDE(0) rec[-1]
+   STIM
+   "$bin_dir/rustqec" circuit stats --format json --in pipeline.stim
+   ```
+
+   The JSON fields are `instruction_count: 5`, `num_qubits: 1`,
+   `num_measurements: 1`, `num_detectors: 1`, and `num_observables: 1`.
+
+3. Run the deterministic detector/DEM round trip:
+
+   ```sh
+   "$bin_dir/rstim" detect --shots 1 --out_format dets --in pipeline.stim
+   "$bin_dir/rstim" analyze_errors --in pipeline.stim --out pipeline.dem
+   cat pipeline.dem
+   "$bin_dir/rstim" sample_dem --shots 1 --out_format dets --in pipeline.dem
+   ```
+
+   Both detector streams are `shot D0 L0`; the DEM is `error(1) D0 L0`.
+
+For a single machine-checkable run of the same commands, use
+`python3 tools/check_installed_quickstart.py --bin-dir "$bin_dir"` from a
+source checkout. The release assets do not yet include this repository tool.
+
+## Build From Source
+
 RustQEC supports native source builds on these tested environments:
 
 | Operating system | Native target | Rust toolchains |
