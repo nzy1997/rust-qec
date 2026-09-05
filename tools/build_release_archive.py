@@ -164,7 +164,7 @@ def package(args: argparse.Namespace) -> None:
         f"Runtime baseline: {TARGETS[target]}\n\n"
         "Binaries:\n  bin/rustqec\n  bin/rstim\n\n"
         "Verify this archive with release-manifest.json, SHA256SUMS, and "
-        "tools/verify_release_archive.py before running it.\n\n"
+        "verify_release_archive.py before running it.\n\n"
         "Recorded dynamic linkage from the build host:\n"
         + args.runtime_linkage.read_text()
     ).encode()
