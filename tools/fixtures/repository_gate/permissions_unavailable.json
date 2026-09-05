@@ -1,0 +1,6 @@
+{
+  "$base": "valid.json",
+  "unavailable": [
+    "GET repos/nzy1997/rust-qec/rules/branches/master: HTTP 403 Forbidden"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "$base": "valid.json",
+  "effective_rules": [
+    {"ruleset_id": 42, "type": "pull_request", "parameters": {"required_approving_review_count": 0}},
+    {
+      "ruleset_id": 42,
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {"context": "perf-gate", "integration_id": 15368}
+        ]
+      }
+    }
+  ],
+  "default_head_checks": [
+    {"id": 106, "name": "perf-gate", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231}
+  ],
+  "pull_request_samples": [
+    {"workflow_id": 231, "run_id": 501, "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "pull_request": 680, "labels": [], "jobs": [{"id": 1006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}]},
+    {"workflow_id": 231, "run_id": 502, "head_sha": "cccccccccccccccccccccccccccccccccccccccc", "pull_request": 681, "labels": [], "jobs": [{"id": 2006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}]},
+    {"workflow_id": 231, "run_id": 503, "head_sha": "dddddddddddddddddddddddddddddddddddddddd", "pull_request": 682, "labels": [], "jobs": [{"id": 3006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}]}
+  ]
+}
