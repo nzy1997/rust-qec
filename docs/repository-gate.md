@@ -36,7 +36,7 @@ gh api \
 ```
 
 Save the returned ruleset ID. If an equivalent ruleset was created through the UI,
-update that ruleset with `PATCH repos/nzy1997/rust-qec/rulesets/RULESET_ID` rather
+update that ruleset with `PUT repos/nzy1997/rust-qec/rulesets/RULESET_ID` rather
 than creating a duplicate.
 
 ## Verify without changing settings
