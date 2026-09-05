@@ -55,7 +55,7 @@ jobs:
           source_sha="$(git rev-parse HEAD)"
           if [ -n "$PR_HEAD_SHA" ]; then
             tag="staging-${source_sha}"
-            git tag -a "$tag" -m "Ephemeral archive staging tag" "$source_sha"
+            git tag "$tag" "$source_sha"
             staging=true
           else
             tag="$REQUESTED_TAG"
@@ -111,7 +111,7 @@ jobs:
       - name: Restore the ephemeral staging tag
         if: needs.prepare.outputs.staging == 'true'
         working-directory: source
-        run: git tag -a "${{ needs.prepare.outputs.tag }}" -m "Ephemeral archive staging tag" "${{ needs.prepare.outputs.source_sha }}"
+        run: git tag "${{ needs.prepare.outputs.tag }}" "${{ needs.prepare.outputs.source_sha }}"
       - name: Install the WebAssembly compiler prerequisite
         run: sudo apt-get update && sudo apt-get install -y clang
       - name: Select stable Rust exactly
@@ -187,7 +187,7 @@ jobs:
       - name: Restore the ephemeral staging tag
         if: needs.prepare.outputs.staging == 'true'
         working-directory: source
-        run: git tag -a "$RELEASE_TAG" -m "Ephemeral archive staging tag" "$SOURCE_SHA"
+        run: git tag "$RELEASE_TAG" "$SOURCE_SHA"
       - name: Verify the production tag is present
         if: needs.prepare.outputs.staging != 'true'
         working-directory: source
