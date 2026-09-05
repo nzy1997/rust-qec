@@ -55,9 +55,14 @@ use rstim::codegen::MidSwapConfig;
 let config = MidSwapConfig {
     distance: 3,
     rounds: 2,
-    pauli_probability: 0.001,
+    before_round_data_depolarization: 0.001,
+    before_round_data_loss_probability: 0.0,
+    after_clifford_depolarization: 0.001,
+    before_measure_flip_probability: 0.001,
+    after_reset_flip_probability: 0.001,
     operation_loss_probability: 0.0,
     measurement_loss_probability: 0.0,
+    pauli_probability: 0.001,
 };
 ```
 
@@ -75,8 +80,8 @@ let config = MidSwapConfig {
     operation_loss_probability: 0.0,
     measurement_loss_probability: 0.0,
 };
-let circuit = rotated_memory_z_midswap(config)?;
-# Ok::<(), rstim::codegen::MidSwapError>(())
+let circuit = rotated_memory_z_midswap(config).unwrap();
+assert!(!circuit.is_empty());
 ```
 
 The valid form is compiled by the `MidSwapConfig` rustdoc test. The obsolete
