@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import dataclasses
 import importlib
 import io
 import tempfile
@@ -15,6 +16,7 @@ FIXTURES = REPO_ROOT / "tools/fixtures/release_gate"
 POLICY_PATH = REPO_ROOT / "tools/release_version_policy.json"
 BRANCH_RULESET = REPO_ROOT / "tools/repository_gate_ruleset.json"
 TAG_RULESET = REPO_ROOT / "tools/release_tag_ruleset.json"
+TAG_RULESET_SNAPSHOT = REPO_ROOT / "tools/release_tag_ruleset_snapshot.json"
 WORKFLOW = REPO_ROOT / ".github/workflows/release.yml"
 checker = importlib.import_module("tools.check_release_gate")
 
@@ -25,6 +27,7 @@ class ReleaseGateCheckerTest(unittest.TestCase):
         cls.policy = checker.load_release_policy(POLICY_PATH)
         cls.required_checks = checker.load_desired_gate(BRANCH_RULESET).checks
         cls.tag_policy = checker.load_tag_protection_policy(TAG_RULESET)
+        cls.reviewed_ruleset = checker.load_reviewed_ruleset_snapshot(TAG_RULESET_SNAPSHOT)
 
     def evaluate(self, fixture: str) -> checker.ReleaseResult:
         return checker.evaluate_snapshot(
@@ -94,6 +97,129 @@ class ReleaseGateCheckerTest(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertIn("no active update-and-deletion ruleset protects refs/tags/v0.2.1", result.errors)
+
+    def test_hidden_bypass_passes_only_with_matching_reviewed_snapshot(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "hidden_bypass.json")
+
+        result = checker.evaluate_snapshot(
+            snapshot,
+            self.policy,
+            self.required_checks,
+            self.tag_policy,
+            self.reviewed_ruleset,
+        )
+
+        self.assertTrue(result.passed, result.errors)
+        self.assertEqual(
+            result.protection_sources,
+            (
+                checker.ProtectionSource(
+                    22323622, "reviewed-snapshot", "2026-09-05T06:54:31.714Z"
+                ),
+            ),
+        )
+        status, stdout, stderr = self.run_main("hidden_bypass.json")
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(
+            "tag protection ruleset: id=22323622 bypass_audit=reviewed-snapshot "
+            "updated_at=2026-09-05T06:54:31.714Z",
+            stdout,
+        )
+
+    def test_hidden_bypass_without_reviewed_snapshot_is_rejected(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "hidden_bypass.json")
+
+        result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy
+        )
+
+        self.assertFalse(result.passed)
+        self.assertIn("no independently reviewed snapshot", "\n".join(result.errors))
+
+    def test_reviewed_snapshot_id_and_millisecond_timestamp_are_bound(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "hidden_bypass.json")
+        wrong_id = dataclasses.replace(self.reviewed_ruleset, ruleset_id=22323623)
+        wrong_time = dataclasses.replace(
+            self.reviewed_ruleset, updated_at="2026-09-05T06:54:31.715Z"
+        )
+
+        id_result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy, wrong_id
+        )
+        time_result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy, wrong_time
+        )
+
+        self.assertIn("snapshot id is 22323623", "\n".join(id_result.errors))
+        self.assertIn("updated_at drifted", "\n".join(time_result.errors))
+
+        with self.assertRaisesRegex(ValueError, "exact millisecond precision"):
+            checker._canonical_timestamp(
+                "2026-09-05T06:54:31.714001Z", "adversarial updated_at"
+            )
+
+    def test_cli_repository_must_match_snapshot_repository(self) -> None:
+        argv = [
+            "--repo",
+            "other/project",
+            "--tag",
+            "v0.2.1",
+            "--dry-run",
+            "--fixture",
+            str(FIXTURES / "hidden_bypass.json"),
+        ]
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            status = checker.main(argv)
+
+        self.assertEqual(status, 1)
+        self.assertIn("snapshot repository is 'nzy1997/rust-qec'", stderr.getvalue())
+        self.assertNotIn("PASS release gate", stdout.getvalue())
+
+    def test_live_public_policy_drift_is_rejected_when_bypass_is_hidden(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "hidden_bypass.json")
+        snapshot["rulesets"][0]["conditions"]["ref_name"]["include"].append(
+            "refs/tags/emergency-*"
+        )
+
+        result = checker.evaluate_snapshot(
+            snapshot,
+            self.policy,
+            self.required_checks,
+            self.tag_policy,
+            self.reviewed_ruleset,
+        )
+
+        self.assertFalse(result.passed)
+        self.assertIn("public policy drifted", "\n".join(result.errors))
+
+    def test_reviewed_public_policy_and_bypass_must_match_committed_policy(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "hidden_bypass.json")
+        changed_public = copy.deepcopy(self.reviewed_ruleset.public_policy)
+        changed_public["rules"] = [{"type": "update"}]
+        bad_public = dataclasses.replace(self.reviewed_ruleset, public_policy=changed_public)
+        bad_bypass = dataclasses.replace(
+            self.reviewed_ruleset,
+            bypass_actors=frozenset({("RepositoryRole", 5, "pull_request")}),
+        )
+
+        public_result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy, bad_public
+        )
+        bypass_result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy, bad_bypass
+        )
+
+        self.assertIn("does not match release_tag_ruleset.json", "\n".join(public_result.errors))
+        self.assertIn("bypass actors do not match", "\n".join(bypass_result.errors))
+
+    def test_live_bypass_is_reported_as_live_api_evidence(self) -> None:
+        result = self.evaluate("valid.json")
+
+        self.assertEqual(
+            result.protection_sources,
+            (checker.ProtectionSource(77, "live-api", None),),
+        )
 
     def test_prerelease_is_explicitly_rejected(self) -> None:
         snapshot = checker.load_snapshot(FIXTURES / "prerelease.json")

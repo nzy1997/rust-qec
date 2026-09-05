@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "repository": "nzy1997/rust-qec",
+  "ruleset_id": 22323622,
+  "updated_at": "2026-09-05T06:54:31.714Z",
+  "public_policy": {
+    "name": "Release tag immutability",
+    "target": "tag",
+    "source_type": "Repository",
+    "source": "nzy1997/rust-qec",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": [
+          "refs/tags/v*.*.*"
+        ],
+        "exclude": []
+      }
+    },
+    "rules": [
+      {
+        "type": "update"
+      },
+      {
+        "type": "deletion"
+      }
+    ]
+  },
+  "reviewed_bypass_actors": [
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ]
+}
