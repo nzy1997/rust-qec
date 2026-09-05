@@ -10,6 +10,7 @@ import os
 import platform
 import re
 import stat
+import struct
 import subprocess
 import sys
 import tarfile
@@ -49,6 +50,11 @@ RSTIM_OUTPUT = {
     "num_sweep_bits": 0,
 }
 MAX_EXTRACTED_BYTES = 512 * 1024 * 1024
+MACHO_MAGIC_64 = 0xFEEDFACF
+MACHO_CPU_TYPE_ARM64 = 0x0100000C
+MACHO_EXECUTE = 2
+MACHO_DYLIB_COMMANDS = {0xC, 0x80000018, 0x8000001F, 0x20, 0x80000023}
+MAX_MACHO_LOAD_COMMAND_BYTES = 32 * 1024 * 1024
 
 
 class VerificationError(RuntimeError):
@@ -198,7 +204,7 @@ def safe_extract(archive_path: Path, destination: Path, root: str) -> Path:
 
 def run_binary(path: Path, arguments: list[str], *, stdin: str = "") -> subprocess.CompletedProcess[str]:
     environment = {
-        "PATH": "/usr/bin:/bin",
+        "PATH": "",
         "HOME": str(path.parent),
         "LANG": "C",
         "LC_ALL": "C",
@@ -207,6 +213,50 @@ def run_binary(path: Path, arguments: list[str], *, stdin: str = "") -> subproce
         [str(path.resolve()), *arguments], input=stdin, text=True, capture_output=True,
         timeout=30, check=False, env=environment,
     )
+
+
+def macho_dependencies(binary: Path) -> list[str]:
+    with binary.open("rb") as handle:
+        header = handle.read(32)
+        if len(header) != 32:
+            raise VerificationError(f"truncated Mach-O header for {binary.name}")
+        magic, cpu_type, _cpu_subtype, file_type, command_count, command_bytes, _flags, _reserved = (
+            struct.unpack("<IiiIIIII", header)
+        )
+        if magic != MACHO_MAGIC_64 or cpu_type != MACHO_CPU_TYPE_ARM64 or file_type != MACHO_EXECUTE:
+            raise VerificationError(f"expected a thin arm64 Mach-O executable: {binary.name}")
+        if command_count > 4096 or command_bytes > MAX_MACHO_LOAD_COMMAND_BYTES:
+            raise VerificationError(f"implausible Mach-O load command table for {binary.name}")
+        commands = handle.read(command_bytes)
+        if len(commands) != command_bytes:
+            raise VerificationError(f"truncated Mach-O load commands for {binary.name}")
+
+    dependencies = []
+    offset = 0
+    for _ in range(command_count):
+        if offset + 8 > len(commands):
+            raise VerificationError(f"truncated Mach-O load command for {binary.name}")
+        command, command_size = struct.unpack_from("<II", commands, offset)
+        if command_size < 8 or command_size % 4 or offset + command_size > len(commands):
+            raise VerificationError(f"malformed Mach-O load command for {binary.name}")
+        if command in MACHO_DYLIB_COMMANDS:
+            if command_size < 24:
+                raise VerificationError(f"truncated Mach-O dylib command for {binary.name}")
+            name_offset = struct.unpack_from("<I", commands, offset + 8)[0]
+            if name_offset < 24 or name_offset >= command_size:
+                raise VerificationError(f"invalid Mach-O dylib name offset for {binary.name}")
+            encoded = commands[offset + name_offset:offset + command_size]
+            terminator = encoded.find(b"\0")
+            if terminator <= 0:
+                raise VerificationError(f"unterminated Mach-O dylib name for {binary.name}")
+            try:
+                dependencies.append(encoded[:terminator].decode("utf-8"))
+            except UnicodeDecodeError as error:
+                raise VerificationError(f"invalid Mach-O dylib name for {binary.name}") from error
+        offset += command_size
+    if offset != len(commands):
+        raise VerificationError(f"Mach-O load command size mismatch for {binary.name}")
+    return dependencies
 
 
 def check_linkage(binary: Path, target: str) -> None:
@@ -219,12 +269,8 @@ def check_linkage(binary: Path, target: str) -> None:
             if match and not match.group(1).startswith(("/lib/", "/usr/lib/")):
                 raise VerificationError(f"non-system Linux runtime dependency for {binary.name}: {line.strip()}")
     else:
-        result = subprocess.run(["/usr/bin/otool", "-L", str(binary)], text=True, capture_output=True, check=False)
-        if result.returncode != 0:
-            raise VerificationError(f"cannot inspect macOS runtime linkage for {binary.name}: {result.stderr}")
-        for line in result.stdout.splitlines()[1:]:
-            dependency = line.strip().split(" ", 1)[0]
-            if dependency and not dependency.startswith(("/usr/lib/", "/System/Library/")):
+        for dependency in macho_dependencies(binary):
+            if not dependency.startswith(("/usr/lib/", "/System/Library/")):
                 raise VerificationError(f"non-system macOS runtime dependency for {binary.name}: {dependency}")
     print(f"runtime linkage: {binary.name} system-only")
 

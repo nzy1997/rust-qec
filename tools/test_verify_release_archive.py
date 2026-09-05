@@ -3,13 +3,14 @@ import hashlib
 import io
 import json
 import platform
+import struct
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from tools.verify_release_archive import VerificationError, verify
+from tools.verify_release_archive import VerificationError, check_linkage, macho_dependencies, verify
 
 
 TAG = "v0.2.1"
@@ -26,6 +27,20 @@ def host_target() -> str:
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def thin_arm64_macho(*dependencies: str) -> bytes:
+    commands = []
+    for dependency in dependencies:
+        name = dependency.encode() + b"\0"
+        command_size = (24 + len(name) + 7) & ~7
+        command = struct.pack("<IIIIII", 0xC, command_size, 24, 0, 0, 0)
+        commands.append(command + name + b"\0" * (command_size - 24 - len(name)))
+    payload = b"".join(commands)
+    header = struct.pack(
+        "<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 2, len(commands), len(payload), 0, 0
+    )
+    return header + payload
 
 
 class ReleaseFixture:
@@ -46,7 +61,7 @@ class ReleaseFixture:
     def script(self, output: object) -> bytes:
         return (
             "#!/bin/sh\n"
-            "cat >/dev/null\n"
+            "while IFS= read -r _line; do :; done\n"
             f": > {self.marker!s}\n"
             f"printf '%s\\n' '{json.dumps(output, separators=(',', ':'))}'\n"
         ).encode()
@@ -193,6 +208,25 @@ class VerifyReleaseArchiveTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, "RUNTIME.md identity"):
             verify(self.fixture.arguments())
         self.assertFalse(self.fixture.marker.exists())
+
+    def test_reads_system_dependencies_from_thin_arm64_macho(self):
+        binary = self.fixture.root / "thin-macho"
+        binary.write_bytes(thin_arm64_macho("/usr/lib/libSystem.B.dylib"))
+        self.assertEqual(macho_dependencies(binary), ["/usr/lib/libSystem.B.dylib"])
+        check_linkage(binary, "aarch64-apple-darwin")
+
+    def test_rejects_non_system_dependency_in_thin_arm64_macho(self):
+        binary = self.fixture.root / "thin-macho"
+        binary.write_bytes(thin_arm64_macho("/opt/homebrew/lib/libexample.dylib"))
+        with self.assertRaisesRegex(VerificationError, "non-system macOS runtime dependency"):
+            check_linkage(binary, "aarch64-apple-darwin")
+
+    def test_rejects_malformed_thin_arm64_macho(self):
+        binary = self.fixture.root / "thin-macho"
+        header = struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 2, 1, 8, 0, 0)
+        binary.write_bytes(header + struct.pack("<II", 0xC, 4))
+        with self.assertRaisesRegex(VerificationError, "malformed Mach-O load command"):
+            macho_dependencies(binary)
 
 
 if __name__ == "__main__":

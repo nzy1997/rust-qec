@@ -384,26 +384,28 @@ jobs:
           test ! -e Cargo.toml
           test ! -e target
           python_bin="$(command -v python3)"
+          developer_stub="$RUNNER_TEMP/no-developer-tools"
+          mkdir "$developer_stub"
           archive="staged-release/rustqec-${{ needs.prepare.outputs.tag }}-aarch64-apple-darwin.tar.gz"
-          PATH=/usr/bin:/bin "$python_bin" staged-release/verify_release_archive.py \
+          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
             --archive "$archive" \
             --checksums staged-release/SHA256SUMS \
             --manifest staged-release/release-manifest.json \
             --expected-tag "${{ needs.prepare.outputs.tag }}" > macos-positive.log
           cat macos-positive.log
           root="$(basename "$archive" .tar.gz)"
-          PYTHONPATH=staged-release "$python_bin" - "$archive" "$root" <<'PY'
+          DEVELOPER_DIR="$developer_stub" PATH='' PYTHONPATH=staged-release "$python_bin" - "$archive" "$root" <<'PY'
           import sys
           from pathlib import Path
           from verify_release_archive import safe_extract
           safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
           PY
-          PATH='' /usr/bin/python3 staged-release/check_installed_quickstart.py \
+          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/check_installed_quickstart.py \
             --bin-dir "$PWD/extracted/$root/bin" | tee macos-quickstart.log
           mkdir tampered
           cp "$archive" "tampered/$(basename "$archive")"
           printf tampered >> "tampered/$(basename "$archive")"
-          if PATH=/usr/bin:/bin "$python_bin" staged-release/verify_release_archive.py \
+          if DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
             --archive "tampered/$(basename "$archive")" \
             --checksums staged-release/SHA256SUMS \
             --manifest staged-release/release-manifest.json \
@@ -412,7 +414,7 @@ jobs:
             exit 1
           fi
           grep 'archive SHA-256 mismatch' macos-tamper.log
-          if PATH=/usr/bin:/bin "$python_bin" staged-release/verify_release_archive.py \
+          if DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/verify_release_archive.py \
             --archive "$archive" \
             --checksums staged-release/SHA256SUMS \
             --manifest staged-release/release-manifest.json \
@@ -421,7 +423,7 @@ jobs:
             exit 1
           fi
           grep 'release tag mismatch' macos-wrong-tag.log
-          { uname -a; sw_vers; echo "clean PATH=/usr/bin:/bin"; } > macos-runtime-identity.txt
+          { uname -a; sw_vers; echo "clean PATH="; echo "empty DEVELOPER_DIR=$developer_stub"; } > macos-runtime-identity.txt
       - name: Upload macOS clean-runtime evidence
         uses: actions/upload-artifact@v4
         with:
