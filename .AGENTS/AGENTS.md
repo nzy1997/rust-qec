@@ -1,13 +1,28 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a Cargo workspace with eight Rust members and one local Typst package. The Rust members are `qec-ilp-core/`, `qec-code/`, `rstim/`, `rsinter/`, `rbposd/`, `rmatching/`, `rilpqec/`, and `benchmarks/surface_decoder_compare/rust_bridge/`. `rstim/` contains the simulator, CLI, code generators, QP101 export, and most circuit logic; key submodules live under `rstim/src/codegen/` and `rstim/src/sim/`. `rsinter/` builds analysis and reporting tools on top of `rstim`, while the other members provide QEC code, decoder, solver, and benchmark-bridge components. Integration tests are organized by feature within the owning workspace member, including `rstim/tests/` and `rsinter/tests/`, with file names such as `cli_export_json.rs` or `dem_ir.rs`. `qp101-viz/` is the local Typst package: `lib.typ` is the entrypoint, `examples/` holds committed demos, and `checks/` holds renderer fixtures. Scratch material belongs in ignored paths like root `drafts/`, `qp101-viz/drafts/`, and `qp101-viz/draft_figs/`.
+This repository is a Cargo workspace with eleven Rust packages and one local Typst package. `rstim/` contains the simulator, CLI, code generators, QP101 export, and most circuit logic; key submodules live under `rstim/src/codegen/` and `rstim/src/sim/`. `rsinter/` builds analysis and reporting tools on top of `rstim`, while the other packages provide QEC code, decoder, solver, envelope, CLI, WebAssembly, and benchmark-bridge components. Integration tests are organized by feature within the owning workspace member, including `rstim/tests/` and `rsinter/tests/`, with file names such as `cli_export_json.rs` or `dem_ir.rs`. `qp101-viz/` is the local Typst package: `lib.typ` is the entrypoint, `examples/` holds committed demos, and `checks/` holds renderer fixtures. Scratch material belongs in ignored paths like root `drafts/`, `qp101-viz/drafts/`, and `qp101-viz/draft_figs/`.
+
+## Current Workspace Members
+The package-to-directory map below is checked against `cargo metadata --no-deps --format-version 1` by `python3 tools/check_agent_entry.py --repo-root .`.
+
+- `qec-ilp-core` — `qec-ilp-core/`
+- `qec-code` — `qec-code/`
+- `renvelope` — `renvelope/`
+- `rustqec-cli` — `rustqec-cli/`
+- `rstim` — `rstim/`
+- `rstim-shot-web` — `rstim-shot-web/`
+- `rsinter` — `rsinter/`
+- `rbposd` — `rbposd/`
+- `rmatching` — `rmatching/`
+- `rilpqec` — `rilpqec/`
+- `surface_decoder_compare_bridge` — `benchmarks/surface_decoder_compare/rust_bridge/`
 
 ## Agent Rules
-Use `.AGENTS/rules/visualization-update-flow.md` for the end-to-end sync process when QP101 export changes affect docs, fixtures, and Typst rendering. Use `.AGENTS/rules/QP101-ZY.md` for the narrower rule that treats `rstim/doc/QP101-ZY.md` as the format contract and lists the exact files that must be kept in sync with it.
+Use the [visualization update flow](rules/visualization-update-flow.md) for the end-to-end sync process when QP101 export changes affect docs, fixtures, and Typst rendering. Use the [QP101-ZY maintenance rule](rules/QP101-ZY.md) for the narrower rule that treats `rstim/doc/QP101-ZY.md` as the format contract and lists the exact files that must be kept in sync with it.
 
 ## Build, Test, and Development Commands
-- `cargo build --workspace`: build all eight Rust workspace members.
+- `cargo build --workspace`: build all workspace packages.
 - `cargo test --workspace`: run the full Rust test suite.
 - `cargo test -p rstim --test qp101_highlights`: run one focused integration test file.
 - `cargo run -p rstim -- <subcommand>`: use the CLI locally, for example `cargo run -p rstim -- export_json --help`.
