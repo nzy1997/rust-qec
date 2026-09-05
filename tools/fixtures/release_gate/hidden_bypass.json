@@ -1,0 +1,21 @@
+{
+  "$base": "valid.json",
+  "rulesets": [
+    {
+      "id": 22323622,
+      "name": "Release tag immutability",
+      "target": "tag",
+      "source_type": "Repository",
+      "source": "nzy1997/rust-qec",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "include": ["refs/tags/v*.*.*"],
+          "exclude": []
+        }
+      },
+      "rules": [{"type": "update"}, {"type": "deletion"}],
+      "updated_at": "2026-09-05T06:54:31.714Z"
+    }
+  ]
+}

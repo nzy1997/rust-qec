@@ -12,6 +12,7 @@ import sys
 import time
 import tomllib
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -35,7 +36,17 @@ from tools.check_repository_gate import (
 DEFAULT_POLICY = REPO_ROOT / "tools/release_version_policy.json"
 DEFAULT_BRANCH_RULESET = REPO_ROOT / "tools/repository_gate_ruleset.json"
 DEFAULT_TAG_RULESET = REPO_ROOT / "tools/release_tag_ruleset.json"
+DEFAULT_TAG_RULESET_SNAPSHOT = REPO_ROOT / "tools/release_tag_ruleset_snapshot.json"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+PUBLIC_POLICY_KEYS = (
+    "name",
+    "target",
+    "source_type",
+    "source",
+    "enforcement",
+    "conditions",
+    "rules",
+)
 
 
 @dataclass(frozen=True)
@@ -59,6 +70,23 @@ class TagProtectionPolicy:
     exclude: tuple[str, ...]
     required_rules: frozenset[str]
     bypass_actors: frozenset[tuple[str, int | None, str]]
+    public_policy: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ReviewedRulesetSnapshot:
+    repository: str
+    ruleset_id: int
+    updated_at: str
+    public_policy: dict[str, Any]
+    bypass_actors: frozenset[tuple[str, int | None, str]]
+
+
+@dataclass(frozen=True, order=True)
+class ProtectionSource:
+    ruleset_id: int
+    bypass_audit: str
+    updated_at: str | None
 
 
 @dataclass(frozen=True)
@@ -69,7 +97,7 @@ class ReleaseResult:
     checks: tuple[tuple[str, int], ...]
     synchronized: tuple[tuple[str, str], ...]
     independent: tuple[tuple[str, str], ...]
-    protection_sources: tuple[int, ...]
+    protection_sources: tuple[ProtectionSource, ...]
     errors: tuple[str, ...]
 
     @property
@@ -135,6 +163,50 @@ def _actor_tuple(actor: object) -> tuple[str, int | None, str] | None:
     return actor_type, actor_id if isinstance(actor_id, int) else None, mode
 
 
+def _actor_set(value: object, label: str) -> frozenset[tuple[str, int | None, str]]:
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be an array")
+    actors = frozenset(actor for item in value if (actor := _actor_tuple(item)) is not None)
+    if len(actors) != len(value):
+        raise ValueError(f"{label} contains an invalid or duplicate bypass actor")
+    return actors
+
+
+def _canonical_json(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _canonical_json(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        normalized = [_canonical_json(item) for item in value]
+        return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")))
+    return value
+
+
+def _public_policy(value: dict[str, Any], label: str) -> dict[str, Any]:
+    missing = [key for key in PUBLIC_POLICY_KEYS if key not in value]
+    if missing:
+        raise ValueError(f"{label} is missing public policy fields: {', '.join(missing)}")
+    policy = {key: value[key] for key in PUBLIC_POLICY_KEYS}
+    if not all(isinstance(policy[key], str) for key in PUBLIC_POLICY_KEYS[:5]):
+        raise ValueError(f"{label} public policy identity fields must be strings")
+    if not isinstance(policy["conditions"], dict) or not isinstance(policy["rules"], list):
+        raise ValueError(f"{label} public conditions/rules have invalid types")
+    return _canonical_json(policy)
+
+
+def _canonical_timestamp(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be an RFC3339 timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{label} must be an RFC3339 timestamp") from error
+    if parsed.tzinfo is None:
+        raise ValueError(f"{label} must include a timezone")
+    if parsed.microsecond % 1000:
+        raise ValueError(f"{label} must have exact millisecond precision")
+    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
 def load_tag_protection_policy(path: Path) -> TagProtectionPolicy:
     value = _read_json_object(path, "tag ruleset")
     if value.get("target") != "tag" or value.get("enforcement") != "active":
@@ -153,13 +225,32 @@ def load_tag_protection_policy(path: Path) -> TagProtectionPolicy:
     required = frozenset(rule.get("type") for rule in rules if isinstance(rule, dict))
     if required != {"update", "deletion"}:
         raise ValueError("tag ruleset must protect exactly tag update and deletion")
-    raw_bypass = value.get("bypass_actors")
-    if not isinstance(raw_bypass, list):
-        raise ValueError("tag ruleset bypass_actors must be an array")
-    bypass = frozenset(actor for item in raw_bypass if (actor := _actor_tuple(item)) is not None)
-    if len(bypass) != len(raw_bypass):
-        raise ValueError("tag ruleset contains an invalid bypass actor")
-    return TagProtectionPolicy(tuple(include), tuple(exclude), required, bypass)
+    bypass = _actor_set(value.get("bypass_actors"), "tag ruleset bypass_actors")
+    public = dict(value)
+    public.pop("bypass_actors", None)
+    public.update({"source_type": "Repository", "source": ""})
+    return TagProtectionPolicy(tuple(include), tuple(exclude), required, bypass, _public_policy(public, "tag ruleset"))
+
+
+def load_reviewed_ruleset_snapshot(path: Path) -> ReviewedRulesetSnapshot:
+    value = _read_json_object(path, "reviewed tag ruleset snapshot")
+    if value.get("schema_version") != 1:
+        raise ValueError("reviewed tag ruleset snapshot schema_version must be 1")
+    repository, ruleset_id = value.get("repository"), value.get("ruleset_id")
+    if not isinstance(repository, str) or repository.count("/") != 1:
+        raise ValueError("reviewed tag ruleset snapshot repository must be OWNER/REPO")
+    if not isinstance(ruleset_id, int):
+        raise ValueError("reviewed tag ruleset snapshot ruleset_id must be an integer")
+    public = value.get("public_policy")
+    if not isinstance(public, dict):
+        raise ValueError("reviewed tag ruleset snapshot public_policy must be an object")
+    return ReviewedRulesetSnapshot(
+        repository,
+        ruleset_id,
+        _canonical_timestamp(value.get("updated_at"), "reviewed tag ruleset snapshot updated_at"),
+        _public_policy(public, "reviewed tag ruleset snapshot"),
+        _actor_set(value.get("reviewed_bypass_actors"), "reviewed tag ruleset snapshot bypass actors"),
+    )
 
 
 def parse_release_version(tag: str, policy: ReleasePolicy) -> str:
@@ -404,11 +495,62 @@ def tag_policy_targets_tag(policy: TagProtectionPolicy, tag: str) -> bool:
     )
 
 
+def _expected_public_policy(policy: TagProtectionPolicy, repository: str) -> dict[str, Any]:
+    expected = dict(policy.public_policy)
+    expected["source"] = repository
+    return _canonical_json(expected)
+
+
+def _reviewed_bypass_errors(
+    ruleset: dict[str, Any],
+    repository: str,
+    desired: TagProtectionPolicy,
+    reviewed: ReviewedRulesetSnapshot | None,
+) -> list[str]:
+    ruleset_id = ruleset.get("id")
+    if reviewed is None:
+        return [
+            f"tag ruleset {ruleset_id} hides bypass actors and no independently reviewed snapshot was provided"
+        ]
+    errors: list[str] = []
+    if reviewed.repository != repository:
+        errors.append(
+            f"reviewed ruleset snapshot repository is {reviewed.repository}, expected {repository}"
+        )
+    if reviewed.ruleset_id != ruleset_id:
+        errors.append(
+            f"reviewed ruleset snapshot id is {reviewed.ruleset_id}, live id is {ruleset_id}"
+        )
+    try:
+        live_updated_at = _canonical_timestamp(ruleset.get("updated_at"), f"tag ruleset {ruleset_id} updated_at")
+    except ValueError as error:
+        errors.append(str(error))
+    else:
+        if live_updated_at != reviewed.updated_at:
+            errors.append(
+                f"tag ruleset {ruleset_id} updated_at drifted: live {live_updated_at}, reviewed {reviewed.updated_at}"
+            )
+    expected_public = _expected_public_policy(desired, repository)
+    if reviewed.public_policy != expected_public:
+        errors.append("reviewed ruleset snapshot public policy does not match release_tag_ruleset.json")
+    if reviewed.bypass_actors != desired.bypass_actors:
+        errors.append("reviewed ruleset snapshot bypass actors do not match release_tag_ruleset.json")
+    try:
+        live_public = _public_policy(ruleset, f"tag ruleset {ruleset_id}")
+    except ValueError as error:
+        errors.append(str(error))
+    else:
+        if live_public != reviewed.public_policy:
+            errors.append(f"tag ruleset {ruleset_id} public policy drifted from the reviewed snapshot")
+    return errors
+
+
 def evaluate_snapshot(
     snapshot: dict[str, Any],
     policy: ReleasePolicy,
     required_checks: tuple[CheckSpec, ...],
     tag_policy: TagProtectionPolicy,
+    reviewed_ruleset: ReviewedRulesetSnapshot | None = None,
 ) -> ReleaseResult:
     unavailable = snapshot.get("unavailable", [])
     if unavailable:
@@ -487,7 +629,10 @@ def evaluate_snapshot(
     raw_rulesets = snapshot.get("rulesets")
     if not isinstance(raw_rulesets, list):
         raise UnavailableError("tag ruleset metadata is unavailable")
-    protection_sources: list[int] = []
+    repository = snapshot.get("repository")
+    if not isinstance(repository, str):
+        raise UnavailableError("snapshot repository identity is unavailable")
+    protection_sources: list[ProtectionSource] = []
     for ruleset in raw_rulesets:
         if not isinstance(ruleset, dict) or not ruleset_targets_tag(ruleset, tag):
             continue
@@ -497,19 +642,31 @@ def evaluate_snapshot(
         rule_types = {rule.get("type") for rule in rules if isinstance(rule, dict)}
         if not tag_policy.required_rules <= rule_types:
             continue
-        if "bypass_actors" not in ruleset:
-            raise UnavailableError(
-                "tag ruleset bypass actors are unavailable; authenticated write access is required"
-            )
-        bypass = frozenset(
-            actor for item in ruleset.get("bypass_actors", []) if (actor := _actor_tuple(item)) is not None
-        )
-        if bypass != tag_policy.bypass_actors:
-            errors.append(f"tag ruleset {ruleset.get('id')} does not use the reviewed emergency bypass")
-            continue
         ruleset_id = ruleset.get("id")
-        if isinstance(ruleset_id, int):
-            protection_sources.append(ruleset_id)
+        if not isinstance(ruleset_id, int):
+            errors.append("matching tag ruleset has no integer id")
+            continue
+        if "bypass_actors" in ruleset:
+            try:
+                bypass = _actor_set(ruleset.get("bypass_actors"), f"tag ruleset {ruleset_id} bypass actors")
+            except ValueError as error:
+                errors.append(str(error))
+                continue
+            if bypass != tag_policy.bypass_actors:
+                errors.append(f"tag ruleset {ruleset_id} does not use the reviewed emergency bypass")
+                continue
+            protection_sources.append(ProtectionSource(ruleset_id, "live-api", None))
+            continue
+        snapshot_errors = _reviewed_bypass_errors(
+            ruleset, repository, tag_policy, reviewed_ruleset
+        )
+        if snapshot_errors:
+            errors.extend(snapshot_errors)
+            continue
+        assert reviewed_ruleset is not None
+        protection_sources.append(
+            ProtectionSource(ruleset_id, "reviewed-snapshot", reviewed_ruleset.updated_at)
+        )
     if not protection_sources:
         errors.append(f"no active update-and-deletion ruleset protects refs/tags/{tag}")
 
@@ -552,6 +709,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
     parser.add_argument("--branch-ruleset", type=Path, default=DEFAULT_BRANCH_RULESET)
     parser.add_argument("--tag-ruleset", type=Path, default=DEFAULT_TAG_RULESET)
+    parser.add_argument(
+        "--tag-ruleset-snapshot",
+        type=Path,
+        default=DEFAULT_TAG_RULESET_SNAPSHOT,
+        help="independently reviewed live ruleset snapshot used when the token cannot read bypass actors",
+    )
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--wait-seconds", type=int, default=0)
     parser.add_argument("--poll-seconds", type=int, default=20)
@@ -570,6 +733,7 @@ def main(argv: list[str] | None = None) -> int:
         del version
         required_checks = load_desired_gate(args.branch_ruleset).checks
         tag_policy = load_tag_protection_policy(args.tag_ruleset)
+        reviewed_ruleset = load_reviewed_ruleset_snapshot(args.tag_ruleset_snapshot)
         snapshot = (
             load_snapshot(args.fixture)
             if args.fixture
@@ -582,7 +746,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.poll_seconds,
             )
         )
-        result = evaluate_snapshot(snapshot, policy, required_checks, tag_policy)
+        if snapshot.get("repository") != args.repo:
+            raise ValueError(
+                f"snapshot repository is {snapshot.get('repository')!r}, expected {args.repo!r}"
+            )
+        result = evaluate_snapshot(
+            snapshot, policy, required_checks, tag_policy, reviewed_ruleset
+        )
     except UnavailableError as error:
         print(f"UNAVAILABLE release gate {args.tag}: {error}", file=sys.stderr)
         return 2
@@ -598,7 +768,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"CI {name} app={GITHUB_ACTIONS_APP_ID} run={run_id} commit={result.commit}")
     print("synchronized crates: " + ", ".join(f"{name}={version}" for name, version in result.synchronized))
     print("independent crates: " + ", ".join(f"{name}={version}" for name, version in result.independent))
-    print("tag protection rulesets: " + ",".join(str(item) for item in result.protection_sources))
+    for source in result.protection_sources:
+        timestamp = f" updated_at={source.updated_at}" if source.updated_at else ""
+        print(
+            f"tag protection ruleset: id={source.ruleset_id} "
+            f"bypass_audit={source.bypass_audit}{timestamp}"
+        )
     print(f"PASS release gate {result.tag} commit={result.commit}")
     if args.github_output:
         _write_github_output(args.github_output, result)
