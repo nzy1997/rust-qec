@@ -1,39 +1,48 @@
 # rmatching
 
-[![CI](https://github.com/nzy1997/rmatching/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rmatching/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rmatching/branch/main/graph/badge.svg)](https://codecov.io/gh/nzy1997/rmatching)
+[![Workspace CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
 
 A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWPM) decoder for quantum error correction, ported from [PyMatching](https://github.com/oscarhiggott/PyMatching).
 
-## Features
+## Highlights
 
 - Full Sparse Blossom algorithm with alternating trees and blossom contraction/shattering
 - Standalone graphlike DEM (Detector Error Model) text parser — no external dependencies
 - Negative edge weight support
 - Decode API: `decode`, `decode_batch`, `decode_to_edges`
-- Optional [rsinter](https://github.com/nzy1997/rust-qec) `Decoder` trait integration behind `rsinter` feature flag
 
 The standalone parser constructs matching edges from one- and two-detector DEM
 error components. `Matching::from_dem` returns an error for higher-degree
 hyperedges instead of silently dropping them. Decompose errors into graphlike
 components before using `rmatching`.
 
+## Cargo Features
+
+- `bench`: enables the bundled benchmark binaries and their optional dependencies.
+
+`rmatching` has no `rsinter` feature and does not implement an `rsinter`
+`Decoder` trait. The consuming `rsinter` crate owns that integration: enable
+its `rmatching-runner` feature when using its adapter.
+
 ## Quick Start
 
 ```rust
 use rmatching::Matching;
 
-// From a DEM string
-let mut m = Matching::from_dem("error(0.1) D0 D1 L0\nerror(0.1) D0\nerror(0.1) D1\n").unwrap();
-let prediction = m.decode(&[1, 1]);
-assert_eq!(prediction, vec![1]);
+fn main() {
+    // From a DEM string
+    let mut m = Matching::from_dem("error(0.1) D0 D1 L0\nerror(0.1) D0\nerror(0.1) D1\n").unwrap();
+    let prediction = m.decode(&[1, 1]);
+    assert_eq!(prediction, vec![1]);
+    assert!(Matching::from_dem("error(0.1) D0 D1 D2\n").is_err());
 
-// Or build manually
-let mut m = Matching::new();
-m.add_edge(0, 1, 2.2, &[0], 0.1);
-m.add_boundary_edge(0, 2.2, &[0], 0.1);
-m.add_boundary_edge(1, 2.2, &[], 0.1);
-let prediction = m.decode(&[1, 0]);
+    // Or build manually
+    let mut m = Matching::new();
+    m.add_edge(0, 1, 2.2, &[0], 0.1);
+    m.add_boundary_edge(0, 2.2, &[0], 0.1);
+    m.add_boundary_edge(1, 2.2, &[], 0.1);
+    let prediction = m.decode(&[1, 0]);
+}
 ```
 
 ## Architecture
@@ -46,7 +55,6 @@ let prediction = m.decode(&[1, 0]);
 | `search` | SearchGraph, SearchFlooder (bidirectional Dijkstra path extraction) |
 | `interop` | CompressedEdge, MwpmEvent, FloodCheckEvent, QueuedEventTracker |
 | `driver` | UserGraph, DEM parser, Matching (public decode API) |
-| `decoder` | rsinter `Decoder` trait impl (feature-gated) |
 
 ## Benchmark Snapshot
 
@@ -56,8 +64,8 @@ commit `33faf6c`.
 The CSV files are overwritten on each benchmark run, so treat this section as a
 point-in-time snapshot instead of a stable baseline.
 
-For the full benchmark evidence and reproduction context, see the
-[`benchmark evidence showcase`](docs/showcases/benchmark-evidence.md).
+For the full benchmark evidence and reproduction context, see the workspace
+[`benchmark evidence showcase`](../docs/showcases/benchmark-evidence.md).
 
 ### Minimal DEM Cases
 
@@ -77,6 +85,9 @@ For the full benchmark evidence and reproduction context, see the
 ## Running Tests And Benchmarks
 
 ### Rust Test Suite
+
+The workspace [CI workflow](../.github/workflows/ci.yml) is the authoritative
+check for this crate and the rest of RustQEC.
 
 Run the full Rust suite:
 
