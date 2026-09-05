@@ -16,7 +16,7 @@ ROOT_ENTRY = Path("AGENTS.md")
 AUTHORITATIVE_GUIDE = Path(".AGENTS/AGENTS.md")
 MEMBERS_HEADING = "## Current Workspace Members"
 MEMBER_LINE = re.compile(r"^- `([^`]+)` — `([^`]+)`$")
-MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]*)\)")
 
 
 class EntryError(Exception):
@@ -26,7 +26,12 @@ class EntryError(Exception):
 def local_link_targets(text: str) -> list[str]:
     targets: list[str] = []
     for match in MARKDOWN_LINK.finditer(text):
-        target = match.group(1).strip().split(maxsplit=1)[0].strip("<>")
+        parts = match.group(1).strip().split(maxsplit=1)
+        if not parts:
+            raise EntryError("malformed empty Markdown link")
+        target = parts[0].strip("<>")
+        if not target:
+            raise EntryError("malformed empty Markdown link")
         parsed = urlsplit(target)
         if target and not target.startswith("#") and not parsed.scheme and not parsed.netloc:
             targets.append(parsed.path)
@@ -79,7 +84,7 @@ def guide_member_lines(text: str) -> list[tuple[str, str]]:
 
 def cargo_workspace_members(repo_root: Path) -> dict[str, str]:
     result = subprocess.run(
-        ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+        ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
         cwd=repo_root,
         check=False,
         text=True,
@@ -108,9 +113,10 @@ def validate_workspace_members(repo_root: Path) -> int:
     if not guide_path.is_file():
         raise EntryError(f"missing required file: {AUTHORITATIVE_GUIDE.as_posix()}")
 
-    guide_members = dict(guide_member_lines(guide_path.read_text(encoding="utf-8")))
+    listed_members = guide_member_lines(guide_path.read_text(encoding="utf-8"))
+    guide_members = dict(listed_members)
     metadata_members = cargo_workspace_members(repo_root)
-    if len(guide_members) != len(guide_member_lines(guide_path.read_text(encoding="utf-8"))):
+    if len(guide_members) != len(listed_members):
         raise EntryError("guide lists a workspace package more than once")
 
     missing = sorted(set(metadata_members) - set(guide_members))
