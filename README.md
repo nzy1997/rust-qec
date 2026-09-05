@@ -54,6 +54,27 @@ With RustQEC you can:
 
 ## Quick Start
 
+When the v0.2.1 native assets are attached to its existing release, download
+the archive for your platform, verify it with `SHA256SUMS` and
+`release-manifest.json`, and extract it. The target archive names are
+`rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz` and
+`rustqec-v0.2.1-aarch64-apple-darwin.tar.gz`; choose the archive matching your
+platform. The following three steps use only the extracted `bin/` directory.
+
+```sh
+bin_dir=/path/to/rustqec-v0.2.1-<target>/bin
+python3 tools/check_installed_quickstart.py --bin-dir "$bin_dir"
+```
+
+The checker runs capability discovery, inspects the deterministic one-qubit
+circuit, and completes the detector-to-DEM round trip shown in the
+[`rstim` CLI DEM pipeline](docs/showcases/rstim-cli-dem-pipeline.md). It prints
+`PASS installed quickstart` only after each observed output matches that
+showcase. It is also the shortest way to verify an installed release without
+reading source code.
+
+## Build From Source
+
 ```sh
 git clone https://github.com/nzy1997/rust-qec.git
 cd rust-qec
