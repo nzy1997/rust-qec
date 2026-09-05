@@ -3,6 +3,7 @@ name = "rstim"
 version = "0.2.1"
 edition = "2024"
 license.workspace = true
+rust-version.workspace = true
 description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]

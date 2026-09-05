@@ -3,6 +3,7 @@ name = "qec-code"
 version = "0.1.0"
 edition = "2024"
 license.workspace = true
+rust-version.workspace = true
 description = "Rust primitives for constructing and analyzing quantum error-correcting codes"
 repository = "https://github.com/nzy1997/rust-qec"
 readme = "README.md"
