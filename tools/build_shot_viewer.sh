@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="${SHOT_VIEWER_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+repo_root="$(cd "$repo_root" && pwd)"
 cd "$repo_root"
 
-if ! command -v wasm-bindgen >/dev/null 2>&1; then
+wasm_bindgen="${WASM_BINDGEN:-$(command -v wasm-bindgen || true)}"
+if [[ -z "$wasm_bindgen" ]]; then
   echo "wasm-bindgen 0.2.126 is required; install it with: cargo install wasm-bindgen-cli --version 0.2.126 --locked" >&2
   exit 1
 fi
 
-wasm_bindgen_version="$(wasm-bindgen --version | awk '{print $2}')"
+wasm_bindgen_version="$("$wasm_bindgen" --version | awk '{print $2}')"
 if [[ "$wasm_bindgen_version" != "0.2.126" ]]; then
   echo "wasm-bindgen 0.2.126 is required, found $wasm_bindgen_version" >&2
   exit 1
@@ -27,12 +29,14 @@ if [[ -z "$wasm_cc" ]] || ! "$wasm_cc" --print-targets 2>/dev/null | grep -q was
   exit 1
 fi
 
-rustc_path="$(rustup which rustc 2>/dev/null || command -v rustc)"
+rustc_path="${RUSTC:-$(rustup which rustc 2>/dev/null || command -v rustc)}"
+cargo_path="${CARGO:-$(rustup which cargo 2>/dev/null || command -v cargo)}"
+target_dir="${CARGO_TARGET_DIR:-$repo_root/target}"
 mkdir -p site/static/interactive/pkg rstim/assets/shot-viewer/pkg
 
 RUSTC="$rustc_path" CC_wasm32_unknown_unknown="$wasm_cc" \
-  cargo build -p rstim-shot-web --target wasm32-unknown-unknown --release
-wasm-bindgen target/wasm32-unknown-unknown/release/rstim_shot_web.wasm \
+  "$cargo_path" build --locked -p rstim-shot-web --target wasm32-unknown-unknown --release
+"$wasm_bindgen" "$target_dir/wasm32-unknown-unknown/release/rstim_shot_web.wasm" \
   --target web \
   --out-dir site/static/interactive/pkg \
   --out-name rstim_shot_web
