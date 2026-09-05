@@ -147,6 +147,12 @@ identities, uploaded CLI evidence, and the checked-out package metadata with:
 python3 tools/check_native_support_matrix.py --repo-root . --run-id RUN_ID
 ```
 
+## Support And Compatibility
+
+The [support and compatibility contract](docs/support-compatibility.md) states
+the current supported boundaries, pre-1.0 compatibility policy, and known
+exclusions for this release line.
+
 ## Primary Next Steps
 
 - [Showcase index](docs/showcases/README.md): runnable workflow categories and
