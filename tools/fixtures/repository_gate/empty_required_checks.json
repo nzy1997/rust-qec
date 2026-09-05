@@ -1,0 +1,14 @@
+{
+  "$base": "valid.json",
+  "effective_rules": [
+    {"ruleset_id": 42, "type": "pull_request", "parameters": {"required_approving_review_count": 0}},
+    {
+      "ruleset_id": 42,
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": []
+      }
+    }
+  ]
+}

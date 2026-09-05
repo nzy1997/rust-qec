@@ -40,6 +40,8 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      - name: Test repository governance gates
+        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner

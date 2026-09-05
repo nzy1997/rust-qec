@@ -115,10 +115,60 @@ source checkout. The release assets do not yet include this repository tool.
 
 ## Build From Source
 
+RustQEC supports native source builds on these tested environments:
+
+| Operating system | Native target | Rust toolchains |
+| --- | --- | --- |
+| Ubuntu 24.04 x86_64 | `x86_64-unknown-linux-gnu` | 1.88.0 (MSRV), stable |
+| macOS 15 on Apple silicon | `aarch64-apple-darwin` | 1.88.0 (MSRV), stable |
+
+Install the full-workspace native build prerequisites on Ubuntu 24.04:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv
+```
+
+On macOS 15, install the Xcode Command Line Tools and the Homebrew packages:
+
+```sh
+xcode-select --install
+brew install cmake fontconfig pkg-config python
+```
+
+Install Rust 1.88.0 with [rustup](https://rustup.rs/) for the minimum-version
+configuration, or select the current stable toolchain:
+
+```sh
+rustup toolchain install 1.88.0 --profile minimal
+rustup default 1.88.0
+```
+
+These prerequisites cover the default workspace, including the HiGHS-backed
+ILP crates and `rsinter` plotting. A smaller `rsinter` build avoids both HiGHS
+and plotting (as well as the other optional decoder runners):
+
+```sh
+cargo build --locked -p rsinter --no-default-features --features rbposd-runner
+```
+
+The complete test suite also invokes Stim through Python. Install it in an
+isolated environment before running `cargo test --locked --workspace`:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install stim
+```
+
+The support promise is limited to the two native targets above. Windows and
+other operating-system, architecture, and toolchain combinations are not part
+of the validated matrix.
+
 ```sh
 git clone https://github.com/nzy1997/rust-qec.git
 cd rust-qec
-cargo build --workspace
+cargo build --locked --workspace
 ```
 
 Inspect a small circuit through the unified CLI:
@@ -148,7 +198,14 @@ printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
 Run the Rust test suite:
 
 ```sh
-cargo test --workspace
+cargo test --locked --workspace
+```
+
+After a native-support workflow completes, validate its four jobs, compiler
+identities, uploaded CLI evidence, and the checked-out package metadata with:
+
+```sh
+python3 tools/check_native_support_matrix.py --repo-root . --run-id RUN_ID
 ```
 
 ## Support And Compatibility

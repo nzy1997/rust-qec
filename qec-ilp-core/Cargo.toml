@@ -3,6 +3,7 @@ name = "qec-ilp-core"
 version = "0.1.0"
 edition = "2024"
 license.workspace = true
+rust-version.workspace = true
 description = "Backend-neutral binary ILP models for quantum error-correction tools"
 repository = "https://github.com/nzy1997/rust-qec"
 

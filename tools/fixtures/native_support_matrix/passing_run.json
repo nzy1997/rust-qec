@@ -1,0 +1,90 @@
+{
+  "run": {"id": 123456, "path": ".github/workflows/native-support.yml", "status": "completed", "conclusion": "success", "head_sha": "0123456789abcdef"},
+  "jobs": [
+    {"name": "Native support / ubuntu-24.04-x86_64-msrv", "status": "completed", "conclusion": "success", "head_sha": "0123456789abcdef"},
+    {"name": "Native support / ubuntu-24.04-x86_64-stable", "status": "completed", "conclusion": "success", "head_sha": "0123456789abcdef"},
+    {"name": "Native support / macos-15-aarch64-msrv", "status": "completed", "conclusion": "success", "head_sha": "0123456789abcdef"},
+    {"name": "Native support / macos-15-aarch64-stable", "status": "completed", "conclusion": "success", "head_sha": "0123456789abcdef"}
+  ],
+  "packages": [
+    {"name": "rstim", "version": "0.2.1", "rust_version": "1.88"}
+  ],
+  "evidence": [
+    {
+      "schema_version": "rustqec.native-support.v1",
+      "cell": "ubuntu-24.04-x86_64-msrv",
+      "status": "pass",
+      "tested_sha": "fedcba9876543210",
+      "source_head_sha": "0123456789abcdef",
+      "requested_toolchain": "1.88.0",
+      "target": "x86_64-unknown-linux-gnu",
+      "compiler": {
+        "release": "1.88.0",
+        "host": "x86_64-unknown-linux-gnu",
+        "path": "/home/runner/.rustup/toolchains/1.88.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "rustup_which": "/home/runner/.rustup/toolchains/1.88.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "cargo_path": "/home/runner/.rustup/toolchains/1.88.0-x86_64-unknown-linux-gnu/bin/cargo"
+      },
+      "runner": {"label": "ubuntu-24.04", "os": "Linux", "arch": "X64", "machine": "x86_64", "os_version": "24.04", "image_os": "ubuntu24", "image_version": "20260901.1"},
+      "cli_output": {"schema_version": "rustqec.cli.v1", "status": "ok", "command": "circuit.stats", "result": {"instruction_count": 2, "repeat_blocks": 0, "max_repeat_depth": 0, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 0, "num_ticks": 0, "num_sweep_bits": 0}, "warnings": [], "artifacts": []},
+      "packages": [{"name": "rstim", "version": "0.2.1", "rust_version": "1.88"}]
+    },
+    {
+      "schema_version": "rustqec.native-support.v1",
+      "cell": "ubuntu-24.04-x86_64-stable",
+      "status": "pass",
+      "tested_sha": "fedcba9876543210",
+      "source_head_sha": "0123456789abcdef",
+      "requested_toolchain": "stable",
+      "target": "x86_64-unknown-linux-gnu",
+      "compiler": {
+        "release": "1.92.0",
+        "host": "x86_64-unknown-linux-gnu",
+        "path": "/home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc",
+        "rustup_which": "/home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc",
+        "cargo_path": "/home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo"
+      },
+      "runner": {"label": "ubuntu-24.04", "os": "Linux", "arch": "X64", "machine": "x86_64", "os_version": "24.04", "image_os": "ubuntu24", "image_version": "20260901.1"},
+      "cli_output": {"schema_version": "rustqec.cli.v1", "status": "ok", "command": "circuit.stats", "result": {"instruction_count": 2, "repeat_blocks": 0, "max_repeat_depth": 0, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 0, "num_ticks": 0, "num_sweep_bits": 0}, "warnings": [], "artifacts": []},
+      "packages": [{"name": "rstim", "version": "0.2.1", "rust_version": "1.88"}]
+    },
+    {
+      "schema_version": "rustqec.native-support.v1",
+      "cell": "macos-15-aarch64-msrv",
+      "status": "pass",
+      "tested_sha": "fedcba9876543210",
+      "source_head_sha": "0123456789abcdef",
+      "requested_toolchain": "1.88.0",
+      "target": "aarch64-apple-darwin",
+      "compiler": {
+        "release": "1.88.0",
+        "host": "aarch64-apple-darwin",
+        "path": "/Users/runner/.rustup/toolchains/1.88.0-aarch64-apple-darwin/bin/rustc",
+        "rustup_which": "/Users/runner/.rustup/toolchains/1.88.0-aarch64-apple-darwin/bin/rustc",
+        "cargo_path": "/Users/runner/.rustup/toolchains/1.88.0-aarch64-apple-darwin/bin/cargo"
+      },
+      "runner": {"label": "macos-15", "os": "macOS", "arch": "ARM64", "machine": "arm64", "os_version": "15.7", "image_os": "macos15", "image_version": "20260901.1"},
+      "cli_output": {"schema_version": "rustqec.cli.v1", "status": "ok", "command": "circuit.stats", "result": {"instruction_count": 2, "repeat_blocks": 0, "max_repeat_depth": 0, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 0, "num_ticks": 0, "num_sweep_bits": 0}, "warnings": [], "artifacts": []},
+      "packages": [{"name": "rstim", "version": "0.2.1", "rust_version": "1.88"}]
+    },
+    {
+      "schema_version": "rustqec.native-support.v1",
+      "cell": "macos-15-aarch64-stable",
+      "status": "pass",
+      "tested_sha": "fedcba9876543210",
+      "source_head_sha": "0123456789abcdef",
+      "requested_toolchain": "stable",
+      "target": "aarch64-apple-darwin",
+      "compiler": {
+        "release": "1.92.0",
+        "host": "aarch64-apple-darwin",
+        "path": "/Users/runner/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+        "rustup_which": "/Users/runner/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+        "cargo_path": "/Users/runner/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo"
+      },
+      "runner": {"label": "macos-15", "os": "macOS", "arch": "ARM64", "machine": "arm64", "os_version": "15.7", "image_os": "macos15", "image_version": "20260901.1"},
+      "cli_output": {"schema_version": "rustqec.cli.v1", "status": "ok", "command": "circuit.stats", "result": {"instruction_count": 2, "repeat_blocks": 0, "max_repeat_depth": 0, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 0, "num_ticks": 0, "num_sweep_bits": 0}, "warnings": [], "artifacts": []},
+      "packages": [{"name": "rstim", "version": "0.2.1", "rust_version": "1.88"}]
+    }
+  ]
+}

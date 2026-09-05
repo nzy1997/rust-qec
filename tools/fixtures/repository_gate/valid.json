@@ -1,0 +1,106 @@
+{
+  "repository": "nzy1997/rust-qec",
+  "repository_default_branch": "master",
+  "branch": "master",
+  "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "branch_protection": null,
+  "rulesets": [
+    {
+      "id": 42,
+      "name": "Default branch pull-request gate",
+      "target": "branch",
+      "enforcement": "active",
+      "bypass_actors": [
+        {
+          "actor_id": 5,
+          "actor_type": "RepositoryRole",
+          "bypass_mode": "pull_request"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "include": ["refs/heads/master"],
+          "exclude": []
+        }
+      }
+    }
+  ],
+  "effective_rules": [
+    {
+      "ruleset_id": 42,
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0
+      }
+    },
+    {
+      "ruleset_id": 42,
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {"context": "test", "integration_id": 15368},
+          {"context": "rsmp-v1-readiness", "integration_id": 15368},
+          {"context": "checked-evidence-portability", "integration_id": 15368},
+          {"context": "publication-evidence-check", "integration_id": 15368},
+          {"context": "coverage", "integration_id": 15368}
+        ]
+      }
+    }
+  ],
+  "default_head_checks": [
+    {"id": 101, "name": "test", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231},
+    {"id": 102, "name": "rsmp-v1-readiness", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231},
+    {"id": 103, "name": "checked-evidence-portability", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231},
+    {"id": 104, "name": "publication-evidence-check", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231},
+    {"id": 105, "name": "coverage", "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_id": 231}
+  ],
+  "pull_request_samples": [
+    {
+      "workflow_id": 231,
+      "run_id": 501,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pull_request": 680,
+      "labels": [],
+      "jobs": [
+        {"id": 1001, "name": "test", "status": "completed", "conclusion": "success"},
+        {"id": 1002, "name": "rsmp-v1-readiness", "status": "completed", "conclusion": "success"},
+        {"id": 1003, "name": "checked-evidence-portability", "status": "completed", "conclusion": "success"},
+        {"id": 1004, "name": "publication-evidence-check", "status": "completed", "conclusion": "success"},
+        {"id": 1005, "name": "coverage", "status": "completed", "conclusion": "success"},
+        {"id": 1006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}
+      ]
+    },
+    {
+      "workflow_id": 231,
+      "run_id": 502,
+      "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "pull_request": 681,
+      "labels": [],
+      "jobs": [
+        {"id": 2001, "name": "test", "status": "completed", "conclusion": "success"},
+        {"id": 2002, "name": "rsmp-v1-readiness", "status": "completed", "conclusion": "success"},
+        {"id": 2003, "name": "checked-evidence-portability", "status": "completed", "conclusion": "success"},
+        {"id": 2004, "name": "publication-evidence-check", "status": "completed", "conclusion": "success"},
+        {"id": 2005, "name": "coverage", "status": "completed", "conclusion": "success"},
+        {"id": 2006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}
+      ]
+    },
+    {
+      "workflow_id": 231,
+      "run_id": 503,
+      "head_sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "pull_request": 682,
+      "labels": [],
+      "jobs": [
+        {"id": 3001, "name": "test", "status": "completed", "conclusion": "success"},
+        {"id": 3002, "name": "rsmp-v1-readiness", "status": "completed", "conclusion": "success"},
+        {"id": 3003, "name": "checked-evidence-portability", "status": "completed", "conclusion": "success"},
+        {"id": 3004, "name": "publication-evidence-check", "status": "completed", "conclusion": "success"},
+        {"id": 3005, "name": "coverage", "status": "completed", "conclusion": "success"},
+        {"id": 3006, "name": "perf-gate", "status": "completed", "conclusion": "skipped"}
+      ]
+    }
+  ],
+  "unavailable": []
+}

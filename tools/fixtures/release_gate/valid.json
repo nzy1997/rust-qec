@@ -1,0 +1,68 @@
+{
+  "repository": "nzy1997/rust-qec",
+  "tag": "v0.2.1",
+  "tag_object_sha": "25758fcc350e97c8975e6d636bbf7f6b9c69121f",
+  "commit": "cfc935fc13e73469f413a08e08d0c19ecad0e42a",
+  "checks": [
+    {"id": 101, "name": "test", "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 33947294824, "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 102, "name": "rsmp-v1-readiness", "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 33947294824, "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 103, "name": "checked-evidence-portability", "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 33947294824, "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 104, "name": "publication-evidence-check", "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 33947294824, "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}},
+    {"id": 105, "name": "coverage", "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "status": "completed", "conclusion": "success", "app": {"id": 15368}, "workflow_run": {"id": 33947294824, "head_sha": "cfc935fc13e73469f413a08e08d0c19ecad0e42a", "event": "push", "status": "completed", "conclusion": "success", "path": ".github/workflows/ci.yml"}}
+  ],
+  "workspace_members": [
+    "qec-ilp-core",
+    "qec-code",
+    "renvelope",
+    "rustqec-cli",
+    "rstim",
+    "rstim-shot-web",
+    "rsinter",
+    "rbposd",
+    "rmatching",
+    "rilpqec",
+    "benchmarks/surface_decoder_compare/rust_bridge"
+  ],
+  "packages": {
+    "qec-ilp-core": {"name": "qec-ilp-core", "version": "0.1.0"},
+    "qec-code": {"name": "qec-code", "version": "0.1.0"},
+    "renvelope": {"name": "renvelope", "version": "0.1.0"},
+    "rustqec-cli": {"name": "rustqec-cli", "version": "0.1.0"},
+    "rstim": {"name": "rstim", "version": "0.2.1"},
+    "rstim-shot-web": {"name": "rstim-shot-web", "version": "0.1.0"},
+    "rsinter": {"name": "rsinter", "version": "0.2.1"},
+    "rbposd": {"name": "rbposd", "version": "0.2.1"},
+    "rmatching": {"name": "rmatching", "version": "0.2.1"},
+    "rilpqec": {"name": "rilpqec", "version": "0.1.0"},
+    "benchmarks/surface_decoder_compare/rust_bridge": {"name": "surface_decoder_compare_bridge", "version": "0.1.0"}
+  },
+  "lock_versions": {
+    "qec-ilp-core": ["0.1.0"],
+    "qec-code": ["0.1.0"],
+    "renvelope": ["0.1.0"],
+    "rustqec-cli": ["0.1.0"],
+    "rstim": ["0.2.1"],
+    "rstim-shot-web": ["0.1.0"],
+    "rsinter": ["0.2.1"],
+    "rbposd": ["0.2.1"],
+    "rmatching": ["0.2.1"],
+    "rilpqec": ["0.1.0"],
+    "surface_decoder_compare_bridge": ["0.1.0"]
+  },
+  "rulesets": [
+    {
+      "id": 77,
+      "name": "Release tag immutability",
+      "target": "tag",
+      "enforcement": "active",
+      "bypass_actors": [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+      ],
+      "conditions": {
+        "ref_name": {"include": ["refs/tags/v*.*.*"], "exclude": []}
+      },
+      "rules": [{"type": "update"}, {"type": "deletion"}]
+    }
+  ],
+  "unavailable": []
+}
