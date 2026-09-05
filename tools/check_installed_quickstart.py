@@ -14,6 +14,7 @@ from pathlib import Path
 CIRCUIT = "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
 BAD_REPEAT = "REPEAT two {\n  M 0\n}\n"
 STATS = ("instruction_count: 5", "num_qubits: 1", "num_measurements: 1", "num_detectors: 1", "num_observables: 1")
+EXPECTED_STATS = {"instruction_count": 5, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 1}
 EVENT = "shot D0 L0"
 
 
@@ -42,10 +43,16 @@ def validate(bin_dir: Path) -> None:
             commands = json.loads(capabilities.stdout)["commands"]
         except (json.JSONDecodeError, KeyError, TypeError) as error:
             raise QuickstartError("capabilities did not return its JSON contract") from error
-        if not any(command.get("name") == "circuit.stats" for command in commands):
+        stats_capability = next((command for command in commands if command.get("name") == "circuit.stats"), None)
+        if stats_capability is None or stats_capability.get("argv") != ["circuit", "stats"] or "json" not in stats_capability.get("formats", []):
             raise QuickstartError("capabilities does not advertise circuit.stats")
-        stats = run(rustqec, "circuit", "stats", "--in", str(circuit), cwd=work)
-        if stats.returncode or any(field not in stats.stdout for field in STATS):
+        stats = run(rustqec, "circuit", "stats", "--format", "json", "--in", str(circuit), cwd=work)
+        try:
+            observed_stats = json.loads(stats.stdout)
+        except json.JSONDecodeError:
+            observed_stats = {}
+        observed_result = observed_stats.get("result", {})
+        if stats.returncode or {key: observed_result.get(key) for key in EXPECTED_STATS} != EXPECTED_STATS:
             raise QuickstartError(f"stats did not match the showcase: {stats.stderr.strip() or stats.stdout.strip()}")
         detect = run(rstim, "detect", "--shots", "1", "--out_format", "dets", "--in", str(circuit), cwd=work)
         if detect.returncode or detect.stdout.strip() != EVENT:

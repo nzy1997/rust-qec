@@ -54,24 +54,58 @@ With RustQEC you can:
 
 ## Quick Start
 
-When the v0.2.1 native assets are attached to its existing release, download
-the archive for your platform, verify it with `SHA256SUMS` and
-`release-manifest.json`, and extract it. The target archive names are
-`rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz` and
-`rustqec-v0.2.1-aarch64-apple-darwin.tar.gz`; choose the archive matching your
-platform. The following three steps use only the extracted `bin/` directory.
+When v0.2.1 native assets are attached to its existing
+[release](https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1), install an
+archive for your platform before running the three steps below. On Ubuntu
+x86_64 use `x86_64-unknown-linux-gnu`; on Apple-silicon macOS use
+`aarch64-apple-darwin`.
 
 ```sh
-bin_dir=/path/to/rustqec-v0.2.1-<target>/bin
-python3 tools/check_installed_quickstart.py --bin-dir "$bin_dir"
+target=x86_64-unknown-linux-gnu
+base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
+archive="rustqec-v0.2.1-${target}.tar.gz"
+curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
+shasum -a 256 -c SHA256SUMS
+tar -xzf "$archive"
+bin_dir="$(pwd)/${archive%.tar.gz}/bin"
 ```
 
-The checker runs capability discovery, inspects the deterministic one-qubit
-circuit, and completes the detector-to-DEM round trip shown in the
-[`rstim` CLI DEM pipeline](docs/showcases/rstim-cli-dem-pipeline.md). It prints
-`PASS installed quickstart` only after each observed output matches that
-showcase. It is also the shortest way to verify an installed release without
-reading source code.
+1. Discover the installed CLI contract:
+
+   ```sh
+   "$bin_dir/rustqec" capabilities --format json
+   ```
+
+2. Inspect the deterministic showcase circuit:
+
+   ```sh
+   cat > pipeline.stim <<'STIM'
+   R 0
+   X_ERROR(1) 0
+   M 0
+   DETECTOR rec[-1]
+   OBSERVABLE_INCLUDE(0) rec[-1]
+   STIM
+   "$bin_dir/rustqec" circuit stats --format json --in pipeline.stim
+   ```
+
+   The JSON fields are `instruction_count: 5`, `num_qubits: 1`,
+   `num_measurements: 1`, `num_detectors: 1`, and `num_observables: 1`.
+
+3. Run the deterministic detector/DEM round trip:
+
+   ```sh
+   "$bin_dir/rstim" detect --shots 1 --out_format dets --in pipeline.stim
+   "$bin_dir/rstim" analyze_errors --in pipeline.stim --out pipeline.dem
+   cat pipeline.dem
+   "$bin_dir/rstim" sample_dem --shots 1 --out_format dets --in pipeline.dem
+   ```
+
+   Both detector streams are `shot D0 L0`; the DEM is `error(1) D0 L0`.
+
+For a single machine-checkable run of the same commands, use
+`python3 tools/check_installed_quickstart.py --bin-dir "$bin_dir"` from a
+source checkout. The release assets do not yet include this repository tool.
 
 ## Build From Source
 
