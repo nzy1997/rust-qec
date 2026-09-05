@@ -258,7 +258,7 @@ jobs:
             --rustqec source/target/release/rustqec \
             --rstim source/target/release/rstim \
             --runtime-linkage runtime-linkage.txt
-      - name: Upload the private target staging artifact
+      - name: Upload the target staging artifact
         uses: actions/upload-artifact@v4
         with:
           name: native-archive-fragment-${{ matrix.target }}
@@ -273,6 +273,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: tooling
+      - name: Checkout the frozen installed-quickstart contract
+        uses: actions/checkout@v4
+        with:
+          ref: f5dc754f73d2eb54459c1dffc282e717fd02d610
+          path: quickstart-tooling
+          sparse-checkout: tools/check_installed_quickstart.py
+          sparse-checkout-cone-mode: false
       - name: Download target staging artifacts
         uses: actions/download-artifact@v4
         with:
@@ -287,7 +294,8 @@ jobs:
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}"
           cp tooling/tools/verify_release_archive.py staged-release/
-      - name: Upload the private complete staging bundle
+          cp quickstart-tooling/tools/check_installed_quickstart.py staged-release/
+      - name: Upload the complete staging bundle
         uses: actions/upload-artifact@v4
         with:
           name: native-release-bundle
@@ -301,13 +309,6 @@ jobs:
     steps:
       - name: Install runtime verifier only
         run: apt-get update && apt-get install -y python3
-      - name: Checkout the frozen installed-quickstart contract
-        uses: actions/checkout@v4
-        with:
-          ref: f5dc754f73d2eb54459c1dffc282e717fd02d610
-          path: quickstart-tooling
-          sparse-checkout: tools/check_installed_quickstart.py
-          sparse-checkout-cone-mode: false
       - name: Download staged release bundle without a source checkout
         uses: actions/download-artifact@v4
         with:
@@ -318,6 +319,9 @@ jobs:
         run: |
           set -euo pipefail
           test ! -e source
+          test ! -e quickstart-tooling
+          test ! -e Cargo.toml
+          test ! -e target
           archive="staged-release/rustqec-${{ needs.prepare.outputs.tag }}-x86_64-unknown-linux-gnu.tar.gz"
           python3 staged-release/verify_release_archive.py \
             --archive "$archive" \
@@ -332,7 +336,7 @@ jobs:
           from verify_release_archive import safe_extract
           safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
           PY
-          PATH='' /usr/bin/python3 quickstart-tooling/tools/check_installed_quickstart.py \
+          PATH='' /usr/bin/python3 staged-release/check_installed_quickstart.py \
             --bin-dir "$PWD/extracted/$root/bin" | tee linux-quickstart.log
           mkdir tampered
           cp "$archive" "tampered/$(basename "$archive")"
@@ -367,13 +371,6 @@ jobs:
     needs: [prepare, aggregate]
     runs-on: macos-15
     steps:
-      - name: Checkout the frozen installed-quickstart contract
-        uses: actions/checkout@v4
-        with:
-          ref: f5dc754f73d2eb54459c1dffc282e717fd02d610
-          path: quickstart-tooling
-          sparse-checkout: tools/check_installed_quickstart.py
-          sparse-checkout-cone-mode: false
       - name: Download staged release bundle without a source checkout
         uses: actions/download-artifact@v4
         with:
@@ -383,6 +380,9 @@ jobs:
         run: |
           set -euo pipefail
           test ! -e source
+          test ! -e quickstart-tooling
+          test ! -e Cargo.toml
+          test ! -e target
           python_bin="$(command -v python3)"
           archive="staged-release/rustqec-${{ needs.prepare.outputs.tag }}-aarch64-apple-darwin.tar.gz"
           PATH=/usr/bin:/bin "$python_bin" staged-release/verify_release_archive.py \
@@ -398,7 +398,7 @@ jobs:
           from verify_release_archive import safe_extract
           safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
           PY
-          PATH='' /usr/bin/python3 quickstart-tooling/tools/check_installed_quickstart.py \
+          PATH='' /usr/bin/python3 staged-release/check_installed_quickstart.py \
             --bin-dir "$PWD/extracted/$root/bin" | tee macos-quickstart.log
           mkdir tampered
           cp "$archive" "tampered/$(basename "$archive")"

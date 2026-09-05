@@ -10,7 +10,7 @@ archives for these platforms:
 
 A pull request that changes the workflow runs a staging build automatically. It
 uses the pull request tooling and an ephemeral tag for the pull request head. The
-artifacts remain private to the Actions run.
+artifacts are attached to the Actions staging run and are not release assets.
 
 To stage an existing immutable tag without uploading assets, run:
 
