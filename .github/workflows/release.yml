@@ -6,18 +6,46 @@ on:
       - "v*.*.*"
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
+  release-gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.verify.outputs.commit }}
+      version: ${{ steps.verify.outputs.version }}
+      prerelease: ${{ steps.verify.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact tested commit, versions, and tag protection
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/check_release_gate.py \
+            --repo "${{ github.repository }}" \
+            --tag "${{ github.ref_name }}" \
+            --dry-run \
+            --wait-seconds 2700 \
+            --poll-seconds 20 \
+            --github-output "$GITHUB_OUTPUT"
+
   create-release:
     name: Create Release
+    needs: release-gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.commit }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.release-gate.outputs.prerelease }}
           generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          target_commitish: ${{ needs.release-gate.outputs.commit }}

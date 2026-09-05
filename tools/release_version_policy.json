@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "tag_pattern": "^v(?P<version>(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*))$",
+  "prerelease_policy": "reject",
+  "ci_workflow_path": ".github/workflows/ci.yml",
+  "synchronized": [
+    {"name": "rstim", "path": "rstim"},
+    {"name": "rsinter", "path": "rsinter"},
+    {"name": "rbposd", "path": "rbposd"},
+    {"name": "rmatching", "path": "rmatching"}
+  ],
+  "independent": [
+    {"name": "qec-ilp-core", "path": "qec-ilp-core"},
+    {"name": "qec-code", "path": "qec-code"},
+    {"name": "renvelope", "path": "renvelope"},
+    {"name": "rustqec-cli", "path": "rustqec-cli"},
+    {"name": "rstim-shot-web", "path": "rstim-shot-web"},
+    {"name": "rilpqec", "path": "rilpqec"},
+    {"name": "surface_decoder_compare_bridge", "path": "benchmarks/surface_decoder_compare/rust_bridge"}
+  ]
+}
