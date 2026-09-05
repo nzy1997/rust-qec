@@ -67,7 +67,11 @@ base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
 archive="rustqec-v0.2.1-${target}.tar.gz"
 curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
 awk -v archive="$archive" '$2 == archive { count++; record = $0 } END { if (count != 1) exit 1; print record }' SHA256SUMS > "$archive.sha256"
-shasum -a 256 -c "$archive.sha256"
+if command -v sha256sum >/dev/null; then
+  sha256sum -c "$archive.sha256"
+else
+  shasum -a 256 -c "$archive.sha256"
+fi
 tar -xzf "$archive"
 bin_dir="$(pwd)/${archive%.tar.gz}/bin"
 ```
