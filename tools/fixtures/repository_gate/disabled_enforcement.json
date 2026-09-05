@@ -1,0 +1,17 @@
+{
+  "$base": "valid.json",
+  "rulesets": [
+    {
+      "id": 42,
+      "name": "Disabled default branch gate",
+      "target": "branch",
+      "enforcement": "disabled",
+      "bypass_actors": [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "pull_request"}
+      ],
+      "conditions": {
+        "ref_name": {"include": ["refs/heads/master"], "exclude": []}
+      }
+    }
+  ]
+}
