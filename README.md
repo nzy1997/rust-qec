@@ -61,11 +61,13 @@ x86_64 use `x86_64-unknown-linux-gnu`; on Apple-silicon macOS use
 `aarch64-apple-darwin`.
 
 ```sh
+set -eu
 target=x86_64-unknown-linux-gnu
 base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
 archive="rustqec-v0.2.1-${target}.tar.gz"
 curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
-shasum -a 256 -c SHA256SUMS
+awk -v archive="$archive" '$2 == archive { count++; record = $0 } END { if (count != 1) exit 1; print record }' SHA256SUMS > "$archive.sha256"
+shasum -a 256 -c "$archive.sha256"
 tar -xzf "$archive"
 bin_dir="$(pwd)/${archive%.tar.gz}/bin"
 ```

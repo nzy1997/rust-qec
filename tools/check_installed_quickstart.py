@@ -13,7 +13,6 @@ from pathlib import Path
 
 CIRCUIT = "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
 BAD_REPEAT = "REPEAT two {\n  M 0\n}\n"
-STATS = ("instruction_count: 5", "num_qubits: 1", "num_measurements: 1", "num_detectors: 1", "num_observables: 1")
 EXPECTED_STATS = {"instruction_count": 5, "num_qubits": 1, "num_measurements": 1, "num_detectors": 1, "num_observables": 1}
 EVENT = "shot D0 L0"
 
