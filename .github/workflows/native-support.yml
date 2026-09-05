@@ -1,0 +1,125 @@
+name: Native support
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: native-support-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-support:
+    name: Native support / ${{ matrix.cell }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cell: ubuntu-24.04-x86_64-msrv
+            runner: ubuntu-24.04
+            runner_os: Linux
+            runner_arch: X64
+            machine: x86_64
+            target: x86_64-unknown-linux-gnu
+            toolchain: 1.88.0
+          - cell: ubuntu-24.04-x86_64-stable
+            runner: ubuntu-24.04
+            runner_os: Linux
+            runner_arch: X64
+            machine: x86_64
+            target: x86_64-unknown-linux-gnu
+            toolchain: stable
+          - cell: macos-15-aarch64-msrv
+            runner: macos-15
+            runner_os: macOS
+            runner_arch: ARM64
+            machine: arm64
+            target: aarch64-apple-darwin
+            toolchain: 1.88.0
+          - cell: macos-15-aarch64-stable
+            runner: macos-15
+            runner_os: macOS
+            runner_arch: ARM64
+            machine: arm64
+            target: aarch64-apple-darwin
+            toolchain: stable
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      NATIVE_CELL: ${{ matrix.cell }}
+      EXPECTED_RUNNER_OS: ${{ matrix.runner_os }}
+      EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
+      EXPECTED_MACHINE: ${{ matrix.machine }}
+      EXPECTED_TARGET: ${{ matrix.target }}
+      REQUESTED_TOOLCHAIN: ${{ matrix.toolchain }}
+      RUNNER_LABEL: ${{ matrix.runner }}
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv
+      - name: Install macOS build prerequisites
+        if: runner.os == 'macOS'
+        run: brew install cmake fontconfig pkg-config python
+      - name: Install Stim in an isolated Python environment
+        run: |
+          python3 -m venv .venv-native-support
+          .venv-native-support/bin/python -m pip install stim
+          echo "$PWD/.venv-native-support/bin" >> "$GITHUB_PATH"
+      - name: Select the exact Rust toolchain
+        run: |
+          rustup toolchain install "$REQUESTED_TOOLCHAIN" --profile minimal
+          rustc_path="$(rustup which --toolchain "$REQUESTED_TOOLCHAIN" rustc)"
+          rustdoc_path="$(rustup which --toolchain "$REQUESTED_TOOLCHAIN" rustdoc)"
+          cargo_path="$(rustup which --toolchain "$REQUESTED_TOOLCHAIN" cargo)"
+          {
+            echo "RUSTC=$rustc_path"
+            echo "RUSTDOC=$rustdoc_path"
+            echo "CARGO=$cargo_path"
+          } >> "$GITHUB_ENV"
+      - name: Verify runner and compiler identity
+        run: |
+          test "$RUNNER_OS" = "$EXPECTED_RUNNER_OS"
+          test "$RUNNER_ARCH" = "$EXPECTED_RUNNER_ARCH"
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          "$RUSTC" --version --verbose
+          test "$("$RUSTC" --print host-tuple)" = "$EXPECTED_TARGET"
+          test "$(rustup which --toolchain "$REQUESTED_TOOLCHAIN" rustc)" = "$RUSTC"
+          if [ "$REQUESTED_TOOLCHAIN" != stable ]; then
+            test "$("$RUSTC" --version | awk '{print $2}')" = "$REQUESTED_TOOLCHAIN"
+          fi
+      - name: Run the one-qubit CLI integration fixture
+        run: |
+          "$CARGO" test --locked -p rustqec-cli --test cli \
+            circuit_stats_json_wraps_the_existing_rstim_result -- --exact
+      - name: Run locked workspace tests
+        run: |
+          "$CARGO" test --locked --workspace
+      - name: Run the real one-qubit CLI workflow
+        run: |
+          mkdir -p native-support-evidence
+          printf 'M 0\nDETECTOR rec[-1]\n' | \
+            "$CARGO" run --locked -p rustqec-cli --bin rustqec -- \
+              circuit stats --format json > native-support-evidence/cli.json
+          python3 -c 'import json; d=json.load(open("native-support-evidence/cli.json")); r=d["result"]; assert (r["num_qubits"], r["num_measurements"], r["num_detectors"]) == (1, 1, 1)'
+      - name: Record native support evidence
+        run: |
+          python3 tools/record_native_support_cell.py \
+            --cell "$NATIVE_CELL" \
+            --runner-label "$RUNNER_LABEL" \
+            --expected-target "$EXPECTED_TARGET" \
+            --toolchain "$REQUESTED_TOOLCHAIN" \
+            --cli-json native-support-evidence/cli.json \
+            --out native-support-evidence/evidence.json
+      - name: Upload native support evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-support-${{ matrix.cell }}
+          path: native-support-evidence/evidence.json
+          if-no-files-found: error
