@@ -136,6 +136,22 @@ test("diagram result controls have keyboard names and focus mode expands the wor
   await expect(page.locator("body")).not.toHaveClass(/shot-focus/);
 });
 
+test("detectors and observables visibly highlight keyboard focus", async ({ page }) => {
+  await page.goto("/interactive/");
+  for (const kind of ["detector", "observable"]) {
+    const target = page.locator(`[data-${kind}-id]`).first();
+    const box = target.locator(".gate-box");
+    const originalStroke = await box.evaluate((node) => getComputedStyle(node).stroke);
+    await target.focus();
+    await expect(box).toHaveCSS("stroke", "rgb(127, 86, 217)");
+    await expect(box).toHaveCSS("stroke-width", "2.5px");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#shot-detail .eyebrow")).toHaveText(kind);
+    await page.locator("#shot-fit").focus();
+    await expect(box).toHaveCSS("stroke", originalStroke);
+  }
+});
+
 test("Escape returns focus to the noise site that opened its outcome menu", async ({ page }) => {
   await page.goto("/interactive/");
   const noise = page.locator("[data-noise-event-id]").first();

@@ -324,10 +324,15 @@ body.shot-focus .shot-stage-wrap {
   outline: none;
 }
 
-.shot-canvas [role="button"]:focus-visible .measurement-anchor,
-.shot-canvas [role="button"]:focus-visible .detector-anchor {
+.shot-canvas [role="button"]:focus-visible .measurement-anchor {
   fill: #7f56d9;
   font-weight: 700;
+}
+
+.shot-canvas .detector:focus-visible .gate-box,
+.shot-canvas .observable:focus-visible .gate-box {
+  stroke: #7f56d9;
+  stroke-width: 2.5px;
 }
 
 .shot-canvas .noise-site:hover .noise-box,
