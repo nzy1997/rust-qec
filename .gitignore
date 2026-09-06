@@ -29,3 +29,5 @@ cobertura.xml
 
 drafts/
 .DS_Store
+
+/site/generated/

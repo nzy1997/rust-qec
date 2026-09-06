@@ -104,6 +104,12 @@ class SiteAppRenderingTest(unittest.TestCase):
               }
             }
 
+            function assertExcludes(html, unexpected) {
+              if (html.includes(unexpected)) {
+                throw new Error(`rendered HTML unexpectedly included ${JSON.stringify(unexpected)}`);
+              }
+            }
+
             (async () => {
               const html = await renderCheckedCards(manifest);
               const surfaceItem = evidenceItem(manifest, "surface-decoder-full");
@@ -119,8 +125,19 @@ class SiteAppRenderingTest(unittest.TestCase):
                 throw new Error("BB reference gap report hash not found");
               }
               const bbSha256 = bbArtifactHashes[bbArtifactPath].sha256;
+              const bbExternalCommit = bbItem.provenance.external_repository_commits.value[0];
               for (const expected of [
                 "<h4>Provenance</h4>",
+                "<summary>Reproduce this result</summary>",
+                "<summary>Full provenance and sources</summary>",
+                "<strong>Evidence status:</strong>",
+                "Checked artifacts are available for this full benchmark run.",
+                "The broader benchmark family has partial checked coverage.",
+                'data-family-status="partial"',
+                'data-item-status="existing"',
+                'data-evidence-tier="full"',
+                "Open the full-size figure to inspect its axes, labels, and legend.",
+                "Checked figure for Checked BB72/BB144 full artifacts.",
                 "artifact_hashes",
                 "recorded",
                 "not_recorded",
@@ -132,8 +149,25 @@ class SiteAppRenderingTest(unittest.TestCase):
                 bbArtifactPath,
                 bbSha256,
                 "make bb-circuit-bposd-compare-full",
+                bbItem.claims_limit,
+                bbItem.caveats[0],
+                "benchmarks/bb_circuit_bposd_compare/README.md",
+                bbExternalCommit.repository,
+                bbExternalCommit.commit,
+                bbExternalCommit.role,
+                `https://github.com/${bbExternalCommit.repository}`,
+                `https://github.com/${bbExternalCommit.repository}/commit/${bbExternalCommit.commit}`,
               ]) {
                 assertIncludes(html, expected);
+              }
+              for (const unexpected of [
+                "[object Object]",
+                "family: partial",
+                "status: existing",
+                "tier: full",
+                "Reproduce and inspect",
+              ]) {
+                assertExcludes(html, unexpected);
               }
 
               const mutatedManifest = JSON.parse(JSON.stringify(manifest));
@@ -143,6 +177,80 @@ class SiteAppRenderingTest(unittest.TestCase):
               };
               const mutatedHtml = await renderCheckedCards(mutatedManifest);
               assertIncludes(mutatedHtml, "hashes were not captured");
+
+              const objectManifest = JSON.parse(JSON.stringify(manifest));
+              evidenceItem(objectManifest, "bb-circuit-full").provenance.external_repository_commits.value = {
+                repository: "example/singular-reference",
+                commit: "abcdef0123456789",
+                role: "single object fixture",
+              };
+              const objectHtml = await renderCheckedCards(objectManifest);
+              assertIncludes(
+                objectHtml,
+                "https://github.com/example/singular-reference/commit/abcdef0123456789"
+              );
+              assertIncludes(objectHtml, "single object fixture");
+              assertExcludes(objectHtml, "[object Object]");
+
+              const statusManifest = JSON.parse(JSON.stringify(manifest));
+              const partialItem = evidenceItem(statusManifest, "bb-circuit-full");
+              partialItem.status = "partial";
+              partialItem.tier = "regression-gate";
+              const localFamily = statusManifest.families.find((family) =>
+                (family.evidence_items || []).some((item) => item.id === "surface-decoder-full")
+              );
+              localFamily.status = "local-only";
+              const localItem = evidenceItem(statusManifest, "surface-decoder-full");
+              localItem.status = "local-only";
+              localItem.tier = "smoke";
+              const statusHtml = await renderCheckedCards(statusManifest);
+              assertIncludes(
+                statusHtml,
+                "Checked artifacts cover part of this regression gate; the claims limit below defines its boundary."
+              );
+              assertIncludes(
+                statusHtml,
+                "This quick smoke run is a local workflow; it does not provide checked site artifacts."
+              );
+              assertIncludes(
+                statusHtml,
+                "The broader benchmark family is documented for local runs only."
+              );
+
+              const nestedManifest = JSON.parse(JSON.stringify(manifest));
+              const nestedItem = evidenceItem(nestedManifest, "bb-circuit-full");
+              nestedItem.provenance.external_repository_commits.value = [
+                {
+                  repository: "example/reference",
+                  commit: "0123456789abcdef",
+                  role: "comparison <contract>",
+                  details: {
+                    branches: ["main", { label: "reviewed & pinned" }],
+                  },
+                },
+                {
+                  role: "identity intentionally missing",
+                },
+              ];
+              nestedItem.provenance.nested_fixture = {
+                status: "recorded",
+                value: [{ platform: "<linux>", flags: ["--locked", { mode: "safe & exact" }] }],
+              };
+              const nestedHtml = await renderCheckedCards(nestedManifest);
+              for (const expected of [
+                "https://github.com/example/reference/commit/0123456789abcdef",
+                "comparison &lt;contract&gt;",
+                "reviewed &amp; pinned",
+                "identity intentionally missing",
+                "not recorded",
+                "&lt;linux&gt;",
+                "safe &amp; exact",
+              ]) {
+                assertIncludes(nestedHtml, expected);
+              }
+              for (const unexpected of ["[object Object]", "<linux>", "safe & exact"] ) {
+                assertExcludes(nestedHtml, unexpected);
+              }
             })().catch((error) => {
               console.error(error && error.stack ? error.stack : error);
               process.exit(1);

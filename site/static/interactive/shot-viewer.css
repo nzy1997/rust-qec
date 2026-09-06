@@ -1,5 +1,9 @@
 .shot-hero {
-  padding-bottom: 2.2rem;
+  padding: 1.35rem 1.25rem 0.75rem;
+}
+
+.shot-hero h1 {
+  font-size: clamp(2rem, 3.5vw, 2.6rem);
 }
 
 .shot-app {
@@ -65,9 +69,14 @@
   box-shadow: 0 18px 50px rgb(16 24 40 / 8%);
 }
 
+.shot-workspace section {
+  margin-top: 0;
+}
+
 .shot-toolbar {
   min-height: 62px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
   padding: 0.65rem 0.8rem;
@@ -77,17 +86,21 @@
 
 .shot-toolbar-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
 }
 
 .shot-toolbar-status {
+  flex: 1 1 15rem;
   color: #475467;
   font-size: 0.88rem;
 }
 
 .shot-toolbar-actions {
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .shot-button,
@@ -100,6 +113,7 @@
   color: #344054;
   font: inherit;
   font-weight: 650;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -160,7 +174,7 @@
 .shot-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  min-height: 610px;
+  min-height: 520px;
 }
 
 .shot-view-panel {
@@ -247,6 +261,32 @@
   background-size: 16px 16px;
 }
 
+body.shot-focus .shot-hero,
+body.shot-focus .site-header,
+body.shot-focus .version-strip,
+body.shot-focus .site-footer {
+  display: none;
+}
+
+body.shot-focus .shot-app {
+  width: min(1900px, calc(100% - 1rem));
+  margin: 0.5rem auto;
+}
+
+body.shot-focus .reading-layout {
+  max-width: none;
+}
+
+body.shot-focus main {
+  max-width: none;
+  padding: 0;
+}
+
+body.shot-focus .shot-layout,
+body.shot-focus .shot-stage-wrap {
+  min-height: clamp(360px, calc(100vh - 210px), 820px);
+}
+
 .shot-stage {
   position: absolute;
   inset: 0;
@@ -278,6 +318,16 @@
 .shot-canvas .detector,
 .shot-canvas .observable {
   cursor: pointer;
+}
+
+.shot-canvas [role="button"]:focus-visible {
+  outline: none;
+}
+
+.shot-canvas [role="button"]:focus-visible .measurement-anchor,
+.shot-canvas [role="button"]:focus-visible .detector-anchor {
+  fill: #7f56d9;
+  font-weight: 700;
 }
 
 .shot-canvas .noise-site:hover .noise-box,

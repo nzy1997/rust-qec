@@ -11,6 +11,11 @@ REPEAT 2 {
 }
 `;
 
+const MEASUREMENT_ERROR_CIRCUIT = `
+MPAD(1) 0
+DETECTOR rec[-1]
+`;
+
 test("fixed gadget gallery edits downstream state and resets history on sample", async ({ page }) => {
   await page.goto("/interactive/");
   await expect(page.getByRole("button", { name: "Sample", exact: true })).toBeVisible();
@@ -34,6 +39,9 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
   expect(layout.stageWidth / layout.workspaceWidth).toBeGreaterThan(0.98);
   expect(layout.viewBottom).toBeLessThanOrEqual(layout.stageTop + 1);
   expect(layout.detailTop).toBeGreaterThanOrEqual(layout.stageBottom - 1);
+  expect(await page.locator(".shot-toolbar button").evaluateAll(
+    (buttons) => buttons.every((button) => getComputedStyle(button).whiteSpace === "nowrap"),
+  )).toBe(true);
 
   const ids = await page.locator("[data-noise-event-id]").evaluateAll((nodes) =>
     nodes.map((node) => node.dataset.noiseEventId),
@@ -89,15 +97,93 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
   await page.locator("[data-noise-event-id]").first().click();
   await page.locator("#shot-popover").getByRole("button", { name: "X", exact: true }).click();
   await expect(page.locator("#shot-summary")).toContainText("1 active errors");
+  await expect(page.locator("#shot-base-badge")).toHaveText("Base: no-error");
+  await expect(page.locator("#shot-summary")).toContainText("Edited: 1 override");
   await expect(page.locator("[data-annotation-tags*='manual-override']")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Undo error edit" })).toBeEnabled();
+  await page.getByRole("button", { name: "Undo error edit" }).click();
+  await expect(page.locator("#shot-summary")).toContainText("Current: no active errors");
+  await expect(page.locator("#shot-summary")).not.toContainText("Edited:");
 
   const transform = await page.locator("#shot-canvas").getAttribute("style");
   await page.getByRole("button", { name: "Sample", exact: true }).click();
-  await expect(page.locator("#shot-base-badge")).toHaveText("Sampled");
+  await expect(page.locator("#shot-base-badge")).toHaveText("Base: sampled");
   await expect(page.locator("[data-annotation-tags*='manual-override']")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Undo error edit" })).toBeDisabled();
   expect(await page.locator("#shot-canvas").getAttribute("style")).toBe(transform);
+});
+
+test("diagram result controls have keyboard names and focus mode expands the workspace", async ({ page }) => {
+  await page.goto("/interactive/");
+  const measurement = page.locator("[data-measurement-ids]").first();
+  const detector = page.locator("[data-detector-id]").first();
+
+  await expect(measurement).toHaveAttribute("role", "button");
+  await expect(measurement).toHaveAttribute("aria-label", /^Measurement .+Press Enter to inspect its result\.$/);
+  await expect(detector).toHaveAttribute("role", "button");
+  await expect(detector).toHaveAttribute("aria-label", /^Detector .+Press Enter to inspect its result\.$/);
+  await measurement.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#shot-detail .eyebrow")).toHaveText("measurement");
+
+  const focus = page.locator("#shot-focus");
+  await focus.click();
+  await expect(focus).toHaveText("Exit focus");
+  await expect(focus).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("body")).toHaveClass(/shot-focus/);
+  await focus.click();
+  await expect(focus).toHaveText("Focus circuit");
+  await expect(page.locator("body")).not.toHaveClass(/shot-focus/);
+});
+
+test("Escape returns focus to the noise site that opened its outcome menu", async ({ page }) => {
+  await page.goto("/interactive/");
+  const noise = page.locator("[data-noise-event-id]").first();
+  await noise.click();
+  const popover = page.locator("#shot-popover");
+  await expect(popover.getByRole("button", { name: "I", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(popover).toBeHidden();
+  await expect(noise).toBeFocused();
+});
+
+test("choosing an outcome focuses the replacement noise site", async ({ page }) => {
+  await page.goto("/interactive/");
+  const noise = page.locator("[data-noise-event-id]").first();
+  const id = await noise.getAttribute("data-noise-event-id");
+  await noise.click();
+  const choice = page.locator("#shot-popover").getByRole("button", { name: "X", exact: true });
+  await choice.focus();
+  await page.keyboard.press("Enter");
+  const replacement = page.locator(`[data-noise-event-id="${id}"]`);
+  await expect(page.locator("#shot-popover")).toBeHidden();
+  await expect(replacement).toBeFocused();
+});
+
+test("MPAD measurement error keeps its noise-site name and Enter uses the noise selection path", async ({ page }) => {
+  await page.goto("/interactive/local/");
+  await page.locator("#shot-file").setInputFiles({
+    name: "measurement-error.stim",
+    mimeType: "text/plain",
+    buffer: Buffer.from(MEASUREMENT_ERROR_CIRCUIT),
+  });
+  const site = page.locator("[data-noise-event-id][data-measurement-ids]");
+  await expect(site).toHaveCount(1);
+  await expect(site).toHaveAttribute("aria-label", /^Noise site .+Press Enter to inspect this outcome\.$/);
+  await site.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#shot-popover")).toBeHidden();
+  await expect(page.locator("#shot-detail .eyebrow")).toHaveText("Noise event");
+});
+
+test("embedded viewer focus mode does not depend on docs page metadata", async () => {
+  const [embeddedHtml, embeddedCss] = await Promise.all([
+    readFile(new URL("../../../rstim/assets/shot-viewer/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../../../rstim/assets/shot-viewer/shot-viewer.css", import.meta.url), "utf8"),
+  ]);
+  expect(embeddedHtml).not.toContain('data-page="shot"');
+  expect(embeddedCss).toContain("body.shot-focus .shot-app");
+  expect(embeddedCss).not.toContain('body[data-page="shot"].shot-focus');
 });
 
 test("local mode starts blank, loads only in-browser, rejects oversized input, and resets on reload", async ({ page }) => {
