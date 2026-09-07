@@ -1,0 +1,8 @@
+<p>This deterministic example resets one qubit, applies an X error with probability 1, then measures a detector and observable. Create the input in your current working directory:</p>
+<pre data-language="Shell · create input"><code>cat &gt; circuit.stim &lt;&lt;'STIM'
+R 0
+X_ERROR(1) 0
+M 0
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]
+STIM</code></pre>

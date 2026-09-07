@@ -6,16 +6,20 @@
 {% block hero %}
 <div class="hero home-hero">
   <p class="eyebrow">RustQEC workspace</p>
-  <h1>A complete quantum error correction workspace in Rust</h1>
+  <h1>Quantum error correction, from circuit to decoder</h1>
   <p class="hero-copy">
     RustQEC brings together the <code>rstim</code> simulator and CLI, MWPM,
     BP-OSD, and ILP decoders, and a parallel benchmark harness in one Cargo
-    workspace — one <code>cargo build</code> away.
+    workspace. Start with a prebuilt CLI or explore a circuit in your browser.
   </p>
+  <div class="actions"><a class="button primary" href="get-started/">Run your first circuit</a><a class="button" href="get-started/#install">Download v0.2.1</a><a class="button" href="interactive/">Try Shot Lab</a></div>
+  <p class="section-copy">Native packages: Ubuntu 24.04 x86_64 and macOS 15 Apple silicon. <a href="support/">Check feature support and compatibility.</a></p>
 </div>
 {% endblock hero %}
 
 {% block main %}
+<section class="task-section" aria-labelledby="first-result"><p class="eyebrow">Start here</p><h2 id="first-result">A circuit, a detector event, a result you can check</h2>
+<ol class="start-path"><li><a href="get-started/#install">Install the CLI</a><span>Choose a native package and check its checksum.</span></li><li><a href="get-started/#first-circuit">Run five instructions</a><span>Use a complete, deterministic input.</span></li><li><a href="get-started/#detector-output">Check the output</a><span>See <code>shot D0 L0</code>, then explore the guides.</span></li></ol></section>
 <section id="capabilities" class="docs-home" aria-label="What is in the box">
   <div class="section-heading">
     <p class="eyebrow">What's in the box</p>

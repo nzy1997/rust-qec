@@ -52,7 +52,8 @@
     <h2 id="sample-title">Generate a loss-visible circuit and inspect four shots</h2>
     <p class="section-copy">Run from the repository root. The first command creates a d=3 Mid-SWAP Z-memory circuit whose loss-visible measurements are stored as interleaved <code>flag,value</code> records.</p>
   </div>
-  <pre class="quick-command"><code>cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+  <p class="doc-note">Source workflow: run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. This advanced guide uses the development CLI and a repository Python loader; start with the <a href="../get-started/">installed CLI example</a> if you are new to RustQEC.</p>
+<pre class="quick-command"><code>cargo run --release --locked -p rustqec-cli --bin rustqec -- \
   circuit gen \
   --code surface_code \
   --task rotated_memory_z_midswap \

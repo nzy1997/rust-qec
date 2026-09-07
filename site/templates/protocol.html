@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}QP101 format specification — RustQEC{% endblock title %}
+{% block main %}<article class="prose protocol-doc">
+<p class="content-links"><a href="../">Circuit diagrams guide</a><a href="../../QP101-ZY.md" download>Download Markdown source</a><a href="../../qp101.schema.json">Download JSON Schema</a></p>
+{{ load_data(path="generated/qp101-protocol.md", format="plain") | replace(from="(qp101.schema.json)", to="(../../qp101.schema.json)") | markdown | safe }}
+</article>{% endblock main %}

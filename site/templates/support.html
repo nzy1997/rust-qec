@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Support and compatibility — RustQEC{% endblock title %}
+{% block main %}<article class="prose">
+<p class="doc-note">This is the development-branch contract. For the frozen v0.2.1 source and migration notes, see the <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">release notes</a>. Repository tags and individual crate versions are distinct.</p>
+{{ load_data(path="generated/support-compatibility.md", format="plain") | replace(from="(../rstim/doc/QP101-ZY.md)", to="(../qp101/protocol/)") | markdown | safe }}
+</article>{% endblock main %}

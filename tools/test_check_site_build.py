@@ -88,6 +88,93 @@ class SiteBuildCheckerTest(unittest.TestCase):
         ]:
             self.assertIn(marker, showcase)
 
+    def test_valid_fixture_includes_new_guides_and_shared_docs_script(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        summary = check_site_build.format_summary(results)
+
+        self.assertNotIn("FAIL", summary)
+        for page, anchors in {
+            "get-started/index.html": ("install", "first-circuit", "detector-output", "source-build"),
+            "support/index.html": ("support-levels", "atom-loss-support-boundary"),
+            "qp101/protocol/index.html": ("schema-identity", "validation-rules"),
+            "validation/index.html": ("reading-results", "historical-results", "local-workflows"),
+        }.items():
+            text = (fixture.site_root / page).read_text(encoding="utf-8")
+            for anchor in anchors:
+                self.assertIn(f'id="{anchor}"', text)
+        self.assertTrue((fixture.site_root / "js/docs.js").is_file())
+
+    def test_rejects_missing_new_page_or_docs_script(self) -> None:
+        for relative in [
+            "get-started/index.html",
+            "support/index.html",
+            "qp101/protocol/index.html",
+            "validation/index.html",
+            "js/docs.js",
+        ]:
+            with self.subTest(relative=relative):
+                fixture = check_site_build.make_fixture_site()
+                self.addCleanup(fixture.cleanup)
+                (fixture.site_root / relative).unlink()
+
+                results = check_site_build.check_site_build(
+                    fixture.site_root, repo_root=fixture.repo_root
+                )
+
+                self.assertTrue(
+                    any(result.status == "FAIL" and relative in result.detail for result in results),
+                    check_site_build.format_summary(results),
+                )
+
+    def test_rejects_missing_new_page_anchor(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        page = fixture.site_root / "validation/index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace('id="historical-results"', 'id="history"'),
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "site pages"
+                and "validation/index.html" in result.detail
+                and "historical-results" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
+    def test_rejects_page_without_shared_docs_script(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        page = fixture.site_root / "qp101/protocol/index.html"
+        page.write_text(
+            page.read_text(encoding="utf-8").replace(
+                '<script src="../../js/docs.js"></script>', ""
+            ),
+            encoding="utf-8",
+        )
+
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+
+        self.assertTrue(
+            any(
+                result.status == "FAIL"
+                and result.area == "site pages"
+                and "qp101/protocol/index.html" in result.detail
+                and "missing required scripts: js/docs.js" in result.detail
+                for result in results
+            ),
+            check_site_build.format_summary(results),
+        )
+
     def test_rejects_missing_qp101_schema(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
@@ -233,12 +320,10 @@ class SiteBuildCheckerTest(unittest.TestCase):
     def test_rejects_missing_distributed_evidence_boundary(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "decoding/index.html"
-        index.write_text(
-            index.read_text(encoding="utf-8").replace(
-                "checked full artifacts support", "checked full artifacts describe"
-            ),
-            encoding="utf-8",
+        check_site_build.replace_site_phrase(
+            fixture,
+            "checked full artifacts support",
+            "checked full artifacts describe",
         )
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
@@ -301,7 +386,13 @@ class SiteBuildCheckerTest(unittest.TestCase):
         )
 
     def test_missing_index_or_app_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in ("index.html", "simulator/index.html", "js/benchmarks.js"):
+        for relative in (
+            "index.html",
+            "get-started/index.html",
+            "validation/index.html",
+            "js/benchmarks.js",
+            "js/docs.js",
+        ):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
@@ -317,7 +408,12 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 )
 
     def test_invalid_utf8_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in ("index.html", "js/benchmarks.js", "data/benchmark-site.json"):
+        for relative in (
+            "index.html",
+            "js/benchmarks.js",
+            "js/docs.js",
+            "data/benchmark-site.json",
+        ):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
@@ -335,12 +431,10 @@ class SiteBuildCheckerTest(unittest.TestCase):
     def test_rejects_missing_evidence_phrase_even_if_manifest_keeps_it(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "simulator/index.html"
-        index.write_text(
-            index.read_text(encoding="utf-8").replace(
-                "not a general performance claim", "not a universal speed ranking"
-            ),
-            encoding="utf-8",
+        check_site_build.replace_site_phrase(
+            fixture,
+            "not a general performance claim",
+            "not a universal speed ranking",
         )
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)

@@ -18,11 +18,14 @@
     <h2 id="qp101-title">From Stim circuit to SVG or JSON</h2>
     <p class="section-copy">QP101 preserves gates, repeat blocks, detectors, noise, coordinates, and annotations in execution order.</p>
   </div>
+  {% include "partials/installed-example.html" %}
   <pre class="quick-command"><code>rstim render_svg --in circuit.stim --out circuit.svg
 rstim export_json --in circuit.stim --out circuit.qp101.json</code></pre>
+  <p><strong>Expected files:</strong> <code>circuit.svg</code> shows the one-qubit circuit; <code>circuit.qp101.json</code> is its ordered circuit document. Open the SVG in your browser.</p>
   <div class="content-links">
     <a href="../qp101.schema.json">JSON Schema</a>
-    <a href="../QP101-ZY.md">Protocol draft</a>
+    <a href="protocol/">Read the format specification</a>
+    <a href="../QP101-ZY.md" download>Markdown source</a>
   </div>
 </section>
 

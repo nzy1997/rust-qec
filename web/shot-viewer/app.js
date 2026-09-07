@@ -66,6 +66,7 @@ function shellMarkup(mode) {
           <button class="shot-icon-button" id="shot-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
           <button class="shot-icon-button" id="shot-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
           <button class="shot-button" id="shot-fit" type="button">Fit</button>
+          <button class="shot-button" id="shot-focus" type="button" aria-pressed="false">Focus circuit</button>
           <button class="shot-button" id="shot-export-svg" type="button">Export SVG</button>
           <button class="shot-button" id="shot-export-pdf" type="button">Export PDF</button>
           ${mode === "local" ? '<button class="shot-button shot-button-quiet" id="shot-close" type="button">Close circuit</button>' : ""}
@@ -82,7 +83,7 @@ function shellMarkup(mode) {
       </section>
       <div class="shot-layout">
         <div class="shot-stage-wrap">
-          <div id="shot-stage" class="shot-stage" tabindex="0" aria-label="Circuit diagram. Click a noise site to edit its realized outcome.">
+          <div id="shot-stage" class="shot-stage" tabindex="0" aria-label="Circuit diagram. Click a noise site to edit its realized outcome. Focus a measurement, detector, or observable and press Enter to inspect its result.">
             <div id="shot-canvas" class="shot-canvas"></div>
           </div>
           <div id="shot-popover" class="shot-popover" role="dialog" aria-label="Choose realized noise outcome" hidden></div>
@@ -112,6 +113,7 @@ function collectUi() {
     zoomOut: find("shot-zoom-out"),
     zoomIn: find("shot-zoom-in"),
     fit: find("shot-fit"),
+    focus: find("shot-focus"),
     exportSvg: find("shot-export-svg"),
     exportPdf: find("shot-export-pdf"),
     close: find("shot-close"),
@@ -140,6 +142,7 @@ function bindControls(state) {
   ui.zoomOut.addEventListener("click", () => zoomAroundCenter(state, 1 / 1.2));
   ui.zoomIn.addEventListener("click", () => zoomAroundCenter(state, 1.2));
   ui.fit.addEventListener("click", () => fitDiagram(state));
+  ui.focus.addEventListener("click", () => toggleFocus(state));
   ui.exportSvg.addEventListener("click", () => exportSvg(state));
   ui.exportPdf.addEventListener("click", () => exportPdf(state));
   ui.close?.addEventListener("click", () => closeCircuit(state));
@@ -167,10 +170,10 @@ function bindControls(state) {
 
   ui.canvas.addEventListener("click", (event) => selectFromDiagram(state, event));
   ui.canvas.addEventListener("keydown", (event) => {
-    if ((event.key === "Enter" || event.key === " ") && event.target.dataset.noiseEventId) {
-      event.preventDefault();
-      selectNoise(state, event.target.dataset.noiseEventId, event.target.getBoundingClientRect());
-    }
+    if (!event.key || !["Enter", " "].includes(event.key)) return;
+    if (!event.target.closest("[data-noise-event-id], [data-measurement-ids], [data-detector-id], [data-observable-id]")) return;
+    event.preventDefault();
+    selectFromDiagram(state, event);
   });
   ui.popover.addEventListener("click", (event) => handleOutcomeChoice(state, event));
 
@@ -241,6 +244,7 @@ function closeCircuit(state) {
   state.ui.canvas.replaceChildren();
   state.ui.workspace.hidden = true;
   hidePopover(state);
+  setFocus(state, false);
   showEmpty(state);
 }
 
@@ -270,6 +274,7 @@ function renderSnapshot(state, snapshot, options = {}) {
   const { ui } = state;
   const previousTransform = { ...state.transform };
   ui.canvas.innerHTML = snapshot.svg;
+  labelDiagramTargets(ui.canvas, snapshot);
   applyFilters(state);
   updateToolbar(state);
   updateWarnings(state);
@@ -296,11 +301,48 @@ function updateToolbar(state) {
     (event) => event.effective_outcome.kind !== "identity" && event.applicable,
   ).length;
   const firedDetectors = snapshot.shot.result.detectors.filter((detector) => detector.flipped).length;
-  ui.badge.textContent = baseKind === "sampled" ? "Sampled" : "No-error";
+  const overrides = snapshot.shot.result.noise_events.filter((event) => event.override_outcome).length;
+  ui.badge.textContent = baseKind === "sampled" ? "Base: sampled" : "Base: no-error";
   ui.badge.classList.toggle("is-sampled", baseKind === "sampled");
-  ui.summary.textContent = `${activeErrors} active errors · ${firedDetectors}/${snapshot.shot.result.detectors.length} detectors`;
+  const edited = overrides ? `Edited: ${overrides} override${overrides === 1 ? "" : "s"} · ` : "";
+  const current = activeErrors ? `Current: ${activeErrors} active errors` : "Current: no active errors";
+  ui.summary.textContent = `${edited}${current} · ${firedDetectors}/${snapshot.shot.result.detectors.length} detectors`;
   ui.undo.disabled = !snapshot.shot.can_undo;
   ui.redo.disabled = !snapshot.shot.can_redo;
+}
+
+function labelDiagramTargets(canvas, snapshot) {
+  const targets = [
+    ["[data-noise-event-id]", "Noise site"],
+    ["[data-measurement-ids]", "Measurement"],
+    ["[data-detector-id]", "Detector"],
+    ["[data-observable-id]", "Observable"],
+  ];
+  const labelled = new Set();
+  const events = new Map(snapshot.shot.result.noise_events.map((event) => [event.id, event]));
+  for (const [selector, label] of targets) {
+    canvas.querySelectorAll(selector).forEach((node) => {
+      if (labelled.has(node)) return;
+      labelled.add(node);
+      const id = node.dataset.noiseEventId ?? node.dataset.measurementIds ?? node.dataset.detectorId ?? node.dataset.observableId;
+      node.setAttribute("role", "button");
+      node.setAttribute("tabindex", "0");
+      const event = node.dataset.noiseEventId ? events.get(node.dataset.noiseEventId) : null;
+      const action = event ? (event.editable ? "inspect or edit this outcome" : "inspect this outcome") : "inspect its result";
+      node.setAttribute("aria-label", `${label} ${id}. Press Enter to ${action}.`);
+    });
+  }
+}
+
+function toggleFocus(state) {
+  setFocus(state, !document.body.classList.contains("shot-focus"));
+}
+
+function setFocus(state, enabled) {
+  document.body.classList.toggle("shot-focus", enabled);
+  state.ui.focus?.setAttribute("aria-pressed", String(enabled));
+  if (state.ui.focus) state.ui.focus.textContent = enabled ? "Exit focus" : "Focus circuit";
+  if (enabled) requestAnimationFrame(() => fitDiagram(state));
 }
 
 function updateWarnings(state) {
@@ -346,9 +388,14 @@ function selectFromDiagram(state, click) {
 function selectNoise(state, eventId, targetRect) {
   state.selectedEventId = eventId;
   state.ui.canvas.querySelectorAll(".is-selected").forEach((node) => node.classList.remove("is-selected"));
-  state.ui.canvas.querySelector(`[data-noise-event-id="${cssEscape(eventId)}"]`)?.classList.add("is-selected");
+  const invoker = state.ui.canvas.querySelector(`[data-noise-event-id="${cssEscape(eventId)}"]`);
+  invoker?.classList.add("is-selected");
+  state.popoverInvoker = invoker;
   updateDetail(state, eventId);
-  if (!showPopover(state, eventId, targetRect)) revealDetail(state);
+  if (!showPopover(state, eventId, targetRect)) {
+    state.popoverInvoker = null;
+    revealDetail(state);
+  }
 }
 
 function updateDetail(state, eventId) {
@@ -435,17 +482,20 @@ function showPopover(state, eventId, targetRect) {
   return true;
 }
 
-function handleOutcomeChoice(state, click) {
+async function handleOutcomeChoice(state, click) {
   const button = click.target.closest("button");
   if (!button || !state.selectedEventId) return;
   const id = state.selectedEventId;
   hidePopover(state);
-  if (button.dataset.restore) mutate(state, () => state.session.restoreNoise(id));
-  else if (button.dataset.outcome) mutate(state, () => state.session.setNoise(id, button.dataset.outcome));
+  if (button.dataset.restore) await mutate(state, () => state.session.restoreNoise(id));
+  else if (button.dataset.outcome) await mutate(state, () => state.session.setNoise(id, button.dataset.outcome));
+  state.ui.canvas.querySelector(`[data-noise-event-id="${cssEscape(id)}"]`)?.focus({ preventScroll: true });
 }
 
-function hidePopover(state) {
+function hidePopover(state, restoreFocus = false) {
+  const invoker = restoreFocus && state.ui.popover.contains(document.activeElement) ? state.popoverInvoker : null;
   state.ui.popover.hidden = true;
+  if (invoker?.isConnected) invoker.focus({ preventScroll: true });
 }
 
 function bindPanZoom(state) {
@@ -478,7 +528,7 @@ function handleShortcut(state, event) {
     mutate(state, () => event.shiftKey ? state.session.redo() : state.session.undo());
     return;
   }
-  if (event.key === "Escape") hidePopover(state);
+  if (event.key === "Escape") hidePopover(state, true);
   if (event.key === "+" || event.key === "=") zoomAroundCenter(state, 1.2);
   if (event.key === "-" || event.key === "_") zoomAroundCenter(state, 1 / 1.2);
   const delta = event.shiftKey ? 80 : 28;

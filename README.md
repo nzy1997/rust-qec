@@ -21,6 +21,12 @@ make build-site
 python3 tools/check_site_build.py _site
 ```
 
+The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
+pins the native CLI examples to v0.2.1. `make build-site` stages the canonical
+QP101 and support contracts into ignored `site/generated/` before Zola renders
+them. Edit `rstim/doc/QP101-ZY.md` or `docs/support-compatibility.md` to update
+those pages; do not edit the generated copies.
+
 ## What You Can Do
 
 With RustQEC you can:

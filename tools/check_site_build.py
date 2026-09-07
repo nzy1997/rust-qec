@@ -41,6 +41,8 @@ class SiteFixture:
 
 PAGE_FILES = (
     "index.html",
+    "get-started/index.html",
+    "support/index.html",
     "simulator/index.html",
     "sampling-data/index.html",
     "detector-models/index.html",
@@ -48,12 +50,31 @@ PAGE_FILES = (
     "css-codes/index.html",
     "rsmp-v1-showcase/index.html",
     "qp101/index.html",
+    "qp101/protocol/index.html",
+    "validation/index.html",
     "interactive/index.html",
     "interactive/local/index.html",
 )
-JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js")
+JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js")
+PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
     "index.html": ("capabilities",),
+    "get-started/index.html": (
+        "install",
+        "first-circuit",
+        "detector-output",
+        "tools",
+        "source-build",
+        "versions",
+    ),
+    "support/index.html": (
+        "support-and-compatibility-contract",
+        "support-levels",
+        "atom-loss-support-boundary",
+        "mid-swap-configuration-migration",
+        "compatibility-and-deprecation-policy",
+        "evidence-and-known-exclusions",
+    ),
     "simulator/index.html": ("circuit-simulation",),
     "sampling-data/index.html": (
         "choose-path",
@@ -76,6 +97,15 @@ PAGE_REQUIRED_ANCHORS = {
         "rsmp-evidence",
     ),
     "qp101/index.html": ("qp101", "operations", "schema-browser", "gallery", "examples"),
+    "qp101/protocol/index.html": (
+        "qp101-zy-quantum-circuit-json-format",
+        "schema-identity",
+        "scope-and-applicability",
+        "core-json-document",
+        "validation-rules",
+        "compatibility-notes",
+    ),
+    "validation/index.html": ("reading-results", "historical-results", "local-workflows"),
     "interactive/index.html": ("shot-viewer",),
     "interactive/local/index.html": ("shot-viewer",),
 }
@@ -274,14 +304,20 @@ def check_pages(
                 problems.append(problem)
 
         script_texts: list[str] = []
+        page_scripts: set[str] = set()
         for src in collector.srcs:
             if not src.endswith(".js"):
                 continue
             _, candidate, _ = resolve_site_reference(site_root, page_dir, src)
             if candidate is not None and candidate.is_file():
                 rel = candidate.relative_to(site_root).as_posix()
+                page_scripts.add(rel)
                 if rel in js_texts:
                     script_texts.append(js_texts[rel])
+
+        missing_scripts = [script for script in PAGE_REQUIRED_SCRIPTS if script not in page_scripts]
+        if missing_scripts:
+            problems.append(f"{page}: missing required scripts: {', '.join(missing_scripts)}")
 
         for path in sorted(collect_local_string_paths(text)):
             if path.startswith("/"):
@@ -540,6 +576,7 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
         "detector-models/index.html",
         "decoding/index.html",
         "css-codes/index.html",
+        "validation/index.html",
     )
     evidence_pages = [page_data[name][0] for name in evidence_page_names if name in page_data]
     if len(evidence_pages) != len(evidence_page_names):
@@ -970,6 +1007,36 @@ def make_fixture_site() -> SiteFixture:
 """,
     )
     write_text(
+        site_root / "get-started/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="install"><a href="../support/">support</a></section>
+  <section id="first-circuit"></section>
+  <section id="detector-output"></section>
+  <section id="tools"></section>
+  <section id="source-build"></section>
+  <section id="versions"><a href="../validation/">evidence guide</a></section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "support/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <h1 id="support-and-compatibility-contract">Support and compatibility contract</h1>
+  <h2 id="support-levels">Support levels</h2>
+  <h2 id="atom-loss-support-boundary">Atom-loss support boundary</h2>
+  <h2 id="mid-swap-configuration-migration">Mid-SWAP configuration migration</h2>
+  <h2 id="compatibility-and-deprecation-policy">Compatibility and deprecation policy</h2>
+  <h2 id="evidence-and-known-exclusions">Evidence and known exclusions</h2>
+</body>
+</html>
+""",
+    )
+    write_text(
         site_root / "rsmp-v1-showcase/index.html",
         """<!doctype html>
 <html lang="en">
@@ -1013,7 +1080,6 @@ def make_fixture_site() -> SiteFixture:
 <body data-root="..">
   <section id="circuit-simulation">
     <p>Sampling evidence is not a general performance claim.</p>
-    <div data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></div>
   </section>
   <script src="../js/benchmarks.js"></script>
 </body>
@@ -1042,7 +1108,6 @@ def make_fixture_site() -> SiteFixture:
 <html lang="en">
 <body data-root="..">
   <section id="dem-extraction">
-    <div data-evidence-items="rstim-vs-stim-full"></div>
   </section>
   <script src="../js/benchmarks.js"></script>
 </body>
@@ -1073,9 +1138,7 @@ def make_fixture_site() -> SiteFixture:
   <section id="css-construction"></section>
   <section id="distance-search">
     <p>Random-window results remain local-only.</p>
-    <div data-evidence-items="qec-code-smoke"></div>
   </section>
-  <script src="../js/benchmarks.js"></script>
 </body>
 </html>
 """,
@@ -1102,6 +1165,42 @@ def make_fixture_site() -> SiteFixture:
     <a href="../examples/atom-loss-sample.qp101.json">atom loss</a>
   </section>
   <script src="../js/qp101-browser.js"></script>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "qp101/protocol/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="../..">
+  <h1 id="qp101-zy-quantum-circuit-json-format">QP101-ZY: Quantum Circuit JSON Format</h1>
+  <h2 id="schema-identity">Schema identity</h2>
+  <h2 id="scope-and-applicability">Scope And Applicability</h2>
+  <h2 id="core-json-document">Core JSON Document</h2>
+  <a href="../../qp101.schema.json">Download JSON Schema</a>
+  <h2 id="validation-rules">Validation Rules</h2>
+  <h2 id="compatibility-notes">Compatibility Notes</h2>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "validation/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <section id="reading-results">
+    <p>Smoke runs check wiring; checked full artifacts support only named cases and are not a general performance claim.</p>
+  </section>
+  <section id="historical-results">
+    <div data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></div>
+  </section>
+  <section id="local-workflows">
+    <p>Local workflow evidence remains local-only.</p>
+    <div data-evidence-items="qec-code-smoke"></div>
+  </section>
+  <script src="../js/benchmarks.js"></script>
 </body>
 </html>
 """,
@@ -1170,6 +1269,24 @@ const localRefs = [
 ];
 """,
     )
+    write_text(
+        site_root / "js/docs.js",
+        """const pageToc = document.querySelector(".page-toc");
+const copyBlocks = document.querySelectorAll("pre code");
+""",
+    )
+
+    for page in PAGE_FILES:
+        page_path = site_root / page
+        page_text = page_path.read_text(encoding="utf-8")
+        if "</body>" not in page_text:
+            raise AssertionError(f"fixture page {page} has no closing body tag")
+        depth = len(Path(page).parent.parts)
+        docs_src = "../" * depth + "js/docs.js"
+        page_path.write_text(
+            page_text.replace("</body>", f'  <script src="{docs_src}"></script>\n</body>', 1),
+            encoding="utf-8",
+        )
 
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
     subprocess.run(
@@ -1217,6 +1334,14 @@ def remove_surface_provenance(manifest_path: Path) -> None:
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
+def replace_site_phrase(fixture: SiteFixture, phrase: str, replacement: str) -> None:
+    for relative in PAGE_FILES:
+        page = fixture.site_root / relative
+        text = page.read_text(encoding="utf-8")
+        if phrase in text:
+            page.write_text(text.replace(phrase, replacement), encoding="utf-8")
+
+
 def run_self_test() -> list[str]:
     failures: list[str] = []
     fixture = make_fixture_site()
@@ -1227,6 +1352,27 @@ def run_self_test() -> list[str]:
 
         mutations: list[tuple[str, Callable[[SiteFixture], None], str]] = [
             ("missing_qp101_schema", lambda f: (f.site_root / "qp101.schema.json").unlink(), "qp101.schema.json"),
+            ("missing_docs_script", lambda f: (f.site_root / "js/docs.js").unlink(), "js/docs.js"),
+            (
+                "missing_validation_anchor",
+                lambda f: (f.site_root / "validation/index.html").write_text(
+                    (f.site_root / "validation/index.html")
+                    .read_text(encoding="utf-8")
+                    .replace('id="historical-results"', 'id="history"'),
+                    encoding="utf-8",
+                ),
+                "historical-results",
+            ),
+            (
+                "protocol_missing_shared_docs_script",
+                lambda f: (f.site_root / "qp101/protocol/index.html").write_text(
+                    (f.site_root / "qp101/protocol/index.html")
+                    .read_text(encoding="utf-8")
+                    .replace('<script src="../../js/docs.js"></script>', ""),
+                    encoding="utf-8",
+                ),
+                "missing required scripts: js/docs.js",
+            ),
             (
                 "missing_checked_plot",
                 lambda f: (f.site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").unlink(),
@@ -1234,11 +1380,10 @@ def run_self_test() -> list[str]:
             ),
             (
                 "missing_evidence_boundary",
-                lambda f: (f.site_root / "decoding/index.html").write_text(
-                    (f.site_root / "decoding/index.html").read_text(encoding="utf-8").replace(
-                        "checked full artifacts support", "checked full artifacts describe"
-                    ),
-                    encoding="utf-8",
+                lambda f: replace_site_phrase(
+                    f,
+                    "checked full artifacts support",
+                    "checked full artifacts describe",
                 ),
                 "checked full artifacts support",
             ),

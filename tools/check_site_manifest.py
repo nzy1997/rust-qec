@@ -712,6 +712,7 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
         "detector-models/index.html",
         "decoding/index.html",
         "css-codes/index.html",
+        "validation/index.html",
     )
     evidence_paths = [site_root / relative for relative in evidence_page_names]
     benchmarks_js_path = site_root / "js/benchmarks.js"
@@ -780,22 +781,31 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
             for item in family.get("evidence_items", [])
             if isinstance(item, dict) and isinstance(item.get("id"), str)
         }
-        assigned_item_ids: set[str] = set()
+        assignments: dict[str, list[str]] = {}
         for relative, path in zip(evidence_page_names, evidence_paths):
             if not path.is_file():
                 continue
             page_text = path.read_text(encoding="utf-8")
             matches = re.findall(r'data-evidence-items="([^"]*)"', page_text)
-            if not matches:
-                add_error(errors, scope, f"{relative} has no benchmark evidence assignment")
             for value in matches:
-                assigned_item_ids.update(value.split())
+                for item_id in value.split():
+                    assignments.setdefault(item_id, []).append(relative)
+        assigned_item_ids = set(assignments)
         missing_assignments = sorted(expected_item_ids - assigned_item_ids)
         unexpected_assignments = sorted(assigned_item_ids - expected_item_ids)
+        duplicate_assignments = {
+            item_id: pages for item_id, pages in assignments.items() if len(pages) > 1
+        }
         if missing_assignments:
             add_error(errors, scope, f"benchmark evidence items are not assigned to a content page: {missing_assignments}")
         if unexpected_assignments:
             add_error(errors, scope, f"content pages reference unknown benchmark evidence items: {unexpected_assignments}")
+        if duplicate_assignments:
+            detail = ", ".join(
+                f"{item_id} ({', '.join(pages)})"
+                for item_id, pages in sorted(duplicate_assignments.items())
+            )
+            add_error(errors, scope, f"benchmark evidence items are assigned more than once: {detail}")
         validate_site_artifact_references(site_root, manifest, errors)
 
     return errors
@@ -805,12 +815,19 @@ def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any],
     checked_paths = {artifact_path for _, artifact_path in iter_checked_artifact_paths(manifest)}
     for relative in (
         "index.html",
+        "get-started/index.html",
+        "support/index.html",
         "simulator/index.html",
         "detector-models/index.html",
         "decoding/index.html",
         "css-codes/index.html",
         "qp101/index.html",
+        "qp101/protocol/index.html",
+        "validation/index.html",
+        "interactive/index.html",
+        "interactive/local/index.html",
         "js/benchmarks.js",
+        "js/docs.js",
         "js/qp101-browser.js",
     ):
         path = site_root / relative

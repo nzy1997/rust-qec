@@ -110,6 +110,10 @@
           <a href="${ROOT}/${escapeHtml(image.path)}">
             <img src="${ROOT}/${escapeHtml(image.path)}" alt="${escapeHtml(item.title || "Checked benchmark plot")}">
           </a>
+          <figcaption class="result-plot-caption">
+            Checked figure for ${escapeHtml(item.title || "this benchmark result")}.
+            <a class="result-plot-enlarge" href="${ROOT}/${escapeHtml(image.path)}">Open the full-size figure to inspect its axes, labels, and legend.</a>
+          </figcaption>
         </figure>
       `,
       )
@@ -120,8 +124,8 @@
     if (!Array.isArray(commands) || !commands.length) {
       return "<p>No reproduction command is listed.</p>";
     }
-    const commandText = commands.map((command) => `$ ${command}`).join("\n");
-    return `<pre class="result-commands"><code>${escapeHtml(commandText)}</code></pre>`;
+    const commandText = commands.join("\n");
+    return `<pre class="result-commands" data-language="Shell · source checkout"><code>${escapeHtml(commandText)}</code></pre>`;
   }
 
   function renderTextList(values) {
@@ -150,13 +154,13 @@
 
   function renderCompactValue(value) {
     if (value === null || value === undefined) {
-      return "";
+      return '<span class="provenance-muted">not recorded</span>';
     }
     if (Array.isArray(value)) {
       if (!value.length) {
         return '<span class="provenance-muted">empty</span>';
       }
-      return `<ul class="provenance-value-list">${value.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+      return `<ul class="provenance-value-list">${value.map((item) => `<li>${renderCompactValue(item)}</li>`).join("")}</ul>`;
     }
     if (typeof value === "object") {
       const entries = Object.entries(value);
@@ -164,10 +168,87 @@
         return '<span class="provenance-muted">empty</span>';
       }
       return `<ul class="provenance-value-list">${entries
-        .map(([key, entryValue]) => `<li><code>${escapeHtml(key)}</code>: ${escapeHtml(JSON.stringify(entryValue))}</li>`)
+        .map(
+          ([key, entryValue]) => `
+            <li>
+              <code>${escapeHtml(key)}</code>
+              ${renderCompactValue(entryValue)}
+            </li>
+          `,
+        )
         .join("")}</ul>`;
     }
     return `<span>${escapeHtml(value)}</span>`;
+  }
+
+  function githubRepositoryHref(repository) {
+    if (typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+      return "";
+    }
+    return `https://github.com/${repository
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/")}`;
+  }
+
+  function renderExternalRepositoryCommits(entry) {
+    if (entry && entry.status === "not_recorded") {
+      return `<p class="provenance-muted">${escapeHtml(entry.reason || "External repository commits were not recorded.")}</p>`;
+    }
+    const recordedValue = entry && entry.value;
+    if (recordedValue === null || recordedValue === undefined) {
+      return '<p class="provenance-muted">No external repository commit value is recorded.</p>';
+    }
+    const commits = Array.isArray(recordedValue) ? recordedValue : [recordedValue];
+    if (!commits.length) {
+      return '<p class="provenance-muted">No external repository commits are listed.</p>';
+    }
+    return `<ul class="provenance-value-list external-repository-list">${commits
+      .map((commitEntry) => {
+        if (!commitEntry || typeof commitEntry !== "object" || Array.isArray(commitEntry)) {
+          return `<li class="external-repository-entry">${renderCompactValue(commitEntry)}</li>`;
+        }
+        const repository = commitEntry.repository;
+        const commit = commitEntry.commit;
+        const repositoryHref = githubRepositoryHref(repository);
+        const commitHref =
+          repositoryHref && typeof commit === "string" && /^[0-9a-fA-F]{7,64}$/.test(commit)
+            ? `${repositoryHref}/commit/${encodeURIComponent(commit)}`
+            : "";
+        const extraEntries = Object.entries(commitEntry).filter(
+          ([key]) => key !== "repository" && key !== "commit",
+        );
+        return `
+          <li class="external-repository-entry">
+            <div>
+              <strong>Repository:</strong>
+              ${
+                repositoryHref
+                  ? `<a href="${escapeHtml(repositoryHref)}">${escapeHtml(repository)}</a>`
+                  : renderCompactValue(repository || null)
+              }
+            </div>
+            <div>
+              <strong>Commit:</strong>
+              ${
+                commitHref
+                  ? `<a href="${escapeHtml(commitHref)}"><code>${escapeHtml(commit)}</code></a>`
+                  : renderCompactValue(commit || null)
+              }
+            </div>
+            ${
+              extraEntries.length
+                ? `<ul class="provenance-value-list">${extraEntries
+                    .map(
+                      ([key, value]) => `<li><code>${escapeHtml(key)}</code> ${renderCompactValue(value)}</li>`,
+                    )
+                    .join("")}</ul>`
+                : ""
+            }
+          </li>
+        `;
+      })
+      .join("")}</ul>`;
   }
 
   function renderArtifactHashes(entry) {
@@ -215,6 +296,8 @@
         const body =
           field === "artifact_hashes"
             ? renderArtifactHashes(entry)
+            : field === "external_repository_commits"
+              ? renderExternalRepositoryCommits(entry)
             : status === "not_recorded"
               ? `<p class="provenance-muted">${escapeHtml(entry.reason || "reason not recorded")}</p>`
               : renderCompactValue(entry && entry.value);
@@ -232,6 +315,41 @@
     return `<ul class="provenance-card-list">${rows}</ul>`;
   }
 
+  function evidenceTierDescription(tier) {
+    const descriptions = {
+      full: "full benchmark run",
+      smoke: "quick smoke run",
+      readiness: "readiness check",
+      release: "release-profile run",
+      "local-pipeline": "local pipeline",
+      "compatibility-gate": "compatibility gate",
+      "regression-gate": "regression gate",
+    };
+    return descriptions[tier] || `run tier “${tier || "unspecified"}”`;
+  }
+
+  function renderEvidenceStatusSummary(family, item) {
+    const tier = evidenceTierDescription(item.tier);
+    let resultSummary;
+    if (item.status === "existing") {
+      resultSummary = `Checked artifacts are available for this ${tier}.`;
+    } else if (item.status === "partial") {
+      resultSummary = `Checked artifacts cover part of this ${tier}; the claims limit below defines its boundary.`;
+    } else if (item.status === "local-only") {
+      resultSummary = `This ${tier} is a local workflow; it does not provide checked site artifacts.`;
+    } else {
+      resultSummary = `This ${tier} has evidence status “${item.status || "unspecified"}”.`;
+    }
+
+    let familySummary = "";
+    if (family.status === "partial") {
+      familySummary = " The broader benchmark family has partial checked coverage.";
+    } else if (family.status === "local-only") {
+      familySummary = " The broader benchmark family is documented for local runs only.";
+    }
+    return `<p class="evidence-status-summary"><strong>Evidence status:</strong> ${escapeHtml(resultSummary + familySummary)}</p>`;
+  }
+
   function renderEvidenceContainers(manifest) {
     evidenceContainers.forEach((container) => {
       const itemIds = String(container.dataset.evidenceItems || "")
@@ -246,30 +364,33 @@
         const { family, item } = found;
         const plotHtml = renderImageArtifacts(item);
         return `
-        <article class="result-card${plotHtml ? " has-plot" : ""}">
+        <article
+          class="result-card${plotHtml ? " has-plot" : ""}"
+          data-family-status="${escapeHtml(family.status || "unspecified")}"
+          data-item-status="${escapeHtml(item.status || "unspecified")}"
+          data-evidence-tier="${escapeHtml(item.tier || "unspecified")}"
+        >
           <div class="result-card-copy">
             <div class="manifest-heading">
               <div>
                 <p class="eyebrow">${escapeHtml(family.title || family.id || "Benchmark family")}</p>
                 <h3>${escapeHtml(item.title || item.id || "Benchmark evidence")}</h3>
               </div>
-              <div class="schema-meta">
-                ${renderBadge("family", family.status)}
-                ${renderBadge("status", item.status)}
-                ${renderBadge("tier", item.tier)}
-              </div>
             </div>
+            ${renderEvidenceStatusSummary(family, item)}
             <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
-            <details class="evidence-details">
-              <summary>Reproduce and inspect</summary>
+            ${renderTextList(item.caveats)}
+            <details class="evidence-details evidence-reproduction">
+              <summary>Reproduce this result</summary>
               <h4>Artifacts</h4>
               ${renderArtifactLinks(item)}
               <h4>Reproduction</h4>
               ${renderCommandList(item.commands)}
+            </details>
+            <details class="evidence-details evidence-provenance">
+              <summary>Full provenance and sources</summary>
               <h4>Provenance</h4>
               ${renderProvenance(item.provenance)}
-              <h4>Caveats</h4>
-              ${renderTextList(item.caveats)}
               <h4>Sources</h4>
               ${renderSourceLinks(item.provenance_sources || family.source_docs)}
             </details>

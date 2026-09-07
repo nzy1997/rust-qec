@@ -1205,3 +1205,67 @@ pre code {
     padding: 0;
   }
 }
+
+/* Reading and navigation aids shared by the guides and reference pages. */
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+[id] { scroll-margin-top: 6rem; }
+.skip-link { position: fixed; top: -5rem; left: 1rem; z-index: 100; padding: .75rem; background: white; }
+.skip-link:focus { top: .5rem; }
+.nav-shell { position: sticky; top: 0; z-index: 30; background: var(--surface); border-bottom: 1px solid var(--border); }
+.nav-shell .top-nav { padding-top: .7rem; padding-bottom: .7rem; }
+.nav-links { align-items: center; gap: .85rem; }
+.nav-group { position: relative; }
+.nav-group summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.nav-group[data-current] summary, .nav-menu [aria-current] { color: var(--accent-dark); text-decoration: underline; text-underline-offset: .3em; }
+.nav-menu { position: absolute; top: calc(100% + .6rem); left: 0; width: 17rem; display: grid; gap: .4rem; padding: .9rem; background: var(--surface); border: 1px solid var(--border); border-radius: .6rem; box-shadow: var(--shadow); }
+.nav-menu a { padding: .4rem; }
+.version-strip { text-align: center; padding: .5rem 1.25rem; color: var(--muted); font-size: .8rem; background: var(--surface-muted); }
+.version-strip span { padding: 0 .45rem; }
+.footer-links { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+.reading-layout { max-width: var(--page-width); margin: auto; }
+.reading-layout main { width: 100%; min-width: 0; }
+.page-toc { padding: 1.5rem 1.25rem 0; font-size: .84rem; }
+.page-toc p { font-weight: 700; margin: 0 0 .65rem; }
+.page-toc nav { display: flex; flex-wrap: wrap; gap: .45rem 1rem; }
+.page-toc a { text-decoration: none; }
+.start-path { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 0; list-style: none; }
+.start-path li, .doc-note { border: 1px solid var(--border); border-radius: .5rem; padding: 1.2rem; background: var(--surface); }
+.doc-note { border-left: 3px solid var(--accent); }
+.prose { max-width: var(--reading-width); margin: auto; overflow-wrap: anywhere; }
+.prose h1 { font-size: 2.25rem; line-height: 1.2; }
+.prose h2 { margin-top: 2.5rem; }
+.prose table { display: block; overflow-x: auto; }
+.prose img { max-width: 100%; }
+pre { max-width: 100%; }
+.code-toolbar { display: flex; align-items: center; gap: .75rem; justify-content: space-between; margin-top: 1rem; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: .4rem .4rem 0 0; background: var(--surface-muted); color: var(--muted); font-size: .8rem; }
+.code-toolbar + pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.code-toolbar button { flex-shrink: 0; border: 1px solid var(--border); border-radius: .3rem; background: white; color: var(--accent-dark); padding: .35rem .75rem; cursor: pointer; font: inherit; }
+.copy-status { margin-left: auto; }
+.evidence-status-summary { color: var(--muted); font-size: .86rem; }
+.evidence-details { margin-top: .75rem; }
+.result-plot-caption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; margin-top: .6rem; font-size: .85rem; color: var(--muted); }
+.external-repository-list { padding-left: 1.1rem; }
+.external-repository-entry { overflow-wrap: anywhere; margin: .4rem 0; }
+@media (min-width: 1380px) {
+  .reading-layout.has-toc { max-width: 1420px; display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+  .page-toc { position: sticky; top: 5rem; align-self: start; max-height: calc(100vh - 6rem); overflow: auto; }
+  .page-toc nav { display: grid; }
+}
+@media (max-width: 700px) {
+  .nav-shell { position: relative; }
+  .nav-links { justify-content: flex-start; gap: .7rem 1rem; font-size: .85rem; }
+  .nav-links { position: relative; }
+  .nav-group { position: static; }
+  .nav-menu { width: min(17rem, 100%); left: 0; right: auto; }
+  .start-path { grid-template-columns: 1fr; }
+  .version-strip { text-align: left; }
+  .hero { padding-top: 2.25rem; padding-bottom: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.start-path li a, .start-path li span { display: block; }
+.start-path li a { font-weight: 700; margin-bottom: .5rem; }
+
+.home-hero { padding-top: 2.75rem; padding-bottom: 2.5rem; }
+.home-hero h1 { font-size: clamp(2.3rem, 4.5vw, 3.5rem); }

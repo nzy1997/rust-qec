@@ -9,8 +9,8 @@
   <h1>RSMP v1</h1>
   <p class="hero-copy">Compress QEC measurement samples without losing the data needed to recover measurements, detectors, and observables.</p>
   <div class="rsmp-hero-grid" aria-label="Pinned RSMP compression result">
-    <article class="rsmp-metric primary"><span>RSMP / raw b8</span><strong>11.98%</strong><small>measured</small></article>
-    <article class="rsmp-metric"><span>RSMP / direct Zstd</span><strong>57.14%</strong><small>measured</small></article>
+    <article class="rsmp-metric primary"><span>RSMP / raw b8</span><strong>11.98%</strong><small>remaining size · lower is smaller</small></article>
+    <article class="rsmp-metric"><span>RSMP / direct Zstd</span><strong>57.14%</strong><small>remaining size · lower is smaller</small></article>
     <article class="rsmp-case"><span class="badge measured">Measured</span><p>Surface code d=11, rounds=100</p><small>1,024 shots</small></article>
   </div>
 </div>
@@ -46,8 +46,11 @@
 
 <section id="rsmp-workflow" class="rsmp-section" aria-labelledby="rsmp-workflow-title">
   <div class="section-heading"><p class="eyebrow">Run it</p><h2 id="rsmp-workflow-title">Pack and verify</h2></div>
-  <pre class="quick-command"><code>rstim pack_samples --circuit circuit.stim --in samples.b8 --in_format b8 --out samples.rsmp
+  {% include "partials/installed-example.html" %}
+  <pre class="quick-command"><code>rstim sample --in circuit.stim --shots 4 --out_format b8 --out samples.b8
+rstim pack_samples --circuit circuit.stim --shots 4 --in samples.b8 --in_format b8 --out samples.rsmp
 rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only</code></pre>
+  <p><strong>Expected:</strong> <code>samples.b8</code> contains four one-bit rows (4 bytes); <code>samples.rsmp</code> is created and verification exits successfully. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
 </section>
 
 <section id="rsmp-compression" class="rsmp-section" aria-labelledby="rsmp-compression-title">

@@ -12,6 +12,7 @@
 {% endblock hero %}
 
 {% block main %}
+<p class="content-links"><a href="../get-started/">First time here? Get started</a><a href="../validation/">How to interpret benchmark evidence</a></p>
 <section id="decoder-families" class="task-section" aria-labelledby="decoder-families-title">
   <div class="section-heading">
     <p class="eyebrow">Choose a decoder</p>
@@ -27,7 +28,8 @@
       </tbody>
     </table>
   </div>
-  <pre class="quick-command"><code>make surface-decoder-compare-smoke</code></pre>
+  <p class="doc-note">Source workflow: run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
+<pre class="quick-command"><code>make surface-decoder-compare-smoke</code></pre>
 </section>
 
 <section id="benchmark-campaigns" class="task-section" aria-labelledby="benchmark-campaigns-title">
@@ -55,7 +57,7 @@ make bb-circuit-bposd-compare-smoke</code></pre>
     <h2 id="decoder-results-title">Surface-code and BP-OSD comparisons</h2>
     <p class="section-copy">The checked plots show only their named cases. Full reproduction details are available inside each result.</p>
   </div>
-  <div class="evidence-stack decoder-evidence" data-evidence-items="surface-decoder-full bb-circuit-full rbposd-parity-gate" aria-live="polite">
+  <div class="evidence-stack decoder-evidence" data-evidence-items="surface-decoder-full bb-circuit-full" aria-live="polite">
     <p>Loading decoder evidence.</p>
   </div>
 </section>
@@ -65,9 +67,7 @@ make bb-circuit-bposd-compare-smoke</code></pre>
     <p class="eyebrow">Local workflow evidence</p>
     <h2 id="campaign-evidence-title">Smoke and readiness checks</h2>
   </div>
-  <div class="evidence-stack" data-evidence-items="surface-decoder-local-smoke bb-circuit-local-readiness" aria-live="polite">
-    <p>Loading campaign evidence.</p>
-  </div>
+  <p><a href="../validation/#local-workflows">Open local smoke and readiness evidence</a>. <a href="../validation/#historical-results">BP-OSD parity regression checks</a> are also listed in the evidence guide.</p>
 </section>
 {% endblock main %}
 
