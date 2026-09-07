@@ -110,6 +110,7 @@ PAGE_REQUIRED_ANCHORS = {
     "interactive/local/index.html": ("shot-viewer",),
 }
 REQUIRED_FILES = PAGE_FILES + JS_FILES + (
+    "install.sh",
     "styles.css",
     "data/benchmark-site.json",
     "QP101-ZY.md",
@@ -956,6 +957,7 @@ def make_fixture_site() -> SiteFixture:
 
     for relative, text in {
         "styles.css": "body { font-family: sans-serif; }\n",
+        "install.sh": "#!/bin/sh\nexit 0\n",
         "QP101-ZY.md": "# QP101-ZY\n",
         "qp101.schema.json": '{ "title": "QP101" }\n',
         "examples/basic.qp101.json": '{ "name": "basic" }\n',
