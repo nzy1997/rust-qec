@@ -101,7 +101,8 @@ sha256 = "863bde24be133bee991198220e9729af153595545dce640b093adac36ddf87cb"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_compiled_steady.py"
-sha256 = "7b4a70b0e38aea81efd7bfb3815e54e36122c5bbfc9c0c99294c396b2e8f03bc"
+# Current runner enables benchmark-tools when building the worker; recorded results are unchanged.
+sha256 = "087d613395ef8cbc62a16d13364c58dadd0b41f872756660dd4815b6d4076aff"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/workers/stim_compiled_steady.py"

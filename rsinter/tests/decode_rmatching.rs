@@ -60,3 +60,33 @@ fn rmatching_dem_decoder_returns_dimension_mismatch_as_error() {
 
     assert!(error.contains("detector count does not match the graph"));
 }
+
+#[test]
+fn rmatching_dem_decoder_preserves_minimum_declared_dimensions() {
+    let mut dem = DetectorErrorModel::new();
+    dem.set_min_counts(72, 12);
+    let compiled = RmatchingDemDecoder.compile_for_dem(&dem).unwrap();
+
+    let predictions = compiled
+        .decode_shots_bit_packed(&[0; 18], 2, 72, 12)
+        .unwrap();
+
+    assert_eq!(predictions, vec![0; 4]);
+}
+
+#[test]
+fn rmatching_dem_decoder_applies_minimum_detector_count_before_trailing_shift() {
+    let mut dem = DetectorErrorModel::new();
+    dem.set_min_counts(72, 1);
+    dem.add_shift_detectors(72, Vec::new());
+    let compiled = RmatchingDemDecoder.compile_for_dem(&dem).unwrap();
+
+    assert_eq!(
+        compiled.decode_shots_bit_packed(&[0; 9], 1, 72, 1).unwrap(),
+        vec![0]
+    );
+    let error = compiled
+        .decode_shots_bit_packed(&[0; 18], 1, 144, 1)
+        .unwrap_err();
+    assert!(error.contains("detector count does not match the graph"));
+}
