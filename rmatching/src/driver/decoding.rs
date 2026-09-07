@@ -202,6 +202,10 @@ impl Matching {
     /// Each detector and observable row is LSB-first and occupies
     /// `width.div_ceil(8)` bytes. Bits beyond the declared detector width in a
     /// row's final byte are ignored.
+    /// Detector bits use the original graph node indices, including positions
+    /// occupied by explicit boundary nodes (whose bits are ignored). `num_dets`
+    /// must cover every non-boundary node and cannot exceed the total node
+    /// count; trailing boundary nodes may be omitted.
     pub fn try_decode_shots_bit_packed(
         &mut self,
         dets: &[u8],
@@ -209,10 +213,15 @@ impl Matching {
         num_dets: usize,
         num_obs: usize,
     ) -> Result<Vec<u8>, PackedDecodeError> {
-        let graph_num_dets = self.user_graph.get_num_detectors();
-        if num_dets != graph_num_dets {
+        let required_width = self
+            .user_graph
+            .nodes
+            .iter()
+            .rposition(|node| !node.is_boundary)
+            .map_or(0, |index| index + 1);
+        if !(required_width..=self.user_graph.get_num_nodes()).contains(&num_dets) {
             return Err(PackedDecodeError::DetectorCountMismatch {
-                expected: graph_num_dets,
+                expected: required_width,
                 actual: num_dets,
             });
         }
