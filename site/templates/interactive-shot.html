@@ -11,7 +11,7 @@
 <div class="hero compact-hero shot-hero">
   <p class="eyebrow">Interactive circuit laboratory</p>
   <h1>{% if section.extra.mode == "local" %}Open a circuit on this device{% else %}Inspect one physical-error shot{% endif %}</h1>
-  <p class="hero-copy">The circuit stays fixed. Sampling replaces the whole shot; clicking an existing noise site changes only that realized outcome and recomputes everything downstream.</p>
+  <p class="hero-copy">Sample a physical-error shot, inspect its downstream results, or edit one existing noise outcome. Focus circuit expands the workspace for close inspection.</p>
   <p class="content-links">{% if section.extra.mode == "local" %}<a href="../">View the fixed example</a>{% else %}<a href="local/">Open your own local circuit</a>{% endif %}</p>
 </div>
 {% endblock hero %}

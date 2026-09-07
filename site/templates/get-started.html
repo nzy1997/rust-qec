@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Get started — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Get started</p><h1>Your first detector event</h1><p class="hero-copy">Install the v0.2.1 CLI, run a complete circuit, and check a deterministic result. No source checkout is needed for this path.</p></div>{% endblock hero %}
+{% block main %}
+<section class="task-section" aria-labelledby="install"><h2 id="install">1. Install a native package</h2>
+<p>Validated runtime environments: <strong>Ubuntu 24.04 x86_64</strong> and <strong>macOS 15 Apple silicon</strong>. Other platforms are outside the tested support matrix. Each archive contains <code>rustqec</code> and <code>rstim</code>.</p>
+<div class="content-links"><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.2.1/rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz">Linux x86_64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.2.1/rustqec-v0.2.1-aarch64-apple-darwin.tar.gz">macOS arm64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">Checksums and release manifest</a></div>
+<p>In a new terminal, use an empty working directory. This POSIX shell snippet selects the architecture, verifies the selected archive, and adds its binaries to <em>this terminal's</em> PATH. Keep this terminal open for the examples below.</p>
+<pre data-language="Shell · empty working directory"><code>set -eu
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) target=x86_64-unknown-linux-gnu ;;
+  Darwin-arm64) target=aarch64-apple-darwin ;;
+  *) echo "No validated native archive for this platform" &gt;&amp;2; exit 1 ;;
+esac
+base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
+archive="rustqec-v0.2.1-${target}.tar.gz"
+curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
+awk -v archive="$archive" '$2 == archive { n++; record=$0 } END { if(n != 1) exit 1; print record }' SHA256SUMS &gt; "$archive.sha256"
+if command -v sha256sum &gt;/dev/null; then
+  sha256sum -c "$archive.sha256"
+else
+  shasum -a 256 -c "$archive.sha256"
+fi
+tar -xzf "$archive"
+export PATH="$(pwd)/${archive%.tar.gz}/bin:$PATH"
+rustqec capabilities --format json</code></pre>
+<p><strong>Success:</strong> the checksum command reports <code>OK</code> and the capability JSON includes <code>circuit.stats</code>. If a checksum fails, stop and download a fresh archive.</p>
+</section>
+<section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Create and inspect a circuit</h2>
+{% include "partials/example-circuit.html" %}
+<pre data-language="Shell · installed CLI"><code>rustqec circuit stats --format json --in circuit.stim</code></pre>
+<p><strong>Expected fields in <code>result</code>:</strong> <code>instruction_count: 5</code>, <code>num_qubits: 1</code>, <code>num_measurements: 1</code>, <code>num_detectors: 1</code>, <code>num_observables: 1</code>.</p>
+</section>
+<section class="task-section" aria-labelledby="detector-output"><h2 id="detector-output">3. Sample and verify a detector event</h2>
+<pre data-language="Shell · installed CLI"><code>rstim detect --in circuit.stim --shots 1 --out_format dets
+rstim analyze_errors --in circuit.stim --out model.dem
+cat model.dem
+rstim sample_dem --in model.dem --shots 1 --out_format dets</code></pre>
+<pre data-output="true" data-language="Expected output"><code>shot D0 L0
+error(1) D0 L0
+shot D0 L0</code></pre>
+<p>The X error has probability 1. Both detector streams therefore contain D0 and logical observable L0. This small example verifies installation and the command path; it is not a numerical-performance benchmark.</p>
+<div class="content-links"><a href="../simulator/">Next: sample circuits</a><a href="../sampling-data/">Save training data</a><a href="../interactive/">Explore errors visually</a></div>
+</section>
+<section class="task-section" aria-labelledby="tools"><h2 id="tools">Which command should I use?</h2>
+<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Role</th><th>Setup</th></tr></thead><tbody><tr><td><code>rustqec</code></td><td>Unified capability discovery, structured circuit and dataset commands</td><td>Native archive</td></tr><tr><td><code>rstim</code></td><td>Simulator, DEM and circuit rendering commands</td><td>Native archive</td></tr><tr><td><code>qec-code</code>, <code>rsinter</code>, <code>make</code> workflows</td><td>Code construction and experiment harnesses</td><td>Source checkout and workflow-specific dependencies</td></tr></tbody></table></div>
+</section>
+<section class="task-section" aria-labelledby="source-build"><h2 id="source-build">Building from source</h2>
+<p>For a frozen source build, check out <code>v0.2.1</code>. Current development builds are tested with Rust 1.88.0 (MSRV) and stable on the two native targets above. Install Rust and the platform's native build dependencies before building.</p>
+<details><summary>Ubuntu 24.04 build prerequisites</summary><pre data-language="Shell · Ubuntu"><code>sudo apt-get update
+sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv</code></pre></details>
+<details><summary>macOS 15 build prerequisites</summary><pre data-language="Shell · macOS"><code>xcode-select --install
+brew install cmake fontconfig pkg-config python</code></pre><p>Homebrew must already be installed.</p></details>
+<pre data-language="Shell · source build"><code>git clone --branch v0.2.1 --depth 1 https://github.com/nzy1997/rust-qec.git
+cd rust-qec
+cargo build --locked --workspace
+export PATH="$(pwd)/target/debug:$PATH"</code></pre>
+<p>You can now run the same circuit example. Benchmark workflows may additionally need Python dependencies; use the setup guide linked from each workflow. The <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">development build guide</a> describes test prerequisites.</p>
+</section>
+<section class="task-section" aria-labelledby="versions"><h2 id="versions">Version and support boundaries</h2><p>This website follows <code>master</code>; the installed quickstart above targets <strong>v0.2.1</strong>. Source links labeled development may describe later changes. The repository release does not make all eleven crates version 0.2.1. Check the release manifest or Cargo metadata when selecting a library dependency.</p><p>Atom-loss envelope decoding is beta; experimental benchmark workflows do not establish universal performance or publication readiness. Read the <a href="../support/">support and migration contract</a> and <a href="../validation/">evidence guide</a> before applying results to another circuit.</p></section>
+{% endblock main %}

@@ -316,6 +316,50 @@ class SiteManifestTest(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_validation_page_can_own_historical_and_local_evidence(self) -> None:
+        repo, _, manifest_path = self.write_fixture_manifest()
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", manifest_path)
+
+        self.assertEqual(errors, [])
+        self.assertNotIn(
+            "data-evidence-items",
+            (repo / "_site/css-codes/index.html").read_text(encoding="utf-8"),
+        )
+
+    def test_rejects_missing_validation_evidence_page(self) -> None:
+        repo, _, manifest_path = self.write_fixture_manifest()
+        (repo / "_site/validation/index.html").unlink()
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", manifest_path)
+
+        self.assertTrue(
+            any("missing built site file validation/index.html" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_evidence_item_assigned_on_validation_and_feature_page(self) -> None:
+        repo, _, manifest_path = self.write_fixture_manifest()
+        css_codes = repo / "_site/css-codes/index.html"
+        css_codes.write_text(
+            css_codes.read_text(encoding="utf-8")
+            + '<section data-evidence-items="qec-code-smoke"></section>\n',
+            encoding="utf-8",
+        )
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", manifest_path)
+
+        self.assertTrue(
+            any(
+                "assigned more than once" in error
+                and "qec-code-smoke" in error
+                and "validation/index.html" in error
+                and "css-codes/index.html" in error
+                for error in errors
+            ),
+            errors,
+        )
+
     def write_fixture_manifest(self, remove_family: str | None = None, mutation: str | None = None):
         tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(tmpdir.cleanup)
@@ -334,6 +378,7 @@ class SiteManifestTest(unittest.TestCase):
         (root / "_site/detector-models").mkdir(parents=True)
         (root / "_site/decoding").mkdir(parents=True)
         (root / "_site/css-codes").mkdir(parents=True)
+        (root / "_site/validation").mkdir(parents=True)
         (root / "_site/js").mkdir(parents=True)
         (root / "benchmarks/out").mkdir(parents=True)
 
@@ -355,11 +400,11 @@ class SiteManifestTest(unittest.TestCase):
             path.write_text(RSTIM_EXPANDED_FIXTURE_CONTENT, encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
         (root / "_site/simulator/index.html").write_text(
-            '<section data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></section>\n',
+            "<section>Current simulator guide.</section>\n",
             encoding="utf-8",
         )
         (root / "_site/detector-models/index.html").write_text(
-            '<section data-evidence-items="rstim-vs-stim-full"></section>\n',
+            "<section>Current detector-model guide.</section>\n",
             encoding="utf-8",
         )
         (root / "_site/decoding/index.html").write_text(
@@ -367,7 +412,11 @@ class SiteManifestTest(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "_site/css-codes/index.html").write_text(
-            '<section data-evidence-items="qec-code-smoke"></section>\n',
+            "<section>Current CSS-code guide.</section>\n",
+            encoding="utf-8",
+        )
+        (root / "_site/validation/index.html").write_text(
+            '<section data-evidence-items="rstim-vs-stim-full rstim-perf-ci qec-code-smoke"></section>\n',
             encoding="utf-8",
         )
         (root / "_site/js/benchmarks.js").write_text(
@@ -976,6 +1025,26 @@ class SiteManifestTest(unittest.TestCase):
         errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
         self.assertTrue(
             any("not listed as a checked manifest artifact" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_validation_artifact_reference_not_listed_in_manifest(self) -> None:
+        repo, _, built_manifest_path = self.write_fixture_manifest()
+        validation = repo / "_site/validation/index.html"
+        validation.write_text(
+            validation.read_text(encoding="utf-8")
+            + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
+            encoding="utf-8",
+        )
+
+        errors = check_site_manifest.validate_site_root(repo / "_site", built_manifest_path)
+
+        self.assertTrue(
+            any(
+                "validation/index.html" in error
+                and "not listed as a checked manifest artifact" in error
+                for error in errors
+            ),
             errors,
         )
 

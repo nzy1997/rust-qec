@@ -17,8 +17,10 @@
     <p class="eyebrow">Run it</p>
     <h2 id="dem-extraction-title">Analyze once, sample directly</h2>
   </div>
+  {% include "partials/installed-example.html" %}
   <pre class="quick-command"><code>rstim analyze_errors --in circuit.stim --out model.dem
-rstim sample_dem --in model.dem --shots 1000 --out_format dets</code></pre>
+rstim sample_dem --in model.dem --shots 1 --out_format dets</code></pre>
+  <p><strong>Expected:</strong> <code>model.dem</code> contains <code>error(1) D0 L0</code>; sampling prints <code>shot D0 L0</code>. <a href="../decoding/">Next: choose a decoder</a>.</p>
 </section>
 
 <section class="task-section" aria-labelledby="dem-results-title">
@@ -26,14 +28,15 @@ rstim sample_dem --in model.dem --shots 1000 --out_format dets</code></pre>
     <p class="eyebrow">Example results</p>
     <h2 id="dem-results-title">Detection and DEM sampling</h2>
   </div>
+  <p>These are separate, recorded workloads. Compare implementations only within the same workload and metric; reproduction details and limits are below.</p>
   <div class="table-wrap result-table">
     <table>
-      <thead><tr><th>Workload</th><th>Implementation</th><th>Result</th></tr></thead>
+      <thead><tr><th>Workload</th><th>Implementation</th><th>Metric</th><th>Result</th></tr></thead>
       <tbody>
-        <tr><td>Surface d=13, r=13 detect</td><td>rstim compiled</td><td>34.339 ms</td></tr>
-        <tr><td>Surface d=13, r=13 detect</td><td>Stim CLI</td><td>266.172 ms</td></tr>
-        <tr><td>Surface d=11, r=100 DEM sample</td><td>rstim</td><td>329 shots/s</td></tr>
-        <tr><td>Surface d=11, r=100 DEM sample</td><td>Stim</td><td>2,669 shots/s</td></tr>
+        <tr><td>Surface d=13, r=13 detect</td><td>rstim compiled</td><td>Elapsed time · lower is better</td><td>34.339 ms</td></tr>
+        <tr><td>Surface d=13, r=13 detect</td><td>Stim CLI</td><td>Elapsed time · lower is better</td><td>266.172 ms</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>rstim</td><td>Throughput · higher is better</td><td>329 shots/s</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>Stim</td><td>Throughput · higher is better</td><td>2,669 shots/s</td></tr>
       </tbody>
     </table>
   </div>

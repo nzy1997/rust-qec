@@ -12,36 +12,58 @@
     <link rel="stylesheet" href="{{ root }}/styles.css">
     {% block head %}{% endblock head %}
   </head>
-  <body data-root="{{ root }}">
-    <header class="site-header">
+  <body data-root="{{ root }}" data-page="{{ current_nav }}">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="nav-shell" id="top">
+
       <nav class="top-nav" aria-label="Primary">
         <a class="brand" href="{{ root }}/" aria-label="RustQEC home">
           <span class="brand-mark">R</span>
           <span>RustQEC</span>
         </a>
         <div class="nav-links">
-          <a class="nav-link{% if current_nav == "home" %} current{% endif %}" href="{{ root }}/"{% if current_nav == "home" %} aria-current="page"{% endif %}>Home</a>
-          <a class="nav-link{% if current_nav == "simulate" %} current{% endif %}" href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate</a>
-          <a class="nav-link{% if current_nav == "data" %} current{% endif %}" href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Data</a>
-          <a class="nav-link{% if current_nav == "dems" %} current{% endif %}" href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>DEMs</a>
-          <a class="nav-link{% if current_nav == "decode" %} current{% endif %}" href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decode</a>
-          <a class="nav-link{% if current_nav == "css" %} current{% endif %}" href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS Codes</a>
-          <a class="nav-link{% if current_nav == "rsmp" %} current{% endif %}" href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP v1</a>
-          <a class="nav-link{% if current_nav == "qp101" %} current{% endif %}" href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>QP101</a>
+          <a class="nav-link{% if current_nav == "start" %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
+          <details class="nav-group"{% if current_nav in ["simulate", "data", "dems", "decode", "css"] %} data-current="true"{% endif %}>
+            <summary>Guides</summary>
+            <div class="nav-menu">
+              <a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate circuits</a>
+              <a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Data</a>
+              <a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
+              <a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decode</a>
+              <a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>Construct CSS codes</a>
+            </div>
+          </details>
+          <details class="nav-group"{% if current_nav in ["qp101", "protocol", "rsmp", "support"] %} data-current="true"{% endif %}>
+            <summary>Reference</summary>
+            <div class="nav-menu">
+              <a href="{{ root }}/support/"{% if current_nav == "support" %} aria-current="page"{% endif %}>Support &amp; compatibility</a>
+              <a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>Sample archives · RSMP v1</a>
+              <a href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>Circuit diagrams · QP101</a>
+              <a href="{{ root }}/qp101/protocol/"{% if current_nav == "protocol" %} aria-current="page"{% endif %}>QP101 format specification</a>
+            </div>
+          </details>
+          <a class="nav-link{% if current_nav == "evidence" %} current{% endif %}" href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Performance &amp; validation</a>
           <a class="nav-link{% if current_nav == "shot" %} current{% endif %}" href="{{ root }}/interactive/"{% if current_nav == "shot" %} aria-current="page"{% endif %}>Shot Lab</a>
         </div>
       </nav>
+    </div>
+    <div class="version-strip">Development docs (master) <span aria-hidden="true">·</span> <a href="{{ root }}/get-started/#install">Install v0.2.1</a> <span aria-hidden="true">·</span> <a href="{{ root }}/support/">Support &amp; migration</a></div>
+    <header class="site-header">
       {% block hero %}{% endblock hero %}
     </header>
 
-    <main>
+    <div class="reading-layout">
+    <aside class="page-toc" aria-label="On this page" hidden><p>On this page</p><nav></nav></aside>
+    <main id="main" tabindex="-1">
     {% block main %}{% endblock main %}
     </main>
+    </div>
 
     <footer class="site-footer">
       <span>RustQEC — a quantum error correction workspace in Rust</span>
-      <a href="https://github.com/nzy1997/rust-qec">Repository</a>
+      <div class="footer-links"><a href="{{ root }}/get-started/">Get started</a><a href="{{ root }}/support/">Support</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">Release notes</a><a href="https://github.com/nzy1997/rust-qec">Repository</a><a href="#top">Back to top</a></div>
     </footer>
+    <script src="{{ root }}/js/docs.js" defer></script>
     {% block scripts %}{% endblock scripts %}
   </body>
 </html>

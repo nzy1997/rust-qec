@@ -17,9 +17,10 @@ on:
       - "rstim-shot-web/**"
       - "tools/build_shot_viewer.sh"
       - "tools/shot_viewer_assets.py"
-      - "site/content/interactive/**"
-      - "site/static/interactive/**"
-      - "site/templates/interactive-shot.html"
+      - "tools/prepare_site_docs.py"
+      - "docs/support-compatibility.md"
+      - "rstim/doc/QP101-ZY.md"
+      - "site/**"
       - "web/shot-viewer/**"
       - "fuzz/**"
       - ".github/workflows/interactive-shot-quality.yml"
@@ -55,11 +56,14 @@ jobs:
         run: |
           cargo install wasm-bindgen-cli --version 0.2.126 --locked
           curl -fsSL https://github.com/getzola/zola/releases/download/v0.22.1/zola-v0.22.1-x86_64-unknown-linux-gnu.tar.gz | sudo tar -xz -C /usr/local/bin zola
+      - name: Check documentation build contracts
+        run: python3 -m unittest tools.test_prepare_site_docs tools.test_site_app_rendering tools.test_check_site_build tools.test_check_site_manifest
       - name: Build site and install browsers
         run: |
           cargo test -p rstim --test interactive_shot_properties
           cargo test -p rstim-shot-web
           make build-site
+          python3 tools/check_site_build.py _site --repo-root .
           npm --prefix web/shot-viewer ci
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
           for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
@@ -70,6 +74,14 @@ jobs:
           timeout 10m npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
       - name: Run browser and export tests
         run: npm --prefix web/shot-viewer run test:e2e
+      - name: Upload browser review screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-browser-review
+          path: web/shot-viewer/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
 
   fuzz-smoke:
     runs-on: ubuntu-latest
