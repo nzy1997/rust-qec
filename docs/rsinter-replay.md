@@ -5,7 +5,7 @@ is deliberately separate from sampling and scoring: the command reads only a
 detector error model and detector rows, and cannot inspect observable answers.
 
 ```sh
-cargo run --release -p rsinter -- replay \
+cargo run --release -p rsinter --features rbposd-runner -- replay \
   --dem model.dem \
   --dets detectors.b8 \
   --decoder rbposd \

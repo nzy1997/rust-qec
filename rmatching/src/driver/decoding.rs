@@ -2,6 +2,44 @@ use crate::driver::dem_parse::parse_dem;
 use crate::driver::user_graph::UserGraph;
 use crate::matcher::mwpm::{MatchingResult, Mwpm};
 use crate::types::*;
+use std::fmt;
+
+/// Errors returned when decoding a batch of bit-packed shots.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PackedDecodeError {
+    DetectorCountMismatch { expected: usize, actual: usize },
+    ObservableCountMismatch { expected: usize, actual: usize },
+    BufferSizeOverflow { num_shots: usize, row_bytes: usize },
+    DetectorBufferLengthMismatch { expected: usize, actual: usize },
+}
+
+impl fmt::Display for PackedDecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DetectorCountMismatch { expected, actual } => write!(
+                f,
+                "detector count does not match the graph: expected {expected}, got {actual}"
+            ),
+            Self::ObservableCountMismatch { expected, actual } => write!(
+                f,
+                "observable count does not match the graph: expected {expected}, got {actual}"
+            ),
+            Self::BufferSizeOverflow {
+                num_shots,
+                row_bytes,
+            } => write!(
+                f,
+                "packed batch size overflows usize: {num_shots} shots times {row_bytes} bytes per shot"
+            ),
+            Self::DetectorBufferLengthMismatch { expected, actual } => write!(
+                f,
+                "detector buffer length mismatch: expected {expected} bytes, got {actual}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PackedDecodeError {}
 
 /// Public-facing decoder wrapping a `UserGraph` and its cached `Mwpm`.
 pub struct Matching {
@@ -142,6 +180,12 @@ impl Matching {
     }
 
     /// Decode bit-packed syndromes into bit-packed observable predictions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the supplied dimensions do not match the graph, if the packed
+    /// buffer length is invalid, or if the requested batch size overflows
+    /// `usize`. Use [`Self::try_decode_shots_bit_packed`] to handle these errors.
     pub fn decode_shots_bit_packed(
         &mut self,
         dets: &[u8],
@@ -149,10 +193,60 @@ impl Matching {
         num_dets: usize,
         num_obs: usize,
     ) -> Vec<u8> {
+        self.try_decode_shots_bit_packed(dets, num_shots, num_dets, num_obs)
+            .unwrap_or_else(|error| panic!("invalid packed decode input: {error}"))
+    }
+
+    /// Decode bit-packed syndromes after validating the batch shape.
+    ///
+    /// Each detector and observable row is LSB-first and occupies
+    /// `width.div_ceil(8)` bytes. Bits beyond the declared detector width in a
+    /// row's final byte are ignored.
+    pub fn try_decode_shots_bit_packed(
+        &mut self,
+        dets: &[u8],
+        num_shots: usize,
+        num_dets: usize,
+        num_obs: usize,
+    ) -> Result<Vec<u8>, PackedDecodeError> {
+        let graph_num_dets = self.user_graph.get_num_detectors();
+        if num_dets != graph_num_dets {
+            return Err(PackedDecodeError::DetectorCountMismatch {
+                expected: graph_num_dets,
+                actual: num_dets,
+            });
+        }
+        let graph_num_observables = self.graph_num_observables();
+        if num_obs != graph_num_observables {
+            return Err(PackedDecodeError::ObservableCountMismatch {
+                expected: graph_num_observables,
+                actual: num_obs,
+            });
+        }
+
         let det_bytes = num_dets.div_ceil(8);
         let obs_bytes = num_obs.div_ceil(8);
-        let mut out = vec![0u8; num_shots * obs_bytes];
-        let graph_num_observables = self.graph_num_observables();
+        let expected_dets_len =
+            num_shots
+                .checked_mul(det_bytes)
+                .ok_or(PackedDecodeError::BufferSizeOverflow {
+                    num_shots,
+                    row_bytes: det_bytes,
+                })?;
+        if dets.len() != expected_dets_len {
+            return Err(PackedDecodeError::DetectorBufferLengthMismatch {
+                expected: expected_dets_len,
+                actual: dets.len(),
+            });
+        }
+        let out_len =
+            num_shots
+                .checked_mul(obs_bytes)
+                .ok_or(PackedDecodeError::BufferSizeOverflow {
+                    num_shots,
+                    row_bytes: obs_bytes,
+                })?;
+        let mut out = vec![0u8; out_len];
         let mut packed_prediction = Vec::new();
 
         for shot in 0..num_shots {
@@ -171,7 +265,7 @@ impl Matching {
             truncate_obs_bytes_in_place(shot_out, num_obs, graph_num_observables);
         }
 
-        out
+        Ok(out)
     }
 
     pub fn graph_num_observables(&mut self) -> usize {
@@ -607,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_num_observables_ignores_declared_but_unused_dem_observables() {
+    fn graph_num_observables_includes_declared_but_unused_dem_observables() {
         let mut matching = Matching::from_dem(
             "\
 error(0.1) D0 L0
@@ -617,7 +711,7 @@ logical_observable L8
         )
         .unwrap();
 
-        assert_eq!(matching.graph_num_observables(), 1);
+        assert_eq!(matching.graph_num_observables(), 9);
     }
 
     #[test]

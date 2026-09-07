@@ -61,7 +61,7 @@ jobs:
           cargo test --locked -p rsinter --no-default-features --features rbposd-runner
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
-      - run: cargo test --locked --workspace
+      - run: cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
   checked-evidence-portability:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -219,7 +219,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
-        run: cargo llvm-cov --locked --workspace --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
+        run: cargo llvm-cov --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

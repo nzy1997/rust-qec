@@ -222,10 +222,15 @@ jobs:
           python3 source/tools/shot_viewer_assets.py
       - name: Build the two native CLIs from the locked source
         run: |
+          # Earlier immutable tags predate the optional ILP feature.
+          full_features=()
+          if python3 -c 'import tomllib; d=tomllib.load(open("source/rustqec-cli/Cargo.toml", "rb")); raise SystemExit(0 if "ilp" in d.get("features", {}) else 1)'; then
+            full_features=(--features rustqec-cli/ilp)
+          fi
           "$CARGO" build --locked --release \
             --manifest-path source/Cargo.toml \
             -p rustqec-cli --bin rustqec \
-            -p rstim --bin rstim
+            -p rstim --bin rstim "${full_features[@]}"
       - name: Record native runtime linkage
         run: |
           if [ "$RUNNER_OS" = Linux ]; then

@@ -7,9 +7,15 @@ from benchmarks.bb_circuit_bposd_compare.cases import (
     BB72_BB144_PLOT_SMOKE_CASES,
 )
 from benchmarks.bb_circuit_bposd_compare.run_compare import (
+    _rust_plot_command,
     main,
     run_batched_suite,
 )
+
+
+def test_default_plot_command_enables_plotting_feature(tmp_path):
+    command = _rust_plot_command(tmp_path / "results.csv", tmp_path / "plot.png")
+    assert command[command.index("--features") + 1] == "plotting"
 
 
 def _fake_export(case):

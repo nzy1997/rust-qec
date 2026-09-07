@@ -4,12 +4,19 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/rilpqec"
+description = "Experimental ILP decoding of quantum detector error models"
+publish = false
+include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 
 [features]
 default = []
 gurobi = ["qec-ilp-core/gurobi"]
 
 [dependencies]
-rstim = { path = "../rstim" }
+rstim = { version = "0.2.1", path = "../rstim" }
 thiserror = "2"
-qec-ilp-core = { path = "../qec-ilp-core" }
+qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core" }

@@ -42,7 +42,7 @@ help:
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
-	cargo test --locked --workspace
+	cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
 
 check:
 	cargo check --locked --workspace
@@ -77,35 +77,35 @@ build-site: build-shot-viewer
 	python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json
 
 bench-surface-smoke:
-	cargo run --locked -p rsinter --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust
 	.venv-surface-decoder/bin/python -m benchmarks.python_runners.surface_decoder.run --spec benchmarks/surface_decoder/spec.toml --language python --out benchmarks/out/surface_decoder/smoke-python
-	cargo run --locked -p rsinter --bin rsinter -- bench merge --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/smoke-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/smoke.jsonl
-	cargo run --locked -p rsinter --bin rsinter -- bench plot --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/merged/smoke.jsonl --out benchmarks/out/surface_decoder/plots/smoke.svg
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench merge --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/smoke-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/smoke.jsonl
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/merged/smoke.jsonl --out benchmarks/out/surface_decoder/plots/smoke.svg
 
 bench-surface-full:
-	cargo run --locked -p rsinter --bin rsinter -- bench run --spec benchmarks/surface_decoder/full.toml --language rust --out benchmarks/out/surface_decoder/full-rust
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench run --spec benchmarks/surface_decoder/full.toml --language rust --out benchmarks/out/surface_decoder/full-rust
 	.venv-surface-decoder/bin/python -m benchmarks.python_runners.surface_decoder.run --spec benchmarks/surface_decoder/full.toml --language python --out benchmarks/out/surface_decoder/full-python
-	cargo run --locked -p rsinter --bin rsinter -- bench merge --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/full-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/full.jsonl
-	cargo run --locked -p rsinter --bin rsinter -- bench plot --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/merged/full.jsonl --out benchmarks/out/surface_decoder/plots/full.svg
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench merge --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/full-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/full.jsonl
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/merged/full.jsonl --out benchmarks/out/surface_decoder/plots/full.svg
 
 surface-decoder-compare-smoke:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier smoke
-	cargo run --locked -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/spec.toml --input benchmarks/surface_decoder_compare/results/smoke/results.csv --out benchmarks/surface_decoder_compare/results/smoke/surface_decoder_compare.png
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/spec.toml --input benchmarks/surface_decoder_compare/results/smoke/results.csv --out benchmarks/surface_decoder_compare/results/smoke/surface_decoder_compare.png
 
 surface-decoder-compare-full:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier full
-	cargo run --locked -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/full.toml --input benchmarks/surface_decoder_compare/results/full/results.csv --out benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png
+	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/full.toml --input benchmarks/surface_decoder_compare/results/full/results.csv --out benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png
 
 bb-circuit-bposd-compare-smoke:
 	python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke
 	python3 -m benchmarks.bb_circuit_bposd_compare.verify_smoke benchmarks/bb_circuit_bposd_compare/results/smoke/results.csv
 
 bb-circuit-bposd-compare-plot-smoke:
-	cargo build --locked --release -p rsinter
+	cargo build --locked --release -p rsinter --features full
 	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/plot-smoke --rust-binary target/release/rsinter --batch-size 10
 
 bb-circuit-bposd-compare-full:
-	cargo build --locked --release -p rsinter
+	cargo build --locked --release -p rsinter --features full
 	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier full --output-dir benchmarks/bb_circuit_bposd_compare/results/full --rust-binary target/release/rsinter --batch-size 500
 
 qec-code-random-window-bench-smoke:

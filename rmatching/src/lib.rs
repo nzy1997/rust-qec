@@ -6,7 +6,7 @@ pub mod matcher;
 pub mod search;
 pub mod driver;
 
-pub use driver::decoding::Matching;
+pub use driver::decoding::{Matching, PackedDecodeError};
 
 #[cfg(test)]
 pub mod test_alloc;

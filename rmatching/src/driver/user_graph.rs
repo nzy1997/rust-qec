@@ -65,6 +65,37 @@ impl UserGraph {
         }
     }
 
+    pub(crate) fn declare_observable(&mut self, observable: usize) -> Result<(), String> {
+        let count = observable
+            .checked_add(1)
+            .ok_or_else(|| format!("observable index {observable} is too large"))?;
+        self.num_observables = self.num_observables.max(count);
+        Ok(())
+    }
+
+    fn record_dem_dimensions(
+        &mut self,
+        detectors: &[usize],
+        observables: &[usize],
+    ) -> Result<(), String> {
+        if let Some(&max_detector) = detectors.iter().max() {
+            let required_len = max_detector
+                .checked_add(1)
+                .ok_or_else(|| format!("detector index {max_detector} is too large"))?;
+            if required_len > self.nodes.len() {
+                let additional = required_len - self.nodes.len();
+                self.nodes.try_reserve(additional).map_err(|_| {
+                    format!("detector index {max_detector} exceeds supported graph capacity")
+                })?;
+                self.nodes.resize_with(required_len, UserNode::default);
+            }
+        }
+        for &observable in observables {
+            self.declare_observable(observable)?;
+        }
+        Ok(())
+    }
+
     /// Add an edge between two detector nodes.
     pub fn add_edge(
         &mut self,
@@ -134,8 +165,7 @@ impl UserGraph {
 
     /// Whether a node index represents a boundary node.
     pub fn is_boundary_node(&self, node_id: usize) -> bool {
-        node_id == usize::MAX
-            || (node_id < self.nodes.len() && self.nodes[node_id].is_boundary)
+        node_id == usize::MAX || (node_id < self.nodes.len() && self.nodes[node_id].is_boundary)
     }
 
     /// Maximum absolute weight across all edges.
@@ -150,15 +180,9 @@ impl UserGraph {
     ///
     /// If all weights are integral, returns 1.0.
     /// Otherwise: `(num_distinct_weights - 1) / max_abs_weight`.
-    fn get_edge_weight_normalising_constant(
-        &self,
-        num_distinct_weights: Weight,
-    ) -> f64 {
+    fn get_edge_weight_normalising_constant(&self, num_distinct_weights: Weight) -> f64 {
         let max_abs = self.max_abs_weight();
-        let all_integral = self
-            .edges
-            .iter()
-            .all(|e| e.weight.round() == e.weight);
+        let all_integral = self.edges.iter().all(|e| e.weight.round() == e.weight);
         if all_integral {
             1.0
         } else {
@@ -177,12 +201,8 @@ impl UserGraph {
     }
 
     /// Convert to a `MatchingGraph` with discretized weights.
-    pub fn to_matching_graph(
-        &self,
-        num_distinct_weights: Weight,
-    ) -> MatchingGraph {
-        let mut mg =
-            MatchingGraph::new(self.nodes.len(), self.num_observables);
+    pub fn to_matching_graph(&self, num_distinct_weights: Weight) -> MatchingGraph {
+        let mut mg = MatchingGraph::new(self.nodes.len(), self.num_observables);
         let norm = self.get_edge_weight_normalising_constant(num_distinct_weights);
 
         // Collect boundary edges per node, keeping only the smallest signed weight
@@ -235,12 +255,8 @@ impl UserGraph {
     }
 
     /// Convert to a `SearchGraph` with discretized weights.
-    pub fn to_search_graph(
-        &self,
-        num_distinct_weights: Weight,
-    ) -> SearchGraph {
-        let mut sg =
-            SearchGraph::new(self.nodes.len(), self.num_observables);
+    pub fn to_search_graph(&self, num_distinct_weights: Weight) -> SearchGraph {
+        let mut sg = SearchGraph::new(self.nodes.len(), self.num_observables);
         let norm = self.get_edge_weight_normalising_constant(num_distinct_weights);
 
         // Collect boundary edges per node, keeping only the smallest signed weight
@@ -310,15 +326,18 @@ impl UserGraph {
         detectors: &[usize],
         observables: Vec<usize>,
     ) -> Result<(), String> {
+        if !p.is_finite() || p < 0.0 || p >= 1.0 {
+            return Err(format!(
+                "rmatching requires finite error probabilities in the range 0 <= p < 1, got {p}"
+            ));
+        }
+        self.record_dem_dimensions(detectors, &observables)?;
+        if p == 0.0 {
+            return Ok(());
+        }
         let weight = ((1.0 - p) / p).ln();
         match detectors.len() {
-            2 => self.add_edge(
-                detectors[0],
-                detectors[1],
-                observables,
-                weight,
-                p,
-            ),
+            2 => self.add_edge(detectors[0], detectors[1], observables, weight, p),
             1 => self.add_boundary_edge(detectors[0], observables, weight, p),
             0 => {}
             count => {

@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "rustqec-consumer-example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+rand = "0.8"
+rmatching = "0.2.1"
+rstim = "0.2.1"
