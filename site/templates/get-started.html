@@ -5,7 +5,14 @@
 <section class="task-section" aria-labelledby="install"><h2 id="install">1. Install a native package</h2>
 <p>Validated runtime environments: <strong>Ubuntu 24.04 x86_64</strong> and <strong>macOS 15 Apple silicon</strong>. Other platforms are outside the tested support matrix. Each archive contains <code>rustqec</code> and <code>rstim</code>.</p>
 <div class="content-links"><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.2.1/rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz">Linux x86_64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.2.1/rustqec-v0.2.1-aarch64-apple-darwin.tar.gz">macOS arm64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">Checksums and release manifest</a></div>
-<p>In a new terminal, use an empty working directory. This POSIX shell snippet selects the architecture, verifies the selected archive, and adds its binaries to <em>this terminal's</em> PATH. Keep this terminal open for the examples below.</p>
+<p>The installer downloads the prebuilt <code>rustqec</code> and <code>rstim</code> binaries, checks their pinned SHA-256, and installs them into <code>~/.local/bin</code>. You do not need Rust or a source checkout.</p>
+<pre data-language="Shell · install v0.2.1"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
+<p>If <code>~/.local/bin</code> is not already in your PATH, run this once in the terminal you will use for the examples:</p>
+<pre data-language="Shell · current terminal"><code>export PATH="$HOME/.local/bin:$PATH"</code></pre>
+<p>The installer prints the installation location and any required PATH setup. It does not use <code>sudo</code> or edit your shell configuration. Use an empty working directory for the circuit files in step 2.</p>
+<div class="content-links"><a href="../install.sh">Inspect the installer</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">Download an archive manually</a></div>
+<details><summary>Manual download and checksum verification</summary>
+<p>Use an empty working directory. This alternative downloads and checks the archive manually, then adds the extracted binaries to this terminal's PATH.</p>
 <pre data-language="Shell · empty working directory"><code>set -eu
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) target=x86_64-unknown-linux-gnu ;;
@@ -25,6 +32,9 @@ tar -xzf "$archive"
 export PATH="$(pwd)/${archive%.tar.gz}/bin:$PATH"
 rustqec capabilities --format json</code></pre>
 <p><strong>Success:</strong> the checksum command reports <code>OK</code> and the capability JSON includes <code>circuit.stats</code>. If a checksum fails, stop and download a fresh archive.</p>
+</details>
+<pre data-language="Shell · check installation"><code>rustqec capabilities --format json</code></pre>
+<p><strong>Success:</strong> the capability JSON includes <code>circuit.stats</code>. Both installed commands are ready for the example below.</p>
 </section>
 <section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Create and inspect a circuit</h2>
 {% include "partials/example-circuit.html" %}
